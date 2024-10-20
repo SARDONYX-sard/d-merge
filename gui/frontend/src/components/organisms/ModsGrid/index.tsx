@@ -1,0 +1,1 @@
+export { ModsGrid } from './ModsGrid';

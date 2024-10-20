@@ -1,0 +1,54 @@
+[package]
+name = "d_merge"
+version.workspace = true
+description = "d-merge GUI"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["skyrim", "gui"]
+license.workspace = true
+readme = "./readme.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[package.metadata.dist]
+dist = false # To run CI and build separately from CLI (cargo dist)
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2.0.1", features = [] }
+
+[dependencies]
+chrono = "0.4.38"
+once_cell = { workspace = true }
+serde = { workspace = true }                           # Implement (De)Serializer
+serde_hkx_features = { workspace = true }
+serde_json = { workspace = true }                      # To avoid generate_context error.
+snafu = { workspace = true }                           # Implement error types
+tauri = { version = "2.0.2", features = ["devtools"] } # For GUI
+tauri-plugin-dialog = "2.0.1"                          # https://github.com/tauri-apps/plugins-workspace
+tauri-plugin-fs = "2.0.1"
+tauri-plugin-shell = "2.0.1"
+tauri-plugin-window-state = "2.0.1"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# worksapce members
+d_merge_core = { workspace = true }
+
+[dev-dependencies]
+temp-dir = "0.1.14"
+pretty_assertions = { workspace = true }
+quick_tracing = { workspace = true }
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
+# If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+
+[lints]
+workspace = true

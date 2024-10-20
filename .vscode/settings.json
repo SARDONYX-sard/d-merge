@@ -1,0 +1,37 @@
+{
+  "[css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json][jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.codeActionsOnSave": {
+    "quickfix.biome": "explicit",
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.sortJSON": "never",
+    "source.organizeImports.biome": "explicit"
+  },
+  "evenBetterToml.formatter.alignComments": true,
+  // "editor.formatOnSave": false,
+  "files.exclude": {
+    ".swc": true,
+    "**/node_modules": true // optional
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/node_modules/**": true,
+    "**/target/**": true
+  },
+  "i18n-ally.keystyle": "nested",
+  "rust-analyzer.cargo.targetDir": true,
+  "rust-analyzer.check.command": "clippy",
+  // "rust-analyzer.imports.granularity.group": "item",
+  // "rust-analyzer.imports.group.enable": false,
+  "rust-analyzer.linkedProjects": ["Cargo.toml"]
+}
