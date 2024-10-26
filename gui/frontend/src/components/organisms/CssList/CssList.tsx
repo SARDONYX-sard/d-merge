@@ -3,16 +3,16 @@ import { type SelectChangeEvent, Tooltip } from '@mui/material';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { useCssContext } from '@/components/providers/CssProvider';
-import { CSS_PRESETS } from '@/lib/css';
+import { CSS } from '@/lib/css';
 
 export const CssList = () => {
   const { t } = useTranslation();
   const { preset, setPreset, setCss } = useCssContext();
 
   const handleChange = (e: SelectChangeEvent<string>) => {
-    const presetN = CSS_PRESETS.normalize(e.target.value);
+    const presetN = CSS.normalize(e.target.value);
     setPreset(presetN);
-    setCss(CSS_PRESETS.getPreset(presetN));
+    setCss(CSS.css.get(presetN));
   };
 
   const title = (

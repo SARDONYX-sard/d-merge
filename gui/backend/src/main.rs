@@ -24,7 +24,7 @@ fn main() {
             crate::cmd::load_activate_mods,
             crate::cmd::load_mods_info,
             crate::cmd::patch,
-            crate::cmd::convert,
+            crate::cmd::convert::convert,
             crate::cmd::write_file,
         ])
         .setup(|app| Ok(crate::log::init(app)?))

@@ -4,14 +4,21 @@ import { type MouseEventHandler, useState } from 'react';
 
 import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { ConvertForm } from '@/components/organisms/ConvertForm';
-import { ConvertProvider, useConvertContext } from '@/components/organisms/ConvertForm/ConvertProvider';
+import {
+  ConvertProvider,
+  type ConvertStatusPayload,
+  useConvertContext,
+} from '@/components/organisms/ConvertForm/ConvertProvider';
 import { ConvertNav } from '@/components/organisms/ConvertNav';
 import { NOTIFY } from '@/lib/notify';
 import { convert } from '@/services/api/serde_hkx';
+import { listen } from '@tauri-apps/api/event';
 
 const sx: SxProps<Theme> = {
   display: 'grid',
-  placeContent: 'center',
+  paddingTop: '5%',
+  alignItems: 'top',
+  justifyItems: 'center',
   minHeight: 'calc(100vh - 56px)',
   width: '100%',
 };
@@ -30,13 +37,30 @@ export const Convert = () => {
 
 const ConvertInner = () => {
   const [loading, setLoading] = useState(false);
-  const { input, output, fmt } = useConvertContext();
+  const { selectedFiles, selectedDirs, output, fmt, selectionType, setConvertStatuses } = useConvertContext();
+  const inputs = selectionType === 'dir' ? selectedDirs : selectedFiles;
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
-    setLoading(true);
-    await NOTIFY.asyncTry(async () => await convert(input, output, fmt));
-    setLoading(false);
-    NOTIFY.success(`Converted ${input}\n -> ${output}`);
+    const eventHandler = (event: { payload: ConvertStatusPayload }) => {
+      setConvertStatuses((prev) => {
+        const { pathId, status } = event.payload;
+        prev.set(pathId, status);
+        // NOTE: As with Object, if the same reference is returned,
+        // the value is not recognized as updated! So we need to call a new constructor sequentially.
+        return new Map(prev);
+      });
+    };
+
+    const unlisten = await listen('d_merge://progress/convert', eventHandler);
+    try {
+      setLoading(true);
+      await convert(inputs, output, fmt);
+    } catch (e) {
+      NOTIFY.error(`${e}`);
+    } finally {
+      unlisten();
+      setLoading(false);
+    }
   };
 
   return (

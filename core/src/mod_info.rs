@@ -21,7 +21,7 @@ where
 }
 
 /// # Note
-/// - Intended `Nemesis_Engine/mod/<id>/info.ini`
+/// - Intended `Nemesis_Engine/mods/<id>/info.ini`
 /// - `priority`: As with MO2, lower numbers indicate lower priority, higher numbers indicate higher priority.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModInfo {
@@ -58,7 +58,7 @@ pub type PriorityMap = HashMap<String, usize>;
 
 pub trait GetModsInfo {
     /// Get `info.ini` and store it in a [`IndexMap`] using `<id>` as the key.
-    /// - Intended `Nemesis_Engine/mod/<id>/info.ini`
+    /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
     ///
     /// # Errors
     /// If invalid glob pattern.
@@ -123,7 +123,7 @@ impl GetModsInfo for ModsInfo {
     }
 }
 
-/// Get `<id>` from `Nemesis_Engine/mod/<id>/info.ini`
+/// Get `<id>` from `Nemesis_Engine/mods/<id>/info.ini`
 #[inline]
 fn extract_id_from_path(path: impl AsRef<Path>) -> Option<String> {
     path.as_ref()
@@ -153,10 +153,10 @@ mod tests {
             assert_eq!(extract_id_from_path(path), id.map(|s| s.to_string()));
         }
 
-        assert_eq_id("Nemesis_Engine/mod/123/info.ini", Some("123"));
-        assert_eq_id("Nemesis_Engine/mod/test_mod/info.ini", Some("test_mod"));
+        assert_eq_id("Nemesis_Engine/mods/123/info.ini", Some("123"));
+        assert_eq_id("Nemesis_Engine/mods/test_mods/info.ini", Some("test_mod"));
         assert_eq_id("Nemesis_Engine/info.ini", Some("Nemesis_Engine"));
-        assert_eq_id(r"Nemesis_Engine\mod\456\info.ini", Some("456"));
+        assert_eq_id(r"Nemesis_Engine\mods\456\info.ini", Some("456"));
         assert_eq_id("info.ini", None);
     }
 

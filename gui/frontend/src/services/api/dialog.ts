@@ -15,7 +15,7 @@ type OpenOptions = {
  * @returns selected path or cancelled null
  * @throws
  */
-export async function openPath(path: string, options: OpenOptions) {
+export async function openPath(path: string, options: OpenOptions = {}): Promise<string | string[] | null> {
   const res = await open({
     defaultPath: path,
     ...options,

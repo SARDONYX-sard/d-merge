@@ -5,7 +5,7 @@ import { useStorageState } from '@/components/hooks/useStorageState/useStorageSt
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { useCssContext } from '@/components/providers/CssProvider';
 import { useJsContext } from '@/components/providers/JsProvider';
-import { CSS_PRESETS } from '@/lib/css';
+import { CSS } from '@/lib/css';
 
 import { type EditorInfo, EditorInitializer } from './EditorInitializer';
 
@@ -27,7 +27,7 @@ export const CodeEditor = () => {
       language: 'css',
       onChange: (value) => {
         setCss(value);
-        CSS_PRESETS.setCss(value ?? '');
+        CSS.css.set(value ?? '');
         setPreset('0');
       },
     },

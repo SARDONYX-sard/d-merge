@@ -9,7 +9,15 @@ import type { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internal
 
 type DragEndHandler = Exclude<DndCtxProps['onDragEnd'], undefined>;
 
-type Props = { loadModsInfoFn: () => Promise<ModInfo[]>; loadActivateModsFn: () => Promise<readonly string[]> };
+type Props = {
+  loadModsInfoFn: () => Promise<ModInfo[]>;
+  loadActivateModsFn: () => Promise<readonly string[]>;
+};
+
+const defaultProps = {
+  loadModsInfoFn: loadModsInfo,
+  loadActivateModsFn: loadActivateMods,
+};
 
 /**
  * # Mocks
@@ -20,7 +28,7 @@ type Props = { loadModsInfoFn: () => Promise<ModInfo[]>; loadActivateModsFn: () 
  * useModsInfo({ modsInfoFn, activateModsFn })
  * ```
  */
-export function useModsInfo({ loadModsInfoFn = loadModsInfo, loadActivateModsFn = loadActivateMods }: Props) {
+export function useModsInfo({ loadActivateModsFn, loadModsInfoFn }: Props = defaultProps) {
   const [rows, setRows] = useState<ModInfo[]>([]);
   const [selectionModel, setSelectionModel] = useState<readonly string[]>([]);
 

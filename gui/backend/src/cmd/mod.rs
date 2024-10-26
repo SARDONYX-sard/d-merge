@@ -1,7 +1,8 @@
 use d_merge_core::mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
-use serde_hkx_features::convert::OutFormat;
 use std::{collections::HashMap, path::Path};
 use tauri::{Emitter as _, Window};
+
+pub(crate) mod convert;
 
 /// Early return with Err() and write log error.
 macro_rules! bail {
@@ -10,6 +11,8 @@ macro_rules! bail {
         return Err($err.to_string());
     }};
 }
+
+pub(super) use bail;
 
 /// Measure the elapsed time and return the result of the given asynchronous function.
 #[allow(unused)]
@@ -49,21 +52,17 @@ macro_rules! sender {
         }
     };
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Convert
-#[tauri::command]
-pub(crate) async fn convert(input: &str, output: Option<&str>, format: &str) -> Result<(), String> {
-    let format = match format {
-        "win32" => OutFormat::Win32,
-        "xml" => OutFormat::Xml,
-        _ => OutFormat::Amd64,
-    };
 
-    let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
-
-    serde_hkx_features::convert::convert(input, output, format)
-        .await
-        .or_else(|err| bail!(err))
+/// # Progress report for progress bar
+///
+/// - First: number of files/dirs explored
+/// - After: working index
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct Settings {
+    /// meshes, caches, settings
+    out_dir: String,
+    /// - Intended `./data` of `./data/Nemesis_Engine/mods/<id>/info.ini`
+    mod_dir: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

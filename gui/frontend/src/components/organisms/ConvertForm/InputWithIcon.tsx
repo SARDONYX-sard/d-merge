@@ -11,7 +11,7 @@ type Props = {
   setPath: (path: string) => void;
 } & ComponentPropsWithRef<typeof Button>;
 
-export function InputWithIcon({ label, icon, path, setPath, ...props }: Props) {
+export function InputField({ label, icon, path, setPath, ...props }: Props) {
   const id = useId();
 
   return (

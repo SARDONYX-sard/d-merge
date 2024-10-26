@@ -1,7 +1,7 @@
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 
-import { ButtonWithToolTip } from '@/components/atoms/ButtonWithToolTip';
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { ButtonWithToolTip } from '@/components/molecules/ButtonWithToolTip';
 import { NOTIFY } from '@/lib/notify';
 import { LOG } from '@/services/api/log';
 
@@ -17,9 +17,9 @@ export const LogDirButton = ({ ...props }: Props) => {
     <ButtonWithToolTip
       {...props}
       buttonName={t('open-log-dir-btn')}
+      icon={<FolderOpenIcon />}
       onClick={handleClick}
-      startIcon={<FolderOpenIcon />}
-      // tooltipTitle={t('open-log-dir-tooltip')}
+      tooltipTitle={t('open-log-dir-tooltip')}
     />
   );
 };

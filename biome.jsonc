@@ -50,7 +50,7 @@
       },
       "suspicious": {
         "noConsoleLog": "off", // Configuration to be removed in due course.
-        "noReactSpecificProps": "off" // Too many false positives.
+        "noReactSpecificProps": "off" // It's for Solid.js, so turn it off in React.
       }
     }
   },

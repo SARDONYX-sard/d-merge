@@ -1,11 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 
-type OutFormat = 'amd64' | 'win32' | 'xml';
+export type OutFormat = 'amd64' | 'win32' | 'xml';
 
 /**
  * Convert xml/hkx => hkx/xml.
+ * - `inputs`: Files or dirs.
+ * - `output`: Output dir.
  * @throws Error
  */
-export async function convert(input: string, output: string, format: OutFormat) {
-  await invoke('convert', { input, output, format });
+export async function convert(inputs: string[], output: string, format: OutFormat) {
+  await invoke('convert', { inputs, output, format });
 }

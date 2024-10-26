@@ -17,6 +17,7 @@
     "subsec",
     "tauri",
     "Uninit",
+    "unlisten",
     "xorout"
   ]
 }

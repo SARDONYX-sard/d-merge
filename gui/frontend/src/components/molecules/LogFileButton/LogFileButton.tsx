@@ -1,7 +1,7 @@
 import FileOpen from '@mui/icons-material/FileOpen';
 
-import { ButtonWithToolTip } from '@/components/atoms/ButtonWithToolTip';
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { ButtonWithToolTip } from '@/components/molecules/ButtonWithToolTip';
 import { NOTIFY } from '@/lib/notify';
 import { LOG } from '@/services/api/log';
 
@@ -12,9 +12,9 @@ export const LogFileButton = () => {
   return (
     <ButtonWithToolTip
       buttonName={t('open-log-btn')}
+      icon={<FileOpen />}
       onClick={handleClick}
-      startIcon={<FileOpen />}
-      // tooltipTitle={t('open-log-tooltip')}
+      tooltipTitle={t('open-log-tooltip')}
     />
   );
 };

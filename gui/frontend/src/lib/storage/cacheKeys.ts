@@ -1,13 +1,15 @@
 import { OBJECT } from '@/lib/object-utils';
 
 const CONVERT_PUB_CACHE_KEYS_OBJ = {
-  convertPathMode: 'convert-path-mode',
-  convertInput: 'convert-input',
+  convertSelectionType: 'convert-selection-type',
+  convertSelectedFiles: 'convert-selected-files',
+  convertSelectedDirs: 'convert-selected-dirs',
   convertOutput: 'convert-output',
   convertOutFmt: 'convert-output-fmt',
 } as const;
 
 const PUB_CACHE_KEYS_OBJ = {
+  selectedPage: 'selected-page',
   customCss: 'custom-css',
   presetNumber: 'css-preset-number',
   editorMode: 'editor-mode',

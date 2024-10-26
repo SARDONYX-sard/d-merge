@@ -1,0 +1,94 @@
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import CircularProgress from '@mui/material/CircularProgress';
+
+import { Box, Chip, Grid2 as Grid } from '@mui/material';
+import type { ComponentPropsWithRef } from 'react';
+
+import { Button } from '@/components/molecules/Button';
+import { open } from '@tauri-apps/plugin-dialog';
+import { useConvertContext } from './ConvertProvider';
+import { OutFormatList } from './OutFormatList';
+import { SelectionTypeRadios } from './SelectionTypeRadios';
+
+export const PathSelector = () => {
+  const {
+    selectionType,
+    selectedFiles,
+    setSelectedFiles,
+    selectedDirs,
+    setSelectedDirs,
+    convertStatuses,
+    setConvertStatuses,
+  } = useConvertContext();
+  const isDirMode = selectionType === 'dir';
+  const selectedPaths = isDirMode ? selectedDirs : selectedFiles;
+  const setSelectedPaths = isDirMode ? setSelectedDirs : setSelectedFiles;
+
+  const handleDelete: ComponentPropsWithRef<typeof Chip>['onDelete'] = (fileToDelete: string) =>
+    setSelectedPaths(selectedPaths.filter((file) => file !== fileToDelete));
+
+  const getStatusByPathId = (pathIdx: number) => {
+    const status = convertStatuses.get(pathIdx);
+    return status ?? 0;
+  };
+
+  const renderStatusIcon = (status: number) => {
+    switch (status) {
+      case 1:
+        return <CircularProgress size={20} />;
+      case 2:
+        return <CheckCircleIcon color='success' />;
+      case 3:
+        return <ErrorIcon color='error' />;
+      default:
+        return undefined;
+    }
+  };
+
+  return (
+    <Box>
+      <Grid container={true} spacing={2}>
+        <Grid>
+          <Button
+            onClick={async () => {
+              const newSelectedPaths = await open({
+                title: isDirMode ? 'Select directory' : 'Select files',
+                filters: [{ name: '', extensions: ['hkx', 'xml', 'json', 'yaml'] }],
+                multiple: true,
+                directory: isDirMode,
+                defaultPath: selectedPaths.at(0),
+              });
+
+              if (Array.isArray(newSelectedPaths)) {
+                setSelectedPaths(newSelectedPaths);
+                setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
+              } else if (newSelectedPaths !== null) {
+                setSelectedPaths([newSelectedPaths]);
+                setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
+              }
+            }}
+          />
+        </Grid>
+        <Grid>
+          <SelectionTypeRadios />
+        </Grid>
+
+        <Grid>
+          <OutFormatList />
+        </Grid>
+      </Grid>
+
+      <Box mt={2}>
+        {selectedPaths.map((path, index) => (
+          <Chip
+            icon={renderStatusIcon(getStatusByPathId(index))}
+            key={path}
+            label={path}
+            onDelete={() => handleDelete(path)}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+};
