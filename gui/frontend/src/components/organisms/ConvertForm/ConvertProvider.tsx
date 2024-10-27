@@ -47,8 +47,8 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
   const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedFiles, []);
   const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedDirs, []);
-  const [output, setOutput] = useStorageState('convert-output', '');
-  const [fmt, setFmt] = useStorageState<OutFormat>('convert-output-fmt', 'amd64');
+  const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');
+  const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
 
   const [convertStatuses, setConvertStatuses] = useState<ConvertStatusesMap>(new Map());
 
