@@ -156,7 +156,7 @@ mod tests {
         assert_eq_id("Nemesis_Engine/mods/123/info.ini", Some("123"));
         assert_eq_id("Nemesis_Engine/mods/test_id/info.ini", Some("test_id"));
         assert_eq_id("Nemesis_Engine/info.ini", Some("Nemesis_Engine"));
-        assert_eq_id(r"Nemesis_Engine\mods\456\info.ini", Some("456"));
+        // assert_eq_id(r"Nemesis_Engine\mods\456\info.ini", Some("456")); // <- windows only
         assert_eq_id("info.ini", None);
     }
 
