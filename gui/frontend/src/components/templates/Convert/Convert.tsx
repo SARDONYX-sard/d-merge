@@ -1,5 +1,6 @@
 'use client';
 import { Box, Grid2, type SxProps, type Theme } from '@mui/material';
+import { listen } from '@tauri-apps/api/event';
 import { type MouseEventHandler, useState } from 'react';
 
 import { useInjectJs } from '@/components/hooks/useInjectJs';
@@ -12,7 +13,6 @@ import {
 import { ConvertNav } from '@/components/organisms/ConvertNav';
 import { NOTIFY } from '@/lib/notify';
 import { convert } from '@/services/api/serde_hkx';
-import { listen } from '@tauri-apps/api/event';
 
 const sx: SxProps<Theme> = {
   display: 'grid',

@@ -6,10 +6,10 @@ import TransformIcon from '@mui/icons-material/Transform';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-import { useStorageState } from '@/components/hooks/useStorageState';
-import { PUB_CACHE_OBJ } from '../../../lib/storage/cacheKeys';
+// import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+// PUB_CACHE_OBJ.selectedPage,
 
 /** HACK: To prevents the conversion button from being hidden because the menu is fixed. */
 const MenuPadding = () => <div style={{ height: '56px' }} />;
@@ -17,7 +17,7 @@ const MenuPadding = () => <div style={{ height: '56px' }} />;
 export function PageNavigation() {
   const router = useRouter();
   const pathname = usePathname();
-  const [selectedPage, setSelectedPage] = useStorageState(PUB_CACHE_OBJ.selectedPage, 0);
+  const [selectedPage, setSelectedPage] = useState(0);
 
   useEffect(() => {
     if (pathname === '/convert') {
@@ -27,7 +27,7 @@ export function PageNavigation() {
     } else if (pathname === '/settings') {
       setSelectedPage(2);
     }
-  }, [pathname, setSelectedPage]);
+  }, [pathname]);
 
   return (
     <>

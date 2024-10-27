@@ -2,7 +2,7 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "extends": [],
   "files": {
-    "ignore": ["**/gen", ".next", "cspell.jsonc", "node_modules", "out", "target"],
+    "ignore": ["**/gen", ".next", "cspell.jsonc", "node_modules", "out", "target", "dummy"],
     "ignoreUnknown": true
   },
   "formatter": {

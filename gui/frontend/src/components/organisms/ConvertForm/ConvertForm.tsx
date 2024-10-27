@@ -6,10 +6,11 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
 
-import type { ComponentPropsWithRef } from 'react';
 import { useConvertContext } from './ConvertProvider';
 import { InputField } from './InputWithIcon';
 import { PathSelector } from './PathSelector';
+
+import type { ComponentPropsWithRef } from 'react';
 
 export const ConvertForm = () => {
   const { setSelectedFiles, setOutput } = useConvertContext();

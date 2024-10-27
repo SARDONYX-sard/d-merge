@@ -14,7 +14,7 @@ export const SelectionTypeRadios = () => {
 
   return (
     <FormControl>
-      <FormLabel id={radioLabelId} component='legend'>
+      <FormLabel component='legend' id={radioLabelId}>
         Selection Type
       </FormLabel>
       <RadioGroup
@@ -24,8 +24,8 @@ export const SelectionTypeRadios = () => {
         row={true}
         value={selectionType}
       >
-        <FormControlLabel value='files' control={<Radio />} label='Files' />
-        <FormControlLabel value='dir' control={<Radio />} label='Directories' />
+        <FormControlLabel control={<Radio />} label='Files' value='files' />
+        <FormControlLabel control={<Radio />} label='Directories' value='dir' />
       </RadioGroup>
     </FormControl>
   );

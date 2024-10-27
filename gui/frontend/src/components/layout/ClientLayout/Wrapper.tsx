@@ -16,9 +16,5 @@ type Props = Readonly<{
 }>;
 
 export const ClientLayout = ({ children }: Props) => {
-  return (
-    <>
-      <ClientLayoutInner>{children}</ClientLayoutInner>
-    </>
-  );
+  return <ClientLayoutInner>{children}</ClientLayoutInner>;
 };

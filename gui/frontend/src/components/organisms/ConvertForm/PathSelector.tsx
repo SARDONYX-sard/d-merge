@@ -1,15 +1,16 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
-import CircularProgress from '@mui/material/CircularProgress';
-
 import { Box, Chip, Grid2 as Grid } from '@mui/material';
-import type { ComponentPropsWithRef } from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
+import { open } from '@tauri-apps/plugin-dialog';
 
 import { Button } from '@/components/molecules/Button';
-import { open } from '@tauri-apps/plugin-dialog';
+
 import { useConvertContext } from './ConvertProvider';
 import { OutFormatList } from './OutFormatList';
 import { SelectionTypeRadios } from './SelectionTypeRadios';
+
+import type { ComponentPropsWithRef } from 'react';
 
 export const PathSelector = () => {
   const {
