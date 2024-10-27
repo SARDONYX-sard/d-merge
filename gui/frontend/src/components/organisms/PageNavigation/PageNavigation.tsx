@@ -24,9 +24,13 @@ export function PageNavigation() {
     const hasRedirected = sessionStorage.getItem('hasRedirected');
     const lastPath = STORAGE.get(PUB_CACHE_OBJ.lastPath);
 
-    // If there's a lastPath, and we haven't redirected yet, navigate to the last path
     if (lastPath && lastPath !== pathname && !hasRedirected) {
       sessionStorage.setItem('hasRedirected', 'true');
+      // Since `/` is the initial coming path, there is no need to jump.
+      // If you jump, you will have to jump twice when `/` is the LAST PATH.
+      if (lastPath === '/') {
+        return;
+      }
       router.push(lastPath);
     }
   }, [pathname, router]);
@@ -51,17 +55,17 @@ export function PageNavigation() {
     STORAGE.set(PUB_CACHE_OBJ.lastPath, pathname); // Save current path as the last visited path in localStorage
   }, [pathname]);
 
-  const handleNavigationChange = (newValue: number) => {
-    setSelectedPage(newValue);
+  const handleNavigationChange = (pageIdx: number) => {
+    setSelectedPage(pageIdx);
     const paths = ['/convert', '/', '/settings'];
-    router.push(paths[newValue]);
+    router.push(paths[pageIdx]);
   };
 
   return (
     <>
       <MenuPadding />
       <BottomNavigation
-        onChange={(_event, newValue) => handleNavigationChange(newValue)}
+        onChange={(_event, newPageIdx: number) => handleNavigationChange(newPageIdx)}
         showLabels={true}
         sx={{
           position: 'fixed',
