@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
@@ -43,7 +43,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
@@ -82,7 +82,7 @@ jobs:
         run: cargo build --release
 
       - name: Node.js cache
-        uses: actions/cache@v4.1.1
+        uses: actions/cache@v4.1.2
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
@@ -93,7 +93,7 @@ jobs:
         run: npm ci
 
       - name: Sync node version
-        uses: actions/setup-node@v4.0.4
+        uses: actions/setup-node@v4.1.0
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -114,11 +114,11 @@ jobs:
       - name: Compress outputs(MacOS)
         shell: bash
         if: runner.os == 'macOS'
-        run: mv ./target/release/d_merge./build
+        run: mv ./target/release/d_merge/build
       - name: Compress outputs(Linux)
         shell: bash
         if: runner.os == 'Linux'
-        run: mv ./target/release/d_merge./build
+        run: mv ./target/release/d_merge/build
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.4.3

@@ -12,14 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
 
       - name: Install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-20.04'
+        if: matrix.platform == 'ubuntu-latest'
         # You can remove libayatana-appindicator3-dev if you don't use the system tray feature.
         run: |
           sudo apt-get update
@@ -34,13 +34,13 @@ jobs:
           prefix-key: cargo-${{ matrix.platform }}
 
       - name: Sync node version and setup cache
-        uses: actions/setup-node@v4.0.4
+        uses: actions/setup-node@v4.1.0
         with:
           node-version: 'lts/*'
           cache: 'npm'
 
       - name: Node.js cache
-        uses: actions/cache@v4.1.1
+        uses: actions/cache@v4.1.2
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
