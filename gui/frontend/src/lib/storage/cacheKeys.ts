@@ -9,15 +9,16 @@ const CONVERT_PUB_CACHE_KEYS_OBJ = {
 } as const;
 
 const PUB_CACHE_KEYS_OBJ = {
-  selectedPage: 'selected-page',
   customCss: 'custom-css',
-  presetNumber: 'css-preset-number',
-  editorMode: 'editor-mode',
   customJs: 'custom-js',
-  logLevel: 'log-level',
   customTranslationDict: 'custom-translation-dict',
+  editorMode: 'editor-mode',
   editorTabSelect: 'editor-tab-select',
+  lastPath: 'last-path', // last visited url(in App)
   locale: 'locale',
+  logLevel: 'log-level',
+  presetNumber: 'css-preset-number',
+  selectedPage: 'selected-page',
   settingsTabSelect: 'settings-tab-select',
   snackbarLimit: 'snackbar-limit',
   snackbarPosition: 'snackbar-position',
