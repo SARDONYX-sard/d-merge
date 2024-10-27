@@ -1,14 +1,16 @@
 //! Parses animation data from asdsf(animationsetdatasinglefile.txt)
 //!
 //! This module provides structures and parsers for reading animation data
-//! from a file formatted in a specific way. The primary structure is [`Adsf`],
+//! from a file formatted in a specific way. The primary structure is [`Asdsf`],
 //! which contains a list of projects and their corresponding animation data.
 //!
 //! # Example
 //!
 //! ```no_run
+//! use d_merge_core::parser::asdsf::parse_asdsf;
+//!
 //! let input = "..."; // Input data from the animation file
-//! let result = asdsf().parse(input).unwrap();
+//! let result = parse_asdsf(input).unwrap();
 //! ```
 
 use super::{
@@ -78,18 +80,14 @@ pub struct AnimInfo {
     ///
     /// Always `7891816`
     /// ```
-    /// assert_eq!(str::from_utf8(&u32::to_le_bytes(7891816)), Ok("hkx\0"));
-    /// assert_eq!(str::from_utf8(&[0x78, 0x6b, 0x68]), Ok("xkh"));
+    /// assert_eq!(core::str::from_utf8(&u32::to_le_bytes(7891816)), Ok("hkx\0"));
+    /// assert_eq!(core::str::from_utf8(&[0x78, 0x6b, 0x68]), Ok("xkh"));
     /// ```
     pub hashed_extension: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Parses the animation data structure from the input.
-///
-/// # Errors
-/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 /// Parses the animation data structure from the input.
 ///
 /// # Errors

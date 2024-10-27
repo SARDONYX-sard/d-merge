@@ -7,8 +7,10 @@
 //! # Example
 //!
 //! ```no_run
+//! use d_merge_core::parser::adsf::parse_adsf;
+//!
 //! let input = "..."; // Input data from the animation file
-//! let result = adsf().parse(input).unwrap();
+//! let result = parse_adsf(input).unwrap();
 //! ```
 
 use super::{
