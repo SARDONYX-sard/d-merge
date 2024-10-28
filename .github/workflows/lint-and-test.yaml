@@ -78,9 +78,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Build Test(CLI)
-        run: cargo build --release
-
       - name: Node.js cache
         uses: actions/cache@v4.1.2
         with:
@@ -105,20 +102,24 @@ jobs:
 
       - name: Make outputs dir
         run: mkdir -p ./build
+
+      # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(Windows)
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
           Move-Item -Path ./target/release/d_merge.exe -Destination './build'
-
+      # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(MacOS)
         shell: bash
         if: runner.os == 'macOS'
         run: mv ./target/release/d_merge ./build
+      # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(Linux)
         shell: bash
         if: runner.os == 'Linux'
         run: mv ./target/release/d_merge ./build
+      # ----------------------------------------------------------------------------------------------------------------
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.4.3
