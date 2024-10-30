@@ -13,11 +13,13 @@ import { PathSelector } from './PathSelector';
 import type { ComponentPropsWithRef } from 'react';
 
 export const ConvertForm = () => {
-  const { setSelectedFiles, setOutput } = useConvertContext();
+  const { setSelectedFiles, setSelectedDirs, setOutput, setConvertStatuses } = useConvertContext();
   const { t } = useTranslation();
 
   const handleAllClear = () => {
+    setConvertStatuses(new Map());
     setSelectedFiles([]);
+    setSelectedDirs([]);
     setOutput('');
   };
 
