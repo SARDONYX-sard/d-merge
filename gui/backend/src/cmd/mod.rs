@@ -1,8 +1,21 @@
-use d_merge_core::mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
-use std::{collections::HashMap, path::Path};
+pub(crate) mod convert;
+pub(crate) mod fs;
+pub(crate) mod log;
+pub(crate) mod patch;
+
 use tauri::{Emitter as _, Window};
 
-pub(crate) mod convert;
+/// Create closure that reports.
+pub(super) fn sender<S>(window: Window, event: &'static str) -> impl Fn(S) + Clone
+where
+    S: serde::Serialize + Clone,
+{
+    move |payload: S| {
+        if let Err(err) = window.emit(event, payload) {
+            tracing::error!("{}", err);
+        };
+    }
+}
 
 /// Early return with Err() and write log error.
 macro_rules! bail {
@@ -11,7 +24,6 @@ macro_rules! bail {
         return Err($err.to_string());
     }};
 }
-
 pub(super) use bail;
 
 /// Measure the elapsed time and return the result of the given asynchronous function.
@@ -29,81 +41,4 @@ macro_rules! time {
         );
         res
     }};
-}
-
-/// # Progress report for progress bar
-///
-/// - First: number of files/dirs explored
-/// - After: working index
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct Payload {
-    /// - First: number of files/dirs explored
-    /// - After: working index
-    index: usize,
-}
-
-/// Closure that reports the number of files
-macro_rules! sender {
-    ($window:ident, $emit_name:literal) => {
-        move |index: usize| {
-            if let Err(err) = $window.emit($emit_name, Payload { index }) {
-                tracing::error!("{}", err);
-            };
-        }
-    };
-}
-
-/// # Progress report for progress bar
-///
-/// - First: number of files/dirs explored
-/// - After: working index
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct Settings {
-    /// meshes, caches, settings
-    out_dir: String,
-    /// - Intended `./data` of `./data/Nemesis_Engine/mods/<id>/info.ini`
-    mod_dir: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Patch
-
-#[tauri::command]
-pub(crate) fn load_mods_info() -> Result<Vec<ModInfo>, String> {
-    let dir = "../../dummy/mods";
-    let pattern = format!("{dir}/*/info.ini");
-    let info = ModsInfo::get_all(&pattern).or_else(|err| bail!(err))?;
-    Ok(info.sort_to_vec_by_priority(HashMap::new()))
-}
-
-#[tauri::command]
-pub(crate) fn load_activate_mods() -> Result<Vec<String>, String> {
-    let mods = "
-aaaaa
-bcbi"
-        .lines();
-    Ok(mods.into_iter().map(|m| m.to_string()).collect())
-}
-
-#[tauri::command]
-pub(crate) fn patch(window: Window, ids: Vec<String>) -> Result<(), String> {
-    tracing::trace!("{:?}", ids);
-    let _sender = sender!(window, "d_merge://progress/patch");
-    Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tauri::command]
-pub(crate) async fn change_log_level(log_level: &str) -> Result<(), String> {
-    tracing::debug!("Selected log level: {log_level}");
-    crate::log::change_level(log_level).or_else(|err| bail!(err))
-}
-
-/// Define our own `writeTextFile` api for tauri,
-/// because there was a bug that contents were not written properly
-/// (there was a case that the order of some data in contents was switched).
-#[tauri::command]
-pub(crate) async fn write_file(path: &Path, content: &str) -> Result<(), String> {
-    std::fs::write(path, content).or_else(|err| bail!(err))
 }

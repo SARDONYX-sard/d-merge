@@ -20,12 +20,12 @@ fn main() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
-            crate::cmd::change_log_level,
-            crate::cmd::load_activate_mods,
-            crate::cmd::load_mods_info,
-            crate::cmd::patch,
             crate::cmd::convert::convert,
-            crate::cmd::write_file,
+            crate::cmd::fs::write_file,
+            crate::cmd::log::change_log_level,
+            crate::cmd::patch::load_activate_mods,
+            crate::cmd::patch::load_mods_info,
+            crate::cmd::patch::patch,
         ])
         .setup(|app| Ok(crate::log::init(app)?))
         .run(tauri::generate_context!())

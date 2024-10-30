@@ -1,20 +1,9 @@
-use super::bail;
+use super::{bail, sender};
 use core::str::FromStr as _;
 use futures::{future::join_all, stream::FuturesUnordered};
-use serde_hkx_features::convert::OutFormat;
+use serde_hkx_features::convert::{convert as serde_hkx_convert, OutFormat};
 use std::path::Path;
-use tauri::{Emitter as _, Window};
-
-/// Closure that reports the number of files
-macro_rules! sender {
-    ($window:ident, $emit_name:literal) => {
-        move |payload: Payload| {
-            if let Err(err) = $window.emit($emit_name, payload) {
-                tracing::error!("{}", err);
-            };
-        }
-    };
-}
+use tauri::Window;
 
 /// # Progress report for progress bar
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -36,14 +25,13 @@ pub(crate) async fn convert(
     let format = OutFormat::from_str(format).or_else(|err| bail!(err))?;
     let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
 
-    let status_sender = sender!(window, "d_merge://progress/convert");
+    let status_sender = sender(window, "d_merge://progress/convert");
 
     let tasks = inputs
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(path_id, input)| {
-            let input_path = Path::new(input).to_path_buf();
-            let input = input.clone();
+            let input_path = Path::new(&input).to_path_buf();
             let output = output.clone();
             let status_sender = status_sender.clone();
 
@@ -52,14 +40,14 @@ pub(crate) async fn convert(
 
                 let result = if input_path.is_file() {
                     let output = output.map(|output_dir| {
-                        let mut output_dir =
-                            Path::new(&output_dir).join(input_path.file_stem().unwrap_or_default());
-                        output_dir.set_extension(format.as_extension());
-                        output_dir
+                        let file_name = input_path.file_stem().unwrap_or_default();
+                        let mut output_file = Path::new(&output_dir).join(file_name);
+                        output_file.set_extension(format.as_extension());
+                        output_file
                     });
-                    serde_hkx_features::convert::convert(&input_path, output, format).await
+                    serde_hkx_convert(&input_path, output, format).await
                 } else {
-                    serde_hkx_features::convert::convert(&input_path, output, format).await
+                    serde_hkx_convert(&input_path, output, format).await
                 };
 
                 match result {
@@ -87,8 +75,8 @@ pub(crate) async fn convert(
                 errs.push(err);
             }
             Err(err) => {
-                tracing::error!("{:?}", err);
-                errs.push(format!("JoinError. id: {:?}", err.id()));
+                tracing::error!("{err}");
+                errs.push(format!("JoinError. id: {}", err.id()));
             }
         }
     }
