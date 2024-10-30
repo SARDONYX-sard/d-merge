@@ -1,5 +1,5 @@
-use std::path::Path;
 use super::bail;
+use std::path::Path;
 
 /// Define our own `writeTextFile` api for tauri,
 /// because there was a bug that contents were not written properly
