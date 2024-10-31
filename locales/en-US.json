@@ -58,5 +58,9 @@
   "tab-label-backup": "Backup",
   "tab-label-editor": "Editor / Preset",
   "tab-label-lang": "Language",
-  "tab-label-notice": "Notice"
+  "tab-label-notice": "Notice",
+  "tab-label-tab": "Tab",
+  "tab-list-position-bottom": "Bottom",
+  "tab-list-position-label": "Tab Position",
+  "tab-list-position-top": "Top"
 }

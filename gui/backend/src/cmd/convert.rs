@@ -9,7 +9,7 @@ use tauri::Window;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Payload {
-    path_id: usize,
+    path_id: u32,
     /// 0: pending, 1: processing, 2: done, 3: error
     status: u8,
 }
@@ -29,8 +29,8 @@ pub(crate) async fn convert(
 
     let tasks = inputs
         .into_iter()
-        .enumerate()
-        .map(|(path_id, input)| {
+        .map(|input| {
+            let path_id = hash_djb2(&input);
             let input_path = Path::new(&input).to_path_buf();
             let output = output.clone();
             let status_sender = status_sender.clone();
@@ -87,5 +87,53 @@ pub(crate) async fn convert(
         Err(errs)
     } else {
         Ok(())
+    }
+}
+
+/// # Why use this?
+/// The frontend selection can be deleted.
+/// Therefore, the conversion status shifts when using index.
+/// So, using hash from path solves this problem.
+/// The exact same hash function is implemented in frontend and tested.
+fn hash_djb2(key: &str) -> u32 {
+    let mut hash: u32 = 5381;
+    for byte in key.as_bytes() {
+        hash = ((hash << 5).wrapping_add(hash)) ^ u32::from(*byte);
+    }
+    hash
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_consistent_hash() {
+        let input = "example";
+        let hash1 = hash_djb2(input);
+        let hash2 = hash_djb2(input);
+        assert_eq!(
+            hash1, hash2,
+            "Different hash values were generated for the same input"
+        );
+    }
+
+    #[test]
+    fn test_different_hashes_for_different_inputs() {
+        let hash1 = hash_djb2("example1");
+        let hash2 = hash_djb2("example2");
+        assert_ne!(
+            hash1, hash2,
+            "Same hash values were generated for different inputs"
+        );
+    }
+
+    #[test]
+    fn test_empty_string() {
+        let hash = hash_djb2("");
+        assert_eq!(
+            hash, 5381,
+            "Hash for empty string does not match the expected initial value"
+        );
     }
 }

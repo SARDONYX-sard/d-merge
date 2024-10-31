@@ -6,6 +6,7 @@ import { Help } from '@/components/atoms/Help';
 import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { CodeEditor } from '@/components/organisms/CodeEditor';
 import { Tabs } from '@/components/organisms/Tabs';
+import { useTabContext } from '@/components/providers/TabProvider';
 import { start } from '@/services/api/shell';
 
 import packageJson from '@/../../package.json';
@@ -23,24 +24,38 @@ const sx: SxProps<Theme> = {
 
 export const Settings = () => {
   useInjectJs();
+  const { tabPos } = useTabContext();
 
-  const handleHelpClick: MouseEventHandler<HTMLAnchorElement> = (event) => {
-    event.preventDefault(); // Avoid to jump by browser
+  return (
+    <Box component='main' sx={sx}>
+      {tabPos === 'top' ? (
+        <>
+          <TabsMenu />
+          <CodeEditor />
+        </>
+      ) : (
+        <>
+          <CodeEditor />
+          <TabsMenu />
+        </>
+      )}
+    </Box>
+  );
+};
+
+const TabsMenu = () => {
+  const handleHelpClick: MouseEventHandler<HTMLButtonElement> = (_event) => {
     start(packageJson.homepage); // jump by backend api
   };
 
   return (
-    <Box component='main' sx={sx}>
-      <CodeEditor />
-
-      <Grid container={true} sx={{ width: '95%' }}>
-        <Grid size={8} sx={{ overflowX: 'auto' }}>
-          <Tabs />
-        </Grid>
-        <Grid size={4} sx={{ overflowX: 'auto' }}>
-          <Help href={packageJson.homepage} onClick={handleHelpClick} version={packageJson.version} />
-        </Grid>
+    <Grid container={true} sx={{ width: '95%' }}>
+      <Grid size={8} sx={{ overflowX: 'auto' }}>
+        <Tabs />
       </Grid>
-    </Box>
+      <Grid size={4} sx={{ overflowX: 'auto' }}>
+        <Help onClick={handleHelpClick} version={packageJson.version} />
+      </Grid>
+    </Grid>
   );
 };

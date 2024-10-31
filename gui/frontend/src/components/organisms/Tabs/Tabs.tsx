@@ -15,11 +15,13 @@ import { CssList } from '@/components/organisms/CssList';
 import { EditorList } from '@/components/organisms/EditorList/EditorList';
 import { I18nList } from '@/components/organisms/I18nList';
 import { NotifyList } from '@/components/organisms/NotifyList';
+import { TabPositionList } from '@/components/organisms/TabPositionList';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 import type { SyntheticEvent } from 'react';
 
 export const Tabs = () => {
-  const [selectedTab, setSelectedTab] = useStorageState('settings-tab-select', 'editor');
+  const [selectedTab, setSelectedTab] = useStorageState(PUB_CACHE_OBJ.settingsTabSelect, 'editor');
   const { t } = useTranslation();
 
   const handleChange = (_event: SyntheticEvent, tabId: string) => setSelectedTab(tabId);
@@ -37,6 +39,7 @@ export const Tabs = () => {
             <Tab label={t('tab-label-editor')} value='editor' />
             <Tab label={t('tab-label-notice')} value='notice' />
             <Tab label={t('tab-label-lang')} value='lang' />
+            <Tab label={t('tab-label-tab')} value='tab' />
             <Tab label={t('tab-label-backup')} value='backup' />
           </TabList>
         </Box>
@@ -54,6 +57,10 @@ export const Tabs = () => {
         <TabPanel value='lang'>
           <ImportLangButton />
           <I18nList />
+        </TabPanel>
+
+        <TabPanel value='tab'>
+          <TabPositionList />
         </TabPanel>
 
         <TabPanel value='backup'>

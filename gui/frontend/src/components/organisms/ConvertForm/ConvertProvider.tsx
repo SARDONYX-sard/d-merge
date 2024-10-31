@@ -17,11 +17,13 @@ export const normalize = (value: string): SelectionType => {
 };
 
 export type ConvertStatusPayload = {
+  /**  Djb2 hash algorism */
   pathId: number;
   /** 0: pending, 1: processing, 2: done, 3: error */
   status: 0 | 1 | 2 | 3;
 };
 
+/** key: Djb2 hash algorism, value:  */
 export type ConvertStatusesMap = Map<number, ConvertStatusPayload['status']>;
 
 type ContextType = {

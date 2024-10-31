@@ -1,12 +1,12 @@
 'use client';
 
-import { Box, Link } from '@mui/material';
+import { Box, Button } from '@mui/material';
 
 import type { ComponentPropsWithoutRef } from 'react';
 
 type Props = {
   version: string;
-} & ComponentPropsWithoutRef<typeof Link>;
+} & ComponentPropsWithoutRef<typeof Button>;
 export const Help = ({ version, ...props }: Props) => {
   return (
     <Box
@@ -21,9 +21,9 @@ export const Help = ({ version, ...props }: Props) => {
       <div>Version: {version}</div>
       <div>
         Source:{' '}
-        <Link rel='noopener' sx={{ fontSize: 'large' }} target='_blank' {...props}>
+        <Button sx={{ fontSize: 'large' }} type='button' variant='text' {...props}>
           GitHub
-        </Link>
+        </Button>
       </div>
     </Box>
   );

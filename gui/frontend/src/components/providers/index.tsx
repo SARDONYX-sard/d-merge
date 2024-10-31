@@ -6,6 +6,7 @@ import { EditorModeProvider } from '@/components/providers/EditorModeProvider';
 import { JsProvider } from '@/components/providers/JsProvider';
 import { LogLevelProvider } from '@/components/providers/LogLevelProvider';
 import NotifyProvider from '@/components/providers/NotifyProvider';
+import { TabProvider } from '@/components/providers/TabProvider';
 
 import type { ComponentProps, ReactNode } from 'react';
 
@@ -37,14 +38,16 @@ export const GlobalProvider = ({ children }: Props) => {
     <ThemeProvider theme={darkTheme}>
       <NotifyProvider />
       <LogLevelProvider>
-        <EditorModeProvider>
-          <JsProvider>
-            <CssProvider>
-              <CssBaseline />
-              {children}
-            </CssProvider>
-          </JsProvider>
-        </EditorModeProvider>
+        <TabProvider>
+          <EditorModeProvider>
+            <JsProvider>
+              <CssProvider>
+                <CssBaseline />
+                {children}
+              </CssProvider>
+            </JsProvider>
+          </EditorModeProvider>
+        </TabProvider>
       </LogLevelProvider>
     </ThemeProvider>
   );

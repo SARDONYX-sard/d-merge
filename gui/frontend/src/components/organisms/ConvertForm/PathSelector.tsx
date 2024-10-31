@@ -5,6 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { open } from '@tauri-apps/plugin-dialog';
 
 import { Button } from '@/components/molecules/Button';
+import { hashDjb2 } from '@/lib/hash-djb2';
 
 import { useConvertContext } from './ConvertProvider';
 import { OutFormatList } from './OutFormatList';
@@ -28,24 +29,6 @@ export const PathSelector = () => {
 
   const handleDelete: ComponentPropsWithRef<typeof Chip>['onDelete'] = (fileToDelete: string) =>
     setSelectedPaths(selectedPaths.filter((file) => file !== fileToDelete));
-
-  const getStatusByPathId = (pathIdx: number) => {
-    const status = convertStatuses.get(pathIdx);
-    return status ?? 0;
-  };
-
-  const renderStatusIcon = (status: number) => {
-    switch (status) {
-      case 1:
-        return <CircularProgress size={20} />;
-      case 2:
-        return <CheckCircleIcon color='success' />;
-      case 3:
-        return <ErrorIcon color='error' />;
-      default:
-        return undefined;
-    }
-  };
 
   return (
     <Box>
@@ -81,15 +64,28 @@ export const PathSelector = () => {
       </Grid>
 
       <Box mt={2}>
-        {selectedPaths.map((path, index) => (
-          <Chip
-            icon={renderStatusIcon(getStatusByPathId(index))}
-            key={path}
-            label={path}
-            onDelete={() => handleDelete(path)}
-          />
-        ))}
+        {selectedPaths.map((path) => {
+          const pathId = hashDjb2(path);
+          const statusId = convertStatuses.get(pathId) ?? 0;
+
+          return (
+            <Chip icon={renderStatusIcon(statusId)} key={pathId} label={path} onDelete={() => handleDelete(path)} />
+          );
+        })}
       </Box>
     </Box>
   );
+};
+
+const renderStatusIcon = (status: number) => {
+  switch (status) {
+    case 1:
+      return <CircularProgress size={20} />;
+    case 2:
+      return <CheckCircleIcon color='success' />;
+    case 3:
+      return <ErrorIcon color='error' />;
+    default:
+      return undefined;
+  }
 };
