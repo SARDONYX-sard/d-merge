@@ -20,7 +20,8 @@ indexmap = { workspace = true, features = ["serde", "rayon"] }
 rayon = { workspace = true }
 serde = { workspace = true }                                   # Implement (De)Serializer
 serde_ini = "0.2.0"
-serde_json = { workspace = true }                              # To avoid generate_context error.
+simd-json = { workspace = true }
+serde_hkx = { workspace = true }
 snafu = { workspace = true }
 tracing = { workspace = true, optional = true }
 winnow = { version = "0.6.20", features = ["simd"] }

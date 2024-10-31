@@ -13,10 +13,8 @@
 //! let result = parse_asdsf(input).unwrap();
 //! ```
 
-use super::{
-    lines::{from_one_line, lines, num_bool_line, one_line},
-    readable_err::ReadableError,
-};
+use super::lines::{from_one_line, lines, num_bool_line, one_line};
+use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
     error::{ContextError, StrContext::*, StrContextValue::*},
