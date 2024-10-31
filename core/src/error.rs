@@ -12,7 +12,7 @@ pub enum Error {
     /// Parser error
     #[snafu(transparent)]
     FailedParse {
-        source: crate::parser::readable_err::ReadableError,
+        source: serde_hkx::errors::readable::ReadableError,
     },
 
     /// Standard io error

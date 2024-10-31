@@ -13,11 +13,9 @@
 //! let result = parse_adsf(input).unwrap();
 //! ```
 
-use super::{
-    lines::{from_one_line, lines, num_bool_line, one_line},
-    readable_err::ReadableError,
-};
+use super::lines::{from_one_line, lines, num_bool_line, one_line};
 use core::str::FromStr;
+use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, space1, till_line_ending},
     error::{ContextError, StrContext::*, StrContextValue::*},
