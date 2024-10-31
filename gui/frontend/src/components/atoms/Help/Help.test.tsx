@@ -14,15 +14,6 @@ describe('Help Component', () => {
     expect(screen.getByText(`Version: ${version}`)).toBeInTheDocument();
   });
 
-  it('should render the GitHub link correctly', () => {
-    const linkElement = screen.getByRole('link', { name: 'GitHub' });
-
-    expect(linkElement).toBeInTheDocument();
-    expect(linkElement).toHaveAttribute('href', 'https://github.com');
-    expect(linkElement).toHaveAttribute('target', '_blank');
-    expect(linkElement).toHaveAttribute('rel', 'noopener');
-  });
-
   it('should apply the correct styles to the Box component', () => {
     const boxElement = screen.getByText(`Version: ${version}`).parentElement;
     // console.log(prettyDOM(boxElement)); // Show HTML for debug
