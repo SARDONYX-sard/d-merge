@@ -259,23 +259,28 @@ impl<'de> PatchDeserializer<'de> {
                             self.current.change_patch_type(PatchType::Value)?;
                         };
                         self.parse_next(start_tag("hkcstring"))?;
+                        self.current.path.push(index.to_string().into());
+                        index += 1;
 
                         let value = self.parse_plane_value(name)?;
-                        index += 1;
                         if matches!(self.current.patch_type, Some(PatchType::Value)) {
-                            self.current.path.push(index.to_string().into());
                             self.current.push_current_patch(value);
                         } else {
                             vec.push(value);
                         };
                         self.parse_next(end_tag("hkcstring"))?;
                         self.parse_maybe_close_comment()?;
+                        self.current.path.pop();
                     }
                 } else if !name.starts_with("Null") {
+                    let mut index = 0;
                     while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+                        self.current.path.push(index.to_string().into());
+                        index += 1;
                         if self.parse_start_maybe_comment()? {
                             self.current.change_patch_type(PatchType::Value)?;
                         };
+
                         let value = self.parse_value(name)?;
                         if matches!(self.current.patch_type, Some(PatchType::Value)) {
                             self.current.push_current_patch(value);
@@ -283,6 +288,7 @@ impl<'de> PatchDeserializer<'de> {
                             vec.push(value);
                         };
                         self.parse_maybe_close_comment()?;
+                        self.current.path.pop();
                     }
                 };
                 BorrowedValue::Array(Box::new(vec)) // `Null`(void)
@@ -481,7 +487,7 @@ mod tests {
                     "0009",
                     "hkbProjectStringData",
                     "characterFilenames",
-                    "2"
+                    "1"
                 ]
                 .into_iter()
                 .map(|s| s.into())
@@ -519,6 +525,7 @@ mod tests {
                     "0008",
                     "hkRootLevelContainer",
                     "namedVariants",
+                    "0",
                     "hkRootLevelContainerNamedVariant",
                     "name"
                 ]
