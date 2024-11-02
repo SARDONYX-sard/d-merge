@@ -33,5 +33,11 @@
   "i18n-ally.keystyle": "nested",
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.linkedProjects": ["Cargo.toml"]
+  "rust-analyzer.linkedProjects": ["Cargo.toml"],
+  "json.schemas": [
+    {
+      "fileMatch": ["/dummy/convert/input/*.json"],
+      "url": "/dummy/convert/schema.json"
+    }
+  ]
 }

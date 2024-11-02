@@ -9,6 +9,12 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedReadFile { source: io::Error, path: PathBuf },
 
+    /// Parser combinator Error
+    #[snafu(display("{err}"))]
+    ContextError {
+        err: winnow::error::ErrMode<winnow::error::ContextError>,
+    },
+
     /// Parser error
     #[snafu(transparent)]
     FailedParse {

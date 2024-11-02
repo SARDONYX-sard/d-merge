@@ -805,6 +805,7 @@ dependencies = [
  "crc",
  "glob",
  "indexmap 2.6.0",
+ "phf 0.11.2",
  "pretty_assertions",
  "quick_tracing",
  "rayon",
