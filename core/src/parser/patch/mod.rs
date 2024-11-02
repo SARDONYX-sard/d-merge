@@ -1,143 +1,118 @@
 mod class_table;
+mod current_state;
 mod helper;
+mod patch_json;
 mod tag;
 
-use class_table::{find_class_info, find_json_parser_by, FieldInfo};
-use helper::{comment_kind, pointer};
+use self::{
+    class_table::{find_class_info, find_json_parser_by, FieldInfo},
+    current_state::{CurrentPatchJson, CurrentState},
+    helper::{comment_kind, pointer, CommentKind},
+    patch_json::PatchJson,
+    tag::{class_start_tag, end_tag, field_start_tag, start_tag},
+};
+use crate::error::{Error, Result};
+use current_state::PatchType;
+use helper::close_comment;
 use serde_hkx::{
     errors::readable::ReadableError,
-    xml::de::parser::{
-        comment,
-        type_kind::{boolean, real, string, vector4},
-    },
+    xml::de::parser::type_kind::{boolean, real, string, vector4},
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode};
-use std::mem;
-use tag::{class_start_tag, end_tag, field_start_tag, start_tag};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
+    error::ContextError,
     token::take_until,
-    PResult, Parser,
+    Parser,
 };
 
 /// # Errors
 /// Parse failed.
-pub fn patch_value(input: &str) -> Result<Vec<PatchJson<'_>>, ReadableError> {
-    let mut patcher_info = PatcherInfo::new(input);
-    patcher_info.root_class().map_err(|err| {
-        let err_pos = input.len() - patcher_info.input.len();
-        ReadableError::from_context(err, input, err_pos)
-    })?;
+pub fn parse_nemesis_patch(input: &str) -> Result<Vec<PatchJson<'_>>> {
+    let mut patcher_info = PatchDeserializer::new(input);
+    patcher_info
+        .root_class()
+        .map_err(|err| patcher_info.to_readable_err(err))?;
     Ok(patcher_info.output_patches)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Op {
-    Add,
-    Remove,
-    Replace,
-    // Move,
-    // Copy,
-    // Test,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PatchJson<'a> {
-    op: Op,
-    /// $(root), index, className, fieldName
-    /// - e.g. "$.4514.hkbStateMachineStateInfo.generator",
-    path: Vec<&'a str>,
-    /// patch target json value
-    value: BorrowedValue<'a>,
-}
-
-type Patches<'a> = Vec<CurrentPatchJson<'a>>;
-
+/// Nemesis patch deserializer
 #[derive(Debug, Clone, Default)]
-struct TempState<'xml> {
-    field_info: Option<&'static FieldInfo>,
-    mode_code: Option<&'xml str>,
-    is_passed_original: bool,
-    patches: Patches<'xml>,
-}
-
-impl<'de> TempState<'de> {
-    const fn new() -> Self {
-        Self {
-            field_info: None,
-            mode_code: None,
-            patches: Vec::new(),
-            is_passed_original: false,
-        }
-    }
-
-    /// The following is an additional element, so push.
-    /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
-    /// - `<!-- ORIGINAL --!> is not found yet.
-    fn conditional_push(&mut self, path: Vec<&'de str>, value: BorrowedValue<'de>) {
-        if self.mode_code.is_some() && !self.is_passed_original {
-            self.patches.push(CurrentPatchJson { path, value });
-        }
-    }
-
-    const fn judge_operation(&self) -> Op {
-        match self.mode_code.is_some() {
-            true => {
-                if self.is_passed_original {
-                    Op::Replace
-                } else {
-                    Op::Add
-                }
-            }
-            false => Op::Remove,
-        }
-    }
-
-    fn clear_flags(&mut self) {
-        self.mode_code = None;
-        self.is_passed_original = false;
-    }
-}
-
-/// The reason this is necessary is because
-/// `<!-- ORIGINAL -->` or `<! -- CLOSE -->` is read, the operation type cannot be determined.
-#[derive(Debug, Clone, PartialEq)]
-struct CurrentPatchJson<'a> {
-    /// $(root), index, className, fieldName
-    /// - e.g. "$.4514.hkbStateMachineStateInfo.generator",
-    path: Vec<&'a str>,
-    /// patch target json value
-    value: BorrowedValue<'a>,
-}
-
-#[derive(Debug, Clone, Default)]
-struct PatcherInfo<'a> {
+struct PatchDeserializer<'a> {
     /// mutable pointer to str
     input: &'a str,
-    /// Indicates the current json position during one patch file.
-    current_path: Vec<&'a str>,
+    /// This is readonly for error report. Not move position.
+    original: &'a str,
 
-    /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
-    /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
-    current: TempState<'a>,
+    /// Output
+    output_patches: Vec<PatchJson<'a>>,
 
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // current state
     /// N time nested classes fields.
     field_infos: Vec<&'static FieldInfo>,
 
-    output_patches: Vec<PatchJson<'a>>,
+    /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
+    /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
+    pub current: CurrentState<'a>,
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
-impl<'de> PatcherInfo<'de> {
+impl<'de> PatchDeserializer<'de> {
     const fn new(input: &'de str) -> Self {
         Self {
-            input,
-            current_path: Vec::new(),
-            current: TempState::new(),
+            current: CurrentState::new(),
             field_infos: Vec::new(),
+            input,
+            original: input,
             output_patches: Vec::new(),
         }
     }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Parser methods
+
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ContextError>) -> Result<O> {
+        parser
+            .parse_next(&mut self.input)
+            .map_err(|err| Error::ContextError { err })
+    }
+
+    /// Parse by argument parser no consume.
+    ///
+    /// If an error occurs, it is converted to [`ReadableError`] and returned.
+    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ContextError>) -> Result<O> {
+        let (_, res) = parser
+            .parse_peek(self.input)
+            .map_err(|err| Error::ContextError { err })?;
+        Ok(res)
+    }
+
+    /// Convert Visitor errors to position-assigned errors.
+    ///
+    /// # Why is this necessary?
+    /// Because Visitor errors that occur within each `Deserialize` implementation cannot indicate the error location in XML.
+    #[cold]
+    fn to_readable_err(&self, err: Error) -> Error {
+        let readable = match err {
+            Error::ContextError { err } => ReadableError::from_context(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+            Error::ReadableError { source } => source,
+            err => ReadableError::from_display(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+        };
+
+        Error::ReadableError { source: readable }
+    }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     fn push_field_info(&mut self, info: &'static FieldInfo) {
         self.field_infos.push(info);
@@ -149,20 +124,17 @@ impl<'de> PatcherInfo<'de> {
         self.current.field_info = self.field_infos.last().map(|v| &**v);
     }
 
-    fn root_class(&mut self) -> PResult<()> {
-        let (ptr_index, class_name) = class_start_tag.parse_next(&mut self.input)?;
-        self.current_path.push("$");
-        self.current_path.push(ptr_index);
-        self.current_path.push(class_name);
+    fn root_class(&mut self) -> Result<()> {
+        let (ptr_index, class_name) = self.parse_next(class_start_tag)?;
+        self.current.path.push("$".into());
+        self.current.path.push(ptr_index.into());
+        self.current.path.push(class_name.into());
 
         self.push_field_info(
             find_class_info(class_name).unwrap_or_else(|| panic!("Not found {class_name} class")),
         );
 
-        while opt(end_tag("hkobject"))
-            .parse_next(&mut self.input)?
-            .is_none()
-        {
+        while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
             self.field()?;
         }
 
@@ -172,29 +144,73 @@ impl<'de> PatcherInfo<'de> {
 
     /// # Errors
     /// Parse failed.
-    fn field(&mut self) -> PResult<()> {
-        self.opt_comment()?;
-
-        let (field_name, _array_len) = field_start_tag.parse_next(&mut self.input)?;
-        self.current_path.push(field_name);
-
-        let value = if let Some(field_info) = self.current.field_info {
-            if let Some(json_type) = find_json_parser_by(field_name, field_info) {
-                self.parse_value(json_type)?
-            } else {
-                panic!("No field info: {field_name}. expected: {field_info:?}");
-            }
-        } else {
-            panic!("Failed to get field_info");
+    fn field(&mut self) -> Result<()> {
+        if self.parse_start_maybe_comment()? {
+            self.current.change_patch_type(PatchType::Field)?;
         };
 
-        self.current
-            .conditional_push(self.current_path.clone(), value); // FIXME: Wrong
-        end_tag("hkparam").parse_next(&mut self.input)?;
-        self.current_path.pop(); // The class is at the bottom of the hierarchy when we exit field
-        self.opt_comment()?;
+        let (field_name, _array_len) = self.parse_next(field_start_tag)?;
+        self.current.path.push(field_name.into());
+
+        let value = {
+            let field_info = self.current.field_info.ok_or(Error::UnknownFieldName {
+                field_name: field_name.to_string(),
+            })?;
+            let json_type =
+                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownFieldName {
+                    field_name: field_name.to_string(),
+                })?;
+            self.parse_value(json_type)?
+        };
+
+        if self.current.patch_type == Some(PatchType::Field) {
+            self.current.push_current_patch(value);
+        }
+
+        self.parse_next(end_tag("hkparam"))?;
+        self.parse_maybe_close_comment()?;
+        self.current.path.pop(); // The class is at the bottom of the hierarchy when we exit field
 
         Ok(())
+    }
+
+    /// non Array or Struct(Object)
+    /// - Bool
+    /// - I64
+    /// - U64
+    /// - F64
+    /// - Null
+    /// - Pointer
+    /// - String
+    fn parse_plane_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
+        let value = match field_type {
+            "Null" => BorrowedValue::Static(StaticNode::Null),
+            "I64" => {
+                self.parse_next(dec_int.map(|int| BorrowedValue::Static(StaticNode::I64(int))))?
+            }
+            "U64" => {
+                self.parse_next(dec_uint.map(|uint| BorrowedValue::Static(StaticNode::U64(uint))))?
+            }
+            "F64" => self.parse_next(
+                real().map(|real| BorrowedValue::Static(StaticNode::F64(real.into()))),
+            )?,
+            "String" => {
+                self.parse_next(alt((
+                    "\u{2400}".value(BorrowedValue::Static(StaticNode::Null)), // StringPtr | CString
+                    string().map(BorrowedValue::String),
+                )))?
+            } // StringPtr | CString
+            "Pointer" => self.parse_next(pointer)?,
+            "Bool" => self.parse_next(
+                boolean().map(|boolean| BorrowedValue::Static(StaticNode::Bool(boolean))),
+            )?,
+            unknown => {
+                return Err(Error::UnknownFieldType {
+                    field_type: unknown.to_string(),
+                })
+            }
+        };
+        Ok(value)
     }
 
     /// - Bool
@@ -207,46 +223,26 @@ impl<'de> PatcherInfo<'de> {
     /// - Object|<ClassName>
     /// - Array|<TypeName>
     /// - Array|Object|<ClassName>
-    fn parse_value(&mut self, json_parser_type: &'static str) -> PResult<BorrowedValue<'de>> {
-        self.opt_comment()?;
-        multispace0.parse_next(&mut self.input)?;
+    fn parse_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
+        self.parse_next(multispace0)?;
+        if self.parse_start_maybe_comment()? {
+            self.current.change_patch_type(PatchType::Value)?;
+        };
+        self.parse_next(multispace0)?;
 
-        let value = match json_parser_type {
-            "Null" => BorrowedValue::Static(StaticNode::Null),
-            "I64" => dec_int
-                .map(|int| BorrowedValue::Static(StaticNode::I64(int)))
-                .parse_next(&mut self.input)?,
-            "U64" => dec_uint
-                .map(|uint| BorrowedValue::Static(StaticNode::U64(uint)))
-                .parse_next(&mut self.input)?,
-            "F64" => real()
-                .map(|real| BorrowedValue::Static(StaticNode::F64(real.into())))
-                .parse_next(&mut self.input)?,
-            "String" => {
-                alt((
-                    "\u{2400}".value(BorrowedValue::Static(StaticNode::Null)), // StringPtr | CString
-                    string().map(BorrowedValue::String),
-                ))
-                .parse_next(&mut self.input)?
-            } // StringPtr | CString
-            "Pointer" => pointer.parse_next(&mut self.input)?,
-            "Bool" => boolean()
-                .map(|boolean| BorrowedValue::Static(StaticNode::Bool(boolean)))
-                .parse_next(&mut self.input)?,
+        let value = match field_type {
             obj if obj.starts_with("Object|") => {
                 let class_name = &obj[7..]; // Remove "object|"
 
                 if class_name.starts_with("Vector4") {
-                    vector4()
-                        .map(|v| {
-                            let mut obj = Object::new();
-                            obj.insert("x".into(), v.x.into());
-                            obj.insert("y".into(), v.y.into());
-                            obj.insert("z".into(), v.z.into());
-                            obj.insert("w".into(), v.w.into());
-                            BorrowedValue::Object(Box::new(obj))
-                        })
-                        .parse_next(&mut self.input)?
+                    self.parse_next(vector4().map(|v| {
+                        let mut obj = Object::new();
+                        obj.insert("x".into(), v.x.into());
+                        obj.insert("y".into(), v.y.into());
+                        obj.insert("z".into(), v.z.into());
+                        obj.insert("w".into(), v.w.into());
+                        BorrowedValue::Object(Box::new(obj))
+                    }))?
                 } else {
                     self.class_in_field(class_name)? // Start with `<hkobject>`
                 }
@@ -257,36 +253,54 @@ impl<'de> PatcherInfo<'de> {
 
                 if name.starts_with("String") {
                     // TODO: Array target (e.g. `Array|Vector4`)
-                    while {
-                        let (_remain, res) = opt(end_tag("hkparam")).parse_peek(self.input)?;
-                        res.is_none()
-                    } {
-                        self.opt_comment()?;
-                        start_tag("hkcstring").parse_next(&mut self.input)?;
-                        let value = self.parse_value(name)?;
-                        end_tag("hkcstring").parse_next(&mut self.input)?;
-                        self.opt_comment()?;
-                        vec.push(value);
+                    let mut index = 0;
+                    while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+                        if self.parse_start_maybe_comment()? {
+                            self.current.change_patch_type(PatchType::Value)?;
+                        };
+                        self.parse_next(start_tag("hkcstring"))?;
+
+                        let value = self.parse_plane_value(name)?;
+                        index += 1;
+                        if matches!(self.current.patch_type, Some(PatchType::Value)) {
+                            self.current.path.push(index.to_string().into());
+                            self.current.push_current_patch(value);
+                        } else {
+                            vec.push(value);
+                        };
+                        self.parse_next(end_tag("hkcstring"))?;
+                        self.parse_maybe_close_comment()?;
                     }
                 } else if !name.starts_with("Null") {
-                    // TODO: Array target (e.g. `Array|Vector4`)
-                    while {
-                        let (_remain, res) = opt(end_tag("hkparam")).parse_peek(self.input)?;
-                        res.is_none()
-                    } {
+                    while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+                        if self.parse_start_maybe_comment()? {
+                            self.current.change_patch_type(PatchType::Value)?;
+                        };
                         let value = self.parse_value(name)?;
-                        vec.push(value);
+                        if matches!(self.current.patch_type, Some(PatchType::Value)) {
+                            self.current.push_current_patch(value);
+                        } else {
+                            vec.push(value);
+                        };
+                        self.parse_maybe_close_comment()?;
                     }
                 };
-
                 BorrowedValue::Array(Box::new(vec)) // `Null`(void)
             }
-            unknown => panic!("Unknown type: {unknown}"),
+            other => self.parse_plane_value(other)?,
         };
 
-        multispace0.parse_next(&mut self.input)?;
-        self.opt_comment()?;
+        let value = if self.current.patch_type == Some(PatchType::Value) {
+            self.current.push_current_patch(value);
+            // NOTE: Since the comment indicates that the change is to change a single value,
+            //       the `value` is used only within this function, so a dummy is returned.
+            Default::default()
+        } else {
+            value
+        };
 
+        self.parse_next(multispace0)?;
+        self.parse_maybe_close_comment()?;
         Ok(value)
     }
 
@@ -294,85 +308,111 @@ impl<'de> PatcherInfo<'de> {
 
     /// # Errors
     /// Parse failed.
-    fn class_in_field(&mut self, class_name: &str) -> PResult<BorrowedValue<'de>> {
-        start_tag("hkobject").parse_next(&mut self.input)?;
+    fn class_in_field(&mut self, class_name: &'static str) -> Result<BorrowedValue<'de>> {
+        self.parse_next(start_tag("hkobject"))?;
+        self.current.path.push(class_name.into());
 
-        // dbg!(&self);
-
-        dbg!("field in class");
-        self.push_field_info(
-            find_class_info(class_name).unwrap_or_else(|| panic!("Not found {class_name} class")),
-        );
+        {
+            let field_info = find_class_info(class_name).ok_or(Error::UnknownClassName {
+                class_name: class_name.to_string(),
+            })?;
+            self.push_field_info(field_info);
+        }
 
         let mut obj = Object::new();
-        while opt(end_tag("hkobject"))
-            .parse_next(&mut self.input)?
-            .is_none()
-        {
+        while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
             let (field_name, value) = self.get_field()?;
-            dbg!(&field_name, &value);
             obj.insert(field_name.into(), value);
         }
 
         self.pop_field_info();
+        self.current.path.pop();
 
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     /// # Errors
     /// Parse failed.
-    fn get_field(&mut self) -> PResult<(&'de str, BorrowedValue<'de>)> {
-        self.opt_comment()?;
-
-        let (field_name, _array_len) = field_start_tag.parse_next(&mut self.input)?;
-        self.current_path.push(field_name);
-
-        let value = if let Some(field_info) = self.current.field_info {
-            if let Some(json_type) = find_json_parser_by(field_name, field_info) {
-                self.parse_value(json_type)?
-            } else {
-                panic!("No field info: {field_name}. expected: {field_info:?}");
-            }
-        } else {
-            panic!("Failed to get field_info");
+    fn get_field(&mut self) -> Result<(&'de str, BorrowedValue<'de>)> {
+        if self.parse_start_maybe_comment()? {
+            self.current.change_patch_type(PatchType::Field)?;
         };
-        self.opt_comment()?;
+        let (field_name, _) = self.parse_next(field_start_tag)?;
 
+        let value = {
+            self.current.path.push(field_name.into());
+            let field_info = self.current.field_info.ok_or(Error::UnknownFieldName {
+                field_name: field_name.to_string(),
+            })?;
+            let json_type =
+                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownFieldName {
+                    field_name: field_name.to_string(),
+                })?;
+            self.parse_value(json_type)?
+        };
+
+        let value = if self.current.patch_type == Some(PatchType::Field) {
+            self.current.push_current_patch(value);
+            Default::default()
+        } else {
+            value
+        };
+        self.parse_next(end_tag("hkparam"))?;
+        self.parse_maybe_close_comment()?;
         Ok((field_name, value))
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fn opt_comment(&mut self) -> PResult<()> {
-        if let Some(mut xml_comment) = opt(comment()).parse_next(&mut self.input)? {
-            let comment_ty = comment_kind.parse_next(&mut xml_comment)?;
+    /// # Return
+    /// Is the mode code comment?
+    fn parse_start_maybe_comment(&mut self) -> Result<bool> {
+        if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
             match comment_ty {
-                helper::CommentKind::ModCode(id) => self.current.mode_code = Some(id),
-                helper::CommentKind::Original => {
-                    self.current.is_passed_original = true;
-                    // FIXME: Support Caseless
-                    take_until(0.., "<!-- CLOSE -->").parse_next(&mut self.input)?;
-                    self.add_patches_json();
+                CommentKind::ModCode(id) => {
+                    self.current.mode_code = Some(id);
+                    return Ok(true);
                 }
-                helper::CommentKind::Close => self.add_patches_json(),
-            }
-        };
+                CommentKind::Original => {
+                    self.current.set_is_passed_original();
+                    self.parse_next(take_until(0.., "<!-- CLOSE -->"))?; // FIXME: Support Caseless
 
+                    self.add_patch_json();
+                }
+                CommentKind::Close => {
+                    self.current.patch_type = None;
+                    self.add_patch_json();
+                }
+                CommentKind::Unknown(_) => {}
+            }
+        }
+        Ok(false)
+    }
+
+    /// ORIGINAL or CLOSE
+    fn parse_maybe_close_comment(&mut self) -> Result<()> {
+        if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
+            match comment_ty {
+                CommentKind::Original => {
+                    self.current.set_is_passed_original();
+                    self.parse_next(take_until(0.., "<!-- CLOSE -->"))?; // FIXME: Support Caseless
+
+                    self.add_patch_json();
+                }
+                CommentKind::Close => {
+                    self.current.patch_type = None;
+                    self.add_patch_json();
+                }
+                _ => unreachable!(),
+            }
+        }
         Ok(())
     }
 
-    fn add_patches_json(&mut self) {
-        // take & reset current states
-        let op = self.current.judge_operation();
-        let patches = mem::take(&mut self.current.patches);
-        self.current.clear_flags();
-
-        for json in patches {
-            self.output_patches.push(PatchJson {
-                op,
-                path: json.path.clone(),
-                value: json.value,
-            });
+    fn add_patch_json(&mut self) {
+        let (op, patches) = self.current.take_patches();
+        for CurrentPatchJson { path, value } in patches {
+            self.output_patches.push(PatchJson { op, path, value });
         }
     }
 }
@@ -380,6 +420,7 @@ impl<'de> PatcherInfo<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use patch_json::Op;
 
     #[test]
     fn replace_field() {
@@ -395,18 +436,20 @@ mod tests {
 		</hkobject>
 "###;
 
-        let actual = patch_value(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
             vec![PatchJson {
                 op: Op::Replace,
-                path: vec!["$", "0010", "hkbProjectData", "stringData"],
+                path: vec!["$", "0010", "hkbProjectData", "stringData"]
+                    .into_iter()
+                    .map(|s| s.into())
+                    .collect(),
                 value: "$id".into(),
             }]
         );
     }
 
-    #[ignore = "cannot pass yet."]
     #[test]
     fn push_array() {
         let nemesis_xml = r###"
@@ -427,44 +470,62 @@ mod tests {
 		</hkobject>
 "###;
 
-        let actual = patch_value(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
             vec![PatchJson {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
-                path: vec!["$", "0009", "hkbProjectData", "characterFilenames[:]"],
+                path: vec![
+                    "$",
+                    "0009",
+                    "hkbProjectStringData",
+                    "characterFilenames",
+                    "2"
+                ]
+                .into_iter()
+                .map(|s| s.into())
+                .collect(),
                 value: "PushDummy".into(),
             }]
         );
     }
 
-    #[ignore = "cannot pass yet."]
     #[test]
     fn field_in_class_patch() {
         let nemesis_xml = r###"
 		<hkobject name="#0008" class="hkRootLevelContainer" signature="0x2772c11e">
 			<hkparam name="namedVariants" numelements="1">
 				<hkobject>
-<!-- MOD_CODE ~id~ OPEN --!>
+<!-- MOD_CODE ~id~ OPEN -->
 					<hkparam name="name">ReplaceDummy</hkparam>
-<!-- ORIGINAL --!>
+<!-- ORIGINAL -->
 					<hkparam name="name">hkbProjectData</hkparam>
-<!-- CLOSE --!>
+<!-- CLOSE -->
 					<hkparam name="className">hkbProjectData</hkparam>
 					<hkparam name="variant">#0010</hkparam>
 				</hkobject>
 			</hkparam>
 		</hkobject>
 "###;
-        let actual = patch_value(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
             vec![PatchJson {
-                op: Op::Add,
+                op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
-                path: vec!["$", "0009", "hkbProjectData", "characterFilenames"],
-                value: "PushDummy".into(),
+                path: [
+                    "$",
+                    "0008",
+                    "hkRootLevelContainer",
+                    "namedVariants",
+                    "hkRootLevelContainerNamedVariant",
+                    "name"
+                ]
+                .into_iter()
+                .map(|s| s.into())
+                .collect(),
+                value: "ReplaceDummy".into()
             }]
         );
     }
