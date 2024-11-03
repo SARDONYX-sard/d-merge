@@ -20,8 +20,8 @@ use serde_hkx::{
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode};
 use winnow::{
-    ascii::{dec_int, dec_uint, multispace0},
-    combinator::{alt, opt},
+    ascii::{dec_int, dec_uint, multispace0, Caseless},
+    combinator::{alt, opt, terminated},
     error::ContextError,
     token::take_until,
     Parser,
@@ -374,22 +374,11 @@ impl<'de> PatchDeserializer<'de> {
     /// Is the mode code comment?
     fn parse_start_maybe_comment(&mut self) -> Result<bool> {
         if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
-            match comment_ty {
-                CommentKind::ModCode(id) => {
-                    self.current.mode_code = Some(id);
-                    return Ok(true);
-                }
-                CommentKind::Original => {
-                    self.current.set_is_passed_original();
-                    self.parse_next(take_until(0.., "<!-- CLOSE -->"))?; // FIXME: Support Caseless
-
-                    self.add_patch_json();
-                }
-                CommentKind::Close => {
-                    self.current.patch_type = None;
-                    self.add_patch_json();
-                }
-                CommentKind::Unknown(_) => {}
+            if let CommentKind::ModCode(id) = comment_ty {
+                self.current.mode_code = Some(id);
+                return Ok(true);
+            } else {
+                return Ok(false);
             }
         }
         Ok(false)
@@ -401,8 +390,10 @@ impl<'de> PatchDeserializer<'de> {
             match comment_ty {
                 CommentKind::Original => {
                     self.current.set_is_passed_original();
-                    self.parse_next(take_until(0.., "<!-- CLOSE -->"))?; // FIXME: Support Caseless
-
+                    self.parse_next(terminated(
+                        take_until(0.., "<!--"),
+                        Caseless("<!-- CLOSE -->"),
+                    ))?;
                     self.add_patch_json();
                 }
                 CommentKind::Close => {
