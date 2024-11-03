@@ -90,9 +90,14 @@ pub(crate) fn close_comment<'a>(input: &mut &'a str) -> PResult<CommentKind<'a>>
         let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
         let close_parser = delimited_multispace0(Caseless("CLOSE"));
 
+        let ignore_parser = delimited_multispace0(
+            (take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take(),
+        );
+
         alt((
             original_parser.value(CommentKind::Original),
             close_parser.value(CommentKind::Close),
+            ignore_parser.map(CommentKind::Unknown),
         ))
     };
     let comment_parser = delimited("<!--", kind_parser, "-->");
@@ -129,16 +134,22 @@ mod tests {
         );
 
         assert_eq!(
-            comment_kind.parse("<!-- ORIGINAL -->"),
+            close_comment.parse("<!-- ORIGINAL -->"),
             Ok(CommentKind::Original)
         );
 
-        assert_eq!(comment_kind.parse("<!-- CLOSE -->"), Ok(CommentKind::Close));
-        assert_eq!(comment_kind.parse("<!--CLOSE  -->"), Ok(CommentKind::Close));
+        assert_eq!(
+            close_comment.parse("<!-- CLOSE -->"),
+            Ok(CommentKind::Close)
+        );
+        assert_eq!(
+            close_comment.parse("<!--CLOSE  -->"),
+            Ok(CommentKind::Close)
+        );
 
         assert_eq!(
-            comment_kind.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),
-            Ok(CommentKind::Unknown(" memSizeAndFlags SERIALIZE_IGNORED "))
+            close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),
+            Ok(CommentKind::Unknown("memSizeAndFlags SERIALIZE_IGNORED"))
         );
     }
 }
