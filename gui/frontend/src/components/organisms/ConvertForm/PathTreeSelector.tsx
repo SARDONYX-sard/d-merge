@@ -15,6 +15,7 @@ import { TreeItem2Provider } from '@mui/x-tree-view/TreeItem2Provider';
 import { type UseTreeItem2Parameters, useTreeItem2 } from '@mui/x-tree-view/useTreeItem2';
 import { type HTMLAttributes, type Ref, type SyntheticEvent, forwardRef, useRef } from 'react';
 
+import { hashDjb2 } from '@/lib/hash-djb2';
 import { OBJECT } from '@/lib/object-utils';
 
 import { useConvertContext } from './ConvertProvider';
@@ -195,7 +196,7 @@ const CustomTreeItem = forwardRef(function CustomTreeItem(props: CustomTreeItemP
           </TreeItem2IconContainer>
           <TreeItem2Checkbox {...getCheckboxProps()} />
           <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
-            {renderStatusIcon(convertStatuses.get(Number(id)) ?? 0)}
+            {renderStatusIcon(convertStatuses.get(hashDjb2(itemId)) ?? 0)}
             <TreeItem2Label {...getLabelProps()} />
           </Box>
         </CustomTreeItemContent>
