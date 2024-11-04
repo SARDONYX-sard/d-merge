@@ -57,8 +57,8 @@ pub struct AnimSetData<'a> {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Condition<'a> {
     pub variable_name: Str<'a>,
-    pub value1: i32,
-    pub value2: i32,
+    pub value_a: i32,
+    pub value_b: i32,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -84,7 +84,7 @@ pub struct AnimInfo {
     /// assert_eq!(core::str::from_utf8(&u32::to_le_bytes(7891816)), Ok("hkx\0"));
     /// assert_eq!(core::str::from_utf8(&[0x78, 0x6b, 0x68]), Ok("xkh"));
     /// ```
-    pub hashed_extension: u32,
+    pub ascii_extension: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -217,8 +217,8 @@ fn conditions<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Condition<'a>>, C
                 seq! {
                     Condition {
                         variable_name: one_line.context(Expected(Description("variable_name: str"))),
-                        value1: from_one_line.context(Expected(Description("value1: i32"))),
-                        value2: from_one_line.context(Expected(Description("value2: i32"))),
+                        value_a: from_one_line.context(Expected(Description("value_a: i32"))),
+                        value_b: from_one_line.context(Expected(Description("value_b: i32"))),
                     }
                 }
                 .context(Label("Condition"))
@@ -260,7 +260,7 @@ fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, Contex
                     AnimInfo {
                         hashed_path: from_one_line.context(Expected(Description("hashed_path: u32"))),
                         hashed_file_name: from_one_line.context(Expected(Description("hashed_file_name: u32"))),
-                        hashed_extension: from_one_line.context(Expected(Description("hashed_extension: u32"))),
+                        ascii_extension: from_one_line.context(Expected(Description("ascii_extension: u32"))),
                     }
                 }
                 .context(Label("AnimInfo"))
