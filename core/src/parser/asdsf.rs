@@ -12,8 +12,7 @@
 //! let input = "..."; // Input data from the animation file
 //! let result = parse_asdsf(input).unwrap();
 //! ```
-
-use super::lines::{from_one_line, lines, num_bool_line, one_line};
+use super::lines::{from_one_line, lines, num_bool_line, one_line, Str};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
@@ -27,7 +26,7 @@ use winnow::{
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Asdsf<'a> {
     /// A list of project names parsed from the input.
-    pub txt_projects: Vec<&'a str>,
+    pub txt_projects: Vec<Str<'a>>,
 
     /// A list of animation data corresponding to each project.
     pub anim_set_list: Vec<AnimSetData<'a>>,
@@ -37,14 +36,15 @@ pub struct Asdsf<'a> {
 ///
 /// This structure holds the header information for the animation and the
 /// associated clip animation and motion blocks.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnimSetData<'a> {
     pub file_names_len: Option<usize>,
-    pub file_names: Option<Vec<&'a str>>,
+    pub file_names: Option<Vec<Str<'a>>>,
     /// always `V3`
-    pub version: &'a str,
+    pub version: Str<'a>,
     pub triggers_len: usize,
-    pub triggers: Vec<&'a str>,
+    pub triggers: Vec<Str<'a>>,
     pub conditions_len: usize,
     pub conditions: Vec<Condition<'a>>,
     pub attacks_len: usize,
@@ -53,21 +53,24 @@ pub struct AnimSetData<'a> {
     pub anim_infos: Vec<AnimInfo>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Condition<'a> {
-    pub variable_name: &'a str,
+    pub variable_name: Str<'a>,
     pub value1: i32,
     pub value2: i32,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Attack<'a> {
-    pub attack_trigger: &'a str,
+    pub attack_trigger: Str<'a>,
     pub unknown: bool,
     pub clip_names_len: usize,
-    pub clip_names: Vec<&'a str>,
+    pub clip_names: Vec<Str<'a>>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnimInfo {
     /// CRC32 representation path
@@ -125,7 +128,7 @@ fn asdsf<'a>(input: &mut &'a str) -> PResult<Asdsf<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn txt_projects<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
+fn txt_projects<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
     let line_len = from_one_line
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
@@ -145,7 +148,7 @@ fn txt_projects<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
 fn anim_set_data<'a>(input: &mut &'a str) -> PResult<AnimSetData<'a>> {
     let file_names_len = opt(one_line
         .verify(|line: &str| line != "V3")
-        .parse_to()
+        .try_map(|s| s.as_ref().parse::<usize>())
         .context(Expected(Description("file_names_len: usize"))))
     .parse_next(input)?;
 

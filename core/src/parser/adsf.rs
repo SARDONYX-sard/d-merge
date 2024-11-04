@@ -13,7 +13,7 @@
 //! let result = parse_adsf(input).unwrap();
 //! ```
 
-use super::lines::{from_one_line, lines, num_bool_line, one_line};
+use super::lines::{from_one_line, lines, num_bool_line, one_line, Str};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -30,10 +30,11 @@ use winnow::{
 ///
 /// This structure contains the names of the projects and a list of associated
 /// animation data.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Adsf<'a> {
     /// A list of project names parsed from the input.
-    pub project_names: Vec<&'a str>,
+    pub project_names: Vec<Str<'a>>,
 
     /// A list of animation data corresponding to each project.
     pub anim_list: Vec<AnimData<'a>>,
@@ -43,6 +44,7 @@ pub struct Adsf<'a> {
 ///
 /// This structure holds the header information for the animation and the
 /// associated clip animation and motion blocks.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AnimData<'a> {
     /// The header containing metadata about the animation data.
@@ -59,6 +61,7 @@ pub struct AnimData<'a> {
 ///
 /// This structure contains metadata related to the animation data, such as
 /// the number of lines remaining, asset count, and project assets.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AnimDataHeader<'a> {
     /// Number of lines remaining representing `anim_data` after this line is read.
@@ -71,7 +74,7 @@ pub struct AnimDataHeader<'a> {
     pub project_assets_len: usize,
 
     /// A list of project asset names.
-    pub project_assets: Vec<&'a str>,
+    pub project_assets: Vec<Str<'a>>,
 
     /// Indicates whether motion data is available.
     pub has_motion_data: bool,
@@ -88,13 +91,14 @@ impl AnimDataHeader<'_> {
 ///
 /// This structure contains information about a single animation clip, such
 /// as playback speed and the trigger names associated with the clip.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipAnimDataBlock<'a> {
     /// The name of the animation clip.
-    pub name: &'a str,
+    pub name: Str<'a>,
 
     /// An identifier for the animation clip.
-    pub clip_id: &'a str,
+    pub clip_id: Str<'a>,
 
     /// The playback speed of the animation.
     pub play_back_speed: f32,
@@ -109,7 +113,7 @@ pub struct ClipAnimDataBlock<'a> {
     pub trigger_names_len: usize,
 
     /// A list of names that trigger the animation.
-    pub trigger_names: Vec<&'a str>,
+    pub trigger_names: Vec<Str<'a>>,
 }
 
 impl ClipAnimDataBlock<'_> {
@@ -123,10 +127,11 @@ impl ClipAnimDataBlock<'_> {
 ///
 /// This structure contains information about the duration and translation
 /// and rotation data for a specific motion clip.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipMotionBlock<'a> {
     /// An identifier for the clip associated with this motion block.
-    pub clip_id: &'a str,
+    pub clip_id: Str<'a>,
 
     /// The duration of the motion in seconds.
     pub duration: f32,
@@ -154,6 +159,7 @@ impl ClipMotionBlock<'_> {
 /// Represents the rotation data using a quaternion,
 /// where time indicates the moment of the rotation,
 /// and x, y, z, w represent the quaternion components.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Rotation {
     /// The timestamp in seconds at which this rotation occurs.
@@ -173,10 +179,11 @@ pub struct Rotation {
     pub w: f32,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
 /// Represents the translation data (movement in space),
 /// where time indicates the moment of translation,
 /// and x, y, z represent the movement along the respective axes.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Translation {
     /// The timestamp in seconds at which this translation occurs.
     pub time: f32,
@@ -203,7 +210,9 @@ pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
 }
 
 fn adsf<'a>(input: &mut &'a str) -> PResult<Adsf<'a>> {
-    let project_names = project_names.parse_next(input)?;
+    let project_names = project_names
+        .context(Expected(Description("project_names: *.txt")))
+        .parse_next(input)?;
 
     let mut anim_list = vec![];
     for _ in 0..project_names.len() {
@@ -222,17 +231,14 @@ fn adsf<'a>(input: &mut &'a str) -> PResult<Adsf<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn project_names<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
-    let line_len = from_one_line.parse_next(input)?;
+fn project_names<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
+    let line_len = from_one_line
+        .context(Expected(Description("project_names_len: usize")))
+        .parse_next(input)?;
 
-    let mut project_names = vec![];
-    for _ in 0..line_len {
-        let project_name = one_line
-            .context(Expected(Description("project_name")))
-            .parse_next(input)?;
-        project_names.push(project_name);
-    }
-    Ok(project_names)
+    lines(line_len)
+        .context(Expected(Description("project_names: Vec<Str>")))
+        .parse_next(input)
 }
 
 /// Parses animation data from the input.
@@ -271,9 +277,9 @@ fn anim_data<'a>(input: &mut &'a str) -> PResult<AnimData<'a>> {
 fn anim_header<'a>(input: &mut &'a str) -> PResult<AnimDataHeader<'a>> {
     let header = seq! {
         AnimDataHeader {
-            line_range: one_line.parse_to().context(Expected(Description("anim_line_len: usize"))),
-            lead_int: one_line.parse_to().context(Expected(Description("lead_int: i32"))),
-            project_assets_len: one_line.parse_to().context(Expected(Description("project_assets_len: usize"))),
+            line_range: from_one_line.context(Expected(Description("anim_line_len: usize"))),
+            lead_int: from_one_line.context(Expected(Description("lead_int: i32"))),
+            project_assets_len: from_one_line.context(Expected(Description("project_assets_len: usize"))),
             project_assets: lines(project_assets_len).context(Expected(Description("project_assets: Vec<str>"))),
             has_motion_data: num_bool_line.context(Expected(Description("has_motion_data: 1 | 0"))),
         }
@@ -291,9 +297,9 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> PResult<ClipAnimDataBlock<'a>> {
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        play_back_speed: one_line.parse_to().context(Expected(Description("play_back_speed: f32"))),
-        crop_start_local_time: one_line.parse_to().context(Expected(Description("crop_start_local_time: f32"))),
-        crop_end_local_time: one_line.parse_to().context(Expected(Description("crop_end_local_time: f32"))),
+        play_back_speed: from_one_line.context(Expected(Description("play_back_speed: f32"))),
+        crop_start_local_time: from_one_line.context(Expected(Description("crop_start_local_time: f32"))),
+        crop_end_local_time: from_one_line.context(Expected(Description("crop_end_local_time: f32"))),
         trigger_names_len: from_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
         _: line_ending.context(Expected(Description("empty line"))),
@@ -327,7 +333,7 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> PResult<Vec<ClipMotionBlock<'a
 fn clip_motion_block<'a>(input: &mut &'a str) -> PResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        duration: one_line.parse_to().context(Expected(Description("duration: f32"))),
+        duration: from_one_line.context(Expected(Description("duration: f32"))),
         translation_len: from_one_line.context(Expected(Description("translation_len: usize"))),
         translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
         rotation_len: from_one_line.context(Expected(Description("rotation_len: usize"))),
