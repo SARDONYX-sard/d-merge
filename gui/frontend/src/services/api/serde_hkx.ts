@@ -10,8 +10,8 @@ export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json' | 'yaml';
  * - `output`: Output dir.
  * @throws Error
  */
-export async function convert(inputs: string[], output: string, format: OutFormat) {
-  await invoke('convert', { inputs, output, format });
+export async function convert(inputs: string[], output: string, format: OutFormat, roots?: string[]) {
+  await invoke('convert', { inputs, output, format, roots });
 }
 
 /**

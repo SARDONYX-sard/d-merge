@@ -51,20 +51,19 @@ p.Mui-error {
   color: var(--error-color);
 }
 
-a,
-span.Mui-checked>svg,
-.MuiInputBase-root.MuiOutlinedInput-root.MuiInputBase-colorPrimary.Mui-focused>fieldset,
-/* Bottom Navigation */
+.Mui-checked,
 .Mui-selected,
-.MuiButton-outlined {
+.MuiButton-outlined,
+.MuiButton-root.MuiButton-text,
+.MuiCircularProgress-svg,
+.MuiInputBase-root.MuiOutlinedInput-root.MuiInputBase-colorPrimary.Mui-focused>fieldset,
+[class$="MuiFormLabel-root"].Mui-focused,
+[class$="MuiInputBase-root-MuiInput-root"]::after,
+label.Mui-focused,
+a,
+span.Mui-checked>svg {
   color: var(--theme-color) !important;
   border-color: var(--theme-color);
-}
-
-label.Mui-focused,
-.MuiButton-root.MuiButton-text,
-.MuiCircularProgress-svg {
-  color: var(--theme-color) !important;
 }
 
 .MuiButton-outlined {

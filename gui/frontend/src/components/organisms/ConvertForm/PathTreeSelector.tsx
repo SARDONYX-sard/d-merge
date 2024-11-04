@@ -15,6 +15,7 @@ import { TreeItem2Provider } from '@mui/x-tree-view/TreeItem2Provider';
 import { type UseTreeItem2Parameters, useTreeItem2 } from '@mui/x-tree-view/useTreeItem2';
 import { type HTMLAttributes, type Ref, type SyntheticEvent, forwardRef, useRef } from 'react';
 
+import { useTranslation } from '@/components/hooks/useTranslation';
 import { hashDjb2 } from '@/lib/hash-djb2';
 import { OBJECT } from '@/lib/object-utils';
 
@@ -74,6 +75,7 @@ export function PathTreeSelector() {
   const { selectedTree, setSelectedTree } = useConvertContext();
   const toggledItemRef = useRef<{ [itemId: string]: boolean }>({});
   const apiRef = useTreeViewApiRef();
+  const { t } = useTranslation();
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const [expandedItems, setExpandedItems] = [
@@ -145,8 +147,12 @@ export function PathTreeSelector() {
 
   return (
     <Box sx={{ minHeight: 352, minWidth: 250 }}>
-      <Button onClick={handleSelectClick}>{selectedFiles.length === 0 ? 'Select all' : 'Unselect all'}</Button>
-      <Button onClick={handleExpandClick}>{expandedItems.length === 0 ? 'Expand all' : 'Collapse all'}</Button>
+      <Button onClick={handleSelectClick}>
+        {selectedFiles.length === 0 ? t('convert-select-all') : t('convert-unselect-all')}
+      </Button>
+      <Button onClick={handleExpandClick}>
+        {expandedItems.length === 0 ? t('convert-expand-all') : t('convert-collapse-all')}
+      </Button>
 
       <RichTreeView
         apiRef={apiRef}

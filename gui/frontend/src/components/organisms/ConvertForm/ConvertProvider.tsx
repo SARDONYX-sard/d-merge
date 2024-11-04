@@ -32,6 +32,7 @@ export type ConvertStatusesMap = Map<number, ConvertStatusPayload['status']>;
 export type SelectedTree = {
   selectedItems: string[];
   expandedItems: string[];
+  roots: string[];
   tree: TreeViewBaseItem[];
 };
 
@@ -62,6 +63,7 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(PUB_CACHE_OBJ.convertSelectedTree, {
     expandedItems: [],
     selectedItems: [],
+    roots: [],
     tree: [],
   });
   const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');

@@ -45,17 +45,17 @@ export const PathSelector = () => {
     });
 
     if (selectionType === 'tree') {
-      const tree = await (async () => {
+      const roots = (() => {
         if (Array.isArray(newSelectedPaths)) {
-          return await loadDirNode(newSelectedPaths);
+          return newSelectedPaths;
         }
         if (newSelectedPaths !== null) {
-          return await loadDirNode([newSelectedPaths]);
+          return [newSelectedPaths];
         }
       })();
 
-      if (tree) {
-        setSelectedTree({ ...selectedTree, tree });
+      if (roots) {
+        setSelectedTree({ ...selectedTree, roots, tree: await loadDirNode(roots) });
       }
       return;
     }

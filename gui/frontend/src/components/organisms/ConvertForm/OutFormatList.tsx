@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { NOTIFY } from '@/lib/notify';
 import { isSupportedExtraFmt } from '@/services/api/serde_hkx';
@@ -11,6 +12,7 @@ import type { SelectChangeEvent } from '@mui/material';
 export const OutFormatList = () => {
   const { fmt, setFmt } = useConvertContext();
   const [isSupportedExtra, setIsSupportedExtra] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     NOTIFY.asyncTry(async () => {
@@ -50,5 +52,12 @@ export const OutFormatList = () => {
     ...extra,
   ] as const;
 
-  return <SelectWithLabel label={'Output Format'} menuItems={menuItems} onChange={handleOnChange} value={fmt} />;
+  return (
+    <SelectWithLabel
+      label={t('convert-output-fmt-label')}
+      menuItems={menuItems}
+      onChange={handleOnChange}
+      value={fmt}
+    />
+  );
 };

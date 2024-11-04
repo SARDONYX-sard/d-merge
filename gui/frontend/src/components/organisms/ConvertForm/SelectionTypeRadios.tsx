@@ -1,10 +1,13 @@
-import { FormControl, FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material';
+import { FormControl, FormControlLabel, FormLabel, Radio, RadioGroup, Tooltip } from '@mui/material';
 import { type ComponentPropsWithRef, useId } from 'react';
+
+import { useTranslation } from '@/components/hooks/useTranslation';
 
 import { normalize, useConvertContext } from './ConvertProvider';
 
 export const SelectionTypeRadios = () => {
   const { selectionType, setSelectionType, setConvertStatuses } = useConvertContext();
+  const { t } = useTranslation();
   const radioLabelId = useId();
 
   const handleSelectionTypeChange: ComponentPropsWithRef<'input'>['onChange'] = (event) => {
@@ -12,10 +15,16 @@ export const SelectionTypeRadios = () => {
     setConvertStatuses(new Map()); // Clear to prevent mixing of file index and dir index status.
   };
 
+  const options = [
+    { label: t('convert-selection-type-dirs'), value: 'dir', tooltip: t('convert-selection-type-dirs-tooltip') },
+    { label: t('convert-selection-type-tree'), value: 'tree', tooltip: t('convert-selection-type-tree-tooltip') },
+    { label: t('convert-selection-type-files'), value: 'files', tooltip: t('convert-selection-type-files-tooltip') },
+  ];
+
   return (
     <FormControl>
       <FormLabel component='legend' id={radioLabelId}>
-        Selection Type
+        {t('convert-selection-type-label')}
       </FormLabel>
       <RadioGroup
         aria-labelledby={radioLabelId}
@@ -24,9 +33,11 @@ export const SelectionTypeRadios = () => {
         row={true}
         value={selectionType}
       >
-        <FormControlLabel control={<Radio />} label='Files' value='files' />
-        <FormControlLabel control={<Radio />} label='Tree' value='tree' />
-        <FormControlLabel control={<Radio />} label='Directories' value='dir' />
+        {options.map((option) => (
+          <Tooltip key={option.value} placement='top' title={option.tooltip}>
+            <FormControlLabel control={<Radio />} label={option.label} value={option.value} />
+          </Tooltip>
+        ))}
       </RadioGroup>
     </FormControl>
   );

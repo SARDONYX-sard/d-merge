@@ -4,7 +4,7 @@ use d_merge_core::path_node::{build_dir_tree, DirEntry};
 use futures::{future::join_all, stream::FuturesUnordered};
 use rayon::prelude::*;
 use serde_hkx_features::convert::{convert as serde_hkx_convert, OutFormat};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::Window;
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,15 +70,18 @@ struct Payload {
 }
 
 /// Convert hkx <-> xml
+/// -
 #[tauri::command]
 pub(crate) async fn convert(
     window: Window,
     inputs: Vec<String>,
     output: Option<String>,
     format: &str,
+    roots: Option<Vec<String>>,
 ) -> Result<(), String> {
     let format = OutFormat::from_str(format).or_else(|err| bail!(err))?;
     let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
+    let strip_roots = roots.unwrap_or_default();
 
     let status_sender = sender(window, "d_merge://progress/convert");
 
@@ -86,9 +89,16 @@ pub(crate) async fn convert(
         .into_iter()
         .map(|input| {
             let path_id = hash_djb2(&input);
-            let input_path = Path::new(&input).to_path_buf();
-            let output = output.clone();
+            let input = Path::new(&input).to_path_buf();
             let status_sender = status_sender.clone();
+
+            let output = output.as_ref().map(|output| {
+                let mut output = generate_output_path(&input, output, &strip_roots);
+                if input.is_file() {
+                    output.set_extension(format.as_extension());
+                }
+                output
+            });
 
             tokio::spawn(async move {
                 status_sender(Payload {
@@ -96,19 +106,7 @@ pub(crate) async fn convert(
                     status: Status::Processing,
                 });
 
-                let result = if input_path.is_file() {
-                    let output = output.map(|output_dir| {
-                        let file_name = input_path.file_stem().unwrap_or_default();
-                        let mut output_file = Path::new(&output_dir).join(file_name);
-                        output_file.set_extension(format.as_extension());
-                        output_file
-                    });
-                    serde_hkx_convert(&input_path, output, format).await
-                } else {
-                    serde_hkx_convert(&input_path, output, format).await
-                };
-
-                match result {
+                match serde_hkx_convert(&input, output, format).await {
                     Ok(_) => {
                         status_sender(Payload {
                             path_id,
@@ -121,6 +119,7 @@ pub(crate) async fn convert(
                             path_id,
                             status: Status::Error,
                         });
+                        let input = input.display();
                         Err(format!("{input}:\n    {err}"))
                     }
                 }
@@ -172,6 +171,30 @@ const fn hash_djb2(key: &str) -> u32 {
     hash
 }
 
+/// Generate an output path based on the roots_path and input_path.
+/// If input_path starts with any of the roots_path entries, the relative path
+/// will be used. Otherwise, only the file stem will be appended.
+fn generate_output_path<P>(input: P, output_dir: &str, strip_roots: &[String]) -> PathBuf
+where
+    P: AsRef<Path>,
+{
+    let input_path = input.as_ref();
+
+    strip_roots
+        .iter()
+        .find(|root| input_path.starts_with(root))
+        .map_or_else(
+            || {
+                let file_name = input_path.file_stem().unwrap_or_default();
+                Path::new(output_dir).join(file_name)
+            },
+            |root| {
+                let relative_path = input_path.strip_prefix(root).unwrap();
+                Path::new(output_dir).join(relative_path)
+            },
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +227,41 @@ mod tests {
             hash, 5381,
             "Hash for empty string does not match the expected initial value"
         );
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_output_path_with_root_match() {
+        let output_dir = "output";
+        let input = Path::new("root_dir/sub_dir/sub_dir2");
+        let roots_path = vec!["root_dir".to_string()];
+        let result = generate_output_path(input, output_dir, &roots_path);
+        assert_eq!(result, Path::new("output/sub_dir/sub_dir2"));
+    }
+
+    #[test]
+    fn test_generate_output_path_without_root_match() {
+        let output_dir = "output";
+        let input = Path::new("other_dir/file.hkx");
+        let roots_path = vec!["root_dir".to_string()];
+
+        let mut result = generate_output_path(input, output_dir, &roots_path);
+        result.set_extension("xml");
+        assert_eq!(result, Path::new("output/file.xml"));
+    }
+
+    #[test]
+    fn test_generate_output_path_multiple_roots() {
+        let output_dir = "output";
+        let input = Path::new("another_root/sub_dir/file.hkx");
+        let roots_path = vec!["root_dir".to_string(), "another_root".to_string()];
+
+        let mut result = generate_output_path(input, output_dir, &roots_path);
+        result.set_extension("xml");
+        assert_eq!(result, Path::new("output/sub_dir/file.xml"));
     }
 }

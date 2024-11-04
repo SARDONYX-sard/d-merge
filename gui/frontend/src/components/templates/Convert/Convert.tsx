@@ -52,18 +52,18 @@ const useConvertExec = () => {
   const { selectedFiles, selectedDirs, selectedTree, output, fmt, selectionType, setConvertStatuses } =
     useConvertContext();
 
-  const inputs = (() => {
+  const [inputs, roots] = (() => {
     switch (selectionType) {
       case 'dir':
-        return selectedDirs;
+        return [selectedDirs, undefined];
       case 'files':
-        return selectedFiles;
+        return [selectedFiles, undefined];
       case 'tree': {
-        const { selectedItems, tree } = selectedTree;
-        return getAllLeafItemIds(selectedItems, tree);
+        const { selectedItems, tree, roots } = selectedTree;
+        return [getAllLeafItemIds(selectedItems, tree), roots];
       }
       default:
-        return [];
+        return [[], undefined];
     }
   })();
 
@@ -81,7 +81,7 @@ const useConvertExec = () => {
     const unlisten = await listen('d_merge://progress/convert', eventHandler);
     try {
       setLoading(true);
-      await convert(inputs, output, fmt);
+      await convert(inputs, output, fmt, roots);
     } catch (e) {
       NOTIFY.error(`${e}`);
     } finally {

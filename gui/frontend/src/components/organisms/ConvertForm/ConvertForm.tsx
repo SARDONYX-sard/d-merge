@@ -1,6 +1,7 @@
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import OutputIcon from '@mui/icons-material/Output';
-import { Button } from '@mui/material';
+import { Button, Tooltip } from '@mui/material';
+import { open } from '@tauri-apps/plugin-shell';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { NOTIFY } from '@/lib/notify';
@@ -47,6 +48,7 @@ export const ConvertForm = () => {
 
 const useInputFieldValues = () => {
   const { output, setOutput } = useConvertContext();
+  const { t } = useTranslation();
 
   const handleOutputClick = () => {
     NOTIFY.asyncTry(async () => {
@@ -54,10 +56,21 @@ const useInputFieldValues = () => {
     });
   };
 
+  const handleOutputIconClick = () => {
+    NOTIFY.asyncTry(async () => await open(output));
+  };
+
   return [
     {
-      icon: <OutputIcon sx={{ color: 'action.active', mr: 1, my: 0.5 }} />,
-      label: 'Output',
+      icon: (
+        <Tooltip placement='top' title={t('open-output-tooltip')}>
+          <OutputIcon
+            onClick={handleOutputIconClick}
+            sx={{ color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' }}
+          />
+        </Tooltip>
+      ),
+      label: t('output-path'),
       onClick: handleOutputClick,
       path: output,
       setPath: setOutput,
