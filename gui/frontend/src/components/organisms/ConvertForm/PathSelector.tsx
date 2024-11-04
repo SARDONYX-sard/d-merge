@@ -7,8 +7,11 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/molecules/Button';
 import { hashDjb2 } from '@/lib/hash-djb2';
 
+import { loadDirNode } from '../../../services/api/serde_hkx';
+
 import { useConvertContext } from './ConvertProvider';
 import { OutFormatList } from './OutFormatList';
+import { PathTreeSelector } from './PathTreeSelector';
 import { SelectionTypeRadios } from './SelectionTypeRadios';
 
 import type { ComponentPropsWithRef } from 'react';
@@ -20,6 +23,8 @@ export const PathSelector = () => {
     setSelectedFiles,
     selectedDirs,
     setSelectedDirs,
+    selectedTree,
+    setSelectedTree,
     convertStatuses,
     setConvertStatuses,
   } = useConvertContext();
@@ -30,32 +35,46 @@ export const PathSelector = () => {
   const handleDelete: ComponentPropsWithRef<typeof Chip>['onDelete'] = (fileToDelete: string) =>
     setSelectedPaths(selectedPaths.filter((file) => file !== fileToDelete));
 
+  const handlePathSelect = async () => {
+    const newSelectedPaths = await open({
+      title: isDirMode ? 'Select directory' : 'Select files',
+      filters: [{ name: '', extensions: ['hkx', 'xml', 'json', 'yaml'] }],
+      multiple: true,
+      directory: ['dir', 'tree'].includes(selectionType),
+      defaultPath: selectedPaths.at(0),
+    });
+
+    if (selectionType === 'tree') {
+      const tree = await (async () => {
+        if (Array.isArray(newSelectedPaths)) {
+          return await loadDirNode(newSelectedPaths);
+        }
+        if (newSelectedPaths !== null) {
+          return await loadDirNode([newSelectedPaths]);
+        }
+      })();
+
+      if (tree) {
+        setSelectedTree({ ...selectedTree, tree });
+      }
+      return;
+    }
+
+    if (Array.isArray(newSelectedPaths)) {
+      setSelectedPaths(newSelectedPaths);
+      setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
+    } else if (newSelectedPaths !== null) {
+      setSelectedPaths([newSelectedPaths]);
+      setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
+    }
+  };
+
   return (
     <Box>
-      <Grid container={true} spacing={2}>
-        <Grid>
-          <Button
-            onClick={async () => {
-              const newSelectedPaths = await open({
-                title: isDirMode ? 'Select directory' : 'Select files',
-                filters: [{ name: '', extensions: ['hkx', 'xml', 'json', 'yaml'] }],
-                multiple: true,
-                directory: isDirMode,
-                defaultPath: selectedPaths.at(0),
-              });
-
-              if (Array.isArray(newSelectedPaths)) {
-                setSelectedPaths(newSelectedPaths);
-                setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
-              } else if (newSelectedPaths !== null) {
-                setSelectedPaths([newSelectedPaths]);
-                setConvertStatuses(new Map()); // Clear the conversion status when a new selection is made.
-              }
-            }}
-          />
-        </Grid>
+      <Grid container={true} spacing={2} sx={{ justifyContent: 'space-between' }}>
         <Grid>
           <SelectionTypeRadios />
+          <Button onClick={handlePathSelect} />
         </Grid>
 
         <Grid>
@@ -64,20 +83,24 @@ export const PathSelector = () => {
       </Grid>
 
       <Box mt={2}>
-        {selectedPaths.map((path) => {
-          const pathId = hashDjb2(path);
-          const statusId = convertStatuses.get(pathId) ?? 0;
+        {selectionType === 'tree' ? (
+          <PathTreeSelector />
+        ) : (
+          selectedPaths.map((path) => {
+            const pathId = hashDjb2(path);
+            const statusId = convertStatuses.get(pathId) ?? 0;
 
-          return (
-            <Chip icon={renderStatusIcon(statusId)} key={pathId} label={path} onDelete={() => handleDelete(path)} />
-          );
-        })}
+            return (
+              <Chip icon={renderStatusIcon(statusId)} key={pathId} label={path} onDelete={() => handleDelete(path)} />
+            );
+          })
+        )}
       </Box>
     </Box>
   );
 };
 
-const renderStatusIcon = (status: number) => {
+export const renderStatusIcon = (status: number) => {
   switch (status) {
     case 1:
       return <CircularProgress size={20} />;

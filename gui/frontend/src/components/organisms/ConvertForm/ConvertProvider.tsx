@@ -4,12 +4,15 @@ import { useStorageState } from '@/components/hooks/useStorageState';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import type { OutFormat } from '@/services/api/serde_hkx';
 
-export type SelectionType = 'files' | 'dir';
+import type { TreeViewBaseItem } from '@mui/x-tree-view';
+
+export type SelectionType = 'files' | 'dir' | 'tree';
 
 export const normalize = (value: string): SelectionType => {
   switch (value) {
     case 'files':
     case 'dir':
+    case 'tree':
       return value;
     default:
       return 'files';
@@ -26,6 +29,12 @@ export type ConvertStatusPayload = {
 /** key: Djb2 hash algorism, value:  */
 export type ConvertStatusesMap = Map<number, ConvertStatusPayload['status']>;
 
+export type SelectedTree = {
+  selectedItems: string[];
+  expandedItems: string[];
+  tree: TreeViewBaseItem[];
+};
+
 type ContextType = {
   selectionType: SelectionType;
   setSelectionType: (pathMode: SelectionType) => void;
@@ -33,13 +42,14 @@ type ContextType = {
   setSelectedFiles: (value: string[]) => void;
   selectedDirs: string[];
   setSelectedDirs: (value: string[]) => void;
+  selectedTree: SelectedTree;
+  setSelectedTree: (value: SelectedTree) => void;
   output: string;
   setOutput: (value: string) => void;
-  fmt: 'amd64' | 'win32' | 'xml';
+  fmt: OutFormat;
   setFmt: (value: OutFormat) => void;
 
   convertStatuses: ConvertStatusesMap;
-
   setConvertStatuses: Dispatch<SetStateAction<ConvertStatusesMap>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
@@ -49,6 +59,11 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
   const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedFiles, []);
   const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedDirs, []);
+  const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(PUB_CACHE_OBJ.convertSelectedTree, {
+    expandedItems: [],
+    selectedItems: [],
+    tree: [],
+  });
   const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');
   const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
 
@@ -63,6 +78,8 @@ export const ConvertProvider = ({ children }: Props) => {
         setSelectedFiles,
         selectedDirs,
         setSelectedDirs,
+        selectedTree,
+        setSelectedTree,
         output,
         setOutput,
         fmt,

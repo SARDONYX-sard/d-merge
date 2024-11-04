@@ -25,6 +25,7 @@ export const SelectionTypeRadios = () => {
         value={selectionType}
       >
         <FormControlLabel control={<Radio />} label='Files' value='files' />
+        <FormControlLabel control={<Radio />} label='Tree' value='tree' />
         <FormControlLabel control={<Radio />} label='Directories' value='dir' />
       </RadioGroup>
     </FormControl>

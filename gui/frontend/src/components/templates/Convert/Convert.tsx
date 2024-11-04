@@ -10,9 +10,20 @@ import {
   type ConvertStatusPayload,
   useConvertContext,
 } from '@/components/organisms/ConvertForm/ConvertProvider';
+import { getAllLeafItemIds } from '@/components/organisms/ConvertForm/PathTreeSelector';
 import { ConvertNav } from '@/components/organisms/ConvertNav';
 import { NOTIFY } from '@/lib/notify';
 import { convert } from '@/services/api/serde_hkx';
+
+export const Convert = () => {
+  useInjectJs();
+
+  return (
+    <ConvertProvider>
+      <ProviderInner />
+    </ConvertProvider>
+  );
+};
 
 const sx: SxProps<Theme> = {
   display: 'grid',
@@ -23,22 +34,38 @@ const sx: SxProps<Theme> = {
   width: '100%',
 };
 
-export const Convert = () => {
-  useInjectJs();
+const ProviderInner = () => {
+  const { loading, handleClick } = useConvertExec();
 
   return (
     <Box component='main' sx={sx}>
-      <ConvertProvider>
-        <ConvertInner />
-      </ConvertProvider>
+      <Grid2 sx={{ width: '90vw' }}>
+        <ConvertForm />
+      </Grid2>
+      <ConvertNav loading={loading} onClick={handleClick} />
     </Box>
   );
 };
 
-const ConvertInner = () => {
+const useConvertExec = () => {
   const [loading, setLoading] = useState(false);
-  const { selectedFiles, selectedDirs, output, fmt, selectionType, setConvertStatuses } = useConvertContext();
-  const inputs = selectionType === 'dir' ? selectedDirs : selectedFiles;
+  const { selectedFiles, selectedDirs, selectedTree, output, fmt, selectionType, setConvertStatuses } =
+    useConvertContext();
+
+  const inputs = (() => {
+    switch (selectionType) {
+      case 'dir':
+        return selectedDirs;
+      case 'files':
+        return selectedFiles;
+      case 'tree': {
+        const { selectedItems, tree } = selectedTree;
+        return getAllLeafItemIds(selectedItems, tree);
+      }
+      default:
+        return [];
+    }
+  })();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     const eventHandler = (event: { payload: ConvertStatusPayload }) => {
@@ -63,12 +90,8 @@ const ConvertInner = () => {
     }
   };
 
-  return (
-    <>
-      <Grid2 sx={{ width: '90vw' }}>
-        <ConvertForm />
-      </Grid2>
-      <ConvertNav loading={loading} onClick={handleClick} />
-    </>
-  );
+  return {
+    loading,
+    handleClick,
+  };
 };

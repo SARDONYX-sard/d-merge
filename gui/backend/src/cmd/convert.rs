@@ -1,20 +1,75 @@
 use super::{bail, sender};
 use core::str::FromStr as _;
+use d_merge_core::path_node::{build_dir_tree, DirEntry};
 use futures::{future::join_all, stream::FuturesUnordered};
+use rayon::prelude::*;
 use serde_hkx_features::convert::{convert as serde_hkx_convert, OutFormat};
 use std::path::Path;
 use tauri::Window;
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Loads a directory structure from the specified path, filtering by allowed extensions.
+///
+/// # Errors
+/// Returns an error message if the directory cannot be loaded or if there are issues reading the path.
+#[tauri::command]
+pub(crate) fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, String> {
+    #[cfg(feature = "extra_fmt")]
+    const FILTER: [&str; 4] = ["hkx", "xml", "json", "yaml"];
+    #[cfg(not(feature = "extra_fmt"))]
+    const FILTER: [&str; 2] = ["hkx", "xml"];
+
+    let (entries, errors): (Vec<_>, Vec<_>) = dirs
+        .par_iter()
+        .map(|dir| build_dir_tree(dir, FILTER).or_else(|err| bail!(err)))
+        .partition(Result::is_ok);
+
+    // Collect only successful entries
+    let entries: Vec<DirEntry> = entries.into_iter().map(Result::unwrap).collect();
+
+    // Collect error messages and join them
+    if !errors.is_empty() {
+        let error_messages: Vec<String> = errors.into_iter().map(Result::unwrap_err).collect();
+        return Err(error_messages.join("\n"));
+    }
+
+    Ok(entries)
+}
+
+/// Whether the converter supports json and yaml conversion as well?
+#[tauri::command]
+pub(crate) const fn is_supported_extra_fmt() -> bool {
+    #[cfg(feature = "extra_fmt")]
+    const RET: bool = true;
+    #[cfg(not(feature = "extra_fmt"))]
+    const RET: bool = false;
+
+    RET
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
+#[repr(u8)]
+enum Status {
+    Pending = 0,
+    Processing = 1,
+    Done = 2,
+    Error = 3,
+}
 
 /// # Progress report for progress bar
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Payload {
+    /// hashed path
     path_id: u32,
-    /// 0: pending, 1: processing, 2: done, 3: error
-    status: u8,
+    /// Current progress status
+    status: Status,
 }
 
-/// Convert
+/// Convert hkx <-> xml
 #[tauri::command]
 pub(crate) async fn convert(
     window: Window,
@@ -36,7 +91,10 @@ pub(crate) async fn convert(
             let status_sender = status_sender.clone();
 
             tokio::spawn(async move {
-                status_sender(Payload { path_id, status: 1 }); // 1: processing
+                status_sender(Payload {
+                    path_id,
+                    status: Status::Processing,
+                });
 
                 let result = if input_path.is_file() {
                     let output = output.map(|output_dir| {
@@ -52,11 +110,17 @@ pub(crate) async fn convert(
 
                 match result {
                     Ok(_) => {
-                        status_sender(Payload { path_id, status: 2 }); // 2: done
+                        status_sender(Payload {
+                            path_id,
+                            status: Status::Done,
+                        });
                         Ok(())
                     }
                     Err(err) => {
-                        status_sender(Payload { path_id, status: 3 }); // 3: error
+                        status_sender(Payload {
+                            path_id,
+                            status: Status::Error,
+                        });
                         Err(format!("{input}:\n    {err}"))
                     }
                 }
@@ -95,10 +159,15 @@ pub(crate) async fn convert(
 /// Therefore, the conversion status shifts when using index.
 /// So, using hash from path solves this problem.
 /// The exact same hash function is implemented in frontend and tested.
-fn hash_djb2(key: &str) -> u32 {
+const fn hash_djb2(key: &str) -> u32 {
     let mut hash: u32 = 5381;
-    for byte in key.as_bytes() {
-        hash = ((hash << 5).wrapping_add(hash)) ^ u32::from(*byte);
+    let bytes = key.as_bytes();
+    let mut i = 0;
+
+    // NOTE: For const, it is necessary to loop with while instead of using for loop(iter).
+    while i < bytes.len() {
+        hash = ((hash << 5).wrapping_add(hash)) ^ (bytes[i] as u32);
+        i += 1;
     }
     hash
 }

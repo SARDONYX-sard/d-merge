@@ -4,6 +4,7 @@ const CONVERT_PUB_CACHE_KEYS_OBJ = {
   convertSelectionType: 'convert-selection-type',
   convertSelectedFiles: 'convert-selected-files',
   convertSelectedDirs: 'convert-selected-dirs',
+  convertSelectedTree: 'convert-selected-tree',
   convertOutput: 'convert-output',
   convertOutFmt: 'convert-output-fmt',
 } as const;

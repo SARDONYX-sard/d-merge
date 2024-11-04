@@ -13,10 +13,10 @@ use self::{
 };
 use crate::error::{Error, Result};
 use current_state::PatchType;
-use helper::close_comment;
+use helper::{close_comment, delimited_multispace0};
 use serde_hkx::{
     errors::readable::ReadableError,
-    xml::de::parser::type_kind::{boolean, real, string, vector4},
+    xml::de::parser::type_kind::{boolean, real, string},
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode};
 use winnow::{
@@ -153,11 +153,11 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(field_name.into());
 
         let value = {
-            let field_info = self.current.field_info.ok_or(Error::UnknownFieldName {
+            let field_info = self.current.field_info.ok_or(Error::UnknownField {
                 field_name: field_name.to_string(),
             })?;
             let json_type =
-                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownFieldName {
+                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownField {
                     field_name: field_name.to_string(),
                 })?;
             self.parse_value(json_type)?
@@ -213,6 +213,36 @@ impl<'de> PatchDeserializer<'de> {
         Ok(value)
     }
 
+    fn parse_real(&mut self) -> Result<f32> {
+        self.parse_next(multispace0)?;
+        if self.parse_start_maybe_comment()? {
+            self.current.change_patch_type(PatchType::Value)?;
+        };
+        self.parse_next(multispace0)?;
+
+        let value = self.parse_next(real())?;
+        if self.current.patch_type == Some(PatchType::Value) {
+            self.current.push_current_patch(value.into());
+        };
+
+        self.parse_next(multispace0)?;
+        self.parse_maybe_close_comment()?;
+        Ok(value)
+    }
+
+    fn parse_vector4(&mut self) -> Result<BorrowedValue<'de>> {
+        let mut obj = Object::new();
+
+        self.parse_next(opt(delimited_multispace0("(")))?;
+        obj.insert("x".into(), self.parse_real()?.into());
+        obj.insert("y".into(), self.parse_real()?.into());
+        obj.insert("z".into(), self.parse_real()?.into());
+        obj.insert("w".into(), self.parse_real()?.into());
+        self.parse_next(opt(delimited_multispace0(")")))?;
+
+        Ok(BorrowedValue::Object(Box::new(obj)))
+    }
+
     /// - Bool
     /// - I64
     /// - U64
@@ -233,24 +263,21 @@ impl<'de> PatchDeserializer<'de> {
         let value = match field_type {
             obj if obj.starts_with("Object|") => {
                 let class_name = &obj[7..]; // Remove "object|"
-
-                if class_name.starts_with("Vector4") {
-                    self.parse_next(vector4().map(|v| {
-                        let mut obj = Object::new();
-                        obj.insert("x".into(), v.x.into());
-                        obj.insert("y".into(), v.y.into());
-                        obj.insert("z".into(), v.z.into());
-                        obj.insert("w".into(), v.w.into());
-                        BorrowedValue::Object(Box::new(obj))
-                    }))?
-                } else {
-                    self.class_in_field(class_name)? // Start with `<hkobject>`
+                match class_name {
+                    "Vector4" => self.parse_vector4()?,
+                    "Quaternion" => self.parse_vector4()?,
+                    "Matrix3" => self.parse_vector4()?,
+                    "Rotation" => self.parse_vector4()?,
+                    "QsTransform" => self.parse_vector4()?,
+                    "Matrix4" => self.parse_vector4()?,
+                    "Transform" => self.parse_vector4()?,
+                    _ => self.class_in_field(class_name)?, // Start with `<hkobject>`
                 }
             }
             arr if arr.starts_with("Array|") => {
-                let name = &arr[6..]; // Remove "array|"
                 let mut vec = vec![];
 
+                let name = &arr[6..]; // Remove "array|"
                 if name.starts_with("String") {
                     // TODO: Array target (e.g. `Array|Vector4`)
                     let mut index = 0;
@@ -319,7 +346,7 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(class_name.into());
 
         {
-            let field_info = find_class_info(class_name).ok_or(Error::UnknownClassName {
+            let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
                 class_name: class_name.to_string(),
             })?;
             self.push_field_info(field_info);
@@ -347,11 +374,11 @@ impl<'de> PatchDeserializer<'de> {
 
         let value = {
             self.current.path.push(field_name.into());
-            let field_info = self.current.field_info.ok_or(Error::UnknownFieldName {
+            let field_info = self.current.field_info.ok_or(Error::UnknownField {
                 field_name: field_name.to_string(),
             })?;
             let json_type =
-                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownFieldName {
+                find_json_parser_by(field_name, field_info).ok_or(Error::UnknownField {
                     field_name: field_name.to_string(),
                 })?;
             self.parse_value(json_type)?

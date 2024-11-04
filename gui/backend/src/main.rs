@@ -21,6 +21,8 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             crate::cmd::convert::convert,
+            crate::cmd::convert::is_supported_extra_fmt,
+            crate::cmd::convert::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,
             crate::cmd::patch::load_activate_mods,

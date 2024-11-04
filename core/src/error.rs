@@ -5,21 +5,11 @@ use std::{io, path::PathBuf};
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    /// Failed to read file from
-    #[snafu(display("{source}: {}", path.display()))]
-    FailedReadFile { source: io::Error, path: PathBuf },
-
-    /// Parser combinator Error
-    #[snafu(display("{err}"))]
-    ContextError {
-        err: winnow::error::ErrMode<winnow::error::ContextError>,
-    },
-
     /// Not found {field_name}
-    UnknownFieldName { field_name: String },
+    UnknownField { field_name: String },
 
     /// Not found {class_name}
-    UnknownClassName { class_name: String },
+    UnknownClass { class_name: String },
 
     /// Unknown field type name: {field_type}
     UnknownFieldType { field_type: String },
@@ -30,15 +20,22 @@ pub enum Error {
     /// Not found push target json patch.
     NotFoundPushTargetJson,
 
+    /// Failed to read file from
+    #[snafu(display("[I/O Error]{}: {source}", path.display()))]
+    IoError { source: io::Error, path: PathBuf },
+
+    // NOTE: Cannot `#snafu(transparent)`
+    /// Parser combinator Error
+    #[snafu(display("{err}"))]
+    ContextError {
+        err: winnow::error::ErrMode<winnow::error::ContextError>,
+    },
+
     /// Human readable XML parsing error
     #[snafu(transparent)]
     ReadableError {
         source: serde_hkx::errors::readable::ReadableError,
     },
-
-    /// Standard io error
-    #[snafu(transparent)]
-    FailedIo { source: io::Error },
 
     /// Glob error
     #[snafu(transparent)]
