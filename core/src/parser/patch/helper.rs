@@ -1,7 +1,7 @@
 use simd_json::BorrowedValue;
 use winnow::{
     ascii::{multispace0, Caseless},
-    combinator::{alt, delimited, trace},
+    combinator::{alt, delimited, terminated, trace},
     error::{ParserError, StrContext, StrContextValue},
     stream::{AsChar, Stream, StreamIsPartial},
     token::{take_till, take_until},
@@ -88,7 +88,6 @@ pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> PResult<CommentKind<'a>> 
 pub(crate) fn close_comment<'a>(input: &mut &'a str) -> PResult<CommentKind<'a>> {
     let kind_parser = {
         let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
-        let close_parser = delimited_multispace0(Caseless("CLOSE"));
 
         let ignore_parser = delimited_multispace0(
             (take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take(),
@@ -107,6 +106,20 @@ pub(crate) fn close_comment<'a>(input: &mut &'a str) -> PResult<CommentKind<'a>>
             "Comment(e.g. `<!-- ORIGINAL -->`, `<!-- CLOSE -->`)",
         )))
         .parse_next(input)
+}
+
+pub(crate) fn close_parser<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    delimited_multispace0(Caseless("CLOSE")).parse_next(input)
+}
+
+pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
+    //       so the only way is to match the comment exactly.
+    terminated(
+        take_until(0.., "<!-- CLOSE -->"),
+        Caseless("<!-- CLOSE -->"),
+    )
+    .parse_next(input)
 }
 
 #[cfg(test)]

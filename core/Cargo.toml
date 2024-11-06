@@ -37,7 +37,7 @@ quick_tracing = { workspace = true }
 workspace = true
 
 [features]
-default = ["serde"] # for debug
+default = ["serde", "tracing"] # for debug
 serde = []
 
 tracing = ["dep:tracing"]

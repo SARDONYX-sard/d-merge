@@ -1,23 +1,13 @@
 use super::{class_table::FieldInfo, patch_json::Op};
-use crate::error::{Error, Result};
 use simd_json::BorrowedValue;
 use std::{borrow::Cow, mem};
 
 type Patches<'xml> = Vec<CurrentPatchJson<'xml>>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PatchType {
-    /// one field inner value, each Array element, etc.
-    Value,
-    /// Target is one `hkparam`
-    Field,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct CurrentState<'xml> {
     pub field_info: Option<&'static FieldInfo>,
     pub mode_code: Option<&'xml str>,
-    pub patch_type: Option<PatchType>,
     is_passed_original: bool,
     pub patches: Patches<'xml>,
 
@@ -30,24 +20,9 @@ impl<'de> CurrentState<'de> {
         Self {
             field_info: None,
             mode_code: None,
-            patch_type: None,
             patches: vec![],
             is_passed_original: false,
             path: vec![],
-        }
-    }
-
-    /// Change patch type.
-    ///
-    /// # Errors
-    /// Already initialized.
-    pub fn change_patch_type(&mut self, patch_type: PatchType) -> Result<()> {
-        match self.patch_type {
-            None => {
-                self.patch_type = Some(patch_type);
-                Ok(())
-            }
-            _ => Err(Error::AlreadyPatchMode),
         }
     }
 

@@ -14,7 +14,8 @@ pub enum Error {
     /// Unknown field type name: {field_type}
     UnknownFieldType { field_type: String },
 
-    /// `<! -- CLOSE -->`If no comments have come in, but `<! -- MODE_CODE` is coming.
+    /// `<! -- MODE_CODE ~<id>~` and `<! -- CLOSE -->` should be a pair,
+    /// but before the `CLOSE` comment comes `<! -- MODE_CODE ~<id>~` has come twice.
     AlreadyPatchMode,
 
     /// Not found push target json patch.
