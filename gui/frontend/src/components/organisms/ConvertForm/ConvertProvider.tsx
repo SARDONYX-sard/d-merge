@@ -35,6 +35,12 @@ export type SelectedTree = {
   roots: string[];
   tree: TreeViewBaseItem[];
 };
+export const CONVERT_TREE_INIT_VALUES = {
+  expandedItems: [],
+  selectedItems: [],
+  roots: [],
+  tree: [],
+} as const satisfies SelectedTree;
 
 type ContextType = {
   selectionType: SelectionType;
@@ -60,12 +66,10 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
   const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedFiles, []);
   const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedDirs, []);
-  const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(PUB_CACHE_OBJ.convertSelectedTree, {
-    expandedItems: [],
-    selectedItems: [],
-    roots: [],
-    tree: [],
-  });
+  const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(
+    PUB_CACHE_OBJ.convertSelectedTree,
+    CONVERT_TREE_INIT_VALUES,
+  );
   const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');
   const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
 

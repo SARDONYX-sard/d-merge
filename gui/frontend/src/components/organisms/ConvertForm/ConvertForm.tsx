@@ -7,20 +7,32 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
 
-import { useConvertContext } from './ConvertProvider';
+import { CONVERT_TREE_INIT_VALUES, useConvertContext } from './ConvertProvider';
 import { InputField } from './InputWithIcon';
 import { PathSelector } from './PathSelector';
 
 import type { ComponentPropsWithRef } from 'react';
 
 export const ConvertForm = () => {
-  const { setSelectedFiles, setSelectedDirs, setOutput, setConvertStatuses } = useConvertContext();
+  const { setSelectedFiles, setSelectedDirs, setSelectedTree, setOutput, setConvertStatuses, selectionType } =
+    useConvertContext();
   const { t } = useTranslation();
 
   const handleAllClear = () => {
     setConvertStatuses(new Map());
-    setSelectedFiles([]);
-    setSelectedDirs([]);
+    switch (selectionType) {
+      case 'files':
+        setSelectedFiles([]);
+        break;
+      case 'dir':
+        setSelectedDirs([]);
+        break;
+      case 'tree':
+        setSelectedTree(CONVERT_TREE_INIT_VALUES);
+        break;
+      default:
+        break;
+    }
     setOutput('');
   };
 
