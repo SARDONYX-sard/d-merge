@@ -28,8 +28,8 @@ tokio = { version = "1.41.0", features = ["fs"] }      # Async runtime
 tracing = { version = "0.1.40" }                       # logger
 tracing-subscriber = "0.3.18"
 
-serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.4.0" }
-serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.4.0" }
+serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", rev = "8eb48e074ed8f4342eb69686185527ad7225fc9d" }
+serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", rev = "8eb48e074ed8f4342eb69686185527ad7225fc9d" }
 
 # dev-dependencies
 pretty_assertions = "1.4.1"                                  # Color diff assertion

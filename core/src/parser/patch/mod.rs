@@ -1,14 +1,17 @@
 mod class_table;
 mod current_state;
-mod helper;
+mod helpers;
+mod nemesis;
 mod patch_json;
 mod tag;
 
 use self::{
     class_table::{find_class_info, find_json_parser_by, FieldInfo},
     current_state::{CurrentPatchJson, CurrentState},
-    helper::{
-        close_comment, comment_kind, delimited_multispace0, pointer, take_till_close, CommentKind,
+    helpers::{delimited_multispace0, pointer},
+    nemesis::{
+        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        variable::{event_id, variable_id},
     },
     patch_json::PatchJson,
     tag::{class_start_tag, end_tag, field_start_tag, start_tag},
@@ -217,20 +220,12 @@ impl<'de> PatchDeserializer<'de> {
     fn parse_plane_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
         let value = match field_type {
             "Null" => BorrowedValue::Static(StaticNode::Null),
-            "I64" => {
-                self.parse_next(dec_int.map(|int| BorrowedValue::Static(StaticNode::I64(int))))?
-            }
-            "U64" => {
-                self.parse_next(dec_uint.map(|uint| BorrowedValue::Static(StaticNode::U64(uint))))?
-            }
-            "F64" => self.parse_next(
-                real().map(|real| BorrowedValue::Static(StaticNode::F64(real.into()))),
-            )?,
+            "I64" => self.parse_i64()?,
+            "U64" => self.parse_u64()?,
+            "F64" => self.parse_next(real.map(|real| real.into()))?,
             "String" => self.parse_string_ptr()?, // StringPtr | CString
             "Pointer" => self.parse_next(pointer)?,
-            "Bool" => self.parse_next(
-                boolean().map(|boolean| BorrowedValue::Static(StaticNode::Bool(boolean))),
-            )?,
+            "Bool" => self.parse_next(boolean.map(|boolean| boolean.into()))?,
             unknown => {
                 return Err(Error::UnknownFieldType {
                     field_type: unknown.to_string(),
@@ -240,11 +235,28 @@ impl<'de> PatchDeserializer<'de> {
         Ok(value)
     }
 
+    /// Parse [`i64`]
+    fn parse_i64(&mut self) -> Result<BorrowedValue<'de>> {
+        let event_parser = event_id.map(|s| s.into());
+        let var_parser = variable_id.map(|s| s.into());
+        let int_parser = dec_int.map(|int: i64| int.into());
+        let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        Ok(value)
+    }
+
+    fn parse_u64(&mut self) -> Result<BorrowedValue<'de>> {
+        let event_parser = event_id.map(|s| s.into());
+        let var_parser = variable_id.map(|s| s.into());
+        let int_parser = dec_uint.map(|int: u64| int.into());
+        let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        Ok(value)
+    }
+
     /// Parse `CString` | `StringPtr`
     fn parse_string_ptr(&mut self) -> Result<BorrowedValue<'de>> {
         self.parse_next(alt((
             "\u{2400}".value(BorrowedValue::Static(StaticNode::Null)), // StringPtr | CString
-            string().map(BorrowedValue::String),
+            string.map(BorrowedValue::String),
         )))
     }
 
@@ -253,7 +265,7 @@ impl<'de> PatchDeserializer<'de> {
         let should_take_in_this = self.parse_start_maybe_comment()?;
         self.parse_next(multispace0)?;
 
-        let value = self.parse_next(real())?;
+        let value = self.parse_next(real)?;
         if should_take_in_this {
             self.current.push_current_patch(value.into());
         };

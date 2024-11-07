@@ -1,45 +1,11 @@
-use simd_json::BorrowedValue;
+use crate::parser::patch::helpers::delimited_multispace0;
 use winnow::{
-    ascii::{multispace0, Caseless},
-    combinator::{alt, delimited, terminated, trace},
-    error::{ParserError, StrContext, StrContextValue},
-    stream::{AsChar, Stream, StreamIsPartial},
-    token::{take_till, take_until},
+    ascii::Caseless,
+    combinator::{alt, delimited, terminated},
+    error::{StrContext, StrContextValue},
+    token::take_until,
     PResult, Parser,
 };
-
-pub fn delimited_multispace0<Input, Output, Error, ParseNext>(
-    mut parser: ParseNext,
-) -> impl Parser<Input, Output, Error>
-where
-    Input: StreamIsPartial + Stream,
-    Error: ParserError<Input>,
-    ParseNext: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar + Clone,
-{
-    trace("delimited_multispace0", move |input: &mut Input| {
-        let _ = multispace0.parse_next(input)?;
-        let o2 = parser.parse_next(input)?;
-        multispace0.parse_next(input).map(|_| o2)
-    })
-}
-
-/// Parse `#0000`, `#0500`
-/// # Errors
-/// Parse failed.
-pub fn pointer<'a>(input: &mut &'a str) -> PResult<BorrowedValue<'a>> {
-    alt((
-        "null".value(BorrowedValue::String("#0000".into())),
-        // '\n', '\t', ' ' => Array elements
-        // `<` => end tag of array or field
-        take_till(0.., |c| matches!(c, '\n' | '\t' | ' ' | '<'))
-            .map(|s: &str| BorrowedValue::String(s.into())),
-    ))
-    .context(StrContext::Expected(StrContextValue::Description(
-        r#"Pointer(e.g. `#0050`)"#,
-    )))
-    .parse_next(input)
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CommentKind<'a> {
@@ -125,19 +91,6 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> PResult<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_pointer() {
-        assert_eq!(
-            pointer.parse_next(&mut "#0000 #0000"),
-            Ok(BorrowedValue::String("#0000".into()))
-        );
-
-        assert_eq!(
-            pointer.parse_next(&mut "$turn$12</hkparam>"),
-            Ok(BorrowedValue::String("$turn$12".into()))
-        );
-    }
 
     #[test]
     fn test_comment_kind() {

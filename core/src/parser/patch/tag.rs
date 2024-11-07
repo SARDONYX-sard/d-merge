@@ -1,4 +1,4 @@
-use super::helper::delimited_multispace0;
+use super::helpers::delimited_multispace0;
 use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use std::str::FromStr;
 use winnow::{

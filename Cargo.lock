@@ -1729,7 +1729,7 @@ checksum = "1e087f84d4f86bf4b218b927129862374b72199ae7d8657835f1e89000eea4fb"
 [[package]]
 name = "havok_classes"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "bitflags 2.6.0",
  "educe",
@@ -1745,7 +1745,7 @@ dependencies = [
 [[package]]
 name = "havok_serde"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "arrayvec",
  "havok_types",
@@ -1755,7 +1755,7 @@ dependencies = [
 [[package]]
 name = "havok_types"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "parse-display",
  "parse_int",
@@ -1767,7 +1767,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "havok_types_derive_proc_macros",
  "parse_int",
@@ -1776,7 +1776,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3616,7 +3616,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "annotate-snippets",
  "byteorder",
@@ -3634,7 +3634,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx_features"
 version = "0.4.0"
-source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.4.0#4f0f48f94e22520f2440ba903d50fcb8dc8fbb6f"
+source = "git+https://github.com/SARDONYX-sard/serde-hkx?rev=8eb48e074ed8f4342eb69686185527ad7225fc9d#8eb48e074ed8f4342eb69686185527ad7225fc9d"
 dependencies = [
  "encoding_rs_io",
  "havok_classes",
