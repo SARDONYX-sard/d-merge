@@ -1,0 +1,81 @@
+name: Cargo Lint & Test
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: '*'
+  workflow_dispatch: # <- Setting to allow manual execution by button.
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2.7.5
+        with:
+          prefix-key: cargo-release-${{ matrix.platform }}
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        # You can remove libayatana-appindicator3-dev if you don't use the system tray feature.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Node.js cache
+        uses: actions/cache@v4.1.2
+        with:
+          path: ${{ github.workspace }}/gui/frontend/.next/cache
+          # Generate a new cache whenever packages or source files change.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('gui/frontend/src/**/*.[jt]s', 'gui/frontend/src/**/*.[jt]sx') }}
+          # If source files changed but packages didn't, rebuild from a prior cache.
+          restore-keys: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Sync node version
+        uses: actions/setup-node@v4.1.0
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Build GUI(Extra mode)
+        run: npm run build:extra
+
+      - name: Make outputs dir
+        run: mkdir -p ./build
+
+      # ----------------------------------------------------------------------------------------------------------------
+      - name: Compress outputs(Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          Move-Item -Path ./target/release/d_merge.exe -Destination './build'
+      # ----------------------------------------------------------------------------------------------------------------
+      - name: Compress outputs(MacOS)
+        shell: bash
+        if: runner.os == 'macOS'
+        run: mv ./target/release/d_merge ./build
+      # ----------------------------------------------------------------------------------------------------------------
+      - name: Compress outputs(Linux)
+        shell: bash
+        if: runner.os == 'Linux'
+        run: mv ./target/release/d_merge ./build
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: d-merge-${{runner.os}}
+          path: |
+            ./build/
