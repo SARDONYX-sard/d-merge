@@ -1,8 +1,9 @@
 mod class_table;
 mod current_state;
 mod helpers;
+mod merge;
 mod nemesis;
-mod patch_json;
+pub mod patch_json;
 mod tag;
 
 use self::{
@@ -589,5 +590,16 @@ mod tests {
                 value: "ReplaceDummy".into()
             }]
         );
+    }
+
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
+    #[test]
+    fn parse() {
+        let nemesis_xml = {
+            // include_str!("../../../../dummy/mods/zcbe/_1stperson/staggerbehavior/#0052.txt")
+            // include_str!("../../../../dummy/mods/turn/1hm_behavior/#0087.txt")
+            include_str!("../../../../dummy/mods/zcbe/_1stperson/staggerbehavior/#0087.txt")
+        };
+        dbg!(parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
     }
 }
