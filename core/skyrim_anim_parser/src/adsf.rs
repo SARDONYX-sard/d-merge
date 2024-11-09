@@ -3,16 +3,6 @@
 //! This module provides structures and parsers for reading animation data
 //! from a file formatted in a specific way. The primary structure is [`Adsf`],
 //! which contains a list of projects and their corresponding animation data.
-//!
-//! # Example
-//!
-//! ```no_run
-//! use d_merge_core::parser::adsf::parse_adsf;
-//!
-//! let input = "..."; // Input data from the animation file
-//! let result = parse_adsf(input).unwrap();
-//! ```
-
 use super::lines::{from_one_line, lines, num_bool_line, one_line, Str};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
