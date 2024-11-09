@@ -75,9 +75,7 @@ impl<'v> PointerMut<'v> for BorrowedValue<'v> {
 
         ptr.iter()
             .try_fold(self, move |target, token| match target {
-                BorrowedValue::Object(map) => {
-                    Some(map.entry(token.clone()).or_insert(Default::default()))
-                }
+                BorrowedValue::Object(map) => map.get_mut(token),
                 BorrowedValue::Array(list) => {
                     fn parse_index(index: &str) -> Option<usize> {
                         index.parse().ok()
@@ -248,7 +246,7 @@ mod tests {
             "existing_key": "value"
         });
         let pointer: &[Cow<str>] = &["non_existent_key".into()];
-
+        dbg!(&pointer);
         assert!(value.ptr_mut(pointer).is_none());
     }
 
