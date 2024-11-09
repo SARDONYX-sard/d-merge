@@ -30,20 +30,6 @@ pub enum Error {
 /// - `pointer_mut`: Takes a slice of `Cow<'v, str>` representing a path,
 ///   and attempts to traverse through the structure, returning a mutable
 ///   reference to the target value if found.
-///
-/// # Example
-/// ```
-/// use std::borrow::Cow;
-///
-/// // Example structure representing `BorrowedValue`
-/// let mut value = BorrowedValue::Object(HashMap::new());
-/// let pointer: &[Cow<str>] = &["some_key".into()];
-///
-/// // Access the mutable value at the given pointer
-/// if let Some(mut val) = value.pointer_mut(pointer) {
-///     // Modify the value
-/// }
-/// ```
 pub trait PointerMut<'v> {
     type Error;
 
