@@ -10,7 +10,7 @@ edition = "2021"
 rust-version = "1.60"
 
 [workspace]
-members = ["core", "gui/backend"]
+members = ["core/*", "gui/backend"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -24,9 +24,10 @@ serde_json = "1.0.132"                                 # gui: To avoid generate_
 serde_repr = "0.1.19"                                  # C like Serialize enum into numbers.(Using progress reporing)
 simd-json = "0.14.2"
 snafu = "0.8.5"
-tokio = { version = "1.41.0", features = ["fs"] }      # Async runtime
+tokio = { version = "1.41.1", features = ["fs"] }      # Async runtime
 tracing = { version = "0.1.40" }                       # logger
 tracing-subscriber = "0.3.18"
+winnow = { version = "0.6.20", features = ["simd"] }
 
 serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", rev = "8eb48e074ed8f4342eb69686185527ad7225fc9d" }
 serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", rev = "8eb48e074ed8f4342eb69686185527ad7225fc9d" }
@@ -36,7 +37,12 @@ pretty_assertions = "1.4.1"                                  # Color diff assert
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-d_merge_core = { path = "./core" }
+crc = { path = "./core/crc" }
+json_patch = { path = "./core/json_patch" }
+mod_info = { path = "./core/mod_info" }
+nemesis_xml = { path = "./core/nemesis_xml" }
+node_expr = { path = "./core/node_expr" }
+skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 
 
 [profile.release]

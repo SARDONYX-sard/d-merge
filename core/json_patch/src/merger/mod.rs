@@ -1,36 +1,12 @@
-use super::merge::searcher::PointerMut as _;
+mod error;
+
+use self::error::{PatchError, Result};
+use crate::searcher::PointerMut as _;
 use simd_json::{
     borrowed::{Array, Object},
     BorrowedValue,
 };
-use snafu::Snafu;
 use std::borrow::Cow;
-
-/// Custom error type for JSON patch operations.
-#[derive(Debug, Snafu)]
-pub enum PatchError {
-    /// Error indicating that the specified path was not found in the JSON structure.
-    #[snafu(display("Path not found: {}", path))]
-    PathNotFound { path: String },
-
-    /// Error indicating an invalid operation at the given path.
-    #[snafu(display("Invalid operation for path: {}", path))]
-    InvalidOperation { path: String },
-
-    #[snafu(transparent)]
-    AccessError { source: simd_json::AccessError },
-
-    #[snafu(transparent)]
-    TryTypeError { source: simd_json::TryTypeError },
-
-    #[snafu(transparent)]
-    SearchedError {
-        source: super::merge::searcher::Error,
-    },
-}
-
-/// Result type alias for JSON patch operations.
-type Result<T, E = PatchError> = std::result::Result<T, E>;
 
 /// Enum representing the type of operation for the JSON patch.
 #[derive(Debug, Clone, Copy, PartialEq)]

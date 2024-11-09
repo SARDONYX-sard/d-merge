@@ -37,10 +37,6 @@ pub enum Error {
     ReadableError {
         source: serde_hkx::errors::readable::ReadableError,
     },
-
-    /// Glob error
-    #[snafu(transparent)]
-    InvalidGlob { source: glob::PatternError },
 }
 
 /// `Result` for this crate.

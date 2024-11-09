@@ -1,0 +1,25 @@
+[package]
+name = "node_expr"
+version = "0.1.0"
+description = "D merge core"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rayon = { workspace = true }
+serde = { workspace = true, optional = true } # Implement (De)Serializer
+snafu = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+default = ["serde"]   # for debug
+serde = ["dep:serde"]

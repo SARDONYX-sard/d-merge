@@ -40,7 +40,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 # worksapce members
-d_merge_core = { workspace = true, features = ["serde"] }
+mod_info = { workspace = true }
+node_expr = { workspace = true }
 
 [dev-dependencies]
 temp-dir = "0.1.14"

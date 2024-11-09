@@ -1,4 +1,5 @@
-use super::{class_table::FieldInfo, patch_json::Op};
+use super::class_table::FieldInfo;
+use json_patch::merger::Op;
 use simd_json::BorrowedValue;
 use std::{borrow::Cow, mem};
 

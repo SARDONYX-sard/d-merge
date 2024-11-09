@@ -1,4 +1,7 @@
-mod ptr;
+pub mod comment;
+pub mod ptr;
+pub mod tag;
+pub mod variable;
 
 pub use ptr::pointer;
 

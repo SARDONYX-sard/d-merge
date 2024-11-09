@@ -1,5 +1,5 @@
 use super::{bail, sender};
-use d_merge_core::mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
+use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
 use std::collections::HashMap;
 use tauri::Window;
 

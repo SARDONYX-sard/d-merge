@@ -640,6 +640,15 @@ dependencies = [
 
 [[package]]
 name = "crc"
+version = "0.1.0"
+dependencies = [
+ "crc 3.2.1",
+ "pretty_assertions",
+ "rayon",
+]
+
+[[package]]
+name = "crc"
 version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69e6e4d7b33a94f0991c26729976b10ebde1d34c3ee82408fb536164fa10d636"
@@ -770,8 +779,9 @@ name = "d_merge"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "d_merge_core",
  "futures",
+ "mod_info",
+ "node_expr",
  "once_cell",
  "pretty_assertions",
  "quick_tracing",
@@ -791,27 +801,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "d_merge_core"
-version = "0.1.0"
-dependencies = [
- "annotate-snippets",
- "crc",
- "glob",
- "indexmap 2.6.0",
- "phf 0.11.2",
- "pretty_assertions",
- "quick_tracing",
- "rayon",
- "serde",
- "serde_hkx",
- "serde_ini",
- "simd-json",
- "snafu",
- "tracing",
- "winnow 0.6.20",
 ]
 
 [[package]]
@@ -2126,6 +2115,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "json_patch"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "quick_tracing",
+ "rayon",
+ "simd-json",
+ "snafu",
+ "tracing",
+ "winnow 0.6.20",
+]
+
+[[package]]
 name = "jsonptr"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2357,6 +2359,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mod_info"
+version = "0.1.0"
+dependencies = [
+ "glob",
+ "indexmap 2.6.0",
+ "pretty_assertions",
+ "rayon",
+ "serde",
+ "serde_ini",
+ "snafu",
+]
+
+[[package]]
 name = "muda"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2407,6 +2422,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nemesis_xml"
+version = "0.1.0"
+dependencies = [
+ "json_patch",
+ "phf 0.11.2",
+ "pretty_assertions",
+ "quick_tracing",
+ "rayon",
+ "serde_hkx",
+ "simd-json",
+ "snafu",
+ "tracing",
+ "winnow 0.6.20",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2422,6 +2453,15 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "node_expr"
+version = "0.1.0"
+dependencies = [
+ "rayon",
+ "serde",
+ "snafu",
 ]
 
 [[package]]
@@ -3878,6 +3918,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
+name = "skyrim_anim_parser"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "quick_tracing",
+ "serde",
+ "serde_hkx",
+ "tracing",
+ "winnow 0.6.20",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4565,9 +4617,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.41.0"
+version = "1.41.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145f3413504347a2be84393cc8a7d2fb4d863b375909ea59f2158261aa258bbb"
+checksum = "22cfb5bee7a6a52939ca9224d6ac897bb669134078daa8735560897f69de4d33"
 dependencies = [
  "backtrace",
  "bytes",

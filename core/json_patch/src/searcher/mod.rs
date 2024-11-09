@@ -1,24 +1,8 @@
-use simd_json::{derived::ValueTryAsScalar as _, BorrowedValue, TryTypeError};
-use snafu::Snafu;
+pub mod error;
+
+use self::error::Error;
+use simd_json::{derived::ValueTryAsScalar as _, BorrowedValue};
 use std::borrow::Cow;
-
-#[derive(Snafu, Debug, Clone)]
-pub enum Error {
-    #[snafu(display("Pointer is empty, cannot add"))]
-    EmptyPointer,
-
-    #[snafu(display("Invalid index: {}", index))]
-    InvalidIndex { index: String },
-
-    #[snafu(display("Cannot go deeper in a String"))]
-    InvalidString,
-
-    /// Can't go deeper in a static node
-    InvalidTarget,
-
-    #[snafu(transparent)]
-    TryType { source: TryTypeError },
-}
 
 /// A trait that provides a mutable reference to a `BorrowedValue`
 /// given a sequence of strings (representing the path or pointer).
@@ -44,6 +28,8 @@ pub trait PointerMut<'v> {
     fn ptr_mut(&mut self, ptr: &[Cow<'v, str>]) -> Option<&mut BorrowedValue<'v>>;
 
     /// Adds a new key (for objects) or a new index (for arrays) if they don't exist.
+    /// # Errors
+    /// If failed to cast.
     fn push_by(
         &mut self,
         ptr: Vec<Cow<'v, str>>,

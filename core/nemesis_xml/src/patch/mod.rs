@@ -1,23 +1,19 @@
 mod class_table;
 mod current_state;
-mod helpers;
-mod merge;
-mod nemesis;
-pub mod patch_json;
-mod tag;
 
 use self::{
     class_table::{find_class_info, find_json_parser_by, FieldInfo},
     current_state::{CurrentPatchJson, CurrentState},
-    helpers::{delimited_multispace0, pointer},
-    nemesis::{
-        comment::{close_comment, comment_kind, take_till_close, CommentKind},
-        variable::{event_id, variable_id},
-    },
-    patch_json::PatchJson,
-    tag::{class_start_tag, end_tag, field_start_tag, start_tag},
 };
 use crate::error::{Error, Result};
+use crate::helpers::{
+    comment::{close_comment, comment_kind, take_till_close, CommentKind},
+    delimited_multispace0,
+    ptr::pointer,
+    tag::{class_start_tag, end_tag, field_start_tag, start_tag},
+    variable::{event_id, variable_id},
+};
+use json_patch::merger::PatchJson;
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
@@ -481,7 +477,7 @@ impl<'de> PatchDeserializer<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use patch_json::Op;
+    use json_patch::merger::Op;
 
     #[test]
     fn replace_field() {

@@ -1,5 +1,5 @@
 [package]
-name = "d_merge_core"
+name = "nemesis_xml"
 version = "0.1.0"
 description = "D merge core"
 
@@ -8,26 +8,21 @@ categories = ["development-tools"]
 edition.workspace = true
 keywords = ["skyrim"]
 license.workspace = true
-readme = "../README.md"
+readme = "../../README.md"
 repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-annotate-snippets = "0.11.4"                                   # Error reporting display
-crc = "3.2.1"
-glob = "0.3.1"
-indexmap = { workspace = true, features = ["serde", "rayon"] }
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
-serde = { workspace = true }                                   # Implement (De)Serializer
 serde_hkx = { workspace = true }
-serde_ini = "0.2.0"
 simd-json = { workspace = true }
 snafu = { workspace = true }
 tracing = { workspace = true, optional = true }
-winnow = { version = "0.6.20", features = ["simd"] }
+winnow = { workspace = true }
 
-# serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", rev = "d8a6ca7da611cb03d3aec913db77ebc1b2a43d82" }
+# workspace members
+json_patch = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

@@ -46,6 +46,8 @@ use winnow::{
     PResult, Parser,
 };
 
+/// # Errors
+/// If not found `$eventID[` `]`
 pub fn event_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
     delimited(Caseless("$eventID["), take_until(0.., "]$"), "]$")
         .context(Expected(Description(
@@ -54,6 +56,8 @@ pub fn event_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
         .parse_next(input)
 }
 
+/// # Errors
+/// If not found `$variableID[` `]`
 pub fn variable_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
     delimited(Caseless("$variableID["), take_until(0.., "]$"), "]$")
         .context(Expected(Description(

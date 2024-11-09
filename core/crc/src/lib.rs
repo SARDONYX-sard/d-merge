@@ -1,8 +1,7 @@
 //! ref: https://www.nexusmods.com/skyrim/articles/50508/
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use crc::{Algorithm, Crc};
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // CRC32 for Skyrim (Poly: 0x04C11DB7, reverse data bytes, reverse CRC result)
 const SKYRIM_CRC32_ALG: Algorithm<u32> = Algorithm {

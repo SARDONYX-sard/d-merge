@@ -1,3 +1,5 @@
+pub mod error;
+
 use crate::error::Result;
 use glob::glob;
 use indexmap::IndexMap;
@@ -7,7 +9,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Remove `null` string
-#[cfg(feature = "serde")]
 fn deserialize_remove_null<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -25,32 +26,26 @@ where
 /// # Note
 /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
 /// - `priority`: As with MO2, lower numbers indicate lower priority, higher numbers indicate higher priority.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModInfo {
     /// Mod-specific dir name.
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_remove_null"))]
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub id: String,
 
     /// Mod name
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_remove_null"))]
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub name: String,
 
     /// Mod author
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_remove_null"))]
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub author: String,
 
     /// Mod download link
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_remove_null"))]
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub site: String,
 
     /// TODO: Unknown
-    #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_remove_null"))]
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub auto: String,
 }
 
@@ -127,14 +122,13 @@ impl GetModsInfo for ModsInfo {
 }
 
 /// Get `<id>` from `Nemesis_Engine/mods/<id>/info.ini`
-#[cfg(feature = "serde")]
 #[inline]
 fn extract_id_from_path(path: impl AsRef<Path>) -> Option<String> {
     path.as_ref()
         .parent()
         .and_then(Path::file_name)
         .and_then(|os_str| os_str.to_str())
-        .map(|s| s.to_string()) // String に変換
+        .map(|s| s.to_string())
 }
 
 #[cfg(test)]
@@ -151,7 +145,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_extract_id_from_path() {
         fn assert_eq_id(path: impl AsRef<Path>, id: Option<&str>) {

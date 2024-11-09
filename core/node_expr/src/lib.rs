@@ -1,3 +1,5 @@
+pub mod error;
+
 use crate::error::{Error, Result};
 use rayon::prelude::*;
 use std::{fs, path::Path};

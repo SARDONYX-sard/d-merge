@@ -1,4 +1,4 @@
-use super::helpers::delimited_multispace0;
+use super::delimited_multispace0;
 use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use std::str::FromStr;
 use winnow::{
@@ -67,6 +67,8 @@ pub fn class_start_tag<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
 
 /// Parses the field of class start opening tag `<hkparam name=`
 ///
+/// # Errors
+/// If encountered unexpected string.
 /// # Note
 /// All arguments are used only for clarity of error reporting.
 pub fn field_start_open_tag(input: &mut &str) -> PResult<()> {
@@ -84,6 +86,9 @@ pub fn field_start_open_tag(input: &mut &str) -> PResult<()> {
 }
 
 /// Parses the field of class start closing tag `>` or `numelements="0">`
+///
+/// # Errors
+/// If encountered unexpected string.
 pub fn field_start_close_tag(input: &mut &str) -> PResult<Option<u64>> {
     seq!(
         winnow::combinator::opt(

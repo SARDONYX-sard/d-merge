@@ -1,7 +1,7 @@
 use super::{bail, sender};
 use core::str::FromStr as _;
-use d_merge_core::path_node::{build_dir_tree, DirEntry};
 use futures::{future::join_all, stream::FuturesUnordered};
+use node_expr::{build_dir_tree, DirEntry};
 use rayon::prelude::*;
 use serde_hkx_features::convert::{convert as serde_hkx_convert, OutFormat};
 use std::path::{Path, PathBuf};

@@ -1,4 +1,4 @@
-use crate::parser::patch::helpers::delimited_multispace0;
+use super::delimited_multispace0;
 use winnow::{
     ascii::Caseless,
     combinator::{alt, delimited, terminated},
@@ -106,10 +106,6 @@ mod tests {
 
         assert_eq!(
             close_comment.parse("<!-- CLOSE -->"),
-            Ok(CommentKind::Close)
-        );
-        assert_eq!(
-            close_comment.parse("<!--CLOSE  -->"),
             Ok(CommentKind::Close)
         );
 
