@@ -37,7 +37,7 @@ pretty_assertions = "1.4.1"                                  # Color diff assert
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-crc = { path = "./core/crc" }
+skyrim_crc = { path = "./core/skyrim_crc" }
 json_patch = { path = "./core/json_patch" }
 mod_info = { path = "./core/mod_info" }
 nemesis_xml = { path = "./core/nemesis_xml" }

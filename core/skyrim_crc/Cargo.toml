@@ -1,5 +1,5 @@
 [package]
-name = "crc"
+name = "skyrim_crc"
 version = "0.1.0"
 description = "D merge core"
 
