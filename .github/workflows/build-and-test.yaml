@@ -1,4 +1,4 @@
-name: Cargo Lint & Test
+name: Build & Test
 
 on:
   push:
