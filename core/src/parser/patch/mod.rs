@@ -596,10 +596,11 @@ mod tests {
     #[ignore = "dummy"]
     #[test]
     fn parse() {
-        let nemesis_xml = {
-            // include_str!("../../../../dummy/mods/zcbe/_1stperson/staggerbehavior/#0052.txt")
-            // include_str!("../../../../dummy/mods/turn/1hm_behavior/#0087.txt")
-            include_str!("../../../../dummy/mods/zcbe/_1stperson/staggerbehavior/#0087.txt")
+        let nemesis_xml = &{
+            // let path = "../dummy/mods/zcbe/_1stperson/staggerbehavior/#0052.txt";
+            // let path = "../dummy/mods/turn/1hm_behavior/#0087.txt";
+            let path = "../dummy/mods/zcbe/_1stperson/staggerbehavior/#0087.txt";
+            std::fs::read_to_string(path).unwrap()
         };
         dbg!(parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
     }
