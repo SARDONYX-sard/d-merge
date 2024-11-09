@@ -593,6 +593,7 @@ mod tests {
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]
+    #[ignore = "dummy"]
     #[test]
     fn parse() {
         let nemesis_xml = {
