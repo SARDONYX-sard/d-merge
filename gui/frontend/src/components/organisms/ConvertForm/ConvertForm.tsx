@@ -4,11 +4,11 @@ import { Button, Tooltip } from '@mui/material';
 import { open } from '@tauri-apps/plugin-shell';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
 
 import { CONVERT_TREE_INIT_VALUES, useConvertContext } from './ConvertProvider';
-import { InputField } from './InputWithIcon';
 import { PathSelector } from './PathSelector';
 
 import type { ComponentPropsWithRef } from 'react';

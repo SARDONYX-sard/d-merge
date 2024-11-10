@@ -26,15 +26,26 @@ const PUB_CACHE_KEYS_OBJ = {
   snackbarPosition: 'snackbar-position',
 } as const;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
+  patchInput: 'patch-input',
+  patchOutput: 'patch-output',
+} as const;
+
 const PRIVATE_CACHE_KEYS_OBJ = {
   exportSettingsPath: 'export-settings-path',
   importSettingsPath: 'import-backup-path',
   langFilePath: 'lang-file-path',
 } as const;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 export const HIDDEN_CACHE_OBJ = {
   runScript: 'run-script',
 } as const;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const PUB_CACHE_OBJ = {
   ...CONVERT_PUB_CACHE_KEYS_OBJ,
@@ -43,6 +54,7 @@ export const PUB_CACHE_OBJ = {
 } as const;
 
 export const PRIVATE_CACHE_OBJ = {
+  ...PATCH_PRIVATE_CACHE_KEYS_OBJ,
   ...PRIVATE_CACHE_KEYS_OBJ,
 } as const;
 

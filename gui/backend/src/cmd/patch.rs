@@ -6,10 +6,10 @@ use tauri::Window;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mod info readers
 
+/// glob: If specified `../../dummy/mods`, then search `../../dummy/mods"/*/info.ini`.
 #[tauri::command]
-pub(crate) fn load_mods_info() -> Result<Vec<ModInfo>, String> {
-    let dir = "../../dummy/mods";
-    let pattern = format!("{dir}/*/info.ini");
+pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
+    let pattern = format!("{glob}/*/info.ini");
     let info = ModsInfo::get_all(&pattern).or_else(|err| bail!(err))?;
     Ok(info.sort_to_vec_by_priority(HashMap::new()))
 }
@@ -37,8 +37,8 @@ struct Payload {
 }
 
 #[tauri::command]
-pub(crate) fn patch(window: Window, ids: Vec<String>) -> Result<(), String> {
-    tracing::trace!("{:?}", ids);
+pub(crate) fn patch(window: Window, output: &str, ids: Vec<String>) -> Result<(), String> {
+    tracing::trace!(?output, ?ids);
     let _sender = sender::<Payload>(window, "d_merge://progress/patch");
     Ok(())
 }

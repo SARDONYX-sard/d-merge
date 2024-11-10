@@ -1,1 +1,1 @@
-export { ModsGrid } from './ModsGrid';
+export { ModsGridWrapper } from './ModsGridWrapper';

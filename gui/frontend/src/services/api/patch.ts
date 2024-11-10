@@ -14,8 +14,8 @@ export type ModIds = readonly string[];
  * Load mods `info.ini`
  * @throws Error
  */
-export async function loadModsInfo() {
-  return await invoke<ModInfo[]>('load_mods_info');
+export async function loadModsInfo(searchGlob: string) {
+  return await invoke<ModInfo[]>('load_mods_info', { glob: searchGlob });
 }
 
 /**
@@ -32,25 +32,6 @@ export async function loadActivateMods() {
  * @example ['aaa', 'bbb']
  * @throws Error
  */
-export async function patch(ids: ModIds) {
-  await invoke('patch', { ids });
+export async function patch(output:string ,ids: ModIds) {
+  await invoke('patch', { output, ids });
 }
-
-export const createMockModsInfo = () => {
-  const modsInfo: Readonly<ModInfo>[] = [];
-
-  for (let i = 1; i < 21; i++) {
-    modsInfo.push({
-      id: `mod-${i}`,
-      name: `Mod ${String.fromCharCode(65 + i)}`,
-      author: 'Author A',
-      site: `https://www.nexusmods.com/skyrimspecialedition/mods/${i}`,
-      auto: 'Yes',
-    } as const);
-  }
-
-  return modsInfo;
-};
-
-export const createMockSelectId = (rows: ModInfo[]) =>
-  rows.filter((r) => ['mod-1', 'mod-2'].includes(r.id)).map((r) => r.id);

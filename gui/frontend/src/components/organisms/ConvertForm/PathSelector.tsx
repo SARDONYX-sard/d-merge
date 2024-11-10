@@ -6,8 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 
 import { Button } from '@/components/molecules/Button';
 import { hashDjb2 } from '@/lib/hash-djb2';
-
-import { loadDirNode } from '../../../services/api/serde_hkx';
+import { loadDirNode } from '@/services/api/serde_hkx';
 
 import { useConvertContext } from './ConvertProvider';
 import { OutFormatList } from './OutFormatList';
