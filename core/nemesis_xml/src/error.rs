@@ -26,8 +26,7 @@ pub enum Error {
     IoError { source: io::Error, path: PathBuf },
 
     // NOTE: Cannot `#snafu(transparent)`
-    /// Parser combinator Error
-    #[snafu(display("{err}"))]
+    /// Parser combinator Error: {err}
     ContextError {
         err: winnow::error::ErrMode<winnow::error::ContextError>,
     },
