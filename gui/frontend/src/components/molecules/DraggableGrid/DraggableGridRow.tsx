@@ -5,16 +5,15 @@ import { GridRow, type GridRowProps } from '@mui/x-data-grid';
 import { type CSSProperties, memo } from 'react';
 
 export const DraggableGridRow = memo(function DraggableGrid(params: GridRowProps) {
-  const { activeIndex, attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+  const { overIndex, activeIndex, attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: params.rowId,
   });
 
-  const isSelected = activeIndex === params.index;
+  const isSelected = activeIndex === params.index || overIndex === params.index;
   const style: CSSProperties = {
     cursor: isDragging ? 'grabbing' : 'grab',
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: isSelected ? '#404755' : undefined,
   };
   const id = isSelected ? 'x-data-grid-selected' : undefined;
 

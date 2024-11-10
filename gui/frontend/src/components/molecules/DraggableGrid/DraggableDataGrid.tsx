@@ -31,13 +31,24 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
 
   return (
     <div>
-      <DndContext autoScroll={true} collisionDetection={closestCorners} onDragEnd={onDragEnd} sensors={sensors}>
+      <DndContext autoScroll={{
+        enabled: true,
+        /**
+         * NOTE: Set to false to avoid the scroll position force-return bug.
+         * ref: https://github.com/clauderic/dnd-kit/issues/825#issuecomment-1459030786
+         */
+        layoutShiftCompensation: false,
+        threshold: { x: 0, y: 0.2 } // Eliminate horizontal auto-scroll
+      }} collisionDetection={closestCorners} onDragEnd={onDragEnd} sensors={sensors}
+      >
         <SortableContext items={rows} strategy={verticalListSortingStrategy}>
           <DataGrid
             checkboxSelection={true}
             disableColumnSorting={true} // Because they cannot be reordered when reordering is applied: https://github.com/mui/mui-x/issues/10706
             disableRowSelectionOnClick={true}
+            rowBufferPx={2000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
+            showCellVerticalBorder={true}
             slots={{ row: DraggableGridRow }}
             {...props}
           />
