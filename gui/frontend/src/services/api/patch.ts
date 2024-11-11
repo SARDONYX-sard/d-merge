@@ -14,8 +14,8 @@ export type ModIds = readonly string[];
  * Load mods `info.ini`
  * @throws Error
  */
-export async function loadModsInfo(searchGlob: string) {
-  return await invoke<ModInfo[]>('load_mods_info', { glob: searchGlob });
+export async function loadModsInfo(searchGlob: string, activateMods: readonly string[]) {
+  return await invoke<ModInfo[]>('load_mods_info', { glob: searchGlob, ids: activateMods });
 }
 
 /**

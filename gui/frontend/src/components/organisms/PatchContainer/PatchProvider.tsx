@@ -34,11 +34,11 @@ export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     NOTIFY.asyncTry(async () => {
       setLoading(true);
-      const modsInfo = await loadModsInfo(modInfoDir);
+      const modsInfo = await loadModsInfo(modInfoDir, activateMods);
       setLoading(false);
       setModInfoList(modsInfo);
     });
-  }, [modInfoDir]);
+  }, [activateMods, modInfoDir]);
 
   const context = {
     activateMods,
