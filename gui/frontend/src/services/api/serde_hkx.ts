@@ -8,6 +8,7 @@ export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json' | 'yaml';
  * Convert xml/hkx => hkx/xml.
  * - `inputs`: Files or dirs.
  * - `output`: Output dir.
+ * - `roots`: The root dir of inputs. (This is needed to preserve the dir structure in the output after conversion in Tree mode.)
  * @throws Error
  */
 export async function convert(inputs: string[], output: string, format: OutFormat, roots?: string[]) {
