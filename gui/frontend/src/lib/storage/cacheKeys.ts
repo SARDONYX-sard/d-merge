@@ -9,7 +9,6 @@ import { OBJECT } from '@/lib/object-utils';
 
 const CONVERT_PUB_CACHE_KEYS_OBJ = {
   convertSelectionType: 'convert-selection-type',
-  convertOutput: 'convert-output',
   convertOutFmt: 'convert-output-fmt',
 } as const;
 
@@ -17,6 +16,7 @@ const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
   convertSelectedFiles: 'convert-selected-files',
   convertSelectedDirs: 'convert-selected-dirs',
   convertSelectedTree: 'convert-selected-tree',
+  convertOutput: 'convert-output',
 } as const;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -70,7 +70,7 @@ export const ConvertProvider = ({ children }: Props) => {
     PRIVATE_CACHE_OBJ.convertSelectedTree,
     CONVERT_TREE_INIT_VALUES,
   );
-  const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');
+  const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.convertOutput, '');
   const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
 
   const [convertStatuses, setConvertStatuses] = useState<ConvertStatusesMap>(new Map());
