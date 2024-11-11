@@ -6,6 +6,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 
+import { JsonPretty } from '@/components/atoms/JsonPretty';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { OBJECT } from '@/lib/object-utils';
 import type { Cache, CacheKey } from '@/lib/storage';
@@ -59,16 +60,25 @@ export const BackupMenuDialog = ({
       </DialogTitle>
 
       <DialogContent dividers={true}>
-        <List sx={{ minWidth: 360, bgcolor: 'background.paper' }}>
-          {OBJECT.entries(cacheItems).map(([key, value]) => (
-            <CacheItem
-              key={key}
-              onToggle={handleToggleItem(key)}
-              selected={checked.includes(key)}
-              title={key}
-              value={value}
-            />
-          ))}
+        <List sx={{ backgroundColor: '#121212be', minWidth: 360 }}>
+          {OBJECT.entries(cacheItems).map(([key, value]) => {
+            const val: ReactNode = (() => {
+              try {
+                return <JsonPretty json={JSON.parse(value ?? '')} />;
+              } catch (_e) {
+                return value;
+              }
+            })();
+            return (
+              <CacheItem
+                key={key}
+                onToggle={handleToggleItem(key)}
+                selected={checked.includes(key)}
+                title={key}
+                value={val}
+              />
+            );
+          })}
         </List>
       </DialogContent>
 

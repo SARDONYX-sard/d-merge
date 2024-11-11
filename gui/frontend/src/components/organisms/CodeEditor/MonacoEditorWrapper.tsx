@@ -4,14 +4,15 @@
 // issue: https://github.com/suren-atoyan/monaco-react/issues/136#issuecomment-731420078
 'use client';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { type ComponentPropsWithoutRef, memo, useCallback, useRef } from 'react';
+import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
 
 import { atomOneDarkPro } from './atom_onedark_pro';
 
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import type { VimMode } from 'monaco-vim';
 
-const loadVimKeyBindings: OnMount = (editor, _monaco) => {
+type KeyLoader = (editor: monaco.editor.IStandaloneCodeEditor, vimModeRef: MutableRefObject<VimMode | null>) => void;
+const loadVimKeyBindings: KeyLoader = (editor, vimModeRef) => {
   // NOTE: need setup key bindings before monaco-vim setup
   // editor.addAction({
   //   id: 'show-hover',
@@ -32,7 +33,7 @@ const loadVimKeyBindings: OnMount = (editor, _monaco) => {
   // @ts-ignore
   window.require(['monaco-vim'], (monacoVim: VimMode) => {
     const statusNode = document.getElementById('status-node');
-    monacoVim.initVimMode(editor, statusNode);
+    vimModeRef.current = monacoVim.initVimMode(editor, statusNode);
   });
 };
 
@@ -43,21 +44,28 @@ type Props = ComponentPropsWithoutRef<typeof Editor> & {
 
 export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({ vimMode = false, onMount, ...params }: Props) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const vimModeRef = useRef<VimMode | null>(null);
 
   const handleDidMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
-      if (vimMode) {
-        loadVimKeyBindings(editor, monaco);
-      }
 
       editor.updateOptions({
         theme: 'onedark',
       });
       onMount?.(editor, monaco);
     },
-    [onMount, vimMode],
+    [onMount],
   );
+
+  // NOTE: If we do not set the key bindings within `useEffect`, the switching will not work.
+  //       If we do it in `handleDidMount`, the key bindings will not switch unless we reload the page.
+  useEffect(() => {
+    vimModeRef.current?.dispose();
+    if (vimMode && editorRef.current) {
+      loadVimKeyBindings(editorRef.current, vimModeRef);
+    }
+  }, [vimMode]);
 
   return (
     <Editor

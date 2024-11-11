@@ -23,6 +23,7 @@ type Props = {
 
 export const EditorInitializer = ({ value, fileName, label, language, onChange }: Props) => {
   const { editorMode } = useEditorModeContext();
+  const isVimMode = editorMode === 'vim';
 
   return (
     <>
@@ -41,7 +42,7 @@ export const EditorInitializer = ({ value, fileName, label, language, onChange }
         path={fileName}
         theme='vs-dark'
         value={value}
-        vimMode={editorMode === 'vim'}
+        vimMode={isVimMode}
         width='95%'
       />
       <InputLabel id='status-node' sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
