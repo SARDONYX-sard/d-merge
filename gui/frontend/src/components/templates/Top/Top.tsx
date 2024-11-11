@@ -2,8 +2,8 @@
 import { Box, type SxProps, type Theme } from '@mui/material';
 
 import { useInjectJs } from '@/components/hooks/useInjectJs';
-import { ModsGridWrapper } from '@/components/organisms/ModsGrid';
-import { PatchProvider } from '@/components/organisms/ModsGrid/PatchProvider';
+import { PatchContainer } from '@/components/organisms/PatchContainer';
+import { PatchProvider } from '@/components/organisms/PatchContainer/PatchProvider';
 
 const sx: SxProps<Theme> = {
   display: 'grid',
@@ -18,7 +18,7 @@ export const Top = () => {
   return (
     <Box component='main' sx={sx}>
       <PatchProvider>
-        <ModsGridWrapper />
+        <PatchContainer />
       </PatchProvider>
     </Box>
   );

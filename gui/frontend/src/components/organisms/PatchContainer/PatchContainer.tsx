@@ -3,13 +3,13 @@ import { type MouseEventHandler, useState } from 'react';
 
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { ConvertNav } from '@/components/organisms/ConvertNav';
-import { ModsGrid } from '@/components/organisms/ModsGrid/ModsGrid';
-import { usePatchContext } from '@/components/organisms/ModsGrid/PatchProvider';
-import { usePatchInputs } from '@/components/organisms/ModsGrid/usePatchInputs';
+import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
+import { usePatchContext } from '@/components/organisms/PatchContainer/PatchProvider';
+import { usePatchInputs } from '@/components/organisms/PatchContainer/usePatchInputs';
 import { NOTIFY } from '@/lib/notify';
 import { patch } from '@/services/api/patch';
 
-export const ModsGridWrapper = () => {
+export const PatchContainer = () => {
   const { output, selectionModel } = usePatchContext();
   const [loading, setLoading] = useState(false);
   const inputFieldsProps = usePatchInputs();

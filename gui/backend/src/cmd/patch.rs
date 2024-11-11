@@ -6,10 +6,12 @@ use tauri::Window;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mod info readers
 
-/// glob: If specified `../../dummy/mods`, then search `../../dummy/mods"/*/info.ini`.
+/// # glob samples
+/// - Steam VFS: `D:/Steam/steamapps/common/Skyrim Special Edition/Data`
+/// - MO2: `D:/GAME/ModOrganizer Skyrim SE/mods/*`
 #[tauri::command]
 pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
-    let pattern = format!("{glob}/*/info.ini");
+    let pattern = format!("{glob}/Nemesis_Engine/mod/*/info.ini");
     let info = ModsInfo::get_all(&pattern).or_else(|err| bail!(err))?;
     Ok(info.sort_to_vec_by_priority(HashMap::new()))
 }

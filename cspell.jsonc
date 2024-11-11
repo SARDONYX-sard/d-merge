@@ -21,6 +21,7 @@
     "serde",
     "simd",
     "Skyrim",
+    "steamapps",
     "subsec",
     "tauri",
     "Uninit",

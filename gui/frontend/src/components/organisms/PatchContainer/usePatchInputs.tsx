@@ -44,11 +44,11 @@ export const usePatchInputs = () => {
           <OutputIcon onClick={handleInputIconClick} sx={sx} />
         </Tooltip>
       ),
-      label: 'Mod Dir',
+      label: 'Skyrim Data Dir',
       onClick: handleInputClick,
       path: modInfoDir,
       setPath: setModInfoDir,
-      placeholder: 'D:/GAME/ModOrganizer Skyrim SE/mods/*/Nemesis_Engine/mod',
+      placeholder: 'D:/Steam/steamapps/common/Skyrim Special Edition/Data',
     },
     {
       icon: (
