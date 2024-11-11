@@ -39,5 +39,9 @@
       "fileMatch": ["/dummy/convert/input/*.json"],
       "url": "/dummy/convert/schema.json"
     }
-  ]
+  ],
+  // Used as an emergency measure because for some reason biome's lsp does not work.
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }

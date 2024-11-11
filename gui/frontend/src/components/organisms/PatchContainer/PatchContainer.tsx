@@ -10,13 +10,13 @@ import { NOTIFY } from '@/lib/notify';
 import { patch } from '@/services/api/patch';
 
 export const PatchContainer = () => {
-  const { output, selectionModel } = usePatchContext();
+  const { output, activateMods } = usePatchContext();
   const [loading, setLoading] = useState(false);
   const inputFieldsProps = usePatchInputs();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     setLoading(true);
-    await NOTIFY.asyncTry(async () => await patch(output, selectionModel));
+    await NOTIFY.asyncTry(async () => await patch(output, activateMods));
     await new Promise((r) => setTimeout(r, 1000));
     setLoading(false);
   };

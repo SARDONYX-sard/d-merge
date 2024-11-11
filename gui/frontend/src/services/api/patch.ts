@@ -23,15 +23,6 @@ export async function loadModsInfo(searchGlob: string) {
  * @example ['aaa', 'bbb']
  * @throws Error
  */
-export async function loadActivateMods() {
-  return await invoke<readonly string[]>('load_activate_mods');
-}
-
-/**
- * Load activate mods id
- * @example ['aaa', 'bbb']
- * @throws Error
- */
-export async function patch(output:string ,ids: ModIds) {
+export async function patch(output: string, ids: ModIds) {
   await invoke('patch', { output, ids });
 }

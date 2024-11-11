@@ -1,15 +1,35 @@
+/**
+ * # Why use key value by object?
+ * Extract strings by property identifier to automate key refactoring on the language server.
+ * This facilitates modification.
+ */
 import { OBJECT } from '@/lib/object-utils';
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const CONVERT_PUB_CACHE_KEYS_OBJ = {
   convertSelectionType: 'convert-selection-type',
-  convertSelectedFiles: 'convert-selected-files',
-  convertSelectedDirs: 'convert-selected-dirs',
-  convertSelectedTree: 'convert-selected-tree',
   convertOutput: 'convert-output',
   convertOutFmt: 'convert-output-fmt',
 } as const;
 
-const PUB_CACHE_KEYS_OBJ = {
+const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
+  convertSelectedFiles: 'convert-selected-files',
+  convertSelectedDirs: 'convert-selected-dirs',
+  convertSelectedTree: 'convert-selected-tree',
+} as const;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
+  patchInput: 'patch-input',
+  patchOutput: 'patch-output',
+  patchActivateIds: 'patch-activate-ids',
+} as const;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const SETTINGS_PUB_CACHE_KEYS_OBJ = {
   customCss: 'custom-css',
   customJs: 'custom-js',
   customTranslationDict: 'custom-translation-dict',
@@ -26,14 +46,7 @@ const PUB_CACHE_KEYS_OBJ = {
   snackbarPosition: 'snackbar-position',
 } as const;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
-  patchInput: 'patch-input',
-  patchOutput: 'patch-output',
-} as const;
-
-const PRIVATE_CACHE_KEYS_OBJ = {
+const SETTINGS_PRIVATE_CACHE_KEYS_OBJ = {
   exportSettingsPath: 'export-settings-path',
   importSettingsPath: 'import-backup-path',
   langFilePath: 'lang-file-path',
@@ -49,13 +62,13 @@ export const HIDDEN_CACHE_OBJ = {
 
 export const PUB_CACHE_OBJ = {
   ...CONVERT_PUB_CACHE_KEYS_OBJ,
-  ...PUB_CACHE_KEYS_OBJ,
-  ...CONVERT_PUB_CACHE_KEYS_OBJ,
+  ...SETTINGS_PUB_CACHE_KEYS_OBJ,
 } as const;
 
 export const PRIVATE_CACHE_OBJ = {
+  ...CONVERT_PRIVATE_CACHE_KEYS_OBJ,
   ...PATCH_PRIVATE_CACHE_KEYS_OBJ,
-  ...PRIVATE_CACHE_KEYS_OBJ,
+  ...SETTINGS_PRIVATE_CACHE_KEYS_OBJ,
 } as const;
 
 /** Public cache keys that are available and exposed for standard use in the application. */

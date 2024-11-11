@@ -15,30 +15,30 @@ type DragEndHandler = Exclude<DndCtxProps['onDragEnd'], undefined>;
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export function ModsGrid({ ...props }: Props) {
-  const { rows, setRows, selectionModel, setSelectionModel } = usePatchContext();
+  const { modInfoList, setModInfoList, activateMods, setActivateMods, loading } = usePatchContext();
   const columns = useColumns();
 
   const handleDragEnd = useCallback<DragEndHandler>(
     ({ active, over }) => {
       if (over) {
-        const oldIndex = rows.findIndex((row) => row.id === active.id);
-        const newIndex = rows.findIndex((row) => row.id === over.id);
-        setRows((prevRows) => arrayMove(prevRows, oldIndex, newIndex));
+        const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
+        const newIndex = modInfoList.findIndex((row) => row.id === over.id);
+        setModInfoList((prevRows) => arrayMove(prevRows, oldIndex, newIndex));
       }
     },
-    [rows, setRows],
+    [modInfoList, setModInfoList],
   );
 
   const handleRowSelectionModelChange: DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'] = (RowId) => {
     const selectedRowId = new Set(RowId);
     const selectedIds: string[] = [];
 
-    for (const row of rows) {
+    for (const row of modInfoList) {
       if (selectedRowId.has(row.id)) {
         selectedIds.push(row.id);
       }
     }
-    setSelectionModel(selectedIds);
+    setActivateMods(selectedIds);
   };
 
   return (
@@ -53,10 +53,11 @@ export function ModsGrid({ ...props }: Props) {
           },
         },
       }}
+      loading={loading}
       onDragEnd={handleDragEnd}
       onRowSelectionModelChange={handleRowSelectionModelChange}
-      rowSelectionModel={selectionModel}
-      rows={rows}
+      rowSelectionModel={activateMods}
+      rows={modInfoList}
       {...props}
     />
   );

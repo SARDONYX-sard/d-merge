@@ -16,15 +16,6 @@ pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
     Ok(info.sort_to_vec_by_priority(HashMap::new()))
 }
 
-#[tauri::command]
-pub(crate) fn load_activate_mods() -> Result<Vec<String>, String> {
-    let mods = "
-aaaaa
-bcbi"
-        .lines();
-    Ok(mods.into_iter().map(|m| m.to_string()).collect())
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// # Progress report for progress bar

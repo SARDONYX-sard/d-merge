@@ -1,7 +1,7 @@
 import { type Dispatch, type ReactNode, type SetStateAction, createContext, useContext, useState } from 'react';
 
 import { useStorageState } from '@/components/hooks/useStorageState';
-import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import type { OutFormat } from '@/services/api/serde_hkx';
 
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
@@ -64,10 +64,10 @@ const Context = createContext<ContextType | undefined>(undefined);
 type Props = { children: ReactNode };
 export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
-  const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedFiles, []);
-  const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PUB_CACHE_OBJ.convertSelectedDirs, []);
+  const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedFiles, []);
+  const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedDirs, []);
   const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(
-    PUB_CACHE_OBJ.convertSelectedTree,
+    PRIVATE_CACHE_OBJ.convertSelectedTree,
     CONVERT_TREE_INIT_VALUES,
   );
   const [output, setOutput] = useStorageState(PUB_CACHE_OBJ.convertOutput, '');

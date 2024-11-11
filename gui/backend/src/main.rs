@@ -25,7 +25,6 @@ fn main() {
             crate::cmd::convert::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,
-            crate::cmd::patch::load_activate_mods,
             crate::cmd::patch::load_mods_info,
             crate::cmd::patch::patch,
         ])

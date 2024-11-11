@@ -1,23 +1,22 @@
 import { save } from '@tauri-apps/plugin-dialog';
 
 import { CACHE_KEYS, type Cache, STORAGE } from '@/lib/storage';
+import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 import { readFile, writeFile } from './fs';
 
-const IMPORT_PATH_CACHE_KEY = 'import-backup-path';
-const EXPORT_PATH_CACHE_KEY = 'export-settings-path';
 const SETTINGS_FILE_NAME = 'settings';
 
 export const BACKUP = {
   /** @throws Error */
-  async import() {
-    const settings = await readFile(IMPORT_PATH_CACHE_KEY, SETTINGS_FILE_NAME);
+  async import(): Promise<Cache | undefined> {
+    const settings = await readFile(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
     if (settings) {
       const obj = JSON.parse(settings);
 
       // Validate
       for (const key of Object.keys(obj)) {
-        if (key === IMPORT_PATH_CACHE_KEY) {
+        if (key === PRIVATE_CACHE_OBJ.importSettingsPath) {
           continue; // The import path does not need to be overwritten.
         }
 
@@ -28,13 +27,13 @@ export const BACKUP = {
         }
       }
 
-      return obj as Cache;
+      return obj;
     }
   },
 
   /** @throws Json parse Error */
   async export(settings: Cache) {
-    const cachedPath = STORAGE.get(EXPORT_PATH_CACHE_KEY);
+    const cachedPath = STORAGE.get(PRIVATE_CACHE_OBJ.exportSettingsPath);
     const path = await save({
       defaultPath: cachedPath ?? undefined,
       filters: [{ name: SETTINGS_FILE_NAME, extensions: ['json'] }],
