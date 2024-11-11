@@ -9,14 +9,14 @@ type Props = {
   icon: ReactNode;
   path: string;
   setPath: (path: string) => void;
-  placeholder?: string,
+  placeholder?: string;
 } & ComponentPropsWithRef<typeof Button>;
 
 export function InputField({ label, icon, path, setPath, placeholder, ...props }: Props) {
   const id = useId();
 
   return (
-    <Box  sx={{ '& > :not(style)': { m: 1 } }}>
+    <Box sx={{ '& > :not(style)': { m: 1 } }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
         {icon}
         <TextField
@@ -28,7 +28,7 @@ export function InputField({ label, icon, path, setPath, placeholder, ...props }
           value={path}
           variant='standard'
         />
-          <Button {...props} />
+        <Button {...props} />
       </Box>
     </Box>
   );

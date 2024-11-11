@@ -40,7 +40,7 @@ export const usePatchInputs = () => {
   return [
     {
       icon: (
-        <Tooltip placement='top' title={"Open specified directory."}>
+        <Tooltip placement='top' title={'Open specified directory.'}>
           <OutputIcon onClick={handleInputIconClick} sx={sx} />
         </Tooltip>
       ),

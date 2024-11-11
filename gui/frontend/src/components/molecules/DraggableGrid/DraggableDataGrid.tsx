@@ -31,15 +31,19 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
 
   return (
     <div>
-      <DndContext autoScroll={{
-        enabled: true,
-        /**
-         * NOTE: Set to false to avoid the scroll position force-return bug.
-         * ref: https://github.com/clauderic/dnd-kit/issues/825#issuecomment-1459030786
-         */
-        layoutShiftCompensation: false,
-        threshold: { x: 0, y: 0.2 } // Eliminate horizontal auto-scroll
-      }} collisionDetection={closestCorners} onDragEnd={onDragEnd} sensors={sensors}
+      <DndContext
+        autoScroll={{
+          enabled: true,
+          /**
+           * NOTE: Set to false to avoid the scroll position force-return bug.
+           * ref: https://github.com/clauderic/dnd-kit/issues/825#issuecomment-1459030786
+           */
+          layoutShiftCompensation: false,
+          threshold: { x: 0, y: 0.2 }, // Eliminate horizontal auto-scroll
+        }}
+        collisionDetection={closestCorners}
+        onDragEnd={onDragEnd}
+        sensors={sensors}
       >
         <SortableContext items={rows} strategy={verticalListSortingStrategy}>
           <DataGrid
