@@ -34,8 +34,10 @@ pub struct PatchJson<'a> {
     pub value: BorrowedValue<'a>,
 }
 
+/// Applies a JSON patch operation to a mutable reference to a JSON value.
+///
 /// # Errors
-/// Failed to parse
+/// If the patch operation fails due to an invalid operation or path not found.
 pub fn apply_patch<'v>(json: &mut BorrowedValue<'v>, patch: PatchJson<'v>) -> Result<()> {
     match patch.op {
         Op::Add => apply_add(json, patch),
