@@ -1,5 +1,5 @@
 import OutputIcon from '@mui/icons-material/Output';
-import { Tooltip } from '@mui/material';
+import { type SxProps, Tooltip } from '@mui/material';
 import { open } from '@tauri-apps/plugin-shell';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
@@ -35,14 +35,13 @@ export const usePatchInputs = () => {
     NOTIFY.asyncTry(async () => await open(output));
   };
 
+  const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
+
   return [
     {
       icon: (
         <Tooltip placement='top' title={"Open specified directory."}>
-          <OutputIcon
-            onClick={handleInputIconClick}
-            sx={{ color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' }}
-          />
+          <OutputIcon onClick={handleInputIconClick} sx={sx} />
         </Tooltip>
       ),
       label: 'Mod Dir',
@@ -54,10 +53,7 @@ export const usePatchInputs = () => {
     {
       icon: (
         <Tooltip placement='top' title={t('open-output-tooltip')}>
-          <OutputIcon
-            onClick={handleOutputIconClick}
-            sx={{ color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' }}
-          />
+          <OutputIcon onClick={handleOutputIconClick} sx={sx} />
         </Tooltip>
       ),
       label: t('output-path'),
