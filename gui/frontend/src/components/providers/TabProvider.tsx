@@ -11,11 +11,11 @@ type ContextType = {
 };
 
 const Context = createContext<ContextType | undefined>(undefined);
-const schema = z.enum(['bottom', 'top']).catch('top');
+export const tabPosSchema = z.enum(['bottom', 'top']).catch('top');
 
 type Props = { children: ReactNode };
 export const TabProvider: FC<Props> = ({ children }) => {
-  const [tabPos, setTabPos] = useStorageState(PUB_CACHE_OBJ.settingsTabPosition, schema);
+  const [tabPos, setTabPos] = useStorageState(PUB_CACHE_OBJ.settingsTabPosition, tabPosSchema);
   return <Context.Provider value={{ tabPos, setTabPos }}>{children}</Context.Provider>;
 };
 
