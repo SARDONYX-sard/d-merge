@@ -85,9 +85,9 @@ describe('NOTIFY_CONFIG', () => {
       expect(result).toBe(10);
     });
 
-    it('should return 1 for invalid snack limit strings', () => {
+    it('should return default for invalid snack limit strings', () => {
       const result = NOTIFY_CONFIG.limit.fromStr('invalid');
-      expect(result).toBe(1);
+      expect(result).toBe(NOTIFY_CONFIG.default.maxSnack);
     });
   });
 });

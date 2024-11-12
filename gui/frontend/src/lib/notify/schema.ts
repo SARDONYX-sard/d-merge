@@ -10,4 +10,6 @@ export const snackbarOriginSchema = z
     vertical: 'top',
   });
 
-export const snackbarLimitSchema = z.number().int().positive().catch(3);
+// NOTE: Cannot convert string to number without `coerce: true`.
+// https://github.com/colinhacks/zod/discussions/330#discussioncomment-8895651
+export const snackbarLimitSchema = z.number({ coerce: true }).int().positive().catch(3);
