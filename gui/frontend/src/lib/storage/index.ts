@@ -9,7 +9,7 @@ export { PUB_CACHE_KEYS, CACHE_KEYS };
 /** key/value pairs related to this project. */
 export type Cache = LocalCache<typeof CACHE_KEYS>;
 export type CacheKey = keyof Cache;
-export type WithHideCacheKey = CacheKey | Mutable<typeof HIDDEN_CACHE_KEYS>[number];
+export type CacheKeyWithHide = CacheKey | Mutable<typeof HIDDEN_CACHE_KEYS>[number];
 
 export const STORAGE = createStorage({
   cacheKeys: CACHE_KEYS,

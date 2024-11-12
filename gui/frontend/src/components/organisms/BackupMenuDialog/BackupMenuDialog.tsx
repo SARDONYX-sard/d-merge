@@ -1,17 +1,21 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Button, type ButtonProps, Dialog } from '@mui/material';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
+import {
+  Button,
+  type ButtonProps,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  List,
+} from '@mui/material';
 
-import { JsonPretty } from '@/components/atoms/JsonPretty';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { OBJECT } from '@/lib/object-utils';
 import type { Cache, CacheKey } from '@/lib/storage';
 
 import { CacheItem } from './CacheItem';
+import { CacheValueItem } from './CacheValueItem';
 import { CheckBoxControls } from './CheckBoxControls';
 import { useCheckBoxState } from './useCheckBoxState';
 
@@ -41,54 +45,84 @@ export const BackupMenuDialog = ({
 
   return (
     <Dialog fullWidth={true} maxWidth='md' onClose={handleClose} open={open}>
-      <DialogTitle>
-        {title}
-        <IconButton
-          aria-label='close'
-          onClick={handleClose}
-          sx={{ position: 'absolute', right: 8, top: 8, color: (theme) => theme.palette.grey[500] }}
-        >
-          <CloseIcon />
-        </IconButton>
-
+      <DialogHeader onClose={handleClose} title={title}>
         <CheckBoxControls
           isAllChecked={isAllChecked}
           isPubAllChecked={isPubAllChecked}
           onAllCheck={handleCheckAll}
           onPubCheck={handleCheckPubAll}
         />
-      </DialogTitle>
+      </DialogHeader>
 
       <DialogContent dividers={true}>
-        <List sx={{ backgroundColor: '#121212be', minWidth: 360 }}>
-          {OBJECT.entries(cacheItems).map(([key, value]) => {
-            const val: ReactNode = (() => {
-              try {
-                return <JsonPretty json={JSON.parse(value ?? '')} />;
-              } catch (_e) {
-                return value;
-              }
-            })();
-            return (
-              <CacheItem
-                key={key}
-                onToggle={handleToggleItem(key)}
-                selected={checked.includes(key)}
-                title={key}
-                value={val}
-              />
-            );
-          })}
-        </List>
+        <DialogContentList cacheItems={cacheItems} checked={checked} handleToggleItem={handleToggleItem} />
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={() => inDialogClick(checked)}>{buttonName}</Button>
-        <CancelButton onClick={handleClose} />
-      </DialogActions>
+      <DialogActionsPanel buttonName={buttonName} onCancel={handleClose} onConfirm={() => inDialogClick(checked)} />
     </Dialog>
   );
 };
+
+const DialogHeader = ({
+  title,
+  onClose,
+  children,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children?: ReactNode;
+}) => (
+  <DialogTitle>
+    {title}
+    <IconButton
+      aria-label='close'
+      onClick={onClose}
+      sx={{ position: 'absolute', right: 8, top: 8, color: (theme) => theme.palette.grey[500] }}
+    >
+      <CloseIcon />
+    </IconButton>
+    {children}
+  </DialogTitle>
+);
+
+const DialogContentList = ({
+  cacheItems,
+  checked,
+  handleToggleItem,
+}: {
+  cacheItems: Cache;
+  checked: readonly CacheKey[];
+  handleToggleItem: (key: CacheKey) => () => void;
+}) => (
+  <List sx={{ backgroundColor: '#121212be', minWidth: 360 }}>
+    {OBJECT.entries(cacheItems).map(([key, value]) =>
+      value ? (
+        <CacheItem
+          key={key}
+          onToggle={handleToggleItem(key)}
+          selected={checked.includes(key)}
+          title={key}
+          value={<CacheValueItem cacheKey={key} value={value} />}
+        />
+      ) : null,
+    )}
+  </List>
+);
+
+const DialogActionsPanel = ({
+  buttonName,
+  onConfirm,
+  onCancel,
+}: {
+  buttonName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) => (
+  <DialogActions>
+    <Button onClick={onConfirm}>{buttonName}</Button>
+    <CancelButton onClick={onCancel} />
+  </DialogActions>
+);
 
 const CancelButton = ({ ...props }: ButtonProps) => {
   const { t } = useTranslation();

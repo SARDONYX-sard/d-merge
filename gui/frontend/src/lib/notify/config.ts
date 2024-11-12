@@ -1,12 +1,15 @@
-import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { stringToJsonSchema } from '@/lib/zod/json-validation';
+
+import { snackbarLimitSchema, snackbarOriginSchema } from './schema';
 
 import type { SnackbarOrigin } from 'notistack';
 
 /**
  * Type representing the configuration for the notification system.
  */
-type NotifyConfig = {
+export type NotifyConfig = {
   /** Determines where the notification will appear on the screen. */
   anchorOrigin: SnackbarOrigin;
   /** Maximum number of snack_bars to display simultaneously. */
@@ -31,14 +34,8 @@ const DEFAULT = {
  * @param param0 - The partial object containing vertical and horizontal position values.
  * @returns - The normalized Snackbar position.
  */
-const normalize = ({ vertical, horizontal }: Partial<{ vertical: string; horizontal: string }>) => {
-  const isValidVertical = (value?: string) => value === 'bottom' || value === 'top';
-  const isValidHorizontal = (value?: string) => value === 'center' || value === 'right' || value === 'left';
-
-  return {
-    vertical: isValidVertical(vertical) ? vertical : DEFAULT.anchorOrigin.vertical,
-    horizontal: isValidHorizontal(horizontal) ? horizontal : DEFAULT.anchorOrigin.horizontal,
-  } as const satisfies SnackbarOrigin;
+const normalize = (value: Partial<{ vertical: string; horizontal: string }>) => {
+  return snackbarOriginSchema.parse(value) satisfies SnackbarOrigin;
 };
 
 /**
@@ -57,18 +54,14 @@ export const NOTIFY_CONFIG = {
    * @returns - The current notification configuration.
    */
   getOrDefault() {
-    const anchorOrigin = (() => {
-      const position: Partial<SnackbarOrigin> = NOTIFY.try(() => {
-        const jsonStr = STORAGE.get('snackbar-position');
-        return jsonStr ? JSON.parse(jsonStr) : {};
-      });
-      return normalize(position) satisfies NotifyConfig['anchorOrigin'];
-    })();
-
-    const maxSnack = (() => {
-      const maxSnackCache = Number(STORAGE.get('snackbar-limit') ?? DEFAULT.maxSnack);
-      return Number.isNaN(maxSnackCache) ? DEFAULT.maxSnack : maxSnackCache;
-    })();
+    const anchorOrigin = stringToJsonSchema
+      .catch(null)
+      .pipe(snackbarOriginSchema)
+      .parse(STORAGE.get(PUB_CACHE_OBJ.snackbarPosition));
+    const maxSnack = stringToJsonSchema
+      .catch(null)
+      .pipe(snackbarLimitSchema)
+      .parse(STORAGE.get(PUB_CACHE_OBJ.snackbarLimit));
 
     return { anchorOrigin, maxSnack } as const satisfies NotifyConfig;
   },
@@ -92,7 +85,7 @@ export const NOTIFY_CONFIG = {
      * @param str - The position string.
      * @returns - The parsed anchor position.
      */
-    fromStr(str: string): NotifyConfig['anchorOrigin'] {
+    fromStr(str: string): SnackbarOrigin {
       const [vertical, horizontal] = str.split('_');
       return normalize({ vertical, horizontal });
     },
@@ -108,7 +101,7 @@ export const NOTIFY_CONFIG = {
      * value - The new maximum snack limit.
      */
     set(value: NotifyConfig['maxSnack']) {
-      STORAGE.set('snackbar-limit', value.toString());
+      STORAGE.set(PUB_CACHE_OBJ.snackbarLimit, JSON.stringify(value));
     },
 
     /**
@@ -118,7 +111,7 @@ export const NOTIFY_CONFIG = {
      * @returns - The parsed snack limit.
      */
     fromStr(str: string): NotifyConfig['maxSnack'] {
-      return Number(str) || 1;
+      return snackbarLimitSchema.parse(str);
     },
   },
 } as const;

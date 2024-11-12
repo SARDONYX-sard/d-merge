@@ -2,7 +2,11 @@ import { type Dispatch, type ReactNode, type SetStateAction, createContext, useC
 
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
 import type { OutFormat } from '@/services/api/serde_hkx';
+
+import { outFormatSchema } from './schemas/out_format';
+import { selectionTypeSchema } from './schemas/selection_type';
 
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
 
@@ -63,14 +67,14 @@ const Context = createContext<ContextType | undefined>(undefined);
 
 type Props = { children: ReactNode };
 export const ConvertProvider = ({ children }: Props) => {
-  const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
-  const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedFiles, []);
-  const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedDirs, []);
+  const [selectionType, setSelectionType] = useStorageState(PUB_CACHE_OBJ.convertSelectionType, selectionTypeSchema);
+  const [selectedFiles, setSelectedFiles] = useStorageState(PRIVATE_CACHE_OBJ.convertSelectedFiles, stringArraySchema);
+  const [selectedDirs, setSelectedDirs] = useStorageState(PRIVATE_CACHE_OBJ.convertSelectedDirs, stringArraySchema);
+  const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.convertOutput, stringSchema);
+  const [fmt, setFmt] = useStorageState(PUB_CACHE_OBJ.convertOutFmt, outFormatSchema);
+
   /** NOTE: Tree is not cached because it can be a huge file */
   const [selectedTree, setSelectedTree] = useState<SelectedTree>(CONVERT_TREE_INIT_VALUES);
-  const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.convertOutput, '');
-  const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
-
   const [convertStatuses, setConvertStatuses] = useState<ConvertStatusesMap>(new Map());
 
   return (

@@ -7,9 +7,26 @@ import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 
-import { STORAGE } from '@/lib/storage';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+
+import { schemaStorage } from '../../../lib/storage/schemaStorage';
+
+const validLastPath = ['settings', 'convert', '/'] as const;
+const lastPathSchema = z.enum(validLastPath);
+const getPageIndex = (path: string) => {
+  switch (path) {
+    case '/convert':
+      return 0;
+    case '/':
+      return 1;
+    case '/settings':
+      return 2;
+    default:
+      return 0;
+  }
+};
 
 /** HACK: To prevents the conversion button from being hidden because the menu is fixed. */
 const MenuPadding = () => <div style={{ height: '56px' }} />;
@@ -18,11 +35,11 @@ export function PageNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const [selectedPage, setSelectedPage] = useState(0);
+  const [lastPath, setLastPath] = schemaStorage.use(PUB_CACHE_OBJ.lastPath, lastPathSchema);
 
   useEffect(() => {
     // Check if we've already redirected in this session
     const hasRedirected = sessionStorage.getItem('hasRedirected');
-    const lastPath = STORAGE.get(PUB_CACHE_OBJ.lastPath);
 
     if (lastPath && lastPath !== pathname && !hasRedirected) {
       sessionStorage.setItem('hasRedirected', 'true');
@@ -33,27 +50,17 @@ export function PageNavigation() {
       }
       router.push(lastPath);
     }
-  }, [pathname, router]);
+  }, [lastPath, pathname, router]);
 
   useEffect(() => {
-    const getPageIndex = (path: string) => {
-      switch (path) {
-        case '/convert':
-          return 0;
-        case '/':
-          return 1;
-        case '/settings':
-          return 2;
-        default:
-          return 0;
-      }
-    };
-
     const currentPage = getPageIndex(pathname);
     setSelectedPage(currentPage);
 
-    STORAGE.set(PUB_CACHE_OBJ.lastPath, pathname); // Save current path as the last visited path in localStorage
-  }, [pathname]);
+    const result = lastPathSchema.safeParse(pathname);
+    if (result.success) {
+      setLastPath(result.data);
+    }
+  }, [pathname, setLastPath]);
 
   const handleNavigationChange = (pageIdx: number) => {
     setSelectedPage(pageIdx);

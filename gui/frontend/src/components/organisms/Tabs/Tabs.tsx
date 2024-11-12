@@ -18,13 +18,23 @@ import { NotifyList } from '@/components/organisms/NotifyList';
 import { TabPositionList } from '@/components/organisms/TabPositionList';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
+import { TabSchema } from './schema';
+
 import type { SyntheticEvent } from 'react';
 
 export const Tabs = () => {
-  const [selectedTab, setSelectedTab] = useStorageState(PUB_CACHE_OBJ.settingsTabSelect, 'editor');
+  const [selectedTab, setSelectedTab] = useStorageState(PUB_CACHE_OBJ.settingsTabSelect, TabSchema);
   const { t } = useTranslation();
 
-  const handleChange = (_event: SyntheticEvent, tabId: string) => setSelectedTab(tabId);
+  const handleChange = (_: SyntheticEvent, tabId: string) => setSelectedTab(TabSchema.parse(tabId));
+
+  const tabs = [
+    { label: t('tab-label-editor'), value: 'editor' },
+    { label: t('tab-label-notice'), value: 'notice' },
+    { label: t('tab-label-lang'), value: 'lang' },
+    { label: t('tab-label-tab'), value: 'tab' },
+    { label: t('tab-label-backup'), value: 'backup' },
+  ] as const;
 
   return (
     <Box
@@ -36,11 +46,9 @@ export const Tabs = () => {
       <TabContext value={selectedTab}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <TabList aria-label='Setting tabs' onChange={handleChange}>
-            <Tab label={t('tab-label-editor')} value='editor' />
-            <Tab label={t('tab-label-notice')} value='notice' />
-            <Tab label={t('tab-label-lang')} value='lang' />
-            <Tab label={t('tab-label-tab')} value='tab' />
-            <Tab label={t('tab-label-backup')} value='backup' />
+            {tabs.map((tab) => (
+              <Tab key={tab.value} label={tab.label} value={tab.value} />
+            ))}
           </TabList>
         </Box>
 

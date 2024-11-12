@@ -1,13 +1,14 @@
 import { type ReactNode, createContext, useContext, useState } from 'react';
 
 import { STORAGE } from '@/lib/storage';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 type ContextType = {
   js: string;
   setJs: (value?: string) => void;
 };
 const Context = createContext<ContextType | undefined>(undefined);
-const CACHE_KEY = 'custom-js';
+const CACHE_KEY = PUB_CACHE_OBJ.customJs;
 
 type Props = { children: ReactNode };
 

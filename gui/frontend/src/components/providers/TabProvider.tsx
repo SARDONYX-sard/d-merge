@@ -1,32 +1,22 @@
-import { type ReactNode, createContext, useContext, useState } from 'react';
+import { type Dispatch, type FC, type ReactNode, type SetStateAction, createContext, useContext } from 'react';
+import { z } from 'zod';
 
-import { STORAGE } from '@/lib/storage';
+import { useStorageState } from '@/components/hooks/useStorageState';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 type TabPosition = 'top' | 'bottom';
 type ContextType = {
   tabPos: TabPosition;
-  setTabPos: (value?: string) => void;
+  setTabPos: Dispatch<SetStateAction<TabPosition>>;
 };
-const Context = createContext<ContextType | undefined>(undefined);
 
-const normalize = (value: string | null) => (value === 'bottom' ? 'bottom' : 'top');
+const Context = createContext<ContextType | undefined>(undefined);
+const schema = z.enum(['bottom', 'top']).catch('top');
 
 type Props = { children: ReactNode };
-export const TabProvider = ({ children }: Props) => {
-  const [tabPos, setTabPos] = useState<TabPosition>(normalize(STORAGE.get(PUB_CACHE_OBJ.settingsTabPosition)));
-
-  const setHook = (value?: string) => {
-    if (value) {
-      const validValue = normalize(value);
-      setTabPos(validValue);
-      STORAGE.set(PUB_CACHE_OBJ.settingsTabPosition, validValue);
-    } else {
-      STORAGE.remove(PUB_CACHE_OBJ.settingsTabPosition);
-    }
-  };
-
-  return <Context.Provider value={{ tabPos, setTabPos: setHook }}>{children}</Context.Provider>;
+export const TabProvider: FC<Props> = ({ children }) => {
+  const [tabPos, setTabPos] = useStorageState(PUB_CACHE_OBJ.settingsTabPosition, schema);
+  return <Context.Provider value={{ tabPos, setTabPos }}>{children}</Context.Provider>;
 };
 
 /**

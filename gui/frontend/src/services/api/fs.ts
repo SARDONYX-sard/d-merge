@@ -1,26 +1,33 @@
 import { invoke } from '@tauri-apps/api/core';
 import { readTextFile } from '@tauri-apps/plugin-fs';
+import { z } from 'zod';
 
-import { type CacheKey, STORAGE } from '@/lib/storage';
+import type { CacheKey } from '@/lib/storage';
+import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 import { openPath } from './dialog';
 
 /**
- * Read the entire contents of a file into a string.
- * @param pathKey - target path cache key
- * @return contents
- * @throws `Error`
+ * Reads the entire contents of a file into a string.
+ *
+ * @param pathCacheKey - Target path cache key.
+ * @param filterName - Name of the filter to be displayed in the file dialog.
+ * @param extensions - Array of file extensions to be filtered in the file dialog. Default is `['json']`.
+ *
+ * @returns A promise that resolves to the contents of the file if successful, or `null` if the user cancels the file dialog.
+ *
+ * @throws Throws an `Error` if there is an issue reading the file.
  */
-export async function readFile(pathKey: CacheKey, filterName: string, extensions = ['json']) {
-  let path = STORAGE.get(pathKey) ?? '';
+export async function readFile(pathCacheKey: CacheKey, filterName: string, extensions = ['json']) {
+  const [path, setPath] = schemaStorage.use(pathCacheKey, z.string());
+  const selectedPath = await openPath(path ?? '', {
+    setPath,
+    filters: [{ name: filterName, extensions }],
+    multiple: false,
+  });
 
-  const setPath = (newPath: string) => {
-    path = newPath;
-    STORAGE.set(pathKey, path);
-  };
-
-  if (await openPath(path, { setPath, filters: [{ name: filterName, extensions }] })) {
-    return await readTextFile(path);
+  if (typeof selectedPath === 'string') {
+    return await readTextFile(selectedPath);
   }
   return null;
 }

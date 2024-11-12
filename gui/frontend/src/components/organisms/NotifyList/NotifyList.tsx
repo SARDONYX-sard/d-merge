@@ -12,9 +12,10 @@ type PosChangeHandler = Exclude<ComponentPropsWithRef<typeof SelectWithLabel>['o
 type SnackChangeHandler = ComponentPropsWithRef<typeof MaxSnackField>['onChange'];
 
 export const NotifyList = () => {
+  const def = NOTIFY_CONFIG.getOrDefault();
   const { t } = useTranslation();
-  const [pos, setPos] = useState<SnackbarOrigin>(NOTIFY_CONFIG.default.anchorOrigin);
-  const [maxSnack, setMaxSnack] = useState<number>(NOTIFY_CONFIG.default.maxSnack);
+  const [pos, setPos] = useState<SnackbarOrigin>(def.anchorOrigin);
+  const [maxSnack, setMaxSnack] = useState<number>(def.maxSnack);
 
   const handlePosChange = useCallback<PosChangeHandler>(({ target }) => {
     const newPosition = NOTIFY_CONFIG.anchor.fromStr(target.value);

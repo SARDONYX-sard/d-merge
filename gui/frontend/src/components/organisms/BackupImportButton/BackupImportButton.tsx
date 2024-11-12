@@ -6,7 +6,7 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { BackupButton } from '@/components/organisms/BackupButton';
 import type { DialogClickHandler } from '@/components/organisms/BackupMenuDialog';
 import { NOTIFY } from '@/lib/notify';
-import type { Cache } from '@/lib/storage';
+import { type Cache, STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 
 export const BackupImportButton = () => {
@@ -28,7 +28,7 @@ export const BackupImportButton = () => {
     for (const key of checkedKeys) {
       const value = settings[key];
       if (value) {
-        localStorage.setItem(key, value);
+        STORAGE.set(key, value);
       }
     }
 

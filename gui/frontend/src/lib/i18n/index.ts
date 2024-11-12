@@ -2,9 +2,12 @@
 
 import { type Resource, use } from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { z } from 'zod';
 
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 import dictEnUs from '@/../../locales/en-US.json';
 import dictJaJp from '@/../../locales/ja-JP.json';
@@ -21,11 +24,17 @@ const RESOURCES = {
   custom: { translation: NOTIFY.try(() => JSON.parse(STORAGE.get('custom-translation-dict') ?? '{}')) },
 } as const satisfies Resource;
 
+/** The actual item to be set in the library. This must be a Key that exists in `RESOURCES`. */
+type ValidI18n = keyof typeof RESOURCES;
+/** Values of i18n selectable items */
+type I18nListValue = 'auto' | ValidI18n;
+export type I18nKeys = keyof (typeof RESOURCES)['en-US']['translation'];
+
 /**
  * Default if `null` or `undefined`.
  * @default `en-US`
  */
-const normalize = (str: string | null): Exclude<I18n, 'auto'> => {
+const normalize = (str: string | null): ValidI18n => {
   switch (str === null || str === 'auto' ? window.navigator.language : str) {
     case 'ja':
     case 'ja-JP':
@@ -37,10 +46,9 @@ const normalize = (str: string | null): Exclude<I18n, 'auto'> => {
   }
 };
 
-type I18n = 'auto' | keyof typeof RESOURCES;
-export type I18nKeys = keyof (typeof RESOURCES)['en-US']['translation'];
+// Define a schema for the valid I18n values
+const i18nSchema = z.string();
 
-const CACHE_KEY = 'locale';
 export const LANG = {
   /**
    * NOTE: This is intended to be done automatically the moment global import is done each time on the previous page in `src/app/layout.tsx`
@@ -51,7 +59,7 @@ export const LANG = {
     use(initReactI18next) // passes i18n down to react-i18next
       .init({
         resources: RESOURCES,
-        lng: normalize(STORAGE.get(CACHE_KEY)),
+        lng: normalize(schemaStorage.get(PUB_CACHE_OBJ.locale, i18nSchema)),
         fallbackLng: 'en-US',
         interpolation: {
           escapeValue: false, // react already safes from xss
@@ -62,13 +70,14 @@ export const LANG = {
   normalize,
 
   /** get current log level from `LocalStorage`. */
-  get(): I18n {
-    const locale = STORAGE.get(CACHE_KEY);
-    return locale === 'auto' ? 'auto' : normalize(locale);
+  get(): I18nListValue {
+    const locale = schemaStorage.get(PUB_CACHE_OBJ.locale, i18nSchema);
+    const isAuto = [null, 'auto'].some((val) => val === locale);
+    return isAuto ? 'auto' : normalize(locale);
   },
 
   /** set log level to `LocalStorage`. */
-  set(lang: I18n) {
-    STORAGE.set(CACHE_KEY, lang);
+  set(lang: I18nListValue) {
+    schemaStorage.set(PUB_CACHE_OBJ.locale, lang);
   },
 } as const;

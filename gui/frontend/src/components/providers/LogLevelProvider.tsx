@@ -18,7 +18,7 @@ const Context = createContext<ContextType | undefined>(undefined);
 
 type Props = { children: ReactNode };
 export const LogLevelProvider = ({ children }: Props) => {
-  const [logLevel, setLogLevel] = useState<LogLevel>(LOG.get());
+  const [logLevel, setLogLevel] = useState(LOG.get());
   const setHook = (value: LogLevel) => {
     setLogLevel(value);
     LOG.set(value);

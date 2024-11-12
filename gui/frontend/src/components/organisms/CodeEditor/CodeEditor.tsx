@@ -6,16 +6,18 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { useCssContext } from '@/components/providers/CssProvider';
 import { useJsContext } from '@/components/providers/JsProvider';
 import { CSS } from '@/lib/css';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 import { type EditorInfo, EditorInitializer } from './EditorInitializer';
+import { schema } from './schema';
 
 export const CodeEditor = () => {
   const { js, setJs } = useJsContext();
   const { css, setCss, setPreset } = useCssContext();
   const { t } = useTranslation();
 
-  const [value, setValue] = useStorageState<'javascript' | 'css'>('editor-tab-select', 'javascript');
-  const handleTabChange: TabListProps['onChange'] = (_event, newValue) => {
+  const [value, setValue] = useStorageState(PUB_CACHE_OBJ.editorTabSelect, schema);
+  const handleTabChange: TabListProps['onChange'] = (_, newValue) => {
     setValue(newValue);
   };
 

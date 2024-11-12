@@ -40,12 +40,10 @@ export const EditorInitializer = ({ value, fileName, label, language, onChange }
           hover: { above: true },
         }}
         path={fileName}
-        theme='vs-dark'
         value={value}
         vimMode={isVimMode}
         width='95%'
       />
-      <InputLabel id='status-node' sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
     </>
   );
 };

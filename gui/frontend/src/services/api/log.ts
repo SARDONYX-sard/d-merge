@@ -2,29 +2,20 @@ import { app } from '@tauri-apps/api';
 import { invoke } from '@tauri-apps/api/core';
 import { appLogDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-shell';
+import { z } from 'zod';
 
 import { STORAGE } from '@/lib/storage';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { stringToJsonSchema } from '@/lib/zod/json-validation';
 
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-
+const logList = ['trace', 'debug', 'info', 'warn', 'error'] as const;
 const DEFAULT = 'error';
-const CACHE_KEY = 'log-level';
+const logLevelSchema = z.enum(logList).catch(DEFAULT);
+export type LogLevel = z.infer<typeof logLevelSchema>;
 
-/**
- * `'error'` if null or undefined
- * @default `error`
- */
+/** @default `error` */
 const normalize = (logLevel?: string | null): LogLevel => {
-  switch (logLevel) {
-    case 'trace':
-    case 'debug':
-    case 'info':
-    case 'warn':
-    case 'error':
-      return logLevel;
-    default:
-      return DEFAULT;
-  }
+  return logLevelSchema.parse(logLevel);
 };
 
 export const LOG = {
@@ -60,11 +51,11 @@ export const LOG = {
 
   /** get current log level from `LocalStorage`. */
   get() {
-    return normalize(STORAGE.get(CACHE_KEY));
+    return stringToJsonSchema.catch('error').pipe(logLevelSchema).parse(STORAGE.get(PUB_CACHE_OBJ.logLevel));
   },
 
   /** set log level to `LocalStorage`. */
   set(level: LogLevel) {
-    STORAGE.set(CACHE_KEY, level);
+    STORAGE.set(PUB_CACHE_OBJ.logLevel, JSON.stringify(level));
   },
 } as const;
