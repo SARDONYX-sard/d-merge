@@ -15,7 +15,6 @@ const CONVERT_PUB_CACHE_KEYS_OBJ = {
 const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
   convertSelectedFiles: 'convert-selected-files',
   convertSelectedDirs: 'convert-selected-dirs',
-  convertSelectedTree: 'convert-selected-tree',
   convertOutput: 'convert-output',
 } as const;
 
@@ -25,6 +24,7 @@ const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
   patchInput: 'patch-input',
   patchOutput: 'patch-output',
   patchActivateIds: 'patch-activate-ids',
+  patchPriorityIds: 'patch-priority-ids',
 } as const;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

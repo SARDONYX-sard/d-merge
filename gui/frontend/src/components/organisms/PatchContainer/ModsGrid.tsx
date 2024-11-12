@@ -8,14 +8,14 @@ import { useColumns } from './useColumns';
 
 import type { Props as DndCtxProps } from '@dnd-kit/core/dist/components/DndContext/DndContext';
 import type { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internals';
-import type { ComponentPropsWithRef } from 'react';
+import type { ComponentPropsWithRef, FC } from 'react';
 
 type DragEndHandler = Exclude<DndCtxProps['onDragEnd'], undefined>;
 
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
-export function ModsGrid({ ...props }: Props) {
-  const { modInfoList, setModInfoList, activateMods, setActivateMods, loading } = usePatchContext();
+export const ModsGrid: FC<Props> = ({ ...props }) => {
+  const { modInfoList, setModInfoList, activateMods, setActivateMods, loading, setPriorities } = usePatchContext();
   const columns = useColumns();
 
   const handleDragEnd = useCallback<DragEndHandler>(
@@ -23,10 +23,14 @@ export function ModsGrid({ ...props }: Props) {
       if (over) {
         const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
         const newIndex = modInfoList.findIndex((row) => row.id === over.id);
-        setModInfoList((prevRows) => arrayMove(prevRows, oldIndex, newIndex));
+        setModInfoList((prevRows) => {
+          const newList = arrayMove(prevRows, oldIndex, newIndex);
+          setPriorities(newList.map((row) => row.id));
+          return newList;
+        });
       }
     },
-    [modInfoList, setModInfoList],
+    [modInfoList, setModInfoList, setPriorities],
   );
 
   const handleRowSelectionModelChange: DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'] = (RowId) => {
@@ -61,4 +65,4 @@ export function ModsGrid({ ...props }: Props) {
       {...props}
     />
   );
-}
+};

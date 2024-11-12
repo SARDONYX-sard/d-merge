@@ -66,10 +66,8 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState<SelectionType>(PUB_CACHE_OBJ.convertSelectionType, 'files');
   const [selectedFiles, setSelectedFiles] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedFiles, []);
   const [selectedDirs, setSelectedDirs] = useStorageState<string[]>(PRIVATE_CACHE_OBJ.convertSelectedDirs, []);
-  const [selectedTree, setSelectedTree] = useStorageState<SelectedTree>(
-    PRIVATE_CACHE_OBJ.convertSelectedTree,
-    CONVERT_TREE_INIT_VALUES,
-  );
+  /** NOTE: Tree is not cached because it can be a huge file */
+  const [selectedTree, setSelectedTree] = useState<SelectedTree>(CONVERT_TREE_INIT_VALUES);
   const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.convertOutput, '');
   const [fmt, setFmt] = useStorageState<OutFormat>(PUB_CACHE_OBJ.convertOutFmt, 'amd64');
 
