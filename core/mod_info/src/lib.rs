@@ -77,7 +77,7 @@ impl GetModsInfo for ModsInfo {
                             .ok()
                             .and_then(|contents| serde_ini::from_str(&contents).ok())
                             .map(|mut mod_info: ModInfo| {
-                                mod_info.id = path.display().to_string();
+                                mod_info.id = path.parent().unwrap_or(path).display().to_string();
                                 mod_info
                             })
                     })
