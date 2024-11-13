@@ -26,13 +26,13 @@ export const useColumns = () => {
       renderCell: (params) => {
         const { site } = params.row;
         const handleMappingClick: MouseEventHandler<HTMLButtonElement> = (event) => {
-          event.preventDefault(); // ブラウザのジャンプを防ぐ
+          event.preventDefault();
           start(site);
         };
         return site === '' ? (
           <></>
         ) : (
-          <Tooltip enterNextDelay={1200} placement='left-start' title={site}>
+          <Tooltip enterNextDelay={1200} placement="left-start" title={site}>
             <Button onClick={handleMappingClick} sx={{ fontSize: 'small', textTransform: 'none' }}>
               {site}
             </Button>

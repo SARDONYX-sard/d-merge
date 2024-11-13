@@ -1,4 +1,4 @@
-'use client';
+'use client'; // If this directive is not present on each page, a build error will occur.
 import { Box, type SxProps, type Theme } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 
@@ -27,7 +27,7 @@ export const Settings = () => {
   const { tabPos } = useTabContext();
 
   return (
-    <Box component='main' sx={sx}>
+    <Box component="main" sx={sx}>
       {tabPos === 'top' ? (
         <>
           <TabsMenu />

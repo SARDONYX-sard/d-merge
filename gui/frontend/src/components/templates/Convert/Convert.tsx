@@ -1,4 +1,4 @@
-'use client';
+'use client'; // If this directive is not present on each page, a build error will occur.
 import { Box, Grid2, type SxProps, type Theme } from '@mui/material';
 import { listen } from '@tauri-apps/api/event';
 import { type MouseEventHandler, useState } from 'react';
@@ -38,7 +38,7 @@ const ProviderInner = () => {
   const { loading, handleClick } = useConvertExec();
 
   return (
-    <Box component='main' sx={sx}>
+    <Box component="main" sx={sx}>
       <Grid2 sx={{ width: '90vw' }}>
         <ConvertForm />
       </Grid2>

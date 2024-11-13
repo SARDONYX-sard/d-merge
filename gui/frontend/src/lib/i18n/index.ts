@@ -1,5 +1,3 @@
-'use client';
-
 import { type Resource, use } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { z } from 'zod';

@@ -1,4 +1,3 @@
-'use client';
 import { Checkbox, FormControlLabel, Tooltip } from '@mui/material';
 
 import { useStorageState } from '@/components/hooks/useStorageState/useStorageState';

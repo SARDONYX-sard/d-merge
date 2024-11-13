@@ -1,5 +1,3 @@
-'use client';
-
 import Layers from '@mui/icons-material/Layers';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TransformIcon from '@mui/icons-material/Transform';
@@ -85,9 +83,9 @@ export function PageNavigation() {
         }}
         value={selectedPage}
       >
-        <BottomNavigationAction icon={<TransformIcon />} label='Convert' />
-        <BottomNavigationAction icon={<Layers />} label='Patch' />
-        <BottomNavigationAction icon={<SettingsIcon />} label='Settings' />
+        <BottomNavigationAction icon={<TransformIcon />} label="Convert" />
+        <BottomNavigationAction icon={<Layers />} label="Patch" />
+        <BottomNavigationAction icon={<SettingsIcon />} label="Settings" />
       </BottomNavigation>
     </>
   );

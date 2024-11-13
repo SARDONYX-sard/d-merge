@@ -1,4 +1,3 @@
-'use client';
 import { Box, type SxProps, type Theme } from '@mui/material';
 
 import { ConvertButton } from '@/components/atoms/ConvertButton';

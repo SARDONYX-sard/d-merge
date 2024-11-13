@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT or Apache-2.0
 //
 // issue: https://github.com/suren-atoyan/monaco-react/issues/136#issuecomment-731420078
-'use client';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import InputLabel from '@mui/material/InputLabel';
 import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
@@ -81,7 +80,7 @@ export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({ vimMode =
   return (
     <>
       <Editor
-        theme='vs-dark'
+        theme="vs-dark"
         {...params}
         beforeMount={(monaco) => monaco.editor.defineTheme('onedark', atomOneDarkPro)}
         onMount={handleDidMount}

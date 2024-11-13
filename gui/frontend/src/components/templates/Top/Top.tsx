@@ -1,4 +1,4 @@
-'use client';
+'use client'; // If this directive is not present on each page, a build error will occur.
 import { Box, type SxProps, type Theme } from '@mui/material';
 
 import { useInjectJs } from '@/components/hooks/useInjectJs';
@@ -16,7 +16,7 @@ export const Top = () => {
   useInjectJs();
 
   return (
-    <Box component='main' sx={sx}>
+    <Box component="main" sx={sx}>
       <PatchProvider>
         <PatchContainer />
       </PatchProvider>
