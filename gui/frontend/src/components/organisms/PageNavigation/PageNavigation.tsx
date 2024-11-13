@@ -8,11 +8,10 @@ import { useEffect, useState } from 'react';
 import { z } from 'zod';
 
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { schemaStorage } from '@/lib/storage/schemaStorage';
 
-import { schemaStorage } from '../../../lib/storage/schemaStorage';
-
-const validLastPath = ['settings', 'convert', '/'] as const;
-const lastPathSchema = z.enum(validLastPath);
+const validPathNames = ['/', '/convert', '/settings'] as const;
+const lastPathSchema = z.enum(validPathNames);
 const getPageIndex = (path: string) => {
   switch (path) {
     case '/convert':
@@ -62,8 +61,7 @@ export function PageNavigation() {
 
   const handleNavigationChange = (pageIdx: number) => {
     setSelectedPage(pageIdx);
-    const paths = ['/convert', '/', '/settings'];
-    router.push(paths[pageIdx]);
+    router.push(validPathNames[pageIdx]);
   };
 
   return (
