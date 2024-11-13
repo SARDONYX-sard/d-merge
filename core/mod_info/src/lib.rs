@@ -105,8 +105,7 @@ mod tests {
 
     #[test]
     fn get_mod_info() -> Result<()> {
-        // let pattern = "../../dummy/Data/Nemesis_Engine/mod/*/info.ini";
-        let pattern = "D:/GAME/ModOrganizer Skyrim SE/mods/*/Nemesis_Engine/mod/*/info.ini";
+        let pattern = "../../dummy/Data/Nemesis_Engine/mod/*/info.ini";
         let info = ModsInfo::get_all(pattern)?;
         println!("{:#?}", info);
         Ok(())
