@@ -32,8 +32,8 @@ export default function NotifyProvider() {
 
 /** It exists to realize the deletion of the history of the passage at any timing by Click. */
 const action = (id: SnackbarKey) => (
-  <IconButton aria-label="close" color="inherit" onClick={() => closeSnackbar(id)} size="small">
-    <CloseIcon fontSize="inherit" />
+  <IconButton aria-label='close' color='inherit' onClick={() => closeSnackbar(id)} size='small'>
+    <CloseIcon fontSize='inherit' />
   </IconButton>
 );
 
@@ -72,7 +72,7 @@ const ThemeResponsiveSnackbar = memo(
         severity={severity}
         style={style}
         sx={sx}
-        variant="outlined"
+        variant='outlined'
       >
         <AlertTitle sx={{ color: '#fff', fontWeight: 'bold' }}>{severity.toUpperCase()}</AlertTitle>
         {errMsg}

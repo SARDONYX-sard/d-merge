@@ -19,7 +19,7 @@ export const Help = ({ version, ...props }: Props) => {
       <div>Version: {version}</div>
       <div>
         Source:{' '}
-        <Button sx={{ fontSize: 'large' }} type="button" variant="text" {...props}>
+        <Button sx={{ fontSize: 'large' }} type='button' variant='text' {...props}>
           GitHub
         </Button>
       </div>

@@ -27,7 +27,7 @@ export const Settings = () => {
   const { tabPos } = useTabContext();
 
   return (
-    <Box component="main" sx={sx}>
+    <Box component='main' sx={sx}>
       {tabPos === 'top' ? (
         <>
           <TabsMenu />

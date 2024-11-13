@@ -80,7 +80,7 @@ export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({ vimMode =
   return (
     <>
       <Editor
-        theme="vs-dark"
+        theme='vs-dark'
         {...params}
         beforeMount={(monaco) => monaco.editor.defineTheme('onedark', atomOneDarkPro)}
         onMount={handleDidMount}

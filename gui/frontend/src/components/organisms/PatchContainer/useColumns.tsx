@@ -32,7 +32,7 @@ export const useColumns = () => {
         return site === '' ? (
           <></>
         ) : (
-          <Tooltip enterNextDelay={1200} placement="left-start" title={site}>
+          <Tooltip enterNextDelay={1200} placement='left-start' title={site}>
             <Button onClick={handleMappingClick} sx={{ fontSize: 'small', textTransform: 'none' }}>
               {site}
             </Button>

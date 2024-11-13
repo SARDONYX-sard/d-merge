@@ -11,7 +11,7 @@ type Props = Readonly<{
 }>;
 export default function RootLayout({ children }: Props) {
   return (
-    <html lang="en">
+    <html lang='en'>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>
       </body>

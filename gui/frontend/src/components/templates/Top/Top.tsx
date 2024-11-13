@@ -16,7 +16,7 @@ export const Top = () => {
   useInjectJs();
 
   return (
-    <Box component="main" sx={sx}>
+    <Box component='main' sx={sx}>
       <PatchProvider>
         <PatchContainer />
       </PatchProvider>
