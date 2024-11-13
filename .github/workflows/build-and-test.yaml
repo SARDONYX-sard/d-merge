@@ -78,6 +78,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
+      - name: Sync node version
+        uses: actions/setup-node@v4.1.0
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
       - name: Node.js cache
         uses: actions/cache@v4.1.2
         with:
@@ -88,12 +94,6 @@ jobs:
           restore-keys: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
       - name: Install frontend dependencies
         run: npm ci
-
-      - name: Sync node version
-        uses: actions/setup-node@v4.1.0
-        with:
-          node-version: 'lts/*'
-          cache: 'npm'
 
       - name: Test(Node.js)
         run: npm test
