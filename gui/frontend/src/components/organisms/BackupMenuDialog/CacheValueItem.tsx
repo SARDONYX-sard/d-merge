@@ -34,7 +34,6 @@ export const CacheValueItem: React.FC<Props> = ({ cacheKey, value }: Props) => {
       height={editorHeight}
       language={language}
       options={{
-        codeLens: false,
         hover: { above: true },
         renderWhitespace: 'boundary',
         rulers: [120],
@@ -49,7 +48,7 @@ export const CacheValueItem: React.FC<Props> = ({ cacheKey, value }: Props) => {
 };
 
 // Helper function to determine the language based on the key
-const getLanguageByKey = (key: string): string => {
+const getLanguageByKey = (key: string) => {
   switch (key) {
     case 'custom-js':
       return 'javascript';
