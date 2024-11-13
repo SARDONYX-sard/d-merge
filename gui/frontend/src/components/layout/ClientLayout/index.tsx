@@ -7,7 +7,7 @@ import Loading from '@/components/templates/Loading';
 
 import type { ReactNode } from 'react';
 
-const DynClientLayout = dynamic(() => import('@/components/layout/ClientLayout'), {
+const DynClientLayout = dynamic(() => import('@/components/layout/ClientLayout/ClientLayout'), {
   loading: () => <Loading />,
   ssr: false,
 });

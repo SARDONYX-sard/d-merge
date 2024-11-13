@@ -15,7 +15,7 @@ type Props = Readonly<{
   children: ReactNode;
 }>;
 
-export const ClientLayout = ({ children }: Props) => {
+const ClientLayout = ({ children }: Props) => {
   showWindow();
 
   return (
@@ -25,3 +25,5 @@ export const ClientLayout = ({ children }: Props) => {
     </GlobalProvider>
   );
 };
+
+export default ClientLayout;
