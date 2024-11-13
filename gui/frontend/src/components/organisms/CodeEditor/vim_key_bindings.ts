@@ -21,7 +21,7 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
     vim.map(key, '<Esc>', 'insert');
   }
 
-  // The default `%` is one-way with no back and forth.Improve this.
+  // Fix the problem that the default `%` is one-way and we can't go back.
   defineVimExCommand(vim, 'goToBracket', editor, 'editor.action.jumpToBracket', '%', 'normal');
   defineVimExCommand(vim, 'showHover', editor, 'editor.action.showHover', 'K', 'normal');
 };
