@@ -10,7 +10,9 @@ import { z } from 'zod';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
-const validPathNames = ['/', '/convert', '/settings'] as const;
+// NOTE: Note that the order of the arrays must be in the order of the `BottomNavigationAction` declarations,
+//       otherwise it will jump to the wrong place.
+const validPathNames = ['/convert', '/', '/settings'] as const;
 const lastPathSchema = z.enum(validPathNames);
 const getPageIndex = (path: string) => {
   switch (path) {
