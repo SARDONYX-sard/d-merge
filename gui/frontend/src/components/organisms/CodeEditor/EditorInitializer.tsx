@@ -1,4 +1,4 @@
-import { InputLabel } from '@mui/material';
+import { Typography } from '@mui/material';
 
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
 
@@ -27,9 +27,9 @@ export const EditorInitializer = ({ value, fileName, label, language, onChange }
 
   return (
     <>
-      <InputLabel sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
+      <Typography sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
         {label}
-      </InputLabel>
+      </Typography>
       <MonacoEditorWrapper
         height='500px'
         language={language}

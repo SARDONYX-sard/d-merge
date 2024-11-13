@@ -72,12 +72,12 @@ impl GetModsInfo for ModsInfo {
                 path.exists()
                     .then(|| extract_id_from_path(path))
                     .flatten()
-                    .and_then(|id| {
+                    .and_then(|_id| {
                         fs::read_to_string(path)
                             .ok()
                             .and_then(|contents| serde_ini::from_str(&contents).ok())
                             .map(|mut mod_info: ModInfo| {
-                                mod_info.id = id;
+                                mod_info.id = path.display().to_string();
                                 mod_info
                             })
                     })
@@ -105,7 +105,8 @@ mod tests {
 
     #[test]
     fn get_mod_info() -> Result<()> {
-        let pattern = "../../dummy/Data/Nemesis_Engine/mod/*/info.ini";
+        // let pattern = "../../dummy/Data/Nemesis_Engine/mod/*/info.ini";
+        let pattern = "D:/GAME/ModOrganizer Skyrim SE/mods/*/Nemesis_Engine/mod/*/info.ini";
         let info = ModsInfo::get_all(pattern)?;
         println!("{:#?}", info);
         Ok(())

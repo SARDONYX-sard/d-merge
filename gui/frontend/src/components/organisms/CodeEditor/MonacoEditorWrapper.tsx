@@ -3,7 +3,6 @@
 //
 // issue: https://github.com/suren-atoyan/monaco-react/issues/136#issuecomment-731420078
 import Editor, { type OnMount } from '@monaco-editor/react';
-import InputLabel from '@mui/material/InputLabel';
 import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
 
 import { atomOneDarkPro } from './atom_onedark_pro';
@@ -11,10 +10,12 @@ import { atomOneDarkPro } from './atom_onedark_pro';
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import type { VimMode } from 'monaco-vim';
 
+type VimModeRef = MutableRefObject<VimMode | null>;
+type VimStatusRef = MutableRefObject<HTMLDivElement | null>;
 type KeyLoaderArgs = {
   editor: monaco.editor.IStandaloneCodeEditor;
-  vimModeRef: MutableRefObject<VimMode | null>;
-  vimStatusRef: MutableRefObject<HTMLLabelElement | null>;
+  vimModeRef: VimModeRef;
+  vimStatusRef: VimStatusRef;
 };
 type KeyLoader = (props: KeyLoaderArgs) => void;
 const loadVimKeyBindings: KeyLoader = ({ editor, vimModeRef, vimStatusRef }) => {
@@ -44,14 +45,20 @@ const loadVimKeyBindings: KeyLoader = ({ editor, vimModeRef, vimStatusRef }) => 
 };
 
 type Props = ComponentPropsWithoutRef<typeof Editor> & {
+  id?: string;
   /** use vim key binding? */
   readonly vimMode?: boolean;
 };
 
-export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({ vimMode = false, onMount, ...params }: Props) {
+export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({
+  id,
+  vimMode = false,
+  onMount,
+  ...params
+}: Props) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const vimModeRef = useRef<VimMode | null>(null);
-  const vimStatusRef = useRef<HTMLLabelElement | null>(null);
+  const vimModeRef: VimModeRef = useRef(null);
+  const vimStatusRef: VimStatusRef = useRef(null);
 
   const handleDidMount: OnMount = useCallback(
     (editor, monaco) => {
@@ -85,7 +92,9 @@ export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({ vimMode =
         beforeMount={(monaco) => monaco.editor.defineTheme('onedark', atomOneDarkPro)}
         onMount={handleDidMount}
       />
-      <InputLabel ref={vimStatusRef} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+        <div ref={vimStatusRef} />
+      </div>
     </>
   );
 });
