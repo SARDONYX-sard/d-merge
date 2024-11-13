@@ -6,43 +6,14 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
 
 import { atomOneDarkPro } from './atom_onedark_pro';
+import { loadVimKeyBindings } from './vim_key_bindings';
 
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import type { VimMode } from 'monaco-vim';
+import type { VimEnvironment } from 'monaco-vim';
 
-type VimModeRef = MutableRefObject<VimMode | null>;
-type VimStatusRef = MutableRefObject<HTMLDivElement | null>;
-type KeyLoaderArgs = {
-  editor: monaco.editor.IStandaloneCodeEditor;
-  vimModeRef: VimModeRef;
-  vimStatusRef: VimStatusRef;
-};
-type KeyLoader = (props: KeyLoaderArgs) => void;
-const loadVimKeyBindings: KeyLoader = ({ editor, vimModeRef, vimStatusRef }) => {
-  // NOTE: need setup key bindings before monaco-vim setup
-  // editor.addAction({
-  //   id: 'show-hover',
-  //   label: 'show-hover',
-  //   keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.KeyK],
-  //   run: (editor) => {
-  //     editor.getAction('editor.action.showHover')?.run();
-  //   },
-  // });
-
-  // setup monaco-vim
-  // @ts-ignore
-  window.require.config({
-    paths: {
-      'monaco-vim': 'https://unpkg.com/monaco-vim/dist/monaco-vim',
-    },
-  });
-  // @ts-ignore
-  window.require(['monaco-vim'], (monacoVim: VimMode) => {
-    if (vimStatusRef.current) {
-      vimModeRef.current = monacoVim.initVimMode(editor, vimStatusRef.current);
-    }
-  });
-};
+export type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
+export type VimModeRef = MutableRefObject<VimEnvironment | null>;
+export type VimStatusRef = MutableRefObject<HTMLDivElement | null>;
 
 type Props = ComponentPropsWithoutRef<typeof Editor> & {
   id?: string;
@@ -56,12 +27,14 @@ export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({
   onMount,
   ...params
 }: Props) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<MonacoEditor | null>(null);
   const vimModeRef: VimModeRef = useRef(null);
   const vimStatusRef: VimStatusRef = useRef(null);
 
   const handleDidMount: OnMount = useCallback(
     (editor, monaco) => {
+      setLangCustomConfig(monaco);
+
       editorRef.current = editor;
       if (vimMode) {
         loadVimKeyBindings({ editor, vimModeRef, vimStatusRef });
@@ -92,9 +65,29 @@ export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({
         beforeMount={(monaco) => monaco.editor.defineTheme('onedark', atomOneDarkPro)}
         onMount={handleDidMount}
       />
+      {/* NOTE: status is forced to have `display: block` at `initVim` call, so you have to wrap it with a div to center it. */}
       <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
         <div ref={vimStatusRef} />
       </div>
     </>
   );
 });
+
+/**
+ * - javascript: enable inlay-hint
+ * - json: enable schema
+ * */
+const setLangCustomConfig = (monacoEnv: typeof monaco) => {
+  monacoEnv.languages.typescript.javascriptDefaults.setInlayHintsOptions({
+    includeInlayFunctionLikeReturnTypeHints: true,
+    includeInlayFunctionParameterTypeHints: true,
+    includeInlayParameterNameHints: 'literals',
+    includeInlayVariableTypeHints: true,
+  });
+  monacoEnv.languages.json.jsonDefaults.setDiagnosticsOptions({
+    validate: true,
+    allowComments: false,
+    schemas: [],
+    enableSchemaRequest: true,
+  });
+};

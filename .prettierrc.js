@@ -4,6 +4,7 @@
 
 /** @type {import('prettier').Options} */
 export default {
+  jsxSingleQuote: true,
   printWidth: 120,
   semi: true,
   singleQuote: true,

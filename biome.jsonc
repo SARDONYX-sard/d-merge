@@ -2,7 +2,16 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "extends": [],
   "files": {
-    "ignore": ["**/gen", ".next", "cspell.jsonc", "node_modules", "out", "target", "schema.json"],
+    "ignore": [
+      "**/gen",
+      ".next",
+      "cspell.jsonc",
+      "monaco-vim.d.ts", //Automatic generation by devtool and LM, so any is used
+      "node_modules",
+      "out",
+      "schema.json",
+      "target"
+    ],
     "ignoreUnknown": true
   },
   "formatter": {

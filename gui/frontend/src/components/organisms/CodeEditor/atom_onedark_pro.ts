@@ -4,7 +4,7 @@
 // https://github.com/ct-js/ct-js/blob/ec638ccdc01e990ed56445873e2a9c768740ecea/src/node_requires/monaco-themes/OneDarkPro.json
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
-export const atomOneDarkPro: monaco.editor.IStandaloneThemeData = {
+export const atomOneDarkPro = {
   inherit: true,
   base: 'vs-dark',
   colors: {
@@ -31,8 +31,10 @@ export const atomOneDarkPro: monaco.editor.IStandaloneThemeData = {
     'editorBracketHighlight.foreground2': '#c678dd',
     'editorBracketHighlight.foreground3': '#56b6c2',
     'editorHoverWidget.highlightForeground': '#61afef',
-    'editorInlayHint.foreground': '#abb2bf',
-    'editorInlayHint.background': '#2c313c',
+    // NOTE: Reason for inlayHint fore/back modification:
+    //       more transparency would help distinguish between code and annotations.
+    'editorInlayHint.foreground': '#cdc5c561',
+    'editorInlayHint.background': '#2928283b',
     'editor.lineHighlightBackground': '#2c313c',
     'editorLineNumber.activeForeground': '#abb2bf',
     'editorGutter.addedBackground': '#109868',
@@ -1997,4 +1999,4 @@ export const atomOneDarkPro: monaco.editor.IStandaloneThemeData = {
     },
   ],
   encodedTokensColors: [],
-};
+} as const satisfies monaco.editor.IStandaloneThemeData;
