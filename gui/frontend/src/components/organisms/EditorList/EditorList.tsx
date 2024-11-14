@@ -1,4 +1,3 @@
-import {} from '@mui/material';
 import { type ComponentPropsWithRef, useCallback } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';

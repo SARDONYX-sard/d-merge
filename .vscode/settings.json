@@ -3,12 +3,10 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[javascript][javascriptreact][typescript][typescriptreact]": {
-    // "editor.defaultFormatter": "biomejs.biome"
-    "editor.defaultFormatter": "esbenp.prettier-vscode" // Used as an emergency measure because for some reason biome's lsp does not work.
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[json][jsonc]": {
-    // "editor.defaultFormatter": "biomejs.biome"
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -19,6 +17,7 @@
     "source.fixAll.sortJSON": "never",
     "source.organizeImports.biome": "explicit"
   },
+  "editor.formatOnSave": true,
   "evenBetterToml.formatter.alignComments": true,
   "files.associations": {
     "**/dummy/mods/**/*.txt": "xml"
