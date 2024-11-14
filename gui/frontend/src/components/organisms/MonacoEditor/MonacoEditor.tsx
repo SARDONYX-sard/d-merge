@@ -21,12 +21,7 @@ type Props = ComponentPropsWithoutRef<typeof Editor> & {
   readonly vimMode?: boolean;
 };
 
-export const MonacoEditorWrapper = memo(function MonacoEditorWrapper({
-  id,
-  vimMode = false,
-  onMount,
-  ...params
-}: Props) {
+export const MonacoEditor = memo(function MonacoEditor({ id, vimMode = false, onMount, ...params }: Props) {
   const editorRef = useRef<MonacoEditor | null>(null);
   const vimModeRef: VimModeRef = useRef(null);
   const vimStatusRef: VimStatusRef = useRef(null);

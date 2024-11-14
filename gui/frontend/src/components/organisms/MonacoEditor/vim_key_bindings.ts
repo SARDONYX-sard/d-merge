@@ -1,6 +1,6 @@
 import type MonacoVim from 'monaco-vim';
 import type { Vim } from 'monaco-vim';
-import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditorWrapper';
+import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
 
 const defineVimExCommand = (
   vim: Vim,

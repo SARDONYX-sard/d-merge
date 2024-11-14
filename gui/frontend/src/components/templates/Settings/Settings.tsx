@@ -4,7 +4,7 @@ import Grid from '@mui/material/Grid2';
 
 import { Help } from '@/components/atoms/Help';
 import { useInjectJs } from '@/components/hooks/useInjectJs';
-import { CodeEditor } from '@/components/organisms/CodeEditor';
+import { CodeEditorTab } from '@/components/organisms/CodeEditorTab';
 import { Tabs } from '@/components/organisms/Tabs';
 import { useTabContext } from '@/components/providers/TabProvider';
 import { start } from '@/services/api/shell';
@@ -31,11 +31,11 @@ export const Settings = () => {
       {tabPos === 'top' ? (
         <>
           <TabsMenu />
-          <CodeEditor />
+          <CodeEditorTab />
         </>
       ) : (
         <>
-          <CodeEditor />
+          <CodeEditorTab />
           <TabsMenu />
         </>
       )}

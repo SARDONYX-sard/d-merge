@@ -1,4 +1,4 @@
-import { MonacoEditorWrapper } from '@/components/organisms/CodeEditor/MonacoEditorWrapper';
+import { MonacoEditor } from '@/components/organisms/MonacoEditor/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
 
@@ -30,7 +30,7 @@ export const CacheValueItem: React.FC<Props> = ({ cacheKey, value }: Props) => {
   const editorHeight = calculateHeight(fmtValue);
 
   return (
-    <MonacoEditorWrapper
+    <MonacoEditor
       height={editorHeight}
       language={language}
       options={{

@@ -1,8 +1,7 @@
 import { Typography } from '@mui/material';
 
+import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
-
-import { MonacoEditorWrapper } from './MonacoEditorWrapper';
 
 import type { ComponentPropsWithoutRef } from 'react';
 
@@ -18,7 +17,7 @@ type Props = {
   fileName: string;
   label: string;
   language: string;
-  onChange: ComponentPropsWithoutRef<typeof MonacoEditorWrapper>['onChange'];
+  onChange: ComponentPropsWithoutRef<typeof MonacoEditor>['onChange'];
 };
 
 export const EditorInitializer = ({ value, fileName, label, language, onChange }: Props) => {
@@ -30,7 +29,7 @@ export const EditorInitializer = ({ value, fileName, label, language, onChange }
       <Typography sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
         {label}
       </Typography>
-      <MonacoEditorWrapper
+      <MonacoEditor
         height='500px'
         language={language}
         onChange={onChange}
