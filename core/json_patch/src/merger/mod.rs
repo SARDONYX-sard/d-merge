@@ -9,6 +9,7 @@ use simd_json::{
 use std::borrow::Cow;
 
 /// Enum representing the type of operation for the JSON patch.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     /// Add a new value to the JSON at the specified path.
@@ -20,6 +21,7 @@ pub enum Op {
 }
 
 /// Struct representing a JSON patch operation.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchJson<'a> {
     /// The type of operation to perform (Add, Remove, Replace).
@@ -31,6 +33,10 @@ pub struct PatchJson<'a> {
     /// - e.g. "$.1.hkRootLevelContainer.namedVariants[0]",
     pub path: Vec<Cow<'a, str>>,
     /// The value to be added or replaced in the JSON.
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>"))
+    )]
     pub value: BorrowedValue<'a>,
 }
 

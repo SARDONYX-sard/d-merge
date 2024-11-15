@@ -3,11 +3,12 @@ use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use std::str::FromStr;
 use winnow::{
     ascii::digit1,
-    combinator::{delimited, preceded, seq},
+    combinator::{alt, delimited, preceded, seq},
     error::{
         ContextError, StrContext,
         StrContextValue::{self},
     },
+    token::take_until,
     PResult, Parser,
 };
 
@@ -43,13 +44,13 @@ pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ContextError> 
 ///
 /// # Errors
 /// Parse failed.
-pub fn class_start_tag<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
+pub fn class_start_tag<'a>(input: &mut &'a str) -> PResult<(PointerType<'a>, &'a str)> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("hkobject"),
         _: delimited_with_multispace0("name"),
         _: delimited_with_multispace0("="),
-        index,
+        index_name_attr,
         _: delimited_with_multispace0("class"),
         _: delimited_with_multispace0("="),
         attr_string,
@@ -138,11 +139,52 @@ where
         .parse_next(input)
 }
 
-fn index<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    delimited(
-        '\"',
-        delimited_multispace0(preceded("#", digit1)), // Pointer index
-        '\"',
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PointerType<'a> {
+    /// Official representation
+    Index(&'a str),
+    /// # Nemesis mod representation
+    /// Originally, only numbers like #0001 come, but in the case of addition, the mod creator cannot determine the number,
+    /// so Nemesis declares it as a variable (e.g. `$id$2`).
+    Var(&'a str),
+}
+
+/// Parse `"#0001"`, `"#$id$2"`
+///
+/// # Errors
+/// If parsing failed.
+fn index_name_attr<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
+    delimited('\"', delimited_multispace0(index_name), '\"').parse_next(input)
+}
+
+/// Parse `#0001`, `#$id$2`
+///
+/// # Errors
+/// If parsing failed.
+pub fn index_name<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
+    preceded(
+        "#",
+        alt((
+            digit1.map(PointerType::Index),
+            take_until(0.., '\"').map(PointerType::Var),
+        )),
     )
     .parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_index() {
+        assert_eq!(
+            index_name_attr.parse("\"#0002\""),
+            Ok(PointerType::Index("0002"))
+        );
+        assert_eq!(
+            index_name_attr.parse("\"#$id$2\""),
+            Ok(PointerType::Var("$id$2"))
+        );
+    }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "nemesis_xml"
+name = "nemesis_merge"
 version = "0.1.0"
 description = "D merge core"
 
@@ -13,16 +13,17 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-phf = { workspace = true, features = ["macros"] }
+jwalk = { workspace = true }
 rayon = { workspace = true }
 serde_hkx = { workspace = true }
-simd-json = { workspace = true }
+simd-json = { workspace = true, optional = true }
 snafu = { workspace = true }
 tracing = { workspace = true, optional = true }
 winnow = { workspace = true }
 
 # workspace members
 json_patch = { workspace = true }
+nemesis_xml = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
@@ -32,6 +33,7 @@ quick_tracing = { workspace = true }
 workspace = true
 
 [features]
-default = ["tracing"] # for debug
+default = ["serde", "tracing"] # for debug
 
 tracing = ["dep:tracing"]
+serde = ["dep:simd-json", "json_patch/serde"]

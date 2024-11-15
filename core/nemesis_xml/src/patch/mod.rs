@@ -1,11 +1,12 @@
 mod class_table;
 mod current_state;
 
+use std::mem;
+
 use self::{
     class_table::{find_class_info, find_json_parser_by, FieldInfo},
     current_state::{CurrentPatchJson, CurrentState},
 };
-use crate::error::{Error, Result};
 use crate::helpers::{
     comment::{close_comment, comment_kind, take_till_close, CommentKind},
     delimited_multispace0,
@@ -13,7 +14,11 @@ use crate::helpers::{
     tag::{class_start_tag, end_tag, field_start_tag, start_tag},
     variable::{event_id, variable_id},
 };
-use json_patch::merger::PatchJson;
+use crate::{
+    error::{Error, Result},
+    helpers::tag::PointerType,
+};
+use json_patch::merger::{Op, PatchJson};
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
@@ -113,12 +118,12 @@ impl<'de> PatchDeserializer<'de> {
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fn push_field_info(&mut self, info: &'static FieldInfo) {
+    fn push_current_field_table(&mut self, info: &'static FieldInfo) {
         self.field_infos.push(info);
         self.current.field_info = Some(info);
     }
 
-    fn pop_field_info(&mut self) {
+    fn pop_current_field_table(&mut self) {
         self.field_infos.pop();
         self.current.field_info = self.field_infos.last().map(|v| &**v);
     }
@@ -126,6 +131,11 @@ impl<'de> PatchDeserializer<'de> {
     fn root_class(&mut self) -> Result<()> {
         let (ptr_index, class_name) = self.parse_next(class_start_tag)?;
         self.current.path.push("$".into());
+
+        let (should_take_in_this, ptr_index) = match ptr_index {
+            PointerType::Index(index) => (false, index),
+            PointerType::Var(id) => (true, id), // $id$2
+        };
         self.current.path.push(ptr_index.into());
         self.current.path.push(class_name.into());
 
@@ -133,15 +143,27 @@ impl<'de> PatchDeserializer<'de> {
             let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
                 class_name: class_name.to_string(),
             })?;
-            self.push_field_info(field_info);
+            self.push_current_field_table(field_info);
         }
 
+        let mut obj = Object::new();
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
-            self.field()?;
+            let (field_name, value) = self.field()?;
+            if should_take_in_this {
+                obj.insert(field_name.into(), value);
+            }
         }
+        self.pop_current_field_table();
 
-        self.pop_field_info();
-        self.current.path.pop();
+        if should_take_in_this {
+            self.output_patches.push(PatchJson {
+                op: Op::Add,
+                path: mem::take(&mut self.current.path),
+                value: BorrowedValue::Object(Box::new(obj)),
+            });
+        }
+        // self.current.path.pop(); // no need remove class name
+
         Ok(())
     }
 
@@ -155,7 +177,7 @@ impl<'de> PatchDeserializer<'de> {
             let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
                 class_name: class_name.to_string(),
             })?;
-            self.push_field_info(field_info);
+            self.push_current_field_table(field_info);
         }
 
         let mut obj = Object::new();
@@ -163,10 +185,9 @@ impl<'de> PatchDeserializer<'de> {
             let (field_name, value) = self.field()?;
             obj.insert(field_name.into(), value);
         }
+        self.pop_current_field_table();
 
-        self.pop_field_info();
-        self.current.path.pop();
-
+        self.current.path.pop(); // Remove class name
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
@@ -438,6 +459,7 @@ impl<'de> PatchDeserializer<'de> {
             tracing::debug!(?comment_ty);
             if let CommentKind::ModCode(id) = comment_ty {
                 self.current.mode_code = Some(id);
+                self.parse_maybe_close_comment()?; // When close comes here, it is Remove.
                 return Ok(true);
             } else {
                 return Ok(false);
@@ -446,6 +468,7 @@ impl<'de> PatchDeserializer<'de> {
         Ok(false)
     }
 
+    // TODO: return bool here and if `ORIGINAL` or `CLOSE` comment comes in, return true and do the `Op::Remove` process.
     /// ORIGINAL or CLOSE
     fn parse_maybe_close_comment(&mut self) -> Result<()> {
         if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
@@ -544,6 +567,53 @@ mod tests {
                 .map(|s| s.into())
                 .collect(),
                 value: "PushDummy".into(),
+            }]
+        );
+    }
+
+    #[ignore = "Deletion is not yet possible."]
+    #[test]
+    fn remove_array() {
+        let nemesis_xml = r###"
+		<hkobject name="#0009" class="hkbProjectStringData" signature="0x76ad60a">
+			<hkparam name="animationFilenames" numelements="0"></hkparam>
+			<hkparam name="behaviorFilenames" numelements="0"></hkparam>
+			<hkparam name="characterFilenames" numelements="3">
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+<!-- MOD_CODE ~id~ OPEN -->
+
+<!-- ORIGINAL -->
+				<<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+<!-- CLOSE -->
+			</hkparam>
+			<hkparam name="eventNames" numelements="0"></hkparam>
+			<hkparam name="animationPath"></hkparam>
+			<hkparam name="behaviorPath"></hkparam>
+			<hkparam name="characterPath"></hkparam>
+			<hkparam name="fullPathToSource"></hkparam>
+		</hkobject>
+"###;
+
+        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            actual,
+            vec![PatchJson {
+                op: Op::Remove,
+                path: vec![
+                    "$",
+                    "0009",
+                    "hkbProjectStringData",
+                    "characterFilenames",
+                    "[4]"
+                ]
+                .into_iter()
+                .map(|s| s.into())
+                .collect(),
+                value: Default::default(),
             }]
         );
     }

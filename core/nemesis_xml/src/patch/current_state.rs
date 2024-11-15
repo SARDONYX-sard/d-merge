@@ -50,7 +50,13 @@ impl<'de> CurrentState<'de> {
         let op = if self.mode_code.is_some() {
             match self.is_passed_original {
                 true => Op::Replace,
-                false => Op::Add,
+                false => {
+                    if self.patches.is_empty() {
+                        Op::Remove
+                    } else {
+                        Op::Add
+                    }
+                }
             }
         } else {
             Op::Remove
