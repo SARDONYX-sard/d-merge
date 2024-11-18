@@ -2,18 +2,22 @@ import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
 import type MonacoVim from 'monaco-vim';
 import type { Vim } from 'monaco-vim';
 
-const defineVimExCommand = (
-  vim: Vim,
-  exCommand: string,
-  editor: MonacoEditor,
-  actionId: string,
-  key: string,
-  mode: 'normal' | 'insert' | 'visual',
-) => {
-  vim.defineEx(exCommand, exCommand, () => {
+type DefineVimExCommand = {
+  actionId: string;
+  editor: MonacoEditor;
+  /** - `actionId: 'editor.action.jumpToBracket'` => `exCommand: 'jumpToBracket'` */
+  exCommand?: string;
+  key: string;
+  mode?: 'normal' | 'insert' | 'visual';
+  vim: Vim;
+};
+
+const defineVimExCommand = ({ vim, exCommand, editor, actionId, key, mode }: DefineVimExCommand) => {
+  const cmd = exCommand ?? actionId.split('.').at(-1) ?? actionId;
+  vim.defineEx(cmd, cmd, () => {
     editor.getAction(actionId)?.run();
   });
-  vim.map(key, `:${exCommand}`, mode);
+  vim.map(key, `:${cmd}`, mode ?? 'normal');
 };
 
 const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
@@ -21,10 +25,17 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
     vim.map(key, '<Esc>', 'insert');
   }
 
-  // Fix the problem that the default `%` is one-way and we can't go back.
-  defineVimExCommand(vim, 'jumpToBracket', editor, 'editor.action.jumpToBracket', '%', 'normal');
-  defineVimExCommand(vim, 'showHover', editor, 'editor.action.showHover', 'K', 'normal');
-  defineVimExCommand(vim, 'openLink', editor, 'editor.action.openLink', 'gx', 'normal');
+  const vimExCommands = [
+    { actionId: 'editor.action.jumpToBracket', key: '%' },
+    { actionId: 'editor.action.openLink', key: 'gx' },
+    { actionId: 'editor.action.revealDefinition', key: 'gd' },
+    { actionId: 'editor.action.showDefinitionPreviewHover', key: 'KK' }, // For some reason, it doesn't work.
+    { actionId: 'editor.action.showHover', key: 'K' },
+  ] as const satisfies Omit<DefineVimExCommand, 'vim' | 'editor'>[];
+
+  for (const command of vimExCommands) {
+    defineVimExCommand({ ...command, vim, editor });
+  }
 };
 
 type VimKeyLoader = (props: { editor: MonacoEditor; vimModeRef: VimModeRef; vimStatusRef: VimStatusRef }) => void;
