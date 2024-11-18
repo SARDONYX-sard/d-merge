@@ -1,6 +1,3 @@
-import { extractUrlFromLine } from '@/lib/url-text';
-import { start } from '@/services/api/shell';
-
 import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
 import type MonacoVim from 'monaco-vim';
 import type { Vim } from 'monaco-vim';
@@ -19,35 +16,15 @@ const defineVimExCommand = (
   vim.map(key, `:${exCommand}`, mode);
 };
 
-const getUrlAtCursor = (editor: MonacoEditor) => {
-  const position = editor.getPosition();
-  if (!position) {
-    return;
-  }
-  const model = editor.getModel();
-  if (!model) {
-    return;
-  }
-  const lineContent = model.getLineContent(position.lineNumber);
-  return extractUrlFromLine(lineContent, position.lineNumber);
-};
-
 const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
   for (const key of ['jj', 'jk', 'kj'] as const) {
     vim.map(key, '<Esc>', 'insert');
   }
 
   // Fix the problem that the default `%` is one-way and we can't go back.
-  defineVimExCommand(vim, 'goToBracket', editor, 'editor.action.jumpToBracket', '%', 'normal');
+  defineVimExCommand(vim, 'jumpToBracket', editor, 'editor.action.jumpToBracket', '%', 'normal');
   defineVimExCommand(vim, 'showHover', editor, 'editor.action.showHover', 'K', 'normal');
-
-  vim.defineEx('GoTo', 'GoTo', async () => {
-    const url = getUrlAtCursor(editor);
-    if (url) {
-      await start(url);
-    }
-  });
-  vim.map('gx', ':GoTo', 'normal');
+  defineVimExCommand(vim, 'openLink', editor, 'editor.action.openLink', 'gx', 'normal');
 };
 
 type VimKeyLoader = (props: { editor: MonacoEditor; vimModeRef: VimModeRef; vimStatusRef: VimStatusRef }) => void;
