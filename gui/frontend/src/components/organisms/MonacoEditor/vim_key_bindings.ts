@@ -1,4 +1,5 @@
-import { start } from '../../../services/api/shell';
+import { extractUrlFromLine } from '@/lib/url-text';
+import { start } from '@/services/api/shell';
 
 import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
 import type MonacoVim from 'monaco-vim';
@@ -18,16 +19,17 @@ const defineVimExCommand = (
   vim.map(key, `:${exCommand}`, mode);
 };
 
-const getWordAtCursor = (editor: MonacoEditor) => {
+const getUrlAtCursor = (editor: MonacoEditor) => {
   const position = editor.getPosition();
   if (!position) {
     return;
   }
-  const wordInfo = editor.getModel()?.getWordAtPosition(position);
-  if (wordInfo) {
-    const word = wordInfo.word;
-    return word;
+  const model = editor.getModel();
+  if (!model) {
+    return;
   }
+  const lineContent = model.getLineContent(position.lineNumber);
+  return extractUrlFromLine(lineContent, position.lineNumber);
 };
 
 const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
@@ -40,12 +42,12 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
   defineVimExCommand(vim, 'showHover', editor, 'editor.action.showHover', 'K', 'normal');
 
   vim.defineEx('GoTo', 'GoTo', async () => {
-    const url = getWordAtCursor(editor);
+    const url = getUrlAtCursor(editor);
     if (url) {
       await start(url);
     }
   });
-  vim.map('gx', ':Goto', 'normal');
+  vim.map('gx', ':GoTo', 'normal');
 };
 
 type VimKeyLoader = (props: { editor: MonacoEditor; vimModeRef: VimModeRef; vimStatusRef: VimStatusRef }) => void;
