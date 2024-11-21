@@ -1,8 +1,6 @@
 mod class_table;
 mod current_state;
 
-use std::mem;
-
 use self::{
     class_table::{find_class_info, find_json_parser_by, FieldInfo},
     current_state::{CurrentPatchJson, CurrentState},
@@ -24,6 +22,7 @@ use serde_hkx::{
     xml::de::parser::type_kind::{boolean, real, string},
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode};
+use std::mem;
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
@@ -199,13 +198,20 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(field_name.into());
 
         let value = {
-            let json_type = self
-                .current
-                .field_info
-                .and_then(|field_info| find_json_parser_by(field_name, field_info))
-                .ok_or(Error::UnknownField {
-                    field_name: field_name.to_string(),
-                })?;
+            let json_type = self.current.field_info.map_or_else(
+                || Err(Error::MissingFieldInfo),
+                |field_info| {
+                    find_json_parser_by(field_name, field_info).ok_or_else(|| {
+                        let acceptable_fields: Vec<&'static str> =
+                            field_info.keys().copied().collect();
+
+                        Error::UnknownField {
+                            field_name: field_name.to_string(),
+                            acceptable_fields,
+                        }
+                    })
+                },
+            )?;
             let value = self.parse_value(json_type)?;
 
             #[cfg(feature = "tracing")]
@@ -278,19 +284,24 @@ impl<'de> PatchDeserializer<'de> {
         )))
     }
 
-    fn parse_real(&mut self) -> Result<f32> {
+    fn parse_real(&mut self) -> Result<BorrowedValue<'de>> {
         self.parse_next(multispace0)?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!("parse real call");
         let should_take_in_this = self.parse_start_maybe_comment()?;
         self.parse_next(multispace0)?;
 
         let value = self.parse_next(real)?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(should_take_in_this, ?value);
         if should_take_in_this {
             self.current.push_current_patch(value.into());
         };
 
         self.parse_next(multispace0)?;
         self.parse_maybe_close_comment()?;
-        Ok(value)
+        self.parse_next(multispace0)?;
+        Ok(value.into())
     }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -332,10 +343,10 @@ impl<'de> PatchDeserializer<'de> {
         let mut obj = Object::new();
 
         self.parse_next(opt(delimited_multispace0("(")))?;
-        obj.insert("x".into(), self.parse_real()?.into());
-        obj.insert("y".into(), self.parse_real()?.into());
-        obj.insert("z".into(), self.parse_real()?.into());
-        obj.insert("scaler".into(), self.parse_real()?.into());
+        obj.insert("x".into(), self.parse_real()?);
+        obj.insert("y".into(), self.parse_real()?);
+        obj.insert("z".into(), self.parse_real()?);
+        obj.insert("scaler".into(), self.parse_real()?);
         self.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
@@ -352,10 +363,10 @@ impl<'de> PatchDeserializer<'de> {
         let mut obj = Object::new();
 
         self.parse_next(opt(delimited_multispace0("(")))?;
-        obj.insert("x".into(), self.parse_real()?.into());
-        obj.insert("y".into(), self.parse_real()?.into());
-        obj.insert("z".into(), self.parse_real()?.into());
-        obj.insert("w".into(), self.parse_real()?.into());
+        obj.insert("x".into(), self.parse_real()?);
+        obj.insert("y".into(), self.parse_real()?);
+        obj.insert("z".into(), self.parse_real()?);
+        obj.insert("w".into(), self.parse_real()?);
         self.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
@@ -375,8 +386,11 @@ impl<'de> PatchDeserializer<'de> {
     /// - Array|Object|<ClassName>
     fn parse_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
         self.parse_next(multispace0)?;
-        let should_take_in_this = self.parse_start_maybe_comment()?;
-        self.parse_next(multispace0)?;
+        // TODO: It might be a partial change to the value, or it could affect the entire field.
+        // The distinction likely depends on whether </hkparam> immediately follows <!--CLOSE --!>,
+        // ignoring whitespace or comments.
+        // let should_take_in_this = self.parse_start_maybe_comment()?;
+        // self.parse_next(multispace0)?;
 
         let value = match field_type {
             obj if obj.starts_with("Object|") => {
@@ -395,57 +409,86 @@ impl<'de> PatchDeserializer<'de> {
                 let mut vec = vec![];
 
                 let name = &arr[6..]; // Remove "array|"
-                if name.starts_with("String") {
-                    let mut index = 0;
-                    while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
-                        let should_take_in_this = self.parse_start_maybe_comment()?;
-                        self.parse_next(start_tag("hkcstring"))?;
-                        self.current.path.push(format!("[{index}]").into());
-                        index += 1;
 
+                self.current.seq_index = Some(0);
+                if name.starts_with("String") {
+                    while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+                        // seq start
+                        let should_take_in_this = self.parse_start_maybe_comment()?;
+                        if let Some(index) = &mut self.current.seq_index {
+                            self.current.path.push(format!("[{index}]").into());
+                            *index += 1;
+                            if should_take_in_this {
+                                self.current.seq_range = Some(*index..*index - 1);
+                                // Start diff patch range.
+                            }
+                        }
+                        self.parse_next(start_tag("hkcstring"))?;
+
+                        // seq inner
                         let value = self.parse_string_ptr()?;
                         if should_take_in_this {
                             self.current.push_current_patch(value);
                         } else {
                             vec.push(value);
                         };
+                        if let Some(ref mut range) = self.current.seq_range {
+                            range.end += 1;
+                        }
+
+                        // seq end
                         self.parse_next(end_tag("hkcstring"))?;
                         self.parse_maybe_close_comment()?;
                         self.current.path.pop();
                     }
                 } else if !name.starts_with("Null") {
-                    let mut index = 0;
                     while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
-                        self.current.path.push(format!("[{index}]").into());
-                        index += 1;
-
+                        // seq start
                         let should_take_in_this = self.parse_start_maybe_comment()?;
+                        if let Some(index) = &mut self.current.seq_index {
+                            self.current.path.push(format!("[{index}]").into());
+                            *index += 1;
+                            if should_take_in_this {
+                                self.current.seq_range = Some(*index..*index - 1);
+                                // Start diff patch range.
+                            }
+                        }
+
+                        // seq inner
                         let value = self.parse_value(name)?;
                         if should_take_in_this {
                             self.current.push_current_patch(value);
                         } else {
                             vec.push(value);
                         };
+                        if let Some(ref mut range) = self.current.seq_range {
+                            range.end += 1;
+                        }
+
+                        // seq end
                         self.parse_maybe_close_comment()?;
+                        self.parse_next(multispace0)?;
                         self.current.path.pop();
                     }
                 };
+                self.current.seq_range = None;
+                self.current.seq_index = None;
                 BorrowedValue::Array(Box::new(vec)) // `Null`(void)
             }
             other => self.parse_plane_value(other)?,
         };
 
-        let value = if should_take_in_this {
-            self.current.push_current_patch(value);
-            // NOTE: Since the comment indicates that the change is to change a single value,
-            //       the `value` is used only within this function, so a dummy is returned.
-            Default::default()
-        } else {
-            value
-        };
+        // let value = if should_take_in_this {
+        //     self.current.push_current_patch(value);
+        //     // NOTE: Since the comment indicates that the change is to change a single value,
+        //     //       the `value` is used only within this function, so a dummy is returned.
+        //     Default::default()
+        // } else {
+        //     value
+        // };
 
-        self.parse_next(multispace0)?;
-        self.parse_maybe_close_comment()?;
+        // self.parse_next(multispace0)?;
+        // self.parse_maybe_close_comment()?;
         Ok(value)
     }
 
@@ -457,12 +500,13 @@ impl<'de> PatchDeserializer<'de> {
         if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
             #[cfg(feature = "tracing")]
             tracing::debug!(?comment_ty);
-            if let CommentKind::ModCode(id) = comment_ty {
-                self.current.mode_code = Some(id);
-                self.parse_maybe_close_comment()?; // When close comes here, it is Remove.
-                return Ok(true);
-            } else {
-                return Ok(false);
+            match comment_ty {
+                CommentKind::ModCode(id) => {
+                    self.current.mode_code = Some(id);
+                    self.parse_maybe_close_comment()?; // When close comes here, it is Remove.
+                    return Ok(true);
+                }
+                _ => return Ok(false),
             }
         }
         Ok(false)
@@ -477,10 +521,31 @@ impl<'de> PatchDeserializer<'de> {
             match comment_ty {
                 CommentKind::Original => {
                     self.current.set_is_passed_original();
-                    self.parse_next(take_till_close)?;
-                    self.add_patch_json();
+                    let op = self.current.judge_operation();
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!(?self.current);
+                    if op != Op::Remove {
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!(?op);
+                        self.parse_next(take_till_close)?;
+                        self.add_patch_json();
+                    }
                 }
                 CommentKind::Close => {
+                    let op = self.current.judge_operation();
+                    if let Some(range) = &self.current.seq_range {
+                        if op == Op::Remove {
+                            self.current.path.pop();
+                            let mut path = self.current.path.clone();
+                            path.push(format!("[{}:{}]", range.start - 1, range.end).into());
+                            self.output_patches.push(PatchJson {
+                                op,
+                                path,
+                                value: BorrowedValue::Static(StaticNode::Null),
+                            });
+                            return Ok(());
+                        }
+                    }
                     self.add_patch_json();
                 }
                 _ => {}
@@ -571,7 +636,7 @@ mod tests {
         );
     }
 
-    #[ignore = "Deletion is not yet possible."]
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
     #[test]
     fn remove_array() {
         let nemesis_xml = r###"
@@ -587,7 +652,8 @@ mod tests {
 <!-- MOD_CODE ~id~ OPEN -->
 
 <!-- ORIGINAL -->
-				<<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
 <!-- CLOSE -->
 			</hkparam>
 			<hkparam name="eventNames" numelements="0"></hkparam>
@@ -608,7 +674,7 @@ mod tests {
                     "0009",
                     "hkbProjectStringData",
                     "characterFilenames",
-                    "[4]"
+                    "[5:7]"
                 ]
                 .into_iter()
                 .map(|s| s.into())
@@ -662,12 +728,17 @@ mod tests {
     #[ignore = "dummy"]
     #[test]
     fn parse() {
-        let nemesis_xml = &{
-            // let path = "../dummy/mods/zcbe/_1stperson/staggerbehavior/#0052.txt";
-            // let path = "../dummy/mods/turn/1hm_behavior/#0087.txt";
-            let path = "../dummy/mods/zcbe/_1stperson/staggerbehavior/#0087.txt";
-            std::fs::read_to_string(path).unwrap()
+        use std::fs::read_to_string;
+        use std::path::Path;
+
+        let nemesis_xml = {
+            // let path = "zcbe/_1stperson/staggerbehavior/#0052.txt";
+            // let path = "turn/1hm_behavior/#0087.txt";
+            // let path = "zcbe/_1stperson/staggerbehavior/#0087.txt";
+            // let path = "zcbe/_1stperson/firstperson/#0060.txt";
+            let path = "turn/1hm_behavior/#2781.txt";
+            read_to_string(Path::new("../../dummy/Data/Nemesis_Engine/mod/").join(path)).unwrap()
         };
-        dbg!(parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
+        dbg!(parse_nemesis_patch(&nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
     }
 }

@@ -5,7 +5,6 @@ use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::iter::{IntoParallelRefIterator as _, ParallelIterator as _};
 use snafu::ResultExt;
 use std::path::{Path, PathBuf};
-use winnow::Parser;
 
 /// - `ids`: Nemesis xml paths.
 ///
@@ -23,9 +22,7 @@ pub fn behavior_gen(output_dir: impl AsRef<Path>, ids: Vec<String>) -> Result<()
             .filter_map(|res| {
                 if let Ok(path) = res.map(|entry| entry.path()) {
                     let file_name = path.file_stem()?.to_str()?;
-                    let is_nemesis_file = nemesis_xml::helpers::tag::index_name
-                        .parse(file_name)
-                        .is_ok();
+                    let is_nemesis_file = file_name.starts_with("#");
                     if path.is_file() && is_nemesis_file {
                         return Some(path);
                     }
@@ -82,14 +79,12 @@ pub fn behavior_gen(output_dir: impl AsRef<Path>, ids: Vec<String>) -> Result<()
 }
 
 fn generate_output_path(input_path: &Path, output_dir: &Path) -> Option<PathBuf> {
-    let input_inner_dir = input_path
-        .strip_prefix(input_path.ancestors().nth(3)?)
-        .ok()?
-        .components()
-        .collect::<PathBuf>();
-
-    let output = output_dir.join(input_inner_dir);
-    Some(output)
+    // Find "Nemesis_Engine/mod"
+    let start_index = input_path
+        .iter()
+        .position(|component| component.eq_ignore_ascii_case("Nemesis_Engine"))?;
+    let relevant_path = input_path.iter().skip(start_index + 2); // Get next of "mod"
+    Some(output_dir.join(relevant_path.collect::<PathBuf>()))
 }
 
 #[cfg(test)]
@@ -99,8 +94,6 @@ mod tests {
     #[ignore = "unimplemented yet"]
     #[test]
     fn merge_test() {
-        // "Nemesis_Engine/mod/flinch/0_master/#0106.txt";
-        // "Nemesis_Engine/mod/flinch/0_master/#flinch$0.txt";
         let ids = [
             "../../dummy\\Data\\Nemesis_Engine\\mod\\aaaaa",
             "../../dummy\\Data\\Nemesis_Engine\\mod\\bcbi",
@@ -130,12 +123,18 @@ mod tests {
 
     #[test]
     fn generate_output_path_test() {
-        let input_path = Path::new("/some/path/to/file.ext");
+        let input_path = Path::new("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
         let output_dir = Path::new("/output");
 
         assert_eq!(
             generate_output_path(input_path, output_dir),
-            Some(Path::new("/output/path/to/file.ext").to_path_buf())
+            Some(Path::new("/output/flinch/0_master/#0106.txt").to_path_buf())
+        );
+
+        let input_path = Path::new("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
+        assert_eq!(
+            generate_output_path(input_path, output_dir),
+            Some(Path::new("/output/flinch/0_master/#0106.txt").to_path_buf())
         );
     }
 }

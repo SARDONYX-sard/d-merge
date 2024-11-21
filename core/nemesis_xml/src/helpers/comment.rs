@@ -88,6 +88,14 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> PResult<&'a str> {
     .parse_next(input)
 }
 
+// /// Expected `<!-- CLOSE --></hkparam>`(when tag is `hkparam`)
+// pub(crate) fn take_till_close_and_tag<'a>(
+//     input: &mut &'a str,
+//     tag: &'static str,
+// ) -> PResult<&'a str> {
+//     terminated(take_till_close, super::tag::end_tag(tag)).parse_next(input)
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;

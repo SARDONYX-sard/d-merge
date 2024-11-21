@@ -1,19 +1,27 @@
 use super::class_table::FieldInfo;
 use json_patch::merger::Op;
 use simd_json::BorrowedValue;
-use std::{borrow::Cow, mem};
+use std::{borrow::Cow, mem, ops::Range};
 
 type Patches<'xml> = Vec<CurrentPatchJson<'xml>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct CurrentState<'xml> {
     pub field_info: Option<&'static FieldInfo>,
+    /// When present, this signals the start of a differential change
     pub mode_code: Option<&'xml str>,
     is_passed_original: bool,
     pub patches: Patches<'xml>,
 
     /// Indicates the current json position during one patch file.
     pub path: Vec<Cow<'xml, str>>,
+
+    /// Current index of the element inside the Array.
+    /// # Note
+    /// This also indicates non-differential ranges.
+    pub seq_index: Option<usize>,
+    /// Indicates the extent of differential change of elements inside the Array
+    pub seq_range: Option<Range<usize>>,
 }
 
 impl<'de> CurrentState<'de> {
@@ -24,6 +32,8 @@ impl<'de> CurrentState<'de> {
             patches: vec![],
             is_passed_original: false,
             path: vec![],
+            seq_index: None,
+            seq_range: None,
         }
     }
 
@@ -40,36 +50,38 @@ impl<'de> CurrentState<'de> {
         }
     }
 
+    /// - `<!-- ORIGINAL --!> is found.
     #[inline]
     pub fn set_is_passed_original(&mut self) {
         self.is_passed_original = true;
     }
 
     #[inline]
-    fn judge_operation(&mut self) -> Op {
-        let op = if self.mode_code.is_some() {
-            match self.is_passed_original {
-                true => Op::Replace,
-                false => {
-                    if self.patches.is_empty() {
-                        Op::Remove
-                    } else {
-                        Op::Add
-                    }
+    pub fn judge_operation(&self) -> Op {
+        self.mode_code.map_or(Op::Remove, |_| {
+            if self.is_passed_original {
+                if self.patches.is_empty() {
+                    Op::Remove
+                } else {
+                    Op::Replace
                 }
+            } else {
+                Op::Add
             }
-        } else {
-            Op::Remove
-        };
+        })
+    }
 
+    #[inline]
+    fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
-        op
     }
 
     #[inline]
     pub fn take_patches(&mut self) -> (Op, Patches<'de>) {
-        (self.judge_operation(), mem::take(&mut self.patches))
+        let op = self.judge_operation();
+        self.clear_flags();
+        (op, mem::take(&mut self.patches))
     }
 }
 

@@ -5,8 +5,15 @@ use std::{io, path::PathBuf};
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    /// Not found {field_name}
-    UnknownField { field_name: String },
+    /// Unknown field names: \"{field_name}\". Expected one of [{}].", acceptable_fields.join(", ")
+    #[snafu(display("Unknown field names: \"{field_name}\". Expected one of `[{}]`.", acceptable_fields.join(", ")))]
+    UnknownField {
+        field_name: String,
+        acceptable_fields: Vec<&'static str>,
+    },
+
+    /// Missing field info
+    MissingFieldInfo,
 
     /// Not found {class_name}
     UnknownClass { class_name: String },
