@@ -3,7 +3,8 @@ import { type ComponentPropsWithRef, useId } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 
-import { normalize, useConvertContext } from './ConvertProvider';
+import { useConvertContext } from './ConvertProvider';
+import { selectionTypeSchema } from './schemas/selection_type';
 
 export const SelectionTypeRadios = () => {
   const { selectionType, setSelectionType, setConvertStatuses } = useConvertContext();
@@ -11,7 +12,7 @@ export const SelectionTypeRadios = () => {
   const radioLabelId = useId();
 
   const handleSelectionTypeChange: ComponentPropsWithRef<'input'>['onChange'] = (event) => {
-    setSelectionType(normalize(event.target.value));
+    setSelectionType(selectionTypeSchema.parse(event.target.value));
     setConvertStatuses(new Map()); // Clear to prevent mixing of file index and dir index status.
   };
 

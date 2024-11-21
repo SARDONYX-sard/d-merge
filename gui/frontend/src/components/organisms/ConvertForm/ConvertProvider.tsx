@@ -6,22 +6,10 @@ import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
 import type { OutFormat } from '@/services/api/serde_hkx';
 
 import { outFormatSchema } from './schemas/out_format';
-import { selectionTypeSchema } from './schemas/selection_type';
+import { SelectionType, selectionTypeSchema } from './schemas/selection_type';
 
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
 
-export type SelectionType = 'files' | 'dir' | 'tree';
-
-export const normalize = (value: string): SelectionType => {
-  switch (value) {
-    case 'files':
-    case 'dir':
-    case 'tree':
-      return value;
-    default:
-      return 'files';
-  }
-};
 
 export type ConvertStatusPayload = {
   /**  Djb2 hash algorism */
