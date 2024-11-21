@@ -286,8 +286,6 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_real(&mut self) -> Result<BorrowedValue<'de>> {
         self.parse_next(multispace0)?;
-        #[cfg(feature = "tracing")]
-        tracing::debug!("parse real call");
         let should_take_in_this = self.parse_start_maybe_comment()?;
         self.parse_next(multispace0)?;
 
@@ -310,28 +308,23 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse `Matrix3`, `Rotation`
     fn parse_matrix3(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-
         obj.insert("x".into(), self.parse_vector4()?);
         obj.insert("y".into(), self.parse_vector4()?);
         obj.insert("z".into(), self.parse_vector4()?);
-
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     fn parse_matrix4(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-
         obj.insert("x".into(), self.parse_vector4()?);
         obj.insert("y".into(), self.parse_vector4()?);
         obj.insert("z".into(), self.parse_vector4()?);
         obj.insert("w".into(), self.parse_vector4()?);
-
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     fn parse_qs_transform(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-
         obj.insert("transition".into(), self.parse_vector4()?);
         obj.insert("quaternion".into(), self.parse_quaternion()?);
         obj.insert("scale".into(), self.parse_vector4()?);
@@ -341,7 +334,6 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_quaternion(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-
         self.parse_next(opt(delimited_multispace0("(")))?;
         obj.insert("x".into(), self.parse_real()?);
         obj.insert("y".into(), self.parse_real()?);
@@ -386,11 +378,11 @@ impl<'de> PatchDeserializer<'de> {
     /// - Array|Object|<ClassName>
     fn parse_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
         self.parse_next(multispace0)?;
-        // TODO: It might be a partial change to the value, or it could affect the entire field.
-        // The distinction likely depends on whether </hkparam> immediately follows <!--CLOSE --!>,
-        // ignoring whitespace or comments.
-        // let should_take_in_this = self.parse_start_maybe_comment()?;
-        // self.parse_next(multispace0)?;
+        // NOTE: Is there any possibility of a comment indicating field change intent coming here?
+        // If there is a comment directly below `<hkparam>` indicating a differential change, it is a change in value alone,
+        // such as a part of Vector4.
+        // If we want to change the field data itself, we should indicate the `<hkparam>` situation with a
+        // comment showing the difference.
 
         let value = match field_type {
             obj if obj.starts_with("Object|") => {
@@ -478,17 +470,6 @@ impl<'de> PatchDeserializer<'de> {
             other => self.parse_plane_value(other)?,
         };
 
-        // let value = if should_take_in_this {
-        //     self.current.push_current_patch(value);
-        //     // NOTE: Since the comment indicates that the change is to change a single value,
-        //     //       the `value` is used only within this function, so a dummy is returned.
-        //     Default::default()
-        // } else {
-        //     value
-        // };
-
-        // self.parse_next(multispace0)?;
-        // self.parse_maybe_close_comment()?;
         Ok(value)
     }
 
