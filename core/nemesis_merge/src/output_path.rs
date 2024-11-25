@@ -28,6 +28,9 @@ pub struct OutputPathResult {
 ///
 /// # Examples
 /// ```rust
+/// use nemesis_merge::output_path::{OutputPathResult, parse_input_nemesis_path};
+/// use std::path::Path;
+///
 /// let input_path = Path::new("/some/path/to/Nemesis_Engine/mod/flinch/1st_person/0_master/#0106.txt");
 /// let result = parse_input_nemesis_path(input_path);
 /// assert_eq!(
