@@ -25,3 +25,5 @@ gui/backend/gen/
 
 # Rust build cache
 **/target
+
+/assets/templates/*
