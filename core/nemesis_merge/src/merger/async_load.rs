@@ -16,7 +16,8 @@ use std::{
 
 use super::tables;
 
-// key: template file stem, value: template xml
+/// - key: template file stem
+/// - value: (`template xml`, `template xml converted to json with reference`)
 type Templates<'a> = Arc<DashMap<String, (String, BorrowedValue<'a>)>>;
 
 /// Processes a list of Nemesis XML paths and generates JSON output in the specified directory.

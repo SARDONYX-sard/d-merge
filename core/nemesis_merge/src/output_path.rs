@@ -33,7 +33,7 @@ pub struct OutputPathResult {
 /// assert_eq!(
 ///     result,
 ///     Some(OutputPathResult {
-///         relevant_path: Path::new("flinch/0_master/#0106.txt").to_path_buf(),
+///         relevant_path: Path::new("flinch/1st_person/0_master/#0106.txt").to_path_buf(),
 ///         template_name: "0_master".to_string(),
 ///         is_1st_person: true,
 ///     })
