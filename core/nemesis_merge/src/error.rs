@@ -36,6 +36,9 @@ pub enum Error {
         source: serde_hkx::errors::de::Error,
     },
 
+    #[snafu(transparent)]
+    JoinError { source: tokio::task::JoinError },
+
     /// (De)Serialize json error
     #[cfg(feature = "serde")]
     #[snafu(display("{}:\n {source}", path.display()))]

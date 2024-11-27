@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::{bail, sender};
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
 use tauri::Window;
@@ -29,7 +31,7 @@ struct Payload {
 }
 
 #[tauri::command]
-pub(crate) fn patch(window: Window, output: &str, ids: Vec<String>) -> Result<(), String> {
+pub(crate) fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
     tracing::trace!(?output, ?ids);
     let _sender = sender::<Payload>(window, "d_merge://progress/patch");
     Ok(())

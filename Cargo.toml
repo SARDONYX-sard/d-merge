@@ -30,8 +30,8 @@ tracing = { version = "0.1.40" }                       # logger
 tracing-subscriber = "0.3.18"
 winnow = { version = "0.6.20", features = ["simd"] }
 
-serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.5.0" }
-serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.5.0" }
+serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.5.0", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.5.0", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1"                                  # Color diff assertion

@@ -16,13 +16,14 @@ rust-version.workspace = true
 dashmap = "6.1.0"
 futures = { workspace = true }
 jwalk = { workspace = true }
+ouroboros = "0.18.4"                                                # For easy use of self-referential structures. This is used to maintain XML ownership of the json patch as a reference
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 simd-json = { workspace = true, optional = true }
 snafu = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true, optional = true }
 winnow = { workspace = true }
 

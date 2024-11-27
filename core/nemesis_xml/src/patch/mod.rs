@@ -32,8 +32,8 @@ use winnow::{
 
 /// # Errors
 /// Parse failed.
-pub fn parse_nemesis_patch(input: &str) -> Result<Vec<PatchJson<'_>>> {
-    let mut patcher_info = PatchDeserializer::new(input);
+pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<Vec<PatchJson<'_>>> {
+    let mut patcher_info = PatchDeserializer::new(nemesis_xml);
     patcher_info
         .root_class()
         .map_err(|err| patcher_info.to_readable_err(err))?;

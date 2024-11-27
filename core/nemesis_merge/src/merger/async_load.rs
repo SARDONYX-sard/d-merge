@@ -1,6 +1,7 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 
 use crate::{
+    collect_path::collect_nemesis_paths,
     error::{Error, FailedIoSnafu, JsonSnafu, NemesisXmlErrSnafu, Result},
     output_path::parse_input_nemesis_path,
 };
@@ -76,7 +77,7 @@ pub async fn behavior_gen(output_dir: impl AsRef<Path>, ids: Vec<String>) -> Res
 /// # Errors
 /// Returns an error if file operations or parsing fail.
 async fn process_id(output_dir: PathBuf, id: String, templates: Templates<'_>) -> Result<()> {
-    let paths = collect_paths(&id);
+    let paths = collect_nemesis_paths(&id);
 
     let results: Vec<_> = futures::future::join_all(paths.into_iter().map(|path| {
         let templates = Arc::clone(&templates);
@@ -86,32 +87,6 @@ async fn process_id(output_dir: PathBuf, id: String, templates: Templates<'_>) -
 
     // Combine all errors from file processing
     results.into_iter().collect::<Result<()>>()
-}
-
-/// Collects all relevant file paths within the given ID directory.
-///
-/// # Arguments
-/// - `id`: Path to the directory containing Nemesis XML files.
-///
-/// # Returns
-/// A vector of `PathBuf` containing valid file paths.
-///
-/// # Errors
-/// Returns an error if path traversal fails.
-fn collect_paths(id: &str) -> Vec<PathBuf> {
-    jwalk::WalkDir::new(id)
-        .into_iter()
-        .filter_map(|res| {
-            if let Ok(path) = res.map(|entry| entry.path()) {
-                let file_name = path.file_stem()?.to_str()?;
-                let is_nemesis_file = file_name.starts_with("#");
-                if path.is_file() && is_nemesis_file {
-                    return Some(path);
-                }
-            }
-            None
-        })
-        .collect()
 }
 
 /// Processes an individual XML file and generates a JSON output file.
