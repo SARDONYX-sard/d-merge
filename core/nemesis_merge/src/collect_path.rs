@@ -22,3 +22,16 @@ pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<PathBuf> {
         })
         .collect()
 }
+
+pub(crate) fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
+    let path = path.as_ref();
+    let is_txt = path
+        .extension()
+        .map_or(false, |ext| ext.eq_ignore_ascii_case("txt"));
+    let is_sharp_prefix = path
+        .file_stem()
+        .and_then(|name| name.to_str().map(|name| name.starts_with('#')))
+        .unwrap_or_default();
+
+    path.is_file() && is_txt && is_sharp_prefix
+}

@@ -1,7 +1,8 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
+use super::tables::{FIRST_PERSON_BEHAVIORS, THIRD_PERSON_BEHAVIORS};
 use crate::{
-    collect_path::collect_nemesis_paths,
+    collect_path::is_nemesis_file,
     error::{FailedIoSnafu, JsonSnafu, NemesisXmlErrSnafu, Result},
     output_path::parse_input_nemesis_path,
 };
@@ -12,9 +13,7 @@ use serde_hkx_features::ClassMap;
 use simd_json::BorrowedValue;
 use snafu::ResultExt;
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
-use tokio::sync::mpsc::Sender;
-
-use super::tables::{FIRST_PERSON_BEHAVIORS, THIRD_PERSON_BEHAVIORS};
+use tokio::{fs, sync::mpsc::Sender};
 
 /// - key: template file stem(e.g. `0_master`)
 /// - value: (`template xml`, `template xml converted to json with reference`)
@@ -63,16 +62,17 @@ impl BehaviorGenerator {
         template_info: ChannelArgs,
     ) -> Result<(String, TemplateJson)> {
         let template_name = &template_info.0;
-        let is_1st_person = template_info.1;
+        let is_1stperson = template_info.1;
 
         let template_path = self.resource_dir.join(
-            match is_1st_person {
+            match is_1stperson {
                 true => FIRST_PERSON_BEHAVIORS.get(template_name),
                 false => THIRD_PERSON_BEHAVIORS.get(template_name),
             }
             .unwrap_or(&""),
         );
 
+        tracing::debug!(?template_path, is_1stperson);
         let template_xml =
             tokio::fs::read_to_string(&template_path)
                 .await
@@ -90,18 +90,19 @@ impl BehaviorGenerator {
             },
         };
 
-        Ok(if is_1st_person {
-            (template_info.0, value.try_build()?)
+        let name = if is_1stperson {
+            format!("{template_name}/_1stperson")
         } else {
-            (format!("{template_name}/_1st_person"), value.try_build()?)
-        })
+            template_info.0
+        };
+        Ok((name, value.try_build()?))
     }
 
     async fn create_nemesis_patch_json(
         self: Arc<Self>,
         patch_xml_path: PathBuf,
     ) -> Result<(PathBuf, JsonPatches)> {
-        let xml = tokio::fs::read_to_string(&patch_xml_path)
+        let xml = fs::read_to_string(&patch_xml_path)
             .await
             .context(FailedIoSnafu {
                 path: patch_xml_path.clone(),
@@ -148,33 +149,36 @@ pub async fn behavior_gen(
 
     for nemesis_dir in nemesis_paths {
         let mut tasks = vec![];
-        for patch_xml_path in collect_nemesis_paths(&nemesis_dir) {
-            let generator = Arc::clone(&generator);
-            let task =
-                tokio::spawn(
-                    async move { generator.create_nemesis_patch_json(patch_xml_path).await },
-                );
+        for path in jwalk::WalkDir::new(nemesis_dir.as_path()) {
+            let patch_xml_path = path?.path();
+            if !is_nemesis_file(&patch_xml_path) {
+                continue;
+            };
 
+            let generator = Arc::clone(&generator);
+            let task = tokio::spawn(generator.create_nemesis_patch_json(patch_xml_path));
             tasks.push(task);
         }
 
         let patches = PatchMap::new();
         for task in tasks {
             let (patch_xml_path, value) = task.await??;
-            tracing::debug!(?patch_xml_path, ?value);
+            tracing::debug!(?patch_xml_path);
             patches.insert(patch_xml_path, value);
         }
     }
 
     // main thread
     let mut tasks = vec![];
-
     let mut templates_set = HashSet::new();
     while let Some(template_info) = rx.recv().await {
         if templates_set.contains(&template_info.0) {
             continue;
         }
-        templates_set.insert(template_info.0.clone());
+        let name = template_info.0.clone();
+        let is_1stperson = template_info.1;
+        tracing::debug!(name, is_1stperson);
+        templates_set.insert(name);
 
         let generator = Arc::clone(&generator);
         let task = tokio::spawn(generator.get_template(template_info));
@@ -208,10 +212,11 @@ mod tests {
     #[ignore = "unimplemented yet"]
     #[quick_tracing::init]
     async fn merge_test() {
+        #[allow(clippy::iter_on_single_items)]
         let ids = [
-            "../../dummy\\Data\\Nemesis_Engine\\mod\\aaaaa",
-            "../../dummy\\Data\\Nemesis_Engine\\mod\\bcbi",
-            // "../../dummy\\Data\\Nemesis_Engine\\mod\\cbbi",
+            // "../../dummy\\Data\\Nemesis_Engine\\mod\\aaaaa",
+            // "../../dummy\\Data\\Nemesis_Engine\\mod\\bcbi",
+            "../../dummy\\Data\\Nemesis_Engine\\mod\\cbbi",
             // "../../dummy\\Data\\Nemesis_Engine\\mod\\gender",
             // "../../dummy\\Data\\Nemesis_Engine\\mod\\hmce",
             // "../../dummy\\Data\\Nemesis_Engine\\mod\\momo",
