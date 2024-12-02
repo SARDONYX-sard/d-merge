@@ -1,4 +1,4 @@
-mod error;
+pub mod error;
 
 use self::error::{PatchError, Result};
 use crate::searcher::PointerMut as _;

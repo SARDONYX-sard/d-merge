@@ -1,15 +1,15 @@
 use std::path::{Path, PathBuf};
 
 /// Represents the parsed result of a Nemesis Engine input path.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NemesisPath {
     /// The path relative to the Nemesis Engine directory,
-    /// e.g., `mod/flinch/#0001.txt`
+    /// e.g., `mod/flinch/0_master/#0001.txt`
     pub relevant_path: PathBuf,
     /// The name of the template, e.g., `0_master`.
     pub template_name: String,
     /// Indicates whether the path includes the `_1stperson` directory.
-    pub is_1st_person: bool,
+    pub is_1stperson: bool,
 }
 
 /// Parses a Nemesis Engine input path and extracts the relevant path, template name,
@@ -47,9 +47,9 @@ pub fn parse_input_nemesis_path(input_path: &Path) -> Option<NemesisPath> {
         .to_string();
 
     Some(NemesisPath {
-        template_name,
         relevant_path,
-        is_1st_person,
+        template_name,
+        is_1stperson: is_1st_person,
     })
 }
 
@@ -65,7 +65,7 @@ mod tests {
             Some(NemesisPath {
                 relevant_path: Path::new("flinch/0_master/#0106.txt").to_path_buf(),
                 template_name: "0_master".to_string(),
-                is_1st_person: false,
+                is_1stperson: false,
             })
         );
 
@@ -75,7 +75,7 @@ mod tests {
             Some(NemesisPath {
                 relevant_path: Path::new("flinch/0_master/#0106.txt").to_path_buf(),
                 template_name: "0_master".to_string(),
-                is_1st_person: false,
+                is_1stperson: false,
             })
         );
 
@@ -86,7 +86,7 @@ mod tests {
             Some(NemesisPath {
                 relevant_path: Path::new("flinch/_1stperson/0_master/#0106.txt").to_path_buf(),
                 template_name: "0_master".to_string(),
-                is_1st_person: true,
+                is_1stperson: true,
             })
         );
     }

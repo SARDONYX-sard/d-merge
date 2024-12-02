@@ -1,7 +1,7 @@
 //! errors of `This crate`
 use std::{io, path::PathBuf};
 
-/// GUI Error
+/// `nemesis_merge` Error
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
@@ -13,6 +13,9 @@ pub enum Error {
     #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
     FailedParseNemesisPath { path: PathBuf },
 
+    /// Missing template xml file. name: {template_name}
+    MissingTemplate { template_name: String },
+
     /// dir strip error
     #[snafu(transparent)]
     StripPrefixError { source: std::path::StripPrefixError },
@@ -21,14 +24,28 @@ pub enum Error {
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
 
+    /// {source}. name: {template_name}
+    PatchError {
+        source: json_patch::merger::error::PatchError,
+        template_name: String,
+    },
+
+    #[snafu(transparent)]
+    SerdeHkxWrapper {
+        source: serde_hkx_features::error::Error,
+    },
+
     /// Nemesis XML parsing error
-    #[snafu(display("{}:\n{xml}\n{source}\n---------------------------------------------------------", path.display()))]
+    #[snafu(display("{}:\n{source}\n---------------------------------------------------------", path.display()))]
     NemesisXmlErr {
-        /// input XML
-        xml: String,
         /// input path
         path: PathBuf,
         source: nemesis_xml::error::Error,
+    },
+
+    #[snafu(transparent)]
+    HkxSerError {
+        source: serde_hkx::errors::ser::Error,
     },
 
     #[snafu(transparent)]

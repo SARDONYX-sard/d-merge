@@ -2,132 +2,34 @@
 #![allow(clippy::mem_forget)]
 use super::tables::{FIRST_PERSON_BEHAVIORS, THIRD_PERSON_BEHAVIORS};
 use crate::{
-    collect_path::is_nemesis_file,
-    error::{FailedIoSnafu, JsonSnafu, NemesisXmlErrSnafu, Result},
-    output_path::parse_input_nemesis_path,
+    collect_path::collect_nemesis_paths,
+    error::{Error, FailedIoSnafu, JsonSnafu, NemesisXmlErrSnafu, PatchSnafu, Result},
+    output_path::{parse_input_nemesis_path, NemesisPath},
 };
-use dashmap::DashMap;
-use json_patch::merger::PatchJson;
+use json_patch::merger::apply_patch;
 use nemesis_xml::patch::parse_nemesis_patch;
-use serde_hkx_features::ClassMap;
+use serde_hkx::bytes::serde::hkx_header::HkxHeader;
+use serde_hkx_features::{fs::ReadExt, ClassMap};
 use simd_json::BorrowedValue;
 use snafu::ResultExt;
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
-use tokio::{fs, sync::mpsc::Sender};
+use std::{collections::HashMap, path::PathBuf};
 
 /// - key: template file stem(e.g. `0_master`)
-/// - value: (`template xml`, `template xml converted to json with reference`)
-type TemplateMap = DashMap<String, TemplateJson>;
+/// - value: output_path(hkx file path), borrowed json (from template xml)
+type TemplateMap<'a> = HashMap<String, (PathBuf, BorrowedValue<'a>)>;
 
-#[ouroboros::self_referencing]
-#[derive(Debug, PartialEq)]
-struct TemplateJson {
-    xml: String,
-    #[borrows(xml)]
-    #[covariant]
-    template: BorrowedValue<'this>,
-}
-
-/// - key: template file stem(e.g. `0_master`)
-/// - value: (`nemesis xml`, `nemesis xml converted to json with reference`)
-type PatchMap = DashMap<PathBuf, JsonPatches>;
-
-#[ouroboros::self_referencing]
-#[derive(Debug, PartialEq)]
-struct JsonPatches {
-    xml: String,
-    #[borrows(xml)]
-    #[covariant]
-    patches: Vec<PatchJson<'this>>,
-}
-
-type ChannelArgs = (String, bool);
+/// - key: merge target template file stem (e.g. `0_master`)
+/// - value: nemesis patch xml(from hkx file)
+type PatchMapOwned = HashMap<String, String>;
+/// - key: (e.g. `0_master`) template file stem.
+/// - key: (e.g. `aaaa`) mod code
+/// - value: nemesis patch xml files
+type PatchModMap<'a> = HashMap<String, PatchMapOwned>;
 
 #[derive(Debug)]
-pub struct BehaviorGenerator {
+pub struct Options {
     resource_dir: PathBuf,
-    sender: Option<Sender<ChannelArgs>>,
-}
-
-impl BehaviorGenerator {
-    pub const fn new(resource_dir: PathBuf) -> Self {
-        Self {
-            resource_dir,
-            sender: None,
-        }
-    }
-
-    async fn get_template(
-        self: Arc<Self>,
-        template_info: ChannelArgs,
-    ) -> Result<(String, TemplateJson)> {
-        let template_name = &template_info.0;
-        let is_1stperson = template_info.1;
-
-        let template_path = self.resource_dir.join(
-            match is_1stperson {
-                true => FIRST_PERSON_BEHAVIORS.get(template_name),
-                false => THIRD_PERSON_BEHAVIORS.get(template_name),
-            }
-            .unwrap_or(&""),
-        );
-
-        tracing::debug!(?template_path, is_1stperson);
-        let template_xml =
-            tokio::fs::read_to_string(&template_path)
-                .await
-                .context(FailedIoSnafu {
-                    path: template_path.clone(),
-                })?;
-
-        let value = TemplateJsonTryBuilder {
-            xml: template_xml,
-            template_builder: |template_xml| {
-                let ast: ClassMap = serde_hkx::from_str(template_xml)?;
-                simd_json::serde::to_borrowed_value(ast).context(JsonSnafu {
-                    path: template_path,
-                })
-            },
-        };
-
-        let name = if is_1stperson {
-            format!("{template_name}/_1stperson")
-        } else {
-            template_info.0
-        };
-        Ok((name, value.try_build()?))
-    }
-
-    async fn create_nemesis_patch_json(
-        self: Arc<Self>,
-        patch_xml_path: PathBuf,
-    ) -> Result<(PathBuf, JsonPatches)> {
-        let xml = fs::read_to_string(&patch_xml_path)
-            .await
-            .context(FailedIoSnafu {
-                path: patch_xml_path.clone(),
-            })?;
-        let path = patch_xml_path.clone();
-        let value = JsonPatchesTryBuilder {
-            xml,
-            patches_builder: |xml| {
-                parse_nemesis_patch(xml).context(NemesisXmlErrSnafu {
-                    xml: xml.to_string(),
-                    path,
-                })
-            },
-        };
-
-        if let Some(nemesis_path) = parse_input_nemesis_path(patch_xml_path.as_path()) {
-            if let Some(sender) = &self.sender {
-                sender
-                    .send((nemesis_path.template_name, nemesis_path.is_1st_person))
-                    .await
-                    .unwrap();
-            };
-        }
-        Ok((patch_xml_path, value.try_build()?))
-    }
+    output_dir: PathBuf,
 }
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
@@ -135,72 +37,116 @@ impl BehaviorGenerator {
 ///
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
-pub async fn behavior_gen(
-    nemesis_paths: Vec<PathBuf>,
-    mut generator: BehaviorGenerator,
-) -> Result<()> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<ChannelArgs>(500);
+pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Result<()> {
+    let mut patch_mod_map = PatchModMap::new();
+    {
+        let mut templates = TemplateMap::new();
 
-    generator.sender = Some(tx);
-    let generator = Arc::new(generator);
+        for patch_path in &nemesis_paths {
+            let mut patch_map_owned = PatchMapOwned::new();
 
-    // 1. Parallel read XML templates + Create json patches.
-    // captures: nemesis_paths, templates_map, patches_map
+            for txt_path in collect_nemesis_paths(patch_path) {
+                let NemesisPath {
+                    relevant_path: _,
+                    template_name,
+                    is_1stperson,
+                } = parse_input_nemesis_path(&txt_path).ok_or(Error::FailedParseNemesisPath {
+                    path: txt_path.clone(),
+                })?;
+                let template_name_key = match is_1stperson {
+                    true => format!("_1stperson/{template_name}"),
+                    false => template_name.clone(),
+                };
 
-    for nemesis_dir in nemesis_paths {
-        let mut tasks = vec![];
-        for path in jwalk::WalkDir::new(nemesis_dir.as_path()) {
-            let patch_xml_path = path?.path();
-            if !is_nemesis_file(&patch_xml_path) {
-                continue;
-            };
+                // one template
+                {
+                    let (output_path, template_path) = match is_1stperson {
+                        true => FIRST_PERSON_BEHAVIORS.get(&template_name),
+                        false => THIRD_PERSON_BEHAVIORS.get(&template_name),
+                    }
+                    .map(|path| {
+                        let Options {
+                            resource_dir,
+                            output_dir,
+                        } = &options;
+                        let mut output_path = output_dir.join(path);
+                        output_path.set_extension("hkx");
+                        (output_path, resource_dir.join(path))
+                    })
+                    .ok_or_else(|| Error::FailedParseNemesisPath {
+                        path: txt_path.clone(),
+                    })?;
+                    let json_value = template_xml_to_value(template_path).await?;
+                    templates.insert(template_name_key.clone(), (output_path, json_value));
+                };
 
-            let generator = Arc::clone(&generator);
-            let task = tokio::spawn(generator.create_nemesis_patch_json(patch_xml_path));
-            tasks.push(task);
+                // one patch
+                let patch_txt =
+                    tokio::fs::read_to_string(&txt_path)
+                        .await
+                        .context(FailedIoSnafu {
+                            path: txt_path.clone(),
+                        })?;
+                patch_map_owned.insert(template_name_key, patch_txt);
+            }
+
+            if let Some(mod_code) = patch_path.file_name() {
+                patch_mod_map.insert(mod_code.to_string_lossy().to_string(), patch_map_owned);
+            }
         }
 
-        let patches = PatchMap::new();
-        for task in tasks {
-            let (patch_xml_path, value) = task.await??;
-            tracing::debug!(?patch_xml_path);
-            patches.insert(patch_xml_path, value);
+        // TODO: Priority joins between patches may allow templates to be processed in a parallel loop.
+        // 2. apply patches
+        for patch_map in patch_mod_map.values() {
+            for (template_target, patch_txt) in patch_map {
+                let patches_json = parse_nemesis_patch(patch_txt).context(NemesisXmlErrSnafu {
+                    path: template_target.clone(),
+                })?;
+                if let Some((_, template)) = templates.get_mut(template_target) {
+                    for patch in patches_json {
+                        apply_patch(template, patch).context(PatchSnafu {
+                            template_name: template_target.clone(),
+                        })?;
+                    }
+                }
+            }
         }
-    }
 
-    // main thread
-    let mut tasks = vec![];
-    let mut templates_set = HashSet::new();
-    while let Some(template_info) = rx.recv().await {
-        if templates_set.contains(&template_info.0) {
-            continue;
+        // 3. save templates as hkx
+        save_template_hkx(templates).await?;
+    };
+
+    Ok(())
+}
+
+async fn template_xml_to_value(path: PathBuf) -> Result<BorrowedValue<'static>> {
+    let template_xml = path.read_any_string().await?;
+    let ast: ClassMap = serde_hkx::from_str(&template_xml)?;
+    simd_json::serde::to_borrowed_value(ast).context(JsonSnafu { path })
+}
+
+async fn save_template_hkx(templates: TemplateMap<'_>) -> Result<()> {
+    for (output_path, template_json) in templates.into_values() {
+        if let Some(output_dir_all) = output_path.parent() {
+            tokio::fs::create_dir_all(output_dir_all)
+                .await
+                .context(FailedIoSnafu {
+                    path: output_dir_all,
+                })?;
         }
-        let name = template_info.0.clone();
-        let is_1stperson = template_info.1;
-        tracing::debug!(name, is_1stperson);
-        templates_set.insert(name);
 
-        let generator = Arc::clone(&generator);
-        let task = tokio::spawn(generator.get_template(template_info));
-        tasks.push(task);
+        let ast: ClassMap =
+            simd_json::serde::from_borrowed_value(template_json).context(JsonSnafu {
+                path: output_path.clone(),
+            })?;
+        let hkx_bytes = serde_hkx::to_bytes(&ast, &HkxHeader::new_skyrim_se())?;
+        tokio::fs::write(&output_path, hkx_bytes)
+            .await
+            .context(FailedIoSnafu {
+                path: output_path.clone(),
+            })?;
     }
 
-    let templates = TemplateMap::new();
-    for task in tasks {
-        let (template_name, value) = task.await??;
-        templates.insert(template_name, value);
-    }
-
-    // 2. Resolve conflicts
-    // captures: patches_map
-
-    // 3. merge json patches into the templates json
-    // captures: templates_map, patches_map
-
-    // 4. write the final json(To hkx) to the output_dir
-    // captures: templates_map
-
-    // 5. errors are reported
     Ok(())
 }
 
@@ -234,12 +180,15 @@ mod tests {
         .into_iter()
         .map(|s| s.into())
         .collect();
-        let output_dir = "../../dummy/patches/output";
+        let output_dir = "../../dummy/patches_applied/output";
         std::fs::create_dir_all(output_dir).unwrap();
 
         behavior_gen(
             ids,
-            BehaviorGenerator::new("../../assets/templates/".into()),
+            Options {
+                resource_dir: "./".into(),
+                output_dir: output_dir.into(),
+            },
         )
         .await
         .unwrap();
