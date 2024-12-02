@@ -10,9 +10,13 @@ use json_patch::merger::apply_patch;
 use nemesis_xml::patch::parse_nemesis_patch;
 use serde_hkx::bytes::serde::hkx_header::HkxHeader;
 use serde_hkx_features::{fs::ReadExt, ClassMap};
-use simd_json::BorrowedValue;
+use simd_json::{
+    serde::{from_borrowed_value, to_borrowed_value},
+    BorrowedValue,
+};
 use snafu::ResultExt;
 use std::{collections::HashMap, path::PathBuf};
+use tokio::fs;
 
 /// - key: template file stem(e.g. `0_master`)
 /// - value: output_path(hkx file path), borrowed json (from template xml)
@@ -81,12 +85,9 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
                 };
 
                 // one patch
-                let patch_txt =
-                    tokio::fs::read_to_string(&txt_path)
-                        .await
-                        .context(FailedIoSnafu {
-                            path: txt_path.clone(),
-                        })?;
+                let patch_txt = fs::read_to_string(&txt_path).await.context(FailedIoSnafu {
+                    path: txt_path.clone(),
+                })?;
                 patch_map_owned.insert(template_name_key, patch_txt);
             }
 
@@ -112,8 +113,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
             }
         }
 
-        // 3. save templates as hkx
-        save_template_hkx(templates).await?;
+        save_templates_to_hkx(templates).await?;
     };
 
     Ok(())
@@ -122,25 +122,24 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
 async fn template_xml_to_value(path: PathBuf) -> Result<BorrowedValue<'static>> {
     let template_xml = path.read_any_string().await?;
     let ast: ClassMap = serde_hkx::from_str(&template_xml)?;
-    simd_json::serde::to_borrowed_value(ast).context(JsonSnafu { path })
+    to_borrowed_value(ast).context(JsonSnafu { path }) // TODO: fix needless realloc
 }
 
-async fn save_template_hkx(templates: TemplateMap<'_>) -> Result<()> {
+async fn save_templates_to_hkx(templates: TemplateMap<'_>) -> Result<()> {
     for (output_path, template_json) in templates.into_values() {
         if let Some(output_dir_all) = output_path.parent() {
-            tokio::fs::create_dir_all(output_dir_all)
+            fs::create_dir_all(output_dir_all)
                 .await
                 .context(FailedIoSnafu {
                     path: output_dir_all,
                 })?;
         }
 
-        let ast: ClassMap =
-            simd_json::serde::from_borrowed_value(template_json).context(JsonSnafu {
-                path: output_path.clone(),
-            })?;
+        let ast: ClassMap = from_borrowed_value(template_json).context(JsonSnafu {
+            path: output_path.clone(),
+        })?;
         let hkx_bytes = serde_hkx::to_bytes(&ast, &HkxHeader::new_skyrim_se())?;
-        tokio::fs::write(&output_path, hkx_bytes)
+        fs::write(&output_path, hkx_bytes)
             .await
             .context(FailedIoSnafu {
                 path: output_path.clone(),
@@ -180,14 +179,12 @@ mod tests {
         .into_iter()
         .map(|s| s.into())
         .collect();
-        let output_dir = "../../dummy/patches_applied/output";
-        std::fs::create_dir_all(output_dir).unwrap();
 
         behavior_gen(
             ids,
             Options {
-                resource_dir: "./".into(),
-                output_dir: output_dir.into(),
+                resource_dir: "../../assets/templates".into(),
+                output_dir: "../../dummy/patches_applied/output".into(),
             },
         )
         .await
