@@ -1,31 +1,35 @@
-import { type ReactNode, createContext, useContext, useState } from 'react';
+import { type Dispatch, type ReactNode, type SetStateAction, createContext, useContext, useState } from 'react';
 
+import { useStorageState } from '@/components/hooks/useStorageState';
 import { STORAGE } from '@/lib/storage';
-import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { HIDDEN_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { boolSchema } from '@/lib/zod/schema-utils';
 
 type ContextType = {
   js: string;
-  setJs: (value?: string) => void;
+  setJs: (value: string) => void;
+  runScript: boolean;
+  setRunScript: Dispatch<SetStateAction<boolean>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
-const CACHE_KEY = PUB_CACHE_OBJ.customJs;
 
 type Props = { children: ReactNode };
 
 /** Wrapper component to allow user-defined css and existing css design presets to be retrieved/modified from anywhere */
 export const JsProvider = ({ children }: Props) => {
-  const [js, setJs] = useState(STORAGE.get(CACHE_KEY) ?? '');
+  const [runScript, setRunScript] = useStorageState(HIDDEN_CACHE_OBJ.runScript, boolSchema);
+  const [js, setJs] = useState(STORAGE.get(PUB_CACHE_OBJ.customJs) ?? '');
 
   const setHook = (value?: string) => {
     if (value) {
       setJs(value);
-      STORAGE.set(CACHE_KEY, value);
+      STORAGE.set(PUB_CACHE_OBJ.customJs, value);
     } else {
-      STORAGE.remove(CACHE_KEY);
+      STORAGE.remove(PUB_CACHE_OBJ.customJs);
     }
   };
 
-  return <Context.Provider value={{ js, setJs: setHook }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ js, setJs: setHook, runScript, setRunScript }}>{children}</Context.Provider>;
 };
 
 /**

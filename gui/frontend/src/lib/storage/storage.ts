@@ -78,5 +78,13 @@ export const createStorage = <
      * storage.getHidden('run-script');
      */
     getHidden: (key: HiddenCacheKey<H>) => localStorage.getItem(key),
+    /**
+     * Set the value for a hidden cache key from localStorage.
+     * @param key - The hidden cache key
+     * @param value - string value
+     * @example
+     * storage.setHidden('run-script', 'true');
+     */
+    setHidden: (key: HiddenCacheKey<H>, value: string) => localStorage.setItem(key, value),
   } as const;
 };

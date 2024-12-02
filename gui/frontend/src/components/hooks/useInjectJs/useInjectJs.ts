@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 
 import { useJsContext } from '@/components/providers/JsProvider';
-import { STORAGE } from '@/lib/storage';
 
 /**
  * Inject JavaScript
@@ -11,7 +10,7 @@ import { STORAGE } from '@/lib/storage';
  * If we load it with `layout.tsx`, it doesn't apply for some reason.
  */
 export function useInjectJs() {
-  const { js, setJs } = useJsContext();
+  const { js, setJs, runScript } = useJsContext();
   const script = useRef<HTMLScriptElement | null>(null);
   // # HACK: To avoid double call `useEffect`
   // If there is no cleanup function (during development), double mounting will not occur.
@@ -21,8 +20,7 @@ export function useInjectJs() {
   const isMounted = useRef(false);
 
   useEffect(() => {
-    const runScript = STORAGE.getHidden('run-script');
-    if (!(runScript && runScript === 'true') || isMounted.current || script.current) {
+    if (!runScript || isMounted.current || script.current) {
       return; // Skip if already run
     }
     isMounted.current = true;
@@ -36,7 +34,7 @@ export function useInjectJs() {
       script.current?.remove();
       script.current = null;
     };
-  }, [js]);
+  }, [js, runScript]);
 
   return { js, setJs } as const;
 }

@@ -1,9 +1,7 @@
 import { Checkbox, FormControlLabel, Tooltip } from '@mui/material';
 
-import { useStorageState } from '@/components/hooks/useStorageState/useStorageState';
 import { useTranslation } from '@/components/hooks/useTranslation';
-
-import { schema } from './schema';
+import { useJsContext } from '@/components/providers/JsProvider';
 
 import type { FormControlLabelProps } from '@mui/material';
 
@@ -12,7 +10,7 @@ const CACHE_KEY = 'run-script';
 
 export const JsAutoRunButton = ({ ...props }: Props) => {
   const { t } = useTranslation();
-  const [runScript, setRunScript] = useStorageState(CACHE_KEY, schema);
+  const { runScript, setRunScript } = useJsContext();
 
   const title = (
     <>
