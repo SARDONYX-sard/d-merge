@@ -7,7 +7,7 @@ import { boolSchema } from '@/lib/zod/schema-utils';
 
 type ContextType = {
   js: string;
-  setJs: (value: string) => void;
+  setJs: (value?: string) => void;
   runScript: boolean;
   setRunScript: Dispatch<SetStateAction<boolean>>;
 };
