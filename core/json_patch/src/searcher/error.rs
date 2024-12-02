@@ -1,6 +1,6 @@
 use simd_json::TryTypeError;
 
-#[derive(snafu::Snafu, Debug, Clone)]
+#[derive(snafu::Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     #[snafu(display("Pointer is empty, cannot add"))]
     EmptyPointer,

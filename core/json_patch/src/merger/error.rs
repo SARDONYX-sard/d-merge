@@ -1,9 +1,16 @@
+use snafu::Location;
+
 /// Custom error type for JSON patch operations.
-#[derive(Debug, snafu::Snafu)]
+#[derive(snafu::Snafu, Debug, Clone)]
+#[snafu(visibility(pub))]
 pub enum PatchError {
     /// Error indicating that the specified path was not found in the JSON structure.
-    #[snafu(display("Path not found: {}", path))]
-    PathNotFound { path: String },
+    #[snafu(display("[{location}] Path not found: {}", path))]
+    PathNotFound {
+        path: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     /// Error indicating an invalid operation at the given path.
     #[snafu(display("Invalid operation for path: {}", path))]
