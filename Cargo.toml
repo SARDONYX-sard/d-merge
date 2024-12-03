@@ -14,6 +14,7 @@ members = ["core/*", "gui/backend"]
 resolver = "2"
 
 [workspace.dependencies]
+educe = { version = "0.6.0" }
 futures = { version = "0.3.31" }
 indexmap = { version = "2.6.0", features = ["rayon"] }
 jwalk = { version = "0.8.1" }
@@ -25,12 +26,12 @@ serde_json = "1.0.133" # gui: To avoid generate_context error.
 serde_repr = "0.1.19" # C like Serialize enum into numbers.(Using progress reporing)
 simd-json = "0.14.3"
 snafu = "0.8.5"
-tokio = { version = "1.41.1", features = [
+tokio = { version = "1.42.0", features = [
   "fs",
   "rt-multi-thread",
 ] } # Async runtime
 tracing = { version = "0.1.41" } # logger
-tracing-subscriber = "0.3.18"
+tracing-subscriber = "0.3.19"
 winnow = { version = "0.6.20", features = ["simd"] }
 
 serde_hkx = { git = "https://github.com/SARDONYX-sard/serde-hkx", tag = "0.5.0", default-features = false }

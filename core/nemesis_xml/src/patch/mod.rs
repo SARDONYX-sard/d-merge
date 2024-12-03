@@ -16,7 +16,7 @@ use crate::{
     error::{Error, Result},
     helpers::tag::PointerType,
 };
-use json_patch::merger::{Op, PatchJson};
+use json_patch::{Op, PatchJson};
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
@@ -546,7 +546,6 @@ impl<'de> PatchDeserializer<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use json_patch::merger::Op;
 
     #[test]
     fn replace_field() {

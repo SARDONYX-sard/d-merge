@@ -1,27 +1,18 @@
 mod add;
 pub mod error;
-pub mod range;
+pub(crate) mod range;
 mod remove;
 mod replace;
 
 use self::add::apply_add;
 use self::error::Result;
+use self::range::apply::apply_range;
+use self::range::parse::is_range_op;
 use self::remove::apply_remove;
 use self::replace::apply_replace;
+use crate::operation::Op;
 use simd_json::BorrowedValue;
 use std::borrow::Cow;
-
-/// Enum representing the type of operation for the JSON patch.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Op {
-    /// Add a new value to the JSON at the specified path.
-    Add,
-    /// Remove the value from the JSON at the specified path.
-    Remove,
-    /// Replace the value at the specified path with a new value.
-    Replace,
-}
 
 /// Struct representing a JSON patch operation.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -48,9 +39,13 @@ pub struct PatchJson<'a> {
 /// # Errors
 /// If the patch operation fails due to an invalid operation or path not found.
 pub fn apply_patch<'v>(json: &mut BorrowedValue<'v>, patch: PatchJson<'v>) -> Result<()> {
-    match patch.op {
-        Op::Add => apply_add(json, patch),
-        Op::Remove => apply_remove(json, patch),
-        Op::Replace => apply_replace(json, patch),
+    if is_range_op(&patch.path) {
+        apply_range(json, patch)
+    } else {
+        match patch.op {
+            Op::Add => apply_add(json, patch),
+            Op::Remove => apply_remove(json, patch),
+            Op::Replace => apply_replace(json, patch),
+        }
     }
 }

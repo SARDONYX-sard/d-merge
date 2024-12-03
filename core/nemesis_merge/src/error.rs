@@ -26,7 +26,7 @@ pub enum Error {
 
     /// {source}. name: {template_name}
     PatchError {
-        source: json_patch::merger::error::PatchError,
+        source: json_patch::merge::error::Error,
         template_name: String,
     },
 

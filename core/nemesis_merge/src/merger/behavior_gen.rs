@@ -6,7 +6,7 @@ use crate::{
     error::{Error, FailedIoSnafu, JsonSnafu, NemesisXmlErrSnafu, PatchSnafu, Result},
     output_path::{parse_input_nemesis_path, NemesisPath},
 };
-use json_patch::merger::apply_patch;
+use json_patch::apply_patch;
 use nemesis_xml::patch::parse_nemesis_patch;
 use serde_hkx::bytes::serde::hkx_header::HkxHeader;
 use serde_hkx_features::{fs::ReadExt, ClassMap};
