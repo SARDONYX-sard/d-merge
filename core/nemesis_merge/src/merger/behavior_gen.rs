@@ -98,6 +98,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
 
         // TODO: Priority joins between patches may allow templates to be processed in a parallel loop.
         // 2. apply patches
+        let mut errors = Vec::new();
         for patch_map in patch_mod_map.values() {
             for (template_target, patch_txt) in patch_map {
                 let patches_json = parse_nemesis_patch(patch_txt).context(NemesisXmlErrSnafu {
@@ -105,14 +106,22 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
                 })?;
                 if let Some((_, template)) = templates.get_mut(template_target) {
                     for patch in patches_json {
-                        apply_patch(template, patch).context(PatchSnafu {
+                        let patch_string = format!("{patch:#?}");
+                        if let Err(err) = apply_patch(template, patch).context(PatchSnafu {
                             template_name: template_target.clone(),
-                        })?;
+                            patch: patch_string,
+                        }) {
+                            errors.push(err.to_string());
+                        };
                     }
                 }
             }
         }
 
+        let error_output = options.output_dir.join("errors.txt");
+        tokio::fs::write(&error_output, errors.join("\n"))
+            .await
+            .context(FailedIoSnafu { path: error_output })?;
         save_templates_to_hkx(templates).await?;
     };
 

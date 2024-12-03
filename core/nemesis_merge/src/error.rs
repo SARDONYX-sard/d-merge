@@ -24,10 +24,12 @@ pub enum Error {
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
 
-    /// {source}. name: {template_name}
+    /// Json patch error
+    #[snafu(display("{template_name}:\n {source}\n\n patch: {patch}"))]
     PatchError {
-        source: json_patch::merge::error::Error,
+        source: json_patch::Error,
         template_name: String,
+        patch: String,
     },
 
     #[snafu(transparent)]
