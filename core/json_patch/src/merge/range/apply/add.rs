@@ -4,8 +4,8 @@ use std::{iter::repeat, ops::RangeFrom};
 
 /// Add `value` to the `range` portion of `target`.
 ///
-/// # Panics
-/// - Panics if `range` is out of bounds.
+/// # Note
+/// - If `range.start` is out of bounds, then extend by default value.
 pub fn handle_add<'value>(target: &mut Vec<Value<'value>>, range: Range, value: Value<'value>) {
     match value {
         Value::Array(vec) => target.extend(*vec), // TODO: separate fn & file. And fix array range patterns.
@@ -57,7 +57,7 @@ pub fn handle_add<'value>(target: &mut Vec<Value<'value>>, range: Range, value: 
                 };
 
                 if insert_count > target_len {
-                    target.extend(repeat(other.clone()).take(insert_count));
+                    target.extend(repeat(default_value(&other)).take(insert_count));
                 }
                 target.splice(start.., repeat(other).take(insert_count));
             }

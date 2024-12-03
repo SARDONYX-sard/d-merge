@@ -29,11 +29,16 @@ pub fn apply_range<'a>(json: &mut Value<'a>, patch: PatchJson<'a>) -> Result<()>
 
     match target {
         Value::Array(target) => {
-            range.check_valid_range(target.len())?;
             match op {
                 Op::Add => handle_add(target, range, value),
-                Op::Remove => handle_remove(target, range),
-                Op::Replace => handle_replace(target, range, value),
+                Op::Remove => {
+                    range.check_valid_range(target.len())?;
+                    handle_remove(target, range);
+                }
+                Op::Replace => {
+                    range.check_valid_range(target.len())?;
+                    handle_replace(target, range, value);
+                }
             };
             Ok(())
         }
