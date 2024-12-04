@@ -492,7 +492,6 @@ impl<'de> PatchDeserializer<'de> {
         Ok(false)
     }
 
-    // TODO: return bool here and if `ORIGINAL` or `CLOSE` comment comes in, return true and do the `Op::Remove` process.
     /// ORIGINAL or CLOSE
     fn parse_maybe_close_comment(&mut self) -> Result<()> {
         if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
