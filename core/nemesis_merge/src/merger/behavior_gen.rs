@@ -4,9 +4,12 @@ use super::{
     apply_patches::apply_patches, collect_templates_and_patches::collect_templates_and_patches,
     save_to_hkx::generate_hkx_files, Options,
 };
-use crate::error::{Error, FailedIoSnafu, Result};
+#[cfg(not(feature = "tracing"))]
+use crate::error::FailedIoSnafu;
+use crate::error::{Error, Result};
 use rayon::prelude::*;
-use snafu::ResultExt;
+#[cfg(not(feature = "tracing"))]
+use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
@@ -15,7 +18,7 @@ use std::path::{Path, PathBuf};
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Result<()> {
-    let error_output = options.output_dir.join("errors.txt");
+    let error_output = options.output_dir.join("d_merge_errors.log");
 
     let (templates, patch_mod_map) = match collect_templates_and_patches(nemesis_paths, options) {
         Ok((new_templates, new_patch_mod_map)) => (new_templates, new_patch_mod_map),
@@ -56,14 +59,18 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
 }
 
 async fn write_errors(path: impl AsRef<Path>, errors: Vec<Error>) -> Result<()> {
-    let path = path.as_ref();
+    let _path = path.as_ref();
 
     let errors: Vec<String> = errors.into_par_iter().map(|e| e.to_string()).collect();
-    tokio::fs::write(&path, errors.join("\n"))
+    #[cfg(feature = "tracing")]
+    tracing::error!("{}", errors.join("\n\n"));
+    #[cfg(not(feature = "tracing"))]
+    tokio::fs::write(&_path, errors.join("\n\n"))
         .await
         .context(FailedIoSnafu {
-            path: path.to_path_buf(),
-        })
+            path: _path.to_path_buf(),
+        })?;
+    Ok(())
 }
 
 #[cfg(test)]

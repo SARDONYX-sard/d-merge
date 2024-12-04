@@ -39,9 +39,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# worksapce members
+# workspace members
 mod_info = { workspace = true }
-nemesis_merge = { workspace = true }
+nemesis_merge = { workspace = true, features = ["tracing"] }
 node_expr = { workspace = true }
 
 [dev-dependencies]

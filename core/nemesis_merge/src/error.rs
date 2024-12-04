@@ -30,7 +30,7 @@ pub enum Error {
     },
 
     /// Json patch error
-    #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
+    #[snafu(display("{template_name}:\n {source}\n patch: {patch}\n\n"))]
     PatchError {
         source: json_patch::Error,
         template_name: String,
@@ -38,7 +38,7 @@ pub enum Error {
     },
 
     /// Nemesis XML parsing error
-    #[snafu(display("{}:\n{source}\n---------------------------------------------------------", path.display()))]
+    #[snafu(display("{}:\n{source}\n", path.display()))]
     NemesisXmlErr {
         /// input path
         path: PathBuf,

@@ -13,17 +13,24 @@ pub fn apply_patches<'a, 'b: 'a>(
 ) -> Vec<Result<(), Error>> {
     patch_mod_map
         .par_iter()
-        .flat_map(|(_, patch_map)| {
+        .flat_map(|(_mode_code, patch_map)| {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(_mode_code);
             patch_map.par_iter().map(|(template_target, nemesis_xml)| {
                 let patches_json =
-                    parse_nemesis_patch(nemesis_xml).context(NemesisXmlErrSnafu {
+                    parse_nemesis_patch(nemesis_xml).with_context(|_| NemesisXmlErrSnafu {
                         path: template_target.clone(),
                     })?;
+                #[cfg(feature = "tracing")]
+                tracing::debug!(template_target);
+                #[cfg(feature = "tracing")]
+                tracing::debug!("patches_json = {patches_json:#?}");
+
                 if let Some(mut template_pair) = templates.get_mut(template_target) {
                     let template = &mut template_pair.value_mut().1;
                     for patch in patches_json {
-                        let patch_string = format!("{patch:#?}");
-                        apply_patch(template, patch).context(PatchSnafu {
+                        let patch_string = format!("{patch:#?}"); // TODO: Fix redundant copy
+                        apply_patch(template, patch).with_context(|_| PatchSnafu {
                             template_name: template_target.clone(),
                             patch: patch_string,
                         })?;
