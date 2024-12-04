@@ -3,7 +3,7 @@ use simd_json::TryTypeError;
 /// Json patch error
 #[derive(snafu::Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    /// Specified path was not found in the JSON:{path}
+    /// The specified path does not exist: {path}
     NotFoundTarget { path: String },
 
     /// Pointer is empty, cannot add

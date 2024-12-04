@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-dashmap = "6.1.0"
+dashmap = { version = "6.1.0", features = ["rayon"] }
 futures = { workspace = true }
 jwalk = { workspace = true }
 ouroboros = "0.18.4"                                                # For easy use of self-referential structures. This is used to maintain XML ownership of the json patch as a reference

@@ -13,8 +13,8 @@ pub enum Error {
     #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
     FailedParseNemesisPath { path: PathBuf },
 
-    /// Missing template xml file. name: {template_name}
-    MissingTemplate { template_name: String },
+    /// Failure to read XML templates converted from patches and hkx. Error count:  {errors_len}
+    FailedToReadTemplateAndPatches { errors_len: usize },
 
     /// dir strip error
     #[snafu(transparent)]
@@ -25,16 +25,11 @@ pub enum Error {
     JwalkErr { source: jwalk::Error },
 
     /// Json patch error
-    #[snafu(display("{template_name}:\n {source}\n\n patch: {patch}"))]
+    #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
     PatchError {
         source: json_patch::Error,
         template_name: String,
         patch: String,
-    },
-
-    #[snafu(transparent)]
-    SerdeHkxWrapper {
-        source: serde_hkx_features::error::Error,
     },
 
     /// Nemesis XML parsing error

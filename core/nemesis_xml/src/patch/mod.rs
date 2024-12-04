@@ -129,7 +129,6 @@ impl<'de> PatchDeserializer<'de> {
 
     fn root_class(&mut self) -> Result<()> {
         let (ptr_index, class_name) = self.parse_next(class_start_tag)?;
-        self.current.path.push("$".into());
 
         let (should_take_in_this, ptr_index) = match ptr_index {
             PointerType::Index(index) => (false, index),
@@ -566,7 +565,7 @@ mod tests {
             actual,
             vec![PatchJson {
                 op: Op::Replace,
-                path: vec!["$", "0010", "hkbProjectData", "stringData"]
+                path: vec!["0010", "hkbProjectData", "stringData"]
                     .into_iter()
                     .map(|s| s.into())
                     .collect(),
@@ -601,16 +600,10 @@ mod tests {
             vec![PatchJson {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
-                path: vec![
-                    "$",
-                    "0009",
-                    "hkbProjectStringData",
-                    "characterFilenames",
-                    "[1]"
-                ]
-                .into_iter()
-                .map(|s| s.into())
-                .collect(),
+                path: vec!["0009", "hkbProjectStringData", "characterFilenames", "[1]"]
+                    .into_iter()
+                    .map(|s| s.into())
+                    .collect(),
                 value: "PushDummy".into(),
             }]
         );
@@ -650,7 +643,6 @@ mod tests {
             vec![PatchJson {
                 op: Op::Remove,
                 path: vec![
-                    "$",
                     "0009",
                     "hkbProjectStringData",
                     "characterFilenames",
@@ -688,7 +680,6 @@ mod tests {
                 op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: [
-                    "$",
                     "0008",
                     "hkRootLevelContainer",
                     "namedVariants",
