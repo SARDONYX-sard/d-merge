@@ -33,7 +33,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
-          prefix-key: cargo-${{ matrix.platform }}
+          prefix-key: cargo-release-${{ matrix.platform }}
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4.1.0

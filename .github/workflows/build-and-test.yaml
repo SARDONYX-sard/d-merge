@@ -9,6 +9,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  BUILD_PROFILE: release-no-lto
+  APP_NAME: d_merge
 
 jobs:
   lint:
@@ -78,7 +80,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
-          prefix-key: cargo-release-${{ matrix.platform }}
+          prefix-key: cargo-${{ env.BUILD_PROFILE }}-${{ matrix.platform }}
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
@@ -117,26 +119,26 @@ jobs:
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          Move-Item -Path ./target/release/d_merge.exe -Destination './build'
+          Move-Item -Path ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }}.exe -Destination './build'
           Move-Item -Path ./resource/assets -Destination './build/assets'
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(MacOS)
         shell: bash
         if: runner.os == 'macOS'
         run: |
-          mv ./target/release/d_merge ./build
+          mv ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(Linux)
         shell: bash
         if: runner.os == 'Linux'
         run: |
-          mv ./target/release/d_merge ./build
+          mv ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.4.3
         with:
-          name: d-merge-${{runner.os}}
+          name: ${{ env.APP_NAME }}-${{runner.os}}
           path: |
             ./build/

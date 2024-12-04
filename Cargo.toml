@@ -53,13 +53,29 @@ nemesis_merge = { path = "./core/nemesis_merge" }
 node_expr = { path = "./core/node_expr" }
 skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 
-
+# NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.
 [profile.release]
 codegen-units = 1
 debug = false
 lto = true
 opt-level = 3
+panic = 'abort'
 strip = true
+
+# Use release mode during development to prevent `serde-hkx` stack overflow
+# - ref: https://doc.rust-lang.org/cargo/reference/profiles.html#release
+[profile.release-no-lto]
+inherits = "dev"
+opt-level = 3
+debug = false
+strip = "none"
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+incremental = false
+codegen-units = 16
+rpath = false
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
