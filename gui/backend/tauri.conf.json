@@ -46,7 +46,7 @@
       "providerShortName": null,
       "signingIdentity": null
     },
-    "resources": ["../../resource"],
+    "resources": { "../../resource/**/*": "resource/" },
     "shortDescription": "",
     "targets": "all",
     "windows": {

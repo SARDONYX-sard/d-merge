@@ -41,7 +41,7 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
         .resource_dir()
         .context(NotFoundResourceDirSnafu)
         .or_else(|err| bail!(err))?
-        .join("assets/templates/"); // Expected `<ResourceDir>/assets/templates/meshes/[..]`
+        .join("resource/assets/templates/"); // Expected `<ResourceDir>/resource/assets/templates/meshes/[..]`
     behavior_gen(
         ids,
         Options {
