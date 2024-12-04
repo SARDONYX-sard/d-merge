@@ -407,7 +407,8 @@ mod tests {
 
     #[test]
     fn should_parse() {
-        let s = include_str!("../../../assets/templates/meshes/animationdatasinglefile.txt");
+        let s =
+            include_str!("../../../resource/assets/templates/meshes/animationdatasinglefile.txt");
         test_parse(s);
     }
 }
