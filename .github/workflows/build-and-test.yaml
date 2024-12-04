@@ -110,7 +110,7 @@ jobs:
         run: npm run build
 
       - name: Make outputs dir
-        run: mkdir -p ./build
+        run: mkdir -p ./build/assets
 
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(Windows)
@@ -118,18 +118,22 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           Move-Item -Path ./target/release/d_merge.exe -Destination './build'
+          Move-Item -Path ./resource/assets -Destination './build/assets'
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(MacOS)
         shell: bash
         if: runner.os == 'macOS'
-        run: mv ./target/release/d_merge ./build
+        run: |
+          mv ./target/release/d_merge ./build
+          mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(Linux)
         shell: bash
         if: runner.os == 'Linux'
-        run: mv ./target/release/d_merge ./build
+        run: |
+          mv ./target/release/d_merge ./build
+          mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
-
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.4.3
         with:
