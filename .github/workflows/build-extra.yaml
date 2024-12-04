@@ -21,7 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          ref: main
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Rust cache
