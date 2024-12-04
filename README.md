@@ -37,8 +37,10 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Deserialization
 - info.txt searcher.
 - Merge
-  - [ ] json patch creator
-  - [x] json merge
+  - [x] Parallel json patch
+  - [ ] Prioritization and conflict resolution among patches, optimization by
+        merging
+  - [ ] Fix range add operation of Array
 
 ## Extra build
 
