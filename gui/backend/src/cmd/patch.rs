@@ -37,10 +37,12 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
     tracing::trace!(?output, ?ids);
 
     let resolver = window.app_handle().path();
+    // meshes/[..]
     let resource_dir = resolver
         .resource_dir()
         .context(NotFoundResourceDirSnafu)
-        .or_else(|err| bail!(err))?;
+        .or_else(|err| bail!(err))?
+        .join("assets/templates/");
     behavior_gen(
         ids,
         Options {
