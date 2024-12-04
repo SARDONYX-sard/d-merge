@@ -1,0 +1,23 @@
+[package]
+name = "skyrim_crc"
+version = "0.1.0"
+description = "D merge core"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+crc = "3.2.1"
+rayon = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

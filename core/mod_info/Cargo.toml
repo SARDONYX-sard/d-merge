@@ -1,0 +1,26 @@
+[package]
+name = "mod_info"
+version = "0.1.0"
+description = "D merge core"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+glob = "0.3.1"
+rayon = { workspace = true }
+serde = { workspace = true } # Implement (De)Serializer
+serde_ini = "0.2.0"
+snafu = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

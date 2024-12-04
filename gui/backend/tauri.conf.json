@@ -1,0 +1,62 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "app": {
+    "security": {
+      "csp": null,
+      "pattern": {
+        "use": "brownfield"
+      }
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 920,
+        "resizable": true,
+        "theme": "Dark",
+        "title": "D Merge",
+        "transparent": true,
+        "visible": false,
+        "width": 825,
+        "windowEffects": {
+          "effects": ["micaDark"]
+        }
+      }
+    ],
+    "withGlobalTauri": true
+  },
+  "build": {
+    "beforeBuildCommand": "npm run build:front",
+    "beforeDevCommand": "npm run dev:front",
+    "devUrl": "http://localhost:3000",
+    "features": [],
+    "frontendDist": "../frontend/out"
+  },
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "SARDONYX-sard",
+    "externalBin": [],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "licenseFile": "../../LICENSE",
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    },
+    "resources": ["../../resource/assets"],
+    "shortDescription": "",
+    "targets": "all",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "identifier": "SARDONYX.d-merge",
+  "plugins": {},
+  "productName": "d_merge",
+  "version": "../../package.json"
+}

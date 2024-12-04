@@ -1,0 +1,4 @@
+[submodule "resource"]
+	path = resource
+	url = git@github.com:SARDONYX-sard/d_merge_resource.git
+	branch = main

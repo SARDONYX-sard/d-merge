@@ -1,0 +1,65 @@
+[package]
+name = "d_merge"
+version.workspace = true
+description = "d-merge GUI"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["skyrim", "gui"]
+license.workspace = true
+readme = "./readme.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[package.metadata.dist]
+dist = false # To run CI and build separately from CLI (cargo dist)
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+chrono = "0.4.38"
+futures = { workspace = true }
+once_cell = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }                           # Implement (De)Serializer
+serde_hkx_features = { workspace = true }
+serde_json = { workspace = true }                      # To avoid generate_context error.
+serde_repr = { workspace = true }                      # Implement (De)Serializer
+snafu = { workspace = true }                           # Implement error types
+tauri = { version = "2.1.1", features = ["devtools"] } # For GUI
+tauri-plugin-dialog = "2.0.3"                          # https://github.com/tauri-apps/plugins-workspace
+tauri-plugin-fs = "2.0.3"
+tauri-plugin-shell = "2.0.2"
+tauri-plugin-window-state = "2.0.2"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# worksapce members
+mod_info = { workspace = true }
+nemesis_merge = { workspace = true }
+node_expr = { workspace = true }
+
+[dev-dependencies]
+temp-dir = "0.1.14"
+pretty_assertions = { workspace = true }
+quick_tracing = { workspace = true }
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
+# If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+
+# Support json, yaml too.
+extra_fmt = ["serde_hkx_features/extra_fmt"]
+
+# Enable hkx conversion log
+tracing = ["serde_hkx_features/tracing"]
+
+[lints]
+workspace = true
