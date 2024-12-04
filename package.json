@@ -7,7 +7,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "rimraf ./gui/frontend/out && tauri build",
+    "build": "rimraf ./gui/frontend/out && tauri build --features extra_fmt",
     "build:extra": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,tracing --no-bundle",
     "build:front": "next build ./gui/frontend",
     "build:icons": "cargo tauri icon ./gui/backend/icons/icon.png",
