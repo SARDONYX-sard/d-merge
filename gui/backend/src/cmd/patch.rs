@@ -37,11 +37,13 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
     tracing::trace!(?output, ?ids);
 
     let resolver = window.app_handle().path();
+    // Expected `<ResourceDir>/assets/templates/meshes/[..]`
+    // - ref https://v2.tauri.app/develop/resources/
     let resource_dir = resolver
         .resource_dir()
         .context(NotFoundResourceDirSnafu)
         .or_else(|err| bail!(err))?
-        .join("resource/assets/templates/"); // Expected `<ResourceDir>/resource/assets/templates/meshes/[..]`
+        .join("resource/assets/templates/");
     behavior_gen(
         ids,
         Options {

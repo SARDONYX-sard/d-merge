@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          submodules: 'recursive'
+          submodules: true
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
@@ -46,6 +46,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
@@ -68,6 +70,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.5
         with:
