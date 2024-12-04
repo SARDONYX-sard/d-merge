@@ -34,15 +34,6 @@ pub enum Error {
 
     /// Tried to put Alary for array index, but that is invalid. (Because 2-dimensional arrays do not exist in the C++ class.)
     WrongMatrix,
-
-    /// Replace operation requires matching array size or a single value.
-    InvalidReplaceSize,
-
-    /// Type mismatch: expected {expected}, found {found}
-    TypeMismatch {
-        expected: &'static str,
-        found: &'static str,
-    },
 }
 
 /// Result type alias for JSON patch operations.

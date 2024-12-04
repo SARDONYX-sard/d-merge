@@ -5,6 +5,9 @@ use std::{io, path::PathBuf};
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
+    /// {msg}
+    Custom { msg: String },
+
     /// Failed to read file from {path}
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
@@ -13,16 +16,18 @@ pub enum Error {
     #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
     FailedParseNemesisPath { path: PathBuf },
 
-    /// Failure to read XML templates converted from patches and hkx. Error count:  {errors_len}
+    /// Failure to read XML templates converted from patches and hkx.(error count: {errors_len})
     FailedToReadTemplateAndPatches { errors_len: usize },
 
-    /// dir strip error
-    #[snafu(transparent)]
-    StripPrefixError { source: std::path::StripPrefixError },
-
-    /// jwalk error
-    #[snafu(transparent)]
-    JwalkErr { source: jwalk::Error },
+    /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
+    ///
+    /// or
+    ///
+    /// - Failure to apply `patch -> XML template`.(error count: {patch_errors_len})
+    FailedToGenerateBehaviors {
+        hkx_errors_len: usize,
+        patch_errors_len: usize,
+    },
 
     /// Json patch error
     #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
@@ -39,6 +44,14 @@ pub enum Error {
         path: PathBuf,
         source: nemesis_xml::error::Error,
     },
+
+    /// dir strip error
+    #[snafu(transparent)]
+    StripPrefixError { source: std::path::StripPrefixError },
+
+    /// jwalk error
+    #[snafu(transparent)]
+    JwalkErr { source: jwalk::Error },
 
     #[snafu(transparent)]
     HkxSerError {

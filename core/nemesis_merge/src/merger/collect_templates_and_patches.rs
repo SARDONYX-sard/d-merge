@@ -1,6 +1,6 @@
 use super::{
     tables::{FIRST_PERSON_BEHAVIORS, THIRD_PERSON_BEHAVIORS},
-    PatchMapOwned, PatchModMap, TemplateMap,
+    BorrowedTemplateMap, ModPatchMap, ModPatchPair, OwnedPatchMap,
 };
 use crate::error::Result;
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     output_path::{parse_input_nemesis_path, NemesisPath},
 };
 use dashmap::DashMap;
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 use serde_hkx_features::ClassMap;
 use simd_json::{serde::to_borrowed_value, BorrowedValue};
 use snafu::ResultExt as _;
@@ -20,38 +20,41 @@ use std::path::{Path, PathBuf};
 pub fn collect_templates_and_patches<'a>(
     nemesis_paths: Vec<PathBuf>,
     options: Options,
-) -> Result<(TemplateMap<'a>, PatchModMap), Vec<Error>> {
+) -> Result<(BorrowedTemplateMap<'a>, ModPatchMap), Vec<Error>> {
     let templates = DashMap::new();
-    let patch_mod_map = DashMap::new();
-    let errors = DashMap::new();
 
-    nemesis_paths.par_iter().for_each(|patch_path| {
-        let mut patch_map_owned = PatchMapOwned::new();
+    let results: Vec<Result<ModPatchPair, Vec<Error>>> = nemesis_paths
+        .par_iter()
+        .map(|patch_path| {
+            let result: Vec<_> = collect_nemesis_paths(patch_path)
+                .par_iter()
+                // # NOTE: Internally mut templates
+                .map(|txt_path| parse_and_process_path(txt_path, &options, &templates))
+                .collect();
 
-        collect_nemesis_paths(patch_path)
-            .into_iter()
-            .for_each(
-                |txt_path| match parse_and_process_path(&txt_path, &options, &templates) {
-                    Ok((template_name_key, patch_txt)) => {
-                        patch_map_owned.insert(template_name_key, patch_txt);
-                    }
-                    Err(err) => {
-                        errors.insert(txt_path.clone(), err);
-                    }
-                },
-            );
+            let (patch_map_owned, errors): (Vec<_>, Vec<_>) =
+                result.into_par_iter().partition_map(|res| match res {
+                    Ok(val) => Either::Left(val),
+                    Err(err) => Either::Right(err),
+                });
+            let patch_map_owned: OwnedPatchMap = patch_map_owned.into_par_iter().collect();
 
-        if let Some(mod_code) = patch_path.file_name() {
-            patch_mod_map.insert(mod_code.to_string_lossy().to_string(), patch_map_owned);
-        }
-    });
+            patch_path.file_name().map_or_else(
+                || Err(errors),
+                |mod_code| Ok((mod_code.to_string_lossy().to_string(), patch_map_owned)),
+            )
+        })
+        .collect();
 
-    // Combine results from DashMap into regular structures
-    let templates: TemplateMap = templates.into_iter().collect();
-    let patch_mod_map: PatchModMap = patch_mod_map.into_iter().collect();
-    let errors: Vec<Error> = errors.into_iter().map(|(_, err)| err).collect();
+    let (successes, errors): (Vec<ModPatchPair>, Vec<Vec<Error>>) =
+        results.into_par_iter().partition_map(|res| match res {
+            Ok((key, patch)) => Either::Left((key, patch)),
+            Err(errs) => Either::Right(errs),
+        });
 
+    let errors: Vec<Error> = errors.into_par_iter().flatten().collect();
     if errors.is_empty() {
+        let patch_mod_map = successes.into_par_iter().collect();
         Ok((templates, patch_mod_map))
     } else {
         Err(errors)
@@ -61,10 +64,10 @@ pub fn collect_templates_and_patches<'a>(
 fn parse_and_process_path(
     txt_path: &Path,
     options: &Options,
-    templates: &TemplateMap,
+    templates: &BorrowedTemplateMap,
 ) -> Result<(String, String), Error> {
     let NemesisPath {
-        relevant_path: _,
+        relevant_path: _relevant_path,
         template_name,
         is_1stperson,
     } = parse_input_nemesis_path(txt_path).ok_or(Error::FailedParseNemesisPath {
@@ -77,30 +80,52 @@ fn parse_and_process_path(
     };
 
     // Process template
-    let (output_path, template_path) = match is_1stperson {
-        true => FIRST_PERSON_BEHAVIORS.get(&template_name),
-        false => THIRD_PERSON_BEHAVIORS.get(&template_name),
-    }
-    .map(|path| {
-        let Options {
-            resource_dir,
-            output_dir,
-        } = options;
-        let mut output_path = output_dir.join(path);
-        output_path.set_extension("hkx");
-        (output_path, resource_dir.join(path))
-    })
-    .ok_or_else(|| Error::FailedParseNemesisPath {
-        path: txt_path.to_path_buf(),
-    })?;
+    if !templates.contains_key(&template_name_key) {
+        let (output_path, template_path) = match is_1stperson {
+            true => FIRST_PERSON_BEHAVIORS.get(&template_name),
+            false => THIRD_PERSON_BEHAVIORS.get(&template_name),
+        }
+        .map(|path| {
+            let Options {
+                resource_dir,
+                output_dir,
+            } = options;
+            let mut output_path = output_dir.join(path);
+            output_path.set_extension("hkx");
+            (output_path, resource_dir.join(path))
+        })
+        .ok_or_else(|| Error::FailedParseNemesisPath {
+            path: txt_path.to_path_buf(),
+        })?;
 
-    let json_value = template_xml_to_value(template_path)?;
-    templates.insert(template_name_key.clone(), (output_path, json_value));
+        let json_value = template_xml_to_value(template_path)?;
+        templates.insert(template_name_key.clone(), (output_path, json_value));
+    }
 
     // Process patch
     let patch_txt = fs::read_to_string(txt_path).context(FailedIoSnafu {
         path: txt_path.to_path_buf(),
     })?;
+
+    #[cfg(feature = "debug")] // Output patch.json for debugging
+    {
+        let mut json_patch_path = options.output_dir.join(_relevant_path);
+        json_patch_path.set_extension("json");
+        let patches_json = nemesis_xml::patch::parse_nemesis_patch(&patch_txt).context(
+            crate::error::NemesisXmlErrSnafu {
+                path: json_patch_path.clone(),
+            },
+        )?;
+        fs::write(
+            &json_patch_path,
+            simd_json::to_string_pretty(&patches_json).context(JsonSnafu {
+                path: json_patch_path.clone(),
+            })?,
+        )
+        .context(FailedIoSnafu {
+            path: json_patch_path.clone(),
+        })?;
+    }
 
     Ok((template_name_key, patch_txt))
 }

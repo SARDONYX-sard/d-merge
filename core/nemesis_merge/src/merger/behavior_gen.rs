@@ -1,9 +1,8 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
 use super::{
-    apply_patches::apply_patches_to_templates,
-    collect_templates_and_patches::collect_templates_and_patches,
-    save_to_hkx::save_templates_to_hkx, Options,
+    apply_patches::apply_patches, collect_templates_and_patches::collect_templates_and_patches,
+    save_to_hkx::generate_hkx_files, Options,
 };
 use crate::error::{Error, FailedIoSnafu, Result};
 use rayon::prelude::*;
@@ -16,7 +15,6 @@ use std::path::{Path, PathBuf};
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Result<()> {
-    let mut errors: Vec<Error> = vec![];
     let error_output = options.output_dir.join("errors.txt");
 
     let (templates, patch_mod_map) = match collect_templates_and_patches(nemesis_paths, options) {
@@ -34,20 +32,25 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
 
         // TODO: Priority joins between patches may allow templates to be processed in a parallel loop.
         // 2. apply patches
-        let results = apply_patches_to_templates(&templates, &patch_mod_map);
-        errors.extend(
-            results
-                .into_par_iter()
-                .filter_map(Result::err)
-                .map(|e| e)
-                .collect::<Vec<Error>>(),
-        );
+        let mut errors: Vec<Error> = apply_patches(&templates, &patch_mod_map)
+            .into_par_iter()
+            .filter_map(Result::err)
+            .map(|e| e)
+            .collect();
+        let apply_errors_len = errors.len();
 
-        if let Err(errs) = save_templates_to_hkx(templates) {
-            errors.extend(errs);
+        // 3. Generate hkx files.
+        if let Err(hkx_errors) = generate_hkx_files(templates) {
+            let errors_len = hkx_errors.len();
+            errors.extend(hkx_errors);
+
+            write_errors(&error_output, errors).await?;
+            return Err(Error::FailedToGenerateBehaviors {
+                hkx_errors_len: errors_len,
+                patch_errors_len: apply_errors_len,
+            });
         };
     };
-    write_errors(&error_output, errors).await?;
 
     Ok(())
 }
@@ -69,7 +72,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "unimplemented yet"]
-    #[quick_tracing::init]
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
     async fn merge_test() {
         #[allow(clippy::iter_on_single_items)]
         let ids = [
@@ -98,7 +101,7 @@ mod tests {
             ids,
             Options {
                 resource_dir: "../../assets/templates".into(),
-                output_dir: "../../dummy/patches_applied/output".into(),
+                output_dir: "../../dummy/behavior_gen/output".into(),
             },
         )
         .await

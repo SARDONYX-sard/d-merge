@@ -27,6 +27,10 @@ tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true, optional = true }
 winnow = { workspace = true }
 
+# To type aliases
+havok_classes = { workspace = true }
+indexmap = { workspace = true }
+
 # workspace members
 json_patch = { workspace = true }
 nemesis_xml = { workspace = true }
@@ -43,7 +47,9 @@ tokio = { workspace = true, features = [
 workspace = true
 
 [features]
-default = ["serde", "tracing"] # for debug
-
+default = ["serde"]
+# Output patch json, json just before hkx
+debug = ["tracing"]
 tracing = ["dep:tracing"]
+
 serde = ["dep:simd-json", "json_patch/serde"]

@@ -1,15 +1,15 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
-use super::{PatchModMap, TemplateMap};
+use super::{BorrowedTemplateMap, ModPatchMap};
 use crate::error::{Error, NemesisXmlErrSnafu, PatchSnafu, Result};
 use json_patch::apply_patch;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::ResultExt;
 
-pub fn apply_patches_to_templates<'a, 'b: 'a>(
-    templates: &TemplateMap<'a>,
-    patch_mod_map: &'b PatchModMap,
+pub fn apply_patches<'a, 'b: 'a>(
+    templates: &BorrowedTemplateMap<'a>,
+    patch_mod_map: &'b ModPatchMap,
 ) -> Vec<Result<(), Error>> {
     patch_mod_map
         .par_iter()

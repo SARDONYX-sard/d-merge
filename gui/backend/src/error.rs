@@ -13,6 +13,9 @@ pub enum Error {
     #[snafu(transparent)]
     FailedIo { source: io::Error },
 
+    /// Not found resource dir
+    NotFoundResourceDir { source: tauri::Error },
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Logger
     /// Not found log dir

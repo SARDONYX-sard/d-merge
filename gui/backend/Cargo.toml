@@ -41,6 +41,7 @@ tracing-subscriber = { workspace = true }
 
 # worksapce members
 mod_info = { workspace = true }
+nemesis_merge = { workspace = true }
 node_expr = { workspace = true }
 
 [dev-dependencies]

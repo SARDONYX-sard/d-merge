@@ -788,6 +788,7 @@ dependencies = [
  "chrono",
  "futures",
  "mod_info",
+ "nemesis_merge",
  "node_expr",
  "once_cell",
  "pretty_assertions",
@@ -1751,7 +1752,7 @@ source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.5.0#e9b26b2f91287
 dependencies = [
  "arrayvec",
  "havok_types",
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
 ]
 
 [[package]]
@@ -1984,12 +1985,13 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
+checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.0",
+ "rayon",
  "serde",
 ]
 
@@ -2425,6 +2427,8 @@ version = "0.1.0"
 dependencies = [
  "dashmap",
  "futures",
+ "havok_classes",
+ "indexmap 2.7.0",
  "json_patch",
  "jwalk",
  "nemesis_xml",
@@ -3129,7 +3133,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42cf17e9a1800f5f396bc67d193dc9411b59012a5876445ef450d449881e1016"
 dependencies = [
  "base64 0.22.1",
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "quick-xml 0.32.0",
  "serde",
  "time",
@@ -3723,7 +3727,7 @@ dependencies = [
  "havok_serde",
  "havok_types",
  "html-escape",
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "snafu",
  "static_assertions",
  "tracing",
@@ -3737,7 +3741,7 @@ source = "git+https://github.com/SARDONYX-sard/serde-hkx?tag=0.5.0#e9b26b2f91287
 dependencies = [
  "encoding_rs_io",
  "havok_classes",
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "jwalk",
  "parse-display",
  "serde_hkx",
@@ -3814,7 +3818,7 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 1.9.3",
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3840,7 +3844,7 @@ version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59e2dd588bf1597a252c3b920e0143eb99b0f76e4e082f4c92ce34fbc9e71ddd"
 dependencies = [
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "itoa 1.0.11",
  "libyml",
  "memchr",
@@ -4785,7 +4789,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -4798,7 +4802,7 @@ version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
- "indexmap 2.6.0",
+ "indexmap 2.7.0",
  "serde",
  "serde_spanned",
  "toml_datetime",

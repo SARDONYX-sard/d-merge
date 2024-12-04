@@ -25,7 +25,9 @@ pub fn apply_range<'a>(json: &mut Value<'a>, patch: PatchJson<'a>) -> Result<()>
     } = patch;
     let range_token = path.pop().ok_or(Error::EmptyPointer)?;
     let range = parse_range(&range_token)?;
-    let target = json.ptr_mut(&path).ok_or(Error::InvalidTarget)?;
+    let target = json.ptr_mut(&path).ok_or_else(|| Error::NotFoundTarget {
+        path: path.join("."),
+    })?;
 
     match target {
         Value::Array(target) => {

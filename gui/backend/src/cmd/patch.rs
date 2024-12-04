@@ -1,8 +1,10 @@
-use std::path::PathBuf;
-
 use super::{bail, sender};
+use crate::error::NotFoundResourceDirSnafu;
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
-use tauri::Window;
+use nemesis_merge::{behavior_gen, Options};
+use snafu::ResultExt as _;
+use std::path::PathBuf;
+use tauri::{Manager, Window};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mod info readers
@@ -31,8 +33,23 @@ struct Payload {
 }
 
 #[tauri::command]
-pub(crate) fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
+pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
     tracing::trace!(?output, ?ids);
+
+    let resolver = window.app_handle().path();
+    let resource_dir = resolver
+        .resource_dir()
+        .context(NotFoundResourceDirSnafu)
+        .or_else(|err| bail!(err))?;
+    behavior_gen(
+        ids,
+        Options {
+            output_dir: PathBuf::from(output),
+            resource_dir,
+        },
+    )
+    .await
+    .or_else(|err| bail!(err))?;
     let _sender = sender::<Payload>(window, "d_merge://progress/patch");
     Ok(())
 }
