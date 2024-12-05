@@ -120,7 +120,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           Move-Item -Path ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }}.exe -Destination './build'
-          Move-Item -Path ./resource/assets -Destination ./build
+          Move-Item -Path -Force ./resource/assets -Destination ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(MacOS)
         shell: bash
