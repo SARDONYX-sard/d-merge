@@ -3664,7 +3664,6 @@ dependencies = [
  "indexmap 2.7.0",
  "snafu",
  "static_assertions",
- "tracing",
  "winnow 0.6.20",
 ]
 
@@ -3684,7 +3683,6 @@ dependencies = [
  "similar",
  "snafu",
  "tokio",
- "tracing",
 ]
 
 [[package]]

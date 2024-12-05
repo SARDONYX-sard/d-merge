@@ -41,7 +41,7 @@ tracing-subscriber = { workspace = true }
 
 # workspace members
 mod_info = { workspace = true }
-nemesis_merge = { workspace = true, features = ["tracing"] }
+nemesis_merge = { workspace = true }
 node_expr = { workspace = true }
 
 [dev-dependencies]
@@ -58,8 +58,8 @@ custom-protocol = ["tauri/custom-protocol"]
 # Support json, yaml too.
 extra_fmt = ["serde_hkx_features/extra_fmt"]
 
-# Enable hkx conversion log
-tracing = ["serde_hkx_features/tracing"]
+# Enable patch log
+tracing = ["nemesis_merge/tracing"]
 
 [lints]
 workspace = true
