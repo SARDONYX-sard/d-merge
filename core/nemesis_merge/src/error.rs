@@ -19,11 +19,7 @@ pub enum Error {
     /// Failure to read XML templates converted from patches and hkx.(error count: {errors_len})
     FailedToReadTemplateAndPatches { errors_len: usize },
 
-    /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
-    ///
-    /// or
-    ///
-    /// - Failure to apply `patch -> XML template`.(error count: {patch_errors_len})
+    /// - Failure to apply `patch -> XML template`.(error count: {patch_errors_len}) / Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
     FailedToGenerateBehaviors {
         hkx_errors_len: usize,
         patch_errors_len: usize,
