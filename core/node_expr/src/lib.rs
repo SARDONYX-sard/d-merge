@@ -55,7 +55,7 @@ pub fn build_dir_tree<const N: usize>(
                 if child_path.is_file() {
                     if let Some(extension) = child_path.extension().and_then(|ext| ext.to_str()) {
                         if !allowed_extensions
-                            .iter()
+                            .par_iter()
                             .any(|&ext| ext.eq_ignore_ascii_case(extension))
                         {
                             return None; // Skip files with disallowed extensions

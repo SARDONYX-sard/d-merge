@@ -35,10 +35,8 @@ impl<'value> PointerMut<'value> for BorrowedValue<'value> {
             .try_fold(self, move |target, token| match target {
                 BorrowedValue::Object(map) => map.get_mut(token.as_ref()),
                 BorrowedValue::Array(list) => {
-                    fn parse_index(index: &str) -> Option<usize> {
-                        index.parse().ok()
-                    }
-                    parse_index(token.as_ref()).and_then(move |x| list.get_mut(x))
+                    let n = token.as_ref().parse::<usize>().ok()?;
+                    list.get_mut(n)
                 }
                 _ => None,
             })
