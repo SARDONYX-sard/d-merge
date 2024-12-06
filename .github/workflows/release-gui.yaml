@@ -49,7 +49,7 @@ jobs:
           key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('gui/frontend/src/**/*.[jt]s', 'gui/frontend/src/**/*.[jt]sx') }}
           restore-keys: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --force
 
       - name: Build the app
         uses: tauri-apps/tauri-action@action-v0.5.15
