@@ -13,8 +13,8 @@ const CONVERT_PUB_CACHE_KEYS_OBJ = {
 } as const;
 
 const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
-  convertSelectedFiles: 'convert-selected-files',
   convertSelectedDirs: 'convert-selected-dirs',
+  convertSelectedFiles: 'convert-selected-files',
   convertOutput: 'convert-output',
 } as const;
 

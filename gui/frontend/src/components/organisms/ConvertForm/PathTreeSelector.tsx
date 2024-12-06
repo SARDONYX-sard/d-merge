@@ -13,14 +13,14 @@ import {
 import { TreeItem2Icon } from '@mui/x-tree-view/TreeItem2Icon';
 import { TreeItem2Provider } from '@mui/x-tree-view/TreeItem2Provider';
 import { type UseTreeItem2Parameters, useTreeItem2 } from '@mui/x-tree-view/useTreeItem2';
-import { type HTMLAttributes, type Ref, type SyntheticEvent, forwardRef, useRef } from 'react';
+import { type HTMLAttributes, memo, type Ref, type SyntheticEvent, useCallback, useRef } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { hashDjb2 } from '@/lib/hash-djb2';
 import { OBJECT } from '@/lib/object-utils';
 
 import { useConvertContext } from './ConvertProvider';
-import { renderStatusIcon } from './PathSelector';
+import { renderStatusIcon } from './renderStatusIcon';
 
 /** Enumerates the selected files in the TreeView. */
 export const getAllLeafItemIds = (selectedItems: string[], items: TreeViewBaseItem[]): TreeViewItemId[] => {
@@ -40,21 +40,18 @@ export const getAllLeafItemIds = (selectedItems: string[], items: TreeViewBaseIt
     registerLeafId(item);
   }
 
-  // items.forEach();
-
   return ids;
 };
 
-function getItemDescendantsIds(item: TreeViewBaseItem) {
+const getItemDescendantsIds = (item: TreeViewBaseItem) => {
   const ids: string[] = [];
   // biome-ignore lint/complexity/noForEach: <explanation>
   item.children?.forEach((child) => {
     ids.push(child.id);
     ids.push(...getItemDescendantsIds(child));
   });
-
   return ids;
-}
+};
 
 /** https://mui.com/x/react-tree-view/rich-tree-view/selection/#controlled-selection */
 const getAllItemItemIds = (items: TreeViewBaseItem[]) => {
@@ -71,7 +68,7 @@ const getAllItemItemIds = (items: TreeViewBaseItem[]) => {
 /**
  * https://mui.com/x/react-tree-view/rich-tree-view/customization/#custom-icons
  */
-export function PathTreeSelector() {
+export const PathTreeSelector = memo(function PathTreeSelector() {
   const { selectedTree, setSelectedTree } = useConvertContext();
   const toggledItemRef = useRef<{ [itemId: string]: boolean }>({});
   const apiRef = useTreeViewApiRef();
@@ -88,13 +85,16 @@ export function PathTreeSelector() {
     },
   ];
 
-  const handleExpandedItemsChange = (_event: SyntheticEvent, itemIds: string[]) => {
-    setExpandedItems(itemIds);
-  };
+  const handleExpandedItemsChange = useCallback(
+    (_event: SyntheticEvent, itemIds: string[]) => {
+      setExpandedItems(itemIds);
+    },
+    [setExpandedItems],
+  );
 
-  const handleExpandClick = () => {
+  const handleExpandClick = useCallback(() => {
     setExpandedItems(expandedItems.length === 0 ? getAllItemItemIds(selectedTree.tree) : []);
-  };
+  }, [expandedItems.length, selectedTree.tree, setExpandedItems]);
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const [selectedFiles, setSelectedFiles] = [
@@ -107,42 +107,43 @@ export function PathTreeSelector() {
     },
   ];
 
-  const handleItemSelectionToggle = (_event: SyntheticEvent, itemId: string, isSelected: boolean) => {
+  const handleItemSelectionToggle = useCallback((_event: SyntheticEvent, itemId: string, isSelected: boolean) => {
     toggledItemRef.current[itemId] = isSelected;
-  };
+  }, []);
 
-  const handleSelectedItemsChange = (_event: SyntheticEvent, newSelectedItems: string[]) => {
-    setSelectedFiles(newSelectedItems);
+  const handleSelectedItemsChange = useCallback(
+    (_event: SyntheticEvent, newSelectedItems: string[]) => {
+      setSelectedFiles(newSelectedItems);
 
-    // Select / unselect the children of the toggled item
-    const itemsToSelect: string[] = [];
-    const itemsToUnSelect: { [itemId: string]: boolean } = {};
+      // Select / unselect the children of the toggled item
+      const itemsToSelect: string[] = [];
+      const itemsToUnSelect: { [itemId: string]: boolean } = {};
 
-    // biome-ignore lint/complexity/noForEach: <explanation>
-    OBJECT.entries(toggledItemRef.current).forEach(([itemId, isSelected]) => {
-      const item = apiRef.current?.getItem(`${itemId}`);
-      if (isSelected) {
-        itemsToSelect.push(...getItemDescendantsIds(item));
-      } else {
-        // biome-ignore lint/complexity/noForEach: <explanation>
-        getItemDescendantsIds(item).forEach((descendantId) => {
-          itemsToUnSelect[descendantId] = true;
-        });
+      for (const [itemId, isSelected] of OBJECT.entries(toggledItemRef.current)) {
+        const item = apiRef.current?.getItem(`${itemId}`);
+        if (isSelected) {
+          itemsToSelect.push(...getItemDescendantsIds(item));
+        } else {
+          for (const descendantId of getItemDescendantsIds(item)) {
+            itemsToUnSelect[descendantId] = true;
+          }
+        }
       }
-    });
 
-    const newSelectedItemsWithChildren = Array.from(
-      new Set([...newSelectedItems, ...itemsToSelect].filter((itemId) => !itemsToUnSelect[itemId])),
-    );
+      const newSelectedItemsWithChildren = Array.from(
+        new Set([...newSelectedItems, ...itemsToSelect].filter((itemId) => !itemsToUnSelect[itemId])),
+      );
 
-    setSelectedFiles(newSelectedItemsWithChildren);
+      setSelectedFiles(newSelectedItemsWithChildren);
 
-    toggledItemRef.current = {};
-  };
+      toggledItemRef.current = {};
+    },
+    [apiRef, setSelectedFiles],
+  );
 
-  const handleSelectClick = () => {
+  const handleSelectClick = useCallback(() => {
     setSelectedFiles(selectedFiles.length === 0 ? getAllItemItemIds(selectedTree.tree) : []);
-  };
+  }, [selectedFiles.length, selectedTree.tree, setSelectedFiles]);
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   return (
@@ -168,17 +169,17 @@ export function PathTreeSelector() {
       />
     </Box>
   );
-}
-
-interface CustomTreeItemProps
-  extends Omit<UseTreeItem2Parameters, 'rootRef'>,
-    Omit<HTMLAttributes<HTMLLIElement>, 'onFocus'> {}
+});
 
 const CustomTreeItemContent = styled(TreeItem2Content)(({ theme }) => ({
   padding: theme.spacing(0.5, 1),
 }));
 
-const CustomTreeItem = forwardRef(function CustomTreeItem(props: CustomTreeItemProps, ref: Ref<HTMLLIElement>) {
+interface CustomTreeItemProps
+  extends Omit<UseTreeItem2Parameters, 'rootRef'>,
+    Omit<HTMLAttributes<HTMLLIElement>, 'onFocus'> {}
+
+const CustomTreeItem = memo(function CustomTreeItem(props: CustomTreeItemProps, ref?: Ref<HTMLLIElement>) {
   const { id, itemId, label, disabled, children, ...other } = props;
 
   const {

@@ -1,5 +1,5 @@
 import { arrayMove } from '@dnd-kit/sortable';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/DraggableDataGrid';
 
@@ -11,10 +11,11 @@ import type { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internal
 import type { ComponentPropsWithRef, FC } from 'react';
 
 type DragEndHandler = Exclude<DndCtxProps['onDragEnd'], undefined>;
+type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'], undefined>;
 
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
-export const ModsGrid: FC<Props> = ({ ...props }) => {
+export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
   const { modInfoList, setModInfoList, activateMods, setActivateMods, loading, setPriorities } = usePatchContext();
   const columns = useColumns();
 
@@ -33,17 +34,26 @@ export const ModsGrid: FC<Props> = ({ ...props }) => {
     [modInfoList, setModInfoList, setPriorities],
   );
 
-  const handleRowSelectionModelChange: DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'] = (RowId) => {
-    const selectedRowId = new Set(RowId);
-    const selectedIds: string[] = [];
-
-    for (const row of modInfoList) {
-      if (selectedRowId.has(row.id)) {
-        selectedIds.push(row.id);
+  const handleRowSelectionModelChange = useCallback<OnRowChange>(
+    (RowId) => {
+      // NOTE: When the value is less than or equal to 0, there is no data and the selection is all cleared during data dir input.
+      // To prevent this, skip judgment is performed.
+      if (modInfoList.length <= 0) {
+        return;
       }
-    }
-    setActivateMods(selectedIds);
-  };
+
+      const selectedRowId = new Set(RowId);
+      const selectedIds: string[] = [];
+
+      for (const row of modInfoList) {
+        if (selectedRowId.has(row.id)) {
+          selectedIds.push(row.id);
+        }
+      }
+      setActivateMods(selectedIds);
+    },
+    [modInfoList, setActivateMods],
+  );
 
   return (
     <DraggableDataGrid
@@ -65,4 +75,4 @@ export const ModsGrid: FC<Props> = ({ ...props }) => {
       {...props}
     />
   );
-};
+});

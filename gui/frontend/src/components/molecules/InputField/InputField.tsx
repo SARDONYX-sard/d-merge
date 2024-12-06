@@ -28,7 +28,7 @@ export function InputField({ label, icon, path, setPath, placeholder, ...props }
           value={path}
           variant='standard'
         />
-        <Button {...props} />
+        <Button {...props} sx={{ height: '50px', width: '125px' }} />
       </Box>
     </Box>
   );

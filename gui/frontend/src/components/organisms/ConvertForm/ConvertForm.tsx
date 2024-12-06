@@ -10,6 +10,7 @@ import { openPath } from '@/services/api/dialog';
 
 import { CONVERT_TREE_INIT_VALUES, useConvertContext } from './ConvertProvider';
 import { PathSelector } from './PathSelector';
+import { PathSelectorButtons } from './PathSelectorButtons';
 
 import type { ComponentPropsWithRef } from 'react';
 
@@ -48,6 +49,8 @@ export const ConvertForm = () => {
       >
         {t('all-clear-btn')}
       </Button>
+
+      <PathSelectorButtons />
 
       {inputFieldsProps.map((inputProps) => {
         return <InputField key={inputProps.label} {...inputProps} />;

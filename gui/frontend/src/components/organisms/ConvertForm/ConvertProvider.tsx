@@ -6,10 +6,9 @@ import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
 import type { OutFormat } from '@/services/api/serde_hkx';
 
 import { outFormatSchema } from './schemas/out_format';
-import { SelectionType, selectionTypeSchema } from './schemas/selection_type';
+import { type SelectionType, selectionTypeSchema } from './schemas/selection_type';
 
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
-
 
 export type ConvertStatusPayload = {
   /**  Djb2 hash algorism */

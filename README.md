@@ -59,3 +59,12 @@ be helped)
   - version: 1.9.3
   - VS Code extension: 2.2.3
 - eslint: ^8
+
+- mui/x-data-grid, when changing from `7.22.2` to `7.23.1`, the `setState` in
+  `handleRowSelectionModelChange` is now
+
+  `Cannot update a component () while rendering a different component ()` and
+  therefore do not use "7.23.1".
+
+- `React19` is a new ver. stabilized on 2024/12/5, so `notistack`,
+  `@monaco-editor/react` warns. In that case, use `npm i --force`.
