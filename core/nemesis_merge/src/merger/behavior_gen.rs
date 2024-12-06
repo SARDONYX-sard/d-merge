@@ -2,15 +2,11 @@
 #![allow(clippy::mem_forget)]
 use super::{
     apply_patches::apply_patches, collect_templates_and_patches::collect_templates_and_patches,
-    save_to_hkx::generate_hkx_files, Options,
+    save_to_hkx::generate_hkx_files, write_errors::write_errors, Options,
 };
-#[cfg(not(feature = "tracing"))]
-use crate::error::FailedIoSnafu;
 use crate::error::{Error, Result};
 use rayon::prelude::*;
-#[cfg(not(feature = "tracing"))]
-use snafu::ResultExt as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
@@ -24,7 +20,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
         Ok((new_templates, new_patch_mod_map)) => (new_templates, new_patch_mod_map),
         Err(errors) => {
             let errors_len = errors.len();
-            write_errors(&error_output, errors).await?;
+            write_errors(&error_output, &errors).await?;
             return Err(Error::FailedToReadTemplateAndPatches { errors_len });
         }
     };
@@ -47,7 +43,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
             let errors_len = hkx_errors.len();
             errors.extend(hkx_errors);
 
-            write_errors(&error_output, errors).await?;
+            write_errors(&error_output, &errors).await?;
             return Err(Error::FailedToGenerateBehaviors {
                 hkx_errors_len: errors_len,
                 patch_errors_len: apply_errors_len,
@@ -55,21 +51,6 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Options) -> Resu
         };
     };
 
-    Ok(())
-}
-
-async fn write_errors(path: impl AsRef<Path>, errors: Vec<Error>) -> Result<()> {
-    let _path = path.as_ref();
-
-    let errors: Vec<String> = errors.into_par_iter().map(|e| e.to_string()).collect();
-    #[cfg(feature = "tracing")]
-    tracing::error!("{}", errors.join("\n\n"));
-    #[cfg(not(feature = "tracing"))]
-    tokio::fs::write(&_path, errors.join("\n\n"))
-        .await
-        .context(FailedIoSnafu {
-            path: _path.to_path_buf(),
-        })?;
     Ok(())
 }
 

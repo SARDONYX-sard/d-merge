@@ -3,6 +3,7 @@ pub mod behavior_gen;
 mod collect_templates_and_patches;
 mod save_to_hkx;
 pub mod tables;
+pub(super) mod write_errors;
 
 use dashmap::DashMap;
 use simd_json::BorrowedValue;
