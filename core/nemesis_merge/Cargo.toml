@@ -30,7 +30,7 @@ havok_classes = { workspace = true }
 indexmap = { workspace = true }
 
 # workspace members
-json_patch = { workspace = true }
+json_patch = { workspace = true, features = ["rayon"] }
 nemesis_xml = { workspace = true }
 
 [dev-dependencies]

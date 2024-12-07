@@ -1,4 +1,6 @@
 use crate::range::Range;
+#[cfg(feature = "rayon")]
+use rayon::iter::ParallelDrainRange;
 use simd_json::borrowed::Value;
 
 /// Remove the `range` portion of `target`.
@@ -11,13 +13,22 @@ pub fn handle_remove(target: &mut Vec<Value<'_>>, range: Range) {
             target.remove(index);
         }
         Range::FromTo(range) => {
+            #[cfg(feature = "rayon")]
+            target.par_drain(range);
+            #[cfg(not(feature = "rayon"))]
             target.drain(range);
         }
-        Range::To(range_to) => {
-            target.drain(range_to);
+        Range::To(range) => {
+            #[cfg(feature = "rayon")]
+            target.par_drain(range);
+            #[cfg(not(feature = "rayon"))]
+            target.drain(range);
         }
-        Range::From(range_from) => {
-            target.drain(range_from);
+        Range::From(range) => {
+            #[cfg(feature = "rayon")]
+            target.par_drain(range);
+            #[cfg(not(feature = "rayon"))]
+            target.drain(range);
         }
         Range::Full => target.clear(),
     }

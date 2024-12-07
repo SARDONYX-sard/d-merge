@@ -1,6 +1,15 @@
+mod array_handler;
+mod other_handler;
+
 use crate::range::Range;
+use array_handler::{
+    process_array_from, process_array_from_to, process_array_index, process_array_to,
+};
+use other_handler::{process_from, process_from_to, process_index, process_to};
+#[cfg(feature = "rayon")]
+use rayon::iter::{ParallelBridge as _, ParallelExtend as _};
 use simd_json::borrowed::{Object, Value};
-use std::{iter::repeat, ops::RangeFrom};
+use std::borrow::Cow;
 
 /// Add `value` to the `range` portion of `target`.
 ///
@@ -8,74 +17,53 @@ use std::{iter::repeat, ops::RangeFrom};
 /// - If `range.start` is out of bounds, then extend by default value.
 pub fn handle_add<'value>(target: &mut Vec<Value<'value>>, range: Range, value: Value<'value>) {
     match value {
-        Value::Array(vec) => target.extend(*vec), // TODO: separate fn & file. And fix array range patterns.
+        Value::Array(vec) => {
+            let vec = *vec;
+            match range {
+                Range::Index(index) => process_array_index(target, vec, index),
+                Range::FromTo(range) => process_array_from_to(target, vec, range),
+                Range::To(range_to) => process_array_to(target, vec, range_to.end),
+                Range::From(range_from) => process_array_from(target, vec, range_from.start),
+                Range::Full => target.extend(vec),
+            }
+        }
         other => match range {
-            Range::Index(index) => {
-                if index >= target.len() {
-                    // Extend with default values if out-of-range
-                    target.extend(repeat(default_value(&other)).take(index - target.len()));
-                }
-                target.insert(index, other);
-            }
-            Range::FromTo(std::ops::Range { start, end }) => {
-                let target_len = target.len();
-
-                if start >= target_len {
-                    target.extend(repeat(default_value(&other)).take(start - target.len()));
-                }
-                if end > target_len {
-                    target.extend(repeat(default_value(&other)).take(end - target.len()));
-                }
-                let (prefix, suffix) = target.split_at_mut(start);
-                let insert_count = end - start;
-
-                let mut new_target = Vec::with_capacity(target_len + insert_count);
-                new_target.extend_from_slice(prefix);
-                new_target.extend(repeat(other).take(insert_count));
-                new_target.extend_from_slice(suffix);
-
-                *target = new_target;
-            }
-            Range::To(range_to) => {
-                if range_to.end > target.len() {
-                    target.extend(repeat(default_value(&other)).take(range_to.end - target.len()));
-                }
-                let mut new_target: Vec<_> = repeat(other).take(range_to.end).collect();
-                new_target.extend(core::mem::take(target));
-                *target = new_target;
-            }
-            Range::From(RangeFrom { start }) => {
-                let target_len = target.len();
-                let insert_count = match start {
-                    start if start == target_len + 1 => {
-                        target.push(other); // There is only one element, and Add after len means push.
-                        return;
-                    }
-                    start if start > target_len => start - target_len,
-                    start if start < target_len => target_len - start,
-                    _ => return,
-                };
-
-                if insert_count > target_len {
-                    target.extend(repeat(default_value(&other)).take(insert_count));
-                }
-                target.splice(start.., repeat(other).take(insert_count));
-            }
+            Range::Index(index) => process_index(target, other, index),
+            Range::FromTo(range) => process_from_to(target, other, range),
+            Range::To(range_to) => process_to(target, other, range_to.end),
+            Range::From(range_from) => process_from(target, other, range_from.start),
             Range::Full => target.push(other),
         },
     }
 }
 
-fn default_value<'a>(value: &Value<'_>) -> Value<'a> {
-    use simd_json::{StaticNode, ValueBuilder as _};
+/// Extend a collection with the contents of an iterator.
+///
+/// # Reason for this function's existence
+/// Add more layers of functions to use `#[feature]` branch processing.
+#[inline]
+pub(super) fn extend<T, I>(target: &mut Vec<T>, iter: I)
+where
+    I: Iterator<Item = T> + Send,
+    T: Send,
+{
+    #[cfg(not(feature = "rayon"))]
+    target.extend(iter);
+
+    #[cfg(feature = "rayon")]
+    target.par_extend(iter.par_bridge());
+}
+
+pub(super) fn default_value<'a>(value: &Value<'_>) -> Value<'a> {
+    use simd_json::StaticNode;
 
     match value {
         Value::Static(StaticNode::I64(_)) => Value::Static(StaticNode::I64(0)),
         Value::Static(StaticNode::Bool(_)) => Value::Static(StaticNode::Bool(false)),
         Value::Static(StaticNode::U64(_)) => Value::Static(StaticNode::U64(0)),
         Value::Static(StaticNode::F64(_)) => Value::Static(StaticNode::F64(0.0)),
-        Value::Static(StaticNode::Null) => Value::null(),
-        Value::String(_) => Value::from(""),
+        Value::Static(StaticNode::Null) => Value::Static(StaticNode::Null),
+        Value::String(_) => Value::String(Cow::Borrowed("")),
         Value::Array(_) => Value::Array(Box::new(Vec::new())),
         Value::Object(_) => Value::Object(Box::new(Object::new())),
     }
@@ -135,7 +123,7 @@ mod tests {
         );
 
         let expected = json_typed!(borrowed, {
-            "array_key": [1, 2, 99, 99, 99]
+            "array_key": [1, 2, 99, 99, 99, 3, 4, 5]
         });
         assert_eq!(target, expected);
     }
@@ -207,7 +195,7 @@ mod tests {
         );
 
         let expected = json_typed!(borrowed, {
-            "array_key": [1, 2, 3, 99]
+            "array_key": [1, 2, 3, 0, 99]
         });
         assert_eq!(target, expected);
     }
