@@ -54,7 +54,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             0
         };
 
-        if errors.is_empty() {
+        if !errors.is_empty() {
             write_errors(&error_output, &errors).await?;
             return Err(Error::FailedToGenerateBehaviors {
                 hkx_errors_len: errors_len,
