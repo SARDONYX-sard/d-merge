@@ -109,7 +109,7 @@ mod tests {
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
-            "array_key": [1, 1, 1]
+            "array_key": [1, 1, 1, 2, 3, 4]
         });
         assert_eq!(target, expected);
     }
