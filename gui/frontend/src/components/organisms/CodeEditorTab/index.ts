@@ -1,1 +1,1 @@
-export { CodeEditorTab } from './CodeEditor';
+export { CodeEditorTab } from './CodeEditorTab';
