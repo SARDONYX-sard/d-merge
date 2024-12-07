@@ -189,7 +189,7 @@ where
                 Path::new(output_dir).join(file_name)
             },
             |root| {
-                let relative_path = input_path.strip_prefix(root).unwrap();
+                let relative_path = input_path.strip_prefix(root).unwrap_or(input_path);
                 Path::new(output_dir).join(relative_path)
             },
         )
