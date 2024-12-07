@@ -17,6 +17,7 @@ use crate::{
     helpers::tag::PointerType,
 };
 use json_patch::{JsonPatch, Op};
+use rayon::prelude::*;
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
@@ -535,9 +536,12 @@ impl<'de> PatchDeserializer<'de> {
 
     fn add_patch_json(&mut self) {
         let (op, patches) = self.current.take_patches();
-        for CurrentPatchJson { path, value } in patches {
-            self.output_patches.push(JsonPatch { op, path, value });
-        }
+
+        self.output_patches.par_extend(
+            patches
+                .into_par_iter()
+                .map(|CurrentPatchJson { path, value }| JsonPatch { op, path, value }),
+        );
     }
 }
 

@@ -34,6 +34,7 @@ pub fn handle_replace<'value>(target: &mut Vec<Value<'value>>, range: Range, val
                     *value = other;
                 }
             }
+            // NOTE: We could not use `rayon::iter::repeat` because `Splice` needs `IntoIterator`.
             Range::FromTo(range) => {
                 target.splice(range.clone(), repeat(other).take(range.count()));
             }
@@ -44,7 +45,13 @@ pub fn handle_replace<'value>(target: &mut Vec<Value<'value>>, range: Range, val
                 let replace_count = target.len() - range_from.start;
                 target.splice(range_from, repeat(other).take(replace_count));
             }
-            Range::Full => *target = repeat(other).take(target.len()).collect(),
+            Range::Full => {
+                #[cfg(feature = "rayon")]
+                use rayon::{iter::repeat, prelude::*};
+                #[cfg(not(feature = "rayon"))]
+                use std::iter::repeat;
+                *target = repeat(other).take(target.len()).collect();
+            }
         },
     }
 }
