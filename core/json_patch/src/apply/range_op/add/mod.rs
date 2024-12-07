@@ -6,8 +6,6 @@ use array_handler::{
     process_array_from, process_array_from_to, process_array_index, process_array_to,
 };
 use other_handler::{process_from, process_from_to, process_index, process_to};
-#[cfg(feature = "rayon")]
-use rayon::iter::{ParallelBridge as _, ParallelExtend as _};
 use simd_json::borrowed::{Object, Value};
 use std::borrow::Cow;
 
@@ -35,23 +33,6 @@ pub fn handle_add<'value>(target: &mut Vec<Value<'value>>, range: Range, value: 
             Range::Full => target.push(other),
         },
     }
-}
-
-/// Extend a collection with the contents of an iterator.
-///
-/// # Reason for this function's existence
-/// Add more layers of functions to use `#[feature]` branch processing.
-#[inline]
-pub(super) fn extend<T, I>(target: &mut Vec<T>, iter: I)
-where
-    I: Iterator<Item = T> + Send,
-    T: Send,
-{
-    #[cfg(not(feature = "rayon"))]
-    target.extend(iter);
-
-    #[cfg(feature = "rayon")]
-    target.par_extend(iter.par_bridge());
 }
 
 pub(super) fn default_value<'a>(value: &Value<'_>) -> Value<'a> {

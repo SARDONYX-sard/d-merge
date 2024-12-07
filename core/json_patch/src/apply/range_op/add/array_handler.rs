@@ -1,5 +1,9 @@
-use super::{default_value, extend};
+use super::default_value;
+use crate::vec_utils::extend;
+#[cfg(feature = "rayon")]
+use rayon::iter::repeat;
 use simd_json::borrowed::Value;
+#[cfg(not(feature = "rayon"))]
 use std::iter::repeat;
 
 pub(super) fn process_array_index<'value>(
@@ -21,7 +25,7 @@ pub(super) fn process_array_from_to<'value>(
 ) {
     // Push pattern.
     if range.start == target.len() + 1 {
-        extend(target, values.into_iter());
+        extend(target, values);
         return;
     }
 
@@ -33,7 +37,7 @@ pub(super) fn process_array_from_to<'value>(
 
     let mut new_target = Vec::with_capacity(target_len + insert_count);
     new_target.extend_from_slice(prefix);
-    extend(&mut new_target, values.into_iter());
+    extend(&mut new_target, values);
     new_target.extend_from_slice(suffix);
     *target = new_target;
 }
@@ -69,7 +73,7 @@ pub(super) fn process_array_from<'value>(
         // Then Grow until start size & Push.
         let pad = repeat(default_value(&values[0])).take(start - target_len);
         extend(target, pad);
-        extend(target, values.into_iter());
+        extend(target, values);
         return;
     }
 

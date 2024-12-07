@@ -8,6 +8,7 @@ use super::{
     write_errors::write_errors,
 };
 use crate::error::{Error, Result};
+use rayon::prelude::*;
 use std::path::PathBuf;
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
@@ -48,7 +49,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         options.report_status(Status::GenerateHkxFiles);
         let errors_len = if let Err(hkx_errors) = generate_hkx_files(templates) {
             let errors_len = hkx_errors.len();
-            errors.extend(hkx_errors);
+            errors.par_extend(hkx_errors);
             errors_len
         } else {
             0

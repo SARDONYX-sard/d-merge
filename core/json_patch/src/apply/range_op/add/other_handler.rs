@@ -1,5 +1,9 @@
-use super::{default_value, extend};
+use super::default_value;
+use crate::vec_utils::extend;
+#[cfg(feature = "rayon")]
+use rayon::iter::repeat;
 use simd_json::borrowed::Value;
+#[cfg(not(feature = "rayon"))]
 use std::iter::repeat;
 
 pub(super) fn process_index<'value>(
