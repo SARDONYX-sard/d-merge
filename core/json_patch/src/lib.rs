@@ -1,7 +1,8 @@
-pub mod merge;
+mod apply;
 mod operation;
 pub mod ptr_mut;
+pub(crate) mod range;
 
-pub use self::merge::error::{Error, Result};
-pub use self::merge::{apply_patch, PatchJson};
+pub use self::apply::error::{JsonPatchError, Result};
+pub use self::apply::{apply_patch, JsonPatch};
 pub use self::operation::Op;

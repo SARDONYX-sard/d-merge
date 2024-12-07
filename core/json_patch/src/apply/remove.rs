@@ -1,5 +1,5 @@
-use super::PatchJson;
-use crate::merge::error::{Error, Result};
+use super::JsonPatch;
+use crate::apply::error::{JsonPatchError, Result};
 use simd_json::borrowed::Value;
 use std::borrow::Cow;
 
@@ -8,8 +8,8 @@ use std::borrow::Cow;
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
-pub(crate) fn apply_remove<'a>(json: &mut Value<'a>, patch: PatchJson<'a>) -> Result<()> {
-    remove(json, &patch.path).ok_or_else(|| Error::NotFoundTarget {
+pub(crate) fn apply_remove<'a>(json: &mut Value<'a>, patch: JsonPatch<'a>) -> Result<()> {
+    remove(json, &patch.path).ok_or_else(|| JsonPatchError::NotFoundTarget {
         path: patch.path.join("."),
     })?;
     Ok(())
@@ -65,7 +65,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::Op;
+    use crate::apply::Op;
     use simd_json::{json_typed, StaticNode};
     use std::borrow::Cow;
 
@@ -79,7 +79,7 @@ mod tests {
             }
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("key2")],
             value: Value::Static(StaticNode::Null),
@@ -102,7 +102,7 @@ mod tests {
             "data": [1, 2, 3]
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("data")],
             value: Value::Static(StaticNode::Null),
@@ -123,7 +123,7 @@ mod tests {
             }
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("settings")],
             value: Value::Static(StaticNode::Null),
@@ -142,7 +142,7 @@ mod tests {
             "key2": "value"
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("key1")],
             value: Value::Static(StaticNode::Null),
@@ -165,7 +165,7 @@ mod tests {
             }
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("key3")],
             value: Value::Static(StaticNode::Null),
@@ -173,7 +173,7 @@ mod tests {
 
         let result = apply_remove(&mut target_json, patch);
 
-        let expected = Err(Error::NotFoundTarget {
+        let expected = Err(JsonPatchError::NotFoundTarget {
             path: "items.key3".to_string(),
         });
         assert_eq!(result, expected);
@@ -185,7 +185,7 @@ mod tests {
             "data": []
         });
 
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("missing")],
             value: Value::Static(StaticNode::Null),
@@ -195,7 +195,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Err(Error::NotFoundTarget {
+            Err(JsonPatchError::NotFoundTarget {
                 path: "missing".to_string()
             })
         );

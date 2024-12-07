@@ -1,5 +1,5 @@
+use super::error::RangeError;
 use super::Range;
-use crate::merge::error::Error;
 use std::borrow::Cow;
 use winnow::{
     ascii::digit1,
@@ -15,12 +15,12 @@ use winnow::{
 /// # Errors
 /// Returns `PatchError::InvalidOperation` if the segment does not conform to the
 /// expected format or contains invalid numeric values.
-pub(crate) fn parse_range(mut segment: &str) -> Result<Range, Error> {
+pub(crate) fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
     let input = &mut segment;
 
     _parse_range
         .parse_next(input)
-        .map_err(|_| Error::InvalidRange {
+        .map_err(|_| RangeError::InvalidRange {
             range: segment.to_string(),
         })
 }

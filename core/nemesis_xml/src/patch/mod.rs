@@ -16,7 +16,7 @@ use crate::{
     error::{Error, Result},
     helpers::tag::PointerType,
 };
-use json_patch::{Op, PatchJson};
+use json_patch::{JsonPatch, Op};
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
@@ -32,7 +32,7 @@ use winnow::{
 
 /// # Errors
 /// Parse failed.
-pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<Vec<PatchJson<'_>>> {
+pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<Vec<JsonPatch<'_>>> {
     let mut patcher_info = PatchDeserializer::new(nemesis_xml);
     patcher_info
         .root_class()
@@ -49,7 +49,7 @@ struct PatchDeserializer<'a> {
     original: &'a str,
 
     /// Output
-    output_patches: Vec<PatchJson<'a>>,
+    output_patches: Vec<JsonPatch<'a>>,
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // current state
@@ -154,7 +154,7 @@ impl<'de> PatchDeserializer<'de> {
         self.pop_current_field_table();
 
         if should_take_in_this {
-            self.output_patches.push(PatchJson {
+            self.output_patches.push(JsonPatch {
                 op: Op::Add,
                 path: mem::take(&mut self.current.path),
                 value: BorrowedValue::Object(Box::new(obj)),
@@ -517,7 +517,7 @@ impl<'de> PatchDeserializer<'de> {
                             self.current.path.pop();
                             let mut path = self.current.path.clone();
                             path.push(format!("[{}:{}]", range.start - 1, range.end).into());
-                            self.output_patches.push(PatchJson {
+                            self.output_patches.push(JsonPatch {
                                 op,
                                 path,
                                 value: BorrowedValue::Static(StaticNode::Null),
@@ -536,7 +536,7 @@ impl<'de> PatchDeserializer<'de> {
     fn add_patch_json(&mut self) {
         let (op, patches) = self.current.take_patches();
         for CurrentPatchJson { path, value } in patches {
-            self.output_patches.push(PatchJson { op, path, value });
+            self.output_patches.push(JsonPatch { op, path, value });
         }
     }
 }
@@ -562,7 +562,7 @@ mod tests {
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
-            vec![PatchJson {
+            vec![JsonPatch {
                 op: Op::Replace,
                 path: vec!["0010", "hkbProjectData", "stringData"]
                     .into_iter()
@@ -596,7 +596,7 @@ mod tests {
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
-            vec![PatchJson {
+            vec![JsonPatch {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: vec!["0009", "hkbProjectStringData", "characterFilenames", "[1]"]
@@ -639,7 +639,7 @@ mod tests {
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
-            vec![PatchJson {
+            vec![JsonPatch {
                 op: Op::Remove,
                 path: vec![
                     "0009",
@@ -675,7 +675,7 @@ mod tests {
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             actual,
-            vec![PatchJson {
+            vec![JsonPatch {
                 op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: [

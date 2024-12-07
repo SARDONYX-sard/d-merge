@@ -1,4 +1,4 @@
-use crate::merge::range::Range;
+use crate::range::Range;
 use simd_json::borrowed::Value;
 use std::iter::repeat;
 
@@ -52,7 +52,6 @@ pub fn handle_replace<'value>(target: &mut Vec<Value<'value>>, range: Range, val
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::range::Range;
     use simd_json::{base::ValueTryAsArrayMut as _, json_typed};
 
     #[test]

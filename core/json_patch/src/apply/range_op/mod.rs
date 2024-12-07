@@ -5,11 +5,11 @@ mod replace;
 use self::add::handle_add;
 use self::remove::handle_remove;
 use self::replace::handle_replace;
-use super::parse::parse_range;
-use crate::merge::error::{Error, Result};
-use crate::merge::PatchJson;
+use super::error::{JsonPatchError, Result};
+use super::JsonPatch;
 use crate::operation::Op;
 use crate::ptr_mut::PointerMut as _;
+use crate::range::parse::parse_range;
 use simd_json::borrowed::Value;
 
 /// Apply json patch for range statements(`[index]`,`[start..end]`, `[start..]`, `[end..]`, `[..]`)
@@ -17,17 +17,19 @@ use simd_json::borrowed::Value;
 /// # Errors
 /// - If `range` is out of bounds.
 /// - If `target` is not [`Value::Array`]
-pub fn apply_range<'a>(json: &mut Value<'a>, patch: PatchJson<'a>) -> Result<()> {
-    let PatchJson {
+pub fn apply_range<'a>(json: &mut Value<'a>, patch: JsonPatch<'a>) -> Result<()> {
+    let JsonPatch {
         op,
         mut path,
         value,
     } = patch;
-    let range_token = path.pop().ok_or(Error::EmptyPointer)?;
+    let range_token = path.pop().ok_or(JsonPatchError::EmptyPointer)?;
     let range = parse_range(&range_token)?;
-    let target = json.ptr_mut(&path).ok_or_else(|| Error::NotFoundTarget {
-        path: path.join("."),
-    })?;
+    let target = json
+        .ptr_mut(&path)
+        .ok_or_else(|| JsonPatchError::NotFoundTarget {
+            path: path.join("."),
+        })?;
 
     match target {
         Value::Array(target) => {
@@ -44,14 +46,14 @@ pub fn apply_range<'a>(json: &mut Value<'a>, patch: PatchJson<'a>) -> Result<()>
             };
             Ok(())
         }
-        _ => Err(Error::UnsupportedRangeKind),
+        _ => Err(JsonPatchError::UnsupportedRangeKind),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::Op;
+    use crate::apply::Op;
     use simd_json::{json_typed, ValueBuilder as _};
     use std::borrow::Cow;
 
@@ -60,7 +62,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [1, 2, 3]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: json_typed!(borrowed, [4, 5]),
@@ -79,7 +81,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": ["a", "b", "c"]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1]")],
             value: json_typed!(borrowed, "x"),
@@ -98,7 +100,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [2, 3, 4]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[0:]")],
             value: json_typed!(borrowed, 1),
@@ -117,7 +119,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": ["x", "y", "z"]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1]")],
             value: Value::null(),
@@ -136,7 +138,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [10, 20, 30, 40, 50]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1:4]")],
             value: Value::null(),
@@ -155,7 +157,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [1, 2, 3, 4, 5]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:3]")],
             value: Value::null(),
@@ -174,7 +176,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [1, 2, 3, 4, 5]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[3:]")],
             value: Value::null(),
@@ -193,7 +195,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": ["a", "b", "c", "d"]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1:3]")],
             value: json_typed!(borrowed, ["x", "y"]),
@@ -212,7 +214,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [1, 2, 3]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: json_typed!(borrowed, [4, 5, 6]),
@@ -231,7 +233,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "array_key": [1, 2, 3, 4]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: Value::null(),

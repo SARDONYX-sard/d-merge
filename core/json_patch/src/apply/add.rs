@@ -1,5 +1,5 @@
-use super::PatchJson;
-use crate::merge::error::{Error, Result};
+use super::JsonPatch;
+use crate::apply::error::{JsonPatchError, Result};
 use simd_json::borrowed::Value;
 use simd_json::derived::ValueTryAsScalar as _;
 use simd_json::StaticNode;
@@ -12,11 +12,11 @@ use simd_json::StaticNode;
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead.
-pub fn apply_add<'value>(json: &mut Value<'value>, patch: PatchJson<'value>) -> Result<()> {
-    let PatchJson { path, value, .. } = patch;
+pub fn apply_add<'value>(json: &mut Value<'value>, patch: JsonPatch<'value>) -> Result<()> {
+    let JsonPatch { path, value, .. } = patch;
 
     if path.is_empty() {
-        return Err(Error::EmptyPointer);
+        return Err(JsonPatchError::EmptyPointer);
     }
     let last_index = path.len() - 1;
 
@@ -46,7 +46,7 @@ pub fn apply_add<'value>(json: &mut Value<'value>, patch: PatchJson<'value>) -> 
                         target = &mut list[index];
                     }
                 } else {
-                    return Err(Error::InvalidIndex {
+                    return Err(JsonPatchError::InvalidIndex {
                         index: token.to_string(),
                     });
                 }
@@ -58,10 +58,10 @@ pub fn apply_add<'value>(json: &mut Value<'value>, patch: PatchJson<'value>) -> 
                             *s = s2;
                             return Ok(());
                         }
-                        _ => return Err(Error::InvalidString),
+                        _ => return Err(JsonPatchError::InvalidString),
                     }
                 } else {
-                    return Err(Error::InvalidString); // Can't go deeper in a String
+                    return Err(JsonPatchError::InvalidString); // Can't go deeper in a String
                 }
             }
             Value::Static(ref mut static_node) => {
@@ -77,7 +77,7 @@ pub fn apply_add<'value>(json: &mut Value<'value>, patch: PatchJson<'value>) -> 
                         Ok(())
                     };
                 } else {
-                    return Err(Error::InvalidTarget); // Can't go deeper in a static node
+                    return Err(JsonPatchError::InvalidTarget); // Can't go deeper in a static node
                 }
             }
         }
@@ -89,7 +89,7 @@ pub fn apply_add<'value>(json: &mut Value<'value>, patch: PatchJson<'value>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::Op;
+    use crate::apply::Op;
     use simd_json::{json_typed, value::StaticNode};
     use std::borrow::Cow;
 
@@ -99,7 +99,7 @@ mod tests {
             "name": "John",
             "age": 30
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("address")],
             value: Value::String(Cow::Borrowed("123 Main St")),
@@ -118,7 +118,7 @@ mod tests {
                 "age": 30
             }
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("user"), Cow::Borrowed("address")],
             value: Value::String(Cow::Borrowed("123 Main St")),
@@ -134,7 +134,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "items": [1, 2, 3]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("3")],
             value: Value::Static(StaticNode::U64(4)),
@@ -151,7 +151,7 @@ mod tests {
                 "items": [1, 2, 3]
             }
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: vec![
                 Cow::Borrowed("data"),
@@ -170,7 +170,7 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "existing_key": "existing_value"
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Add,
             path: ["new_key".into()].to_vec(),
             value: "new_value".into(),

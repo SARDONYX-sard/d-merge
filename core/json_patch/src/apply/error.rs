@@ -2,7 +2,7 @@ use simd_json::TryTypeError;
 
 /// Json patch error
 #[derive(snafu::Snafu, Debug, Clone, PartialEq, Eq)]
-pub enum Error {
+pub enum JsonPatchError {
     /// The specified path does not exist: {path}
     NotFoundTarget { path: String },
 
@@ -26,15 +26,12 @@ pub enum Error {
 
     #[snafu(transparent)]
     OutOfRange {
-        source: crate::merge::range::error::RangeError,
+        source: crate::range::error::RangeError,
     },
-
-    /// Invalid range format: {range}
-    InvalidRange { range: String },
 
     /// Tried to put Alary for array index, but that is invalid. (Because 2-dimensional arrays do not exist in the C++ class.)
     WrongMatrix,
 }
 
 /// Result type alias for JSON patch operations.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+pub type Result<T, E = JsonPatchError> = core::result::Result<T, E>;

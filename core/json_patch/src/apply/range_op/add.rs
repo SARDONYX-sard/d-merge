@@ -1,4 +1,4 @@
-use crate::merge::range::Range;
+use crate::range::Range;
 use simd_json::borrowed::{Object, Value};
 use std::{iter::repeat, ops::RangeFrom};
 

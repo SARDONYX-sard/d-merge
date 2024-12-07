@@ -1,4 +1,4 @@
-use crate::merge::range::Range;
+use crate::range::Range;
 use simd_json::borrowed::Value;
 
 /// Remove the `range` portion of `target`.

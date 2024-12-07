@@ -18,4 +18,7 @@ pub enum RangeError {
         end: usize,
         len: usize,
     },
+
+    /// Invalid range format: {range}
+    InvalidRange { range: String },
 }

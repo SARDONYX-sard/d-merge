@@ -1,3 +1,4 @@
+use crate::range::{parse::parse_range, Range};
 use simd_json::BorrowedValue;
 
 /// A trait that provides a mutable reference to a `BorrowedValue`
@@ -10,22 +11,18 @@ use simd_json::BorrowedValue;
 /// - `pointer_mut`: Takes a slice of `Cow<'v, str>` representing a path,
 ///   and attempts to traverse through the structure, returning a mutable
 ///   reference to the target value if found.
-pub trait PointerMut<'value> {
-    /// Given a path represented by `pointer`, attempts to navigate
-    /// through a `BorrowedValue` structure and return a mutable reference
-    /// to the target value.
+pub trait PointerMut {
+    /// Get the `&mut Self` corresponding to the specified json path.
     ///
-    /// # Returns
-    /// - `Some(&mut BorrowedValue)` if the path is found and points to a valid
-    ///   mutable value.
-    /// - `None` if the path is not valid or the value at the path cannot be mutated.
-    fn ptr_mut<I>(&mut self, ptr: I) -> Option<&mut BorrowedValue<'value>>
+    /// # Note
+    /// The range specification can be used only for Index (e.g. `[1]`).
+    fn ptr_mut<I>(&mut self, ptr: I) -> Option<&mut Self>
     where
         I: IntoIterator,
         I::Item: AsRef<str>;
 }
 
-impl<'value> PointerMut<'value> for BorrowedValue<'value> {
+impl PointerMut for BorrowedValue<'_> {
     fn ptr_mut<I>(&mut self, ptr: I) -> Option<&mut Self>
     where
         I: IntoIterator,
@@ -33,10 +30,14 @@ impl<'value> PointerMut<'value> for BorrowedValue<'value> {
     {
         ptr.into_iter()
             .try_fold(self, move |target, token| match target {
-                BorrowedValue::Object(map) => map.get_mut(token.as_ref()),
-                BorrowedValue::Array(list) => {
-                    let n = token.as_ref().parse::<usize>().ok()?;
-                    list.get_mut(n)
+                Self::Object(map) => map.get_mut(token.as_ref()),
+                Self::Array(list) => {
+                    let token = token.as_ref();
+                    let range = parse_range(token).ok()?;
+                    match range {
+                        Range::Index(index) => list.get_mut(index),
+                        _ => None,
+                    }
                 }
                 _ => None,
             })
@@ -82,7 +83,7 @@ mod tests {
         let mut value = json_typed!(borrowed, {
             "array_key": ["first", "second"]
         });
-        let pointer: &[Cow<str>] = &["array_key".into(), "1".into()];
+        let pointer: &[Cow<str>] = &["array_key".into(), "[1]".into()];
 
         if let Some(val) = value.ptr_mut(pointer) {
             if let BorrowedValue::String(ref mut s) = val {
@@ -107,7 +108,7 @@ mod tests {
                 "array_key": ["item_0", "item_1"]
             }
         });
-        let pointer: &[Cow<str>] = &["object_key".into(), "array_key".into(), "1".into()];
+        let pointer: &[Cow<str>] = &["object_key".into(), "array_key".into(), "[1]".into()];
 
         if let Some(val) = value.ptr_mut(pointer) {
             if let BorrowedValue::String(ref mut s) = val {
@@ -132,7 +133,6 @@ mod tests {
             "existing_key": "value"
         });
         let pointer: &[Cow<str>] = &["non_existent_key".into()];
-        dbg!(&pointer);
         assert!(value.ptr_mut(pointer).is_none());
     }
 
@@ -142,7 +142,7 @@ mod tests {
         let mut value = json_typed!(borrowed, {
             "array_key": ["first", "second"]
         });
-        let pointer: &[Cow<str>] = &["array_key".into(), "2".into()];
+        let pointer: &[Cow<str>] = &["array_key".into(), "[2]".into()];
 
         assert!(value.ptr_mut(pointer).is_none());
     }
@@ -152,7 +152,7 @@ mod tests {
         let mut value = json_typed!(borrowed, {
             "array_key": ["item_0", "item_1"]
         });
-        let pointer: &[Cow<str>] = &["array_key".into(), "1".into()];
+        let pointer: &[Cow<str>] = &["array_key".into(), "[1]".into()];
 
         let val = value
             .ptr_mut(pointer)

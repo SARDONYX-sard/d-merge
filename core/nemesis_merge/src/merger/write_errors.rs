@@ -9,7 +9,16 @@ use std::path::Path;
 pub async fn write_errors(path: impl AsRef<Path>, errors: &[Error]) -> Result<()> {
     let _path = path.as_ref();
 
-    let errors: Vec<String> = errors.into_par_iter().map(|e| e.to_string()).collect();
+    let err_len = errors.len();
+    let errors: Vec<String> = errors
+        .into_par_iter()
+        .enumerate()
+        .map(|(index, err)| {
+            let index = index + 1;
+            format!("[Error {index}/{err_len}] {err}")
+        })
+        .collect();
+
     #[cfg(feature = "tracing")]
     tracing::error!("{}", errors.join("\n\n"));
     #[cfg(not(feature = "tracing"))]

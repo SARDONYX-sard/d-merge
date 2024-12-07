@@ -1,5 +1,5 @@
-use super::PatchJson;
-use crate::merge::error::{Error, Result};
+use super::JsonPatch;
+use crate::apply::error::{JsonPatchError, Result};
 use crate::ptr_mut::PointerMut as _;
 use simd_json::BorrowedValue;
 
@@ -8,12 +8,12 @@ use simd_json::BorrowedValue;
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
-pub(crate) fn apply_replace<'a>(json: &mut BorrowedValue<'a>, patch: PatchJson<'a>) -> Result<()> {
+pub(crate) fn apply_replace<'a>(json: &mut BorrowedValue<'a>, patch: JsonPatch<'a>) -> Result<()> {
     if let Some(target) = json.ptr_mut(&patch.path) {
         *target = patch.value;
         Ok(())
     } else {
-        Err(Error::NotFoundTarget {
+        Err(JsonPatchError::NotFoundTarget {
             path: patch.path.join("."),
         })
     }
@@ -22,7 +22,7 @@ pub(crate) fn apply_replace<'a>(json: &mut BorrowedValue<'a>, patch: PatchJson<'
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::Op;
+    use crate::apply::Op;
     use simd_json::json_typed;
     use std::borrow::Cow;
 
@@ -34,7 +34,7 @@ mod tests {
                 "age": 30
             }
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data"), Cow::Borrowed("name")],
             value: json_typed!(borrowed, "Jane"),
@@ -56,9 +56,9 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "items": [1, 2, 3]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
-            path: vec![Cow::Borrowed("items"), Cow::Borrowed("1")],
+            path: vec![Cow::Borrowed("items"), Cow::Borrowed("[1]")],
             value: json_typed!(borrowed, 99),
         };
 
@@ -76,7 +76,7 @@ mod tests {
             "key1": "value1",
             "key2": "value2"
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("key1")],
             value: json_typed!(borrowed, "new_value1"),
@@ -96,7 +96,7 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": [10, 20, 30]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data"), Cow::Borrowed("5")],
             value: json_typed!(borrowed, 99),
@@ -106,7 +106,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Err(Error::NotFoundTarget {
+            Err(JsonPatchError::NotFoundTarget {
                 path: "data.5".to_string()
             })
         );
@@ -122,7 +122,7 @@ mod tests {
                 }
             }
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![
                 Cow::Borrowed("settings"),
@@ -150,7 +150,7 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": [1, 2, 3]
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data")],
             value: json_typed!(borrowed, [10, 20]),
@@ -171,12 +171,12 @@ mod tests {
                 "list": [1, 2, 3]
             }
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![
                 Cow::Borrowed("nested"),
                 Cow::Borrowed("list"),
-                Cow::Borrowed("2"),
+                Cow::Borrowed("[2]"),
             ],
             value: json_typed!(borrowed, 99),
         };
@@ -196,7 +196,7 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": []
         });
-        let patch = PatchJson {
+        let patch = JsonPatch {
             op: Op::Replace,
             path: vec![Cow::Borrowed("address"), Cow::Borrowed("zip")],
             value: json_typed!(borrowed, "12345"),
@@ -206,7 +206,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Err(Error::NotFoundTarget {
+            Err(JsonPatchError::NotFoundTarget {
                 path: "address.zip".to_string()
             })
         );
