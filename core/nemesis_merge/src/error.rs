@@ -28,7 +28,7 @@ pub enum Error {
     },
 
     /// Json patch error
-    #[snafu(display("{template_name}:\n {source}\n patch: {patch}\n\n"))]
+    #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
     PatchError {
         source: json_patch::JsonPatchError,
         template_name: String,

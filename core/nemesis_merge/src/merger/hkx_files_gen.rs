@@ -58,6 +58,8 @@ pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(
                                 Ok(hkx_bytes) => {
                                     fs::write(&output_path, hkx_bytes)
                                         .context(FailedIoSnafu { path: output_path })?;
+                                    #[cfg(feature = "tracing")]
+                                    tracing::info!("Generation complete: {path}");
                                 }
                                 Err(err) => return Err(err.into()),
                             }
