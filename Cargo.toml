@@ -10,7 +10,16 @@ edition = "2021"
 rust-version = "1.60"
 
 [workspace]
-members = ["core/*", "gui/backend"]
+members = [
+  "core/json_patch",
+  "core/mod_info",
+  "core/nemesis_merge",
+  "core/nemesis_xml",
+  "core/node_expr",
+  "core/skyrim_anim_parser",
+  "core/skyrim_crc",
+  "gui/backend",
+]
 resolver = "2"
 
 [workspace.dependencies]
