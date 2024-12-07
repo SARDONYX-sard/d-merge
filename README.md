@@ -38,9 +38,9 @@ The only thing we are considering at this time is support for the Nemesis patch.
 - info.txt searcher.
 - Merge
   - [x] Parallel json patch
+  - [x] Fix range add operation of Array
   - [ ] Prioritization and conflict resolution among patches, optimization by
         merging
-  - [ ] Fix range add operation of Array
 
 ## Extra build
 
