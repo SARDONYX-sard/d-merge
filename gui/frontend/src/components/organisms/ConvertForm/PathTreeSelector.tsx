@@ -13,7 +13,7 @@ import {
 import { TreeItem2Icon } from '@mui/x-tree-view/TreeItem2Icon';
 import { TreeItem2Provider } from '@mui/x-tree-view/TreeItem2Provider';
 import { type UseTreeItem2Parameters, useTreeItem2 } from '@mui/x-tree-view/useTreeItem2';
-import { type HTMLAttributes, memo, type Ref, type SyntheticEvent, useCallback, useRef } from 'react';
+import { type HTMLAttributes, type Ref, type SyntheticEvent, memo, useCallback, useRef } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { hashDjb2 } from '@/lib/hash-djb2';
