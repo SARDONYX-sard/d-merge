@@ -1,10 +1,19 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
 import { useDebounce } from './useDebounce';
 
+// NOTE: See below for how to test with Timer.
+// -ref: https://vitest.dev/guide/mocking#example
+
 describe('useDebounce', () => {
-  vi.useFakeTimers();
+  beforeEach(() => {
+    vi.useFakeTimers(); // Setup functions required to use `advanceTimersByTime`.
+  });
+
+  afterEach(() => {
+    vi.useRealTimers(); // restoring date after each test run
+  });
 
   it('should return the initial value immediately', () => {
     const { result } = renderHook(() => useDebounce('test', 500));
@@ -12,7 +21,6 @@ describe('useDebounce', () => {
   });
 
   it('should debounce the value', () => {
-    vi.useFakeTimers(); // Setup functions required to use `advanceTimersByTime`.
     const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
       initialProps: { value: 'initial', delay: 500 },
     });
@@ -59,6 +67,4 @@ describe('useDebounce', () => {
     // Now the value should update to the latest one
     expect(result.current).toBe('second update');
   });
-
-  vi.useRealTimers();
 });
