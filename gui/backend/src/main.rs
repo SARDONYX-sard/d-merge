@@ -3,6 +3,7 @@
 
 mod cmd;
 mod error;
+mod libs;
 mod log;
 
 use tauri_plugin_window_state::StateFlags;
@@ -20,9 +21,9 @@ fn main() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
-            crate::cmd::convert::convert,
-            crate::cmd::convert::is_supported_extra_fmt,
-            crate::cmd::convert::load_dir_node,
+            crate::cmd::conversion::convert,
+            crate::cmd::conversion::is_supported_extra_fmt,
+            crate::cmd::conversion::par_walk_dir::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,
             crate::cmd::patch::load_mods_info,

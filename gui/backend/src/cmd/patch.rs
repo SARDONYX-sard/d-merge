@@ -34,8 +34,6 @@ struct Payload {
 
 #[tauri::command]
 pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
-    tracing::trace!(?output, ?ids);
-
     let resolver = window.app_handle().path();
     // Expected `<ResourceDir>/assets/templates/meshes/[..]`
     // - ref https://v2.tauri.app/develop/resources/
@@ -44,6 +42,8 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
         .context(NotFoundResourceDirSnafu)
         .or_else(|err| bail!(err))?
         .join("assets/templates/");
+
+    let _sender = sender::<Payload>(window, "d_merge://progress/patch");
     behavior_gen(
         ids,
         Options {
@@ -53,6 +53,5 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
     )
     .await
     .or_else(|err| bail!(err))?;
-    let _sender = sender::<Payload>(window, "d_merge://progress/patch");
     Ok(())
 }
