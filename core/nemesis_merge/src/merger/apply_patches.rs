@@ -1,6 +1,9 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
-use super::{BorrowedTemplateMap, ModPatchMap};
+use super::{
+    aliases::{BorrowedTemplateMap, ModPatchMap},
+    results::filter_results,
+};
 use crate::error::{Error, NemesisXmlErrSnafu, PatchSnafu, Result};
 use json_patch::apply_patch;
 use nemesis_xml::patch::parse_nemesis_patch;
@@ -10,8 +13,8 @@ use snafu::ResultExt;
 pub fn apply_patches<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
     patch_mod_map: &'b ModPatchMap,
-) -> Vec<Result<(), Error>> {
-    patch_mod_map
+) -> Result<(), Vec<Error>> {
+    let results = patch_mod_map
         .par_iter()
         .flat_map(|(_mode_code, patch_map)| {
             #[cfg(feature = "tracing")]
@@ -39,5 +42,7 @@ pub fn apply_patches<'a, 'b: 'a>(
                 Ok(())
             })
         })
-        .collect()
+        .collect();
+
+    filter_results(results)
 }

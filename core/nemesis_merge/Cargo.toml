@@ -17,6 +17,7 @@ dashmap = { version = "6.1.0", features = ["rayon"] }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
+serde = { workspace = true, optional = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 simd-json = { workspace = true, optional = true }
@@ -50,4 +51,4 @@ default = ["serde"]
 debug = ["tracing"]
 tracing = ["dep:tracing"]
 
-serde = ["dep:simd-json", "json_patch/serde"]
+serde = ["dep:serde", "dep:simd-json", "json_patch/serde"]

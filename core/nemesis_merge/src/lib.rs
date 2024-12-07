@@ -1,6 +1,9 @@
-pub mod collect_path;
+mod collect_path;
 pub mod error;
-pub mod merger;
-pub mod output_path;
+mod merger;
+mod output_path;
 
-pub use merger::{behavior_gen::behavior_gen, Options};
+pub use merger::{
+    behavior_gen::behavior_gen,
+    config::{Config, Status},
+};

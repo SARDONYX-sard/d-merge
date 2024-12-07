@@ -1,7 +1,7 @@
 use super::{bail, sender};
 use crate::error::NotFoundResourceDirSnafu;
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
-use nemesis_merge::{behavior_gen, Options};
+use nemesis_merge::{behavior_gen, Config, Status};
 use snafu::ResultExt as _;
 use std::path::PathBuf;
 use tauri::{Manager, Window};
@@ -21,17 +21,6 @@ pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// # Progress report for progress bar
-///
-/// - First: number of files/dirs explored
-/// - After: working index
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct Payload {
-    /// - First: number of files/dirs explored
-    /// - After: working index
-    index: usize,
-}
-
 #[tauri::command]
 pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
     let resolver = window.app_handle().path();
@@ -43,12 +32,13 @@ pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Re
         .or_else(|err| bail!(err))?
         .join("assets/templates/");
 
-    let _sender = sender::<Payload>(window, "d_merge://progress/patch");
+    let status_reporter = sender::<Status>(window, "d_merge://progress/patch");
     behavior_gen(
         ids,
-        Options {
+        Config {
             output_dir: PathBuf::from(output),
             resource_dir,
+            status_report: Some(Box::new(status_reporter)),
         },
     )
     .await

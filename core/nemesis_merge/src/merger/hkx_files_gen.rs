@@ -1,16 +1,15 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
-use super::BorrowedTemplateMap;
+use super::aliases::BorrowedTemplateMap;
 use crate::error::{Error, FailedIoSnafu, Result};
 use rayon::prelude::*;
 use serde_hkx::bytes::serde::hkx_header::HkxHeader;
 use serde_hkx_features::ClassMap;
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
+use std::fs;
 
 pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(), Vec<Error>> {
-    use std::fs;
-
     let results: Vec<Result<(), Error>> = templates
         .into_par_iter()
         .map(|(_, (output_path, template_json))| {

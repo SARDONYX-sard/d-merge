@@ -1,12 +1,12 @@
 use super::{
+    aliases::{BorrowedTemplateMap, ModPatchMap, ModPatchPair, OwnedPatchMap},
+    config::Config,
     tables::{FIRST_PERSON_BEHAVIORS, THIRD_PERSON_BEHAVIORS},
-    BorrowedTemplateMap, ModPatchMap, ModPatchPair, OwnedPatchMap,
 };
 use crate::error::Result;
 use crate::{
     collect_path::collect_nemesis_paths,
     error::{Error, FailedIoSnafu, JsonSnafu},
-    merger::Options,
     output_path::{parse_input_nemesis_path, NemesisPath},
 };
 use dashmap::DashMap;
@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 
 pub fn collect_templates_and_patches<'a>(
     nemesis_paths: Vec<PathBuf>,
-    options: Options,
+    options: &Config,
 ) -> Result<(BorrowedTemplateMap<'a>, ModPatchMap), Vec<Error>> {
     let templates = DashMap::new();
 
@@ -29,7 +29,7 @@ pub fn collect_templates_and_patches<'a>(
             let result: Vec<_> = collect_nemesis_paths(patch_path)
                 .par_iter()
                 // # NOTE: Internally mut templates
-                .map(|txt_path| parse_and_process_path(txt_path, &options, &templates))
+                .map(|txt_path| parse_and_process_path(txt_path, options, &templates))
                 .collect();
 
             let (patch_map_owned, errors): (Vec<_>, Vec<_>) =
@@ -63,7 +63,7 @@ pub fn collect_templates_and_patches<'a>(
 
 fn parse_and_process_path(
     txt_path: &Path,
-    options: &Options,
+    options: &Config,
     templates: &BorrowedTemplateMap,
 ) -> Result<(String, String), Error> {
     let NemesisPath {
@@ -86,9 +86,10 @@ fn parse_and_process_path(
             false => THIRD_PERSON_BEHAVIORS.get(&template_name),
         }
         .map(|path| {
-            let Options {
+            let Config {
                 resource_dir,
                 output_dir,
+                ..
             } = options;
             let mut output_path = output_dir.join(path);
             output_path.set_extension("hkx");
