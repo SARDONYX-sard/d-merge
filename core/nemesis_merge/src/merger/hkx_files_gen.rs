@@ -56,8 +56,11 @@ pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(
                         Ok(class_map) => {
                             match serde_hkx::to_bytes(&class_map, &HkxHeader::new_skyrim_se()) {
                                 Ok(hkx_bytes) => {
-                                    fs::write(&output_path, hkx_bytes)
-                                        .context(FailedIoSnafu { path: output_path })?;
+                                    fs::write(&output_path, hkx_bytes).with_context(|_| {
+                                        FailedIoSnafu {
+                                            path: output_path.clone(),
+                                        }
+                                    })?;
                                     #[cfg(feature = "tracing")]
                                     tracing::info!(
                                         "Generation complete: {}",
