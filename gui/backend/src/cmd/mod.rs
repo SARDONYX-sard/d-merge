@@ -27,7 +27,6 @@ macro_rules! bail {
 pub(super) use bail;
 
 /// Measure the elapsed time and return the result of the given asynchronous function.
-#[allow(unused)]
 macro_rules! time {
     ($name:literal, $expr:expr) => {{
         let start = std::time::Instant::now();
@@ -42,3 +41,4 @@ macro_rules! time {
         res
     }};
 }
+pub(super) use time;
