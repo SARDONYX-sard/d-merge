@@ -1,5 +1,5 @@
-use super::JsonPatch;
 use crate::apply::error::{JsonPatchError, Result};
+use crate::JsonPatch;
 use simd_json::borrowed::Value;
 use simd_json::derived::ValueTryAsScalar as _;
 use simd_json::StaticNode;
@@ -12,7 +12,7 @@ use simd_json::StaticNode;
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead.
-pub fn apply_add<'value>(json: &mut Value<'value>, patch: JsonPatch<'value>) -> Result<()> {
+pub(crate) fn apply_add<'value>(json: &mut Value<'value>, patch: JsonPatch<'value>) -> Result<()> {
     let JsonPatch { path, value, .. } = patch;
 
     if path.is_empty() {

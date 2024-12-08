@@ -1,6 +1,6 @@
-use super::JsonPatch;
 use crate::apply::error::{JsonPatchError, Result};
 use crate::ptr_mut::PointerMut as _;
+use crate::JsonPatch;
 use simd_json::BorrowedValue;
 
 /// Replace one value.

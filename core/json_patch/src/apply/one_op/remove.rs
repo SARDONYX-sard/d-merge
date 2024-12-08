@@ -1,5 +1,5 @@
-use super::JsonPatch;
 use crate::apply::error::{JsonPatchError, Result};
+use crate::JsonPatch;
 use simd_json::borrowed::Value;
 use std::borrow::Cow;
 

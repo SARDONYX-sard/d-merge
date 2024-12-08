@@ -1,14 +1,12 @@
-mod add;
 pub mod error;
-pub(crate) mod range_op;
-mod remove;
-mod replace;
+mod one_op;
+mod range_op;
 
-use self::add::apply_add;
 use self::error::Result;
+use self::one_op::add::apply_add;
+use self::one_op::remove::apply_remove;
+use self::one_op::replace::apply_replace;
 use self::range_op::apply_range;
-use self::remove::apply_remove;
-use self::replace::apply_replace;
 use crate::operation::Op;
 use crate::range::parse::is_range_op;
 use simd_json::BorrowedValue;
