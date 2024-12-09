@@ -3,7 +3,7 @@ use json_patch::Op;
 use simd_json::BorrowedValue;
 use std::{borrow::Cow, mem, ops::Range};
 
-type Patches<'xml> = Vec<CurrentPatchJson<'xml>>;
+type Patches<'xml> = Vec<CurrentJsonPatch<'xml>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct CurrentState<'xml> {
@@ -16,12 +16,13 @@ pub struct CurrentState<'xml> {
     /// Indicates the current json position during one patch file.
     pub path: Vec<Cow<'xml, str>>,
 
-    /// Current index of the element inside the Array.
+    /// Indicates the extent of differential change of elements inside the Array.
     /// # Note
-    /// This also indicates non-differential ranges.
-    pub seq_index: Option<usize>,
-    /// Indicates the extent of differential change of elements inside the Array
+    /// - Used only when changing Array.
+    /// - If start and end of range are the same, index mode
     pub seq_range: Option<Range<usize>>,
+
+    pub seq_values: Vec<BorrowedValue<'xml>>,
 }
 
 impl<'de> CurrentState<'de> {
@@ -32,21 +33,22 @@ impl<'de> CurrentState<'de> {
             patches: vec![],
             is_passed_original: false,
             path: vec![],
-            seq_index: None,
             seq_range: None,
+            seq_values: vec![],
         }
     }
 
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    #[inline]
     pub fn push_current_patch(&mut self, value: BorrowedValue<'de>) {
         if self.mode_code.is_some() && !self.is_passed_original {
-            self.patches.push(CurrentPatchJson {
-                path: self.path.clone(),
-                value,
-            });
+            if self.seq_range.is_some() {
+                self.seq_values.push(value);
+            } else {
+                let path = self.path.clone();
+                self.patches.push(CurrentJsonPatch { path, value });
+            }
         }
     }
 
@@ -83,12 +85,28 @@ impl<'de> CurrentState<'de> {
         self.clear_flags();
         (op, mem::take(&mut self.patches))
     }
+
+    pub fn current_range_to_path(&self) -> Option<String> {
+        self.seq_range.as_ref().map(|range| {
+            let Range { start, end } = range.clone();
+            match (start..end).count() {
+                0 => format!("[{end}]"),
+                _ => format!("[{start}:{end}]"),
+            }
+        })
+    }
+
+    pub fn increment_range(&mut self) {
+        if let Some(ref mut range) = self.seq_range {
+            range.end += 1;
+        }
+    }
 }
 
 /// The reason this is necessary is because
 /// `<!-- ORIGINAL -->` or `<! -- CLOSE -->` is read, the operation type cannot be determined.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CurrentPatchJson<'xml> {
+pub struct CurrentJsonPatch<'xml> {
     /// $(root), index, className, fieldName
     /// - e.g. "$.4514.hkbStateMachineStateInfo.generator",
     pub path: Vec<Cow<'xml, str>>,
