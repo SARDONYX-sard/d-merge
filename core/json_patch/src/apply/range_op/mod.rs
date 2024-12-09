@@ -6,10 +6,10 @@ use self::add::handle_add;
 use self::remove::handle_remove;
 use self::replace::handle_replace;
 use super::error::{JsonPatchError, Result};
-use super::JsonPatch;
 use crate::operation::Op;
 use crate::ptr_mut::PointerMut as _;
 use crate::range::parse::parse_range;
+use crate::JsonPatch;
 use simd_json::borrowed::Value;
 
 /// Apply json patch for range statements(`[index]`,`[start..end]`, `[start..]`, `[end..]`, `[..]`)

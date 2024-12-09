@@ -9,28 +9,8 @@ use self::one_op::replace::apply_replace;
 use self::range_op::apply_range;
 use crate::operation::Op;
 use crate::range::parse::is_range_op;
+use crate::JsonPatch;
 use simd_json::BorrowedValue;
-use std::borrow::Cow;
-
-/// Struct representing a JSON patch operation.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub struct JsonPatch<'a> {
-    /// The type of operation to perform (Add, Remove, Replace).
-    pub op: Op,
-    /// A vector representing the path in the JSON where the operation is applied.
-    ///
-    /// $(root), index, className, fieldName
-    /// - e.g. "$.4514.hkbStateMachineStateInfo.generator",
-    /// - e.g. "$.1.hkRootLevelContainer.namedVariants[0]",
-    pub path: Vec<Cow<'a, str>>,
-    /// The value to be added or replaced in the JSON.
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>"))
-    )]
-    pub value: BorrowedValue<'a>,
-}
 
 /// Applies a JSON patch operation to a mutable reference to a JSON value.
 ///
