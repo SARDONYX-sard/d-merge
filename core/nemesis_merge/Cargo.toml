@@ -46,7 +46,7 @@ tokio = { workspace = true, features = [
 workspace = true
 
 [features]
-default = ["serde"]
+default = ["serde", "tracing"]
 # Output patch json, json just before hkx
 debug = ["tracing"]
 tracing = ["dep:tracing"]

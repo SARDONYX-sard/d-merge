@@ -17,13 +17,15 @@ use snafu::ResultExt as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+type Results = Vec<Result<ModPatchPair, Vec<Error>>>;
+
 pub fn collect_templates_and_patches<'a>(
-    nemesis_paths: Vec<PathBuf>,
+    nemesis_paths: &[PathBuf],
     options: &Config,
 ) -> Result<(BorrowedTemplateMap<'a>, ModPatchMap), Vec<Error>> {
     let templates = DashMap::new();
 
-    let results: Vec<Result<ModPatchPair, Vec<Error>>> = nemesis_paths
+    let results: Results = nemesis_paths
         .par_iter()
         .map(|patch_path| {
             let result: Vec<_> = collect_nemesis_paths(patch_path)
@@ -46,21 +48,10 @@ pub fn collect_templates_and_patches<'a>(
         })
         .collect();
 
-    let (successes, errors): (Vec<ModPatchPair>, Vec<Vec<Error>>) =
-        results.into_par_iter().partition_map(|res| match res {
-            Ok((key, patch)) => Either::Left((key, patch)),
-            Err(errs) => Either::Right(errs),
-        });
-
-    let errors: Vec<Error> = errors.into_par_iter().flatten().collect();
-    if errors.is_empty() {
-        let patch_mod_map = successes.into_par_iter().collect();
-        Ok((templates, patch_mod_map))
-    } else {
-        Err(errors)
-    }
+    separate_results(results).map(|mod_patch_map| (templates, mod_patch_map))
 }
 
+/// Insert template & Get patch pairs
 fn parse_and_process_path(
     txt_path: &Path,
     options: &Config,
@@ -107,27 +98,6 @@ fn parse_and_process_path(
     let patch_txt = fs::read_to_string(txt_path).context(FailedIoSnafu {
         path: txt_path.to_path_buf(),
     })?;
-
-    #[cfg(feature = "debug")] // Output patch.json for debugging
-    {
-        let mut json_patch_path = options.output_dir.join(_relevant_path);
-        json_patch_path.set_extension("json");
-        let patches_json = nemesis_xml::patch::parse_nemesis_patch(&patch_txt).context(
-            crate::error::NemesisXmlErrSnafu {
-                path: json_patch_path.clone(),
-            },
-        )?;
-        fs::write(
-            &json_patch_path,
-            simd_json::to_string_pretty(&patches_json).context(JsonSnafu {
-                path: json_patch_path.clone(),
-            })?,
-        )
-        .context(FailedIoSnafu {
-            path: json_patch_path.clone(),
-        })?;
-    }
-
     Ok((template_name_key, patch_txt))
 }
 
@@ -135,4 +105,21 @@ fn template_xml_to_value(path: PathBuf) -> Result<BorrowedValue<'static>> {
     let template_xml = fs::read_to_string(&path).context(FailedIoSnafu { path: path.clone() })?;
     let ast: ClassMap = serde_hkx::from_str(&template_xml)?;
     to_borrowed_value(ast).context(JsonSnafu { path }) // TODO: fix needless realloc
+}
+
+/// Separate the result array into [`Ok`] and [`Err`] arrays.
+#[inline]
+fn separate_results(results: Results) -> Result<ModPatchMap, Vec<Error>> {
+    let (successes, errors): (Vec<ModPatchPair>, Vec<Vec<Error>>) =
+        results.into_par_iter().partition_map(|res| match res {
+            Ok((key, patch)) => Either::Left((key, patch)),
+            Err(errs) => Either::Right(errs),
+        });
+
+    let errors: Vec<Error> = errors.into_par_iter().flatten().collect();
+    if errors.is_empty() {
+        Ok(successes.into_par_iter().collect())
+    } else {
+        Err(errors)
+    }
 }
