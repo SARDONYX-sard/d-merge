@@ -1,4 +1,5 @@
 mod apply;
+pub mod json_path;
 mod operation;
 pub mod ptr_mut;
 pub(crate) mod range;
