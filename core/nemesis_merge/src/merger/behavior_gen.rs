@@ -1,5 +1,4 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-#![allow(clippy::mem_forget)]
 use super::{
     apply_patches::apply_patches,
     collect_templates_and_patches::collect_templates_and_patches,
