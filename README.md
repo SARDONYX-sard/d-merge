@@ -2,7 +2,7 @@
 
 diff & merge => d_merge json patch-based hkx patch
 
-- Current serde_hkx ver. 0.5.0
+- Current serde_hkx ver. 0.6.0
 
 ## For Tester
 
