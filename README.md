@@ -52,13 +52,11 @@ The only thing we are considering at this time is support for the Nemesis patch.
 Comments cannot be written in `Package.json`, so write them here.
 
 Note that the following version must be fixed or it will not work for some
-reason. (eslint in particular has many deprecated libraries at 8, but it can't
-be helped)
+reason.
 
 - Biome:
   - version: 1.9.3
   - VS Code extension: 2.2.3
-- eslint: ^8
 
 - mui/x-data-grid, when changing from `7.22.2` to `7.23.1`, the `setState` in
   `handleRowSelectionModelChange` is now
