@@ -11,41 +11,29 @@ import { usePatchContext } from './PatchProvider';
 
 import type { ComponentPropsWithRef } from 'react';
 
+const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
+
+const createHandlers = (path: string, setPath: (path: string) => void) => ({
+  onClick: () => NOTIFY.asyncTry(async () => await openPath(path, { setPath, directory: true })),
+  onIconClick: () => NOTIFY.asyncTry(async () => await open(path)),
+});
+
 export const usePatchInputs = () => {
   const { modInfoDir, setModInfoDir, output, setOutput } = usePatchContext();
   const { t } = useTranslation();
 
-  const handleInputClick = () => {
-    NOTIFY.asyncTry(async () => {
-      await openPath(modInfoDir, { setPath: setModInfoDir, directory: true });
-    });
-  };
-
-  const handleInputIconClick = () => {
-    NOTIFY.asyncTry(async () => await open(modInfoDir));
-  };
-
-  const handleOutputClick = () => {
-    NOTIFY.asyncTry(async () => {
-      await openPath(output, { setPath: setOutput, directory: true });
-    });
-  };
-
-  const handleOutputIconClick = () => {
-    NOTIFY.asyncTry(async () => await open(output));
-  };
-
-  const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
+  const inputHandlers = createHandlers(modInfoDir, setModInfoDir);
+  const outputHandlers = createHandlers(output, setOutput);
 
   return [
     {
       icon: (
-        <Tooltip placement='top' title={'Open specified directory.'}>
-          <OutputIcon onClick={handleInputIconClick} sx={sx} />
+        <Tooltip placement='top' title={t('open-tooltip')}>
+          <OutputIcon onClick={inputHandlers.onIconClick} sx={sx} />
         </Tooltip>
       ),
       label: 'Skyrim Data Dir',
-      onClick: handleInputClick,
+      onClick: inputHandlers.onClick,
       path: modInfoDir,
       setPath: setModInfoDir,
       placeholder: 'D:/Steam/steamapps/common/Skyrim Special Edition/Data',
@@ -53,11 +41,11 @@ export const usePatchInputs = () => {
     {
       icon: (
         <Tooltip placement='top' title={t('open-output-tooltip')}>
-          <OutputIcon onClick={handleOutputIconClick} sx={sx} />
+          <OutputIcon onClick={outputHandlers.onIconClick} sx={sx} />
         </Tooltip>
       ),
       label: t('output-path'),
-      onClick: handleOutputClick,
+      onClick: outputHandlers.onClick,
       path: output,
       setPath: setOutput,
     },

@@ -63,6 +63,7 @@
   "open-log-dir-tooltip": "ログの格納場所を開きます。",
   "open-log-tooltip": "現在のログファイルを開きます。(アプリを起動するたびに新しいログファイルにローテーションします)",
   "open-output-tooltip": "出力先のパスを開きます",
+  "open-tooltip": "指定されたパスを開きます",
   "output-path": "出力先",
   "patch-column-author": "作者",
   "patch-column-name": "Mod名",
