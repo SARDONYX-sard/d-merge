@@ -543,9 +543,8 @@ impl<'de> PatchDeserializer<'de> {
 
 #[cfg(test)]
 mod tests {
-    use simd_json::json_typed;
-
     use super::*;
+    use simd_json::json_typed;
 
     #[test]
     fn replace_field() {
@@ -566,7 +565,7 @@ mod tests {
             actual,
             vec![JsonPatch {
                 op: Op::Replace,
-                path: vec!["0010", "hkbProjectData", "stringData"]
+                path: vec!["#0010", "hkbProjectData", "stringData"]
                     .into_iter()
                     .map(|s| s.into())
                     .collect(),
@@ -607,7 +606,7 @@ mod tests {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: vec![
-                    "0009",
+                    "#0009",
                     "hkbProjectStringData",
                     "characterFilenames",
                     "[1:7]"
@@ -664,7 +663,7 @@ mod tests {
             vec![JsonPatch {
                 op: Op::Remove,
                 path: vec![
-                    "0009",
+                    "#0009",
                     "hkbProjectStringData",
                     "characterFilenames",
                     "[5:7]"
@@ -701,7 +700,7 @@ mod tests {
                 op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: [
-                    "0008",
+                    "#0008",
                     "hkRootLevelContainer",
                     "namedVariants",
                     "[0]",
@@ -717,7 +716,7 @@ mod tests {
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]
-    #[ignore = "dummy"]
+    #[ignore = "because we need external test files"]
     #[test]
     fn parse() {
         use std::fs::read_to_string;

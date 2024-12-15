@@ -3,7 +3,7 @@ use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use std::str::FromStr;
 use winnow::{
     ascii::digit1,
-    combinator::{alt, delimited, preceded, seq},
+    combinator::{alt, delimited, seq},
     error::{
         ContextError, StrContext,
         StrContextValue::{self},
@@ -162,13 +162,10 @@ fn index_name_attr<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
 /// # Errors
 /// If parsing failed.
 pub fn index_name<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
-    preceded(
-        "#",
-        alt((
-            digit1.map(PointerType::Index),
-            take_until(0.., '\"').map(PointerType::Var),
-        )),
-    )
+    alt((
+        ("#", digit1).take().map(PointerType::Index),
+        take_until(0.., '\"').map(PointerType::Var),
+    ))
     .parse_next(input)
 }
 
@@ -180,10 +177,10 @@ mod tests {
     fn test_index() {
         assert_eq!(
             index_name_attr.parse("\"#0002\""),
-            Ok(PointerType::Index("0002"))
+            Ok(PointerType::Index("#0002"))
         );
         assert_eq!(
-            index_name_attr.parse("\"#$id$2\""),
+            index_name_attr.parse("\"$id$2\""),
             Ok(PointerType::Var("$id$2"))
         );
     }
