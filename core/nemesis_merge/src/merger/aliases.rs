@@ -9,7 +9,7 @@ pub type BorrowedTemplateMap<'a> = DashMap<String, (PathBuf, BorrowedValue<'a>)>
 /// - key: merge target template file stem (e.g. `0_master`)
 /// - value: nemesis patch xml(from hkx file)
 pub type OwnedPatchMap = HashMap<String, String>;
-/// - key: (e.g. `0_master`) template file stem.
-/// - value: (mod code: (e.g. `aaaa`), nemesis patch xml files)
+/// - key: (mod code: (e.g. `aaaa`)
+/// - value: (template file stem e.g. `0_master`, nemesis patch xml files)
 pub type ModPatchMap = HashMap<String, OwnedPatchMap>;
 pub type ModPatchPair = (String, OwnedPatchMap);

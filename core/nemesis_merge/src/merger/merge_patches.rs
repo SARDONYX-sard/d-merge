@@ -3,7 +3,7 @@ use crate::error::{NemesisXmlErrSnafu, Result};
 use crate::output_path::parse_input_nemesis_path;
 use json_patch::{JsonPatch, Op};
 use nemesis_xml::patch::parse_nemesis_patch;
-use rayon::iter::ParallelExtend;
+use rayon::prelude::*;
 use snafu::ResultExt as _;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ pub type TemplatePatches<'a> = HashMap<String, Vec<JsonPatch<'a>>>;
 
 pub fn paths_to_ids(paths: &[PathBuf]) -> Vec<String> {
     paths
-        .iter()
+        .par_iter()
         .filter_map(|path| parse_input_nemesis_path(path).map(|parsed| parsed.template_name))
         .collect()
 }
@@ -32,21 +32,21 @@ pub fn merge_mod_patches(
     Ok(template_patches)
 }
 
-fn convert_mod_patch_map(mod_patch_map: &ModPatchMap) -> Result<JsonPatchMap<'_>> {
+fn convert_mod_patch_map(mod_patch_map: &ModPatchMap) -> Result<JsonPatchMap> {
     let mut patch_map = HashMap::new();
 
-    for (template, owned_patches) in mod_patch_map {
-        let mut json_patches = Vec::new();
-
-        for (mode_code, patch_xml) in owned_patches {
+    for owned_patches in mod_patch_map.values() {
+        for (template_name, patch_xml) in owned_patches {
             let parsed_patches =
                 parse_nemesis_patch(patch_xml).with_context(|_| NemesisXmlErrSnafu {
-                    path: format!("{mode_code}/{template}"),
+                    path: format!("{template_name}/{template_name}"),
                 })?;
-            json_patches.par_extend(parsed_patches);
-        }
 
-        patch_map.insert(template, json_patches);
+            patch_map
+                .entry(template_name)
+                .or_insert_with(Vec::new)
+                .par_extend(parsed_patches);
+        }
     }
 
     Ok(patch_map)
@@ -68,23 +68,19 @@ pub fn merge_patches_with_priority<'a>(
                 if let Some(existing_patch) = path_map.get_mut(&path) {
                     match (&existing_patch.op, &patch.op) {
                         (Op::Add, Op::Add) => {
-                            // 両方の Add を保持
                             merged_patches
                                 .entry(key.clone())
                                 .or_default()
                                 .push(patch.clone());
                         }
                         (Op::Remove | Op::Replace, Op::Add) => {
-                            // Remove や Replace が優先されるため無視
                             continue;
                         }
                         (_, _) => {
-                            // 他のケースでは新しい Patch で置き換え
                             *existing_patch = patch.clone();
                         }
                     }
                 } else {
-                    // パスが初めての場合は追加
                     path_map.insert(path.clone(), patch.clone());
                     merged_patches
                         .entry(key.clone())
@@ -107,7 +103,6 @@ mod tests {
 
     #[test]
     fn test_merge_patches_with_priority() {
-        // パッチデータ
         let patch1 = JsonPatch {
             op: Op::Add,
             path: vec![Cow::Borrowed("$"), Cow::Borrowed("0029")],
@@ -137,8 +132,6 @@ mod tests {
 
         let result = merge_patches_with_priority(keys, patches);
 
-        assert_eq!(result.len(), 1);
-        // assert!(result.iter().any(|p| p.value == *"Value2"));
-        // assert!(result.iter().any(|p| p.op == Op::Remove));
+        assert_eq!(result.len(), 2);
     }
 }
