@@ -86,22 +86,22 @@ mod tests {
     async fn merge_test() {
         #[allow(clippy::iter_on_single_items)]
         let ids = [
-            // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
-            // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
+            "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
+            "../../dummy/Data/Nemesis_Engine/mod/bcbi",
             "../../dummy/Data/Nemesis_Engine/mod/cbbi",
-            // "../../dummy/Data/Nemesis_Engine/mod/gender",
-            // "../../dummy/Data/Nemesis_Engine/mod/hmce",
-            // "../../dummy/Data/Nemesis_Engine/mod/momo",
-            // "../../dummy/Data/Nemesis_Engine/mod/na1w",
-            // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
-            // "../../dummy/Data/Nemesis_Engine/mod/pscd",
-            // "../../dummy/Data/Nemesis_Engine/mod/rthf",
-            // "../../dummy/Data/Nemesis_Engine/mod/skice",
-            // "../../dummy/Data/Nemesis_Engine/mod/sscb",
-            // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
-            // "../../dummy/Data/Nemesis_Engine/mod/tudm",
-            // "../../dummy/Data/Nemesis_Engine/mod/turn",
-            // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+            "../../dummy/Data/Nemesis_Engine/mod/gender",
+            "../../dummy/Data/Nemesis_Engine/mod/hmce",
+            "../../dummy/Data/Nemesis_Engine/mod/momo",
+            "../../dummy/Data/Nemesis_Engine/mod/na1w",
+            "../../dummy/Data/Nemesis_Engine/mod/nemesis",
+            "../../dummy/Data/Nemesis_Engine/mod/pscd",
+            "../../dummy/Data/Nemesis_Engine/mod/rthf",
+            "../../dummy/Data/Nemesis_Engine/mod/skice",
+            "../../dummy/Data/Nemesis_Engine/mod/sscb",
+            "../../dummy/Data/Nemesis_Engine/mod/tkuc",
+            "../../dummy/Data/Nemesis_Engine/mod/tudm",
+            "../../dummy/Data/Nemesis_Engine/mod/turn",
+            "../../dummy/Data/Nemesis_Engine/mod/zcbe",
         ]
         .into_par_iter()
         .map(|s| s.into())

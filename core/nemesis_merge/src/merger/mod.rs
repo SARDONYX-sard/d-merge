@@ -5,6 +5,7 @@ mod collect_templates_and_patches;
 pub mod config;
 mod hkx_files_gen;
 mod merge_patches;
+pub mod patches_gen;
 mod results;
 pub(super) mod tables;
 pub(super) mod write_errors;

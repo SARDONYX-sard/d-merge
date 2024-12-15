@@ -57,27 +57,34 @@ pub fn merge_patches_with_priority<'a>(
     patches: JsonPatchMap<'a>,
 ) -> HashMap<String, Vec<JsonPatch<'a>>> {
     let mut merged_patches: HashMap<String, Vec<JsonPatch<'a>>> = HashMap::new();
-    let mut path_map: HashMap<Vec<Cow<'a, str>>, JsonPatch<'a>> = HashMap::new();
 
     for key in keys {
         if let Some(patch_list) = patches.get(&key) {
+            let mut path_map: HashMap<Vec<Cow<'a, str>>, JsonPatch<'a>> = HashMap::new();
+
             for patch in patch_list {
                 let path = patch.path.clone();
 
                 if let Some(existing_patch) = path_map.get_mut(&path) {
                     match (&existing_patch.op, &patch.op) {
                         (Op::Add, Op::Add) => {
+                            // 両方の Add を保持
                             merged_patches
                                 .entry(key.clone())
                                 .or_default()
                                 .push(patch.clone());
                         }
-                        (Op::Remove | Op::Replace, Op::Add) => continue,
+                        (Op::Remove | Op::Replace, Op::Add) => {
+                            // Remove や Replace が優先されるため無視
+                            continue;
+                        }
                         (_, _) => {
+                            // 他のケースでは新しい Patch で置き換え
                             *existing_patch = patch.clone();
                         }
                     }
                 } else {
+                    // パスが初めての場合は追加
                     path_map.insert(path.clone(), patch.clone());
                     merged_patches
                         .entry(key.clone())
