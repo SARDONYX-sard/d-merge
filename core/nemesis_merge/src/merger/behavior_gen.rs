@@ -32,16 +32,14 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     #[cfg(feature = "tracing")]
     tracing::debug!("mod_patch_map = {mod_patch_map:#?}");
 
+    let ids = paths_to_ids(&nemesis_paths);
     {
         // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
         // Therefore, reassign the local variable in the block to shorten the lifetime
         let templates = templates;
 
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = {
-            let ids = paths_to_ids(&nemesis_paths);
-            merge_mod_patches(&mod_patch_map, ids)?
-        };
+        let patches = { merge_mod_patches(&mod_patch_map, &ids)? };
 
         // 3/4: Apply patches
         options.report_status(Status::ApplyingPatches);
