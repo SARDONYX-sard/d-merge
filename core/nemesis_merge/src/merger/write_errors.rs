@@ -1,8 +1,8 @@
-#[cfg(not(feature = "tracing"))]
+// #[cfg(not(feature = "tracing"))]
 use crate::error::FailedIoSnafu;
 use crate::error::{Error, Result};
 use rayon::prelude::*;
-#[cfg(not(feature = "tracing"))]
+// #[cfg(not(feature = "tracing"))]
 use snafu::ResultExt as _;
 use std::path::Path;
 
@@ -19,12 +19,12 @@ pub async fn write_errors(path: impl AsRef<Path>, errors: &[Error]) -> Result<()
         })
         .collect();
 
-    #[cfg(feature = "tracing")]
-    tracing::error!("{}", errors.join("\n\n"));
-    #[cfg(not(feature = "tracing"))]
+    // #[cfg(feature = "tracing")]
+    // tracing::error!("{}", errors.join("\n\n"));
+    // #[cfg(not(feature = "tracing"))]
     tokio::fs::write(&_path, errors.join("\n\n"))
         .await
-        .context(FailedIoSnafu {
+        .with_context(|_| FailedIoSnafu {
             path: _path.to_path_buf(),
         })?;
     Ok(())

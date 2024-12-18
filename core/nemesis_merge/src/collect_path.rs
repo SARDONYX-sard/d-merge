@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 /// Collects all relevant file paths within the given ID directory.
@@ -18,6 +19,14 @@ pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<PathBuf> {
             }
             None
         })
+        .collect()
+}
+
+/// Collect & flatten the path of a patch
+pub fn collect_all_patch_paths(nemesis_paths: &[PathBuf]) -> Vec<PathBuf> {
+    nemesis_paths
+        .par_iter()
+        .flat_map(collect_nemesis_paths)
         .collect()
 }
 

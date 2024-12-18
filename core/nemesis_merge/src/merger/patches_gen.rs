@@ -1,6 +1,5 @@
 use super::results::filter_results;
-use crate::error::{Error, FailedParseNemesisPathSnafu, NemesisXmlErrSnafu, Result};
-use crate::output_path::parse_input_nemesis_path;
+use crate::error::{Error, MissingParseNemesisPathSnafu, NemesisXmlErrSnafu, Result};
 use crate::{
     collect_path::collect_nemesis_paths,
     error::{FailedIoSnafu, JsonSnafu},
@@ -8,7 +7,7 @@ use crate::{
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::{OptionExt, ResultExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Generate nemesis patches to json patches.
 /// # Errors
@@ -38,12 +37,12 @@ where
             };
 
             let mut output = {
-                let parsed_path = parse_input_nemesis_path(txt_path).with_context(|| {
-                    FailedParseNemesisPathSnafu {
-                        path: txt_path.clone(),
-                    }
-                })?;
-                output.join(parsed_path.relevant_path)
+                let start_index = txt_path
+                    .iter()
+                    .position(|component| component.eq_ignore_ascii_case("Nemesis_Engine"))
+                    .with_context(|| MissingParseNemesisPathSnafu { path: txt_path })?;
+                let relevant_path: PathBuf = txt_path.iter().skip(start_index + 2).collect();
+                output.join(relevant_path)
             };
             output.set_extension("json");
             if let Some(parent) = output.parent() {

@@ -1,132 +1,53 @@
-use super::aliases::ModPatchMap;
-use crate::error::{NemesisXmlErrSnafu, Result};
-use crate::output_path::parse_input_nemesis_path;
-use json_patch::{JsonPatch, Op};
-use nemesis_xml::patch::parse_nemesis_patch;
+use super::aliases::{MergedPatchMap, TemplatePatchMap};
+use crate::error::Result;
+use crate::output_path::get_nemesis_id;
+use json_patch::JsonPatch;
 use rayon::prelude::*;
-use snafu::ResultExt as _;
-use std::borrow::Cow;
-use std::collections::HashMap;
 use std::path::PathBuf;
-
-pub type JsonPatchMap<'a> = HashMap<&'a String, Vec<JsonPatch<'a>>>;
 
 pub fn paths_to_ids(paths: &[PathBuf]) -> Vec<String> {
     paths
         .par_iter()
-        .filter_map(|path| parse_input_nemesis_path(path).map(|parsed| parsed.template_name))
+        .filter_map(|path| get_nemesis_id(path).ok())
         .collect()
 }
 
-pub fn merge_mod_patches<'a>(
-    mod_patch_map: &'a ModPatchMap,
-    priority_ids: &'a [String],
-) -> Result<JsonPatchMap<'a>> {
-    let json_patch_map = convert_mod_patch_map(mod_patch_map)?;
-    #[cfg(feature = "tracing")]
-    tracing::debug!("json_patch_map = {json_patch_map:#?}");
-    let template_patches = merge_patches_with_priority(priority_ids, json_patch_map);
-    #[cfg(feature = "tracing")]
-    tracing::debug!("template_patches = {template_patches:#?}");
-    Ok(template_patches)
-}
+pub fn merge_patches<'p>(
+    patches: TemplatePatchMap<'p>,
+    ids: &[String],
+) -> Result<MergedPatchMap<'p>> {
+    let merged_patches = MergedPatchMap::new();
 
-fn convert_mod_patch_map(mod_patch_map: &ModPatchMap) -> Result<JsonPatchMap> {
-    let mut patch_map = HashMap::new();
+    patches.into_par_iter().for_each(|idx_map| {
+        let (template_name, patch_idx_map) = idx_map;
 
-    for (mod_code, owned_patches) in mod_patch_map {
-        for (template_name, patch_xml) in owned_patches {
-            let parsed_patches =
-                parse_nemesis_patch(patch_xml).with_context(|_| NemesisXmlErrSnafu {
-                    path: format!("{mod_code}/{template_name}"),
-                })?;
+        patch_idx_map.into_par_iter().for_each(|patch| {
+            let (_index, mut patches) = patch;
 
-            patch_map
-                .entry(template_name)
-                .or_insert_with(Vec::new)
-                .par_extend(parsed_patches);
-        }
-    }
+            let sorted_patches: Vec<Vec<JsonPatch<'p>>> = ids
+                .iter()
+                .filter_map(|id| patches.remove(id))
+                .collect::<Vec<_>>();
 
-    Ok(patch_map)
-}
-
-type JsonPath<'a> = Vec<Cow<'a, str>>;
-
-pub fn merge_patches_with_priority<'a>(
-    keys: &'a [String],
-    patches: JsonPatchMap<'a>,
-) -> JsonPatchMap<'a> {
-    let mut merged_patches: JsonPatchMap = JsonPatchMap::new();
-
-    for key in keys {
-        if let Some(patch_list) = patches.get(&key) {
-            let mut path_map: HashMap<JsonPath<'a>, JsonPatch<'a>> = HashMap::new();
-
-            for patch in patch_list {
-                let path = patch.path.clone();
-
-                if let Some(existing_patch) = path_map.get_mut(&path) {
-                    match (&existing_patch.op, &patch.op) {
-                        (Op::Add, Op::Add) => {
-                            merged_patches.entry(key).or_default().push(patch.clone());
-                        }
-                        (Op::Remove | Op::Replace, Op::Add) => {
-                            continue;
-                        }
-                        (_, _) => {
-                            *existing_patch = patch.clone();
-                        }
-                    }
-                } else {
-                    path_map.insert(path.clone(), patch.clone());
-                    merged_patches.entry(key).or_default().push(patch.clone());
-                }
+            let mut merged_result = Vec::new();
+            for patch_vec in sorted_patches {
+                merge_json_patches(&mut merged_result, patch_vec);
             }
-        }
-    }
 
-    merged_patches
+            merged_patches
+                .entry(template_name.clone())
+                .or_default()
+                .par_extend(merged_result);
+        });
+    });
+
+    Ok(merged_patches)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use json_patch::{JsonPatch, Op};
-    use simd_json::{BorrowedValue, ValueBuilder as _};
-    use std::borrow::Cow;
-
-    #[test]
-    fn test_merge_patches_with_priority() {
-        let patch1 = JsonPatch {
-            op: Op::Add,
-            path: vec![Cow::Borrowed("$"), Cow::Borrowed("0029")],
-            value: BorrowedValue::from("Value1"),
-        };
-
-        let patch2 = JsonPatch {
-            op: Op::Remove,
-            path: vec![Cow::Borrowed("$"), Cow::Borrowed("0029")],
-            value: BorrowedValue::null(),
-        };
-
-        let patch3 = JsonPatch {
-            op: Op::Add,
-            path: vec![Cow::Borrowed("$"), Cow::Borrowed("0029")],
-            value: BorrowedValue::from("Value2"),
-        };
-
-        let mut patches = HashMap::new();
-
-        let key1 = "low_priority".to_string();
-        let key2 = "high_priority".to_string();
-        patches.insert(&key1, vec![patch1]);
-        patches.insert(&key2, vec![patch2, patch3]);
-
-        let keys = vec!["low_priority".to_string(), "high_priority".to_string()];
-
-        let result = merge_patches_with_priority(&keys, patches);
-
-        assert_eq!(result.len(), 2);
+fn merge_json_patches<'p>(base: &mut Vec<JsonPatch<'p>>, additional: Vec<JsonPatch<'p>>) {
+    for patch in additional {
+        if !base.contains(&patch) {
+            base.push(patch);
+        }
     }
 }

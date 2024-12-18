@@ -2426,7 +2426,6 @@ name = "nemesis_merge"
 version = "0.1.0"
 dependencies = [
  "dashmap",
- "havok_classes",
  "indexmap 2.7.0",
  "json_patch",
  "jwalk",
