@@ -6,7 +6,7 @@ use super::{bail, sender};
 use crate::libs::{hash::hash_djb2, path::infer::generate_output_path};
 use core::str::FromStr as _;
 use futures::{future::join_all, stream::FuturesUnordered};
-use serde_hkx_features::convert::{convert as serde_hkx_convert, OutFormat};
+use serde_hkx_features::OutFormat;
 use std::path::Path;
 use tauri::Window;
 
@@ -60,23 +60,22 @@ pub(crate) async fn convert(
                     status: Status::Processing,
                 });
 
-                match serde_hkx_convert(&input, output, format).await {
-                    Ok(_) => {
+                serde_hkx_features::convert(&input, output, format)
+                    .await
+                    .map(|_| {
                         status_sender(Payload {
                             path_id,
                             status: Status::Done,
                         });
-                        Ok(())
-                    }
-                    Err(err) => {
+                    })
+                    .map_err(|err| {
                         status_sender(Payload {
                             path_id,
                             status: Status::Error,
                         });
                         let input = input.display();
-                        Err(format!("{input}:\n    {err}"))
-                    }
-                }
+                        format!("{input}:\n    {err}")
+                    })
             })
         })
         .collect::<FuturesUnordered<_>>();

@@ -1,8 +1,8 @@
-mod class_table;
+pub mod class_table;
 mod current_state;
 
 use self::{
-    class_table::{find_class_info, find_json_parser_by, FieldInfo},
+    class_table::{find_class_info, FieldInfo},
     current_state::{CurrentJsonPatch, CurrentState},
 };
 use crate::helpers::{
@@ -161,8 +161,8 @@ impl<'de> PatchDeserializer<'de> {
                 value: BorrowedValue::Object(Box::new(obj)),
             });
         }
-        // self.current.path.pop(); // no need remove class name
 
+        // NOTE: no need remove class name on root class.
         Ok(())
     }
 
@@ -194,25 +194,16 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse failed.
     fn field(&mut self) -> Result<(&'de str, BorrowedValue<'de>)> {
         let should_take_in_this = self.parse_start_maybe_comment()?;
-        let (field_name, _) = self.parse_next(field_start_tag)?;
+
+        let field_info = self
+            .current
+            .field_info
+            .ok_or_else(|| Error::MissingFieldInfo)?;
+        let (field_name, field_type, _) = self.parse_next(field_start_tag(field_info))?;
         self.current.path.push(field_name.into());
 
         let value = {
-            let json_type = self.current.field_info.map_or_else(
-                || Err(Error::MissingFieldInfo),
-                |field_info| {
-                    find_json_parser_by(field_name, field_info).ok_or_else(|| {
-                        let acceptable_fields: Vec<&'static str> =
-                            field_info.keys().copied().collect();
-
-                        Error::UnknownField {
-                            field_name: field_name.to_string(),
-                            acceptable_fields,
-                        }
-                    })
-                },
-            )?;
-            let value = self.parse_value(json_type)?;
+            let value = self.parse_value(field_type)?;
 
             #[cfg(feature = "tracing")]
             tracing::debug!(?field_name, ?value);
@@ -428,7 +419,9 @@ impl<'de> PatchDeserializer<'de> {
                             self.current.path.push(format!("[{index}]").into());
                         }
                         let value = self.parse_value(name)?;
-                        self.current.path.pop();
+                        if self.current.seq_range.is_none() {
+                            self.current.path.pop();
+                        }
                         value
                     };
 
@@ -543,9 +536,8 @@ impl<'de> PatchDeserializer<'de> {
 
 #[cfg(test)]
 mod tests {
-    use simd_json::json_typed;
-
     use super::*;
+    use simd_json::json_typed;
 
     #[test]
     fn replace_field() {
@@ -566,7 +558,7 @@ mod tests {
             actual,
             vec![JsonPatch {
                 op: Op::Replace,
-                path: vec!["0010", "hkbProjectData", "stringData"]
+                path: vec!["#0010", "hkbProjectData", "stringData"]
                     .into_iter()
                     .map(|s| s.into())
                     .collect(),
@@ -607,7 +599,7 @@ mod tests {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: vec![
-                    "0009",
+                    "#0009",
                     "hkbProjectStringData",
                     "characterFilenames",
                     "[1:7]"
@@ -664,7 +656,7 @@ mod tests {
             vec![JsonPatch {
                 op: Op::Remove,
                 path: vec![
-                    "0009",
+                    "#0009",
                     "hkbProjectStringData",
                     "characterFilenames",
                     "[5:7]"
@@ -701,7 +693,7 @@ mod tests {
                 op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
                 path: [
-                    "0008",
+                    "#0008",
                     "hkRootLevelContainer",
                     "namedVariants",
                     "[0]",
@@ -717,7 +709,7 @@ mod tests {
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]
-    #[ignore = "dummy"]
+    #[ignore = "because we need external test files"]
     #[test]
     fn parse() {
         use std::fs::read_to_string;

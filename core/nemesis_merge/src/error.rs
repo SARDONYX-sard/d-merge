@@ -12,20 +12,27 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
 
-    /// "Failed to parse path as nemesis path: {}", path.display()
-    #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
-    FailedParseNemesisPath { path: PathBuf },
+    /// Failed to read owned patches.
+    FailedToReadOwnedPatches { errors_len: usize },
+
+    /// Failed to read borrowed patches.
+    FailedToReadBorrowedPatches { errors_len: usize },
 
     /// Failure to read XML templates converted from patches and hkx.(error count: {errors_len})
-    FailedToReadTemplateAndPatches { errors_len: usize },
+    FailedToReadTemplates { errors_len: usize },
 
-    /// - Failure to apply `patch -> XML template`.(error count: {patch_errors_len})
+    /// - Json patch error count: {patch_errors_len}
+    /// - Failure to apply `patch -> XML template`.(error count: {apply_errors_len})
     /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
-    #[snafu(display("- Apply json patch error count: {patch_errors_len}\n- Generate hkx error count: {hkx_errors_len}"))]
+    #[snafu(display("- json patch error count: {patch_errors_len}\n- Apply json patch error count: {apply_errors_len}\n- Generate hkx error count: {hkx_errors_len}"))]
     FailedToGenerateBehaviors {
         hkx_errors_len: usize,
         patch_errors_len: usize,
+        apply_errors_len: usize,
     },
+
+    /// No such template `{template_name}`.
+    NotFoundTemplate { template_name: String },
 
     /// Json patch error
     #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
@@ -41,6 +48,16 @@ pub enum Error {
         /// input path
         path: PathBuf,
         source: nemesis_xml::error::Error,
+    },
+
+    /// Failed to parse path {}
+    #[snafu(display("Failed to parse path: {}", path.display()))]
+    MissingParseNemesisPath { path: PathBuf },
+
+    /// Failed to parse path as nemesis path
+    #[snafu(transparent)]
+    FailedParseNemesisPath {
+        source: crate::output_path::NemesisPathError,
     },
 
     /// dir strip error

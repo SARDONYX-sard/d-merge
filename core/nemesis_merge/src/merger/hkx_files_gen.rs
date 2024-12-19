@@ -4,15 +4,22 @@ use super::{aliases::BorrowedTemplateMap, results::filter_results};
 use crate::error::{Error, FailedIoSnafu, Result};
 use rayon::prelude::*;
 use serde_hkx::bytes::serde::hkx_header::HkxHeader;
-use serde_hkx_features::ClassMap;
+use serde_hkx_features::{alt_map::ClassMapAlt, ClassMap};
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
-use std::fs;
+use std::{fs, path::Path};
 
-pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(), Vec<Error>> {
+pub(crate) fn generate_hkx_files(
+    output_dir: impl AsRef<Path>,
+    templates: BorrowedTemplateMap<'_>,
+) -> Result<(), Vec<Error>> {
+    let output_dir = output_dir.as_ref();
+
     let results = templates
         .into_par_iter()
-        .map(|(_, (output_path, template_json))| {
+        .map(|(_, (inner_path, template_json))| {
+            let mut output_path = output_dir.join(inner_path);
+
             if let Some(output_dir_all) = output_path.parent() {
                 fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
                     path: output_dir_all,
@@ -42,8 +49,6 @@ pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(
                 })?;
             }
 
-            type ClassMapAlt<'a> =
-                indexmap::IndexMap<std::borrow::Cow<'a, str>, havok_classes::Classes<'a>>;
             match from_borrowed_value::<ClassMapAlt>(template_json) {
                 Ok(ast) => {
                     let result: Result<ClassMap, _> = ast
@@ -56,6 +61,7 @@ pub(crate) fn generate_hkx_files(templates: BorrowedTemplateMap<'_>) -> Result<(
                         Ok(class_map) => {
                             match serde_hkx::to_bytes(&class_map, &HkxHeader::new_skyrim_se()) {
                                 Ok(hkx_bytes) => {
+                                    output_path.set_extension("hkx");
                                     fs::write(&output_path, hkx_bytes).with_context(|_| {
                                         FailedIoSnafu {
                                             path: output_path.clone(),

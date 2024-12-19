@@ -6,4 +6,5 @@ mod output_path;
 pub use merger::{
     behavior_gen::behavior_gen,
     config::{Config, Status},
+    patches_gen::generate_patches,
 };

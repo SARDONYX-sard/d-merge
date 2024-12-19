@@ -1,9 +1,13 @@
 use super::delimited_multispace0;
+use crate::{
+    error::Error,
+    patch::class_table::{find_json_parser_by, FieldInfo},
+};
 use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use std::str::FromStr;
 use winnow::{
     ascii::digit1,
-    combinator::{alt, delimited, preceded, seq},
+    combinator::{alt, delimited, seq},
     error::{
         ContextError, StrContext,
         StrContextValue::{self},
@@ -109,13 +113,32 @@ pub fn field_start_close_tag(input: &mut &str) -> PResult<Option<u64>> {
     .parse_next(input)
 }
 
+fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, Error> {
+    find_json_parser_by(field_name, field_info).ok_or_else(|| {
+        let acceptable_fields: Vec<&'static str> = field_info.keys().copied().collect();
+
+        Error::UnknownField {
+            field_name: field_name.to_string(),
+            acceptable_fields,
+        }
+    })
+}
+
 /// # Errors
 /// Parse failed.
-pub fn field_start_tag<'a>(input: &mut &'a str) -> PResult<(&'a str, Option<u64>)> {
-    field_start_open_tag.parse_next(input)?; // <hkparam name=
-    let field_name = attr_string.parse_next(input)?; // "name"
-    let array_len = field_start_close_tag.parse_next(input)?; // > or numelements="">
-    Ok((field_name, array_len))
+pub fn field_start_tag<'a>(
+    field_info: &'a FieldInfo,
+) -> impl Parser<&'a str, (&'a str, &'static str, Option<u64>), ContextError> {
+    move |input: &mut &'a str| {
+        field_start_open_tag.parse_next(input)?; // <hkparam name=
+        let (field_name, type_kind) = attr_string
+            .try_map(|field_name| {
+                find_type(field_name, field_info).map(|field_type| (field_name, field_type))
+            })
+            .parse_next(input)?; // "name"
+        let array_len = field_start_close_tag.parse_next(input)?; // > or numelements="">
+        Ok((field_name, type_kind, array_len))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,13 +185,10 @@ fn index_name_attr<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
 /// # Errors
 /// If parsing failed.
 pub fn index_name<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
-    preceded(
-        "#",
-        alt((
-            digit1.map(PointerType::Index),
-            take_until(0.., '\"').map(PointerType::Var),
-        )),
-    )
+    alt((
+        ("#", digit1).take().map(PointerType::Index),
+        take_until(0.., '\"').map(PointerType::Var),
+    ))
     .parse_next(input)
 }
 
@@ -180,10 +200,10 @@ mod tests {
     fn test_index() {
         assert_eq!(
             index_name_attr.parse("\"#0002\""),
-            Ok(PointerType::Index("0002"))
+            Ok(PointerType::Index("#0002"))
         );
         assert_eq!(
-            index_name_attr.parse("\"#$id$2\""),
+            index_name_attr.parse("\"$id$2\""),
             Ok(PointerType::Var("$id$2"))
         );
     }

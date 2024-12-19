@@ -1,10 +1,12 @@
-pub(super) mod aliases;
-mod apply_patches;
-pub(super) mod behavior_gen;
-mod collect_templates_and_patches;
+pub mod behavior_gen;
 pub mod config;
+pub mod patches_gen;
+
+mod aliases;
+mod apply_patches;
+mod collect_templates_and_patches;
 mod hkx_files_gen;
 mod merge_patches;
 mod results;
-pub(super) mod tables;
-pub(super) mod write_errors;
+mod tables;
+mod write_errors;
