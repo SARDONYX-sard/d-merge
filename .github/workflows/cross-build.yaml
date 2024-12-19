@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p ./build/assets
-          mv ./target/x86_64-pc-windows-msvc/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
+          mv ./target/x86_64-pc-windows-msvc/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }}.exe ./build
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Upload a Build Artifact
