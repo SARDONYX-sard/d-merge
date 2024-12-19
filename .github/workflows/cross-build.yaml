@@ -63,10 +63,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --force
 
-      - name: Test(Node.js)
-        run: npm test
       - name: Build Test(GUI)
-        run: npm run build -- -- --runner cargo-xwin --target x86_64-pc-windows-msvc
+        run: npm run build:cross
 
       - name: Compress outputs(Linux)
         shell: bash

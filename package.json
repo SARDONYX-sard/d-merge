@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,tracing --no-bundle -- --profile release-no-lto",
+    "build:cross": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,tracing --no-bundle --runner cargo-xwin --target x86_64-pc-windows-msvc -- --profile release-no-lto",
     "build:front": "next build ./gui/frontend",
     "build:icons": "cargo tauri icon ./gui/backend/icons/icon.png",
     "dev": "tauri dev",
