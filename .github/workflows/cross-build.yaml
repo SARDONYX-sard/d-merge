@@ -20,6 +20,8 @@ jobs:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
 
+    # Cross build
+    # - ref: https://v2.tauri.app/distribute/windows-installer/#experimental-build-windows-apps-on-linux-and-macos
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -40,7 +42,9 @@ jobs:
         run: rustup target add x86_64-pc-windows-msvc
 
       - name: Install winodws build runner
-        run: cargo install --locked cargo-xwin
+        uses: taiki-e/install-action@v2.46.15
+        with:
+          tool: cargo-xwin
 
       - name: Sync node version
         uses: actions/setup-node@v4.1.0
@@ -62,14 +66,14 @@ jobs:
       - name: Test(Node.js)
         run: npm test
       - name: Build Test(GUI)
-        run: npm run build
+        run: npm run build -- -- --runner cargo-xwin --target x86_64-pc-windows-msvc
 
       - name: Compress outputs(Linux)
         shell: bash
         if: runner.os == 'Linux'
         run: |
           mkdir -p ./build/assets
-          mv ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
+          mv ./target/x86_64-pc-windows-msvc/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Upload a Build Artifact
