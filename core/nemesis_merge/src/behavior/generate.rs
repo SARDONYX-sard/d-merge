@@ -1,15 +1,14 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-use super::{
-    apply_patches::apply_patches,
-    collect_templates_and_patches::{collect_borrowed_patches, collect_templates},
-    config::{Config, Status},
-    hkx_files_gen::generate_hkx_files,
-    merge_patches::{merge_patches, paths_to_ids},
-    write_errors::write_errors,
-};
 use crate::{
-    error::{Error, Result},
-    merger::collect_templates_and_patches::collect_owned_patches,
+    config::{Config, Status},
+    errors::{write_errors::write_errors, Error, Result},
+    hkx::generate::generate_hkx_files,
+    patches::{
+        apply::apply_patches,
+        collect::{collect_borrowed_patches, collect_owned_patches},
+        merge::{merge_patches, paths_to_ids},
+    },
+    templates::collect::collect_templates,
 };
 use rayon::prelude::*;
 use std::path::PathBuf;

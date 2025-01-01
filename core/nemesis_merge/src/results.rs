@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::errors::Error;
 use rayon::{iter::Either, prelude::*};
 
 #[inline]

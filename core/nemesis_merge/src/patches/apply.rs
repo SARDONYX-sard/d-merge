@@ -1,9 +1,9 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-use super::{
+use crate::{
     aliases::{BorrowedTemplateMap, MergedPatchMap},
+    errors::{Error, PatchSnafu, Result},
     results::filter_results,
 };
-use crate::error::{Error, PatchSnafu, Result};
 use json_patch::apply_patch;
 use rayon::prelude::*;
 use snafu::ResultExt;

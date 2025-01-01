@@ -79,6 +79,11 @@ pub enum Error {
     },
 
     #[snafu(transparent)]
+    HkxError {
+        source: serde_hkx_features::error::Error,
+    },
+
+    #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
 
     /// (De)Serialize json error

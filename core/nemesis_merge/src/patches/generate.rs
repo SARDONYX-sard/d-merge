@@ -1,9 +1,8 @@
-use super::results::filter_results;
-use crate::error::{Error, MissingParseNemesisPathSnafu, NemesisXmlErrSnafu, Result};
-use crate::{
-    collect_path::collect_nemesis_paths,
-    error::{FailedIoSnafu, JsonSnafu},
+use crate::errors::{
+    Error, FailedIoSnafu, JsonSnafu, MissingParseNemesisPathSnafu, NemesisXmlErrSnafu, Result,
 };
+use crate::paths::collect::collect_nemesis_paths;
+use crate::results::filter_results;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::{OptionExt, ResultExt};
@@ -54,10 +53,7 @@ where
         })
         .collect();
 
-    match filter_results(results) {
-        Ok(()) => Ok(()),
-        Err(errors) => Err(errors),
-    }
+    filter_results(results)
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 {
   "name": "d-merge",
-  "description": "patch",
   "version": "0.1.0",
-  "license": "MIT",
-  "homepage": "https://github.com/SARDONYX-sard/d-merge",
   "private": true,
+  "description": "patch",
+  "homepage": "https://github.com/SARDONYX-sard/d-merge",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,tracing --no-bundle -- --profile release-no-lto",
