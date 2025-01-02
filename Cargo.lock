@@ -3923,6 +3923,7 @@ dependencies = [
  "quick_tracing",
  "serde",
  "serde_hkx",
+ "serde_hkx_features",
  "tracing",
  "winnow 0.6.20",
 ]

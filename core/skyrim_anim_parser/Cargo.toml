@@ -21,6 +21,7 @@ winnow = { workspace = true }
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
+serde_hkx_features = { workspace = true }
 
 [lints]
 workspace = true
