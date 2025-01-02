@@ -1,8 +1,10 @@
 use crate::{
     aliases::{OwnedPatchMap, TemplatePatchMap},
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
-    output_path::{parse_nemesis_path, NemesisPath},
-    paths::collect::collect_all_patch_paths,
+    paths::{
+        collect::collect_all_patch_paths,
+        parse::{parse_nemesis_path, NemesisPath},
+    },
     results::{filter_results, partition_results},
 };
 use dashmap::DashSet;

@@ -1,6 +1,6 @@
 use crate::aliases::{MergedPatchMap, TemplatePatchMap};
 use crate::errors::Result;
-use crate::output_path::get_nemesis_id;
+use crate::paths::parse::get_nemesis_id;
 use json_patch::JsonPatch;
 use rayon::prelude::*;
 use simd_json::{base::ValueTryAsArrayMut as _, derived::ValueTryIntoArray};

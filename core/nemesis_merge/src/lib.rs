@@ -3,7 +3,6 @@ mod behavior;
 mod config;
 pub mod errors;
 mod hkx;
-mod output_path;
 mod patches;
 mod paths;
 mod results;

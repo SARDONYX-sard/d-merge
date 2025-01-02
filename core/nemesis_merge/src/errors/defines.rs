@@ -57,7 +57,7 @@ pub enum Error {
     /// Failed to parse path as nemesis path
     #[snafu(transparent)]
     FailedParseNemesisPath {
-        source: crate::output_path::NemesisPathError,
+        source: crate::paths::parse::NemesisPathError,
     },
 
     /// dir strip error
