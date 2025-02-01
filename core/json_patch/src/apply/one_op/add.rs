@@ -103,6 +103,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("address")],
             value: Value::String(Cow::Borrowed("123 Main St")),
+            ..Default::default()
         };
 
         apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -122,6 +123,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("user"), Cow::Borrowed("address")],
             value: Value::String(Cow::Borrowed("123 Main St")),
+            ..Default::default()
         };
 
         apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -138,6 +140,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("3")],
             value: Value::Static(StaticNode::U64(4)),
+            ..Default::default()
         };
 
         apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -159,6 +162,7 @@ mod tests {
                 Cow::Borrowed("3"),
             ],
             value: Value::Static(StaticNode::U64(4)),
+            ..Default::default()
         };
 
         apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -174,6 +178,7 @@ mod tests {
             op: Op::Add,
             path: ["new_key".into()].to_vec(),
             value: "new_value".into(),
+            ..Default::default()
         };
 
         apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));

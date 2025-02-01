@@ -22,6 +22,7 @@ pub fn apply_range<'a>(json: &mut Value<'a>, patch: JsonPatch<'a>) -> Result<()>
         op,
         mut path,
         value,
+        ..
     } = patch;
     let range_token = path.pop().ok_or(JsonPatchError::EmptyPointer)?;
     let range = parse_range(&range_token)?;
@@ -66,6 +67,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: json_typed!(borrowed, [4, 5]),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -85,6 +87,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1]")],
             value: json_typed!(borrowed, "x"),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -104,6 +107,7 @@ mod tests {
             op: Op::Add,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[0:]")],
             value: json_typed!(borrowed, 1),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -123,6 +127,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1]")],
             value: Value::null(),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -142,6 +147,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1:4]")],
             value: Value::null(),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -161,6 +167,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:3]")],
             value: Value::null(),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -180,6 +187,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[3:]")],
             value: Value::null(),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -199,6 +207,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[1:3]")],
             value: json_typed!(borrowed, ["x", "y"]),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -218,6 +227,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: json_typed!(borrowed, [4, 5, 6]),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -237,6 +247,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("array_key"), Cow::Borrowed("[:]")],
             value: Value::null(),
+            ..Default::default()
         };
 
         apply_range(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));

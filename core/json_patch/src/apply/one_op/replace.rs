@@ -38,6 +38,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data"), Cow::Borrowed("name")],
             value: json_typed!(borrowed, "Jane"),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -60,6 +61,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("[1]")],
             value: json_typed!(borrowed, 99),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -80,6 +82,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("key1")],
             value: json_typed!(borrowed, "new_value1"),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -100,6 +103,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data"), Cow::Borrowed("5")],
             value: json_typed!(borrowed, 99),
+            ..Default::default()
         };
 
         let result = apply_replace(&mut target_json, patch);
@@ -130,6 +134,7 @@ mod tests {
                 Cow::Borrowed("color"),
             ],
             value: json_typed!(borrowed, "red"),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -154,6 +159,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("data")],
             value: json_typed!(borrowed, [10, 20]),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -179,6 +185,7 @@ mod tests {
                 Cow::Borrowed("[2]"),
             ],
             value: json_typed!(borrowed, 99),
+            ..Default::default()
         };
 
         apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -200,6 +207,7 @@ mod tests {
             op: Op::Replace,
             path: vec![Cow::Borrowed("address"), Cow::Borrowed("zip")],
             value: json_typed!(borrowed, "12345"),
+            ..Default::default()
         };
 
         let result = apply_replace(&mut target_json, patch);

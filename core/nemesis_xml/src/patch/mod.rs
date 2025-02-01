@@ -16,14 +16,14 @@ use crate::{
     error::{Error, Result},
     helpers::tag::PointerType,
 };
-use json_patch::{JsonPatch, Op};
+use json_patch::{JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
-use std::mem;
+use std::{collections::HashMap, mem};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
@@ -33,7 +33,7 @@ use winnow::{
 
 /// # Errors
 /// Parse failed.
-pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<Vec<JsonPatch<'_>>> {
+pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<HashMap<JsonPath<'_>, JsonPatch<'_>>> {
     let mut patcher_info = PatchDeserializer::new(nemesis_xml);
     patcher_info
         .root_class()
@@ -50,7 +50,8 @@ struct PatchDeserializer<'a> {
     original: &'a str,
 
     /// Output
-    output_patches: Vec<JsonPatch<'a>>,
+    // output_patches: Vec<JsonPatch<'a>>,
+    output_patches: HashMap<JsonPath<'a>, JsonPatch<'a>>,
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // current state
@@ -64,13 +65,13 @@ struct PatchDeserializer<'a> {
 }
 
 impl<'de> PatchDeserializer<'de> {
-    const fn new(input: &'de str) -> Self {
+    fn new(input: &'de str) -> Self {
         Self {
             current: CurrentState::new(),
             field_infos: Vec::new(),
             input,
             original: input,
-            output_patches: Vec::new(),
+            output_patches: HashMap::new(),
         }
     }
 
@@ -155,11 +156,17 @@ impl<'de> PatchDeserializer<'de> {
         self.pop_current_field_table();
 
         if should_take_in_this {
-            self.output_patches.push(JsonPatch {
-                op: Op::Add,
-                path: mem::take(&mut self.current.path),
-                value: BorrowedValue::Object(Box::new(obj)),
-            });
+            let path = mem::take(&mut self.current.path);
+            let path_cloned = path.clone();
+            self.output_patches.insert(
+                path,
+                JsonPatch {
+                    op: Op::Add,
+                    path: path_cloned,
+                    value: BorrowedValue::Object(Box::new(obj)),
+                    range: None,
+                },
+            );
         }
 
         // NOTE: no need remove class name on root class.
@@ -494,11 +501,15 @@ impl<'de> PatchDeserializer<'de> {
                             path.push(range_path.into());
                         }
 
-                        self.output_patches.push(JsonPatch {
-                            op,
-                            path,
-                            value: BorrowedValue::null(),
-                        });
+                        self.output_patches.insert(
+                            path.clone(),
+                            JsonPatch {
+                                op,
+                                path,
+                                value: BorrowedValue::null(),
+                                range: Default::default(),
+                            },
+                        );
                         return Ok(true);
                     }
                     self.extend_output_patches();
@@ -515,12 +526,17 @@ impl<'de> PatchDeserializer<'de> {
         if let Some(range_path) = self.current.current_range_to_path() {
             let mut path = self.current.path.clone();
             path.push(range_path.into());
+            let path_cloned = path.clone();
             let seq_values = mem::take(&mut self.current.seq_values);
-            self.output_patches.push(JsonPatch {
-                op: self.current.judge_operation(),
+            self.output_patches.insert(
                 path,
-                value: BorrowedValue::Array(Box::new(seq_values)),
-            });
+                JsonPatch {
+                    op: self.current.judge_operation(),
+                    path: path_cloned,
+                    value: BorrowedValue::Array(Box::new(seq_values)),
+                    range: None,
+                },
+            );
             return;
         }
 
@@ -529,14 +545,28 @@ impl<'de> PatchDeserializer<'de> {
         self.output_patches.par_extend(
             patches
                 .into_par_iter()
-                .map(|CurrentJsonPatch { path, value }| JsonPatch { op, path, value }),
+                .map(|CurrentJsonPatch { path, value }| {
+                    (
+                        path.clone(),
+                        JsonPatch {
+                            op,
+                            path,
+                            value,
+                            range: None,
+                        },
+                    )
+                })
+                .collect::<HashMap<JsonPath<'_>, JsonPatch<'_>>>(),
         );
     }
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+    use json_patch::{json_path, RangeKind};
+    use rayon::collections::hash_map;
     use simd_json::json_typed;
 
     #[test]
@@ -554,18 +584,38 @@ mod tests {
 "###;
 
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            actual,
-            vec![JsonPatch {
+        // if map.contain_keys() {}
+
+        let mut hash_map = HashMap::new();
+        hash_map.insert(
+            json_path!["#0010", "hkbProjectData", "stringData"],
+            JsonPatch {
                 op: Op::Replace,
-                path: vec!["#0010", "hkbProjectData", "stringData"]
-                    .into_iter()
-                    .map(|s| s.into())
-                    .collect(),
+                path: json_path!["#0010", "hkbProjectData", "stringData"],
                 value: "$id".into(),
-            }]
+                range: Default::default(),
+            },
         );
+
+        assert_eq!(actual, hash_map);
     }
+
+    // key: vec!["#0010", "hkbProjectData", "Array", "[100:101]"]
+    // vec![ptr, ptr, ptr]
+    // value: JsonPatch
+    //
+    //- patch1
+    // key: vec!["#0010", "hkbProjectData", "Array"], range1
+    // Patch1HashMap.get(Patch2HashMap.first().unwrap())
+    //
+    //- patch2
+    // key: vec!["#0010", "hkbProjectData", "Array", range2
+    // range1 : range2
+    //
+    // vec![ptr, ptr, ptr]
+    // value: JsonPatch
+    //
+    // [op, path, range, value]
 
     #[test]
     fn push_array() {
@@ -575,6 +625,17 @@ mod tests {
 			<hkparam name="behaviorFilenames" numelements="0"></hkparam>
 			<hkparam name="characterFilenames" numelements="1">
 				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+<!-- MOD_CODE ~id~ OPEN -->
+            <hkcstring>PushDummy</hkcstring>
+            <hkcstring>PushDummy</hkcstring>
+            <hkcstring>PushDummy</hkcstring>
+            <hkcstring>PushDummy</hkcstring>
+            <hkcstring>PushDummy</hkcstring>
+            <hkcstring>PushDummy</hkcstring>
+<!-- CLOSE -->
+            <hkcstring>Original</hkcstring>
+            <hkcstring>Original</hkcstring>
+            <hkcstring>Original</hkcstring>
 <!-- MOD_CODE ~id~ OPEN -->
             <hkcstring>PushDummy</hkcstring>
             <hkcstring>PushDummy</hkcstring>
@@ -593,20 +654,14 @@ mod tests {
 "###;
 
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            actual,
-            vec![JsonPatch {
+        let mut hash_map = HashMap::new();
+
+        hash_map.insert(
+            json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
+            JsonPatch {
                 op: Op::Add,
                 // path: https://crates.io/crates/jsonpath-rust
-                path: vec![
-                    "#0009",
-                    "hkbProjectStringData",
-                    "characterFilenames",
-                    "[1:7]"
-                ]
-                .into_iter()
-                .map(|s| s.into())
-                .collect(),
+                path: json_path!["#0009", "hkbProjectStringData", "characterFilenames",],
                 value: json_typed!(
                     borrowed,
                     [
@@ -618,8 +673,11 @@ mod tests {
                         "PushDummy"
                     ]
                 ),
-            }]
+                range: Some(RangeKind::One(1..7)),
+            },
         );
+
+        assert_eq!(actual, hash_map);
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]
@@ -651,26 +709,26 @@ mod tests {
 "###;
 
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            actual,
-            vec![JsonPatch {
+        let json_path = json_path!["#0009", "hkbProjectStringData", "characterFilenames"];
+
+        let mut hash_map = HashMap::new();
+
+        hash_map.insert(
+            json_path.clone(),
+            JsonPatch {
                 op: Op::Remove,
-                path: vec![
-                    "#0009",
-                    "hkbProjectStringData",
-                    "characterFilenames",
-                    "[5:7]"
-                ]
-                .into_iter()
-                .map(|s| s.into())
-                .collect(),
+                path: json_path,
                 value: Default::default(),
-            }]
+                range: Some(RangeKind::One(6..7)),
+            },
         );
+        assert_eq!(actual, hash_map);
     }
 
+    // Todo: Consider designing for unmodified lines between patch merges
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
     #[test]
-    fn field_in_class_patch() {
+    fn replace_array() {
         let nemesis_xml = r###"
 		<hkobject name="#0008" class="hkRootLevelContainer" signature="0x2772c11e">
 			<hkparam name="namedVariants" numelements="1">
@@ -687,25 +745,28 @@ mod tests {
 		</hkobject>
 "###;
         let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            actual,
-            vec![JsonPatch {
+        let json_path = json_path![
+            "#0008",
+            "hkRootLevelContainer",
+            "namedVariants",
+            "[0]",
+            "hkRootLevelContainerNamedVariant",
+            "name"
+        ];
+        let mut hash_map = HashMap::new();
+
+        hash_map.insert(
+            json_path.clone(),
+            JsonPatch {
                 op: Op::Replace,
                 // path: https://crates.io/crates/jsonpath-rust
-                path: [
-                    "#0008",
-                    "hkRootLevelContainer",
-                    "namedVariants",
-                    "[0]",
-                    "hkRootLevelContainerNamedVariant",
-                    "name"
-                ]
-                .into_iter()
-                .map(|s| s.into())
-                .collect(),
-                value: "ReplaceDummy".into()
-            }]
+                path: json_path,
+                value: "ReplaceDummy".into(),
+                range: None,
+            },
         );
+
+        assert_eq!(actual, hash_map);
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]

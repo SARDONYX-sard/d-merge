@@ -83,6 +83,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("key2")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         apply_remove(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -106,6 +107,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("data")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         apply_remove(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -127,6 +129,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("settings")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         apply_remove(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -146,6 +149,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("key1")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         apply_remove(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
@@ -169,6 +173,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("items"), Cow::Borrowed("key3")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         let result = apply_remove(&mut target_json, patch);
@@ -189,6 +194,7 @@ mod tests {
             op: Op::Remove,
             path: vec![Cow::Borrowed("missing")],
             value: Value::Static(StaticNode::Null),
+            ..Default::default()
         };
 
         let result = apply_remove(&mut target_json, patch);
