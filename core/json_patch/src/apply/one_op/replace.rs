@@ -1,30 +1,36 @@
 use crate::apply::error::{JsonPatchError, Result};
 use crate::ptr_mut::PointerMut as _;
-use crate::JsonPatch;
-use simd_json::BorrowedValue;
+use crate::JsonPath;
+use simd_json::borrowed::Value;
 
 /// Replace one value.
 ///
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
-pub(crate) fn apply_replace<'a>(json: &mut BorrowedValue<'a>, patch: JsonPatch<'a>) -> Result<()> {
-    if let Some(target) = json.ptr_mut(&patch.path) {
-        *target = patch.value;
-        Ok(())
-    } else {
-        Err(JsonPatchError::NotFoundTarget {
-            path: patch.path.join("."),
-        })
-    }
+pub(crate) fn apply_replace<'a>(
+    json: &mut Value<'a>,
+    path: JsonPath<'a>,
+    value: Value<'a>,
+) -> Result<()> {
+    json.ptr_mut(&path).map_or_else(
+        || {
+            Err(JsonPatchError::NotFoundTarget {
+                path: path.join("."),
+            })
+        },
+        |target| {
+            *target = value;
+            Ok(())
+        },
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apply::Op;
+    use crate::json_path;
     use simd_json::json_typed;
-    use std::borrow::Cow;
 
     #[test]
     fn replace_existing_key_in_object() {
@@ -34,14 +40,11 @@ mod tests {
                 "age": 30
             }
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("data"), Cow::Borrowed("name")],
-            value: json_typed!(borrowed, "Jane"),
-            ..Default::default()
-        };
 
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["data", "name"];
+        let value = json_typed!(borrowed, "Jane");
+
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "data": {
@@ -57,14 +60,10 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "items": [1, 2, 3]
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("items"), Cow::Borrowed("[1]")],
-            value: json_typed!(borrowed, 99),
-            ..Default::default()
-        };
 
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["items", "[1]"];
+        let value = json_typed!(borrowed, 99);
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "items": [1, 99, 3]
@@ -78,14 +77,10 @@ mod tests {
             "key1": "value1",
             "key2": "value2"
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("key1")],
-            value: json_typed!(borrowed, "new_value1"),
-            ..Default::default()
-        };
 
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["key1"];
+        let value = json_typed!(borrowed, "new_value1");
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "key1": "new_value1",
@@ -99,14 +94,10 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": [10, 20, 30]
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("data"), Cow::Borrowed("5")],
-            value: json_typed!(borrowed, 99),
-            ..Default::default()
-        };
 
-        let result = apply_replace(&mut target_json, patch);
+        let path = json_path!["data", "5"];
+        let value = json_typed!(borrowed, 99);
+        let result = apply_replace(&mut target_json, path, value);
 
         assert_eq!(
             result,
@@ -126,18 +117,10 @@ mod tests {
                 }
             }
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![
-                Cow::Borrowed("settings"),
-                Cow::Borrowed("theme"),
-                Cow::Borrowed("color"),
-            ],
-            value: json_typed!(borrowed, "red"),
-            ..Default::default()
-        };
 
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["settings", "theme", "color"];
+        let value = json_typed!(borrowed, "red");
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "settings": {
@@ -155,14 +138,9 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": [1, 2, 3]
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("data")],
-            value: json_typed!(borrowed, [10, 20]),
-            ..Default::default()
-        };
-
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["data"];
+        let value = json_typed!(borrowed, [10, 20]);
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "data": [10, 20]
@@ -177,18 +155,10 @@ mod tests {
                 "list": [1, 2, 3]
             }
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![
-                Cow::Borrowed("nested"),
-                Cow::Borrowed("list"),
-                Cow::Borrowed("[2]"),
-            ],
-            value: json_typed!(borrowed, 99),
-            ..Default::default()
-        };
 
-        apply_replace(&mut target_json, patch).unwrap_or_else(|err| panic!("{err}"));
+        let path = json_path!["nested", "list", "[2]"];
+        let value = json_typed!(borrowed, 99);
+        apply_replace(&mut target_json, path, value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "nested": {
@@ -203,14 +173,10 @@ mod tests {
         let mut target_json = json_typed!(borrowed, {
             "data": []
         });
-        let patch = JsonPatch {
-            op: Op::Replace,
-            path: vec![Cow::Borrowed("address"), Cow::Borrowed("zip")],
-            value: json_typed!(borrowed, "12345"),
-            ..Default::default()
-        };
 
-        let result = apply_replace(&mut target_json, patch);
+        let path = json_path!["address", "zip"];
+        let value = json_typed!(borrowed, 12345);
+        let result = apply_replace(&mut target_json, path, value);
 
         assert_eq!(
             result,

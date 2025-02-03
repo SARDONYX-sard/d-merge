@@ -43,4 +43,4 @@ pub type SortedPatchMap<'a> = HashMap<JsonPath<'a>, JsonPatch<'a>>;
 
 /// - key: template name
 /// - value: json patches
-pub type MergedPatchMap<'a> = DashMap<String, Vec<JsonPatch<'a>>>;
+pub type MergedPatchMap<'a> = DashMap<String, SortedPatchMap<'a>>;
