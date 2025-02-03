@@ -35,7 +35,7 @@ pub fn merge_patches<'p>(
                 merge_json_patches(&mut merged_result, patch_map);
             }
 
-            let vec_result: Vec<_> = merged_result.into_iter().map(|(_, patch)| patch).collect();
+            let vec_result: Vec<_> = merged_result.into_values().collect();
             merged_patches
                 .entry(template_name.clone())
                 .or_default()
@@ -60,8 +60,8 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, key: JsonPath<'a>, patch: JsonPatch
     // 1 separate range and non-range
     match patch.range {
         Some(range_kind) => match range_kind {
-            RangeKind::One(range) => {}
-            RangeKind::Multi(vec) => {}
+            RangeKind::Sequence(range) => {}
+            RangeKind::Discrete(vec) => {}
         },
         None => {
             if base.op == patch.op {

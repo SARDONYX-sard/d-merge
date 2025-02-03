@@ -16,13 +16,15 @@ use crate::{
     error::{Error, Result},
     helpers::tag::PointerType,
 };
-use json_patch::{JsonPatch, JsonPath, Op};
+use json_patch::{JsonPatch, JsonPath, Op, OpRange, RangeKind};
 use rayon::prelude::*;
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
 };
-use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
+use simd_json::{
+    base::ValueTryAsArrayMut, borrowed::Object, BorrowedValue, StaticNode, ValueBuilder,
+};
 use std::{collections::HashMap, mem};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
@@ -212,8 +214,6 @@ impl<'de> PatchDeserializer<'de> {
         let value = {
             let value = self.parse_value(field_type)?;
 
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?field_name, ?value);
             if should_take_in_this {
                 self.current.push_current_patch(value);
                 Default::default() // return dummy
@@ -395,63 +395,70 @@ impl<'de> PatchDeserializer<'de> {
                     _ => self.class_in_field(class_name)?, // Start with `<hkobject>`
                 }
             }
-            arr if arr.starts_with("Array|") => {
-                let name = &arr[6..]; // Remove "array|"
-                let mut vec = vec![];
-
-                if name.starts_with("Null") {
-                    return Ok(BorrowedValue::Array(Box::new(vec))); // `Null`(void)
-                };
-
-                let mut index = 0;
-                let mut should_take_in_this = false;
-                while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
-                    // seq start
-                    let is_start = self.parse_start_maybe_comment()?;
-                    if is_start {
-                        should_take_in_this = true;
-                        self.current.seq_range = Some(index..index); // Start range
-                    }
-
-                    // seq inner
-                    let value = if name.starts_with("String") {
-                        self.parse_next(start_tag("hkcstring"))?;
-                        let value = self.parse_string_ptr()?;
-                        self.parse_next(end_tag("hkcstring"))?;
-                        value
-                    } else {
-                        // NOTE: In the case of nested seq patterns, intermediate indexes
-                        // need to be added here because they require a path.
-                        if self.current.seq_range.is_none() {
-                            self.current.path.push(format!("[{index}]").into());
-                        }
-                        let value = self.parse_value(name)?;
-                        if self.current.seq_range.is_none() {
-                            self.current.path.pop();
-                        }
-                        value
-                    };
-
-                    // seq end
-                    if should_take_in_this {
-                        self.current.push_current_patch(value);
-                    } else {
-                        vec.push(value);
-                    };
-                    index += 1;
-                    self.current.increment_range();
-                    if self.parse_maybe_close_comment()? {
-                        should_take_in_this = false;
-                    };
-                }
-
-                self.current.seq_range = None;
-                BorrowedValue::Array(Box::new(vec))
-            }
+            arr if arr.starts_with("Array|") => self.parse_array(arr)?,
             other => self.parse_plane_value(other)?,
         };
 
         Ok(value)
+    }
+
+    fn parse_array(&mut self, arr: &'static str) -> Result<BorrowedValue<'de>> {
+        // Array|Null
+        let name = &arr[6..]; // Remove "array|"
+        let mut vec = vec![];
+
+        if name.starts_with("Null") {
+            return Ok(BorrowedValue::Array(Box::new(vec))); // `Null`(void)
+        };
+
+        let mut index = 0;
+        let mut should_take_in_this = false;
+        while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+            // seq start
+            let is_start = self.parse_start_maybe_comment()?;
+            if is_start {
+                should_take_in_this = true;
+                self.current.seq_range = Some(index..index); // Start range
+            }
+
+            // seq inner
+            let value = if name.starts_with("String") {
+                // <hkcstring>String</hkcstring>
+                self.parse_next(start_tag("hkcstring"))?;
+                let value = self.parse_string_ptr()?;
+                self.parse_next(end_tag("hkcstring"))?;
+                value
+            } else {
+                // NOTE: In the case of nested seq patterns, intermediate indexes
+                // need to be added here because they require a path
+                // (in case of Array|Object|<ClassName>)
+                if self.current.seq_range.is_none() {
+                    self.current.path.push(format!("[{index}]").into()); // only for class
+                }
+                let value = self.parse_value(name)?;
+                // If not a class, remove `[index]` because of non-nesting.
+                //  Array|Object|<ClassName> ...Array|<TypeName> -> pop
+                if self.current.seq_range.is_none() {
+                    self.current.path.pop();
+                }
+                value
+            };
+
+            // seq end
+            if should_take_in_this {
+                self.current.push_current_patch(value);
+            } else {
+                vec.push(value);
+            };
+            index += 1;
+            self.current.increment_range();
+            if self.parse_maybe_close_comment()? {
+                should_take_in_this = false;
+            };
+        }
+
+        self.current.seq_range = None;
+        Ok(BorrowedValue::Array(Box::new(vec)))
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -494,25 +501,8 @@ impl<'de> PatchDeserializer<'de> {
                     return Ok(true);
                 }
                 CommentKind::Close => {
-                    let op = self.current.judge_operation();
-                    if op == Op::Remove {
-                        let mut path = self.current.path.clone();
-                        if let Some(range_path) = self.current.current_range_to_path() {
-                            path.push(range_path.into());
-                        }
-
-                        self.output_patches.insert(
-                            path.clone(),
-                            JsonPatch {
-                                op,
-                                path,
-                                value: BorrowedValue::null(),
-                                range: Default::default(),
-                            },
-                        );
-                        return Ok(true);
-                    }
                     self.extend_output_patches();
+                    return Ok(true);
                 }
                 _ => {}
             }
@@ -523,20 +513,81 @@ impl<'de> PatchDeserializer<'de> {
     /// This is the method that is called when a single differential change comment pair finishes calling.
     fn extend_output_patches(&mut self) {
         // range diff pattern
-        if let Some(range_path) = self.current.current_range_to_path() {
-            let mut path = self.current.path.clone();
-            path.push(range_path.into());
-            let path_cloned = path.clone();
+        if let Some(new_range) = self.current.seq_range.take() {
+            let path = self.current.path.clone(); // needless clone? replace?
             let seq_values = mem::take(&mut self.current.seq_values);
-            self.output_patches.insert(
-                path,
-                JsonPatch {
-                    op: self.current.judge_operation(),
-                    path: path_cloned,
-                    value: BorrowedValue::Array(Box::new(seq_values)),
-                    range: None,
-                },
-            );
+            let value = if self.current.judge_operation() == Op::Remove {
+                BorrowedValue::null() // no add
+            } else {
+                BorrowedValue::Array(Box::new(seq_values))
+            };
+
+            // Discrete
+            if let Some(prev_patch) = self.output_patches.remove(&path) {
+                match prev_patch.range {
+                    // twice discrete array
+                    Some(RangeKind::Sequence(prev_range)) => {
+                        let new_op = self.current.judge_operation();
+                        let new_value: Vec<BorrowedValue<'de>> = vec![prev_patch.value, value];
+
+                        let merged_range = vec![
+                            OpRange {
+                                op: prev_patch.op,
+                                range: prev_range,
+                            },
+                            OpRange {
+                                op: new_op,
+                                range: new_range,
+                            },
+                        ];
+
+                        self.output_patches.insert(
+                            prev_patch.path.clone(),
+                            JsonPatch {
+                                op: self.current.judge_operation(),
+                                path,
+                                value: new_value.into(),
+                                range: Some(RangeKind::Discrete(merged_range)),
+                            },
+                        );
+                    }
+                    // 3 times and more discrete array
+                    Some(RangeKind::Discrete(prev_vec_range)) => {
+                        let mut merged_range = prev_vec_range;
+                        merged_range.push(OpRange {
+                            op: self.current.judge_operation(),
+                            range: new_range,
+                        });
+
+                        let mut new_value = prev_patch.value;
+                        if let Ok(array) = new_value.try_as_array_mut() {
+                            array.push(value);
+                        }
+
+                        self.output_patches.insert(
+                            prev_patch.path.clone(),
+                            JsonPatch {
+                                op: self.current.judge_operation(),
+                                path,
+                                value: new_value,
+                                range: Some(RangeKind::Discrete(merged_range)),
+                            },
+                        );
+                    }
+                    None => {}
+                }
+            } else {
+                self.output_patches.insert(
+                    path.clone(),
+                    JsonPatch {
+                        op: self.current.judge_operation(),
+                        path,
+                        value,
+                        range: Some(RangeKind::Sequence(new_range)),
+                    },
+                );
+            }
+
             return;
         }
 
@@ -565,8 +616,7 @@ impl<'de> PatchDeserializer<'de> {
 mod tests {
 
     use super::*;
-    use json_patch::{json_path, RangeKind};
-    use rayon::collections::hash_map;
+    use json_patch::{json_path, OpRange, RangeKind};
     use simd_json::json_typed;
 
     #[test]
@@ -633,17 +683,6 @@ mod tests {
             <hkcstring>PushDummy</hkcstring>
             <hkcstring>PushDummy</hkcstring>
 <!-- CLOSE -->
-            <hkcstring>Original</hkcstring>
-            <hkcstring>Original</hkcstring>
-            <hkcstring>Original</hkcstring>
-<!-- MOD_CODE ~id~ OPEN -->
-            <hkcstring>PushDummy</hkcstring>
-            <hkcstring>PushDummy</hkcstring>
-            <hkcstring>PushDummy</hkcstring>
-            <hkcstring>PushDummy</hkcstring>
-            <hkcstring>PushDummy</hkcstring>
-            <hkcstring>PushDummy</hkcstring>
-<!-- CLOSE -->
 			</hkparam>
 			<hkparam name="eventNames" numelements="0"></hkparam>
 			<hkparam name="animationPath"></hkparam>
@@ -673,7 +712,77 @@ mod tests {
                         "PushDummy"
                     ]
                 ),
-                range: Some(RangeKind::One(1..7)),
+                range: Some(RangeKind::Sequence(1..7)),
+            },
+        );
+
+        assert_eq!(actual, hash_map);
+    }
+
+    #[test]
+    fn discrete_push_array() {
+        let nemesis_xml = r###"
+		<hkobject name="#0009" class="hkbProjectStringData" signature="0x76ad60a">
+			<hkparam name="animationFilenames" numelements="0"></hkparam>
+			<hkparam name="behaviorFilenames" numelements="0"></hkparam>
+			<hkparam name="characterFilenames" numelements="1">
+				<hkcstring>Characters\DefaultMale.hkx</hkcstring>
+<!-- MOD_CODE ~id~ OPEN -->
+                <hkcstring>PushDummy</hkcstring>
+                <hkcstring>PushDummy</hkcstring>
+                <hkcstring>PushDummy</hkcstring>
+                <hkcstring>PushDummy</hkcstring>
+                <hkcstring>PushDummy</hkcstring>
+                <hkcstring>PushDummy</hkcstring>
+<!-- CLOSE -->
+                <hkcstring>Original</hkcstring>
+                <hkcstring>Original</hkcstring>
+                <hkcstring>Original</hkcstring>
+                <hkcstring>Original</hkcstring>
+<!-- MOD_CODE ~id~ OPEN -->
+
+<!-- ORIGINAL -->
+                <hkcstring>Original</hkcstring>
+                <hkcstring>Original</hkcstring>
+<!-- CLOSE -->
+			</hkparam>
+			<hkparam name="behaviorPath"></hkparam>
+			<hkparam name="characterPath"></hkparam>
+			<hkparam name="fullPathToSource"></hkparam>
+		</hkobject>
+"###;
+        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let mut hash_map = HashMap::new();
+
+        let array_value = json_typed!(
+            borrowed,
+            [
+                "PushDummy",
+                "PushDummy",
+                "PushDummy",
+                "PushDummy",
+                "PushDummy",
+                "PushDummy"
+            ]
+        );
+
+        hash_map.insert(
+            json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
+            JsonPatch {
+                op: Op::Remove,
+                // path: https://crates.io/crates/jsonpath-rust
+                path: json_path!["#0009", "hkbProjectStringData", "characterFilenames",],
+                value: json_typed!(borrowed, [array_value, null]),
+                range: Some(RangeKind::Discrete(vec![
+                    OpRange {
+                        op: Op::Add,
+                        range: 1..7,
+                    },
+                    OpRange {
+                        op: Op::Remove,
+                        range: 11..13,
+                    },
+                ])),
             },
         );
 
@@ -719,7 +828,7 @@ mod tests {
                 op: Op::Remove,
                 path: json_path,
                 value: Default::default(),
-                range: Some(RangeKind::One(6..7)),
+                range: Some(RangeKind::Sequence(5..7)),
             },
         );
         assert_eq!(actual, hash_map);

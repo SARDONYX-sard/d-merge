@@ -15,14 +15,20 @@ use std::ops::Range;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OpRange {
+    pub op: Op,
+    pub range: Range<usize>,
+}
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeKind {
-    One(Range<usize>),
-    Multi(Vec<Range<usize>>),
+    Sequence(Range<usize>),
+    Discrete(Vec<OpRange>),
 }
 
 impl Default for RangeKind {
     fn default() -> Self {
-        Self::One(0..0)
+        Self::Sequence(0..0)
     }
 }
 

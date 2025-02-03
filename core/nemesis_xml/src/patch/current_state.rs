@@ -86,16 +86,6 @@ impl<'de> CurrentState<'de> {
         (op, mem::take(&mut self.patches))
     }
 
-    pub fn current_range_to_path(&self) -> Option<String> {
-        self.seq_range.as_ref().map(|range| {
-            let Range { start, end } = range.clone();
-            match (start..end).count() {
-                0 => format!("[{end}]"),
-                _ => format!("[{start}:{end}]"),
-            }
-        })
-    }
-
     pub fn increment_range(&mut self) {
         if let Some(ref mut range) = self.seq_range {
             range.end += 1;
