@@ -48,9 +48,16 @@ pub fn merge_patches<'p>(
 
 fn merge_json_patches<'a>(base: &mut SortedPatchMap<'a>, additional: SortedPatchMap<'a>) {
     for (key, value) in additional {
+        // Same path is mutation.
+        // Todo: Except for three patterns in hash key
+        // conflict
+        // - (non conflict) e.g. Remove: 1..5, Add: 10..11 -> Remove:1..5, Add: 10..11
+        // - (patch start) e.g. Remove: 1..5, Add: 4..11 -> Remove:1..3, Add: 4..11
+        // - (base end) e.g. Remove: 10..12, Add: 4..10 -> Add: 4..10, Remove:11..12
         if let Some(base_mut) = base.get_mut(&key) {
             merge_inner(base_mut, value);
         } else {
+            // Todo: Add three patterns
             base.insert(key, value);
         }
     }
@@ -84,12 +91,37 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, patch: JsonPatch<'a>) {
                         range: patch_range,
                     } = patch_op_range;
 
-                    let equal_replace =
-                        *base_op == Op::Remove && *patch_op == Op::Add && base_range == patch_range;
+                    let is_same_start = base_range.start == patch_range.start;
 
-                    if equal_replace {
-                        *base_op = Op::Replace;
-                        *base_value = patch_value;
+                    match (&base_op, &patch_op) {
+                        (Op::Add, Op::Add) => {
+                            // Add patch
+                            // e.g. Add:  1..5,  Add: 10..11 -> Add: 1..5,  Add: 10..11
+                            // e.g. Add:  1..5,  Add:  4..11 -> Add: 1..12
+                            // e.g. Add:  1..20(+19), Add: 11..15(+4) -> Add: 1..24(+23)
+                            // e.g. Add: 10..12, Add:  4..10 -> Add: 4..10, Add: 11..12
+                            if is_same_start {
+                                let _ =
+                                    seq_add(base_range, base_value, patch_range.len(), patch_value);
+                            }
+                        }
+                        (Op::Remove, Op::Add) => {
+                            // Replace patch
+                            if is_same_start {
+                                // There can be no other pattern than these two.
+                                // - e.g. Remove: 1657..1661(+3), Add: 1657..1661(+3) -> Replace: 1657..1661(+3)
+                                // - e.g. Remove: 1657..1661(+3), Add: 1657..1662(+4) -> Replace: 1657..1662(+4)
+                                *base_op = Op::Replace;
+                                base_range.end = patch_range.end;
+                                *base_value = patch_value;
+                            } else {
+                                // TODO: Discrete indices are treated as separate patches at a higher function stage before reaching this point.
+                                // e.g. Remove: 1..5, Add: 10..11 -> Remove:1..5, Add: 10..11
+                                // e.g. Remove: 1..5, Add: 4..11 -> Remove:1..3, Add: 4..11
+                                // e.g. Remove: 10..12, Add: 4..10 -> Add: 4..10, Remove:11..12
+                            }
+                        }
+                        _ => unimplemented!(),
                     }
                 }
                 OpRangeKind::Discrete(_op_ranges) => {}
@@ -98,13 +130,7 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, patch: JsonPatch<'a>) {
         }
         OpRangeKind::Discrete(_op_ranges) => {}
         OpRangeKind::Pure(op) => match op {
-            Op::Add => {
-                if let Ok(base_arr) = base.value.try_as_array_mut() {
-                    if let Ok(additional_arr) = patch_value.try_into_array() {
-                        base_arr.extend(additional_arr);
-                    }
-                }
-            }
+            Op::Add => {} // TODO: error occurred (unit value; e.g. 1, "string")
             Op::Replace => {
                 base.value = patch_value;
             }
@@ -115,6 +141,25 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, patch: JsonPatch<'a>) {
     }
 }
 
+fn seq_add<'a>(
+    base_range: &mut std::ops::Range<usize>,
+    base_value: &mut Value<'a>,
+    patch_range_len: usize,
+    patch_value: Value<'a>,
+) -> Result<(), MergeError> {
+    let base_arr = base_value.try_as_array_mut()?;
+    base_arr.par_extend(patch_value.try_into_array()?);
+    base_range.end += patch_range_len;
+    Ok(())
+}
+
+#[derive(Debug, snafu::Snafu)]
+enum MergeError {
+    #[snafu(transparent)]
+    TryTypeError { source: simd_json::TryTypeError },
+}
+
+/// Remove & fallback to default
 fn remove(base: &mut JsonPatch<'_>) {
     match &mut base.value {
         Value::Object(map) => {
@@ -173,7 +218,7 @@ mod tests {
                     op: Op::Add,
                     range: 1656..1657,
                 }),
-                value: json_typed!(borrowed, "Animations\\1hm_UnsheatheAttack.hkx"),
+                value: json_typed!(borrowed, ["Animations\\1hm_UnsheatheAttack.hkx"]),
             },
         );
 
@@ -186,15 +231,14 @@ mod tests {
                     op: Op::Add,
                     range: 1656..1657,
                 }),
-                value: json_typed!(borrowed, "Animations\\MomoAJ\\mt_jumpfallback.hkx"),
+                value: json_typed!(borrowed, ["Animations\\MomoAJ\\mt_jumpfallback.hkx"]),
             },
         );
 
         merge_json_patches(&mut base_hash_map, add_hash_map);
 
         let mut expected = HashMap::new();
-        let json_path = json_path!["#0029", "hkbCharacterStringData", "animationNames",];
-
+        let json_path = json_path!["#0009", "hkbProjectStringData", "characterFilenames",];
         expected.insert(
             json_path,
             JsonPatch {
@@ -202,7 +246,6 @@ mod tests {
                     op: Op::Add,
                     range: 1656..1658,
                 }),
-
                 value: json_typed!(
                     borrowed,
                     [
@@ -282,6 +325,55 @@ mod tests {
                 op: OpRangeKind::Seq(json_patch::OpRange {
                     op: Op::Replace,
                     range: 1656..1657,
+                }),
+
+                value: json_typed!(borrowed, ["Animations\\MomoAJ\\mt_jumpfallback.hkx"]),
+            },
+        );
+
+        assert_eq!(base_hash_map, expected);
+    }
+
+    #[test]
+    fn test_seq_op_not_same_json_patches() {
+        // Ex.1
+        let json_path = json_path!["#0009", "hkbCharacterStringData", "characterFilenames",];
+        let mut base_hash_map = HashMap::new();
+
+        base_hash_map.insert(
+            json_path.clone(),
+            JsonPatch {
+                op: OpRangeKind::Seq(OpRange {
+                    op: Op::Remove,
+                    range: 1656..1657,
+                }),
+                value: json_typed!(borrowed, null),
+            },
+        );
+
+        let mut add_hash_map = HashMap::new();
+
+        add_hash_map.insert(
+            json_path.clone(),
+            JsonPatch {
+                op: OpRangeKind::Seq(json_patch::OpRange {
+                    op: Op::Add,
+                    range: 1656..1658,
+                }),
+                value: json_typed!(borrowed, ["Animations\\MomoAJ\\mt_jumpfallback.hkx"]),
+            },
+        );
+
+        merge_json_patches(&mut base_hash_map, add_hash_map);
+
+        let mut expected = HashMap::new();
+
+        expected.insert(
+            json_path,
+            JsonPatch {
+                op: OpRangeKind::Seq(json_patch::OpRange {
+                    op: Op::Replace,
+                    range: 1656..1658,
                 }),
 
                 value: json_typed!(borrowed, ["Animations\\MomoAJ\\mt_jumpfallback.hkx"]),
