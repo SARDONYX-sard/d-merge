@@ -1,6 +1,6 @@
 use dashmap::DashMap;
 use indexmap::IndexMap;
-use json_patch::JsonPatch;
+use json_patch::{JsonPatch, JsonPath};
 use simd_json::BorrowedValue;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -35,8 +35,12 @@ pub type PatchIdxMap<'a> = DashMap<String, ModPatchMap<'a>>;
 
 /// - key: mod_code (e.g.: "aaaa", "bbbb")
 /// - value: patches
-pub type ModPatchMap<'a> = HashMap<String, Vec<JsonPatch<'a>>>;
+pub type ModPatchMap<'a> = HashMap<String, SortedPatchMap<'a>>;
+
+/// - key : path
+/// - value: json patch
+pub type SortedPatchMap<'a> = HashMap<JsonPath<'a>, JsonPatch<'a>>;
 
 /// - key: template name
 /// - value: json patches
-pub type MergedPatchMap<'a> = DashMap<String, Vec<JsonPatch<'a>>>;
+pub type MergedPatchMap<'a> = DashMap<String, SortedPatchMap<'a>>;

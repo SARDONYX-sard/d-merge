@@ -1,5 +1,5 @@
 use crate::apply::error::{JsonPatchError, Result};
-use crate::JsonPatch;
+use crate::JsonPath;
 use simd_json::borrowed::Value;
 use simd_json::derived::ValueTryAsScalar as _;
 use simd_json::StaticNode;
@@ -12,9 +12,11 @@ use simd_json::StaticNode;
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead.
-pub(crate) fn apply_add<'value>(json: &mut Value<'value>, patch: JsonPatch<'value>) -> Result<()> {
-    let JsonPatch { path, value, .. } = patch;
-
+pub(crate) fn apply_add<'value>(
+    json: &mut Value<'value>,
+    path: JsonPath<'value>,
+    value: Value<'value>,
+) -> Result<()> {
     if path.is_empty() {
         return Err(JsonPatchError::EmptyPointer);
     }
@@ -89,7 +91,7 @@ pub(crate) fn apply_add<'value>(json: &mut Value<'value>, patch: JsonPatch<'valu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apply::Op;
+    use crate::json_path;
     use simd_json::{json_typed, value::StaticNode};
     use std::borrow::Cow;
 
@@ -99,13 +101,13 @@ mod tests {
             "name": "John",
             "age": 30
         });
-        let patch = JsonPatch {
-            op: Op::Add,
-            path: vec![Cow::Borrowed("address")],
-            value: Value::String(Cow::Borrowed("123 Main St")),
-        };
 
-        apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
+        apply_add(
+            &mut target,
+            json_path!("address"),
+            Value::String(Cow::Borrowed("123 Main St")),
+        )
+        .unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["address"], "123 Main St");
     }
@@ -118,13 +120,10 @@ mod tests {
                 "age": 30
             }
         });
-        let patch = JsonPatch {
-            op: Op::Add,
-            path: vec![Cow::Borrowed("user"), Cow::Borrowed("address")],
-            value: Value::String(Cow::Borrowed("123 Main St")),
-        };
 
-        apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
+        let value = Value::String(Cow::Borrowed("123 Main St"));
+        apply_add(&mut target, json_path!("user", "address"), value)
+            .unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["user"]["address"], "123 Main St");
     }
@@ -134,13 +133,10 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "items": [1, 2, 3]
         });
-        let patch = JsonPatch {
-            op: Op::Add,
-            path: vec![Cow::Borrowed("items"), Cow::Borrowed("3")],
-            value: Value::Static(StaticNode::U64(4)),
-        };
+        let value = Value::Static(StaticNode::U64(4));
+        apply_add(&mut target, json_path!("items", "3"), value)
+            .unwrap_or_else(|err| panic!("{err}"));
 
-        apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
         assert_eq!(target["items"][3], 4);
     }
 
@@ -151,17 +147,11 @@ mod tests {
                 "items": [1, 2, 3]
             }
         });
-        let patch = JsonPatch {
-            op: Op::Add,
-            path: vec![
-                Cow::Borrowed("data"),
-                Cow::Borrowed("items"),
-                Cow::Borrowed("3"),
-            ],
-            value: Value::Static(StaticNode::U64(4)),
-        };
 
-        apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
+        let value = Value::Static(StaticNode::U64(4));
+        apply_add(&mut target, json_path!("data", "items", "3"), value)
+            .unwrap_or_else(|err| panic!("{err}"));
+
         assert_eq!(target["data"]["items"][3], 4);
     }
 
@@ -170,13 +160,9 @@ mod tests {
         let mut target = json_typed!(borrowed, {
             "existing_key": "existing_value"
         });
-        let patch = JsonPatch {
-            op: Op::Add,
-            path: ["new_key".into()].to_vec(),
-            value: "new_value".into(),
-        };
 
-        apply_add(&mut target, patch).unwrap_or_else(|err| panic!("{err}"));
+        let value = "new_value".into();
+        apply_add(&mut target, json_path!("new_key"), value).unwrap_or_else(|err| panic!("{err}"));
 
         let expected = json_typed!(borrowed, {
             "existing_key": "existing_value",
