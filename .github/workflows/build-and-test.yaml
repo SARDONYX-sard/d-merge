@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
   pull_request:
-    branches: '*'
+    branches: ["*"]
   workflow_dispatch: # <- Setting to allow manual execution by button.
 
 env:
@@ -95,11 +95,11 @@ jobs:
       - name: Sync node version
         uses: actions/setup-node@v4.1.0
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: Node.js cache
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.2
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
