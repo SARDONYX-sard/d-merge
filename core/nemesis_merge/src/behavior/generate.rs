@@ -47,7 +47,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
         let patches = { merge_patches(template_patch_map, &ids)? };
 
-        // 3/4: Apply patches
+        // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
         if let Err(errors) = apply_patches(&templates, patches) {
             all_errors.par_extend(errors);

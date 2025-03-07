@@ -23,6 +23,9 @@ pub fn apply_patches<'a, 'b: 'a>(
                         template_name: template_name.clone(),
                         patch: patch_string,
                     })?;
+
+                    // TODO: Replace variables to indexes
+                    // template
                 }
             }
             Ok(())

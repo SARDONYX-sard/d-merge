@@ -10,18 +10,36 @@
 //! ```xml
 //!      <hkobject name="#0052" class="hkbBehaviorGraphStringData" signature="0xc713064e">
 //!          <hkparam name="eventNames" numelements="9">
-//!              <hkcstring>staggerStop</hkcstring>
-//!              <!-- (omit) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  0) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  1) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  2) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  3) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  4) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  5) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  6) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  7) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  8) -->
+//!              <hkcstring>eventSample</hkcstring> <!-- (index is  9) -->
 //! <!-- MOD_CODE ~sample~ OPEN -->
 //!              <hkcstring>eventSample</hkcstring> <!-- (index is 10) -->
 //! <!-- CLOSE -->
 //!          </hkparam>
 //!          <hkparam name="variableNames" numelements="9">
-//!              <!-- (omit) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  0) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  1) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  2) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  3) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  4) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  5) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  6) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  7) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  8) -->
+//!              <hkcstring>variableSample</hkcstring> <!-- (index is  9) -->
 //! <!-- MOD_CODE ~sample~ OPEN -->
 //!              <hkcstring>variableSample</hkcstring> <!-- (index is 10) -->
 //! <!-- CLOSE -->
 //!          </hkparam>
+//!      <hkobject>
 //! ```
 //!
 //! - #sample$1.txt
@@ -38,6 +56,7 @@
 //!     <!-- (omit) -->
 //! </hkobject>
 //! ```
+
 use winnow::{
     ascii::Caseless,
     combinator::delimited,
