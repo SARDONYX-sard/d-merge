@@ -3,33 +3,86 @@
 //! 1. in the creation stage of this patch, it is necessary to replace eventName with index, so it is reserved as a string here. 2.
 //! 2. replace them in the merge stage of patch.
 
-use json_patch::ptr_mut::PointerMut;
-use simd_json::{borrowed::Value, derived::ValueTryAsArray, StaticNode};
+use json_patch::{json_path, ptr_mut::PointerMut, JsonPath};
+use simd_json::{base::ValueTryAsArrayMut, borrowed::Value, StaticNode};
 
-#[allow(unused)]
+enum IdKind {
+    Event,
+    Variable,
+}
+
+struct NemesisVar<'xml> {
+    ///  hkbBehaviorGraphStringData template index (pre create)
+    index: &'xml str,
+
+    /// SpeedWalk
+    id: &'xml str,
+    /// e.g. "#sample$1", "hkbVariableBindingSet", "bindings", "[0]", "variableIndex",
+    id_path: JsonPath<'xml>,
+    /// - e.g. $eventID[sampleEvent]$ -> Event
+    /// - e.g. $variableID[sampleName]$ -> Variable
+    id_kind: IdKind,
+}
+
+// FIXME: Temp
+impl Default for NemesisVar<'_> {
+    fn default() -> Self {
+        NemesisVar {
+            index: "106",
+            id: "SpeedWalk",
+            id_path: json_path![
+                "#sample$1",
+                "hkbVariableBindingSet",
+                "bindings",
+                "[0]",
+                "variableIndex",
+            ],
+            id_kind: IdKind::Event,
+        }
+    }
+}
+
 #[allow(clippy::unwrap_used)]
-fn replace_var(template: &mut Value<'_>) {
-    let var_array = template
-        .ptr_mut(&["106", "hkbBehaviorGraphStringData", "variableNames"])
+fn replace_var_common_process(
+    template: &mut Value<'_>,
+    event_path: &[&str],
+    id_path: JsonPath<'_>,
+    id: &str,
+) {
+    let search_target_array = template
+        .ptr_mut(event_path)
+        .unwrap()
+        .try_as_array_mut()
         .unwrap();
-    let var_array = var_array.try_as_array().unwrap();
 
-    let (index, _) = var_array
+    let (index, _) = search_target_array
         .iter()
         .enumerate()
-        .find(|(_, item)| **item == Value::String("SpeedWalk".into()))
+        .find(|(_, item)| **item == Value::String(id.into()))
         .unwrap();
 
-    let target = template
-        .ptr_mut(&[
-            "#sample$1",
-            "hkbVariableBindingSet",
-            "bindings",
-            "[0]",
-            "variableIndex",
-        ])
-        .unwrap();
-    *target = Value::Static(StaticNode::U64(index as u64));
+    let target = template.ptr_mut(id_path).unwrap();
+    *target = Value::Static(StaticNode::U64(index as u64)); // assumed cast type as u64
+}
+
+pub fn replace_var(template: &mut Value<'_>, nemesis_vars: NemesisVar<'_>) {
+    let NemesisVar {
+        index,
+        id,
+        id_path,
+        id_kind,
+    } = nemesis_vars;
+
+    match id_kind {
+        IdKind::Variable => {
+            let var_path = &[index, "hkbBehaviorGraphStringData", "variableNames"];
+            replace_var_common_process(template, var_path, id_path, id);
+        }
+        IdKind::Event => {
+            let event_path = &[index, "hkbBehaviorGraphStringData", "eventNames"];
+            replace_var_common_process(template, event_path, id_path, id);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -82,7 +135,7 @@ mod tests {
         });
 
         // call replacer this
-        replace_var(&mut template);
+        replace_var(&mut template, NemesisVar::default());
 
         let expected = simd_json::json_typed!(borrowed, {
             "106": {
@@ -116,7 +169,6 @@ mod tests {
                 }
             }
         });
-
         assert_eq!(template, expected);
     }
 }

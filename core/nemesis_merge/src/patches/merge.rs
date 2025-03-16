@@ -20,28 +20,34 @@ pub fn merge_patches<'p>(
     patches: TemplatePatchMap<'p>,
     ids: &[String],
 ) -> Result<MergedPatchMap<'p>> {
+    // new merged patches
     let merged_patches = MergedPatchMap::new();
 
-    patches.into_par_iter().for_each(|idx_map| {
-        let (template_name, patch_idx_map) = idx_map;
+    // patch loop
+    patches
+        .into_par_iter()
+        .for_each(|(template_name, patch_idx_map)| {
+            // index loop
+            patch_idx_map.into_par_iter().for_each(|patch| {
+                let (_index, mut patches) = patch;
 
-        patch_idx_map.into_par_iter().for_each(|patch| {
-            let (_index, mut patches) = patch;
+                // Priority sorting by id and path from GUI
+                let sorted_patches: Vec<SortedPatchMap<'_>> =
+                    ids.iter().filter_map(|id| patches.remove(id)).collect();
 
-            let sorted_patches: Vec<SortedPatchMap<'_>> =
-                ids.iter().filter_map(|id| patches.remove(id)).collect();
+                // Merge json patches
+                let mut merged_result = HashMap::new();
+                for patch_map in sorted_patches {
+                    merge_json_patches(&mut merged_result, patch_map);
+                }
 
-            let mut merged_result = HashMap::new();
-            for patch_map in sorted_patches {
-                merge_json_patches(&mut merged_result, patch_map);
-            }
-
-            merged_patches
-                .entry(template_name.clone())
-                .or_default()
-                .par_extend(merged_result);
+                // Insert merged patches
+                merged_patches
+                    .entry(template_name.clone())
+                    .or_default()
+                    .par_extend(merged_result);
+            });
         });
-    });
 
     Ok(merged_patches)
 }

@@ -260,6 +260,17 @@ impl<'de> PatchDeserializer<'de> {
         let var_parser = variable_id.map(|s| s.into());
         let int_parser = dec_int.map(|int: i64| int.into());
         let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+
+        // let (value, id_kind) = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        // if id_kind != IdKind::Int {
+        //    NemesisVar {
+        //        id: value,
+        //        id_path: self.current.path,
+        //        id_kind, (if integer, immutable)
+        //    }
+        // };
+        // (middle)
+
         Ok(value)
     }
 
