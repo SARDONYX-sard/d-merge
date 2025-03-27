@@ -5,13 +5,13 @@ use crate::{
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
-        collect::{collect_borrowed_patches, collect_owned_patches},
+        collect::{collect_borrowed_patches, collect_owned_patches, PatchResult},
         merge::{merge_patches, paths_to_ids},
     },
     templates::collect::collect_templates,
 };
 use rayon::prelude::*;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
@@ -33,7 +33,12 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     };
 
     options.report_status(Status::ReadingTemplatesAndPatches);
-    let ((template_names, template_patch_map), errors) = collect_borrowed_patches(&owned_patches);
+    let (patch_result, errors) = collect_borrowed_patches(&owned_patches);
+    let PatchResult {
+        template_names,
+        template_patch_map,
+        id_index,
+    } = patch_result;
     let patch_errors_len = errors.len();
     all_errors.par_extend(errors);
 
@@ -53,6 +58,17 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             all_errors.par_extend(errors);
         };
         let apply_errors_len = all_errors.len();
+
+        // create ids map.
+        // create hkbGraphStringData
+        //
+        let mut event_id_map = HashMap::new(); // key: elem of vec, value: index of vec
+        let mut variable_id_map = HashMap::new(); // key: elem of vec, value: index of vec
+
+        //todo 4/4: Create ClassMap & id_map
+        // class_map.get(index);
+        // hkbGraphStringData.eventNames: Vec<Cow<'a, str>
+        // hkbBehaviorGraphStringData.VariableNames: Vec<Cow<'a, str>
 
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);

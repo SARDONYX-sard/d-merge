@@ -69,9 +69,10 @@ fn txt_to_json(txt_path: &PathBuf, output: &Path) -> Result<()> {
         let nemesis_xml = std::fs::read_to_string(txt_path).with_context(|_| FailedIoSnafu {
             path: txt_path.clone(),
         })?;
-        let patch = parse_nemesis_patch(&nemesis_xml).with_context(|_| NemesisXmlErrSnafu {
-            path: txt_path.clone(),
-        })?;
+        let (patch, _id_index) =
+            parse_nemesis_patch(&nemesis_xml).with_context(|_| NemesisXmlErrSnafu {
+                path: txt_path.clone(),
+            })?;
 
         let patch = GenerableJsonPatches::from(patch);
         simd_json::to_string_pretty(&patch).with_context(|_| JsonSnafu {

@@ -14,7 +14,6 @@ pub fn apply_patches<'a, 'b: 'a>(
     patch_mod_map: MergedPatchMap<'b>,
     // nemesis_vars: NemesisVars,
 ) -> Result<(), Vec<Error>> {
-    //
     let results = patch_mod_map // patches
         .into_par_iter()
         .map(|(template_name, patches)| {

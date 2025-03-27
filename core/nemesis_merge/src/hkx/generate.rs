@@ -7,7 +7,7 @@ use crate::{
 };
 use rayon::prelude::*;
 use serde_hkx::bytes::serde::hkx_header::HkxHeader;
-use serde_hkx_features::alt_map::{convert_to_usize_keys, ClassMapAlt};
+use serde_hkx_features::ClassMap;
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 use std::{fs, path::Path};
@@ -33,13 +33,25 @@ pub(crate) fn generate_hkx_files(
             write_json_patch(&output_path, &template_json)?;
 
             let hkx_bytes = {
-                let ast = from_borrowed_value::<ClassMapAlt>(template_json).with_context(|_| {
-                    JsonSnafu {
+                let class_map =
+                    from_borrowed_value::<ClassMap>(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
-                    }
-                })?;
-                let class_map = convert_to_usize_keys(ast)?;
-                serde_hkx::to_bytes(&class_map, &HkxHeader::new_skyrim_se())?
+                    })?;
+
+                let header = HkxHeader::new_skyrim_se();
+
+                // create id_maps
+                // hkx ids
+                //
+                // 0_master.hkx: $eventNames[speed]$
+                // $name$.hkx:   $eventNames[speed]$
+
+                // let ser = serde_hkx::bytes::ser::ByteSerializer::from_maps(
+                //     // event_id_map,
+                //     // variable_id_map,
+                //     &header,
+                // );
+                serde_hkx::bytes::ser::to_bytes_with_opt(&class_map, &header, ser)?
             };
 
             output_path.set_extension("hkx");
