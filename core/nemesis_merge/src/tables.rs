@@ -5,43 +5,61 @@
 //!
 //! From here, we need to determine and load the xml to which the patch will be applied, so we use a table to load this.
 //! Note that the dir paths above `mesh` can be optionally specified and concatenated as resource paths later.
-use phf::{phf_ordered_map, OrderedMap};
+use dashmap::DashMap;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::path::{Path, PathBuf};
 
-/// hkx to XML
-pub type XmlTemplateTable = OrderedMap<&'static str, &'static str>;
+pub fn collect_nemesis_paths<P>(path: P) -> DashMap<String, PathBuf>
+where
+    P: AsRef<Path>,
+{
+    let paths: Vec<PathBuf> = jwalk::WalkDir::new(path)
+        .into_iter()
+        .filter_map(|res| {
+            if let Ok(path) = res.map(|entry| entry.path()) {
+                let ext = path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
+                if ext {
+                    return Some(path);
+                }
+            }
+            None
+        })
+        .collect();
 
-/// NOTE: `shoutmounted_behavior` is x64 only
-#[rustfmt::skip]
-pub const TEMPLATE_BEHAVIORS: XmlTemplateTable = phf_ordered_map! {
-    "0_master"                         => "meshes/actors/character/behaviors/0_master.xml"                        ,
-    "1hm_behavior"                     => "meshes/actors/character/behaviors/1hm_behavior.xml"                    ,
-    "1hm_locomotion"                   => "meshes/actors/character/behaviors/1hm_locomotion.xml"                  ,
-    "bashbehavior"                     => "meshes/actors/character/behaviors/bashbehavior.xml"                    ,
-    "blockbehavior"                    => "meshes/actors/character/behaviors/blockbehavior.xml"                   ,
-    "bow_direction_behavior"           => "meshes/actors/character/behaviors/bow_direction_behavior.xml"          ,
-    "horsebehavior"                    => "meshes/actors/character/behaviors/horsebehavior.xml"                   ,
-    "idlebehavior"                     => "meshes/actors/character/behaviors/idlebehavior.xml"                    ,
-    "magic_readied_direction_behavior" => "meshes/actors/character/behaviors/magic_readied_direction_behavior.xml",
-    "magicbehavior"                    => "meshes/actors/character/behaviors/magicbehavior.xml"                   ,
-    "mt_behavior"                      => "meshes/actors/character/behaviors/mt_behavior.xml"                     ,
-    "shout_behavior"                   => "meshes/actors/character/behaviors/shout_behavior.xml"                  ,
-    "shoutmounted_behavior.hkx"        => "meshes/actors/character/behaviors/shoutmounted_behavior.xml",
-    "sprintbehavior"                   => "meshes/actors/character/behaviors/sprintbehavior.xml"                  ,
-    "staggerbehavior"                  => "meshes/actors/character/behaviors/staggerbehavior.xml"                 ,
-    "weapequip"                        => "meshes/actors/character/behaviors/weapequip.xml"                       ,
+    paths
+        .into_par_iter()
+        .filter_map(|path| {
+            let key = key_from_path(&path)?;
+            Some((key, path))
+        })
+        .collect()
+}
 
-    "_1stperson/0_master"               => "meshes/actors/character/_1stperson/behaviors/0_master.xml"              ,
-    "_1stperson/1hm_behavior"           => "meshes/actors/character/_1stperson/behaviors/1hm_behavior.xml"          ,
-    "_1stperson/1hm_locomotion"         => "meshes/actors/character/_1stperson/behaviors/1hm_locomotion.xml"        ,
-    "_1stperson/bashbehavior"           => "meshes/actors/character/_1stperson/behaviors/bashbehavior.xml"          ,
-    "_1stperson/blockbehavior"          => "meshes/actors/character/_1stperson/behaviors/blockbehavior.xml"         ,
-    "_1stperson/bow_direction_behavior" => "meshes/actors/character/_1stperson/behaviors/bow_direction_behavior.xml",
-    "_1stperson/horsebehavior"          => "meshes/actors/character/_1stperson/behaviors/horsebehavior.xml"         ,
-    "_1stperson/idlebehavior"           => "meshes/actors/character/_1stperson/behaviors/idlebehavior.xml"          ,
-    "_1stperson/magicbehavior"          => "meshes/actors/character/_1stperson/behaviors/magicbehavior.xml"         ,
-    "_1stperson/mt_behavior"            => "meshes/actors/character/_1stperson/behaviors/mt_behavior.xml"           ,
-    "_1stperson/shout_behavior"         => "meshes/actors/character/_1stperson/behaviors/shout_behavior.xml"        ,
-    "_1stperson/sprintbehavior"         => "meshes/actors/character/_1stperson/behaviors/sprintbehavior.xml"        ,
-    "_1stperson/staggerbehavior"        => "meshes/actors/character/_1stperson/behaviors/staggerbehavior.xml"       ,
-    "_1stperson/weapequip"              => "meshes/actors/character/_1stperson/behaviors/weapequip.xml"             ,
-};
+fn key_from_path(path: &Path) -> Option<String> {
+    let file_stem = path.file_stem()?.to_string_lossy();
+    let mut components = path.components();
+
+    let is_1stperson = components.any(|c| c.as_os_str().eq_ignore_ascii_case("_1stPerson"));
+
+    Some(if is_1stperson {
+        format!("_1stperson/{file_stem}")
+    } else {
+        file_stem.to_string()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_1st_person() {
+        let path = Path::new(
+            "resource/assets/templates/meshes/actors/character/_1stperson/behaviors/weapequip.xml",
+        );
+
+        assert_eq!(key_from_path(path).as_deref(), Some("_1stperson/weapequip"));
+    }
+}

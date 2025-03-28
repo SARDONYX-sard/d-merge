@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 /// - key: template file stem(e.g. `0_master`)
 /// - value: output_path(hkx file path), borrowed json (from template xml)
-pub type BorrowedTemplateMap<'a> = DashMap<String, (&'a str, BorrowedValue<'a>)>;
+pub type BorrowedTemplateMap<'a> = DashMap<String, (PathBuf, BorrowedValue<'a>)>;
 /// - key: full path
 /// - value: nemesis xml
 pub type OwnedPatchMap = IndexMap<PathBuf, String>;
