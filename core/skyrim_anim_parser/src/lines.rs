@@ -4,13 +4,13 @@ use winnow::{
     ascii::{line_ending, till_line_ending},
     combinator::alt,
     error::{ContextError, StrContext::*, StrContextValue::*},
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 pub type Str<'a> = Cow<'a, str>;
 
 /// Parse 1 line.
-pub(crate) fn one_line<'a>(input: &mut &'a str) -> PResult<Str<'a>> {
+pub(crate) fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     let line = till_line_ending.parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
     Ok(line.into())
@@ -28,7 +28,7 @@ pub(crate) fn lines<'a>(read_len: usize) -> impl Parser<&'a str, Vec<Str<'a>>, C
 
 /// Parse one line and then parse to T.
 #[inline]
-pub(crate) fn from_one_line<T: FromStr>(input: &mut &str) -> PResult<T> {
+pub(crate) fn from_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
     let line = till_line_ending.parse_to().parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
@@ -37,7 +37,7 @@ pub(crate) fn from_one_line<T: FromStr>(input: &mut &str) -> PResult<T> {
 
 /// - `'0'` => `false`
 /// - `'1'` => `true`
-fn num_bool(input: &mut &str) -> PResult<bool> {
+fn num_bool(input: &mut &str) -> ModalResult<bool> {
     alt(('0'.value(false), '1'.value(true)))
         .context(Expected(CharLiteral('0')))
         .context(Expected(CharLiteral('1')))
@@ -46,7 +46,7 @@ fn num_bool(input: &mut &str) -> PResult<bool> {
 
 /// - `'0'` => `false`
 /// - `'1'` => `true`
-pub(crate) fn num_bool_line(input: &mut &str) -> PResult<bool> {
+pub(crate) fn num_bool_line(input: &mut &str) -> ModalResult<bool> {
     let boolean = num_bool.parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
     Ok(boolean)

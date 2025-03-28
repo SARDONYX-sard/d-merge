@@ -4,7 +4,7 @@ use winnow::{
     ascii::digit1,
     combinator::{alt, delimited, opt},
     token::take_till,
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 /// Parses a string segment to determine if it represents an index or a range.
@@ -24,7 +24,7 @@ pub(crate) fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
         })
 }
 
-fn _parse_range(input: &mut &str) -> PResult<Range> {
+fn _parse_range(input: &mut &str) -> ModalResult<Range> {
     let range = alt((
         "*".value(Range::Full),
         parse_range_inner.map(|range| match range {
@@ -40,7 +40,7 @@ fn _parse_range(input: &mut &str) -> PResult<Range> {
 }
 
 /// Parse a range, e.g., "1:3", "3:", ":3", ":"
-fn parse_range_inner(input: &mut &str) -> PResult<(Option<usize>, Option<usize>)> {
+fn parse_range_inner(input: &mut &str) -> ModalResult<(Option<usize>, Option<usize>)> {
     let start = opt(digit1.parse_to()).parse_next(input)?;
     ":".parse_next(input)?;
     let end = opt(digit1.parse_to()).parse_next(input)?;
@@ -48,7 +48,7 @@ fn parse_range_inner(input: &mut &str) -> PResult<(Option<usize>, Option<usize>)
     Ok((start, end))
 }
 
-fn _is_range_op<'a>(input: &mut &'a str) -> PResult<&'a str> {
+fn _is_range_op<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     delimited("[", take_till(0.., |c| c == ']'), "]").parse_next(input)
 }
 
