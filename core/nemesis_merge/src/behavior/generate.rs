@@ -5,7 +5,7 @@ use crate::{
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
-        collect::{collect_borrowed_patches, collect_owned_patches},
+        collect::{collect_borrowed_patches, collect_owned_patches, PatchResult},
         merge::{merge_patches, paths_to_ids},
     },
     templates::collect::collect_templates,
@@ -33,7 +33,12 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     };
 
     options.report_status(Status::ReadingTemplatesAndPatches);
-    let ((template_names, template_patch_map), errors) = collect_borrowed_patches(&owned_patches);
+    let (patch_result, errors) = collect_borrowed_patches(&owned_patches);
+    let PatchResult {
+        template_names,
+        template_patch_map,
+        ptr_map,
+    } = patch_result;
     let patch_errors_len = errors.len();
     all_errors.par_extend(errors);
 
@@ -47,7 +52,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
         let patches = { merge_patches(template_patch_map, &ids)? };
 
-        // 3/4: Apply patches
+        // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
         if let Err(errors) = apply_patches(&templates, patches) {
             all_errors.par_extend(errors);
@@ -57,7 +62,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);
         let hkx_errors_len =
-            if let Err(hkx_errors) = generate_hkx_files(options.output_dir, templates) {
+            if let Err(hkx_errors) = generate_hkx_files(options.output_dir, templates, ptr_map) {
                 let errors_len = hkx_errors.len();
                 all_errors.par_extend(hkx_errors);
                 errors_len

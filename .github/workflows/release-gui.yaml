@@ -2,7 +2,7 @@ name: Release GUI
 on:
   push:
     tags:
-      - '*'
+      - "*"
   workflow_dispatch:
 
 jobs:
@@ -38,11 +38,11 @@ jobs:
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4.1.0
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: Node.js cache
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.2
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
@@ -57,6 +57,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseName: 'D merge v__VERSION__'
+          releaseName: "D merge v__VERSION__"
           tagName: ${{ github.ref_name }} # This only works if your workflow triggers on new tags.
           prerelease: false

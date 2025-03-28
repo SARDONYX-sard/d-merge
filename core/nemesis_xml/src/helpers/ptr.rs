@@ -3,13 +3,13 @@ use winnow::{
     combinator::alt,
     error::{StrContext, StrContextValue},
     token::take_till,
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 /// Parse `#0000`, `#0500`
 /// # Errors
 /// Parse failed.
-pub fn pointer<'a>(input: &mut &'a str) -> PResult<BorrowedValue<'a>> {
+pub fn pointer<'a>(input: &mut &'a str) -> ModalResult<BorrowedValue<'a>> {
     alt((
         "null".value(BorrowedValue::String("#0000".into())),
         // '\n', '\t', ' ' => Array elements

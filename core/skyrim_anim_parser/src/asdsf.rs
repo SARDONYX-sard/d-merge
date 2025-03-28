@@ -8,7 +8,7 @@ use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
     error::{ContextError, StrContext::*, StrContextValue::*},
-    seq, PResult, Parser,
+    seq, ModalResult, Parser,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,7 +90,7 @@ pub fn parse_asdsf(input: &str) -> Result<Asdsf<'_>, ReadableError> {
         .map_err(|e| ReadableError::from_parse(e, input))
 }
 
-fn asdsf<'a>(input: &mut &'a str) -> PResult<Asdsf<'a>> {
+fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
     let txt_projects = txt_projects.parse_next(input)?;
 
     let mut anim_set_list = vec![];
@@ -119,7 +119,7 @@ fn asdsf<'a>(input: &mut &'a str) -> PResult<Asdsf<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn txt_projects<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
+fn txt_projects<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     let line_len = from_one_line
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
@@ -136,7 +136,7 @@ fn txt_projects<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
     Ok(txt_projects)
 }
 
-fn anim_set_data<'a>(input: &mut &'a str) -> PResult<AnimSetData<'a>> {
+fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
     let file_names_len = opt(one_line
         .verify(|line: &str| line != "V3")
         .try_map(|s| s.as_ref().parse::<usize>())

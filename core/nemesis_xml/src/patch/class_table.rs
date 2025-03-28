@@ -2027,7 +2027,7 @@ const CLASS_TABLE: ClassTable = phf_ordered_map! {
     "referenceCount" => "I64", "determinismCheckFrameCounter" => "U64", "world" =>
     "Pointer", "lastProcessingStep" => "String", "currentTime" => "F64", "currentPsiTime"
     => "F64", "physicsDeltaTime" => "F64", "simulateUntilTime" => "F64",
-    "frameMarkerPsiSnap" => "F64", "previousStepResult" => "U64", },
+    "frameMarkerPsiSnap" => "F64", "previousSteModalResult" => "U64", },
     "hkpSingleShapeContainer" => phf_ordered_map! { "childShape" => "Pointer", },
     "hkpSoftContactModifierConstraintAtom" => phf_ordered_map! { "type" => "String",
     "modifierAtomSize" => "U64", "childSize" => "U64", "child" => "Pointer", "pad" =>

@@ -33,14 +33,16 @@ use winnow::{
     Parser,
 };
 
+pub type PatchesMap<'a> = HashMap<JsonPath<'a>, JsonPatch<'a>>;
+
 /// # Errors
 /// Parse failed.
-pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<HashMap<JsonPath<'_>, JsonPatch<'_>>> {
+pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<(PatchesMap<'_>, Option<&str>)> {
     let mut patcher_info = PatchDeserializer::new(nemesis_xml);
     patcher_info
         .root_class()
         .map_err(|err| patcher_info.to_readable_err(err))?;
-    Ok(patcher_info.output_patches)
+    Ok((patcher_info.output_patches, patcher_info.id_index))
 }
 
 /// Nemesis patch deserializer
@@ -63,6 +65,11 @@ struct PatchDeserializer<'a> {
     /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
     /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
     pub current: CurrentState<'a>,
+
+    /// `hkbBehaviorGraphStringData`
+    ///
+    /// event_id, variable_id
+    id_index: Option<&'a str>,
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
@@ -74,6 +81,7 @@ impl<'de> PatchDeserializer<'de> {
             input,
             original: input,
             output_patches: HashMap::new(),
+            id_index: None,
         }
     }
 
@@ -138,6 +146,10 @@ impl<'de> PatchDeserializer<'de> {
             PointerType::Index(index) => (false, index),
             PointerType::Var(id) => (true, id), // $id$2
         };
+
+        if class_name == "hkbBehaviorGraphStringData" {
+            self.id_index = Some(ptr_index);
+        }
         self.current.path.push(ptr_index.into());
         self.current.path.push(class_name.into());
 
@@ -260,6 +272,17 @@ impl<'de> PatchDeserializer<'de> {
         let var_parser = variable_id.map(|s| s.into());
         let int_parser = dec_int.map(|int: i64| int.into());
         let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+
+        // let (value, id_kind) = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        // if id_kind != IdKind::Int {
+        //    NemesisVar {
+        //        id: value,
+        //        id_path: self.current.path,
+        //        id_kind, (if integer, immutable)
+        //    }
+        // };
+        // (middle)
+
         Ok(value)
     }
 
@@ -625,7 +648,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         // if map.contain_keys() {}
 
         let mut hash_map = HashMap::new();
@@ -682,7 +705,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         let mut hash_map = HashMap::new();
 
         hash_map.insert(
@@ -742,7 +765,7 @@ mod tests {
 			<hkparam name="fullPathToSource"></hkparam>
 		</hkobject>
 "###;
-        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         let mut hash_map = HashMap::new();
 
         let array_value = json_typed!(
@@ -806,7 +829,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path!["#0009", "hkbProjectStringData", "characterFilenames"];
 
         let mut hash_map = HashMap::new();
@@ -843,7 +866,7 @@ mod tests {
 			</hkparam>
 		</hkobject>
 "###;
-        let actual = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path![
             "#0008",
             "hkRootLevelContainer",

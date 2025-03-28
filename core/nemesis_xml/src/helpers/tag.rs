@@ -13,7 +13,7 @@ use winnow::{
         StrContextValue::{self},
     },
     token::take_until,
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 /// Parses the start tag `<tag>`
@@ -48,7 +48,7 @@ pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ContextError> 
 ///
 /// # Errors
 /// Parse failed.
-pub fn class_start_tag<'a>(input: &mut &'a str) -> PResult<(PointerType<'a>, &'a str)> {
+pub fn class_start_tag<'a>(input: &mut &'a str) -> ModalResult<(PointerType<'a>, &'a str)> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("hkobject"),
@@ -76,7 +76,7 @@ pub fn class_start_tag<'a>(input: &mut &'a str) -> PResult<(PointerType<'a>, &'a
 /// If encountered unexpected string.
 /// # Note
 /// All arguments are used only for clarity of error reporting.
-pub fn field_start_open_tag(input: &mut &str) -> PResult<()> {
+pub fn field_start_open_tag(input: &mut &str) -> ModalResult<()> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("hkparam"),
@@ -94,7 +94,7 @@ pub fn field_start_open_tag(input: &mut &str) -> PResult<()> {
 ///
 /// # Errors
 /// If encountered unexpected string.
-pub fn field_start_close_tag(input: &mut &str) -> PResult<Option<u64>> {
+pub fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
     seq!(
         winnow::combinator::opt(
             seq!(
@@ -149,7 +149,7 @@ pub fn field_start_tag<'a>(
 ///
 /// # Errors
 /// Parse failed.
-fn number_in_string<Num>(input: &mut &str) -> PResult<Num>
+fn number_in_string<Num>(input: &mut &str) -> ModalResult<Num>
 where
     Num: FromStr,
 {
@@ -176,7 +176,7 @@ pub enum PointerType<'a> {
 ///
 /// # Errors
 /// If parsing failed.
-fn index_name_attr<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
+fn index_name_attr<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
     delimited('\"', delimited_multispace0(index_name), '\"').parse_next(input)
 }
 
@@ -184,7 +184,7 @@ fn index_name_attr<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
 ///
 /// # Errors
 /// If parsing failed.
-pub fn index_name<'a>(input: &mut &'a str) -> PResult<PointerType<'a>> {
+pub fn index_name<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
     alt((
         ("#", digit1).take().map(PointerType::Index),
         take_until(0.., '\"').map(PointerType::Var),

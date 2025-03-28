@@ -1,5 +1,5 @@
 use crate::{
-    aliases::{OwnedPatchMap, TemplatePatchMap},
+    aliases::{OwnedPatchMap, PtrMap, TemplatePatchMap},
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
     paths::{
         collect::collect_all_patch_paths,
@@ -26,11 +26,10 @@ pub fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPatchMap,
     partition_results(results)
 }
 
-pub fn collect_borrowed_patches(
-    owned_patches: &OwnedPatchMap,
-) -> ((DashSet<String>, TemplatePatchMap<'_>), Vec<Error>) {
+pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, Vec<Error>) {
     let template_patch_map = TemplatePatchMap::new();
     let template_names = DashSet::new();
+    let ptr_map = PtrMap::new();
 
     let results: Vec<Result<()>> = owned_patches
         .par_iter()
@@ -42,8 +41,18 @@ pub fn collect_borrowed_patches(
             } = parse_nemesis_path(path)?;
             template_names.insert(template_name.clone());
 
-            let patch_idx_map = template_patch_map.entry(template_name).or_default();
-            let xml = parse_nemesis_patch(xml).with_context(|_| NemesisXmlErrSnafu { path })?;
+            let patch_idx_map = template_patch_map.entry(template_name.clone()).or_default();
+            let (xml, ptr) =
+                parse_nemesis_patch(xml).with_context(|_| NemesisXmlErrSnafu { path })?;
+
+            // ptr == `#0100`
+            //
+            // ```xml
+            // <hkobject name="#0100" class="hkbBehaviorGraphStringData"></hkobject>
+            // <hkobject name="$name$3" class="hkbBehaviorGraphStringData"></hkobject>
+            // <hkobject name="$name$4" class="hkbBehaviorGraphStringData"></hkobject>
+            // ```
+            ptr_map.0.entry(template_name).or_insert(ptr);
 
             patch_idx_map
                 .entry(index)
@@ -57,5 +66,18 @@ pub fn collect_borrowed_patches(
         Ok(_) => vec![],
         Err(errors) => errors,
     };
-    ((template_names, template_patch_map), errors)
+    (
+        PatchResult {
+            template_names,
+            template_patch_map,
+            ptr_map,
+        },
+        errors,
+    )
+}
+
+pub struct PatchResult<'a> {
+    pub template_names: DashSet<String>,
+    pub template_patch_map: TemplatePatchMap<'a>,
+    pub ptr_map: PtrMap<'a>,
 }
