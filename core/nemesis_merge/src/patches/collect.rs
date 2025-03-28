@@ -1,5 +1,5 @@
 use crate::{
-    aliases::{OwnedPatchMap, TemplatePatchMap},
+    aliases::{OwnedPatchMap, PtrMap, TemplatePatchMap},
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
     paths::{
         collect::collect_all_patch_paths,
@@ -11,11 +11,7 @@ use dashmap::DashSet;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::ResultExt as _;
-use std::{
-    fs,
-    path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{fs, path::PathBuf};
 
 pub fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPatchMap, Vec<Error>> {
     let results: Vec<Result<(PathBuf, String)>> = collect_all_patch_paths(nemesis_paths)
@@ -33,10 +29,7 @@ pub fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPatchMap,
 pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, Vec<Error>) {
     let template_patch_map = TemplatePatchMap::new();
     let template_names = DashSet::new();
-
-    // key: template_name hkx, value: index of class
-    // DashMap<String, usize>
-    let id_index = AtomicUsize::new(0); // Assumed non use nemesis ID
+    let ptr_map = PtrMap::new();
 
     let results: Vec<Result<()>> = owned_patches
         .par_iter()
@@ -48,19 +41,18 @@ pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, 
             } = parse_nemesis_path(path)?;
             template_names.insert(template_name.clone());
 
-            let patch_idx_map = template_patch_map.entry(template_name).or_default();
-            let (xml, id_idx) =
+            let patch_idx_map = template_patch_map.entry(template_name.clone()).or_default();
+            let (xml, ptr) =
                 parse_nemesis_patch(xml).with_context(|_| NemesisXmlErrSnafu { path })?;
 
-            // <hkobject name="#0100"> // hkbGraph
+            // ptr == `#0100`
             //
-            // <hkobject name="$name$3">
-            // <hkobject name="$name$4">
-            if let Some(id_idx) = id_idx {
-                if let Some(idx) = id_idx.parse().ok() {
-                    id_index.store(idx, Ordering::Release)
-                };
-            }
+            // ```xml
+            // <hkobject name="#0100" class="hkbBehaviorGraphStringData"></hkobject>
+            // <hkobject name="$name$3" class="hkbBehaviorGraphStringData"></hkobject>
+            // <hkobject name="$name$4" class="hkbBehaviorGraphStringData"></hkobject>
+            // ```
+            ptr_map.0.entry(template_name).or_insert(ptr);
 
             patch_idx_map
                 .entry(index)
@@ -78,7 +70,7 @@ pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, 
         PatchResult {
             template_names,
             template_patch_map,
-            id_index: id_index.load(Ordering::Acquire),
+            ptr_map,
         },
         errors,
     )
@@ -87,5 +79,5 @@ pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, 
 pub struct PatchResult<'a> {
     pub template_names: DashSet<String>,
     pub template_patch_map: TemplatePatchMap<'a>,
-    pub id_index: usize,
+    pub ptr_map: PtrMap<'a>,
 }

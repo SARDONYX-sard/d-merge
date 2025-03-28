@@ -22,9 +22,6 @@ pub fn apply_patches<'a, 'b: 'a>(
             if let Some(mut template_pair) = templates.get_mut(&template_name) {
                 let template = &mut template_pair.value_mut().1;
 
-                // update_id_path(&patches, &mut nemesis_vars);
-
-                // TODO: Replace variables to indexes (in advance, update id_path in template)
                 for (path, patch) in patches {
                     let patch_string = format!("{patch:#?}"); // TODO: Fix redundant copy
                     apply_patch(template, path, patch).with_context(|_| PatchSnafu {
