@@ -61,5 +61,7 @@ extra_fmt = ["serde_hkx_features/extra_fmt"]
 # Enable patch log
 tracing = ["nemesis_merge/tracing"]
 
+debug = ["tracing", "nemesis_merge/debug"]
+
 [lints]
 workspace = true
