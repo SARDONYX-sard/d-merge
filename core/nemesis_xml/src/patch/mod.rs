@@ -874,7 +874,6 @@ mod tests {
             "hkRootLevelContainer",
             "namedVariants",
             "[0]",
-            "hkRootLevelContainerNamedVariant",
             "name"
         ];
         let mut hash_map = HashMap::new();
