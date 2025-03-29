@@ -91,7 +91,7 @@ fn write_json_patch(
     json_path.set_extension("json");
     fs::write(
         &json_path,
-        simd_json::to_string_pretty(&template_json).context(crate::error::JsonSnafu {
+        simd_json::to_string_pretty(&template_json).context(crate::errors::JsonSnafu {
             path: json_path.clone(),
         })?,
     )
