@@ -14,8 +14,8 @@ pub fn collect_templates<'a>(
     resource_dir: &Path,
 ) -> (BorrowedTemplateMap<'a>, Vec<Error>) {
     let template_behaviors = collect_table_paths(resource_dir);
-    #[cfg(feature = "tracing")]
-    tracing::trace!("{template_behaviors:#?}");
+    // #[cfg(feature = "tracing")]
+    // tracing::trace!("{template_behaviors:#?}");
 
     let results: Vec<Result<(String, (PathBuf, BorrowedValue<'static>))>> = template_names
         .into_par_iter()

@@ -2,7 +2,7 @@
 #![allow(clippy::mem_forget)]
 use crate::{
     aliases::{BorrowedTemplateMap, PtrMap},
-    errors::{Error, FailedIoSnafu, JsonSnafu, Result},
+    errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
 };
 use rayon::prelude::*;
@@ -58,7 +58,10 @@ pub(crate) fn generate_hkx_files(
                 let header = HkxHeader::new_skyrim_se();
                 let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
                 let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
-                serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)?
+                serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
+                    .with_context(|_| HkxSerSnafu {
+                        path: output_path.clone(),
+                    })?
             };
 
             output_path.set_extension("hkx");

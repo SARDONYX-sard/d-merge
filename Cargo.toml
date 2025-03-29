@@ -43,11 +43,11 @@ tracing = { version = "0.1.41" } # logger
 tracing-subscriber = "0.3.19"
 winnow = { version = "0.6.20", features = ["simd"] }
 
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9b3b396", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9b3b396", default-features = false, features = [
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "471ace9", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "471ace9", default-features = false, features = [
   "ignore_duplicates",
 ] }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9b3b396", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "471ace9", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1"                                  # Color diff assertion

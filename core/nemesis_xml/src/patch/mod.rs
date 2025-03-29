@@ -188,7 +188,6 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse failed.
     fn class_in_field(&mut self, class_name: &'static str) -> Result<BorrowedValue<'de>> {
         self.parse_next(start_tag("hkobject"))?;
-        self.current.path.push(class_name.into());
 
         {
             let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
@@ -204,7 +203,6 @@ impl<'de> PatchDeserializer<'de> {
         }
         self.pop_current_field_table();
 
-        self.current.path.pop(); // Remove class name
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
@@ -272,17 +270,6 @@ impl<'de> PatchDeserializer<'de> {
         let var_parser = variable_id.map(|s| s.into());
         let int_parser = dec_int.map(|int: i64| int.into());
         let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
-
-        // let (value, id_kind) = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
-        // if id_kind != IdKind::Int {
-        //    NemesisVar {
-        //        id: value,
-        //        id_path: self.current.path,
-        //        id_kind, (if integer, immutable)
-        //    }
-        // };
-        // (middle)
-
         Ok(value)
     }
 
@@ -464,6 +451,12 @@ impl<'de> PatchDeserializer<'de> {
                 value
             };
 
+            #[cfg(feature = "tracing")]
+            {
+                tracing::trace!("{:#?}", self.current);
+                tracing::trace!("{value:#?}");
+            }
+
             // seq end
             if should_take_in_this {
                 self.current.push_current_patch(value);
@@ -514,7 +507,10 @@ impl<'de> PatchDeserializer<'de> {
                     // NOTE: `Op::Remove` passes through here because it needs to count the number of deletions
                     if op != Op::Remove {
                         #[cfg(feature = "tracing")]
-                        tracing::debug!(?op);
+                        {
+                            tracing::debug!(?op);
+                            tracing::trace!("{:#?}", self.current);
+                        }
                         self.parse_next(take_till_close)?;
                         self.extend_output_patches();
                     }
@@ -534,9 +530,14 @@ impl<'de> PatchDeserializer<'de> {
     fn extend_output_patches(&mut self) {
         // range diff pattern
         if let Some(new_range) = self.current.seq_range.take() {
+            // NOTE: If op is not calculated before taking `seq_values`,
+            // it will cause a misjudgment since it will be a remove process when `seq_values` is empty.
+            let op = self.current.judge_operation();
+
             let path = self.current.path.clone(); // needless clone? replace?
             let seq_values = mem::take(&mut self.current.seq_values);
-            let value = if self.current.judge_operation() == Op::Remove {
+
+            let value = if op == Op::Remove {
                 BorrowedValue::null() // no add
             } else {
                 BorrowedValue::Array(Box::new(seq_values))
@@ -550,14 +551,13 @@ impl<'de> PatchDeserializer<'de> {
                         op: prev_op,
                         range: prev_range,
                     }) => {
-                        let new_op = self.current.judge_operation();
                         let merged_op_range = OpRangeKind::Discrete(vec![
                             OpRange {
                                 op: prev_op,
                                 range: prev_range,
                             },
                             OpRange {
-                                op: new_op,
+                                op,
                                 range: new_range,
                             },
                         ]);
@@ -574,7 +574,7 @@ impl<'de> PatchDeserializer<'de> {
                     OpRangeKind::Discrete(prev_vec_range) => {
                         let mut merged_op_range = prev_vec_range;
                         merged_op_range.push(OpRange {
-                            op: self.current.judge_operation(),
+                            op,
                             range: new_range,
                         });
 
@@ -594,11 +594,12 @@ impl<'de> PatchDeserializer<'de> {
                     OpRangeKind::Pure(_) => {} // We do not consider it strange that a patch to an existing field comes twice.
                 }
             } else {
+                // New array patch
                 self.output_patches.insert(
                     path,
                     JsonPatch {
                         op: OpRangeKind::Seq(OpRange {
-                            op: self.current.judge_operation(),
+                            op,
                             range: new_range,
                         }),
                         value,
@@ -606,6 +607,7 @@ impl<'de> PatchDeserializer<'de> {
                 );
             }
 
+            self.current.clear_flags(); // new patch is generated so clear flags.
             return;
         }
 
@@ -889,12 +891,14 @@ mod tests {
         assert_eq!(actual, hash_map);
     }
 
-    #[cfg_attr(feature = "tracing", quick_tracing::init)]
+    #[cfg_attr(
+        feature = "tracing",
+        quick_tracing::init(file = "./parse.log", stdio = false)
+    )]
     #[ignore = "because we need external test files"]
     #[test]
     fn parse() {
         use std::fs::read_to_string;
-        use std::path::Path;
 
         let nemesis_xml = {
             // let path = "zcbe/_1stperson/staggerbehavior/#0052.txt";
@@ -902,7 +906,8 @@ mod tests {
             // let path = "zcbe/_1stperson/staggerbehavior/#0087.txt";
             // let path = "zcbe/_1stperson/firstperson/#0060.txt";
             let path = "turn/1hm_behavior/#2781.txt";
-            read_to_string(Path::new("../../dummy/Data/Nemesis_Engine/mod/").join(path)).unwrap()
+            let path = std::path::Path::new("../../dummy/Data/Nemesis_Engine/mod/").join(path);
+            read_to_string(path).unwrap()
         };
         dbg!(parse_nemesis_patch(&nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
     }

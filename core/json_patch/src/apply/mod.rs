@@ -15,6 +15,8 @@ use simd_json::BorrowedValue;
 ///
 /// # Errors
 /// If the patch operation fails due to an invalid operation or path not found.
+///
+/// # Panics
 pub fn apply_patch<'v>(
     json: &mut BorrowedValue<'v>,
     path: JsonPath<'v>,
@@ -36,15 +38,24 @@ pub fn apply_patch<'v>(
             apply_range(json, path, op, range, value)
         }
         OpRangeKind::Discrete(vec_range) => {
+            #[allow(clippy::unwrap_used)]
+            let json_str = simd_json::to_string_pretty(&json).unwrap();
+
             // TODO:
             for op_range in vec_range {
                 let OpRange { op, range } = op_range;
                 let range = crate::range::Range::FromTo(range);
 
-                apply_range(json, path.clone(), op, range, value.clone())?;
-                // if let Err(err) = apply_range(json, path.clone(), op, range, value.clone()) {
-                //     return Err(err);
-                // }
+                // apply_range(json, path.clone(), op, range, value.clone())?;
+                if let Err(err) = apply_range(json, path.clone(), op, range, value.clone()) {
+                    let mut json_file = String::from("./");
+                    json_file.push_str(&path.join("_"));
+                    json_file.push_str(".json");
+                    #[allow(clippy::unwrap_used)]
+                    std::fs::write(json_file, json_str).unwrap();
+
+                    return Err(err);
+                }
             }
             Ok(())
         }

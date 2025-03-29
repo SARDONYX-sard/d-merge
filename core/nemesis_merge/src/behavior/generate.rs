@@ -54,7 +54,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
         // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
-        if let Err(errors) = apply_patches(&templates, patches) {
+        if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
             all_errors.par_extend(errors);
         };
         let apply_errors_len = all_errors.len();
@@ -94,24 +94,28 @@ mod tests {
         quick_tracing::init(file = "../../dummy/merge_test.log", stdio = false)
     )]
     async fn merge_test() {
+        // let log_path = "../../dummy/merge_test.log";
+        // crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
+
         #[allow(clippy::iter_on_single_items)]
         let ids = [
-            "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
-            "../../dummy/Data/Nemesis_Engine/mod/bcbi",
-            "../../dummy/Data/Nemesis_Engine/mod/cbbi",
-            "../../dummy/Data/Nemesis_Engine/mod/gender",
-            "../../dummy/Data/Nemesis_Engine/mod/hmce",
-            "../../dummy/Data/Nemesis_Engine/mod/momo",
-            "../../dummy/Data/Nemesis_Engine/mod/na1w",
-            "../../dummy/Data/Nemesis_Engine/mod/nemesis",
-            "../../dummy/Data/Nemesis_Engine/mod/pscd",
-            "../../dummy/Data/Nemesis_Engine/mod/rthf",
-            "../../dummy/Data/Nemesis_Engine/mod/skice",
-            "../../dummy/Data/Nemesis_Engine/mod/sscb",
-            "../../dummy/Data/Nemesis_Engine/mod/tkuc",
-            "../../dummy/Data/Nemesis_Engine/mod/tudm",
-            "../../dummy/Data/Nemesis_Engine/mod/turn",
-            "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+            // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
+            // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
+            // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
+            // "../../dummy/Data/Nemesis_Engine/mod/gender",
+            // "../../dummy/Data/Nemesis_Engine/mod/hmce",
+            // "../../dummy/Data/Nemesis_Engine/mod/momo",
+            // "../../dummy/Data/Nemesis_Engine/mod/na1w",
+            // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
+            // "../../dummy/Data/Nemesis_Engine/mod/pscd",
+            // "../../dummy/Data/Nemesis_Engine/mod/rthf",
+            // "../../dummy/Data/Nemesis_Engine/mod/skice",
+            // "../../dummy/Data/Nemesis_Engine/mod/sscb",
+            // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
+            // "../../dummy/Data/Nemesis_Engine/mod/tudm",
+            // "../../dummy/Data/Nemesis_Engine/mod/turn",
+            // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
         ]
         .into_par_iter()
         .map(|s| s.into())

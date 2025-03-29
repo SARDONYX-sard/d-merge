@@ -64,6 +64,16 @@ impl<'a> GenerableJsonPatches<'a> {
     }
 }
 
+pub fn patch_map_to_json_value<P>(path: P, patch: SortedPatchMap<'_>) -> Result<String>
+where
+    P: AsRef<Path>,
+{
+    let patch = GenerableJsonPatches::from(patch);
+    simd_json::to_string_pretty(&patch).with_context(|_| JsonSnafu {
+        path: path.as_ref(),
+    })
+}
+
 fn txt_to_json(txt_path: &PathBuf, output: &Path) -> Result<()> {
     let json = {
         let nemesis_xml = std::fs::read_to_string(txt_path).with_context(|_| FailedIoSnafu {
@@ -74,10 +84,7 @@ fn txt_to_json(txt_path: &PathBuf, output: &Path) -> Result<()> {
                 path: txt_path.clone(),
             })?;
 
-        let patch = GenerableJsonPatches::from(patch);
-        simd_json::to_string_pretty(&patch).with_context(|_| JsonSnafu {
-            path: txt_path.clone(),
-        })?
+        patch_map_to_json_value(txt_path, patch)?
     };
 
     let output = {

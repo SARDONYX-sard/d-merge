@@ -62,7 +62,7 @@ impl<'de> CurrentState<'de> {
     pub fn judge_operation(&self) -> Op {
         self.mode_code.map_or(Op::Remove, |_| {
             if self.is_passed_original {
-                if self.patches.is_empty() {
+                if self.patches.is_empty() && self.seq_values.is_empty() {
                     Op::Remove
                 } else {
                     Op::Replace
@@ -74,11 +74,12 @@ impl<'de> CurrentState<'de> {
     }
 
     #[inline]
-    fn clear_flags(&mut self) {
+    pub fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
     }
 
+    /// Judge Op + clear flags + take patches
     #[inline]
     pub fn take_patches(&mut self) -> (Op, Patches<'de>) {
         let op = self.judge_operation();
