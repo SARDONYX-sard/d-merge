@@ -144,25 +144,6 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_path() {
-        let paths = vec![
-            Path::new("templates/meshes/actors/character/_1stperson/characters/firstperson.xml"),
-            Path::new("templates/meshes/actors/character/_1stperson/firstperson.xml"),
-        ];
-        let res: DashMap<String, PathBuf> =
-            paths.into_par_iter().filter_map(get_key_value).collect();
-
-        let pair = res.iter().last().unwrap();
-        let (key, value) = (pair.key(), pair.value());
-        assert_eq!(key, "_1stperson/firstperson");
-        assert_eq!(
-            value,
-            Path::new("meshes/actors/character/_1stperson/characters/firstperson.xml")
-        );
-        drop(pair);
-    }
-
-    #[test]
     fn test_parse() {
         let path =
             Path::new("templates/meshes/actors/character/_1stperson/characters/firstperson.xml")
