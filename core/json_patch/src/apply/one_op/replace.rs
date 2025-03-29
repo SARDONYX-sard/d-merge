@@ -13,7 +13,7 @@ pub(crate) fn apply_replace<'a>(
     path: JsonPath<'a>,
     value: Value<'a>,
 ) -> Result<()> {
-   let res = json.ptr_mut(&path);
+    let res = json.ptr_mut(&path);
 
     res.map_or_else(
         || {
