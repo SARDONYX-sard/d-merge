@@ -6,7 +6,6 @@ mod hkx;
 mod patches;
 mod paths;
 mod results;
-mod tables;
 mod templates;
 
 pub use crate::config::{Config, Status};

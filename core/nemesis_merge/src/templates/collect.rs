@@ -1,6 +1,6 @@
 use crate::aliases::BorrowedTemplateMap;
 use crate::errors::{Error, FailedIoSnafu, JsonSnafu, NotFoundTemplateSnafu, Result};
-use crate::tables::collect_nemesis_paths;
+use crate::templates::tables::collect_table_paths;
 use dashmap::{DashMap, DashSet};
 use rayon::{iter::Either, prelude::*};
 use serde_hkx_features::ClassMap;
@@ -13,7 +13,7 @@ pub fn collect_templates<'a>(
     template_names: DashSet<String>,
     resource_dir: &Path,
 ) -> (BorrowedTemplateMap<'a>, Vec<Error>) {
-    let template_behaviors = collect_nemesis_paths(resource_dir);
+    let template_behaviors = collect_table_paths(resource_dir);
     #[cfg(feature = "tracing")]
     tracing::trace!("{template_behaviors:#?}");
 
