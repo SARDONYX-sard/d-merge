@@ -30,24 +30,42 @@ where
 
     paths
         .into_par_iter()
-        .filter_map(|path| {
-            let key = key_from_path(&path)?;
-            Some((key, path))
-        })
+        .filter_map(|path| get_key_value(&path))
         .collect()
 }
 
-fn key_from_path(path: &Path) -> Option<String> {
-    let file_stem = path.file_stem()?.to_string_lossy();
-    let mut components = path.components();
+/// - key: (`_1stperson`) + file stem
+/// - value: Path after `mesh`
+fn get_key_value(path: &Path) -> Option<(String, PathBuf)> {
+    let key = {
+        let file_stem = path.file_stem()?.to_string_lossy();
+        let mut components = path.components();
+        let is_1stperson = components.any(|c| c.as_os_str().eq_ignore_ascii_case("_1stPerson"));
+        if is_1stperson {
+            format!("_1stperson/{file_stem}")
+        } else {
+            file_stem.to_string()
+        }
+    };
 
-    let is_1stperson = components.any(|c| c.as_os_str().eq_ignore_ascii_case("_1stPerson"));
+    let value = {
+        let mut value = None;
+        let mut components = path.components();
 
-    Some(if is_1stperson {
-        format!("_1stperson/{file_stem}")
-    } else {
-        file_stem.to_string()
-    })
+        while let Some(comp) = components.next() {
+            if comp.as_os_str().eq_ignore_ascii_case("mesh")
+                || comp.as_os_str().eq_ignore_ascii_case("meshes")
+            {
+                let mut rel_path = PathBuf::from(comp.as_os_str()); // Include `mesh` too.
+                rel_path.extend(components);
+                value = Some(rel_path);
+                break;
+            }
+        }
+        value?
+    };
+
+    Some((key, value))
 }
 
 #[cfg(test)]
@@ -59,7 +77,15 @@ mod tests {
         let path = Path::new(
             "resource/assets/templates/meshes/actors/character/_1stperson/behaviors/weapequip.xml",
         );
-
-        assert_eq!(key_from_path(path).as_deref(), Some("_1stperson/weapequip"));
+        match get_key_value(path) {
+            Some((key, value)) => {
+                assert_eq!(key, "_1stperson/weapequip");
+                assert_eq!(
+                    value,
+                    Path::new("meshes/actors/character/_1stperson/behaviors/weapequip.xml")
+                );
+            }
+            None => panic!("Invalid path"),
+        }
     }
 }
