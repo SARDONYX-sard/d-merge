@@ -15,7 +15,7 @@ pub fn pointer<'a>(input: &mut &'a str) -> ModalResult<BorrowedValue<'a>> {
         // '\n', '\t', ' ' => Array elements
         // `<` => end tag of array or field
         take_till(0.., |c| matches!(c, '\r' | '\n' | '\t' | ' ' | '<'))
-            .map(|s: &str| BorrowedValue::String(s.trim().into())),
+            .map(|s: &str| BorrowedValue::String(s.trim().into())), // Double cut off because winnow doesn't omit `\r` in release builds for some reason.
     ))
     .context(StrContext::Expected(StrContextValue::Description(
         r#"Pointer(e.g. `#0050`)"#,
