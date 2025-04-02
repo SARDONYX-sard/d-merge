@@ -35,7 +35,7 @@ mod tests {
         );
 
         assert_eq!(
-            pointer.parse_next(&mut "$turn$12</hkparam>"),
+            pointer.parse_next(&mut "$turn$12\r\n</hkparam>"),
             Ok(BorrowedValue::String("$turn$12".into()))
         );
     }
