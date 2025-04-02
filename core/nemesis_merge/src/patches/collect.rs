@@ -52,7 +52,9 @@ pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (PatchResult, 
             // <hkobject name="$name$3" class="hkbBehaviorGraphStringData"></hkobject>
             // <hkobject name="$name$4" class="hkbBehaviorGraphStringData"></hkobject>
             // ```
-            ptr_map.0.entry(template_name).or_insert(ptr);
+            if let Some(ptr) = ptr {
+                ptr_map.0.entry(template_name).or_insert(ptr);
+            }
 
             patch_idx_map
                 .entry(index)

@@ -8,7 +8,9 @@ use self::one_op::remove::apply_remove;
 use self::one_op::replace::apply_replace;
 use self::range_op::apply_range;
 use crate::operation::Op;
+use crate::range::Range;
 use crate::{JsonPatch, JsonPath, OpRange, OpRangeKind};
+use simd_json::derived::ValueTryIntoArray as _;
 use simd_json::BorrowedValue;
 
 /// Applies a JSON patch operation to a mutable reference to a JSON value.
@@ -33,29 +35,19 @@ pub fn apply_patch<'v>(
         //  Range
         OpRangeKind::Seq(op_range) => {
             let OpRange { op, range } = op_range;
-            let range = crate::range::Range::FromTo(range);
+            let range = Range::FromTo(range);
 
             apply_range(json, path, op, range, value)
         }
         OpRangeKind::Discrete(vec_range) => {
-            #[allow(clippy::unwrap_used)]
-            let json_str = simd_json::to_string_pretty(&json).unwrap();
+            let array = value
+                .try_into_array()
+                .map_err(|err| error::JsonPatchError::TryType { source: err })?;
 
-            // TODO:
-            for op_range in vec_range {
+            for (op_range, value) in vec_range.into_iter().zip(array) {
                 let OpRange { op, range } = op_range;
-                let range = crate::range::Range::FromTo(range);
-
-                // apply_range(json, path.clone(), op, range, value.clone())?;
-                if let Err(err) = apply_range(json, path.clone(), op, range, value.clone()) {
-                    let mut json_file = String::from("./");
-                    json_file.push_str(&path.join("_"));
-                    json_file.push_str(".json");
-                    #[allow(clippy::unwrap_used)]
-                    std::fs::write(json_file, json_str).unwrap();
-
-                    return Err(err);
-                }
+                let range = Range::FromTo(range);
+                apply_range(json, path.clone(), op, range, value)?;
             }
             Ok(())
         }

@@ -161,6 +161,7 @@ impl<'de> PatchDeserializer<'de> {
         }
 
         let mut obj = Object::new();
+        obj.insert("__ptr".into(), ptr_index.into());
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
             let (field_name, value) = self.field()?;
             if should_take_in_this {

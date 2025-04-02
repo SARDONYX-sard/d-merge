@@ -48,7 +48,7 @@ pub type MergedPatchMap<'a> = DashMap<String, SortedPatchMap<'a>>;
 /// - key: template name
 /// - value: ptr name (e.g.: "#0029", "$aaaa$10", etc.)
 #[derive(Debug, Default, Clone)]
-pub struct PtrMap<'a>(pub DashMap<String, Option<&'a str>>);
+pub struct PtrMap<'a>(pub DashMap<String, &'a str>);
 impl PtrMap<'_> {
     pub fn new() -> Self {
         Self(DashMap::new())

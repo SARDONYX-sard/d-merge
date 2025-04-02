@@ -38,26 +38,36 @@ pub(crate) fn generate_hkx_files(
                     from_borrowed_value(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
                     })?;
+                // #[cfg(feature = "debug")]
+                // write_xml(&output_path, &class_map)?;
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
                 if let Some(pair) = ptr_map.0.get(&file_stem) {
-                    if let Some(ptr) = pair.value() {
-                        // Create eventID & variableId maps from hkbBehaviorGraphStringData class
-                        if let Some((event_map, var_map)) = class_map
-                            .get(*ptr)
-                            .and_then(|class| crate_maps_from_id_class(class))
-                        {
-                            event_id_map = Some(event_map);
-                            variable_id_map = Some(var_map);
-                        };
+                    let ptr = pair.value();
+
+                    // Create eventID & variableId maps from hkbBehaviorGraphStringData class
+                    if let Some((event_map, var_map)) = class_map
+                        .get(*ptr)
+                        .and_then(|class| crate_maps_from_id_class(class))
+                    {
+                        event_id_map = Some(event_map);
+                        variable_id_map = Some(var_map);
                     };
                 }
+
+                // #[cfg(feature = "tracing")]
+                // {
+                //     tracing::trace!("event_id_map = {:#?}", event_id_map);
+                //     tracing::trace!("variable_id_map = {:#?}", variable_id_map);
+                // }
 
                 // Convert to hkx bytes & Replace nemesis id.
                 let header = HkxHeader::new_skyrim_se();
                 let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
                 let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
+                // Output error info
+                // serialize target class, field ptr number.
                 serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
                     .with_context(|_| HkxSerSnafu {
                         path: output_path.clone(),
@@ -100,6 +110,27 @@ fn write_json_patch(
     )
     .context(FailedIoSnafu {
         path: json_path.clone(),
+    })?;
+
+    Ok(())
+}
+
+#[cfg(feature = "debug")]
+#[allow(unused)]
+fn write_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()> {
+    use serde_hkx::HavokSort as _;
+
+    let mut class_map = class_map.clone();
+    let ptr = class_map
+        .sort_for_xml()
+        .with_context(|_| HkxSerSnafu { path: output_path })?;
+    let xml = serde_hkx::to_string(&class_map, &ptr)
+        .with_context(|_| HkxSerSnafu { path: output_path })?;
+
+    let mut xml_path = output_path.to_path_buf();
+    xml_path.set_extension("xml");
+    fs::write(&xml_path, &xml).context(FailedIoSnafu {
+        path: xml_path.clone(),
     })?;
 
     Ok(())

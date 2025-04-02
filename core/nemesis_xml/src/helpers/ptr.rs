@@ -14,7 +14,7 @@ pub fn pointer<'a>(input: &mut &'a str) -> ModalResult<BorrowedValue<'a>> {
         "null".value(BorrowedValue::String("#0000".into())),
         // '\n', '\t', ' ' => Array elements
         // `<` => end tag of array or field
-        take_till(0.., |c| matches!(c, '\n' | '\t' | ' ' | '<'))
+        take_till(0.., |c| matches!(c, '\r' | '\n' | '\t' | ' ' | '<'))
             .map(|s: &str| BorrowedValue::String(s.into())),
     ))
     .context(StrContext::Expected(StrContextValue::Description(
