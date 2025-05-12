@@ -51,7 +51,7 @@ pub(crate) fn generate_hkx_files(
                 //     // variable_id_map,
                 //     &header,
                 // );
-                serde_hkx::bytes::ser::to_bytes_with_opt(&class_map, &header, ser)?
+                serde_hkx::bytes::ser::to_bytes(&class_map, &header)?
             };
 
             output_path.set_extension("hkx");
