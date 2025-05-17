@@ -2,6 +2,7 @@ use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use simd_json::borrowed::Value;
 
+#[derive(Debug, Clone, Default)]
 struct Node<'a> {
     /// when removed, then None,
     value: Option<Value<'a>>,
@@ -11,18 +12,72 @@ struct Node<'a> {
 }
 
 /// key: array index, value: any & insert target + priority
-#[repr(transparent)]
-pub struct Map<'a>(pub DashMap<usize, Node<'a>>);
+#[derive(Debug, Clone, Default)]
+pub struct ArrayMap<'a> {
+    inner: DashMap<usize, Node<'a>>,
+    last_index: usize,
+}
 
-impl<'a> Map<'a> {
+impl<'a> ArrayMap<'a> {
     #[inline]
     pub fn new() -> Self {
-        Self(DashMap::new())
+        Self {
+            inner: DashMap::new(),
+            last_index: 0,
+        }
     }
 
-    pub fn insert_after(&self, key: usize, value: Value<'a>, target_index: usize, priority: usize) {
-        self.0.insert(
-            key,
+    pub fn insert(&mut self, value: Value<'a>) -> Option<Node<'a>> {
+        let ret = self.inner.insert(
+            self.last_index,
+            Node {
+                value: Some(value),
+                target_index: self.last_index,
+                priority: 0,
+            },
+        );
+        self.last_index += 1;
+
+        ret
+    }
+
+    pub fn insert_after(&mut self, target_index: usize, priority: usize, value: Value<'a>) {
+        if let Some(pair) = self.inner.get(&target_index) {
+            let (_, node) = pair.pair();
+
+            // Low priority
+            if priority < node.priority {
+                return;
+            }
+        };
+
+        self.inner.insert(
+            self.last_index,
+            Node {
+                value: Some(value),
+                target_index,
+                priority,
+            },
+        );
+        self.last_index += 1;
+    }
+
+    pub fn remove(&self, key: usize) -> Option<(usize, Node<'a>)> {
+        self.inner.remove(&key)
+    }
+
+    pub fn replace(&self, target_index: usize, priority: usize, value: Value<'a>) {
+        if let Some(pair) = self.inner.get(&target_index) {
+            let (_, node) = pair.pair();
+
+            // Low priority
+            if priority < node.priority {
+                return;
+            }
+        };
+
+        self.inner.insert(
+            target_index,
             Node {
                 value: Some(value),
                 target_index,
@@ -31,64 +86,66 @@ impl<'a> Map<'a> {
         );
     }
 
-    pub fn remove(&self, key: usize) -> Option<(usize, Node<'a>)> {
-        self.0.remove(&key)
-    }
-
     pub fn get(&self, key: usize) -> Option<Ref<'_, usize, Node<'a>>> {
-        self.0.get(&key)
+        self.inner.get(&key)
     }
 
     // array of map.keys()
-    pub fn sort(&self) -> Vec<usize> {
-        let mut output = Vec::with_capacity(self.0.len());
+    pub fn sorted_keys(&self) -> Vec<usize> {
+        let mut entries: Vec<(usize, usize, usize)> = self
+            .inner
+            .iter()
+            .map(|r| {
+                let (key, node) = r.pair();
+                (*key, node.target_index, node.priority)
+            })
+            .collect();
 
-        for (index, pair) in self.0.iter().enumerate() {
-            let (&key, node) = pair.pair();
-            let Node {
-                target_index,
-                priority,
-                ..
-            } = node;
+        // sort by target_index, priority
+        entries.sort_by_key(|&(_, target_index, priority)| (target_index, priority));
 
-            match output.get_mut(*target_index) {
-                Some(prev_index) => {
-                    let prev_priority = self.0.get(prev_index).unwrap().priority;
-                    if prev_priority > *priority {
-                        output.insert(*target_index, key);
-                    }
-                }
-                None => {
-                    output.insert(index, key);
-                }
-            }
+        // key
+        entries.into_iter().map(|(key, _, _)| key).collect()
+    }
 
-            output[target_index + 1] = index;
+    pub fn into_vec(self) -> Vec<Value<'a>> {
+        self.into()
+    }
+
+    pub fn into_values(self) -> Vec<Value<'a>> {
+        let mut output = Vec::with_capacity(self.inner.len());
+
+        for (_, node) in self.inner {
+            if let Some(value) = node.value {
+                output.push(value);
+            };
         }
-
         output
     }
 }
 
-impl<'a> From<&mut Vec<Value<'a>>> for Map<'a> {
+impl<'a> From<&mut Vec<Value<'a>>> for ArrayMap<'a> {
     fn from(value: &mut Vec<Value<'a>>) -> Self {
-        let map = Map::new();
+        let mut map = ArrayMap::new();
 
         let value = core::mem::take(value);
         for (i, v) in value.into_iter().enumerate() {
-            map.insert_after(i, v, i, 0);
+            map.insert_after(i, 0, v);
         }
         map
     }
 }
 
-impl<'a> From<Map<'a>> for Vec<Value<'a>> {
-    fn from(value: Map<'a>) -> Self {
-        let mut output = Vec::with_capacity(value.0.len());
+impl<'a> From<ArrayMap<'a>> for Vec<Value<'a>> {
+    fn from(value: ArrayMap<'a>) -> Self {
+        let mut output = Self::with_capacity(value.inner.len());
 
-        let sorted_indexes = value.sort();
+        let sorted_indexes = value.sorted_keys();
+
         for index in sorted_indexes {
-            let (_, node) = value.remove(index).unwrap();
+            let Some((_, node)) = value.remove(index) else {
+                continue;
+            };
             if let Some(value) = node.value {
                 output.push(value);
             };
@@ -101,17 +158,56 @@ impl<'a> From<Map<'a>> for Vec<Value<'a>> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_sort_map() {
-        let map = super::Map::new();
-        map.insert_after(0, 1_usize.into(), 0, 0);
-        map.insert_after(1, 2_usize.into(), 1, 0);
-        map.insert_after(2, 3_usize.into(), 2, 0);
-        map.insert_after(3, 4_usize.into(), 3, 0);
+    fn test_sort_map_add() {
+        let mut map = super::ArrayMap::new();
+
+        map.insert(1_usize.into());
+        map.insert(2_usize.into());
+        map.insert(3_usize.into());
+        map.insert(4_usize.into());
+        assert_eq!(map.sorted_keys(), vec![0, 1, 2, 3]);
 
         // mods
-        map.insert_after(4, 5_usize.into(), 1, 1); // 4 => 1(priority 1)
-        map.insert_after(5, 5_usize.into(), 1, 3); // 5 => 1(priority 3)
+        map.insert_after(1, 1, 5_usize.into()); // [1] = 5  (priority 1)
+        map.insert_after(1, 3, 15_usize.into()); // [1] = 15(priority 3)
 
-        assert_eq!(map.sort(), vec![0, 1, 5, 4, 2, 3]);
+        assert_eq!(map.sorted_keys(), vec![0, 1, 4, 5, 2, 3]);
+        assert_eq!(map.into_vec(), [1, 2, 5, 15, 3, 4]);
+    }
+
+    #[test]
+    fn test_sort_map_remove() {
+        let mut map = super::ArrayMap::new();
+
+        map.insert(1_usize.into());
+        map.insert(2_usize.into());
+        map.insert(3_usize.into());
+        map.insert(4_usize.into());
+        assert_eq!(map.sorted_keys(), vec![0, 1, 2, 3]);
+
+        // mods
+        map.remove(1);
+        assert_eq!(map.sorted_keys(), vec![0, 2, 3]);
+    }
+
+    #[test]
+    fn tes_sort_map_replace() {
+        // op: Replace, range: 0..1, 3..5, patch:[1, 2], [2, 3]
+        let mut map = super::ArrayMap::new();
+
+        map.insert(1_usize.into());
+        map.insert(2_usize.into());
+        map.insert(3_usize.into());
+        map.insert(4_usize.into());
+        assert_eq!(map.sorted_keys(), vec![0, 1, 2, 3]);
+
+        // mods
+        map.replace(1, 1, 5_usize.into()); // [1] = 5  (priority 1)
+        assert_eq!(map.sorted_keys(), vec![0, 1, 2, 3]);
+        assert_eq!(map.clone().into_vec(), [1, 5, 3, 4]);
+
+        map.replace(1, 3, 15_usize.into()); // [1] = 15(priority 3)
+        assert_eq!(map.sorted_keys(), vec![0, 1, 2, 3]);
+        assert_eq!(map.into_vec(), [1, 15, 3, 4]);
     }
 }
