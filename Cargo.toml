@@ -7,7 +7,7 @@ license = "GPL-3.0"
 repository = "https://github.com/SARDONYX-sard/d-merge"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.70"
 
 [workspace]
 members = [
@@ -32,7 +32,7 @@ phf = "0.11.2"
 rayon = "1.10.0"
 serde = { version = "1.0.219", features = ["derive"] } # Implement (De)Serialize
 serde_json = "1.0.140" # gui: To avoid generate_context error.
-serde_repr = "0.1.19" # C like Serialize enum into numbers.(Using progress reporing)
+serde_repr = "0.1.19" # C like Serialize enum into numbers.(Using progress reporting)
 simd-json = "0.14.3"
 snafu = "0.8.5"
 tokio = { version = "1.44.1", features = [
@@ -43,11 +43,11 @@ tracing = { version = "0.1.41" } # logger
 tracing-subscriber = "0.3.19"
 winnow = { version = "0.6.20", features = ["simd"] }
 
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9d23e15", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9d23e15", default-features = false, features = [
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "4500f99", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "4500f99", default-features = false, features = [
   "ignore_duplicates",
 ] }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "9d23e15", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "4500f99", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1"                                  # Color diff assertion

@@ -9,6 +9,7 @@
     "Caseless",
     "chrono",
     "clippy",
+    "dashmap",
     "havok",
     "hkcstring",
     "hkobject",

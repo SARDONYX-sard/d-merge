@@ -1,0 +1,77 @@
+{
+  "#0067": {
+    "hkbStateMachineTransitionInfoArray": {
+      "__ptr": "#0067",
+      "memSizeAndFlags": "0",
+      "referenceCount": "0",
+      "transitions": [
+        {
+          "triggerInterval": {
+            "enterEventId": "-1",
+            "exitEventId": "-1",
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "initiateInterval": {
+            "enterEventId": "-1",
+            "exitEventId": "-1",
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "transition": "#0068",
+          "condition": "null",
+          "eventId": "0",
+          "toStateId": "0",
+          "fromNestedStateId": "0",
+          "toNestedStateId": "0",
+          "priority": "0",
+          "flags": "FLAG_DISABLE_CONDITION"
+        },
+        {
+          "triggerInterval": {
+            "enterEventId": "-1",
+            "exitEventId": "-1",
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "initiateInterval": {
+            "enterEventId": "-1",
+            "exitEventId": "-1",
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "transition": "#0068",
+          "condition": "null",
+          "eventId": "4",
+          "toStateId": "0",
+          "fromNestedStateId": "0",
+          "toNestedStateId": "0",
+          "priority": "0",
+          "flags": "FLAG_DISABLE_CONDITION"
+        },
+        {
+          "triggerInterval": {
+            "enterEventId": -1,
+            "exitEventId": -1,
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "initiateInterval": {
+            "enterEventId": -1,
+            "exitEventId": -1,
+            "enterTime": 0.0,
+            "exitTime": 0.0
+          },
+          "transition": "#0000",
+          "condition": "#0000",
+          "eventId": 4,
+          "toStateId": 2,
+          "fromNestedStateId": 0,
+          "toNestedStateId": 0,
+          "priority": 0,
+          "flags": "FLAG_DISABLE_CONDITION"
+        }
+      ]
+    }
+  }
+}

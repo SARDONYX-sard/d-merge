@@ -8,13 +8,17 @@ use self::one_op::remove::apply_remove;
 use self::one_op::replace::apply_replace;
 use self::range_op::apply_range;
 use crate::operation::Op;
+use crate::range::Range;
 use crate::{JsonPatch, JsonPath, OpRange, OpRangeKind};
+use simd_json::derived::ValueTryIntoArray as _;
 use simd_json::BorrowedValue;
 
 /// Applies a JSON patch operation to a mutable reference to a JSON value.
 ///
 /// # Errors
 /// If the patch operation fails due to an invalid operation or path not found.
+///
+/// # Panics
 pub fn apply_patch<'v>(
     json: &mut BorrowedValue<'v>,
     path: JsonPath<'v>,
@@ -31,20 +35,19 @@ pub fn apply_patch<'v>(
         //  Range
         OpRangeKind::Seq(op_range) => {
             let OpRange { op, range } = op_range;
-            let range = crate::range::Range::FromTo(range);
+            let range = Range::FromTo(range);
 
             apply_range(json, path, op, range, value)
         }
         OpRangeKind::Discrete(vec_range) => {
-            // TODO:
-            for op_range in vec_range {
-                let OpRange { op, range } = op_range;
-                let range = crate::range::Range::FromTo(range);
+            let array = value
+                .try_into_array()
+                .map_err(|err| error::JsonPatchError::TryType { source: err })?;
 
-                apply_range(json, path.clone(), op, range, value.clone())?;
-                // if let Err(err) = apply_range(json, path.clone(), op, range, value.clone()) {
-                //     return Err(err);
-                // }
+            for (op_range, value) in vec_range.into_iter().zip(array) {
+                let OpRange { op, range } = op_range;
+                let range = Range::FromTo(range);
+                apply_range(json, path.clone(), op, range, value)?;
             }
             Ok(())
         }

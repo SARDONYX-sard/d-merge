@@ -24,8 +24,9 @@ pub enum JsonPatchError {
     #[snafu(transparent)]
     TryType { source: TryTypeError },
 
-    #[snafu(transparent)]
+    /// Out Of Range {path}: {source}
     OutOfRange {
+        path: String,
         source: crate::range::error::RangeError,
     },
 

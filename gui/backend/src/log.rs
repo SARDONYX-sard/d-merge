@@ -82,7 +82,7 @@ fn create_rotate_log(
             entry
                 .file_name()
                 .to_str()
-                .map_or(false, |name| name.starts_with(log_name))
+                .is_some_and(|name| name.starts_with(log_name))
         })
         .collect::<Vec<_>>();
 

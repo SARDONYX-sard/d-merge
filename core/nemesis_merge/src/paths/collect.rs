@@ -34,7 +34,7 @@ pub(crate) fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
     let path = path.as_ref();
     let is_txt = path
         .extension()
-        .map_or(false, |ext| ext.eq_ignore_ascii_case("txt"));
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"));
     let is_sharp_prefix = path
         .file_stem()
         .and_then(|name| name.to_str().map(|name| name.starts_with('#')))

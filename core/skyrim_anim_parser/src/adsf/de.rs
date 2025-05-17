@@ -14,7 +14,7 @@ use winnow::{
     error::{ContextError, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +28,7 @@ pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
         .map_err(|e| ReadableError::from_parse(e, input))
 }
 
-fn adsf<'a>(input: &mut &'a str) -> PResult<Adsf<'a>> {
+fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
     let project_names = project_names
         .context(Expected(Description("project_names: *.txt")))
         .parse_next(input)?;
@@ -50,7 +50,7 @@ fn adsf<'a>(input: &mut &'a str) -> PResult<Adsf<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn project_names<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
+fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     let line_len = from_one_line
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
@@ -64,7 +64,7 @@ fn project_names<'a>(input: &mut &'a str) -> PResult<Vec<Str<'a>>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn anim_data<'a>(input: &mut &'a str) -> PResult<AnimData<'a>> {
+fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
     let header = anim_header.parse_next(input)?;
     let line_range = header.line_range;
 
@@ -93,7 +93,7 @@ fn anim_data<'a>(input: &mut &'a str) -> PResult<AnimData<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn anim_header<'a>(input: &mut &'a str) -> PResult<AnimDataHeader<'a>> {
+fn anim_header<'a>(input: &mut &'a str) -> ModalResult<AnimDataHeader<'a>> {
     let header = seq! {
         AnimDataHeader {
             line_range: from_one_line.context(Expected(Description("anim_line_len: usize"))),
@@ -112,7 +112,7 @@ fn anim_header<'a>(input: &mut &'a str) -> PResult<AnimDataHeader<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_anim_block<'a>(input: &mut &'a str) -> PResult<ClipAnimDataBlock<'a>> {
+fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
@@ -132,7 +132,7 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> PResult<ClipAnimDataBlock<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_motion_blocks<'a>(input: &mut &'a str) -> PResult<Vec<ClipMotionBlock<'a>>> {
+fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBlock<'a>>> {
     let line_range = from_one_line.parse_next(input)?;
 
     let mut motion_blocks = vec![];
@@ -149,7 +149,7 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> PResult<Vec<ClipMotionBlock<'a
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_motion_block<'a>(input: &mut &'a str) -> PResult<ClipMotionBlock<'a>> {
+fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
         duration: from_one_line.context(Expected(Description("duration: f32"))),
@@ -208,7 +208,7 @@ fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation>, Context
 }
 
 /// Get a string up to a space and then consume the space.
-fn word_and_space<'a>(input: &mut &'a str) -> PResult<&'a str> {
+fn word_and_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let s = take_till(0.., |c| c == ' ').parse_next(input)?;
     space1.parse_next(input)?;
     Ok(s)
@@ -216,7 +216,7 @@ fn word_and_space<'a>(input: &mut &'a str) -> PResult<&'a str> {
 
 /// Get a string up to a space and parse to T, then consume the space.
 #[inline]
-fn from_word_and_space<T: FromStr>(input: &mut &str) -> PResult<T> {
+fn from_word_and_space<T: FromStr>(input: &mut &str) -> ModalResult<T> {
     word_and_space.parse_to().parse_next(input)
 }
 

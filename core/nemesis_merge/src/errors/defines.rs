@@ -68,8 +68,10 @@ pub enum Error {
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
 
-    #[snafu(transparent)]
+    /// serde_hkx serialize error.
+    #[snafu(display("{}:\n {source}", path.display()))]
     HkxSerError {
+        path: PathBuf,
         source: serde_hkx::errors::ser::Error,
     },
 
@@ -87,7 +89,6 @@ pub enum Error {
     JoinError { source: tokio::task::JoinError },
 
     /// (De)Serialize json error
-    #[cfg(feature = "serde")]
     #[snafu(display("{}:\n {source}", path.display()))]
     JsonError {
         /// input path

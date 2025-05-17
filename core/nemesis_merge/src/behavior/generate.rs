@@ -11,7 +11,7 @@ use crate::{
     templates::collect::collect_templates,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
@@ -37,7 +37,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     let PatchResult {
         template_names,
         template_patch_map,
-        id_index,
+        ptr_map,
     } = patch_result;
     let patch_errors_len = errors.len();
     all_errors.par_extend(errors);
@@ -54,26 +54,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
         // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
-        if let Err(errors) = apply_patches(&templates, patches) {
+        if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
             all_errors.par_extend(errors);
         };
         let apply_errors_len = all_errors.len();
 
-        // create ids map.
-        // create hkbGraphStringData
-        //
-        let mut event_id_map = HashMap::new(); // key: elem of vec, value: index of vec
-        let mut variable_id_map = HashMap::new(); // key: elem of vec, value: index of vec
-
-        //todo 4/4: Create ClassMap & id_map
-        // class_map.get(index);
-        // hkbGraphStringData.eventNames: Vec<Cow<'a, str>
-        // hkbBehaviorGraphStringData.VariableNames: Vec<Cow<'a, str>
-
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);
         let hkx_errors_len =
-            if let Err(hkx_errors) = generate_hkx_files(options.output_dir, templates) {
+            if let Err(hkx_errors) = generate_hkx_files(options.output_dir, templates, ptr_map) {
                 let errors_len = hkx_errors.len();
                 all_errors.par_extend(hkx_errors);
                 errors_len
@@ -105,24 +94,28 @@ mod tests {
         quick_tracing::init(file = "../../dummy/merge_test.log", stdio = false)
     )]
     async fn merge_test() {
+        // let log_path = "../../dummy/merge_test.log";
+        // crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
+
         #[allow(clippy::iter_on_single_items)]
         let ids = [
-            "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
-            "../../dummy/Data/Nemesis_Engine/mod/bcbi",
-            "../../dummy/Data/Nemesis_Engine/mod/cbbi",
-            "../../dummy/Data/Nemesis_Engine/mod/gender",
-            "../../dummy/Data/Nemesis_Engine/mod/hmce",
-            "../../dummy/Data/Nemesis_Engine/mod/momo",
-            "../../dummy/Data/Nemesis_Engine/mod/na1w",
-            "../../dummy/Data/Nemesis_Engine/mod/nemesis",
-            "../../dummy/Data/Nemesis_Engine/mod/pscd",
-            "../../dummy/Data/Nemesis_Engine/mod/rthf",
-            "../../dummy/Data/Nemesis_Engine/mod/skice",
-            "../../dummy/Data/Nemesis_Engine/mod/sscb",
-            "../../dummy/Data/Nemesis_Engine/mod/tkuc",
-            "../../dummy/Data/Nemesis_Engine/mod/tudm",
-            "../../dummy/Data/Nemesis_Engine/mod/turn",
-            "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+            // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
+            // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
+            // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
+            // "../../dummy/Data/Nemesis_Engine/mod/gender",
+            // "../../dummy/Data/Nemesis_Engine/mod/hmce",
+            // "../../dummy/Data/Nemesis_Engine/mod/momo",
+            // "../../dummy/Data/Nemesis_Engine/mod/na1w",
+            // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
+            // "../../dummy/Data/Nemesis_Engine/mod/pscd",
+            // "../../dummy/Data/Nemesis_Engine/mod/rthf",
+            // "../../dummy/Data/Nemesis_Engine/mod/skice",
+            // "../../dummy/Data/Nemesis_Engine/mod/sscb",
+            // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
+            // "../../dummy/Data/Nemesis_Engine/mod/tudm",
+            // "../../dummy/Data/Nemesis_Engine/mod/turn",
+            // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
         ]
         .into_par_iter()
         .map(|s| s.into())

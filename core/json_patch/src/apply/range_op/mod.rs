@@ -34,11 +34,21 @@ pub fn apply_range<'a>(
             match op {
                 Op::Add => handle_add(target, range, value),
                 Op::Remove => {
-                    range.check_valid_range(target.len())?;
+                    range.check_valid_range(target.len()).map_err(|err| {
+                        JsonPatchError::OutOfRange {
+                            path: path.join("."),
+                            source: err,
+                        }
+                    })?;
                     handle_remove(target, range);
                 }
                 Op::Replace => {
-                    range.check_valid_range(target.len())?;
+                    range.check_valid_range(target.len()).map_err(|err| {
+                        JsonPatchError::OutOfRange {
+                            path: path.join("."),
+                            source: err,
+                        }
+                    })?;
                     handle_replace(target, range, value);
                 }
             };

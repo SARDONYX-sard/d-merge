@@ -13,7 +13,9 @@ pub(crate) fn apply_replace<'a>(
     path: JsonPath<'a>,
     value: Value<'a>,
 ) -> Result<()> {
-    json.ptr_mut(&path).map_or_else(
+    let res = json.ptr_mut(&path);
+
+    res.map_or_else(
         || {
             Err(JsonPatchError::NotFoundTarget {
                 path: path.join("."),

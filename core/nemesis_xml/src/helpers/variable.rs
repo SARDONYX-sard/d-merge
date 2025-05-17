@@ -59,16 +59,17 @@
 
 use winnow::{
     ascii::Caseless,
-    combinator::delimited,
+    combinator::separated_pair,
     error::{StrContext::*, StrContextValue::*},
     token::take_until,
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 /// # Errors
 /// If not found `$eventID[` `]`
-pub fn event_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    delimited(Caseless("$eventID["), take_until(0.., "]$"), "]$")
+pub fn event_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    separated_pair(Caseless("$eventID["), take_until(0.., "]$"), "]$")
+        .take()
         .context(Expected(Description(
             "eventID(e.g. `$eventID[sampleEventName]$`)",
         )))
@@ -77,8 +78,9 @@ pub fn event_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
 
 /// # Errors
 /// If not found `$variableID[` `]`
-pub fn variable_id<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    delimited(Caseless("$variableID["), take_until(0.., "]$"), "]$")
+pub fn variable_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    separated_pair(Caseless("$variableID["), take_until(0.., "]$"), "]$")
+        .take()
         .context(Expected(Description(
             "variableID(e.g. `$variableID[sampleName]$`)",
         )))
@@ -92,9 +94,11 @@ mod tests {
     #[test]
     fn test_variable() {
         let event_name = event_id.parse_next(&mut "$eventID[sampleEvent]$");
-        assert_eq!(event_name, Ok("sampleEvent"));
+        assert_eq!(event_name, Ok("$eventID[sampleEvent]$"));
+        let event_name = event_id.parse_next(&mut "$eventID[sampleEvent]$remain");
+        assert_eq!(event_name, Ok("$eventID[sampleEvent]$"));
 
         let var_name = variable_id.parse_next(&mut "$variableID[sampleVal]$");
-        assert_eq!(var_name, Ok("sampleVal"));
+        assert_eq!(var_name, Ok("$variableID[sampleVal]$"));
     }
 }
