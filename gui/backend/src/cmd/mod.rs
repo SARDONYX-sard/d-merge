@@ -1,8 +1,8 @@
 pub(crate) mod conversion;
 pub(crate) mod fs;
 pub(crate) mod log;
-pub(crate) mod patch;
 pub(crate) mod open;
+pub(crate) mod patch;
 
 use tauri::{Emitter as _, Window};
 
