@@ -19,7 +19,6 @@ export const PatchContainer = () => {
     try {
       const startMs = performance.now();
 
-
       await patch(output, activateMods);
       setLoading(false);
 

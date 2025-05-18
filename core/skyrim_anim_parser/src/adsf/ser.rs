@@ -12,7 +12,7 @@ pub fn serialize_adsf(adsf: &Adsf) -> String {
     // Serialize project names
     output.push_str(&format!("{}\n", adsf.project_names.len()));
     for name in &adsf.project_names {
-        output.push_str(&format!("{}\n", name));
+        output.push_str(&format!("{name}\n"));
     }
 
     // Serialize animation data
@@ -59,7 +59,7 @@ fn serialize_anim_header(header: &AnimDataHeader) -> String {
     output.push_str(&format!("{}\n", header.lead_int));
     output.push_str(&format!("{}\n", header.project_assets_len));
     for asset in &header.project_assets {
-        output.push_str(&format!("{}\n", asset));
+        output.push_str(&format!("{asset}\n"));
     }
     output.push_str(&format!("{}\n", if header.has_motion_data { 1 } else { 0 }));
 
@@ -77,7 +77,7 @@ fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
     output.push_str(&format!("{:.}\n", block.crop_end_local_time));
     output.push_str(&format!("{}\n", block.trigger_names_len));
     for trigger in &block.trigger_names {
-        output.push_str(&format!("{}\n", trigger));
+        output.push_str(&format!("{trigger}\n"));
     }
     output.push('\n'); // Empty line
 

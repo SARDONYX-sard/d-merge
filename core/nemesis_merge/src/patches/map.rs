@@ -3,7 +3,7 @@ use dashmap::DashMap;
 use simd_json::borrowed::Value;
 
 #[derive(Debug, Clone, Default)]
-struct Node<'a> {
+pub struct Node<'a> {
     /// when removed, then None,
     value: Option<Value<'a>>,
     // insert target index, priority
