@@ -2,7 +2,7 @@ name: Build & Test
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "impl_id_map"]
   pull_request:
     branches: ["*"]
   workflow_dispatch: # <- Setting to allow manual execution by button.
