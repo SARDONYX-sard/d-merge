@@ -1,10 +1,12 @@
 import { arrayMove } from '@dnd-kit/sortable';
+import { useGridApiRef } from '@mui/x-data-grid';
 import { memo, useCallback } from 'react';
 
 import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/DraggableDataGrid';
 
 import { usePatchContext } from './PatchProvider';
 import { useColumns } from './useColumns';
+import { useGridStatePersistence } from './useGridStatePersistence';
 
 import type { Props as DndCtxProps } from '@dnd-kit/core/dist/components/DndContext/DndContext';
 import type { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internals';
@@ -55,8 +57,13 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
     [modInfoList, setActivateMods],
   );
 
+  const apiRef = useGridApiRef();
+  const storageKey = 'modsGridState';
+  useGridStatePersistence(apiRef, storageKey);
+
   return (
     <DraggableDataGrid
+      apiRef={apiRef}
       columns={columns}
       density='compact'
       initialState={{
@@ -72,7 +79,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
       onRowSelectionModelChange={handleRowSelectionModelChange}
       rowSelectionModel={{
         ids: new Set(activateMods),
-        type: 'include'
+        type: 'include',
       }}
       rows={modInfoList}
       {...props}
