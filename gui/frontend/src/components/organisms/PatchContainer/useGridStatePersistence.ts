@@ -3,7 +3,6 @@ import { type RefObject, useEffect } from 'react';
 import type { GridApi, GridInitialState } from '@mui/x-data-grid';
 
 export function useGridStatePersistence(apiRef: RefObject<GridApi | null>, storageKey: string) {
-  // 初期化時に保存された状態を復元
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     if (saved) {

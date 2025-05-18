@@ -1,0 +1,132 @@
+{
+  "general": {
+    "all_clear_button": "全てクリア",
+    "cancel_button": "キャンセル",
+    "conversion_complete_message": "変換が完了しました。"
+  },
+  "backup": {
+    "dialog": {
+      "all_checked_label": "全てチェック",
+      "public_checked_label": "公開のみ全てチェック"
+    },
+    "export": {
+      "button_name": "エクスポート",
+      "dialog_title": "設定のエクスポート",
+      "success_message": "設定をエクスポートしました。",
+      "tooltip": "現在の設定をエクスポートします。(個人情報の取り扱いにはご注意ください)"
+    },
+    "import": {
+      "button_name": "インポート",
+      "dialog_title": "設定のインポート",
+      "tooltip": "JSONファイルから設定をインポートします。(インポート時にJavaScriptが実行されます。悪意のあるスクリプトにご注意ください)"
+    }
+  },
+  "convert": {
+    "button": {
+      "convert": "変換",
+      "collapse_all": "すべて閉じる",
+      "expand_all": "すべて開く",
+      "select_all": "すべて選択",
+      "unselect_all": "すべて解除"
+    },
+    "output_format_label": "出力形式",
+    "selection_type": {
+      "label": "選択タイプ",
+      "directories": "ディレクトリ",
+      "directories_tooltip": "ディレクトリを選択 → 並列変換(ディレクトリ構造を維持)",
+      "files": "ファイル",
+      "files_tooltip": "ファイルを選択 → 一括変換して出力先に保存",
+      "tree": "ツリー",
+      "tree_tooltip": "ディレクトリ選択 → ファイルを選択 → 並列変換(ディレクトリ構造を維持)"
+    },
+    "converting_button": "変換中..."
+  },
+  "css_preset": {
+    "list_label": "CSSプリセット",
+    "list_tooltip": "CSSプリセットを選択できます。",
+    "list_tooltip_edit_warning": "注意：「プリセット」を編集すると「カスタム」が上書きされます。",
+    "items": {
+      "custom": "カスタム",
+      "preset1": "プリセット1",
+      "preset2": "プリセット2",
+      "preset3": "プリセット3",
+      "preset4": "プリセット4"
+    },
+    "custom_css_label": "現在適用中のCSS"
+  },
+  "custom_js": {
+    "auto_run_label": "JS自動実行",
+    "auto_run_tooltip": "ページ遷移のたびにJavaScriptを自動実行します。(無効の場合は設定適用のために自動で再読み込みします)",
+    "auto_run_tooltip_note": "手動で有効化した場合にのみ動作します。",
+    "js_label": "各ページ遷移時に実行するJavaScript(許可がある場合のみ)"
+  },
+  "editor": {
+    "mode_list_label": "エディタモード"
+  },
+  "import_language": {
+    "button": "言語をインポート",
+    "tooltip": "任意の言語をJSONファイルからインポートします。(バリデーションのため自動的に再読み込みします)",
+    "tooltip_invalid_json": "注意: JSONが不正な場合は英語にフォールバックします。(JSON形式はWikiを参照してください)"
+  },
+  "language_preset": {
+    "auto": "自動",
+    "custom": "カスタム",
+    "label": "言語"
+  },
+  "log_level": {
+    "list_label": "ログレベル",
+    "tooltip_summary": "低いログレベルは上位の重大度レベルを含みます。(例: Error ⊂ Info)",
+    "tooltip_debug": "デバッグ：変換処理中のデータを記録します。",
+    "tooltip_info": "情報：変換時間を記録します。",
+    "tooltip_error": "エラー：エラーのみを記録します。"
+  },
+  "notice": {
+    "limit": "表示数制限",
+    "position": {
+      "list_label": "通知の表示位置",
+      "bottom_center": "下・中央",
+      "bottom_left": "下・左",
+      "bottom_right": "下・右",
+      "top_center": "上・中央",
+      "top_left": "上・左",
+      "top_right": "上・右"
+    }
+  },
+  "log": {
+    "open_button": "ログ閲覧",
+    "open_directory_button": "ログ(場所)",
+    "open_directory_tooltip": "ログディレクトリを開きます。",
+    "open_file_tooltip": "現在のログファイルを開きます。(起動毎に新規ログファイルにローテーションします)"
+  },
+  "output": {
+    "open_tooltip": "出力先ディレクトリを開く",
+    "path_label": "出力先"
+  },
+  "directory": {
+    "open_tooltip": "指定したディレクトリを開く"
+  },
+  "patch": {
+    "button": "パッチ",
+    "columns": {
+      "author": "作成者",
+      "mod_name": "MOD名",
+      "priority": "優先度",
+      "site": "サイト"
+    },
+    "patching_button": "パッチ適用中...",
+    "patch_complete_message": "パッチが適用されました。"
+  },
+  "select_button": "選択",
+  "tabs": {
+    "backup": "バックアップ",
+    "editor_preset": "エディタ／プリセット",
+    "language": "言語",
+    "notice": "通知",
+    "tab": "タブ",
+    "position_label": "タブの位置",
+    "positions": {
+      "bottom": "下",
+      "top": "上"
+    }
+  }
+}

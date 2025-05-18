@@ -21,15 +21,17 @@ export const PatchContainer = () => {
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     setLoading(true);
+    const startMs = performance.now();
     startTimer();
 
     try {
       await patch(output, activateMods);
-      NOTIFY.success(`${t('patch-complete')} (${elapsedText})`);
-    } catch (error) {
-      NOTIFY.error(`Time: (${elapsedText})\n\n${error}`);
-    } finally {
       stopTimer();
+      NOTIFY.success(`${t('patch-complete')} (${elapsedToText(startMs)})`);
+    } catch (error) {
+      stopTimer();
+      NOTIFY.error(`Time: (${elapsedToText(startMs)})\n\n${error}`);
+    } finally {
       setLoading(false);
     }
   };
@@ -55,3 +57,11 @@ export const PatchContainer = () => {
     </>
   );
 };
+
+function elapsedToText(startMs: number) {
+  const endMs = performance.now();
+  const elapsed = endMs - startMs;
+  const seconds = Math.floor(elapsed / 1000);
+  const ms = Math.floor(elapsed % 1000);
+  return `${seconds}.${ms.toString().padStart(3, '0')}s`;
+}
