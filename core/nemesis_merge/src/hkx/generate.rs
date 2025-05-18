@@ -6,7 +6,7 @@ use crate::{
     results::filter_results,
 };
 use rayon::prelude::*;
-use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, VariableIdMap};
+use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
 use serde_hkx_features::{id_maker::crate_maps_from_id_class, ClassMap};
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
@@ -34,7 +34,7 @@ pub(crate) fn generate_hkx_files(
             write_json_patch(&output_path, &template_json)?;
 
             let hkx_bytes = {
-                let class_map: ClassMap =
+                let mut class_map: ClassMap =
                     from_borrowed_value(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
                     })?;
@@ -56,16 +56,14 @@ pub(crate) fn generate_hkx_files(
                     };
                 }
 
-                // #[cfg(feature = "tracing")]
-                // {
-                //     tracing::trace!("event_id_map = {:#?}", event_id_map);
-                //     tracing::trace!("variable_id_map = {:#?}", variable_id_map);
-                // }
-
                 // Convert to hkx bytes & Replace nemesis id.
                 let header = HkxHeader::new_skyrim_se();
                 let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
                 let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
+
+                // NOTE: T-pause if we don't sort before `to_bytes`.
+                class_map.sort_for_bytes();
+
                 // Output error info
                 // serialize target class, field ptr number.
                 serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
