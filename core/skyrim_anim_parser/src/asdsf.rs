@@ -7,7 +7,7 @@ use super::lines::{from_one_line, lines, num_bool_line, one_line, Str};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
-    error::{ContextError, StrContext::*, StrContextValue::*},
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq, ModalResult, Parser,
 };
 
@@ -200,7 +200,9 @@ fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
     })
 }
 
-fn conditions<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Condition<'a>>, ContextError> {
+fn conditions<'a>(
+    line_len: usize,
+) -> impl Parser<&'a str, Vec<Condition<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut conditions = vec![];
         for _ in 0..line_len {
@@ -221,7 +223,7 @@ fn conditions<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Condition<'a>>, C
     }
 }
 
-fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ContextError> {
+fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut attacks = vec![];
         for _ in 0..line_len {
@@ -242,7 +244,7 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, Context
     }
 }
 
-fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ContextError> {
+fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut anim_infos = vec![];
         for _ in 0..line_len {

@@ -29,7 +29,7 @@ use std::{collections::HashMap, mem};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
-    error::ContextError,
+    error::{ContextError, ErrMode},
     Parser,
 };
 
@@ -88,7 +88,10 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ContextError>) -> Result<O> {
+    fn parse_next<O>(
+        &mut self,
+        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
+    ) -> Result<O> {
         parser
             .parse_next(&mut self.input)
             .map_err(|err| Error::ContextError { err })
@@ -97,7 +100,10 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse by argument parser no consume.
     ///
     /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ContextError>) -> Result<O> {
+    fn parse_peek<O>(
+        &self,
+        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
+    ) -> Result<O> {
         let (_, res) = parser
             .parse_peek(self.input)
             .map_err(|err| Error::ContextError { err })?;
