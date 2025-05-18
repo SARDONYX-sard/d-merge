@@ -19,8 +19,8 @@ export const PatchContainer = () => {
     try {
       const startMs = performance.now();
 
-      return await patch(output, activateMods);
-      await new Promise((r) => setTimeout(r, 1000));
+
+      await patch(output, activateMods);
       setLoading(false);
 
       const endMs = performance.now();
