@@ -7,7 +7,7 @@ import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { CodeEditorTab } from '@/components/organisms/CodeEditorTab';
 import { Tabs } from '@/components/organisms/Tabs';
 import { useTabContext } from '@/components/providers/TabProvider';
-import { start } from '@/services/api/shell';
+import { openUrl } from '@/services/api/shell';
 
 import packageJson from '@/../../package.json';
 
@@ -45,7 +45,7 @@ export const Settings = () => {
 
 const TabsMenu = () => {
   const handleHelpClick: MouseEventHandler<HTMLButtonElement> = (_event) => {
-    start(packageJson.homepage); // jump by backend api
+    openUrl(packageJson.homepage); // jump by backend api
   };
 
   return (

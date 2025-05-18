@@ -22,7 +22,6 @@ export const PatchContainer = () => {
       const startMs = performance.now();
 
       await patch(output, activateMods);
-      setLoading(false);
 
       const endMs = performance.now();
       const durationMs = endMs - startMs;
@@ -33,6 +32,8 @@ export const PatchContainer = () => {
       NOTIFY.success(`${t('patch-complete')} (${seconds}.${ms}s)`);
     } catch (error) {
       NOTIFY.error(`${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -45,6 +46,7 @@ export const PatchContainer = () => {
       </Box>
       <ModsGrid
         sx={{
+          backgroundColor: '#160b0b60',
           marginTop: '10px',
           width: '95vw',
           maxHeight: '65vh',

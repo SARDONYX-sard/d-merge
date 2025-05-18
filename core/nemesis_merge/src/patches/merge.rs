@@ -127,7 +127,10 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, patch: JsonPatch<'a>) {
                                 // e.g. Remove: 10..12, Add: 4..10 -> Add: 4..10, Remove:11..12
                             }
                         }
-                        _ => unimplemented!(),
+                        (_base, _op) => {
+                            #[cfg(feature = "tracing")]
+                            tracing::warn!("Unsupported Descread pattern: {_base}, {_op} yet.")
+                        }
                     }
                 }
                 OpRangeKind::Discrete(_op_ranges) => {}

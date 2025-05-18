@@ -1,9 +1,9 @@
 import ConvertIcon from '@mui/icons-material/Transform';
-import LoadingButton, { type LoadingButtonProps } from '@mui/lab/LoadingButton';
+import Button, { type ButtonProps } from '@mui/material/Button';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 
-type Props = LoadingButtonProps & {
+type Props = ButtonProps & {
   buttonText?: string;
   loadingText?: string;
 };
@@ -17,7 +17,7 @@ export function ConvertButton({ loading, buttonText, loadingText, ...props }: Pr
   const { t } = useTranslation();
 
   return (
-    <LoadingButton
+    <Button
       endIcon={<ConvertIcon />}
       loading={loading}
       loadingPosition='end'
@@ -30,6 +30,6 @@ export function ConvertButton({ loading, buttonText, loadingText, ...props }: Pr
       {...props}
     >
       <span>{loading ? (loadingText ?? t('converting-btn')) : (buttonText ?? t('convert-btn'))}</span>
-    </LoadingButton>
+    </Button>
   );
 }

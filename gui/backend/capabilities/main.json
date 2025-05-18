@@ -14,6 +14,6 @@
     "dialog:allow-save",
     "fs:allow-read-text-file",
     "fs:allow-resource-read-recursive",
-    "shell:allow-open"
+    "fs:scope-appdata-recursive"
   ]
 }

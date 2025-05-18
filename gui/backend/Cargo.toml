@@ -24,20 +24,20 @@ tauri-build = { version = "2.2.0", features = [] }
 chrono = "0.4.41"
 futures = { workspace = true }
 once_cell = { workspace = true }
+open = { version = "5.3.2", features = ["shellexecute-on-windows"] }
 rayon = { workspace = true }
-serde = { workspace = true }                           # Implement (De)Serializer
+serde = { workspace = true }                                         # Implement (De)Serializer
 serde_hkx_features = { workspace = true }
-serde_json = { workspace = true }                      # To avoid generate_context error.
-serde_repr = { workspace = true }                      # Implement (De)Serializer
-snafu = { workspace = true }                           # Implement error types
-tauri = { version = "2.5.1", features = ["devtools"] } # For GUI
-tauri-plugin-dialog = "2.2.1"                          # https://github.com/tauri-apps/plugins-workspace
+serde_json = { workspace = true }                                    # To avoid generate_context error.
+serde_repr = { workspace = true }                                    # Implement (De)Serializer
+snafu = { workspace = true }                                         # Implement error types
+tauri = { version = "2.5.1", features = ["devtools"] }               # For GUI
+tauri-plugin-dialog = "2.2.1"                                        # https://github.com/tauri-apps/plugins-workspace
 tauri-plugin-fs = "2.2.1"
-tauri-plugin-shell = "2.2.1"
 tauri-plugin-window-state = "2.2.2"
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # workspace members
 mod_info = { workspace = true }

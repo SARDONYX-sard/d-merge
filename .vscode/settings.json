@@ -9,7 +9,7 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -17,8 +17,8 @@
   "editor.codeActionsOnSave": {
     "quickfix.biome": "explicit",
     "source.fixAll.eslint": "explicit",
-    "source.fixAll.sortJSON": "never"
-    // "source.organizeImports.biome": "explicit"
+    "source.fixAll.sortJSON": "never",
+    "source.organizeImports.biome": "never"
   },
   "editor.formatOnSave": true,
   "evenBetterToml.formatter.alignComments": true,

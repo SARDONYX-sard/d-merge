@@ -2,7 +2,7 @@ import { Button, Tooltip } from '@mui/material';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { ModInfo } from '@/services/api/patch';
-import { start } from '@/services/api/shell';
+import { openUrl } from '@/services/api/shell';
 
 import type { GridColDef } from '@mui/x-data-grid';
 import type { MouseEventHandler } from 'react';
@@ -27,7 +27,7 @@ export const useColumns = () => {
         const { site } = params.row;
         const handleMappingClick: MouseEventHandler<HTMLButtonElement> = (event) => {
           event.preventDefault();
-          start(site);
+          openUrl(site);
         };
         return site === '' ? (
           <></>

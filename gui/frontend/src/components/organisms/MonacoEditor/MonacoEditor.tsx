@@ -6,7 +6,7 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { isTauri } from '@tauri-apps/api/core';
 import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
 
-import { start } from '@/services/api/shell';
+import { openUrl } from '@/services/api/shell';
 
 import { atomOneDarkPro } from './atom_onedark_pro';
 import { loadVimKeyBindings } from './vim_key_bindings';
@@ -80,7 +80,7 @@ const setLangCustomConfig = (monacoEnv: typeof monaco) => {
   if (isTauri()) {
     monacoEnv.editor.registerLinkOpener({
       open(url) {
-        start(url.toString());
+        openUrl(url.toString());
         //? False is for hooks, but true replaces the function.
         //? In this case, it is a replacement because it opens the URL with its own API.
         return true;

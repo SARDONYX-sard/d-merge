@@ -1,11 +1,11 @@
 import OutputIcon from '@mui/icons-material/Output';
 import { type SxProps, Tooltip } from '@mui/material';
-import { open } from '@tauri-apps/plugin-shell';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
+import { openPath as open } from '@/services/api/shell';
 
 import { usePatchContext } from './PatchProvider';
 
