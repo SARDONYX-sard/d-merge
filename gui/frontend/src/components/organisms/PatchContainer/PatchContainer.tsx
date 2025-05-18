@@ -1,6 +1,7 @@
 import { Box } from '@mui/material';
 import { type MouseEventHandler, useState } from 'react';
 
+import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { ConvertNav } from '@/components/organisms/ConvertNav';
 import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
@@ -13,6 +14,7 @@ export const PatchContainer = () => {
   const { output, activateMods } = usePatchContext();
   const [loading, setLoading] = useState(false);
   const inputFieldsProps = usePatchInputs();
+  const { t } = useTranslation();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     setLoading(true);
@@ -48,7 +50,12 @@ export const PatchContainer = () => {
           maxHeight: '65vh',
         }}
       />
-      <ConvertNav loading={loading} onClick={handleClick} />
+      <ConvertNav
+        buttonText={t('patch-btn')}
+        loading={loading}
+        loadingText={t('patching-btn')}
+        onClick={handleClick}
+      />
     </>
   );
 };

@@ -3,14 +3,17 @@ import LoadingButton, { type LoadingButtonProps } from '@mui/lab/LoadingButton';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 
-type Props = LoadingButtonProps;
+type Props = LoadingButtonProps & {
+  buttonText?: string;
+  loadingText?: string;
+};
 
 /**
  *
  * Icon ref
  * - https://mui.com/material-ui/material-icons/
  */
-export function ConvertButton({ loading, ...props }: Props) {
+export function ConvertButton({ loading, buttonText, loadingText, ...props }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -26,7 +29,7 @@ export function ConvertButton({ loading, ...props }: Props) {
       variant='contained'
       {...props}
     >
-      <span>{loading ? t('converting-btn') : t('convert-btn')}</span>
+      <span>{loading ? (loadingText ?? t('converting-btn')) : (buttonText ?? t('convert-btn'))}</span>
     </LoadingButton>
   );
 }

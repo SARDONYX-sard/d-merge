@@ -1,4 +1,4 @@
-import { Grid2 as Grid } from '@mui/material';
+import { Grid } from '@mui/material';
 import { open } from '@tauri-apps/plugin-dialog';
 
 import { Button } from '@/components/molecules/Button';

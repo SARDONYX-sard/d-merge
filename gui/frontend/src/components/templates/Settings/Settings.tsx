@@ -1,6 +1,6 @@
 'use client'; // If this directive is not present on each page, a build error will occur.
 import { Box, type SxProps, type Theme } from '@mui/material';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 
 import { Help } from '@/components/atoms/Help';
 import { useInjectJs } from '@/components/hooks/useInjectJs';

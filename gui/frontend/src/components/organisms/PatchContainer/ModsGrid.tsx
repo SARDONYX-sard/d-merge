@@ -42,7 +42,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         return;
       }
 
-      const selectedRowId = new Set(RowId);
+      const selectedRowId = new Set(RowId.ids);
       const selectedIds: string[] = [];
 
       for (const row of modInfoList) {
@@ -70,7 +70,10 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
       loading={loading}
       onDragEnd={handleDragEnd}
       onRowSelectionModelChange={handleRowSelectionModelChange}
-      rowSelectionModel={activateMods}
+      rowSelectionModel={{
+        ids: new Set(activateMods),
+        type: 'include'
+      }}
       rows={modInfoList}
       {...props}
     />
