@@ -13,17 +13,19 @@ import type { ComponentPropsWithRef } from 'react';
 
 const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
 
-const createHandlers = (path: string, setPath: (path: string) => void) => ({
-  onClick: () => NOTIFY.asyncTry(async () => await openPath(path, { setPath, directory: true })),
-  onIconClick: () => NOTIFY.asyncTry(async () => await open(path)),
-});
-
 export const usePatchInputs = () => {
   const { modInfoDir, setModInfoDir, output, setOutput } = usePatchContext();
   const { t } = useTranslation();
 
-  const inputHandlers = createHandlers(modInfoDir, setModInfoDir);
-  const outputHandlers = createHandlers(output, setOutput);
+  const inputHandlers = {
+    onClick: () => NOTIFY.asyncTry(async () => await openPath(modInfoDir, { setPath: setModInfoDir, directory: true })),
+    onIconClick: () => NOTIFY.asyncTry(async () => await open(modInfoDir)),
+  };
+
+  const outputHandlers = {
+    onClick: () => NOTIFY.asyncTry(async () => await openPath(output, { setPath: setOutput, directory: true })),
+    onIconClick: () => NOTIFY.asyncTry(async () => await open(output)),
+  };
 
   return [
     {
