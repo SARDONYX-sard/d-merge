@@ -107,7 +107,7 @@ mod tests {
                 fs::create_dir_all("../dummy/").unwrap();
                 fs::write("../dummy/dump.txt", format!("{directory_tree:#?}")).unwrap();
             }
-            Err(e) => panic!("Error building directory tree: {}", e),
+            Err(e) => panic!("Error building directory tree: {e}"),
         }
     }
 

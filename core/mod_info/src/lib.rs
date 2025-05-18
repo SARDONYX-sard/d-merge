@@ -107,7 +107,7 @@ mod tests {
     fn get_mod_info() -> Result<()> {
         let pattern = "../../dummy/Data/Nemesis_Engine/mod/*/info.ini";
         let info = ModsInfo::get_all(pattern)?;
-        println!("{:#?}", info);
+        println!("{info:#?}");
         Ok(())
     }
 

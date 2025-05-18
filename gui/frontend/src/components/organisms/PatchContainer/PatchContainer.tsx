@@ -16,9 +16,22 @@ export const PatchContainer = () => {
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     setLoading(true);
-    await NOTIFY.asyncTry(async () => await patch(output, activateMods));
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
+    try {
+      const startMs = performance.now();
+
+      await patch(output, activateMods);
+      setLoading(false);
+
+      const endMs = performance.now();
+      const durationMs = endMs - startMs;
+
+      const seconds = Math.floor(durationMs / 1000);
+      const ms = Math.round(durationMs % 1000);
+
+      NOTIFY.success(`Generation Complete! (${seconds}.${ms}s)`);
+    } catch (error) {
+      NOTIFY.error(`${error}`);
+    }
   };
 
   return (
