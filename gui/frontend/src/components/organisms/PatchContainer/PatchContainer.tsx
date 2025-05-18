@@ -1,6 +1,7 @@
 import { Box } from '@mui/material';
 import { type MouseEventHandler, useState } from 'react';
 
+import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { ConvertNav } from '@/components/organisms/ConvertNav';
@@ -11,6 +12,8 @@ import { NOTIFY } from '@/lib/notify';
 import { patch } from '@/services/api/patch';
 
 export const PatchContainer = () => {
+  const { text: elapsedText, start: startTimer, stop: stopTimer } = useTimer();
+
   const { output, activateMods } = usePatchContext();
   const [loading, setLoading] = useState(false);
   const inputFieldsProps = usePatchInputs();
@@ -18,24 +21,20 @@ export const PatchContainer = () => {
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
     setLoading(true);
+    startTimer();
+
     try {
-      const startMs = performance.now();
-
       await patch(output, activateMods);
-
-      const endMs = performance.now();
-      const durationMs = endMs - startMs;
-
-      const seconds = Math.floor(durationMs / 1000);
-      const ms = Math.round(durationMs % 1000);
-
-      NOTIFY.success(`${t('patch-complete')} (${seconds}.${ms}s)`);
+      NOTIFY.success(`${t('patch-complete')} (${elapsedText})`);
     } catch (error) {
-      NOTIFY.error(`${error}`);
+      NOTIFY.error(`Time: (${elapsedText})\n\n${error}`);
     } finally {
+      stopTimer();
       setLoading(false);
     }
   };
+
+  const loadingText = `${t('patching-btn')} (${elapsedText})`;
 
   return (
     <>
@@ -52,7 +51,7 @@ export const PatchContainer = () => {
           maxHeight: '65vh',
         }}
       />
-      <ConvertNav buttonText={t('patch-btn')} loading={loading} loadingText={t('patching-btn')} onClick={handleClick} />
+      <ConvertNav buttonText={t('patch-btn')} loading={loading} loadingText={loadingText} onClick={handleClick} />
     </>
   );
 };
