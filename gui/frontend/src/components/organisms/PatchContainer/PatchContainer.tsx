@@ -30,7 +30,7 @@ export const PatchContainer = () => {
       const seconds = Math.floor(durationMs / 1000);
       const ms = Math.round(durationMs % 1000);
 
-      NOTIFY.success(`Generation Complete! (${seconds}.${ms}s)`);
+      NOTIFY.success(`${t('patch-complete')} (${seconds}.${ms}s)`);
     } catch (error) {
       NOTIFY.error(`${error}`);
     }
@@ -50,12 +50,7 @@ export const PatchContainer = () => {
           maxHeight: '65vh',
         }}
       />
-      <ConvertNav
-        buttonText={t('patch-btn')}
-        loading={loading}
-        loadingText={t('patching-btn')}
-        onClick={handleClick}
-      />
+      <ConvertNav buttonText={t('patch-btn')} loading={loading} loadingText={t('patching-btn')} onClick={handleClick} />
     </>
   );
 };
