@@ -21,11 +21,13 @@ export const I18nList = () => {
   };
 
   const menuItems = [
-    { value: 'auto', label: t('lang-preset-auto') },
+    { value: 'auto', label: t('language_preset.auto') },
     { value: 'en-US', label: 'English(US)' },
     { value: 'ja-JP', label: 'Japanese' },
-    { value: 'custom', label: t('lang-preset-custom') },
+    { value: 'custom', label: t('language_preset.custom') },
   ] as const;
 
-  return <SelectWithLabel label={t('lang-preset-label')} menuItems={menuItems} onChange={handleChange} value={lang} />;
+  return (
+    <SelectWithLabel label={t('language_preset.label')} menuItems={menuItems} onChange={handleChange} value={lang} />
+  );
 };

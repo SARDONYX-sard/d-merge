@@ -17,21 +17,21 @@ export const CssList = () => {
 
   const title = (
     <>
-      <p>{t('css-preset-list-tooltip')}</p>
-      <p>{t('css-preset-list-tooltip2')}</p>
+      <p>{t('css_preset.list_tooltip')}</p>
+      <p>{t('css_preset.list_tooltip_edit_warning')}</p>
     </>
   );
 
   return (
     <Tooltip placement='right-end' title={title}>
       <SelectWithLabel
-        label={t('css-preset-list-label')}
+        label={t('css_preset.list_label')}
         menuItems={[
-          { value: '0', label: t('css-preset-list-item0') },
-          { value: '1', label: t('css-preset-list-item1') },
-          { value: '2', label: t('css-preset-list-item2') },
-          { value: '3', label: t('css-preset-list-item3') },
-          { value: '4', label: t('css-preset-list-item4') },
+          { value: '0', label: t('css_preset.items.custom') },
+          { value: '1', label: t('css_preset.items.preset1') },
+          { value: '2', label: t('css_preset.items.preset2') },
+          { value: '3', label: t('css_preset.items.preset3') },
+          { value: '4', label: t('css_preset.items.preset4') },
         ]}
         onChange={handleChange}
         value={preset}

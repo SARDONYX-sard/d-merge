@@ -12,8 +12,8 @@ export const ImportLangButton = () => {
 
   const title = (
     <>
-      <p>{t('import-lang-tooltip')}</p>
-      <p>{t('import-lang-tooltip2')}</p>
+      <p>{t('import_language.tooltip')}</p>
+      <p>{t('import_language.tooltip_invalid_json')}</p>
     </>
   );
 
@@ -43,7 +43,7 @@ export const ImportLangButton = () => {
         type='button'
         variant='outlined'
       >
-        {t('import-lang-btn')}
+        {t('import_language.button')}
       </Button>
     </Tooltip>
   );

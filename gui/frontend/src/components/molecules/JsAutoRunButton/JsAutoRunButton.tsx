@@ -14,9 +14,9 @@ export const JsAutoRunButton = ({ ...props }: Props) => {
 
   const title = (
     <>
-      {t('custom-js-auto-run-tooltip')}
+      {t('custom_js.auto_run_tooltip')}
       <br />
-      {t('custom-js-auto-run-tooltip2')}
+      {t('custom_js.auto_run_tooltip_note')}
     </>
   );
 
@@ -27,7 +27,7 @@ export const JsAutoRunButton = ({ ...props }: Props) => {
     setRunScript(!runScript);
   };
 
-  const label = t('custom-js-auto-run-label');
+  const label = t('custom_js.auto_run_label');
 
   return (
     <Tooltip title={title}>

@@ -2,10 +2,9 @@ import { useCallback } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
+import { useLogLevelContext } from '@/components/providers/LogLevelProvider';
 import { NOTIFY } from '@/lib/notify';
 import { LOG } from '@/services/api/log';
-
-import { useLogLevelContext } from '../../providers/LogLevelProvider';
 
 import type { SelectChangeEvent } from '@mui/material';
 
@@ -31,7 +30,7 @@ export const LogLevelList = () => {
 
   return (
     <SelectWithLabel
-      label={useTranslation().t('log-level-list-label')}
+      label={useTranslation().t('log_level.list_label')}
       menuItems={menuItems}
       onChange={handleOnChange}
       value={logLevel}

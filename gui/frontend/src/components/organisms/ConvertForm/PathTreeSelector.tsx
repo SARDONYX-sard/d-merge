@@ -152,10 +152,10 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
   return (
     <Box sx={{ minHeight: 35, minWidth: 50 }}>
       <Button onClick={handleSelectClick}>
-        {selectedFiles.length === 0 ? t('convert-select-all') : t('convert-unselect-all')}
+        {selectedFiles.length === 0 ? t('convert.button.select_all') : t('convert.button.unselect_all')}
       </Button>
       <Button onClick={handleExpandClick}>
-        {expandedItems.length === 0 ? t('convert-expand-all') : t('convert-collapse-all')}
+        {expandedItems.length === 0 ? t('convert.button.expand_all') : t('convert.button.collapse_all')}
       </Button>
 
       <RichTreeView

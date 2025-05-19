@@ -54,7 +54,7 @@ export const OutFormatList = () => {
 
   return (
     <SelectWithLabel
-      label={t('convert-output-fmt-label')}
+      label={t('convert.output_format_label')}
       menuItems={menuItems}
       onChange={handleOnChange}
       value={fmt}

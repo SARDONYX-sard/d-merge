@@ -14,14 +14,14 @@ export const useColumns = () => {
     { field: 'id', headerName: 'ID', width: 100, flex: 0.4 },
     {
       field: 'name',
-      headerName: t('patch-column-name'),
+      headerName: t('patch.columns.mod_name'),
       flex: 1.2,
     },
-    { field: 'author', headerName: t('patch-column-author'), flex: 0.4 },
+    { field: 'author', headerName: t('patch.columns.author'), flex: 0.4 },
     {
       field: 'site',
       headerAlign: 'center',
-      headerName: t('patch-column-site'),
+      headerName: t('patch.columns.site'),
       flex: 1.2,
       renderCell: (params) => {
         const { site } = params.row;
@@ -43,7 +43,7 @@ export const useColumns = () => {
     { field: 'auto', headerName: 'Auto', flex: 1 },
     {
       field: 'priority',
-      headerName: t('patch-column-priority'),
+      headerName: t('patch.columns.priority'),
       filterable: false,
       flex: 0.3,
       align: 'center',

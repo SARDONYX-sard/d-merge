@@ -126,5 +126,5 @@ const DialogActionsPanel = ({
 
 const CancelButton = ({ ...props }: ButtonProps) => {
   const { t } = useTranslation();
-  return <Button {...props}>{t('cancel-btn')}</Button>;
+  return <Button {...props}>{t('general.cancel_button')}</Button>;
 };

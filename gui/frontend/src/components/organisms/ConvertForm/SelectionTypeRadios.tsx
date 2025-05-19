@@ -17,15 +17,15 @@ export const SelectionTypeRadios = () => {
   };
 
   const options = [
-    { label: t('convert-selection-type-dirs'), value: 'dir', tooltip: t('convert-selection-type-dirs-tooltip') },
-    { label: t('convert-selection-type-tree'), value: 'tree', tooltip: t('convert-selection-type-tree-tooltip') },
-    { label: t('convert-selection-type-files'), value: 'files', tooltip: t('convert-selection-type-files-tooltip') },
+    { label: t('convert.selection_type.directories'), value: 'dir', tooltip: t('convert.selection_type.directories_tooltip') },
+    { label: t('convert.selection_type.tree'), value: 'tree', tooltip: t('convert.selection_type.tree_tooltip') },
+    { label: t('convert.selection_type.files'), value: 'files', tooltip: t('convert.selection_type.files_tooltip') },
   ];
 
   return (
     <FormControl>
       <FormLabel component='legend' id={radioLabelId}>
-        {t('convert-selection-type-label')}
+        {t('convert.selection_type.label')}
       </FormLabel>
       <RadioGroup
         aria-labelledby={radioLabelId}

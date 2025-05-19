@@ -24,6 +24,6 @@ export const EditorList = () => {
   ] as const;
 
   return (
-    <SelectWithLabel label={t('editor-mode-list-label')} menuItems={menuItems} onChange={handleOnChange} value={mode} />
+    <SelectWithLabel label={t('editor.mode_list_label')} menuItems={menuItems} onChange={handleOnChange} value={mode} />
   );
 };

@@ -11,10 +11,10 @@ export const LogFileButton = () => {
 
   return (
     <ButtonWithToolTip
-      buttonName={t('open-log-btn')}
+      buttonName={t('log.open_button')}
       icon={<FileOpen />}
       onClick={handleClick}
-      tooltipTitle={t('open-log-tooltip')}
+      tooltipTitle={t('log.open_file_tooltip')}
     />
   );
 };
