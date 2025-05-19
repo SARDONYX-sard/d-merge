@@ -19,10 +19,23 @@ export async function loadModsInfo(searchGlob: string) {
 }
 
 /**
- * Load activate mods id
- * @example ['aaa', 'bbb']
+ * Patch mods to hkx files.
+ * @example
+ * ```ts
+ * const ids = *['C:/Nemesis_Engine/mod/aaa', 'C:/Nemesis_Engine/mod/bbb']
+ * const output = 'C:/output/path';
+ * await patch(output, ids);
+ * ```
  * @throws Error
  */
 export async function patch(output: string, ids: ModIds) {
   await invoke('patch', { output, ids });
+}
+
+/**
+ * Cancel patch
+ * @throws Error
+ */
+export async function cancelPatch() {
+  await invoke('cancel_patch');
 }

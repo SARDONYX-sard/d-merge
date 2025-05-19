@@ -20,29 +20,73 @@ pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tauri::command]
-pub(crate) async fn patch(window: Window, output: &str, ids: Vec<PathBuf>) -> Result<(), String> {
-    // Expected `<ResourceDir>/assets/templates/meshes/[..]`
-    // - ref https://v2.tauri.app/develop/resources/
-    let resource_dir = {
-        let resolver = window.app_handle().path();
-        resolver
-            .resource_dir()
-            .context(NotFoundResourceDirSnafu)
-            .or_else(|err| bail!(err))?
-            .join("assets/templates/")
-    };
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+use tauri::async_runtime::JoinHandle;
 
-    let status_reporter = sender::<Status>(window, "d_merge://progress/patch");
-    time! {
-        "[patch]",
-        behavior_gen(
-            ids,
-            Config {
-                output_dir: PathBuf::from(output),
-                resource_dir,
-                status_report: Some(Box::new(status_reporter)),
-            },
-        ).await
+static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
+
+#[tauri::command]
+pub(crate) fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> Result<(), String> {
+    // Abort previous task if exists
+    cancel_patch_inner()?;
+
+    // Spawn new task
+    let handle = tauri::async_runtime::spawn({
+        let resource_dir = {
+            let resolver = window.app_handle().path();
+            resolver
+                .resource_dir()
+                .context(NotFoundResourceDirSnafu)
+                .or_else(|err| bail!(err))?
+                .join("assets/templates/")
+        };
+
+        let status_reporter = sender::<Status>(window, "d_merge://progress/patch");
+
+        async move {
+            let _ = time! {
+                "[patch]",
+                behavior_gen(
+                    ids,
+                    Config {
+                        output_dir: PathBuf::from(output),
+                        resource_dir,
+                        status_report: Some(Box::new(status_reporter)),
+                    },
+                ).await
+            };
+        }
+    });
+
+    match PATCH_TASK.lock() {
+        Ok(mut guard) => {
+            *guard = Some(handle);
+        }
+        Err(err) => {
+            bail!(format!("Failed to acquire lock: {err}"));
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cancel_patch() -> Result<(), String> {
+    cancel_patch_inner()
+}
+
+fn cancel_patch_inner() -> Result<(), String> {
+    match PATCH_TASK.lock() {
+        Ok(mut guard) => {
+            if let Some(handle) = guard.take() {
+                handle.abort();
+            }
+
+            Ok(())
+        }
+        Err(err) => {
+            bail!(format!("Failed to acquire lock: {err}"));
+        }
     }
 }
