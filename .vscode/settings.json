@@ -36,6 +36,7 @@
     "**/target/**": true
   },
   "i18n-ally.keystyle": "nested",
+  "i18n-ally.localesPaths": ["locales", "gui/frontend/src/lib/i18n"],
   "json.schemas": [
     {
       "fileMatch": ["/dummy/convert/input/*.json"],
