@@ -21,7 +21,7 @@ export const usePatchInputs = () => {
   const inputHandlers = {
     onClick: () =>
       NOTIFY.asyncTry(async () => await openPath(stripGlob(modInfoDir), { setPath: setModInfoDir, directory: true })),
-    onIconClick: () => NOTIFY.asyncTry(async () => await open(modInfoDir)),
+    onIconClick: () => NOTIFY.asyncTry(async () => await open(stripGlob(modInfoDir))),
   };
 
   const outputHandlers = {
