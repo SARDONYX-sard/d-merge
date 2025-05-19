@@ -16,7 +16,7 @@ export function Button({ sx, ...props }: Props) {
 
   return (
     <Button_ startIcon={<FolderOpenIcon />} sx={{ ...defaultStyle, ...sx }} type='button' variant='outlined' {...props}>
-      {t('select-btn')}
+      {t('select_button')}
     </Button_>
   );
 }
