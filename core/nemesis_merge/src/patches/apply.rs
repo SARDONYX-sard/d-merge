@@ -19,24 +19,9 @@ pub fn apply_patches<'a, 'b: 'a>(
         .into_par_iter()
         .map(|(template_name, patches)| {
             let _output_dir = output_dir;
-            #[cfg(feature = "debug")]
-            {
-                use crate::errors::FailedIoSnafu;
-                use crate::patches::generate::patch_map_to_json_value;
-                use snafu::ResultExt as _;
 
-                let output_dir = _output_dir.join(".debug").join("patches");
-                let output_dir_1st_person = output_dir.join("_1stperson");
-                std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
-                    path: output_dir_1st_person,
-                })?;
-                std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {
-                    path: output_dir.clone(),
-                })?;
-                let output_path = output_dir.join(format!("{template_name}.patch.json"));
-                let json = patch_map_to_json_value(&output_path, patches.clone())?;
-                std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
-            }
+            #[cfg(feature = "debug")]
+            write_json_patch(_output_dir, &template_name, &patches)?;
 
             // template_name: e.g. 0_master.hkx -> 0_master
             // patches: patches for 0_master.hkx
@@ -58,4 +43,30 @@ pub fn apply_patches<'a, 'b: 'a>(
         .collect();
 
     filter_results(results)
+}
+
+#[cfg(feature = "debug")]
+fn write_json_patch(
+    output_dir: &Path,
+    template_name: &str,
+    patches: &crate::aliases::SortedPatchMap,
+) -> Result<(), Error> {
+    use crate::errors::FailedIoSnafu;
+    use crate::patches::generate::patch_map_to_json_value;
+    use snafu::ResultExt as _;
+
+    let output_dir = output_dir.join(".debug").join("patches");
+
+    let output_dir_1st_person = output_dir.join("_1stperson");
+    std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
+        path: output_dir_1st_person,
+    })?;
+    std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {
+        path: output_dir.clone(),
+    })?;
+    let output_path = output_dir.join(format!("{template_name}.patch.json"));
+    let json = patch_map_to_json_value(&output_path, patches.clone())?;
+    std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
+
+    Ok(())
 }
