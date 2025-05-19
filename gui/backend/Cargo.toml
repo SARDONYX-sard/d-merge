@@ -41,7 +41,7 @@ tracing-subscriber = { workspace = true }
 
 # workspace members
 mod_info = { workspace = true }
-nemesis_merge = { workspace = true, features = ["serde"] }
+nemesis_merge = { workspace = true, features = ["serde", "ts_serde"] }
 node_expr = { workspace = true }
 
 [dev-dependencies]

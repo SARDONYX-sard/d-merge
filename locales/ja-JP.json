@@ -113,10 +113,11 @@
       "priority": "優先度",
       "site": "サイト"
     },
-    "patching_button": "パッチ適用中...",
     "patch_applying_message": "パッチを適用中...",
     "patch_complete_message": "パッチが適用されました。",
-    "patch_reading_message": "テンプレートとパッチを読み込み中..."
+    "patch_error_message": "パッチの適用中にエラーが発生しました。",
+    "patch_reading_message": "テンプレートとパッチを読み込み中...",
+    "patching_button": "パッチ適用中..."
   },
   "select_button": "選択",
   "tabs": {

@@ -129,7 +129,7 @@ fn merge_inner<'a>(base: &mut JsonPatch<'a>, patch: JsonPatch<'a>) {
                         }
                         (_base, _op) => {
                             #[cfg(feature = "tracing")]
-                            tracing::warn!("Unsupported Descread pattern: {_base:?}, {_op:?} yet.")
+                            tracing::warn!("Unsupported Descread pattern: {_base:?}, {_op:?} yet.");
                         }
                     }
                 }

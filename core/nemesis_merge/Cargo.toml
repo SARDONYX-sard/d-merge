@@ -44,7 +44,7 @@ tokio = { workspace = true, features = [
 workspace = true
 
 [features]
-# default = ["debug"]
+default = ["debug"]
 
 # Output patch json, json just before hkx
 debug = ["serde", "tracing", "dashmap/serde"]
@@ -53,3 +53,14 @@ debug = ["serde", "tracing", "dashmap/serde"]
 tracing = ["dep:tracing"]
 
 serde = ["dep:serde", "json_patch/serde"]
+
+# Enables TypeScript-compatible serialization for the `Status` enum.
+# This feature modifies the `Status` enum to use Serde's externally tagged representation
+# with `type` and `message` keys, making it easier to consume in TypeScript/JavaScript frontend.
+#
+# Example serialized form:
+#   { "type": "ReadingTemplatesAndPatches" }
+#   { "type": "Error", "message": "Something went wrong" }
+#
+# Disable this feature if you prefer the default Rust/Serde enum format.
+ts_serde = []

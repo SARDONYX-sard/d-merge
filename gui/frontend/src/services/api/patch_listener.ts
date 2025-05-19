@@ -18,7 +18,16 @@ type ListenerProps = {
  *
  * The backend emits these status values using `window.emit(...)` during various stages.
  */
-export type Status = 'ReadingTemplatesAndPatches' | 'ApplyingPatches' | 'GenerateHkxFiles' | 'Done';
+export type Status =
+  | { type: 'ReadingTemplatesAndPatches' }
+  | { type: 'ApplyingPatches' }
+  | { type: 'GenerateHkxFiles' }
+  | { type: 'Done' }
+  | {
+      type: 'Error';
+      /** Error message from the backend */
+      message: string;
+    };
 
 type StatusPayload = Status;
 
