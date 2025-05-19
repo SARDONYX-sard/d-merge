@@ -31,7 +31,18 @@ pub(crate) fn generate_hkx_files(
             }
 
             #[cfg(feature = "debug")]
-            let debug_path = output_dir.join(".debug").join(inner_path);
+            let debug_path = {
+                let debug_path = output_dir.join(".debug").join(inner_path);
+
+                if let Some(output_dir_all) = debug_path.parent() {
+                    fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
+                        path: output_dir_all,
+                    })?;
+                }
+
+                debug_path
+            };
+
             #[cfg(feature = "debug")]
             write_patched_json(&debug_path, &template_json)?;
 
