@@ -114,7 +114,9 @@
       "site": "Site"
     },
     "patching_button": "Patching...",
-    "patch_complete_message": "Patching complete."
+    "patch_applying_message": "Applying patches...",
+    "patch_complete_message": "Patching complete.",
+    "patch_reading_message": "Reading templates and patches..."
   },
   "select_button": "Select",
   "tabs": {

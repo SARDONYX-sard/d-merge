@@ -62,7 +62,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);
         let hkx_errors_len =
-            if let Err(hkx_errors) = generate_hkx_files(options.output_dir, templates, ptr_map) {
+            if let Err(hkx_errors) = generate_hkx_files(&options.output_dir, templates, ptr_map) {
                 let errors_len = hkx_errors.len();
                 all_errors.par_extend(hkx_errors);
                 errors_len
@@ -77,8 +77,10 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
                 patch_errors_len,
                 apply_errors_len,
             });
-        }
+        };
     };
+
+    options.report_status(Status::Done);
 
     Ok(())
 }

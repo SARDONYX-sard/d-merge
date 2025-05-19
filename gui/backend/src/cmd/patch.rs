@@ -27,7 +27,7 @@ use tauri::async_runtime::JoinHandle;
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
 #[tauri::command]
-pub(crate) fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> Result<(), String> {
+pub(crate) async fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> Result<(), String> {
     // Abort previous task if exists
     cancel_patch_inner()?;
 
