@@ -4,6 +4,7 @@ import { type SxProps, Tooltip } from '@mui/material';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
+import { stripGlob } from '@/lib/path';
 import { openPath } from '@/services/api/dialog';
 import { openPath as open } from '@/services/api/shell';
 
@@ -18,7 +19,8 @@ export const usePatchInputs = () => {
   const { t } = useTranslation();
 
   const inputHandlers = {
-    onClick: () => NOTIFY.asyncTry(async () => await openPath(modInfoDir, { setPath: setModInfoDir, directory: true })),
+    onClick: () =>
+      NOTIFY.asyncTry(async () => await openPath(stripGlob(modInfoDir), { setPath: setModInfoDir, directory: true })),
     onIconClick: () => NOTIFY.asyncTry(async () => await open(modInfoDir)),
   };
 
