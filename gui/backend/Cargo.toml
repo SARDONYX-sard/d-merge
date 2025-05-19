@@ -37,7 +37,7 @@ tauri-plugin-fs = "2.2.1"
 tauri-plugin-window-state = "2.2.2"
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
 
 # workspace members
 mod_info = { workspace = true }

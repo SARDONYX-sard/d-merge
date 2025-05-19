@@ -22,7 +22,7 @@ pub(crate) fn generate_hkx_files(
     let results = templates
         .into_par_iter()
         .map(|(file_stem, (inner_path, template_json))| {
-            let mut output_path = output_dir.join(inner_path);
+            let mut output_path = output_dir.join(&inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
                 fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
@@ -31,15 +31,18 @@ pub(crate) fn generate_hkx_files(
             }
 
             #[cfg(feature = "debug")]
-            write_json_patch(&output_path, &template_json)?;
+            let debug_path = output_dir.join(".debug").join(inner_path);
+            #[cfg(feature = "debug")]
+            write_patched_json(&debug_path, &template_json)?;
 
             let hkx_bytes = {
                 let mut class_map: ClassMap =
                     from_borrowed_value(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
                     })?;
+
                 // #[cfg(feature = "debug")]
-                // write_xml(&output_path, &class_map)?;
+                // write_patched_xml(&debug_path, &class_map)?;
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
@@ -86,36 +89,30 @@ pub(crate) fn generate_hkx_files(
     filter_results(results)
 }
 
-#[cfg(feature = "debug")] // output template.json & template.json debug string
+#[cfg(feature = "debug")]
 /// Output template.json & template.json debug string
-fn write_json_patch(
-    output_path: &Path,
+fn write_patched_json(
+    output_base: &Path,
     template_json: &simd_json::BorrowedValue<'_>,
 ) -> Result<()> {
-    let mut json_path = output_path.to_path_buf();
-    json_path.set_extension("json.log");
-    fs::write(&json_path, format!("{template_json:#?}")).context(FailedIoSnafu {
-        path: json_path.clone(),
-    })?;
-
-    let mut json_path = output_path.to_path_buf();
-    json_path.set_extension("json");
-    fs::write(
-        &json_path,
-        simd_json::to_string_pretty(&template_json).context(crate::errors::JsonSnafu {
-            path: json_path.clone(),
-        })?,
-    )
-    .context(FailedIoSnafu {
-        path: json_path.clone(),
-    })?;
+    if let Ok(pretty_json) = simd_json::to_string_pretty(&template_json) {
+        let mut json_path = output_base.to_path_buf();
+        json_path.set_extension("json");
+        fs::write(&json_path, pretty_json).context(FailedIoSnafu { path: json_path })?;
+    } else {
+        // If pretty print fails, fall back to normal print
+        let mut debug_path = output_base.to_path_buf();
+        debug_path.set_extension("debug_json.log");
+        fs::write(&debug_path, format!("{template_json:#?}"))
+            .context(FailedIoSnafu { path: debug_path })?;
+    }
 
     Ok(())
 }
 
 #[cfg(feature = "debug")]
 #[allow(unused)]
-fn write_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()> {
+fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()> {
     use serde_hkx::HavokSort as _;
 
     let mut class_map = class_map.clone();

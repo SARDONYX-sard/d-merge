@@ -25,7 +25,7 @@ pub fn apply_patches<'a, 'b: 'a>(
                 use crate::patches::generate::patch_map_to_json_value;
                 use snafu::ResultExt as _;
 
-                let output_dir = _output_dir.join("patches");
+                let output_dir = _output_dir.join(".debug").join("patches");
                 let output_dir_1st_person = output_dir.join("_1stperson");
                 std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
                     path: output_dir_1st_person,
