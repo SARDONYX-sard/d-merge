@@ -206,14 +206,16 @@ mod tests {
         .replace('\n', "\r\n");
         let adsf = parse_adsf(&expected).unwrap();
         let actual = serialize_adsf(&adsf);
-        std::fs::write("../../dummy/adsf.txt", &actual).unwrap();
 
-        let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+        // std::fs::create_dir_all("../../dummy").unwrap();
+        // std::fs::write("../../dummy/adsf.txt", &actual).unwrap();
+
+        // let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
         let res = dbg!(actual != expected);
         if res {
-            std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            // std::fs::write("../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
-        println!("Ok!");
+        assert!(res);
     }
 }
