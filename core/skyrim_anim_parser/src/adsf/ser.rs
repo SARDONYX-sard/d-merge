@@ -198,13 +198,20 @@ mod tests {
     use super::*;
     use crate::adsf::de::parse_adsf;
 
+    fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
+        if input.contains("\r\n") {
+            input.into()
+        } else {
+            input.replace("\r", "").replace("\n", "\r\n").into()
+        }
+    }
+
     #[test]
     fn test_serialize_adsf() {
-        let expected = include_str!(
+        let expected = normalize_to_crlf(include_str!(
             "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
-        )
-        .replace('\n', "\r\n");
-        let adsf = parse_adsf(&expected).unwrap();
+        ));
+        let adsf = parse_adsf(&expected).unwrap_or_else(|e| panic!("{e}"));
         let actual = serialize_adsf(&adsf);
 
         // std::fs::create_dir_all("../../dummy").unwrap();
