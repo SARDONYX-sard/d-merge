@@ -47,7 +47,7 @@ export const ConvertForm = () => {
         sx={{ width: '100%', marginBottom: '15px' }}
         variant='outlined'
       >
-        {t('all-clear-btn')}
+        {t('general.all_clear_button')}
       </Button>
 
       {inputFieldsProps.map((inputProps) => {
@@ -78,14 +78,14 @@ const useInputFieldValues = () => {
   return [
     {
       icon: (
-        <Tooltip placement='top' title={t('open-output-tooltip')}>
+        <Tooltip placement='top' title={t('output.open_tooltip')}>
           <OutputIcon
             onClick={handleOutputIconClick}
             sx={{ color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' }}
           />
         </Tooltip>
       ),
-      label: t('output-path'),
+      label: t('output.path_label'),
       onClick: handleOutputClick,
       path: output,
       setPath: setOutput,

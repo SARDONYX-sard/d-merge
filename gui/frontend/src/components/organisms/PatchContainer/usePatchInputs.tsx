@@ -30,7 +30,7 @@ export const usePatchInputs = () => {
   return [
     {
       icon: (
-        <Tooltip placement='top' title={t('open-tooltip')}>
+        <Tooltip placement='top' title={t('directory.open_tooltip')}>
           <OutputIcon onClick={inputHandlers.onIconClick} sx={sx} />
         </Tooltip>
       ),
@@ -42,11 +42,11 @@ export const usePatchInputs = () => {
     },
     {
       icon: (
-        <Tooltip placement='top' title={t('open-output-tooltip')}>
+        <Tooltip placement='top' title={t('output.open_tooltip')}>
           <OutputIcon onClick={outputHandlers.onIconClick} sx={sx} />
         </Tooltip>
       ),
-      label: t('output-path'),
+      label: t('output.path_label'),
       onClick: outputHandlers.onClick,
       path: output,
       setPath: setOutput,

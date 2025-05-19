@@ -16,10 +16,10 @@ export const LogDirButton = ({ ...props }: Props) => {
   return (
     <ButtonWithToolTip
       {...props}
-      buttonName={t('open-log-dir-btn')}
+      buttonName={t('log.open_directory_button')}
       icon={<FolderOpenIcon />}
       onClick={handleClick}
-      tooltipTitle={t('open-log-dir-tooltip')}
+      tooltipTitle={t('log.open_directory_tooltip')}
     />
   );
 };

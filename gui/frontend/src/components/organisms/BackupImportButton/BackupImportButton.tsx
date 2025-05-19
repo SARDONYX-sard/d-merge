@@ -37,15 +37,15 @@ export const BackupImportButton = () => {
 
   return (
     <BackupButton
-      buttonName={t('backup-import-btn-name')}
+      buttonName={t('backup.import.button_name')}
       cacheItems={settings}
       inDialogClick={handleDialogClick}
       onClick={handleClick}
       open={open}
       setOpen={setOpen}
       startIcon={<FileOpen />}
-      title={t('backup-import-dialog-title')}
-      tooltipTitle={t('backup-import-tooltip')}
+      title={t('backup.import.dialog_title')}
+      tooltipTitle={t('backup.import.tooltip')}
     />
   );
 };

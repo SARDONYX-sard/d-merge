@@ -13,13 +13,13 @@ export const TabPositionList = () => {
   };
 
   const menuItems = [
-    { value: 'top', label: t('tab-list-position-top') },
-    { value: 'bottom', label: t('tab-list-position-bottom') },
+    { value: 'top', label: t('tabs.positions.top') },
+    { value: 'bottom', label: t('tabs.positions.bottom') },
   ] as const;
 
   return (
     <SelectWithLabel
-      label={t('tab-list-position-label')}
+      label={t('tabs.position_label')}
       menuItems={menuItems}
       onChange={handleChange}
       value={tabPos}

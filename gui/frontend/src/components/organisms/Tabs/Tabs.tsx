@@ -28,11 +28,11 @@ export const Tabs = () => {
   const handleChange = (_: SyntheticEvent, tabId: string) => setSelectedTab(TabSchema.parse(tabId));
 
   const tabs = [
-    { label: t('tab-label-editor'), value: 'editor' },
-    { label: t('tab-label-notice'), value: 'notice' },
-    { label: t('tab-label-lang'), value: 'lang' },
-    { label: t('tab-label-tab'), value: 'tab' },
-    { label: t('tab-label-backup'), value: 'backup' },
+    { label: t('tabs.editor_preset'), value: 'editor' },
+    { label: t('tabs.notice'), value: 'notice' },
+    { label: t('tabs.language'), value: 'lang' },
+    { label: t('tabs.tab'), value: 'tab' },
+    { label: t('tabs.backup'), value: 'backup' },
   ] as const;
 
   return (

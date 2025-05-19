@@ -29,7 +29,9 @@ export function ConvertButton({ loading, buttonText, loadingText, ...props }: Pr
       variant='contained'
       {...props}
     >
-      <span>{loading ? (loadingText ?? t('converting-btn')) : (buttonText ?? t('convert-btn'))}</span>
+      <span>
+        {loading ? (loadingText ?? t('convert.converting_button')) : (buttonText ?? t('convert.button.convert'))}
+      </span>
     </Button>
   );
 }

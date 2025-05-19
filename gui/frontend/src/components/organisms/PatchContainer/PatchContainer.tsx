@@ -27,22 +27,23 @@ export const PatchContainer = () => {
       setStatus(s);
 
       switch (s) {
-        case 'ReadingTemplatesAndPatches':
-          // TODO: t('patch.patch_reading_message')
-          setStatusText(t('patch-reading'));
+        case 'ReadingTemplatesAndPatches': {
+          setStatusText(t('patch.patch_reading_message'));
           break;
-        case 'ApplyingPatches':
-          setStatusText(t('patch-applying'));
+        }
+        case 'ApplyingPatches': {
+          setStatusText(t('patch.patch_applying_message'));
           break;
+        }
         case 'Done': {
-          setStatusText(t('patch-complete'));
-          setStatusText(`${t('patch-complete')} (${stop()})`);
+          setStatusText(`${t('patch.patch_complete_message')} (${stop()})`);
           setLoading(false);
           unlisten?.();
           break;
         }
-        default:
+        default: {
           break;
+        }
       }
     },
     onError: (err) => {
@@ -51,7 +52,7 @@ export const PatchContainer = () => {
     },
   });
 
-  const loadingText = `${t('patching-btn')} (${elapsedText})`;
+  const loadingText = `${t('patch.patching_button')} (${elapsedText})`;
 
   return (
     <>
@@ -69,14 +70,13 @@ export const PatchContainer = () => {
           maxHeight: '65vh',
         }}
       />
-
       {status && (
-        <Typography sx={{ mt: 1, mb: 1 }} variant='body2'>
+        <Typography sx={{ mt: 1, mb: 0, textAlign: 'right' }} variant='body2'>
           Status: {statusText}
         </Typography>
       )}
 
-      <ConvertNav buttonText={t('patch-btn')} loading={loading} loadingText={loadingText} onClick={handleClick} />
+      <ConvertNav buttonText={t('patch.button')} loading={loading} loadingText={loadingText} onClick={handleClick} />
     </>
   );
 };

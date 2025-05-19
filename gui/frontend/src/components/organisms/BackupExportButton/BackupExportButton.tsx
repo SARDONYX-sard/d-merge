@@ -15,7 +15,7 @@ export const BackupExportButton = () => {
   const handleClick: DialogClickHandler = (checkedKeys) => {
     NOTIFY.asyncTry(async () => {
       if (await BACKUP.export(STORAGE.getByKeys(checkedKeys))) {
-        NOTIFY.success(t('backup-export-success'));
+        NOTIFY.success(t('backup.export.success_message'));
         setOpen(false);
       }
     });
@@ -23,15 +23,15 @@ export const BackupExportButton = () => {
 
   return (
     <BackupButton
-      buttonName={t('backup-export-btn-name')}
+      buttonName={t('backup.export.button_name')}
       cacheItems={STORAGE.getAll()}
       inDialogClick={handleClick}
       onClick={() => setOpen(true)}
       open={open}
       setOpen={setOpen}
       startIcon={<FileDownloadIcon />}
-      title={t('backup-export-dialog-title')}
-      tooltipTitle={t('backup-export-tooltip')}
+      title={t('backup.export.dialog_title')}
+      tooltipTitle={t('backup.export.tooltip')}
     />
   );
 };

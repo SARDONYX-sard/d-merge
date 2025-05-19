@@ -18,12 +18,12 @@ export const CheckBoxControls = ({ isAllChecked, isPubAllChecked, onAllCheck, on
       <FormControlLabel
         checked={isAllChecked}
         control={<Checkbox onClick={onAllCheck} />}
-        label={t('backup-dialog-all-checked-label')}
+        label={t('backup.dialog.all_checked_label')}
       />
       <FormControlLabel
         checked={isPubAllChecked}
         control={<Checkbox onClick={onPubCheck} />}
-        label={t('backup-dialog-pub-checked-label')}
+        label={t('backup.dialog.public_checked_label')}
       />
     </Box>
   );

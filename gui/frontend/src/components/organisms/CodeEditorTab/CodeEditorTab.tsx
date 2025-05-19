@@ -25,7 +25,7 @@ export const CodeEditorTab = () => {
     css: {
       value: css,
       fileName: 'style.css',
-      label: t('custom-css-label'),
+      label: t('css_preset.custom_css_label'),
       language: 'css',
       onChange: (value) => {
         setCss(value);
@@ -37,7 +37,7 @@ export const CodeEditorTab = () => {
     javascript: {
       value: js,
       fileName: 'script.js',
-      label: t('custom-js-label'),
+      label: t('custom_js.js_label'),
       language: 'javascript',
       onChange: setJs,
     },
