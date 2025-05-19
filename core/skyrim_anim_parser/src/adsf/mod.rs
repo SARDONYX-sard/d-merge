@@ -3,6 +3,8 @@ pub mod ser;
 
 use crate::lines::Str;
 
+// NOTE: Since f32 is very slow if it is made into str, only check that it is f32 and allocate it as `&str`.
+
 /// Represents the entire animation data structure.
 ///
 /// This structure contains the names of the projects and a list of associated

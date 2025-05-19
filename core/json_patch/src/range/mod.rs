@@ -44,7 +44,7 @@ impl Range {
                 }
             }
             Self::FromTo(range) => {
-                if range.start >= range.end || range.start >= array_len || range.end > array_len {
+                if range.start >= range.end || range.start >= array_len || range.end >= array_len {
                     return Err(RangeError::FromToOutOfBounds {
                         start: range.start,
                         end: range.end,
@@ -53,7 +53,7 @@ impl Range {
                 }
             }
             Self::To(range_to) => {
-                if range_to.end > array_len {
+                if range_to.end >= array_len {
                     return Err(RangeError::EndOutOfBounds {
                         end: range_to.end,
                         len: array_len,
@@ -138,8 +138,8 @@ mod tests {
 
     #[test]
     fn test_end_out_of_bounds() {
-        let result = Range::To(..6).check_valid_range(5);
-        assert_eq!(result, Err(RangeError::EndOutOfBounds { end: 6, len: 5 }));
+        let result = Range::To(..6).check_valid_range(6);
+        assert_eq!(result, Err(RangeError::EndOutOfBounds { end: 6, len: 6 }));
     }
 
     #[test]
