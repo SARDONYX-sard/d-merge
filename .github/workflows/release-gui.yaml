@@ -31,18 +31,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.5
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           prefix-key: cargo-release-${{ matrix.platform }}
 
       - name: Sync node version and setup cache
-        uses: actions/setup-node@v4.1.0
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: "lts/*"
           cache: "npm"
 
       - name: Node.js cache
-        uses: actions/cache@v4.2.2
+        uses: actions/cache@v4.2.3
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
@@ -52,7 +52,7 @@ jobs:
         run: npm ci --force
 
       - name: Build the app
-        uses: tauri-apps/tauri-action@action-v0.5.15
+        uses: tauri-apps/tauri-action@action-v0.5.20
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -25,7 +25,7 @@ jobs:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.5
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           prefix-key: cargo-debug-${{ matrix.platform }}
 
@@ -53,7 +53,7 @@ jobs:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.5
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           prefix-key: cargo-debug-${{ matrix.platform }}
       # https://nexte.st/docs/installation/pre-built-binaries/#using-nextest-in-github-actions
@@ -81,7 +81,7 @@ jobs:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.5
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           prefix-key: cargo-${{ env.BUILD_PROFILE }}-${{ matrix.platform }}
 
@@ -93,13 +93,13 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Sync node version
-        uses: actions/setup-node@v4.1.0
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: "lts/*"
           cache: "npm"
 
       - name: Node.js cache
-        uses: actions/cache@v4.2.2
+        uses: actions/cache@v4.2.3
         with:
           path: ${{ github.workspace }}/gui/frontend/.next/cache
           # Generate a new cache whenever packages or source files change.
@@ -140,7 +140,7 @@ jobs:
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4.4.3
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ env.APP_NAME }}-${{runner.os}}
           path: |
