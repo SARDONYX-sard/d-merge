@@ -6,7 +6,7 @@
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
-use crate::lines::{from_one_line, lines, num_bool_line, one_line, Str};
+use crate::lines::{lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -51,7 +51,7 @@ fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
-    let line_len = from_one_line
+    let line_len = parse_one_line
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
 
@@ -96,9 +96,9 @@ fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
 fn anim_header<'a>(input: &mut &'a str) -> ModalResult<AnimDataHeader<'a>> {
     let header = seq! {
         AnimDataHeader {
-            line_range: from_one_line.context(Expected(Description("anim_line_len: usize"))),
-            lead_int: from_one_line.context(Expected(Description("lead_int: i32"))),
-            project_assets_len: from_one_line.context(Expected(Description("project_assets_len: usize"))),
+            line_range: parse_one_line.context(Expected(Description("anim_line_len: usize"))),
+            lead_int: parse_one_line.context(Expected(Description("lead_int: i32"))),
+            project_assets_len: parse_one_line.context(Expected(Description("project_assets_len: usize"))),
             project_assets: lines(project_assets_len).context(Expected(Description("project_assets: Vec<str>"))),
             has_motion_data: num_bool_line.context(Expected(Description("has_motion_data: 1 | 0"))),
         }
@@ -116,10 +116,10 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        play_back_speed: from_one_line.context(Expected(Description("play_back_speed: f32"))),
-        crop_start_local_time: from_one_line.context(Expected(Description("crop_start_local_time: f32"))),
-        crop_end_local_time: from_one_line.context(Expected(Description("crop_end_local_time: f32"))),
-        trigger_names_len: from_one_line.context(Expected(Description("trigger_names_len: usize"))),
+        play_back_speed: verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))).map(|s| s.into()),
+        crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))).map(|s| s.into()),
+        crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))).map(|s| s.into()),
+        trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
         _: line_ending.context(Expected(Description("empty line"))),
     }}
@@ -133,7 +133,7 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBlock<'a>>> {
-    let line_range = from_one_line.parse_next(input)?;
+    let line_range = parse_one_line.parse_next(input)?;
 
     let mut motion_blocks = vec![];
     let mut current_line_len = 0;
@@ -152,10 +152,10 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBloc
 fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        duration: from_one_line.context(Expected(Description("duration: f32"))),
-        translation_len: from_one_line.context(Expected(Description("translation_len: usize"))),
+        duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))).map(|s| s.into()),
+        translation_len: parse_one_line.context(Expected(Description("translation_len: usize"))),
         translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
-        rotation_len: from_one_line.context(Expected(Description("rotation_len: usize"))),
+        rotation_len: parse_one_line.context(Expected(Description("rotation_len: usize"))),
         rotations: rotations(rotation_len).context(Expected(Description("rotations: Vec<Rotation>"))),
         _: line_ending.context(Expected(Description("empty line"))),
     }}
@@ -166,15 +166,15 @@ fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>
 
 fn translations<'a>(
     line_len: usize,
-) -> impl Parser<&'a str, Vec<Translation>, ErrMode<ContextError>> {
+) -> impl Parser<&'a str, Vec<Translation<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut translations = vec![];
         for _ in 0..line_len {
             let translation = seq! {Translation {
-                time: from_word_and_space.context(Expected(Description("time: f32"))),
-                x: from_word_and_space.context(Expected(Description("x: f32"))),
-                y: from_word_and_space.context(Expected(Description("y: f32"))),
-                z: till_line_ending.parse_to().context(Expected(Description("z: f32"))),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
+                z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
                 _: line_ending,
             }}
             .context(Label("Translation"))
@@ -187,16 +187,18 @@ fn translations<'a>(
     }
 }
 
-fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation>, ErrMode<ContextError>> {
+fn rotations<'a>(
+    line_len: usize,
+) -> impl Parser<&'a str, Vec<Rotation<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut rotations = vec![];
         for _ in 0..line_len {
             let rotation = seq! {Rotation {
-                time: from_word_and_space.context(Expected(Description("time: f32"))),
-                x: from_word_and_space.context(Expected(Description("x: f32"))),
-                y: from_word_and_space.context(Expected(Description("y: f32"))),
-                z: from_word_and_space.context(Expected(Description("z: f32"))),
-                w: till_line_ending.parse_to().context(Expected(Description("w: f32"))),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
+                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))).map(|s| s.into()),
+                w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
                 _: line_ending,
             }}
             .context(Label("Rotation"))
@@ -218,8 +220,10 @@ fn word_and_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 /// Get a string up to a space and parse to T, then consume the space.
 #[inline]
-fn from_word_and_space<T: FromStr>(input: &mut &str) -> ModalResult<T> {
-    word_and_space.parse_to().parse_next(input)
+fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<&'a str> {
+    word_and_space
+        .verify(|s: &str| s.parse::<T>().is_ok())
+        .parse_next(input)
 }
 
 #[cfg(test)]

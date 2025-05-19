@@ -3,7 +3,7 @@
 //! This module provides structures and parsers for reading animation data
 //! from a file formatted in a specific way. The primary structure is [`Asdsf`],
 //! which contains a list of projects and their corresponding animation data.
-use super::lines::{from_one_line, lines, num_bool_line, one_line, Str};
+use super::lines::{lines, num_bool_line, one_line, parse_one_line, Str};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
@@ -120,7 +120,7 @@ fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn txt_projects<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
-    let line_len = from_one_line
+    let line_len = parse_one_line
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
 
@@ -157,28 +157,28 @@ fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
         .context(Expected(Description("version == V3")))
         .parse_next(input)?;
 
-    let triggers_len = from_one_line
+    let triggers_len = parse_one_line
         .context(Expected(Description("triggers_len: usize")))
         .parse_next(input)?;
     let triggers = lines(triggers_len)
         .context(Expected(Description("triggers: Vec<Str>")))
         .parse_next(input)?;
 
-    let conditions_len = from_one_line
+    let conditions_len = parse_one_line
         .context(Expected(Description("conditions_len: usize")))
         .parse_next(input)?;
     let conditions = conditions(conditions_len)
         .context(Expected(Description("conditions: Vec<Str>")))
         .parse_next(input)?;
 
-    let attacks_len = from_one_line
+    let attacks_len = parse_one_line
         .context(Expected(Description("attacks_len: usize")))
         .parse_next(input)?;
     let attacks = attacks(attacks_len)
         .context(Expected(Description("attacks: Vec<Str>")))
         .parse_next(input)?;
 
-    let anim_infos_len = from_one_line
+    let anim_infos_len = parse_one_line
         .context(Expected(Description("anim_infos_len: usize")))
         .parse_next(input)?;
     let anim_infos = anim_infos(anim_infos_len)
@@ -210,8 +210,8 @@ fn conditions<'a>(
                 seq! {
                     Condition {
                         variable_name: one_line.context(Expected(Description("variable_name: str"))),
-                        value_a: from_one_line.context(Expected(Description("value_a: i32"))),
-                        value_b: from_one_line.context(Expected(Description("value_b: i32"))),
+                        value_a: parse_one_line.context(Expected(Description("value_a: i32"))),
+                        value_b: parse_one_line.context(Expected(Description("value_b: i32"))),
                     }
                 }
                 .context(Label("Condition"))
@@ -231,7 +231,7 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode
                     Attack {
                         attack_trigger: one_line.context(Expected(Description("attack_trigger: str"))),
                         unknown: num_bool_line.context(Expected(Description("unknown: 0 | 1"))),
-                        clip_names_len: from_one_line.context(Expected(Description("clip_names_len: usize"))),
+                        clip_names_len: parse_one_line.context(Expected(Description("clip_names_len: usize"))),
                         clip_names: lines(clip_names_len).context(Expected(Description("clip_names: Vec<str>"))),
                     }
                 }
@@ -251,9 +251,9 @@ fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ErrMod
             anim_infos.push(
                 seq! {
                     AnimInfo {
-                        hashed_path: from_one_line.context(Expected(Description("hashed_path: u32"))),
-                        hashed_file_name: from_one_line.context(Expected(Description("hashed_file_name: u32"))),
-                        ascii_extension: from_one_line.context(Expected(Description("ascii_extension: u32"))),
+                        hashed_path: parse_one_line.context(Expected(Description("hashed_path: u32"))),
+                        hashed_file_name: parse_one_line.context(Expected(Description("hashed_file_name: u32"))),
+                        ascii_extension: parse_one_line.context(Expected(Description("ascii_extension: u32"))),
                     }
                 }
                 .context(Label("AnimInfo"))

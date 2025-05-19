@@ -78,13 +78,16 @@ pub struct ClipAnimDataBlock<'a> {
     pub clip_id: Str<'a>,
 
     /// The playback speed of the animation.
-    pub play_back_speed: f32,
+    /// - type: [`f32`]
+    pub play_back_speed: Str<'a>,
 
     /// The start time for cropping the animation.
-    pub crop_start_local_time: f32,
+    /// - type: [`f32`]
+    pub crop_start_local_time: Str<'a>,
 
     /// The end time for cropping the animation.
-    pub crop_end_local_time: f32,
+    /// - type: [`f32`]
+    pub crop_end_local_time: Str<'a>,
 
     /// The length of the trigger names.
     pub trigger_names_len: usize,
@@ -111,19 +114,20 @@ pub struct ClipMotionBlock<'a> {
     pub clip_id: Str<'a>,
 
     /// The duration of the motion in seconds.
-    pub duration: f32,
+    /// - type: [`f32`]
+    pub duration: Str<'a>,
 
     /// The length of the translation data.
     pub translation_len: usize,
 
     /// A list of translation data points.
-    pub translations: Vec<Translation>,
+    pub translations: Vec<Translation<'a>>,
 
     /// The length of the rotation data.
     pub rotation_len: usize,
 
     /// A list of rotation data points.
-    pub rotations: Vec<Rotation>,
+    pub rotations: Vec<Rotation<'a>>,
 }
 
 impl ClipMotionBlock<'_> {
@@ -138,22 +142,27 @@ impl ClipMotionBlock<'_> {
 /// and x, y, z, w represent the quaternion components.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct Rotation {
+pub struct Rotation<'a> {
     /// The timestamp in seconds at which this rotation occurs.
-    pub time: f32,
+    /// - type: [`f32`]
+    pub time: Str<'a>,
 
     /// The x component of the quaternion, representing the rotation axis.
-    pub x: f32,
+    /// - type: [`f32`]
+    pub x: Str<'a>,
 
     /// The y component of the quaternion, representing the rotation axis.
-    pub y: f32,
+    /// - type: [`f32`]
+    pub y: Str<'a>,
 
     /// The z component of the quaternion, representing the rotation axis.
-    pub z: f32,
+    /// - type: [`f32`]
+    pub z: Str<'a>,
 
     /// The w component of the quaternion, representing the cosine of half the rotation angle.
     /// A value of `1.0` means no rotation (identity quaternion).
-    pub w: f32,
+    /// - type: [`f32`]
+    pub w: Str<'a>,
 }
 
 /// Represents the translation data (movement in space),
@@ -161,16 +170,20 @@ pub struct Rotation {
 /// and x, y, z represent the movement along the respective axes.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct Translation {
+pub struct Translation<'a> {
     /// The timestamp in seconds at which this translation occurs.
-    pub time: f32,
+    /// - type: [`f32`]
+    pub time: Str<'a>,
 
     /// The amount of movement along the x-axis.
-    pub x: f32,
+    /// - type: [`f32`]
+    pub x: Str<'a>,
 
     /// The amount of movement along the y-axis.
-    pub y: f32,
+    /// - type: [`f32`]
+    pub y: Str<'a>,
 
     /// The amount of movement along the z-axis.
-    pub z: f32,
+    /// - type: [`f32`]
+    pub z: Str<'a>,
 }

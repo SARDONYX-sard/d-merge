@@ -30,7 +30,21 @@ pub(crate) fn lines<'a>(
 
 /// Parse one line and then parse to T.
 #[inline]
-pub(crate) fn from_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
+pub(crate) fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<&'a str>
+where
+    T: FromStr,
+{
+    // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
+    let line = till_line_ending
+        .verify(|s: &str| s.parse::<T>().is_ok())
+        .parse_next(input)?;
+    line_ending.parse_next(input)?; // skip line end
+    Ok(line)
+}
+
+/// Parse one line and then parse to T.
+#[inline]
+pub(crate) fn parse_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
     let line = till_line_ending.parse_to().parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
@@ -92,15 +106,15 @@ mod tests {
     #[test]
     fn test_from_one_line() {
         let mut input = "123\n";
-        let result: i32 = from_one_line(&mut input).unwrap();
+        let result = parse_one_line::<i32>(&mut input).unwrap();
         assert_eq!(result, 123);
 
         let mut input_non_numeric = "abc\n";
-        let result_non_numeric: Result<i32, _> = from_one_line(&mut input_non_numeric);
+        let result_non_numeric = verify_line_parses_to::<i32>(&mut input_non_numeric);
         assert!(result_non_numeric.is_err());
 
         let mut input_empty = "\n";
-        let result_empty: Result<i32, _> = from_one_line(&mut input_empty);
+        let result_empty = verify_line_parses_to::<i32>(&mut input_empty);
         assert!(result_empty.is_err());
     }
 
