@@ -36,13 +36,14 @@ export const PatchContainer = () => {
           break;
         }
         case 'Done': {
-          setStatusText(t('patch.patch_complete_message'));
+          setStatusText(`${t('patch.patch_complete_message')} (${stop()})`);
           setLoading(false);
           unlisten?.();
           break;
         }
-        default:
+        default: {
           break;
+        }
       }
     },
     onError: (err) => {
@@ -69,9 +70,8 @@ export const PatchContainer = () => {
           maxHeight: '65vh',
         }}
       />
-
       {status && (
-        <Typography sx={{ mt: 1, mb: 1 }} variant='body2'>
+        <Typography sx={{ mt: 1, mb: 0, textAlign: 'right' }} variant='body2'>
           Status: {statusText}
         </Typography>
       )}
