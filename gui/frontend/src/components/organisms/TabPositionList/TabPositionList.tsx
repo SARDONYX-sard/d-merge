@@ -2,7 +2,7 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { tabPosSchema, useTabContext } from '@/components/providers/TabProvider';
 
-import type { SelectChangeEvent } from '@mui/material/Select/Select';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 export const TabPositionList = () => {
   const { t } = useTranslation();

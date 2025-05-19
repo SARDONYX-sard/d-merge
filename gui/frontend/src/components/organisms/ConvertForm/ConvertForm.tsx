@@ -1,12 +1,12 @@
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import OutputIcon from '@mui/icons-material/Output';
 import { Button, Tooltip } from '@mui/material';
-import { open } from '@tauri-apps/plugin-shell';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
+import { openPath as open } from '@/services/api/shell';
 
 import { CONVERT_TREE_INIT_VALUES, useConvertContext } from './ConvertProvider';
 import { PathSelector } from './PathSelector';
@@ -50,11 +50,11 @@ export const ConvertForm = () => {
         {t('all-clear-btn')}
       </Button>
 
-      <PathSelectorButtons />
-
       {inputFieldsProps.map((inputProps) => {
         return <InputField key={inputProps.label} {...inputProps} />;
       })}
+
+      <PathSelectorButtons />
 
       <PathSelector />
     </>

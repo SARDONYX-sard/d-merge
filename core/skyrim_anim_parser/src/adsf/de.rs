@@ -11,7 +11,7 @@ use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, space1, till_line_ending},
-    error::{ContextError, StrContext::*, StrContextValue::*},
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
     ModalResult, Parser,
@@ -164,7 +164,9 @@ fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>
     Ok(block)
 }
 
-fn translations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Translation>, ContextError> {
+fn translations<'a>(
+    line_len: usize,
+) -> impl Parser<&'a str, Vec<Translation>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut translations = vec![];
         for _ in 0..line_len {
@@ -185,7 +187,7 @@ fn translations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Translation>, C
     }
 }
 
-fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation>, ContextError> {
+fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut rotations = vec![];
         for _ in 0..line_len {

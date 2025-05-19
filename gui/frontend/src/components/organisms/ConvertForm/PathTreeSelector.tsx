@@ -3,16 +3,16 @@ import Box from '@mui/material/Box';
 import { type TreeViewBaseItem, type TreeViewItemId, useTreeViewApiRef } from '@mui/x-tree-view';
 import { RichTreeView } from '@mui/x-tree-view/RichTreeView';
 import {
-  TreeItem2Checkbox,
-  TreeItem2Content,
-  TreeItem2GroupTransition,
-  TreeItem2IconContainer,
-  TreeItem2Label,
-  TreeItem2Root,
-} from '@mui/x-tree-view/TreeItem2';
-import { TreeItem2Icon } from '@mui/x-tree-view/TreeItem2Icon';
-import { TreeItem2Provider } from '@mui/x-tree-view/TreeItem2Provider';
-import { type UseTreeItem2Parameters, useTreeItem2 } from '@mui/x-tree-view/useTreeItem2';
+  TreeItemCheckbox,
+  TreeItemContent,
+  TreeItemGroupTransition,
+  TreeItemIconContainer,
+  TreeItemLabel,
+  TreeItemRoot,
+} from '@mui/x-tree-view/TreeItem';
+import { TreeItemIcon } from '@mui/x-tree-view/TreeItemIcon';
+import { TreeItemProvider } from '@mui/x-tree-view/TreeItemProvider';
+import { type UseTreeItemParameters, useTreeItem } from '@mui/x-tree-view/useTreeItem';
 import { type HTMLAttributes, type Ref, type SyntheticEvent, memo, useCallback, useRef } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
@@ -86,7 +86,7 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
   ];
 
   const handleExpandedItemsChange = useCallback(
-    (_event: SyntheticEvent, itemIds: string[]) => {
+    (_event: SyntheticEvent | null, itemIds: string[]) => {
       setExpandedItems(itemIds);
     },
     [setExpandedItems],
@@ -107,12 +107,15 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
     },
   ];
 
-  const handleItemSelectionToggle = useCallback((_event: SyntheticEvent, itemId: string, isSelected: boolean) => {
-    toggledItemRef.current[itemId] = isSelected;
-  }, []);
+  const handleItemSelectionToggle = useCallback(
+    (_event: SyntheticEvent | null, itemId: string, isSelected: boolean) => {
+      toggledItemRef.current[itemId] = isSelected;
+    },
+    [],
+  );
 
   const handleSelectedItemsChange = useCallback(
-    (_event: SyntheticEvent, newSelectedItems: string[]) => {
+    (_event: SyntheticEvent | null, newSelectedItems: string[]) => {
       setSelectedFiles(newSelectedItems);
 
       // Select / unselect the children of the toggled item
@@ -147,7 +150,7 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   return (
-    <Box sx={{ minHeight: 352, minWidth: 250 }}>
+    <Box sx={{ minHeight: 35, minWidth: 50 }}>
       <Button onClick={handleSelectClick}>
         {selectedFiles.length === 0 ? t('convert-select-all') : t('convert-unselect-all')}
       </Button>
@@ -171,12 +174,12 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
   );
 });
 
-const CustomTreeItemContent = styled(TreeItem2Content)(({ theme }) => ({
+const CustomTreeItemContent = styled(TreeItemContent)(({ theme }) => ({
   padding: theme.spacing(0.5, 1),
 }));
 
 interface CustomTreeItemProps
-  extends Omit<UseTreeItem2Parameters, 'rootRef'>,
+  extends Omit<UseTreeItemParameters, 'rootRef'>,
     Omit<HTMLAttributes<HTMLLIElement>, 'onFocus'> {}
 
 const CustomTreeItem = memo(function CustomTreeItem(props: CustomTreeItemProps, ref?: Ref<HTMLLIElement>) {
@@ -190,25 +193,25 @@ const CustomTreeItem = memo(function CustomTreeItem(props: CustomTreeItemProps, 
     getLabelProps,
     getGroupTransitionProps,
     status,
-  } = useTreeItem2({ id, itemId, children, label, disabled, rootRef: ref });
+  } = useTreeItem({ id, itemId, children, label, disabled, rootRef: ref });
 
   const { convertStatuses } = useConvertContext();
 
   return (
-    <TreeItem2Provider itemId={itemId}>
-      <TreeItem2Root {...getRootProps(other)}>
+    <TreeItemProvider id={id} itemId={itemId}>
+      <TreeItemRoot {...getRootProps(other)}>
         <CustomTreeItemContent {...getContentProps()}>
-          <TreeItem2IconContainer {...getIconContainerProps()}>
-            <TreeItem2Icon status={status} />
-          </TreeItem2IconContainer>
-          <TreeItem2Checkbox {...getCheckboxProps()} />
+          <TreeItemIconContainer {...getIconContainerProps()}>
+            <TreeItemIcon status={status} />
+          </TreeItemIconContainer>
+          <TreeItemCheckbox {...getCheckboxProps()} />
           <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
             {renderStatusIcon(convertStatuses.get(hashDjb2(itemId)) ?? 0)}
-            <TreeItem2Label {...getLabelProps()} />
+            <TreeItemLabel {...getLabelProps()} />
           </Box>
         </CustomTreeItemContent>
-        {children && <TreeItem2GroupTransition {...getGroupTransitionProps()} />}
-      </TreeItem2Root>
-    </TreeItem2Provider>
+        {children && <TreeItemGroupTransition {...getGroupTransitionProps()} />}
+      </TreeItemRoot>
+    </TreeItemProvider>
   );
 });

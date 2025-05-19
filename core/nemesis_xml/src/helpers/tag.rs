@@ -9,7 +9,7 @@ use winnow::{
     ascii::digit1,
     combinator::{alt, delimited, seq},
     error::{
-        ContextError, StrContext,
+        ContextError, ErrMode, StrContext,
         StrContextValue::{self},
     },
     token::take_until,
@@ -19,7 +19,7 @@ use winnow::{
 /// Parses the start tag `<tag>`
 ///
 /// - `tag`: e.g. `<string>`
-pub fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ContextError> {
+pub fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0(tag),
@@ -30,7 +30,7 @@ pub fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ContextError
 }
 
 /// Parses the end tag `</tag>`
-pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ContextError> {
+pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("/"),
@@ -128,7 +128,7 @@ fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, E
 /// Parse failed.
 pub fn field_start_tag<'a>(
     field_info: &'a FieldInfo,
-) -> impl Parser<&'a str, (&'a str, &'static str, Option<u64>), ContextError> {
+) -> impl Parser<&'a str, (&'a str, &'static str, Option<u64>), ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         field_start_open_tag.parse_next(input)?; // <hkparam name=
         let (field_name, type_kind) = attr_string

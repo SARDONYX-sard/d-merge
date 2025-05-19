@@ -13,7 +13,6 @@ fn main() {
     if let Err(err) = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(
             // Avoid auto show(To avoid white flash screen): https://github.com/tauri-apps/plugins-workspace/issues/344
             tauri_plugin_window_state::Builder::default()
@@ -26,6 +25,7 @@ fn main() {
             crate::cmd::conversion::par_walk_dir::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,
+            crate::cmd::open::open,
             crate::cmd::patch::load_mods_info,
             crate::cmd::patch::patch,
         ])

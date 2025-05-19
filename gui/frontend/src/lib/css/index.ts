@@ -13,6 +13,19 @@ const createPreset = <T extends string>(css: T) => {
   ${css}
 }
 
+.MuiDataGrid-container--top,
+.MuiDataGrid-row--borderBottom {
+  background-color: none;
+}
+.MuiDataGrid-columnHeader,
+.MuiDataGrid-columnHeaders {
+  background-color: rgba(7, 7, 7, 0.77) !important;
+}
+
+.MuiDataGrid-row.Mui-selected {
+  background-color: rgba(81, 81, 81, 0.21) !important;
+}
+
 body {
   background-attachment: fixed;
   background-color: #000;
@@ -75,13 +88,13 @@ span.Mui-checked>svg {
   background-color: var(--hover-btn-color);
 }
 
-#x-data-grid-selected,
-.MuiLoadingButton-root {
+.MuiButton-contained,
+#x-data-grid-selected {
   color: #fff;
   background-color: var(--convert-btn-color);
 }
 
-.MuiLoadingButton-root:hover {
+.MuiButton-contained:hover {
   background-color: var(--hover-convert-btn-color);
 }
 
