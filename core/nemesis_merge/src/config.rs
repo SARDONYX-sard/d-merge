@@ -66,6 +66,7 @@ impl fmt::Debug for Config {
 /// This enum is used to track and report the current state of an ongoing process, such as
 /// reading templates, applying patches, generating files, or completing the task.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "message"))]
 #[derive(Debug, Clone)]
 pub enum Status {
     /// Status when reading templates and patches.
@@ -79,4 +80,19 @@ pub enum Status {
 
     /// Status when the process is completed.
     Done,
+
+    Error(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "ts_serde")]
+    #[test]
+    fn serialize_status() {
+        let status = Status::Error("Error message".to_string());
+        let serialized = simd_json::to_string(&status).unwrap();
+        assert_eq!(serialized, r#"{"type":"Error","message":"Error message"}"#);
+    }
 }

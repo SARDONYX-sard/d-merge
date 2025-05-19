@@ -3,7 +3,7 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[javascript][javascriptreact][typescript][typescriptreact]": {
-    // "editor.defaultFormatter": "biomejs.biome"
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[json]": {
     "editor.defaultFormatter": "biomejs.biome"
@@ -36,6 +36,7 @@
     "**/target/**": true
   },
   "i18n-ally.keystyle": "nested",
+  "i18n-ally.localesPaths": ["locales", "gui/frontend/src/lib/i18n"],
   "json.schemas": [
     {
       "fileMatch": ["/dummy/convert/input/*.json"],
@@ -44,8 +45,5 @@
   ],
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.linkedProjects": ["Cargo.toml"],
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "ms-vsliveshare.vsliveshare"
-  }
+  "rust-analyzer.linkedProjects": ["Cargo.toml"]
 }

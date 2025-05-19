@@ -113,10 +113,11 @@
       "priority": "Priority",
       "site": "Site"
     },
-    "patching_button": "Patching...",
     "patch_applying_message": "Applying patches...",
     "patch_complete_message": "Patching complete.",
-    "patch_reading_message": "Reading templates and patches..."
+    "patch_error_message": "Error occurred while applying patches.",
+    "patch_reading_message": "Reading templates and patches...",
+    "patching_button": "Patching..."
   },
   "select_button": "Select",
   "tabs": {

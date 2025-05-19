@@ -27,8 +27,10 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
-            write_errors(&error_output, &errors).await?;
-            return Err(Error::FailedToReadOwnedPatches { errors_len });
+            let err = Error::FailedToReadOwnedPatches { errors_len };
+
+            options.report_status(Status::Error(err.to_string()));
+            return Err(err);
         }
     };
 
@@ -72,6 +74,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
         if !all_errors.is_empty() {
             write_errors(&error_output, &all_errors).await?;
+
+            let err = Error::FailedToGenerateBehaviors {
+                hkx_errors_len,
+                patch_errors_len,
+                apply_errors_len,
+            };
+
+            options.report_status(Status::Error(err.to_string()));
+
             return Err(Error::FailedToGenerateBehaviors {
                 hkx_errors_len,
                 patch_errors_len,
