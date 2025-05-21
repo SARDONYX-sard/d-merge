@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: ["main", "impl_id_map"]
+    branches: ['main', 'impl_id_map']
   pull_request:
-    branches: ["*"]
+    branches: ['*']
   workflow_dispatch: # <- Setting to allow manual execution by button.
 
 env:
@@ -24,6 +24,8 @@ jobs:
         with:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.8
         with:
@@ -52,6 +54,8 @@ jobs:
         with:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.8
         with:
@@ -80,6 +84,9 @@ jobs:
         with:
           submodules: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
       - name: Rust cache
         uses: Swatinem/rust-cache@v2.7.8
         with:
@@ -95,8 +102,8 @@ jobs:
       - name: Sync node version
         uses: actions/setup-node@v4.4.0
         with:
-          node-version: "lts/*"
-          cache: "npm"
+          node-version: 'lts/*'
+          cache: 'npm'
 
       - name: Node.js cache
         uses: actions/cache@v4.2.3
