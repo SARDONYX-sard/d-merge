@@ -1,5 +1,6 @@
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
 
 /// Collects all relevant file paths within the given ID directory.
 ///
@@ -11,6 +12,7 @@ use std::path::{Path, PathBuf};
 pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<PathBuf> {
     jwalk::WalkDir::new(path)
         .into_iter()
+        .par_bridge()
         .filter_map(|res| {
             if let Ok(path) = res.map(|entry| entry.path()) {
                 if is_nemesis_file(&path) {
@@ -22,15 +24,7 @@ pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Collect & flatten the path of a patch
-pub fn collect_all_patch_paths(nemesis_paths: &[PathBuf]) -> Vec<PathBuf> {
-    nemesis_paths
-        .par_iter()
-        .flat_map(collect_nemesis_paths)
-        .collect()
-}
-
-pub(crate) fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
+fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
     let path = path.as_ref();
     let is_txt = path
         .extension()

@@ -5,7 +5,7 @@ use crate::{
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
-        collect::{collect_borrowed_patches, collect_owned_patches, PatchResult},
+        collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
         merge::{merge_patches, paths_to_ids},
     },
     templates::collect::collect_templates,
@@ -23,7 +23,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
     // 1/4: Collect all patches & templates xml
     options.report_status(Status::ReadingTemplatesAndPatches);
-    let owned_patches = match collect_owned_patches(&nemesis_paths) {
+    let owned_patches = match collect_owned_patches(&nemesis_paths).await {
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
@@ -36,7 +36,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         }
     };
     let (
-        PatchResult {
+        BorrowedPatches {
             template_names,
             template_patch_map,
             ptr_map,
@@ -67,14 +67,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);
-        let hkx_errors_len =
+        let hkx_errors_len = {
             if let Err(hkx_errors) = generate_hkx_files(&options.output_dir, templates, ptr_map) {
                 let errors_len = hkx_errors.len();
                 all_errors.par_extend(hkx_errors);
                 errors_len
             } else {
                 0
-            };
+            }
+        };
 
         if !all_errors.is_empty() {
             write_errors(&options, &all_errors).await?;
