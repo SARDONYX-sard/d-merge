@@ -65,14 +65,15 @@ fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
-    let header = anim_header.parse_next(input)?;
-    let line_range = header.line_range;
+    let (line_range, header) = anim_header
+        .context(Label("AnimDataHeader"))
+        .parse_next(input)?;
 
-    let mut current_line_len = header.parsed_line_len();
+    let mut current_line_len = header.to_line_len();
     let mut clip_anim_blocks = vec![];
     while current_line_len < line_range {
         let clip_anim_block = clip_anim_block.parse_next(input)?;
-        current_line_len += clip_anim_block.parsed_line_len();
+        current_line_len += clip_anim_block.to_line_len();
         clip_anim_blocks.push(clip_anim_block);
     }
 
@@ -94,19 +95,34 @@ fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn anim_header<'a>(input: &mut &'a str) -> ModalResult<AnimDataHeader<'a>> {
-    let header = seq! {
+fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a>)> {
+    // Number of lines when `AnimDataHeader` & `clip_anim_blocks: Vec<ClipAnimDataBlock>`(+ add) are serialized.
+    let line_range = parse_one_line
+        .context(Expected(Description("anim_line_len: usize")))
+        .parse_next(input)?;
+
+    let lead_int = parse_one_line
+        .context(Expected(Description("lead_int: i32")))
+        .parse_next(input)?;
+    let project_assets_len = parse_one_line
+        .context(Expected(Description("project_assets_len: usize")))
+        .parse_next(input)?;
+    let project_assets = lines(project_assets_len)
+        .context(Expected(Description("project_assets: Vec<str>")))
+        .parse_next(input)?;
+
+    let has_motion_data = num_bool_line
+        .context(Expected(Description("has_motion_data: 1 | 0")))
+        .parse_next(input)?;
+
+    Ok((
+        line_range,
         AnimDataHeader {
-            line_range: parse_one_line.context(Expected(Description("anim_line_len: usize"))),
-            lead_int: parse_one_line.context(Expected(Description("lead_int: i32"))),
-            project_assets_len: parse_one_line.context(Expected(Description("project_assets_len: usize"))),
-            project_assets: lines(project_assets_len).context(Expected(Description("project_assets: Vec<str>"))),
-            has_motion_data: num_bool_line.context(Expected(Description("has_motion_data: 1 | 0"))),
-        }
-    }
-    .context(Label("AnimDataHeader"))
-    .parse_next(input)?;
-    Ok(header)
+            lead_int,
+            project_assets,
+            has_motion_data,
+        },
+    ))
 }
 
 /// Parses a clip animation data block from the input.
@@ -140,7 +156,7 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBloc
     let mut current_line_len = 0;
     while current_line_len < line_range {
         let clip_motion_block = clip_motion_block.parse_next(input)?;
-        current_line_len += clip_motion_block.parsed_line_len();
+        current_line_len += clip_motion_block.to_line_len();
         motion_blocks.push(clip_motion_block);
     }
     Ok(motion_blocks)
@@ -233,22 +249,21 @@ mod tests {
 
     #[quick_tracing::init(level = "DEBUG", file = "./log/test.log", stdio = false)]
     fn test_parse(input: &str) {
-        match parse_adsf(input) {
-            Ok(res) => {
-                tracing::debug!("project_names = {}", res.project_names.len());
-                tracing::debug!("anim_list ={}", res.anim_list.len());
-                for anim_data in res.anim_list {
-                    tracing::debug!("assets_len = {}", anim_data.header.project_assets.len());
-                    tracing::debug!("project_assets = {:?}", anim_data.header.project_assets);
-                    tracing::debug!("anim_blocks = {}", anim_data.clip_anim_blocks.len());
-                    tracing::debug!("motion_blocks = {}\n", anim_data.clip_motion_blocks.len());
-                }
+        let adsf = parse_adsf(input).unwrap_or_else(|err| {
+            panic!("Failed to parse adsf:\n{err}");
+        });
 
-                // std::fs::create_dir_all("../dummy/debug").unwrap();
-                // std::fs::write("../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
-            }
-            Err(err) => panic!("{err}"),
+        tracing::debug!("project_names = {}", adsf.project_names.len());
+        tracing::debug!("anim_list ={}", adsf.anim_list.len());
+        for anim_data in adsf.anim_list {
+            tracing::debug!("assets_len = {}", anim_data.header.project_assets.len());
+            tracing::debug!("project_assets = {:?}", anim_data.header.project_assets);
+            tracing::debug!("anim_blocks = {}", anim_data.clip_anim_blocks.len());
+            tracing::debug!("motion_blocks = {}\n", anim_data.clip_motion_blocks.len());
         }
+
+        // std::fs::create_dir_all("../dummy/debug").unwrap();
+        // std::fs::write("../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
     }
 
     #[test]
@@ -257,5 +272,26 @@ mod tests {
             "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
         );
         test_parse(s);
+    }
+
+    #[test]
+    #[cfg(feature = "alt_map")]
+    fn should_write_alt_adsf_json() {
+        use crate::adsf::AltAdsf;
+
+        let input = include_str!(
+            "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
+        );
+        let adsf = parse_adsf(input).unwrap_or_else(|err| {
+            panic!("Failed to parse adsf:\n{err}");
+        });
+        let alt_adsf: AltAdsf = adsf.into();
+        // let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
+        //     panic!("Failed to serialize adsf to JSON:\n{err}");
+        // });
+        // std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
+
+        let bin = rmp_serde::to_vec(&alt_adsf).unwrap();
+        std::fs::write("../../dummy/debug/animationdatasinglefile.bin", bin).unwrap();
     }
 }

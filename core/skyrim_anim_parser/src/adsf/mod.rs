@@ -2,6 +2,7 @@ pub mod de;
 pub mod ser;
 
 use crate::lines::Str;
+use rayon::prelude::*;
 
 // NOTE: Since f32 is very slow if it is made into str, only check that it is f32 and allocate it as `&str`.
 
@@ -17,6 +18,42 @@ pub struct Adsf<'a> {
 
     /// A list of animation data corresponding to each project.
     pub anim_list: Vec<AnimData<'a>>,
+}
+
+/// Represents the alternative animation data structure.
+#[cfg(feature = "alt_map")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct AltAdsf<'a>(pub indexmap::IndexMap<Str<'a>, AnimData<'a>>);
+
+#[cfg(feature = "alt_map")]
+impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
+    #[inline]
+    fn from(adsf: Adsf<'a>) -> Self {
+        let Adsf {
+            project_names,
+            anim_list,
+        } = adsf;
+
+        debug_assert_eq!(
+            project_names.len(),
+            anim_list.len(),
+            "Need to be the same length. but got project_names.len() != anim_list.len()"
+        );
+        Self(project_names.into_par_iter().zip(anim_list).collect())
+    }
+}
+
+#[cfg(feature = "alt_map")]
+impl<'a> From<AltAdsf<'a>> for Adsf<'a> {
+    #[inline]
+    fn from(alt_adsf: AltAdsf<'a>) -> Self {
+        let (project_names, anim_list) = alt_adsf.0.into_par_iter().collect();
+        Self {
+            project_names,
+            anim_list,
+        }
+    }
 }
 
 /// Represents individual animation data.
@@ -50,6 +87,48 @@ pub struct AnimData<'a> {
     pub add_clip_motion_blocks: Vec<ClipMotionBlock<'a>>,
 }
 
+impl AnimData<'_> {
+    /// Returns the number of lines when serialized.
+    ///
+    /// ```txt
+    /// 1(header) + n(clip_anim_blocks) + n(clip_motion_blocks)
+    /// = 1 + n_1 + n_2
+    /// ```
+    fn to_line_range(&self) -> usize {
+        (self.header.to_line_len() - 1) + self.clip_anim_blocks_line_len()
+    }
+
+    pub(crate) fn clip_anim_blocks_line_len(&self) -> usize {
+        // NOTE: `.zip()` is not used here because it must be the same length.
+        let len: usize = self
+            .clip_anim_blocks
+            .par_iter()
+            .map(|block| block.to_line_len())
+            .sum();
+        let add_len: usize = self
+            .add_clip_anim_blocks
+            .par_iter()
+            .map(|block| block.to_line_len())
+            .sum();
+        len + add_len
+    }
+
+    pub(crate) fn clip_motion_blocks_line_len(&self) -> usize {
+        // NOTE: `.zip()` is not used here because it must be the same length.
+        let len: usize = self
+            .clip_motion_blocks
+            .par_iter()
+            .map(|block| block.to_line_len())
+            .sum();
+        let add_len: usize = self
+            .add_clip_motion_blocks
+            .par_iter()
+            .map(|block| block.to_line_len())
+            .sum();
+        len + add_len
+    }
+}
+
 /// Represents the header of animation data.
 ///
 /// This structure contains metadata related to the animation data, such as
@@ -57,14 +136,8 @@ pub struct AnimData<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AnimDataHeader<'a> {
-    /// Number of lines remaining representing `anim_data` after this line is read.
-    pub line_range: usize,
-
     /// An integer value related to the animation (meaning may vary based on context).
     pub lead_int: i32,
-
-    /// The length of the project assets.
-    pub project_assets_len: usize,
 
     /// A list of project asset names.
     pub project_assets: Vec<Str<'a>>,
@@ -74,9 +147,15 @@ pub struct AnimDataHeader<'a> {
 }
 
 impl AnimDataHeader<'_> {
-    /// Returns the number of lines consumed to read this struct.
-    const fn parsed_line_len(&self) -> usize {
-        3 + self.project_assets_len + 1
+    /// Returns the number of lines when serialized.
+    ///
+    /// ```txt
+    /// 1(line_range) + 1(lead_int) + 1(project_assets_len size)
+    ///         + n(project_assets_len) + 1(empty_line)
+    /// = 4 + n
+    /// ```
+    const fn to_line_len(&self) -> usize {
+        3 + self.project_assets.len() + 1
     }
 }
 
@@ -113,9 +192,15 @@ pub struct ClipAnimDataBlock<'a> {
 }
 
 impl ClipAnimDataBlock<'_> {
-    /// Returns the number of lines consumed to read this struct.
-    const fn parsed_line_len(&self) -> usize {
-        6 + self.trigger_names_len + 1 // +1 for the empty line
+    /// Returns the number of lines when serialized.
+    ///
+    /// ```txt
+    /// 1(name) + 1(clip_id) + 1(play_back_speed) + 1(crop_end_local_time)
+    ///         + n(trigger_names_len) + 1(empty_line)
+    /// = 7 + n
+    /// ```
+    const fn to_line_len(&self) -> usize {
+        7 + self.trigger_names.len()
     }
 }
 
@@ -123,6 +208,16 @@ impl ClipAnimDataBlock<'_> {
 ///
 /// This structure contains information about the duration and translation
 /// and rotation data for a specific motion clip.
+///
+/// # Example
+/// ```txt
+/// 999
+/// 3.66667
+/// 1
+/// 3.66667 0 0 0
+/// 1
+/// 3.66667 0 0 0 1
+/// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipMotionBlock<'a> {
@@ -134,12 +229,18 @@ pub struct ClipMotionBlock<'a> {
     pub duration: Str<'a>,
 
     /// The length of the translation data.
+    ///
+    /// # Note
+    /// used only for deserialization
     pub translation_len: usize,
 
     /// A list of translation data points.
     pub translations: Vec<Translation<'a>>,
 
     /// The length of the rotation data.
+    ///
+    /// # Note
+    /// used only for deserialization
     pub rotation_len: usize,
 
     /// A list of rotation data points.
@@ -147,9 +248,15 @@ pub struct ClipMotionBlock<'a> {
 }
 
 impl ClipMotionBlock<'_> {
-    /// Returns the number of lines consumed to read this struct.
-    const fn parsed_line_len(&self) -> usize {
-        3 + self.translation_len + 1 + self.rotation_len + 1 // +1 for the empty line
+    /// Returns the number of lines when serialized.
+    ///
+    /// ```txt
+    /// 1(clip_id) + 1(duration) + 1(translation_len size) + n_1(translations_len)
+    /// + 1(rotations_len size) + n_2(rotations_len) + 1(empty_line)
+    /// = 5 + n_1 + n_2
+    /// ```
+    const fn to_line_len(&self) -> usize {
+        3 + self.translations.len() + 1 + self.rotations.len() + 1 // +1 for the empty line
     }
 }
 

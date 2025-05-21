@@ -31,7 +31,10 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     let mut output = String::new();
 
     // Serialize header
-    output.push_str(&serialize_anim_header(&anim_data.header));
+    output.push_str(&serialize_anim_header(
+        &anim_data.header,
+        anim_data.to_line_range(),
+    ));
 
     // Serialize clip animation blocks
     for block in &anim_data.clip_anim_blocks {
@@ -39,11 +42,9 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     }
 
     // Serialize clip motion blocks if present
-    let clip_motion_blocks_len = count_clip_motion_lines(&anim_data.clip_motion_blocks);
-    let add_clip_motion_blocks_len = count_clip_motion_lines(&anim_data.add_clip_motion_blocks);
-
-    if (clip_motion_blocks_len + add_clip_motion_blocks_len) > 0 {
-        output.push_str(&format!("{clip_motion_blocks_len}\r\n"));
+    let clip_motion_blocks_line_len = anim_data.clip_motion_blocks_line_len();
+    if clip_motion_blocks_line_len > 0 {
+        output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
     };
     if anim_data.header.has_motion_data {
         // It must be added at the beginning, but `Vec::insert` is slow.
@@ -60,31 +61,18 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     output
 }
 
-fn count_clip_motion_lines(blocks: &[ClipMotionBlock]) -> usize {
-    blocks
-        .iter()
-        .map(|block| {
-            // empty line: 1(clip_id) + 1(duration) + 1(translation_len) + 1(rotation_len) + 1(empty_line) = 5
-            let base_lines = 5;
-            let translation_lines = block.translations.len();
-            let rotation_lines = block.rotations.len();
-            base_lines + translation_lines + rotation_lines
-        })
-        .sum()
-}
-
 /// Serializes the animation data header into a string.
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-fn serialize_anim_header(header: &AnimDataHeader) -> String {
+fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
     let mut output = String::new();
 
-    output.push_str(&header.line_range.to_string());
+    output.push_str(&line_range.to_string());
     output.push_str("\r\n");
     output.push_str(&header.lead_int.to_string());
     output.push_str("\r\n");
-    output.push_str(&header.project_assets_len.to_string());
+    output.push_str(&header.project_assets.len().to_string());
     output.push_str("\r\n");
 
     for asset in &header.project_assets {
@@ -144,10 +132,9 @@ fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
     let ClipMotionBlock {
         clip_id,
         duration,
-        translation_len,
         translations,
-        rotation_len,
         rotations,
+        ..
     } = block;
 
     output.push_str(clip_id.as_ref());
@@ -156,12 +143,12 @@ fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
     output.push_str(duration.as_ref());
     output.push_str("\r\n");
 
-    output.push_str(&format!("{translation_len}\r\n"));
+    output.push_str(&format!("{}\r\n", translations.len()));
     for translation in translations {
         serialize_translation(&mut output, translation);
     }
 
-    output.push_str(&format!("{rotation_len}\r\n"));
+    output.push_str(&format!("{}\r\n", rotations.len()));
     for rotation in rotations {
         serialize_rotation(&mut output, rotation);
     }
@@ -220,6 +207,7 @@ mod tests {
             "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
         ));
         let adsf = parse_adsf(&expected).unwrap_or_else(|e| panic!("{e}"));
+        // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();
         let actual = serialize_adsf(&adsf);
 
         // std::fs::create_dir_all("../../dummy").unwrap();
@@ -227,8 +215,8 @@ mod tests {
 
         let res = dbg!(actual == expected);
         if !res {
-            // let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
-            // std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+            std::fs::write("../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
         assert!(res);
