@@ -1,6 +1,6 @@
 use crate::range::Range;
 use simd_json::borrowed::Value;
-use std::iter::repeat;
+use std::iter::repeat_n;
 
 /// Replace `value` to the `range` portion of `target`.
 ///
@@ -36,14 +36,14 @@ pub fn handle_replace<'value>(target: &mut Vec<Value<'value>>, range: Range, val
             }
             // NOTE: We could not use `rayon::iter::repeat` because `Splice` needs `IntoIterator`.
             Range::FromTo(range) => {
-                target.splice(range.clone(), repeat(other).take(range.count()));
+                target.splice(range.clone(), repeat_n(other, range.count()));
             }
             Range::To(range_to) => {
-                target.splice(range_to, repeat(other).take(range_to.end));
+                target.splice(range_to, repeat_n(other, range_to.end));
             }
             Range::From(range_from) => {
                 let replace_count = target.len() - range_from.start;
-                target.splice(range_from, repeat(other).take(replace_count));
+                target.splice(range_from, repeat_n(other, replace_count));
             }
             Range::Full => {
                 #[cfg(feature = "rayon")]

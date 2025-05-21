@@ -7,7 +7,7 @@ license = "GPL-3.0"
 repository = "https://github.com/SARDONYX-sard/d-merge"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.87"
 
 [workspace]
 members = [

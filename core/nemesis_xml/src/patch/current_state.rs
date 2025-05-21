@@ -54,7 +54,7 @@ impl<'de> CurrentState<'de> {
 
     /// - `<!-- ORIGINAL --!> is found.
     #[inline]
-    pub fn set_is_passed_original(&mut self) {
+    pub const fn set_is_passed_original(&mut self) {
         self.is_passed_original = true;
     }
 
@@ -74,7 +74,7 @@ impl<'de> CurrentState<'de> {
     }
 
     #[inline]
-    pub fn clear_flags(&mut self) {
+    pub const fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
     }
@@ -87,7 +87,7 @@ impl<'de> CurrentState<'de> {
         (op, mem::take(&mut self.patches))
     }
 
-    pub fn increment_range(&mut self) {
+    pub const fn increment_range(&mut self) {
         if let Some(ref mut range) = self.seq_range {
             range.end += 1;
         }
