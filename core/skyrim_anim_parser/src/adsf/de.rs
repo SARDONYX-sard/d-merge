@@ -286,6 +286,8 @@ mod tests {
             panic!("Failed to parse adsf:\n{err}");
         });
         let alt_adsf: AltAdsf = adsf.into();
+
+        std::fs::create_dir_all("../../dummy/debug/").unwrap();
         // let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
         //     panic!("Failed to serialize adsf to JSON:\n{err}");
         // });
