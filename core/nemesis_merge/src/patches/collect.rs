@@ -13,6 +13,10 @@ use rayon::prelude::*;
 use snafu::ResultExt as _;
 use std::{fs, path::PathBuf};
 
+/// Collects all patches from the given nemesis paths and returns a map of owned patches.
+///
+/// # Errors
+/// Returns an error if any of the paths cannot be read or parsed.
 pub fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPatchMap, Vec<Error>> {
     let results: Vec<Result<(PathBuf, String)>> = collect_all_patch_paths(nemesis_paths)
         .into_par_iter()

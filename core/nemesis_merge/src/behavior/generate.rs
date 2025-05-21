@@ -19,40 +19,44 @@ use std::path::PathBuf;
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Result<()> {
-    let error_output = options.output_dir.join("d_merge_errors.log");
     let mut all_errors = vec![];
 
-    // 1/4:
+    // 1/4: Collect all patches & templates xml
+    options.report_status(Status::ReadingTemplatesAndPatches);
     let owned_patches = match collect_owned_patches(&nemesis_paths) {
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
-            let err = Error::FailedToReadOwnedPatches { errors_len };
 
+            let err = Error::FailedToReadOwnedPatches { errors_len };
             options.report_status(Status::Error(err.to_string()));
+
+            write_errors(&options, &errors).await?;
             return Err(err);
         }
     };
+    let (
+        PatchResult {
+            template_names,
+            template_patch_map,
+            ptr_map,
+        },
+        patch_errors_len,
+    ) = {
+        let (patch_result, errors) = collect_borrowed_patches(&owned_patches);
+        let patch_errors_len = errors.len();
+        all_errors.par_extend(errors);
+        (patch_result, patch_errors_len)
+    };
 
-    options.report_status(Status::ReadingTemplatesAndPatches);
-    let (patch_result, errors) = collect_borrowed_patches(&owned_patches);
-    let PatchResult {
-        template_names,
-        template_patch_map,
-        ptr_map,
-    } = patch_result;
-    let patch_errors_len = errors.len();
-    all_errors.par_extend(errors);
-
-    let ids = paths_to_ids(&nemesis_paths);
+    // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
+    // Therefore, reassign the local variable in the block to shorten the lifetime
     {
-        // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
-        // Therefore, reassign the local variable in the block to shorten the lifetime
         let (templates, errors) = collect_templates(template_names, &options.resource_dir);
         all_errors.par_extend(errors);
 
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = { merge_patches(template_patch_map, &ids)? };
+        let patches = { merge_patches(template_patch_map, &paths_to_ids(&nemesis_paths))? };
 
         // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
@@ -73,7 +77,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             };
 
         if !all_errors.is_empty() {
-            write_errors(&error_output, &all_errors).await?;
+            write_errors(&options, &all_errors).await?;
 
             let err = Error::FailedToGenerateBehaviors {
                 hkx_errors_len,
@@ -82,12 +86,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             };
 
             options.report_status(Status::Error(err.to_string()));
-
-            return Err(Error::FailedToGenerateBehaviors {
-                hkx_errors_len,
-                patch_errors_len,
-                apply_errors_len,
-            });
+            return Err(err);
         };
     };
 

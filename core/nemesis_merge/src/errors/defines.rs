@@ -12,10 +12,10 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
 
-    /// Failed to read owned patches.
+    /// Failed to read owned patches.(errors count: {errors_len})
     FailedToReadOwnedPatches { errors_len: usize },
 
-    /// Failed to read borrowed patches.
+    /// Failed to read borrowed patches.(errors count: {errors_len})
     FailedToReadBorrowedPatches { errors_len: usize },
 
     /// Failure to read XML templates converted from patches and hkx.(error count: {errors_len})
