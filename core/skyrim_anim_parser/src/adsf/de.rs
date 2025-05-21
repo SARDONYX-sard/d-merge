@@ -86,6 +86,7 @@ fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
         header,
         clip_anim_blocks,
         clip_motion_blocks,
+        ..Default::default()
     })
 }
 
@@ -230,11 +231,21 @@ fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<&'a s
 mod tests {
     use super::*;
 
+    #[quick_tracing::init(level = "DEBUG", file = "./log/test.log", stdio = false)]
     fn test_parse(input: &str) {
         match parse_adsf(input) {
             Ok(res) => {
-                std::fs::create_dir_all("../dummy/debug").unwrap();
-                std::fs::write("../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
+                tracing::debug!("project_names = {}", res.project_names.len());
+                tracing::debug!("anim_list ={}", res.anim_list.len());
+                for anim_data in res.anim_list {
+                    tracing::debug!("assets_len = {}", anim_data.header.project_assets.len());
+                    tracing::debug!("project_assets = {:?}", anim_data.header.project_assets);
+                    tracing::debug!("anim_blocks = {}", anim_data.clip_anim_blocks.len());
+                    tracing::debug!("motion_blocks = {}\n", anim_data.clip_motion_blocks.len());
+                }
+
+                // std::fs::create_dir_all("../dummy/debug").unwrap();
+                // std::fs::write("../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
             }
             Err(err) => panic!("{err}"),
         }

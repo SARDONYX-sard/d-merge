@@ -40,10 +40,18 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
 
     // Serialize clip motion blocks if present
     let clip_motion_blocks_len = count_clip_motion_lines(&anim_data.clip_motion_blocks);
-    if clip_motion_blocks_len > 0 {
+    let add_clip_motion_blocks_len = count_clip_motion_lines(&anim_data.add_clip_motion_blocks);
+
+    if (clip_motion_blocks_len + add_clip_motion_blocks_len) > 0 {
         output.push_str(&format!("{clip_motion_blocks_len}\r\n"));
     };
     if anim_data.header.has_motion_data {
+        // It must be added at the beginning, but `Vec::insert` is slow.
+        // Therefore, another additional field is created and it is added first.
+        for block in &anim_data.add_clip_motion_blocks {
+            output.push_str(&serialize_clip_motion_block(block));
+        }
+
         for block in &anim_data.clip_motion_blocks {
             output.push_str(&serialize_clip_motion_block(block));
         }

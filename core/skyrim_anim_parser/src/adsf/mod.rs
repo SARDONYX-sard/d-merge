@@ -32,8 +32,22 @@ pub struct AnimData<'a> {
     /// A list of animation blocks corresponding to the clips.
     pub clip_anim_blocks: Vec<ClipAnimDataBlock<'a>>,
 
+    /// It must be added at the beginning, but `Vec::insert` is slow.
+    /// Therefore, another additional field is created and it is added first.
+    ///
+    /// # Note
+    /// This is used during the patch merge phase.
+    pub add_clip_anim_blocks: Vec<ClipMotionBlock<'a>>,
+
     /// A list of motion blocks corresponding to the clips.
     pub clip_motion_blocks: Vec<ClipMotionBlock<'a>>,
+
+    /// It must be added at the beginning, but `Vec::insert` is slow.
+    /// Therefore, another additional field is created and it is added first.
+    ///
+    /// # Note
+    /// This is used during the patch merge phase.
+    pub add_clip_motion_blocks: Vec<ClipMotionBlock<'a>>,
 }
 
 /// Represents the header of animation data.
