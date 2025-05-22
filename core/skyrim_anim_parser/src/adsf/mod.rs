@@ -1,3 +1,4 @@
+pub mod clip_id_manager;
 pub mod de;
 pub mod ser;
 

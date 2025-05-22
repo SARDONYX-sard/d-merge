@@ -39,45 +39,33 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     ));
 
     // Serialize clip animation blocks
-    let mut clip_id = 0;
+    // TODO: clip id unique check
+    let mut clip_id_manager = super::clip_id_manager::ClipIdManager::new();
     for block in &anim_data.add_clip_anim_blocks {
         output.push_str(&serialize_clip_anim_block(
             block,
-            Some(clip_id.to_string().into()),
+            clip_id_manager.next_id().map(|id| id.to_string().into()),
         ));
-        clip_id += 1;
-    }
-    for block in &anim_data.clip_anim_blocks {
-        output.push_str(&serialize_clip_anim_block(
-            block,
-            Some(clip_id.to_string().into()),
-        ));
-        clip_id += 1;
     }
 
-    // Serialize clip motion blocks if present
+    for block in &anim_data.clip_anim_blocks {
+        output.push_str(&serialize_clip_anim_block(block, None));
+    }
+
     let clip_motion_blocks_line_len = anim_data.clip_motion_blocks_line_len();
     if clip_motion_blocks_line_len > 0 {
         output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
     };
     if anim_data.header.has_motion_data {
-        // It must be added at the beginning, but `Vec::insert` is slow.
-        // Therefore, another additional field is created and it is added first.
-        let mut clip_id = 0;
         for block in &anim_data.add_clip_motion_blocks {
             output.push_str(&serialize_clip_motion_block(
                 block,
-                Some(clip_id.to_string().into()),
+                clip_id_manager.next_id().map(|id| id.to_string().into()),
             ));
-            clip_id += 1;
         }
 
         for block in &anim_data.clip_motion_blocks {
-            output.push_str(&serialize_clip_motion_block(
-                block,
-                Some(clip_id.to_string().into()),
-            ));
-            clip_id += 1;
+            output.push_str(&serialize_clip_motion_block(block, None));
         }
     }
 
@@ -133,7 +121,6 @@ fn serialize_clip_anim_block(
         Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),
         None => output.push_str(clip_id.as_ref()),
     };
-    output.push_str(clip_id.as_ref());
     output.push_str("\r\n");
 
     output.push_str(play_back_speed.as_ref());
@@ -251,8 +238,8 @@ mod tests {
 
         let res = dbg!(actual == expected);
         if !res {
-            let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
-            std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            // let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+            // std::fs::write("../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
         assert!(res);
