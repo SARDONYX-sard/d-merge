@@ -155,6 +155,9 @@ fn read_adsf_file(config: &Config) -> Result<String, Error> {
 fn write_adsf_file(path: impl AsRef<Path>, adsf: &Adsf) -> Result<(), Error> {
     let serialized = serialize_adsf(adsf);
     let path = path.as_ref();
+    if let Some(parent_dir) = path.parent() {
+        let _ = std::fs::create_dir_all(parent_dir);
+    }
     std::fs::write(path, serialized).with_context(|_| FailedIoSnafu {
         path: path.to_path_buf(),
     })?;
