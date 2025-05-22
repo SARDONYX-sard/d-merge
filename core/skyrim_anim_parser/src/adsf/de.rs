@@ -13,6 +13,7 @@ use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, space1, till_line_ending},
+    combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
@@ -275,7 +276,7 @@ fn translations<'a>(
                 x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
                 y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
                 z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
-                _: line_ending,
+                _: opt(line_ending),
             }}
             .context(Label("Translation"))
             .parse_next(input)?;
@@ -299,7 +300,7 @@ fn rotations<'a>(
                 y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
                 z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))).map(|s| s.into()),
                 w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
-                _: line_ending,
+                _: opt(line_ending), // In the case of patches, this may not be present, so opt
             }}
             .context(Label("Rotation"))
             .parse_next(input)?;
