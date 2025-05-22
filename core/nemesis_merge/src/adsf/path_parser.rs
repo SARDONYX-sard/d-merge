@@ -117,7 +117,7 @@ mod tests {
             ParsedAdsfPatchPath {
                 target: "DefaultFemale",
                 id: "dmco",
-                parser_type: ParserType::Anim
+                parser_type: ParserType::Motion
             }
         );
     }
@@ -130,6 +130,6 @@ mod tests {
         let parsed = parse_adsf_path(path).unwrap();
         assert_eq!(parsed.target, "DefaultFemale");
         assert_eq!(parsed.id, "dmco");
-        assert_eq!(parsed.parser_type, ParserType::Motion);
+        assert_eq!(parsed.parser_type, ParserType::Anim);
     }
 }
