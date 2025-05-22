@@ -1,8 +1,8 @@
 use crate::{
-    aliases::{OwnedPatchMap, PtrMap, TemplatePatchMap},
+    aliases::{AdsfPatchMap, OwnedPatchMap, PtrMap, TemplatePatchMap},
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
     paths::{
-        collect::collect_nemesis_paths,
+        collect::{collect_nemesis_paths, Category},
         parse::{parse_nemesis_path, NemesisPath},
     },
     results::filter_results,
@@ -18,22 +18,38 @@ use tokio::fs;
 ///
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
-pub async fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPatchMap, Vec<Error>> {
-    let mut handles = vec![];
+pub async fn collect_owned_patches(
+    nemesis_paths: &[PathBuf],
+) -> Result<(AdsfPatchMap, OwnedPatchMap), Vec<Error>> {
+    let mut nemesis_handles = vec![];
+    let mut adsf_handles = vec![];
 
     let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
-    for path in paths {
-        handles.push(tokio::spawn(async move {
-            let xml = fs::read_to_string(&path)
-                .await
-                .with_context(|_| FailedIoSnafu { path: path.clone() })?;
-            Ok((path, xml))
-        }));
+    for (category, path) in paths {
+        match category {
+            Category::Nemesis => {
+                nemesis_handles.push(tokio::spawn(async move {
+                    let xml = fs::read_to_string(&path)
+                        .await
+                        .with_context(|_| FailedIoSnafu { path: path.clone() })?;
+                    Ok((path, xml))
+                }));
+            }
+            Category::Adsf => {
+                adsf_handles.push(tokio::spawn(async move {
+                    let adsf = fs::read_to_string(&path)
+                        .await
+                        .with_context(|_| FailedIoSnafu { path: path.clone() })?;
+                    Ok((path, adsf))
+                }));
+            }
+        };
     }
 
-    let mut owned_patches = OwnedPatchMap::new();
     let mut errors = vec![];
-    for handle in handles {
+
+    let mut owned_patches = OwnedPatchMap::new();
+    for handle in nemesis_handles {
         let result = match handle.await {
             Ok(result) => result,
             Err(err) => {
@@ -52,8 +68,26 @@ pub async fn collect_owned_patches(nemesis_paths: &[PathBuf]) -> Result<OwnedPat
         }
     }
 
+    let mut adsf_patches = AdsfPatchMap::new();
+    for handle in adsf_handles {
+        let result = match handle.await {
+            Ok(result) => result,
+            Err(err) => {
+                errors.push(Error::JoinError { source: err });
+                continue;
+            }
+        };
+
+        match result {
+            Ok((path, xml)) => {
+                adsf_patches.insert(path, xml);
+            }
+            Err(err) => errors.push(err),
+        }
+    }
+
     if errors.is_empty() {
-        Ok(owned_patches)
+        Ok((adsf_patches, owned_patches))
     } else {
         Err(errors)
     }

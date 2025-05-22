@@ -6,7 +6,9 @@
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
-use crate::lines::{lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str};
+use crate::lines::{
+    lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
+};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -29,6 +31,8 @@ pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
 }
 
 fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
+    // DefaultMale
+    // DefaultMale.txt
     let project_names = project_names
         .context(Expected(Description("project_names: *.txt")))
         .parse_next(input)?;
@@ -55,9 +59,15 @@ fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
 
-    lines(line_len)
-        .context(Expected(Description("project_names: Vec<Str>")))
-        .parse_next(input)
+    (move |input: &mut &'a str| {
+        let mut lines = vec![];
+        for _ in 0..line_len {
+            lines.push(txt_one_line.parse_next(input)?);
+        }
+        Ok(lines)
+    })
+    .context(Expected(Description("project_names: Vec<Str>")))
+    .parse_next(input)
 }
 
 /// Parses animation data from the input.
@@ -125,7 +135,17 @@ fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a
     ))
 }
 
-/// Parses a clip animation data block from the input.
+/// Parses the animation data structure from the input.
+///
+/// # Errors
+/// If parsing fails, returns human readable error.
+pub fn parse_clip_anim_block(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
+    clip_anim_block
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e, input))
+}
+
+/// Parses `ClipAnimDataBlock`
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
@@ -143,6 +163,16 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
     .context(Label("ClipAnimDataBlock"))
     .parse_next(input)?;
     Ok(block)
+}
+
+/// Parses `ClipMotionBlock`
+///
+/// # Errors
+/// If parsing fails, returns human readable error.
+pub fn parse_clip_motion_block(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
+    clip_motion_block
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e, input))
 }
 
 /// Parses multiple clip motion blocks from the input.
@@ -247,6 +277,20 @@ fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<&'a s
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_parse_project_names() {
+        let input = r"5
+            ChickenProject.txt
+            HareProject.txt
+            AtronachFlame.txt
+            AtronachFrostProject.txt
+            AtronachStormProject.txt
+";
+
+        let project_names = project_names.parse(input).unwrap_or_else(|e| panic!("{e}"));
+        dbg!(project_names);
+    }
+
     #[quick_tracing::init(level = "DEBUG", file = "./log/test.log", stdio = false)]
     fn test_parse(input: &str) {
         let adsf = parse_adsf(input).unwrap_or_else(|err| {
@@ -288,10 +332,10 @@ mod tests {
         let alt_adsf: AltAdsf = adsf.into();
 
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
-        // let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
-        //     panic!("Failed to serialize adsf to JSON:\n{err}");
-        // });
-        // std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
+        let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
+            panic!("Failed to serialize adsf to JSON:\n{err}");
+        });
+        std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
 
         let bin = rmp_serde::to_vec(&alt_adsf).unwrap();
         std::fs::write("../../dummy/debug/animationdatasinglefile.bin", bin).unwrap();

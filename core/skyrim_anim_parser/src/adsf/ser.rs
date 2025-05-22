@@ -12,7 +12,7 @@ pub fn serialize_adsf(adsf: &Adsf) -> String {
     // Serialize project names
     output.push_str(&format!("{}\r\n", adsf.project_names.len()));
     for name in &adsf.project_names {
-        output.push_str(&format!("{name}\r\n"));
+        output.push_str(&format!("{name}.txt\r\n"));
     }
 
     // Serialize animation data

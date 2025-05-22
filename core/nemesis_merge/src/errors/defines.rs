@@ -68,6 +68,16 @@ pub enum Error {
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
 
+    #[snafu(transparent)]
+    ParsedAdsfPathError {
+        source: crate::adsf::path_parser::ParseError,
+    },
+
+    #[snafu(transparent)]
+    ReadableError {
+        source: serde_hkx::errors::readable::ReadableError,
+    },
+
     /// serde_hkx serialize error.
     #[snafu(display("{}:\n {source}", path.display()))]
     HkxSerError {

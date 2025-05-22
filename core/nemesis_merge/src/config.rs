@@ -8,6 +8,8 @@ use std::{fmt, path::PathBuf};
 #[derive(Default)]
 pub struct Config {
     /// The directory containing the hkx templates you want to patch
+    ///
+    /// Select the directory where mesh is located(e.g. `assets/templates`, then use `assets/templates/meshes`)
     pub resource_dir: PathBuf,
 
     /// The directory where the output files will be saved.
@@ -84,11 +86,11 @@ pub enum Status {
     Error(String),
 }
 
+#[cfg(feature = "ts_serde")]
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "ts_serde")]
     #[test]
     fn serialize_status() {
         let status = Status::Error("Error message".to_string());

@@ -23,7 +23,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
     // 1/4: Collect all patches & templates xml
     options.report_status(Status::ReadingTemplatesAndPatches);
-    let owned_patches = match collect_owned_patches(&nemesis_paths).await {
+    let (owned_adsf_patches, owned_patches) = match collect_owned_patches(&nemesis_paths).await {
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
@@ -35,6 +35,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             return Err(err);
         }
     };
+
+    let ids = paths_to_ids(&nemesis_paths);
+
+    all_errors.par_extend(crate::adsf::apply_adsf_patches(
+        owned_adsf_patches,
+        &ids,
+        &options,
+    ));
+
     let (
         BorrowedPatches {
             template_names,
@@ -56,7 +65,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         all_errors.par_extend(errors);
 
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = { merge_patches(template_patch_map, &paths_to_ids(&nemesis_paths))? };
+        let patches = { merge_patches(template_patch_map, &ids)? };
 
         // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);

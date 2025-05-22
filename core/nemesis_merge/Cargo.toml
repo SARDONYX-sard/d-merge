@@ -30,6 +30,7 @@ winnow = { workspace = true }
 # workspace members
 json_patch = { workspace = true, features = ["rayon"] }
 nemesis_xml = { workspace = true }
+skyrim_anim_parser = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

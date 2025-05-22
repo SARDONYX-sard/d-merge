@@ -11,6 +11,22 @@ pub type BorrowedTemplateMap<'a> = DashMap<String, (PathBuf, BorrowedValue<'a>)>
 /// - value: nemesis xml
 pub type OwnedPatchMap = IndexMap<PathBuf, String>;
 
+/// - key: full path(For adsf)
+/// - value: adsf patch
+#[derive(Debug, Default)]
+pub struct AdsfPatchMap(pub IndexMap<PathBuf, String>);
+impl AdsfPatchMap {
+    #[inline]
+    pub fn new() -> Self {
+        Self(IndexMap::new())
+    }
+
+    #[inline]
+    pub fn insert(&mut self, path: PathBuf, patch: String) -> Option<String> {
+        self.0.insert(path, patch)
+    }
+}
+
 // Parallel
 // - "0_master": {
 //      #0029", {
