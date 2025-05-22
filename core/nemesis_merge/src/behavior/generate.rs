@@ -23,7 +23,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
     // 1/4: Collect all patches & templates xml
     options.report_status(Status::ReadingTemplatesAndPatches);
-    let owned_patches = match collect_owned_patches(&nemesis_paths).await {
+    let (owned_adsf_patches, owned_patches) = match collect_owned_patches(&nemesis_paths).await {
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
@@ -35,6 +35,13 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             return Err(err);
         }
     };
+
+    let ids = paths_to_ids(&nemesis_paths);
+
+    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &ids, &options);
+    let adsf_errors_len = adsf_errors.len();
+    all_errors.par_extend(adsf_errors);
+
     let (
         BorrowedPatches {
             template_names,
@@ -56,14 +63,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         all_errors.par_extend(errors);
 
         // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = { merge_patches(template_patch_map, &paths_to_ids(&nemesis_paths))? };
+        let patches = { merge_patches(template_patch_map, &ids)? };
 
         // 3/4: Apply patches & Replace variables to indexes
         options.report_status(Status::ApplyingPatches);
+        let mut apply_errors_len = 0;
         if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
+            apply_errors_len = errors.len();
             all_errors.par_extend(errors);
         };
-        let apply_errors_len = all_errors.len();
 
         // 4/4: Generate hkx files.
         options.report_status(Status::GenerateHkxFiles);
@@ -81,6 +89,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             write_errors(&options, &all_errors).await?;
 
             let err = Error::FailedToGenerateBehaviors {
+                adsf_errors_len,
                 hkx_errors_len,
                 patch_errors_len,
                 apply_errors_len,
@@ -102,13 +111,10 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "unimplemented yet"]
-    #[cfg_attr(
-        feature = "tracing",
-        quick_tracing::init(file = "../../dummy/merge_test.log", stdio = false)
-    )]
+    #[cfg(feature = "tracing")]
     async fn merge_test() {
-        // let log_path = "../../dummy/merge_test.log";
-        // crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
+        let log_path = "../../dummy/merge_test.log";
+        crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
 
         #[allow(clippy::iter_on_single_items)]
         let ids = [

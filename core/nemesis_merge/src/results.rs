@@ -1,5 +1,5 @@
 use crate::errors::Error;
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 
 #[inline]
 pub fn filter_results<T>(results: Vec<Result<T, Error>>) -> Result<(), Vec<Error>>
@@ -12,4 +12,15 @@ where
     } else {
         Err(errors)
     }
+}
+
+pub fn partition_results<T, E>(results: Vec<Result<T, E>>) -> (Vec<T>, Vec<E>)
+where
+    T: Send,
+    E: Send,
+{
+    results.into_par_iter().partition_map(|res| match res {
+        Ok(v) => Either::Left(v),
+        Err(e) => Either::Right(e),
+    })
 }

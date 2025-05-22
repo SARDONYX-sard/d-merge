@@ -6,11 +6,13 @@
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
-use crate::lines::{lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str};
+use crate::lines::{
+    lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
+};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
-    ascii::{line_ending, space1, till_line_ending},
+    ascii::{line_ending, multispace0, space1, till_line_ending},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
@@ -24,11 +26,12 @@ use winnow::{
 /// # Errors
 /// If parsing fails, returns human readable error.
 pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
-    adsf.parse(input)
-        .map_err(|e| ReadableError::from_parse(e, input))
+    adsf.parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
+    // DefaultMale
+    // DefaultMale.txt
     let project_names = project_names
         .context(Expected(Description("project_names: *.txt")))
         .parse_next(input)?;
@@ -55,9 +58,15 @@ fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
         .context(Expected(Description("project_names_len: usize")))
         .parse_next(input)?;
 
-    lines(line_len)
-        .context(Expected(Description("project_names: Vec<Str>")))
-        .parse_next(input)
+    (move |input: &mut &'a str| {
+        let mut lines = vec![];
+        for _ in 0..line_len {
+            lines.push(txt_one_line.parse_next(input)?);
+        }
+        Ok(lines)
+    })
+    .context(Expected(Description("project_names: Vec<Str>")))
+    .parse_next(input)
 }
 
 /// Parses animation data from the input.
@@ -125,11 +134,21 @@ fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a
     ))
 }
 
-/// Parses a clip animation data block from the input.
+/// Parses the animation data structure from the input.
+///
+/// # Errors
+/// If parsing fails, returns human readable error.
+pub fn parse_clip_anim_block_patch(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
+    clip_anim_block_patch
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e))
+}
+
+/// Parses `ClipAnimDataBlock`
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+fn clip_anim_block_common<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
@@ -138,8 +157,35 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
         crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))).map(|s| s.into()),
         trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
-        _: line_ending.context(Expected(Description("empty line"))),
     }}
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses `ClipAnimDataBlock`
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+    let (block,) = seq! {
+        clip_anim_block_common,
+        _: line_ending.context(Expected(Description("empty line"))),
+    }
+    .context(Label("ClipAnimDataBlock"))
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses `ClipAnimDataBlock`
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_anim_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+    let (block,) = seq! {
+        _: multispace0,
+        clip_anim_block_common,
+        _: multispace0,
+    }
     .context(Label("ClipAnimDataBlock"))
     .parse_next(input)?;
     Ok(block)
@@ -162,11 +208,21 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBloc
     Ok(motion_blocks)
 }
 
+/// Parses `ClipMotionBlock`
+///
+/// # Errors
+/// If parsing fails, returns human readable error.
+pub fn parse_clip_motion_block_patch(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
+    clip_motion_block_patch
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e))
+}
+
 /// Parses a clip motion block from the input.
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+fn clip_motion_block_common<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
         duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))).map(|s| s.into()),
@@ -174,8 +230,35 @@ fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>
         translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
         rotation_len: parse_one_line.context(Expected(Description("rotation_len: usize"))),
         rotations: rotations(rotation_len).context(Expected(Description("rotations: Vec<Rotation>"))),
-        _: line_ending.context(Expected(Description("empty line"))),
     }}
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses a clip motion block from the input.
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+    let (block,) = seq! {
+        clip_motion_block_common,
+        _: line_ending.context(Expected(Description("empty line"))),
+    }
+    .context(Label("ClipMotionBlock"))
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses a clip motion block from the input.
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_motion_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+    let (block,) = seq! {
+        _: multispace0,
+        clip_motion_block_common,
+        _: multispace0,
+    }
     .context(Label("ClipMotionBlock"))
     .parse_next(input)?;
     Ok(block)
@@ -247,6 +330,20 @@ fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<&'a s
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_parse_project_names() {
+        let input = r"5
+            ChickenProject.txt
+            HareProject.txt
+            AtronachFlame.txt
+            AtronachFrostProject.txt
+            AtronachStormProject.txt
+";
+
+        let project_names = project_names.parse(input).unwrap_or_else(|e| panic!("{e}"));
+        dbg!(project_names);
+    }
+
     #[quick_tracing::init(level = "DEBUG", file = "./log/test.log", stdio = false)]
     fn test_parse(input: &str) {
         let adsf = parse_adsf(input).unwrap_or_else(|err| {
@@ -288,10 +385,10 @@ mod tests {
         let alt_adsf: AltAdsf = adsf.into();
 
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
-        // let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
-        //     panic!("Failed to serialize adsf to JSON:\n{err}");
-        // });
-        // std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
+        let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
+            panic!("Failed to serialize adsf to JSON:\n{err}");
+        });
+        std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
 
         let bin = rmp_serde::to_vec(&alt_adsf).unwrap();
         std::fs::write("../../dummy/debug/animationdatasinglefile.bin", bin).unwrap();

@@ -1,3 +1,4 @@
+pub mod clip_id_manager;
 pub mod de;
 pub mod ser;
 
@@ -74,7 +75,7 @@ pub struct AnimData<'a> {
     ///
     /// # Note
     /// This is used during the patch merge phase.
-    pub add_clip_anim_blocks: Vec<ClipMotionBlock<'a>>,
+    pub add_clip_anim_blocks: Vec<ClipAnimDataBlock<'a>>,
 
     /// A list of motion blocks corresponding to the clips.
     pub clip_motion_blocks: Vec<ClipMotionBlock<'a>>,

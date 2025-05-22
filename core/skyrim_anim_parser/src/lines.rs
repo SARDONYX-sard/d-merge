@@ -1,7 +1,7 @@
 use core::str::FromStr;
 use std::borrow::Cow;
 use winnow::{
-    ascii::{line_ending, till_line_ending},
+    ascii::{line_ending, space0, till_line_ending},
     combinator::alt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     ModalResult, Parser,
@@ -26,6 +26,17 @@ pub(crate) fn lines<'a>(
         }
         Ok(lines)
     }
+}
+
+/// Parse txt stem line.
+///
+/// e.g. `DefaultMale.txt` -> `DefaultMale`
+pub(crate) fn txt_one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
+    space0.parse_next(input)?;
+    let name = winnow::token::take_until(0.., ".txt").parse_next(input)?;
+    till_line_ending.parse_next(input)?;
+    line_ending.parse_next(input)?; // skip line end
+    Ok(name.into())
 }
 
 /// Parse one line and then parse to T.

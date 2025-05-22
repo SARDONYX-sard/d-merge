@@ -13,6 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bitvec = "1.0.1"
 indexmap = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true, optional = true }    # Implement (De)Serializer
@@ -34,7 +35,7 @@ workspace = true
 default = ["tracing", "serde", "alt_map"] # for debug
 
 # alternative to adsf indexmap
-alt_map = ["serde", "indexmap/serde"]
+alt_map = ["serde", "indexmap/serde", "bitvec/serde"]
 
 serde = ["dep:serde"]
 

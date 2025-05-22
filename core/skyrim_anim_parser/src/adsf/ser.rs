@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
@@ -12,7 +14,7 @@ pub fn serialize_adsf(adsf: &Adsf) -> String {
     // Serialize project names
     output.push_str(&format!("{}\r\n", adsf.project_names.len()));
     for name in &adsf.project_names {
-        output.push_str(&format!("{name}\r\n"));
+        output.push_str(&format!("{name}.txt\r\n"));
     }
 
     // Serialize animation data
@@ -37,24 +39,46 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     ));
 
     // Serialize clip animation blocks
-    for block in &anim_data.clip_anim_blocks {
-        output.push_str(&serialize_clip_anim_block(block));
+    // TODO: clip id unique check
+    let mut clip_id_manager = super::clip_id_manager::ClipIdManager::new();
+    let mut clip_id_map = std::collections::HashMap::new();
+    for block in &anim_data.add_clip_anim_blocks {
+        let new_id = clip_id_manager.next_id();
+        if let Some(new_id) = new_id {
+            clip_id_map.insert(&block.clip_id, new_id);
+        } else {
+            #[cfg(feature = "tracing")]
+            tracing::error!("clip_id allocation has reached its limit");
+        }
+        output.push_str(&serialize_clip_anim_block(
+            block,
+            new_id.map(|id| id.to_string().into()),
+        ));
     }
 
-    // Serialize clip motion blocks if present
+    for block in &anim_data.clip_anim_blocks {
+        output.push_str(&serialize_clip_anim_block(block, None));
+    }
+
     let clip_motion_blocks_line_len = anim_data.clip_motion_blocks_line_len();
     if clip_motion_blocks_line_len > 0 {
         output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
     };
     if anim_data.header.has_motion_data {
-        // It must be added at the beginning, but `Vec::insert` is slow.
-        // Therefore, another additional field is created and it is added first.
         for block in &anim_data.add_clip_motion_blocks {
-            output.push_str(&serialize_clip_motion_block(block));
+            if let Some(&new_id) = clip_id_map.get(&block.clip_id) {
+                output.push_str(&serialize_clip_motion_block(
+                    block,
+                    Some(new_id.to_string().into()),
+                ));
+            } else {
+                #[cfg(feature = "tracing")]
+                tracing::error!("not found clip_id: `{}`", block.clip_id);
+            }
         }
 
         for block in &anim_data.clip_motion_blocks {
-            output.push_str(&serialize_clip_motion_block(block));
+            output.push_str(&serialize_clip_motion_block(block, None));
         }
     }
 
@@ -87,7 +111,10 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
 }
 
 /// Serializes a clip animation data block into a string.
-fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
+fn serialize_clip_anim_block(
+    block: &ClipAnimDataBlock,
+    replace_clip_id: Option<Cow<'_, str>>,
+) -> String {
     let mut output = String::new();
 
     let ClipAnimDataBlock {
@@ -103,7 +130,10 @@ fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
     output.push_str(name.as_ref());
     output.push_str("\r\n");
 
-    output.push_str(clip_id.as_ref());
+    match replace_clip_id {
+        Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),
+        None => output.push_str(clip_id.as_ref()),
+    };
     output.push_str("\r\n");
 
     output.push_str(play_back_speed.as_ref());
@@ -126,7 +156,10 @@ fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
 }
 
 /// Serializes a clip motion block into a string.
-fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
+fn serialize_clip_motion_block(
+    block: &ClipMotionBlock,
+    replace_clip_id: Option<Cow<'_, str>>,
+) -> String {
     let mut output = String::new();
 
     let ClipMotionBlock {
@@ -137,7 +170,10 @@ fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
         ..
     } = block;
 
-    output.push_str(clip_id.as_ref());
+    match replace_clip_id {
+        Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),
+        None => output.push_str(clip_id.as_ref()),
+    };
     output.push_str("\r\n");
 
     output.push_str(duration.as_ref());
@@ -215,8 +251,8 @@ mod tests {
 
         let res = dbg!(actual == expected);
         if !res {
-            let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
-            std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            // let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+            // std::fs::write("../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
         assert!(res);

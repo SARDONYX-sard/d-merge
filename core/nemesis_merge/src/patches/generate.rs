@@ -23,7 +23,7 @@ where
 
     let results: Vec<_> = collect_nemesis_paths(patch_path)
         .par_iter()
-        .map(|txt_path| txt_to_json(txt_path, output))
+        .map(|(_, txt_path)| txt_to_json(txt_path, output))
         .collect();
 
     filter_results(results)
