@@ -19,7 +19,7 @@ pub enum ParserType {
 // rule:
 // anim path:
 // - format: <any>/<id>/animationdatasinglefile/<target>~1/<anim_data_clip_id>.txt
-//   (e.g. D:\mod\slide\animationdatasinglefile\DefaultFemale~1\slide$0.txt)
+//   (e.g. D:/mod\slide\animationdatasinglefile\DefaultFemale~1\slide$0.txt)
 //
 // motion path:
 // - format: <any>/<id>/animationdatasinglefile/<target>~1/<name>~<anim_data_clip_id>.txt
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_parse_adsf_path() {
-        let path = r"C:\Users\Steam\Skyrim SE\MO2\mods\Dodge MCO-DXP\Nemesis_Engine\mod\dmco\animationdatasinglefile\DefaultFemale~1\dmco$1.txt";
+        let path = r"/Users/Steam/Skyrim SE/MO2/mods/Dodge MCO-DXP/Nemesis_Engine/mod/dmco/animationdatasinglefile/DefaultFemale~1/dmco$1.txt";
         let result = parse_adsf_path(Path::new(path));
         assert!(result.is_ok());
         let parsed = result.unwrap();
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_anim_path() {
-        let path = r"C:\Users\Steam\Skyrim SE\MO2\mods\Dodge\Nemesis_Engine\mod\dmco\animationdatasinglefile\DefaultFemale~1\dmco$1.txt";
+        let path = r"/Users/Steam/Skyrim SE/MO2/mods/Dodge/Nemesis_Engine/mod/dmco/animationdatasinglefile/DefaultFemale~1/dmco$1.txt";
         let parsed = parse_adsf_path(Path::new(path)).unwrap();
         assert_eq!(
             parsed,
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_motion_path() {
         let path = Path::new(
-            r"C:\Users\Steam\Skyrim SE\MO2\mods\Dodge\Nemesis_Engine\mod\dmco\animationdatasinglefile\DefaultFemale~1\MCO_ClipGenerator_Dodge_B_Dodge1~dmco$11.txt",
+            r"/Users/Steam/Skyrim SE/MO2/mods/Dodge/Nemesis_Engine/mod/dmco/animationdatasinglefile/DefaultFemale~1/MCO_ClipGenerator_Dodge_B_Dodge1~dmco$11.txt",
         );
         let parsed = parse_adsf_path(path).unwrap();
         assert_eq!(parsed.target, "DefaultFemale");
