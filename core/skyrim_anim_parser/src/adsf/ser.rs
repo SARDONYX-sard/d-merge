@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
@@ -37,8 +39,20 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     ));
 
     // Serialize clip animation blocks
+    let mut clip_id = 0;
+    for block in &anim_data.add_clip_anim_blocks {
+        output.push_str(&serialize_clip_anim_block(
+            block,
+            Some(clip_id.to_string().into()),
+        ));
+        clip_id += 1;
+    }
     for block in &anim_data.clip_anim_blocks {
-        output.push_str(&serialize_clip_anim_block(block));
+        output.push_str(&serialize_clip_anim_block(
+            block,
+            Some(clip_id.to_string().into()),
+        ));
+        clip_id += 1;
     }
 
     // Serialize clip motion blocks if present
@@ -49,12 +63,21 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     if anim_data.header.has_motion_data {
         // It must be added at the beginning, but `Vec::insert` is slow.
         // Therefore, another additional field is created and it is added first.
+        let mut clip_id = 0;
         for block in &anim_data.add_clip_motion_blocks {
-            output.push_str(&serialize_clip_motion_block(block));
+            output.push_str(&serialize_clip_motion_block(
+                block,
+                Some(clip_id.to_string().into()),
+            ));
+            clip_id += 1;
         }
 
         for block in &anim_data.clip_motion_blocks {
-            output.push_str(&serialize_clip_motion_block(block));
+            output.push_str(&serialize_clip_motion_block(
+                block,
+                Some(clip_id.to_string().into()),
+            ));
+            clip_id += 1;
         }
     }
 
@@ -87,7 +110,10 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
 }
 
 /// Serializes a clip animation data block into a string.
-fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
+fn serialize_clip_anim_block(
+    block: &ClipAnimDataBlock,
+    replace_clip_id: Option<Cow<'_, str>>,
+) -> String {
     let mut output = String::new();
 
     let ClipAnimDataBlock {
@@ -103,6 +129,10 @@ fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
     output.push_str(name.as_ref());
     output.push_str("\r\n");
 
+    match replace_clip_id {
+        Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),
+        None => output.push_str(clip_id.as_ref()),
+    };
     output.push_str(clip_id.as_ref());
     output.push_str("\r\n");
 
@@ -126,7 +156,10 @@ fn serialize_clip_anim_block(block: &ClipAnimDataBlock) -> String {
 }
 
 /// Serializes a clip motion block into a string.
-fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
+fn serialize_clip_motion_block(
+    block: &ClipMotionBlock,
+    replace_clip_id: Option<Cow<'_, str>>,
+) -> String {
     let mut output = String::new();
 
     let ClipMotionBlock {
@@ -137,7 +170,10 @@ fn serialize_clip_motion_block(block: &ClipMotionBlock) -> String {
         ..
     } = block;
 
-    output.push_str(clip_id.as_ref());
+    match replace_clip_id {
+        Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),
+        None => output.push_str(clip_id.as_ref()),
+    };
     output.push_str("\r\n");
 
     output.push_str(duration.as_ref());
