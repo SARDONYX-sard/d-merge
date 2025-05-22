@@ -74,7 +74,7 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: ${{ env.APP_NAME }}-${{runner.os}}
+          name: d_merge-debug-files
           path: |
             ./dummy/
         if: runner.os == 'Linux'
