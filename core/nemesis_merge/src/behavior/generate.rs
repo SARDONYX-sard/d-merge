@@ -38,11 +38,9 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
 
     let ids = paths_to_ids(&nemesis_paths);
 
-    all_errors.par_extend(crate::adsf::apply_adsf_patches(
-        owned_adsf_patches,
-        &ids,
-        &options,
-    ));
+    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &ids, &options);
+    let adsf_errors_len = adsf_errors.len();
+    all_errors.par_extend(adsf_errors);
 
     let (
         BorrowedPatches {
@@ -90,6 +88,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
             write_errors(&options, &all_errors).await?;
 
             let err = Error::FailedToGenerateBehaviors {
+                adsf_errors_len,
                 hkx_errors_len,
                 patch_errors_len,
                 apply_errors_len,

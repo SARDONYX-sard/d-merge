@@ -24,11 +24,19 @@ pub enum Error {
     /// - Json patch error count: {patch_errors_len}
     /// - Failure to apply `patch -> XML template`.(error count: {apply_errors_len})
     /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
-    #[snafu(display("- json patch error count: {patch_errors_len}\n- Apply json patch error count: {apply_errors_len}\n- Generate hkx error count: {hkx_errors_len}"))]
+    #[snafu(display(
+        "
+- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}
+
+-       Json Patch Error Count: {patch_errors_len}
+- Apply Json Patch Error Count: {apply_errors_len}
+-     Generate hkx Error Count: {hkx_errors_len}"
+    ))]
     FailedToGenerateBehaviors {
-        hkx_errors_len: usize,
+        adsf_errors_len: usize,
         patch_errors_len: usize,
         apply_errors_len: usize,
+        hkx_errors_len: usize,
     },
 
     /// No such template `{template_name}`.
