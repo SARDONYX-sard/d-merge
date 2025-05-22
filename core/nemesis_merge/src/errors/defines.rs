@@ -73,9 +73,18 @@ pub enum Error {
         source: crate::adsf::path_parser::ParseError,
     },
 
-    #[snafu(transparent)]
-    ReadableError {
+    /// Failed to parse adsf template
+    #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n {source}", path.display()))]
+    FailedParseAdsfTemplate {
         source: serde_hkx::errors::readable::ReadableError,
+        path: PathBuf,
+    },
+
+    /// Failed to parse adsf patch
+    #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n {source}", path.display()))]
+    FailedParseAdsfPatch {
+        source: serde_hkx::errors::readable::ReadableError,
+        path: PathBuf,
     },
 
     /// serde_hkx serialize error.

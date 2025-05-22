@@ -16,14 +16,15 @@ pub enum ParserType {
 
 /// Parses an adsf path and returns target and id as &str references.
 ///
-// rule:
-// anim path:
-// - format: <any>/<id>/animationdatasinglefile/<target>~1/<anim_data_clip_id>.txt
-//   (e.g. D:/mod\slide\animationdatasinglefile\DefaultFemale~1\slide$0.txt)
-//
-// motion path:
-// - format: <any>/<id>/animationdatasinglefile/<target>~1/<name>~<anim_data_clip_id>.txt
-//   (e.g. D:\mod\slide\animationdatasinglefile\DefaultFemale~1\SprintSlide~slide$0.txt)
+/// rule:
+/// anim path:
+/// - format: <any>/<id>/animationdatasinglefile/<target>~1/<name>~<anim_data_clip_id>.txt
+///   (e.g. D:\mod\slide\animationdatasinglefile\DefaultFemale~1\SprintSlide~slide$0.txt)
+///
+/// motion path:
+/// - format: <any>/<id>/animationdatasinglefile/<target>~1/<anim_data_clip_id>.txt
+///   (e.g. D:/mod\slide\animationdatasinglefile\DefaultFemale~1\slide$0.txt)
+///
 /// Parses an adsf path and returns target, id, and parser type.
 pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
     let components: Vec<&'a str> = path
@@ -61,9 +62,9 @@ pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, Pa
         })?;
 
     let parser_type = if file_name.contains('~') {
-        ParserType::Motion
-    } else {
         ParserType::Anim
+    } else {
+        ParserType::Motion
     };
 
     Ok(ParsedAdsfPatchPath {

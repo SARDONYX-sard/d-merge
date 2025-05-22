@@ -9,6 +9,7 @@ use snafu::ResultExt as _;
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::errors::{FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu};
 use crate::results::partition_results;
 use crate::{
     aliases::AdsfPatchMap,
@@ -66,8 +67,14 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
             } = parse_adsf_path(path)?;
 
             let patch = match parser_type {
-                ParserType::Anim => PatchKind::Anim(parse_clip_anim_block(adsf_patch)?),
-                ParserType::Motion => PatchKind::Motion(parse_clip_motion_block(adsf_patch)?),
+                ParserType::Anim => PatchKind::Anim(
+                    parse_clip_anim_block(adsf_patch)
+                        .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
+                ),
+                ParserType::Motion => PatchKind::Motion(
+                    parse_clip_motion_block(adsf_patch)
+                        .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
+                ),
             };
             Ok(AdsfPatch { target, id, patch })
         })
@@ -98,7 +105,11 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
             return errors;
         }
     };
-    let adsf = ret_error!(parse_adsf(&adsf).map_err(|e| e.into()));
+    let adsf = ret_error!(
+        parse_adsf(&adsf).with_context(|_| FailedParseAdsfTemplateSnafu {
+            path: config.resource_dir.join(ADSF_INNER_PATH)
+        })
+    );
     let mut alt_adsf: AltAdsf = adsf.into();
 
     // 4. Apply adsf patch to base adsf(anim_data & motion data).
