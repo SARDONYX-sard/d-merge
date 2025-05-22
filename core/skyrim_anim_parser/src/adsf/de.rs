@@ -12,7 +12,7 @@ use crate::lines::{
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
-    ascii::{line_ending, space1, till_line_ending},
+    ascii::{line_ending, multispace0, space1, till_line_ending},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
@@ -26,8 +26,7 @@ use winnow::{
 /// # Errors
 /// If parsing fails, returns human readable error.
 pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
-    adsf.parse(input)
-        .map_err(|e| ReadableError::from_parse(e, input))
+    adsf.parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
@@ -139,17 +138,17 @@ fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a
 ///
 /// # Errors
 /// If parsing fails, returns human readable error.
-pub fn parse_clip_anim_block(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
-    clip_anim_block
+pub fn parse_clip_anim_block_patch(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
+    clip_anim_block_patch
         .parse(input)
-        .map_err(|e| ReadableError::from_parse(e, input))
+        .map_err(|e| ReadableError::from_parse(e))
 }
 
 /// Parses `ClipAnimDataBlock`
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+fn clip_anim_block_common<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
@@ -158,21 +157,38 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
         crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))).map(|s| s.into()),
         trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
-        _: line_ending.context(Expected(Description("empty line"))),
     }}
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses `ClipAnimDataBlock`
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+    let (block,) = seq! {
+        clip_anim_block_common,
+        _: line_ending.context(Expected(Description("empty line"))),
+    }
     .context(Label("ClipAnimDataBlock"))
     .parse_next(input)?;
     Ok(block)
 }
 
-/// Parses `ClipMotionBlock`
+/// Parses `ClipAnimDataBlock`
 ///
 /// # Errors
-/// If parsing fails, returns human readable error.
-pub fn parse_clip_motion_block(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
-    clip_motion_block
-        .parse(input)
-        .map_err(|e| ReadableError::from_parse(e, input))
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_anim_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>> {
+    let (block,) = seq! {
+        _: multispace0,
+        clip_anim_block_common,
+        _: multispace0,
+    }
+    .context(Label("ClipAnimDataBlock"))
+    .parse_next(input)?;
+    Ok(block)
 }
 
 /// Parses multiple clip motion blocks from the input.
@@ -192,11 +208,21 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBloc
     Ok(motion_blocks)
 }
 
+/// Parses `ClipMotionBlock`
+///
+/// # Errors
+/// If parsing fails, returns human readable error.
+pub fn parse_clip_motion_block_patch(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
+    clip_motion_block_patch
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e))
+}
+
 /// Parses a clip motion block from the input.
 ///
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
-fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+fn clip_motion_block_common<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
         duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))).map(|s| s.into()),
@@ -204,8 +230,35 @@ fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>
         translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
         rotation_len: parse_one_line.context(Expected(Description("rotation_len: usize"))),
         rotations: rotations(rotation_len).context(Expected(Description("rotations: Vec<Rotation>"))),
-        _: line_ending.context(Expected(Description("empty line"))),
     }}
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses a clip motion block from the input.
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+    let (block,) = seq! {
+        clip_motion_block_common,
+        _: line_ending.context(Expected(Description("empty line"))),
+    }
+    .context(Label("ClipMotionBlock"))
+    .parse_next(input)?;
+    Ok(block)
+}
+
+/// Parses a clip motion block from the input.
+///
+/// # Errors
+/// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
+fn clip_motion_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
+    let (block,) = seq! {
+        _: multispace0,
+        clip_motion_block_common,
+        _: multispace0,
+    }
     .context(Label("ClipMotionBlock"))
     .parse_next(input)?;
     Ok(block)

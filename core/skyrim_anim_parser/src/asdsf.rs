@@ -85,9 +85,7 @@ pub struct AnimInfo {
 /// # Errors
 /// If parsing fails, returns human readable error.
 pub fn parse_asdsf(input: &str) -> Result<Asdsf<'_>, ReadableError> {
-    asdsf
-        .parse(input)
-        .map_err(|e| ReadableError::from_parse(e, input))
+    asdsf.parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {

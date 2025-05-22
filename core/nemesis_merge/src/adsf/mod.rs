@@ -1,7 +1,10 @@
 pub mod path_parser;
 
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
-use skyrim_anim_parser::adsf::de::{parse_adsf, parse_clip_anim_block, parse_clip_motion_block};
+use rayon::prelude::*;
+use skyrim_anim_parser::adsf::de::{
+    parse_adsf, parse_clip_anim_block_patch, parse_clip_motion_block_patch,
+};
 use skyrim_anim_parser::adsf::ser::serialize_adsf;
 use skyrim_anim_parser::adsf::{Adsf, AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
 use snafu::ResultExt as _;
@@ -57,7 +60,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
     // }
     let results: Vec<Result<AdsfPatch, Error>> = map
         .0
-        .iter() // par iter
+        .par_iter() // par iter
         .map(|(path, adsf_patch)| {
             // 1. Parse adsf patch (1 loop with par_iter)
             let ParsedAdsfPatchPath {
@@ -68,11 +71,11 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
 
             let patch = match parser_type {
                 ParserType::Anim => PatchKind::Anim(
-                    parse_clip_anim_block(adsf_patch)
+                    parse_clip_anim_block_patch(adsf_patch)
                         .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
                 ),
                 ParserType::Motion => PatchKind::Motion(
-                    parse_clip_motion_block(adsf_patch)
+                    parse_clip_motion_block_patch(adsf_patch)
                         .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
                 ),
             };
@@ -98,13 +101,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
     }
 
     // 3. read template adsf.
-    let adsf = match read_adsf_file(config) {
-        Ok(adsf) => adsf,
-        Err(err) => {
-            errors.push(err);
-            return errors;
-        }
-    };
+    let adsf = ret_error!(read_adsf_file(config));
     let adsf = ret_error!(
         parse_adsf(&adsf).with_context(|_| FailedParseAdsfTemplateSnafu {
             path: config.resource_dir.join(ADSF_INNER_PATH)
