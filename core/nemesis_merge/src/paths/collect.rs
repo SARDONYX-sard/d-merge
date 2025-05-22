@@ -90,19 +90,19 @@ mod tests {
     fn test_is_adsf_patch_file_valid_cases() {
         // Pattern: <clip_id>~<anim_data_id>.txt
         assert!(is_adsf_patch_file(Path::new(
-            r"D:\mod\slide\animationdatasinglefile\DefaultFemale~1\SprintSlide~slide$0.txt"
+            r"/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"
         )));
 
         // Pattern: <anim_data_id>.txt
         assert!(is_adsf_patch_file(Path::new(
-            r"D:\mod\slide\animationdatasinglefile\DefaultFemale~1\slide$0.txt"
+            r"/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt"
         )));
     }
 
     #[test]
     fn test_is_adsf_patch_file_wrong_directory() {
         assert!(!is_adsf_patch_file(Path::new(
-            r"D:\mod\slide\some_other_folder\DefaultFemale~1\slide$0.txt"
+            r"/mod/slide/some_other_folder/DefaultFemale~1/slide$0.txt"
         )));
     }
 
@@ -110,7 +110,7 @@ mod tests {
     fn test_is_adsf_patch_file_partial_match() {
         // Not contains "animationdatasinglefile" in the directory path
         assert!(!is_adsf_patch_file(Path::new(
-            r"D:\mod\slide\animation_data_single_file\DefaultFemale~1\slide$0.txt"
+            r"/mod/slide/animation_data_single_file/DefaultFemale~1/slide$0.txt"
         )));
     }
 }
