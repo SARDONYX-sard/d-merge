@@ -77,7 +77,7 @@ mod tests {
 		</hkobject>
 "###;
         skip_tag_balanced("hkparam").parse_next(&mut input).unwrap();
-        assert_eq!(input.trim_start(), "after");
+        assert_eq!(input.trim_start(), "</hkobject>\n");
     }
 
     #[test]
