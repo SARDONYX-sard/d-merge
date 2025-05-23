@@ -7,21 +7,35 @@ type Patches<'xml> = Vec<CurrentJsonPatch<'xml>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct CurrentState<'xml> {
+    /// current parsing filed type info.
     pub field_info: Option<&'static FieldInfo>,
     /// When present, this signals the start of a differential change
     pub mode_code: Option<&'xml str>,
+
+    /// Is passed `<!-- ORIGINAL --!>` xml comment?
     is_passed_original: bool,
+
+    /// If the addition or deletion is `<! -- CLOSE --!>` since it is impossible to determine whether something
+    /// is added or deleted until a comment comes in, this is a place to temporarily save them.
     pub patches: Patches<'xml>,
 
     /// Indicates the current json position during one patch file.
+    ///
+    /// e.g. `["#2521", "BSRagdollContactListenerModifier"]`
     pub path: Vec<Cow<'xml, str>>,
 
     /// Indicates the extent of differential change of elements inside the Array.
+    ///
     /// # Note
     /// - Used only when changing Array.
     /// - If start and end of range are the same, index mode
     pub seq_range: Option<Range<usize>>,
 
+    /// Array range patch
+    ///
+    /// # Note
+    /// - Used only when changing Array.
+    /// - If start and end of range are the same, index mode
     pub seq_values: Vec<BorrowedValue<'xml>>,
 }
 

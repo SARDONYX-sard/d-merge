@@ -8,7 +8,7 @@ use crate::{
     results::filter_results,
 };
 use dashmap::DashSet;
-use nemesis_xml::patch::parse_nemesis_patch;
+use nemesis_xml::{hack::HackOptions, patch::parse_nemesis_patch};
 use rayon::prelude::*;
 use snafu::ResultExt as _;
 use std::path::PathBuf;
@@ -93,7 +93,10 @@ pub async fn collect_owned_patches(
     }
 }
 
-pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (BorrowedPatches, Vec<Error>) {
+pub fn collect_borrowed_patches<'a>(
+    owned_patches: &'a OwnedPatchMap,
+    hack_options: Option<HackOptions>,
+) -> (BorrowedPatches<'a>, Vec<Error>) {
     let template_patch_map = TemplatePatchMap::new();
     let template_names = DashSet::new();
     let ptr_map = PtrMap::new();
@@ -109,8 +112,8 @@ pub fn collect_borrowed_patches(owned_patches: &OwnedPatchMap) -> (BorrowedPatch
             template_names.insert(template_name.clone());
 
             let patch_idx_map = template_patch_map.entry(template_name.clone()).or_default();
-            let (xml, ptr) =
-                parse_nemesis_patch(xml).with_context(|_| NemesisXmlErrSnafu { path })?;
+            let (xml, ptr) = parse_nemesis_patch(xml, hack_options)
+                .with_context(|_| NemesisXmlErrSnafu { path })?;
 
             // ptr == `#0100`
             //

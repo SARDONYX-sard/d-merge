@@ -1,5 +1,7 @@
 use std::{fmt, path::PathBuf};
 
+use nemesis_xml::hack::HackOptions;
+
 /// A configuration structure used to specify various directories and a status report callback.
 ///
 /// The `Config` struct holds paths for resource and output directories, as well as an optional
@@ -19,28 +21,20 @@ pub struct Config {
     ///
     /// This closure takes a `Status` enum and is invoked to report status updates.
     pub status_report: Option<Box<dyn Fn(Status) + Send + Sync>>,
+
+    /// Enables lenient parsing for known issues in unofficial or modded patches.
+    ///
+    /// This may fix common mistakes in community patches (e.g., misnamed fields),
+    /// but can also hide real data errors.
+    pub hack_options: Option<HackOptions>,
 }
 
 impl Config {
-    /// Creates a new `Config` instance with the specified resource directory, output directory,
-    /// and an optional status reporting closure.
-    pub fn new(
-        resource_dir: PathBuf,
-        output_dir: PathBuf,
-        status_report: Option<Box<dyn Fn(Status) + Send + Sync>>,
-    ) -> Self {
-        Self {
-            resource_dir,
-            output_dir,
-            status_report,
-        }
-    }
-
     /// Calls the status reporting closure with the provided status.
     ///
     /// This method allows us to easily invoke the status callback if it's provided.
     #[inline]
-    pub fn report_status(&self, status: Status) {
+    pub fn on_report_status(&self, status: Status) {
         if let Some(f) = &self.status_report {
             f(status);
         }

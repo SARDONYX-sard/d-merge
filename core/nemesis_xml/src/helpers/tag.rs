@@ -124,21 +124,48 @@ fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, E
     })
 }
 
+/// Parses the start tag of a field element (`<hkparam name="..." numelements="...">`).
+///
+/// This parser extracts the field name, type kind, and an optional array length (if specified
+/// via `numelements="..."`). It performs type lookup using the provided [`FieldInfo`] and may fail
+/// if the type is unknown.
+///
+/// # Returns
+/// A tuple of:
+/// - The field name as a string slice
+/// - The type kind as a static string
+/// - An optional array length (e.g., from `numelements`)
+///
 /// # Errors
-/// Parse failed.
+/// Returns a [`ContextError`] if the input does not match the expected structure or if the type cannot be resolved.
 pub fn field_start_tag<'a>(
     field_info: &'a FieldInfo,
 ) -> impl Parser<&'a str, (&'a str, &'static str, Option<u64>), ErrMode<ContextError>> {
     move |input: &mut &'a str| {
-        field_start_open_tag.parse_next(input)?; // <hkparam name=
-        let (field_name, type_kind) = attr_string
-            .try_map(|field_name| {
-                find_type(field_name, field_info).map(|field_type| (field_name, field_type))
+        any_field_start_tag
+            .try_map(|(field_name, array_len)| {
+                find_type(field_name, field_info)
+                    .map(|field_type| (field_name, field_type, array_len))
             })
-            .parse_next(input)?; // "name"
-        let array_len = field_start_close_tag.parse_next(input)?; // > or numelements="">
-        Ok((field_name, type_kind, array_len))
+            .parse_next(input)
     }
+}
+
+/// Parses the start tag of a field element (`<hkparam name="..." numelements="...">`).
+///
+/// # Returns
+/// A tuple of:
+/// - The field name as a string slice
+/// - An optional array length (e.g., from `numelements`)
+///
+/// # Errors
+/// Returns a [`ContextError`] if the input does not match the expected structure or if the type cannot be resolved.
+#[inline]
+pub fn any_field_start_tag<'a>(input: &mut &'a str) -> ModalResult<(&'a str, Option<u64>)> {
+    field_start_open_tag.parse_next(input)?; // <hkparam name=
+    let field_name = attr_string.parse_next(input)?; // "name"
+    let array_len = field_start_close_tag.parse_next(input)?; // > or numelements="">
+    Ok((field_name, array_len))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
