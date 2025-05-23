@@ -2,8 +2,9 @@ pub mod path_parser;
 
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
 use rayon::prelude::*;
-use skyrim_anim_parser::adsf::de::{
-    parse_adsf, parse_clip_anim_block_patch, parse_clip_motion_block_patch,
+use skyrim_anim_parser::adsf::de::parse_adsf;
+use skyrim_anim_parser::adsf::de_patch::{
+    parse_clip_anim_block_patch, parse_clip_motion_block_patch,
 };
 use skyrim_anim_parser::adsf::ser::serialize_adsf;
 use skyrim_anim_parser::adsf::{Adsf, AltAdsf, ClipAnimDataBlock, ClipMotionBlock};

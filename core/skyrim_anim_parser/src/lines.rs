@@ -2,7 +2,7 @@ use core::str::FromStr;
 use std::borrow::Cow;
 use winnow::{
     ascii::{line_ending, space0, till_line_ending},
-    combinator::{alt, opt},
+    combinator::alt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     ModalResult, Parser,
 };
@@ -13,7 +13,7 @@ pub type Str<'a> = Cow<'a, str>;
 pub(crate) fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     let line = till_line_ending.parse_next(input)?;
     // In the case of patches, this may not be present, so `opt`
-    opt(line_ending).parse_next(input)?; // skip line end
+    line_ending.parse_next(input)?; // skip line end
     Ok(line.into())
 }
 
@@ -60,7 +60,7 @@ pub(crate) fn parse_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
     let line = till_line_ending.parse_to().parse_next(input)?;
     // In the case of patches, this may not be present, so `opt`
-    opt(line_ending).parse_next(input)?; // skip line end
+    line_ending.parse_next(input)?; // skip line end
     Ok(line)
 }
 

@@ -1,5 +1,6 @@
 pub mod clip_id_manager;
 pub mod de;
+pub mod de_patch;
 pub mod ser;
 
 use crate::lines::Str;
