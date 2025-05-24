@@ -45,7 +45,8 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [ ] Redundant heap alloc: Omit clone()
   - [ ] Change xml templates for bin file
 
-- [ ] hkx json/pPatch editor
+- [ ] hkx json/patch editor
+- [ ] Support Pandora patch
 
 ## How to debug Nemesis Patches?
 
