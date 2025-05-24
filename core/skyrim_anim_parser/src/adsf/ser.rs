@@ -40,6 +40,9 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
 
     // Serialize clip animation blocks
     // TODO: clip id unique check
+    // Hints:
+    // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
+
     let mut clip_id_manager = super::clip_id_manager::ClipIdManager::new();
     let mut clip_id_map = std::collections::HashMap::new();
     for block in &anim_data.add_clip_anim_blocks {
@@ -72,8 +75,11 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
                     Some(new_id.to_string().into()),
                 ));
             } else {
-                #[cfg(feature = "tracing")]
-                tracing::error!("not found clip_id: `{}`", block.clip_id);
+                let new_id = clip_id_manager.next_id();
+                output.push_str(&serialize_clip_motion_block(
+                    block,
+                    new_id.map(|id| id.to_string().into()),
+                ));
             }
         }
 
