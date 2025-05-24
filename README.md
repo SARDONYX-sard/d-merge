@@ -22,18 +22,30 @@ The only thing we are considering at this time is support for the Nemesis patch.
 (Since I only use the Nemesis patch).
 
 - [x] frontend
-- asdsf(Not serialization),
-  - [x] Serialization
-  - [x] Deserialization
-- adsf,
+- asdsf (Not serialization),
   - [ ] Serialization
   - [x] Deserialization
-- info.txt searcher.
+- adsf,
+  - [x] Serialization
+  - [x] Deserialization
+- [x] `info.txt` searcher.
+
 - Merge
+
   - [x] Parallel json patch
   - [x] Fix range add operation of Array
   - [ ] Prioritization and conflict resolution among patches, optimization by
         merging(60%)
+    - [ ] Patch handling for non-contiguous arrays: apply multiple arrays to an array patch (e.g. `[0..3, 6..10]`)
+
+## Todos after completion
+
+- [ ] Optimization
+
+  - [ ] Redundant heap alloc: Omit clone()
+  - [ ] Change xml templates for bin file
+
+- [ ] hkx json/pPatch editor
 
 ## How to debug Nemesis Patches?
 
