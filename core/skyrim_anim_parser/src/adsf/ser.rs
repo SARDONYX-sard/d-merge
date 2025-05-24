@@ -106,7 +106,8 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
     output.push_str("\r\n");
 
     for asset in &header.project_assets {
-        output.push_str(&format!("{asset}\r\n"));
+        output.push_str(asset.as_ref());
+        output.push_str("\r\n");
     }
     output.push_str(&format!(
         "{}\r\n",
