@@ -22,14 +22,14 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     let mut all_errors = vec![];
 
     // 1/4: Collect all patches & templates xml
-    options.report_status(Status::ReadingTemplatesAndPatches);
+    options.on_report_status(Status::ReadingTemplatesAndPatches);
     let (owned_adsf_patches, owned_patches) = match collect_owned_patches(&nemesis_paths).await {
         Ok(owned_patches) => owned_patches,
         Err(errors) => {
             let errors_len = errors.len();
 
             let err = Error::FailedToReadOwnedPatches { errors_len };
-            options.report_status(Status::Error(err.to_string()));
+            options.on_report_status(Status::Error(err.to_string()));
 
             write_errors(&options, &errors).await?;
             return Err(err);
@@ -50,7 +50,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(&owned_patches);
+        let (patch_result, errors) = collect_borrowed_patches(&owned_patches, options.hack_options);
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
@@ -66,7 +66,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         let patches = { merge_patches(template_patch_map, &ids)? };
 
         // 3/4: Apply patches & Replace variables to indexes
-        options.report_status(Status::ApplyingPatches);
+        options.on_report_status(Status::ApplyingPatches);
         let mut apply_errors_len = 0;
         if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
             apply_errors_len = errors.len();
@@ -74,7 +74,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         };
 
         // 4/4: Generate hkx files.
-        options.report_status(Status::GenerateHkxFiles);
+        options.on_report_status(Status::GenerateHkxFiles);
         let hkx_errors_len = {
             if let Err(hkx_errors) = generate_hkx_files(&options.output_dir, templates, ptr_map) {
                 let errors_len = hkx_errors.len();
@@ -95,12 +95,12 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
                 apply_errors_len,
             };
 
-            options.report_status(Status::Error(err.to_string()));
+            options.on_report_status(Status::Error(err.to_string()));
             return Err(err);
         };
     };
 
-    options.report_status(Status::Done);
+    options.on_report_status(Status::Done);
 
     Ok(())
 }
@@ -113,6 +113,8 @@ mod tests {
     #[ignore = "unimplemented yet"]
     #[cfg(feature = "tracing")]
     async fn merge_test() {
+        use nemesis_xml::hack::HackOptions;
+
         let log_path = "../../dummy/merge_test.log";
         crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
 
@@ -146,6 +148,7 @@ mod tests {
                 resource_dir: "../../resource/assets/templates".into(),
                 output_dir: "../../dummy/behavior_gen/output".into(),
                 status_report: None,
+                hack_options: Some(HackOptions::enable_all()),
             },
         )
         .await

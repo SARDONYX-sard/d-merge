@@ -1,7 +1,7 @@
 use super::{bail, sender, time};
 use crate::error::NotFoundResourceDirSnafu;
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
-use nemesis_merge::{behavior_gen, Config, Status};
+use nemesis_merge::{behavior_gen, Config, HackOptions, Status};
 use snafu::ResultExt as _;
 use std::path::PathBuf;
 use tauri::{Manager, Window};
@@ -53,6 +53,7 @@ pub(crate) async fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> 
                         output_dir: PathBuf::from(output),
                         resource_dir,
                         status_report: Some(Box::new(status_reporter)),
+                        hack_options: Some(HackOptions::enable_all()), // TODO: Create GUI hack control popup
                     },
                 ).await
             };

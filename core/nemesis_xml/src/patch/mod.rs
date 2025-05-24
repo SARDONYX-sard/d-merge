@@ -1,10 +1,12 @@
 pub mod class_table;
 mod current_state;
+mod skip;
 
 use self::{
     class_table::{find_class_info, FieldInfo},
     current_state::{CurrentJsonPatch, CurrentState},
 };
+use crate::hack::{do_hack_cast_ragdoll_event, HackOptions};
 use crate::helpers::{
     comment::{close_comment, comment_kind, take_till_close, CommentKind},
     delimited_multispace0,
@@ -35,14 +37,22 @@ use winnow::{
 
 pub type PatchesMap<'a> = HashMap<JsonPath<'a>, JsonPatch<'a>>;
 
+/// Parse nemesis xml patch.
+///
+/// # Return
+/// Return (patches, root class ptr if `hkbBehaviorGraphStringData` to replace nemesis variable)
+///
 /// # Errors
 /// Parse failed.
-pub fn parse_nemesis_patch(nemesis_xml: &str) -> Result<(PatchesMap<'_>, Option<&str>)> {
-    let mut patcher_info = PatchDeserializer::new(nemesis_xml);
-    patcher_info
+pub fn parse_nemesis_patch(
+    nemesis_xml: &str,
+    hack_options: Option<HackOptions>,
+) -> Result<(PatchesMap<'_>, Option<&str>)> {
+    let mut patcher_de = PatchDeserializer::new(nemesis_xml, hack_options.unwrap_or_default());
+    patcher_de
         .root_class()
-        .map_err(|err| patcher_info.to_readable_err(err))?;
-    Ok((patcher_info.output_patches, patcher_info.id_index))
+        .map_err(|err| patcher_de.to_readable_err(err))?;
+    Ok((patcher_de.output_patches, patcher_de.id_index))
 }
 
 /// Nemesis patch deserializer
@@ -57,6 +67,12 @@ struct PatchDeserializer<'a> {
     // output_patches: Vec<JsonPatch<'a>>,
     output_patches: HashMap<JsonPath<'a>, JsonPatch<'a>>,
 
+    /// Enables lenient parsing for known issues in unofficial or modded patches.
+    ///
+    /// This may fix common mistakes in community patches (e.g., misnamed fields),
+    /// but can also hide real data errors.
+    hack_options: HackOptions,
+
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // current state
     /// N time nested classes fields.
@@ -66,21 +82,22 @@ struct PatchDeserializer<'a> {
     /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
     pub current: CurrentState<'a>,
 
-    /// `hkbBehaviorGraphStringData`
+    /// The value of the name attribute of `hkbBehaviorGraphStringData` (id index).
     ///
-    /// event_id, variable_id
+    /// This is needed to replace event/variable ID
     id_index: Option<&'a str>,
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 impl<'de> PatchDeserializer<'de> {
-    fn new(input: &'de str) -> Self {
+    fn new(input: &'de str, hack_options: HackOptions) -> Self {
         Self {
-            current: CurrentState::new(),
-            field_infos: Vec::new(),
             input,
             original: input,
             output_patches: HashMap::new(),
+            hack_options,
+            field_infos: Vec::new(),
+            current: CurrentState::new(),
             id_index: None,
         }
     }
@@ -145,6 +162,7 @@ impl<'de> PatchDeserializer<'de> {
         self.current.field_info = self.field_infos.last().map(|v| &**v);
     }
 
+    /// Parse root C++ class(as XML)
     fn root_class(&mut self) -> Result<()> {
         let (ptr_index, class_name) = self.parse_next(class_start_tag)?;
 
@@ -160,7 +178,7 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(class_name.into());
 
         {
-            let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
+            let field_info = find_class_info(class_name).ok_or_else(|| Error::UnknownClass {
                 class_name: class_name.to_string(),
             })?;
             self.push_current_field_table(field_info);
@@ -197,7 +215,7 @@ impl<'de> PatchDeserializer<'de> {
         self.parse_next(start_tag("hkobject"))?;
 
         {
-            let field_info = find_class_info(class_name).ok_or(Error::UnknownClass {
+            let field_info = find_class_info(class_name).ok_or_else(|| Error::UnknownClass {
                 class_name: class_name.to_string(),
             })?;
             self.push_current_field_table(field_info);
@@ -218,11 +236,24 @@ impl<'de> PatchDeserializer<'de> {
     fn field(&mut self) -> Result<(&'de str, BorrowedValue<'de>)> {
         let should_take_in_this = self.parse_start_maybe_comment()?;
 
-        let field_info = self
-            .current
-            .field_info
-            .ok_or_else(|| Error::MissingFieldInfo)?;
-        let (field_name, field_type, _) = self.parse_next(field_start_tag(field_info))?;
+        let field_info = self.current.field_info.ok_or(Error::MissingFieldInfo)?;
+
+        let (field_name, field_type, _) =
+            match self.parse_next(field_start_tag(field_info)) {
+                Ok(ret) => ret,
+                Err(err) => {
+                    if self.hack_options.cast_ragdoll_event
+                        && self.current.path.last().is_some_and(|s| {
+                            s.eq_ignore_ascii_case("BSRagdollContactListenerModifier")
+                        })
+                    {
+                        self.parse_next(do_hack_cast_ragdoll_event)?
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
+
         self.current.path.push(field_name.into());
 
         let value = {
@@ -657,7 +688,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         // if map.contain_keys() {}
 
         let mut hash_map = HashMap::new();
@@ -714,7 +745,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let mut hash_map = HashMap::new();
 
         hash_map.insert(
@@ -774,7 +805,7 @@ mod tests {
 			<hkparam name="fullPathToSource"></hkparam>
 		</hkobject>
 "###;
-        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let mut hash_map = HashMap::new();
 
         let array_value = json_typed!(
@@ -838,7 +869,7 @@ mod tests {
 		</hkobject>
 "###;
 
-        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path!["#0009", "hkbProjectStringData", "characterFilenames"];
 
         let mut hash_map = HashMap::new();
@@ -875,7 +906,7 @@ mod tests {
 			</hkparam>
 		</hkobject>
 "###;
-        let (actual, _) = parse_nemesis_patch(nemesis_xml).unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path![
             "#0008",
             "hkRootLevelContainer",
@@ -897,6 +928,54 @@ mod tests {
         assert_eq!(actual, hash_map);
     }
 
+    #[test]
+    fn test_bs_ragdoll_hack() {
+        let nemesis_xml = r###"
+		<hkobject name="#2521" class="BSRagdollContactListenerModifier" signature="0x8003d8ce">
+			<hkparam name="variableBindingSet">null</hkparam>
+			<hkparam name="userData">2</hkparam>
+			<hkparam name="name">VictimState_RagdollListener</hkparam>
+			<hkparam name="enable">true</hkparam>
+			<hkparam name="event">
+				<hkobject>
+<!-- MOD_CODE ~mod_id~ OPEN -->
+					<hkparam name="id">0</hkparam>
+<!-- ORIGINAL -->
+					<hkparam name="id">100</hkparam>
+<!-- CLOSE -->
+					<hkparam name="payload">null</hkparam>
+				</hkobject>
+			</hkparam>
+			<hkparam name="anotherBoneIndex">#2520</hkparam>
+		</hkobject>
+        "###;
+        let (actual, _) = parse_nemesis_patch(
+            nemesis_xml,
+            Some(HackOptions {
+                cast_ragdoll_event: true,
+            }),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+
+        let json_path = json_path![
+            "#2521",
+            "BSRagdollContactListenerModifier",
+            "contactEvent",
+            "id"
+        ];
+
+        let mut hash_map = HashMap::new();
+
+        hash_map.insert(
+            json_path,
+            JsonPatch {
+                op: OpRangeKind::Pure(Op::Replace),
+                value: 0.into(),
+            },
+        );
+        assert_eq!(actual, hash_map);
+    }
+
     #[cfg_attr(
         feature = "tracing",
         quick_tracing::init(file = "./parse.log", stdio = false)
@@ -915,6 +994,6 @@ mod tests {
             let path = std::path::Path::new("../../dummy/Data/Nemesis_Engine/mod/").join(path);
             read_to_string(path).unwrap()
         };
-        dbg!(parse_nemesis_patch(&nemesis_xml).unwrap_or_else(|e| panic!("{e}")));
+        dbg!(parse_nemesis_patch(&nemesis_xml, None).unwrap_or_else(|e| panic!("{e}")));
     }
 }
