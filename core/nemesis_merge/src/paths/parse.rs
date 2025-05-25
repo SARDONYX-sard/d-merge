@@ -30,7 +30,7 @@ pub enum NemesisPathError {
 type Result<T, E = NemesisPathError> = core::result::Result<T, E>;
 
 /// Parses a Nemesis path from a `&Path`.
-pub fn get_nemesis_id(path: &Path) -> Result<String> {
+pub fn get_nemesis_id(path: &Path) -> Result<&str> {
     let engine_index = path
         .iter()
         .position(|component| component.eq_ignore_ascii_case("Nemesis_Engine"))
@@ -39,7 +39,7 @@ pub fn get_nemesis_id(path: &Path) -> Result<String> {
     let mut path = path.iter().skip(engine_index + 2);
     let mod_code = path
         .next()
-        .map(|path| path.to_string_lossy().to_string())
+        .and_then(|path| path.to_str())
         .ok_or(NemesisPathError::NotFoundTemplateName)?;
 
     Ok(mod_code)

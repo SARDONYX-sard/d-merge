@@ -9,7 +9,7 @@ use simd_json::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn paths_to_ids(paths: &[PathBuf]) -> Vec<String> {
+pub fn paths_to_ids(paths: &[PathBuf]) -> Vec<&str> {
     paths
         .par_iter()
         .filter_map(|path| get_nemesis_id(path).ok())
@@ -18,7 +18,7 @@ pub fn paths_to_ids(paths: &[PathBuf]) -> Vec<String> {
 
 pub fn merge_patches<'p>(
     patches: TemplatePatchMap<'p>,
-    ids: &[String],
+    ids: &[&str],
 ) -> Result<MergedPatchMap<'p>> {
     // new merged patches
     let merged_patches = MergedPatchMap::new();
@@ -33,7 +33,7 @@ pub fn merge_patches<'p>(
 
                 // Priority sorting by id and path from GUI
                 let sorted_patches: Vec<SortedPatchMap<'_>> =
-                    ids.iter().filter_map(|id| patches.remove(id)).collect();
+                    ids.iter().filter_map(|&id| patches.remove(id)).collect();
 
                 // Merge json patches
                 let mut merged_result = HashMap::new();

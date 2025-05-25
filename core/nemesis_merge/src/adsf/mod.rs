@@ -46,7 +46,7 @@ impl<'a> Default for PatchKind<'a> {
 const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.txt";
 
 // "dmco", "slide"
-pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Config) -> Vec<Error> {
+pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[&str], config: &Config) -> Vec<Error> {
     // {
     //    "DefaultFemale": {
     //       add_anim_data_patches: [], //sorted by priority
@@ -135,12 +135,8 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
 }
 
 /// Sorts AdsfPatch list based on the given ID priority list.
-fn sort_patches_by_priority(patches: &mut [AdsfPatch], ids: &[String]) {
-    let id_order: HashMap<_, _> = ids
-        .iter()
-        .enumerate()
-        .map(|(i, id)| (id.as_str(), i))
-        .collect();
+fn sort_patches_by_priority(patches: &mut [AdsfPatch], ids: &[&str]) {
+    let id_order: HashMap<_, _> = ids.iter().enumerate().map(|(i, &id)| (id, i)).collect();
 
     patches.sort_by_key(|patch| id_order.get(patch.id).copied().unwrap_or(usize::MAX));
 }
@@ -194,7 +190,6 @@ mod tests {
             },
         ];
 
-        let ids: Vec<_> = ids.iter().map(|s| (*s).to_string()).collect();
         sort_patches_by_priority(&mut patches, &ids);
 
         let sorted_ids: Vec<&str> = patches.iter().map(|p| p.id).collect();
