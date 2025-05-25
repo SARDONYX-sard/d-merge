@@ -68,6 +68,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
                 target, // e.g. DefaultFemale
                 id,     // e.g. slide
                 parser_type,
+                op: _,
             } = parse_adsf_path(path)?;
 
             let patch = match parser_type {
@@ -79,6 +80,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[String], config: &Con
                     parse_clip_motion_block_patch(adsf_patch)
                         .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
                 ),
+                ParserType::AnimHeader => todo!(),
             };
             Ok(AdsfPatch { target, id, patch })
         })
