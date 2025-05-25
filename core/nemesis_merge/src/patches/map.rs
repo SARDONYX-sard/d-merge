@@ -111,20 +111,10 @@ impl<'a> ArrayMap<'a> {
     pub fn into_vec(self) -> Vec<Value<'a>> {
         self.into()
     }
-
-    pub fn into_values(self) -> Vec<Value<'a>> {
-        let mut output = Vec::with_capacity(self.inner.len());
-
-        for (_, node) in self.inner {
-            if let Some(value) = node.value {
-                output.push(value);
-            };
-        }
-        output
-    }
 }
 
 impl<'a> From<&mut Vec<Value<'a>>> for ArrayMap<'a> {
+    #[inline]
     fn from(value: &mut Vec<Value<'a>>) -> Self {
         let mut map = ArrayMap::new();
 
@@ -136,7 +126,20 @@ impl<'a> From<&mut Vec<Value<'a>>> for ArrayMap<'a> {
     }
 }
 
+impl<'a> From<Vec<Value<'a>>> for ArrayMap<'a> {
+    #[inline]
+    fn from(value: Vec<Value<'a>>) -> Self {
+        let mut map = ArrayMap::new();
+
+        for (i, v) in value.into_iter().enumerate() {
+            map.insert_after(i, 0, v);
+        }
+        map
+    }
+}
+
 impl<'a> From<ArrayMap<'a>> for Vec<Value<'a>> {
+    #[inline]
     fn from(value: ArrayMap<'a>) -> Self {
         let mut output = Self::with_capacity(value.inner.len());
 
