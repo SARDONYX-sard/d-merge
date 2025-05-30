@@ -43,7 +43,7 @@ pub enum Error {
     NotFoundTemplate { template_name: String },
 
     /// Json patch error
-    #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
+    #[snafu(display("[Apply patch Error to `{template_name}`]:\n {source}\n patch: {patch}"))]
     PatchError {
         source: json_patch::JsonPatchError,
         template_name: String,
@@ -51,7 +51,7 @@ pub enum Error {
     },
 
     /// Nemesis XML parsing error
-    #[snafu(display("{}:\n{source}\n", path.display()))]
+    #[snafu(display("[Nemesis XML Patch Parsing Error `{}`]:\n{source}\n", path.display()))]
     NemesisXmlErr {
         /// input path
         path: PathBuf,
@@ -61,25 +61,6 @@ pub enum Error {
     /// Failed to parse path {}
     #[snafu(display("Failed to parse path: {}", path.display()))]
     MissingParseNemesisPath { path: PathBuf },
-
-    /// Failed to parse path as nemesis path
-    #[snafu(transparent)]
-    FailedParseNemesisPath {
-        source: crate::paths::parse::NemesisPathError,
-    },
-
-    /// dir strip error
-    #[snafu(transparent)]
-    StripPrefixError { source: std::path::StripPrefixError },
-
-    /// jwalk error
-    #[snafu(transparent)]
-    JwalkErr { source: jwalk::Error },
-
-    #[snafu(transparent)]
-    ParsedAdsfPathError {
-        source: crate::adsf::path_parser::ParseError,
-    },
 
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n {source}", path.display()))]
@@ -109,6 +90,25 @@ pub enum Error {
         path: PathBuf,
         source: simd_json::Error,
     },
+
+    /// Failed to parse path as nemesis path
+    #[snafu(transparent)]
+    FailedParseNemesisPath {
+        source: crate::paths::parse::NemesisPathError,
+    },
+
+    #[snafu(transparent)]
+    ParsedAdsfPathError {
+        source: crate::adsf::path_parser::ParseError,
+    },
+
+    /// dir strip error
+    #[snafu(transparent)]
+    StripPrefixError { source: std::path::StripPrefixError },
+
+    /// jwalk error
+    #[snafu(transparent)]
+    JwalkErr { source: jwalk::Error },
 
     #[snafu(transparent)]
     HkxDeError {
