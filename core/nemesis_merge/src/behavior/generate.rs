@@ -139,8 +139,9 @@ mod tests {
             // "../../dummy/Data/Nemesis_Engine/mod/tudm",
             // "../../dummy/Data/Nemesis_Engine/mod/turn",
             // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
-            "D:/GAME/ModOrganizer Skyrim SE/mods/FlinchingSSE やられモーションを追加(要OnHit/Nemesis_Engine/mod/flinch",
-            // "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
+            // "D:/GAME/ModOrganizer Skyrim SE/mods/FlinchingSSE やられモーションを追加(要OnHit/Nemesis_Engine/mod/flinch",
+            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
+            "D:/GAME/ModOrganizer Skyrim SE/mods/Eating Animations And Sounds SE 歩行しながら食べるモーション/Nemesis_Engine/mod/eaas"
         ]
         .into_par_iter()
         .map(|s| s.into())

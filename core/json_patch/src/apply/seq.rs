@@ -35,13 +35,8 @@ pub(crate) fn apply_seq_by_priority<'a>(
     let patched_array = apply_ops_parallel(*patch_target_vec, patches)
         .smart_iter()
         .filter(|v| v != &MARK_AS_REMOVED);
-    template_array.smart_extend(patched_array);
 
-    #[cfg(feature = "tracing")]
-    {
-        tracing::debug!("Operation Map:\n{}", visualize_ops(&patches, patches.len()));
-        tracing::debug!("Final Result:\n{}", draw_box(&patched_array));
-    }
+    template_array.smart_extend(patched_array);
 
     Ok(())
 }
@@ -152,7 +147,7 @@ fn apply_ops_parallel<'a>(
         if insert_at <= base.len() {
             base.splice(insert_at..insert_at, values);
             offset += len;
-        } else if insert_at == base.len() + 1 {
+        } else {
             base.smart_extend(values);
         }
     }
@@ -160,83 +155,81 @@ fn apply_ops_parallel<'a>(
     base
 }
 
-#[cfg(any(feature = "tracing", test))]
-fn visualize_ops(ops: &[ValueWithPriority<'_>], width: usize) -> String {
-    let label_start: usize = 60;
-
-    let mut s = String::new();
-    s.push_str(&format!("Base index: [0..{}]\n", width - 1));
-
-    for value in ops {
-        let ValueWithPriority { patch, priority } = value;
-
-        let mut line = vec![' '; label_start + 40];
-
-        let seq = patch.op.as_seq();
-        let op = seq.op;
-        let range = seq.range.clone();
-
-        let start = range.start.min(width);
-        let end = range.end.min(width);
-        let label = format!(
-            "| op: {:<7} | priority({})",
-            match op {
-                Op::Add => "add",
-                Op::Remove => "remove",
-                Op::Replace => "replace",
-            },
-            priority
-        );
-
-        for i in start..end {
-            let idx = i * 3;
-            if idx + 2 < label_start {
-                line[idx] = '[';
-                line[idx + 1] = '-';
-                line[idx + 2] = ']';
-            }
-        }
-
-        for (i, c) in label.chars().enumerate() {
-            if label_start + i < line.len() {
-                line[label_start + i] = c;
-            }
-        }
-        line.push('\n');
-        s.push_str(&line.smart_iter().collect::<String>());
-    }
-
-    s
-}
-
-#[cfg(any(feature = "tracing", test))]
-fn draw_box(data: &[Value<'_>]) -> String {
-    data.smart_iter()
-        .enumerate()
-        .map(|(idx, v)| {
-            let mut s = String::new();
-
-            if idx % 20 == 0 {
-                if idx != 0 {
-                    s.push('\n');
-                }
-                s.push_str("    ");
-            }
-
-            match v {
-                v if v == &MARK_AS_REMOVED => s.push_str("[ ]"),
-                _ => s.push_str("[{}]"),
-            };
-
-            s
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{OpRange, OpRangeKind};
+
+    fn visualize_ops(ops: &[ValueWithPriority<'_>], width: usize) -> String {
+        let label_start: usize = 60;
+
+        let mut s = String::new();
+        s.push_str(&format!("Base index: [0..{}]\n", width - 1));
+
+        for value in ops {
+            let ValueWithPriority { patch, priority } = value;
+
+            let mut line = vec![' '; label_start + 40];
+
+            let seq = patch.op.as_seq();
+            let op = seq.op;
+            let range = seq.range.clone();
+
+            let start = range.start.min(width);
+            let end = range.end.min(width);
+            let label = format!(
+                "| op: {:<7} | priority({})",
+                match op {
+                    Op::Add => "add",
+                    Op::Remove => "remove",
+                    Op::Replace => "replace",
+                },
+                priority
+            );
+
+            for i in start..end {
+                let idx = i * 3;
+                if idx + 2 < label_start {
+                    line[idx] = '[';
+                    line[idx + 1] = '-';
+                    line[idx + 2] = ']';
+                }
+            }
+
+            for (i, c) in label.chars().enumerate() {
+                if label_start + i < line.len() {
+                    line[label_start + i] = c;
+                }
+            }
+            line.push('\n');
+            s.push_str(&line.smart_iter().collect::<String>());
+        }
+
+        s
+    }
+
+    fn draw_box(data: &[Value<'_>]) -> String {
+        data.smart_iter()
+            .enumerate()
+            .map(|(idx, v)| {
+                let mut s = String::new();
+
+                if idx % 20 == 0 {
+                    if idx != 0 {
+                        s.push('\n');
+                    }
+                    s.push_str("    ");
+                }
+
+                match v {
+                    v if v == &MARK_AS_REMOVED => s.push_str("[ ]"),
+                    _ => s.push_str("[{}]"),
+                };
+
+                s
+            })
+            .collect()
+    }
 
     #[test]
     fn test_seq_patch() {

@@ -81,13 +81,13 @@ impl<'a> PatchMap<'a> {
                     },
                     Patch::Seq(old_items) => {
                         match kind {
+                            PatchKind::Seq => old_items.push(new_value),
                             PatchKind::OneField => {
                                 return Err(TypeError {
                                     actual: PatchKind::Seq,
                                     expected: PatchKind::OneField,
                                 })
                             }
-                            PatchKind::Seq => old_items.push(new_value),
                         };
                     }
                 }

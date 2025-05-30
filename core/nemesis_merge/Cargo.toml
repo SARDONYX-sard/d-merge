@@ -51,7 +51,7 @@ default = ["debug"]
 debug = ["serde", "tracing", "dashmap/serde"]
 
 # tracing = ["dep:tracing", "json_patch/tracing", "serde_hkx/tracing"]
-tracing = ["dep:tracing"]
+tracing = ["dep:tracing", "json_patch/tracing"]
 
 serde = ["dep:serde", "json_patch/serde"]
 

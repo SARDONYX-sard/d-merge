@@ -123,23 +123,36 @@ pub fn collect_borrowed_patches<'a>(
                 variable_class_map.0.entry(template_name).or_insert(ptr);
             }
 
-            let patch_map = PatchMap::new();
             json_patches
                 .into_par_iter()
                 .for_each(|(key, value)| match &value.op {
                     // Overwrite to match patch structure
                     json_patch::OpRangeKind::Pure(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        if let Err(_err) = patch_map.insert(key, value, PatchKind::OneField) {
-                            #[cfg(feature = "tracing")]
-                            tracing::debug!("{_err:?}");
+                        if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
+                            let v = v.value();
+                            if let Err(_err) = v.insert(key, value, PatchKind::OneField) {
+                                #[cfg(feature = "tracing")]
+                                tracing::debug!("{_err:?}");
+                            };
+                        } else {
+                            let patch_map = PatchMap::new();
+                            let _ = patch_map.insert(key, value, PatchKind::OneField);
+                            let _ = patch_map_foreach_template.insert(template_name, patch_map);
                         };
                     }
                     json_patch::OpRangeKind::Seq(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        if let Err(_err) = patch_map.insert(key, value, PatchKind::Seq) {
-                            #[cfg(feature = "tracing")]
-                            tracing::debug!("{_err:?}");
+                        if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
+                            let v = v.value();
+                            if let Err(_err) = v.insert(key, value, PatchKind::Seq) {
+                                #[cfg(feature = "tracing")]
+                                tracing::debug!("{_err:?}");
+                            };
+                        } else {
+                            let patch_map = PatchMap::new();
+                            let _ = patch_map.insert(key, value, PatchKind::Seq);
+                            let _ = patch_map_foreach_template.insert(template_name, patch_map);
                         };
                     }
                     json_patch::OpRangeKind::Discrete(range_vec) => {
@@ -157,17 +170,21 @@ pub fn collect_borrowed_patches<'a>(
                                 value,
                             };
                             let value = ValueWithPriority::new(value, *priority);
-                            let _ = patch_map.insert(key.clone(), value, PatchKind::Seq);
+
+                            if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
+                                let v = v.value();
+                                if let Err(_err) = v.insert(key.clone(), value, PatchKind::Seq) {
+                                    #[cfg(feature = "tracing")]
+                                    tracing::debug!("{_err:?}");
+                                };
+                            } else {
+                                let patch_map = PatchMap::new();
+                                let _ = patch_map.insert(key.clone(), value, PatchKind::Seq);
+                                let _ = patch_map_foreach_template.insert(template_name, patch_map);
+                            };
                         }
                     }
                 });
-
-            if let Some(mut v) = patch_map_foreach_template.get_mut(template_name) {
-                let v = v.value_mut();
-                v.0.par_extend(patch_map.0);
-            } else {
-                patch_map_foreach_template.insert(template_name, patch_map);
-            };
 
             Ok(())
         })
