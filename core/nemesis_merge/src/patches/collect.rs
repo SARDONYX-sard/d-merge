@@ -111,7 +111,7 @@ pub fn collect_borrowed_patches<'a>(
     let variable_class_map = VariableClassMap::new();
 
     let results: Vec<Result<()>> = owned_patches
-        .iter()
+        .par_iter()
         .map(|(path, (xml, priority))| {
             let (json_patches, ptr) = parse_nemesis_patch(xml, hack_options)
                 .with_context(|_| NemesisXmlErrSnafu { path })?;
@@ -124,50 +124,50 @@ pub fn collect_borrowed_patches<'a>(
                 variable_class_map.0.entry(template_name).or_insert(ptr);
             }
 
-            json_patches
-                .into_par_iter()
-                .for_each(|(key, value)| match &value.op {
+            json_patches.into_par_iter().for_each(|(key, value)| {
+                // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
+                let entry = patch_map_foreach_template
+                    .entry(template_name)
+                    .or_insert_with(PatchMap::new);
+
+                match &value.op {
                     // Overwrite to match patch structure
                     json_patch::OpRangeKind::Pure(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        let entry = patch_map_foreach_template
-                            .entry(template_name)
-                            .or_insert_with(PatchMap::new);
-                        let patch_map = entry.value();
-                        let _ = patch_map.insert(key, value, PatchKind::OneField);
+                        let _ = entry.value().insert(key, value, PatchKind::OneField);
                     }
                     json_patch::OpRangeKind::Seq(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        let entry = patch_map_foreach_template
-                            .entry(template_name)
-                            .or_insert_with(PatchMap::new);
-                        let patch_map = entry.value();
-                        let _ = patch_map.insert(key, value, PatchKind::Seq);
+                        let _ = entry.value().insert(key, value, PatchKind::Seq);
                     }
                     json_patch::OpRangeKind::Discrete(range_vec) => {
                         let json_patch::JsonPatch { value, .. } = value;
 
-                        #[allow(clippy::expect_used)]
-                        let array = simd_json::derived::ValueTryIntoArray::try_into_array(value)
-                            .expect(
-                                "This could be a creation error by the implementer.: must be array",
-                            );
-
-                        for (range, value) in range_vec.clone().into_iter().zip(array) {
-                            let value = json_patch::JsonPatch {
-                                op: json_patch::OpRangeKind::Seq(range),
-                                value,
+                        let array =
+                            match simd_json::derived::ValueTryIntoArray::try_into_array(value) {
+                                Ok(array) => array,
+                                Err(_err) => {
+                                    #[cfg(feature = "tracing")]
+                                    tracing::error!("{_err}",);
+                                    return;
+                                }
                             };
-                            let value = ValueWithPriority::new(value, *priority);
 
-                            let entry = patch_map_foreach_template
-                                .entry(template_name)
-                                .or_insert_with(PatchMap::new);
-                            let patch_map = entry.value();
-                            let _ = patch_map.insert(key.clone(), value, PatchKind::Seq);
-                        }
+                        range_vec
+                            .clone()
+                            .into_par_iter()
+                            .zip(array)
+                            .for_each(|(range, value)| {
+                                let value = json_patch::JsonPatch {
+                                    op: json_patch::OpRangeKind::Seq(range),
+                                    value,
+                                };
+                                let value = ValueWithPriority::new(value, *priority);
+                                let _ = entry.value().insert(key.clone(), value, PatchKind::Seq);
+                            });
                     }
-                });
+                }
+            });
 
             Ok(())
         })
