@@ -6,8 +6,8 @@ use crate::{
     patches::{
         apply::apply_patches,
         collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
-        merge::{merge_patches, paths_to_ids},
     },
+    paths::id::paths_to_priority_map,
     templates::collect::collect_templates,
 };
 use rayon::prelude::*;
@@ -18,39 +18,41 @@ use std::path::PathBuf;
 ///
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
-pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Result<()> {
+pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result<()> {
+    let id_order = paths_to_priority_map(&nemesis_paths);
+
     let mut all_errors = vec![];
 
     // 1/4: Collect all patches & templates xml
-    options.on_report_status(Status::ReadingTemplatesAndPatches);
-    let (owned_adsf_patches, owned_patches) = match collect_owned_patches(&nemesis_paths).await {
-        Ok(owned_patches) => owned_patches,
-        Err(errors) => {
-            let errors_len = errors.len();
+    config.on_report_status(Status::ReadingTemplatesAndPatches);
+    let (owned_adsf_patches, owned_patches) =
+        match collect_owned_patches(&nemesis_paths, &id_order).await {
+            Ok(owned_patches) => owned_patches,
+            Err(errors) => {
+                let errors_len = errors.len();
 
-            let err = Error::FailedToReadOwnedPatches { errors_len };
-            options.on_report_status(Status::Error(err.to_string()));
+                let err = Error::FailedToReadOwnedPatches { errors_len };
+                config.on_report_status(Status::Error(err.to_string()));
 
-            write_errors(&options, &errors).await?;
-            return Err(err);
-        }
-    };
+                write_errors(&config, &errors).await?;
+                return Err(err);
+            }
+        };
 
-    let ids = paths_to_ids(&nemesis_paths);
-
-    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &ids, &options);
+    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config);
     let adsf_errors_len = adsf_errors.len();
     all_errors.par_extend(adsf_errors);
 
+    // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
     let (
         BorrowedPatches {
             template_names,
-            template_patch_map,
-            ptr_map,
+            patch_map_foreach_template,
+            variable_class_map,
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(&owned_patches, options.hack_options);
+        let (patch_result, errors) = collect_borrowed_patches(&owned_patches, config.hack_options);
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
@@ -59,24 +61,25 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
     // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
     // Therefore, reassign the local variable in the block to shorten the lifetime
     {
-        let (templates, errors) = collect_templates(template_names, &options.resource_dir);
+        let (templates, errors) = collect_templates(template_names, &config.resource_dir);
         all_errors.par_extend(errors);
 
-        // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = { merge_patches(template_patch_map, &ids)? };
-
         // 3/4: Apply patches & Replace variables to indexes
-        options.on_report_status(Status::ApplyingPatches);
+        config.on_report_status(Status::ApplyingPatches);
         let mut apply_errors_len = 0;
-        if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
+        if let Err(errors) =
+            apply_patches(&templates, patch_map_foreach_template, &config.output_dir)
+        {
             apply_errors_len = errors.len();
             all_errors.par_extend(errors);
         };
 
         // 4/4: Generate hkx files.
-        options.on_report_status(Status::GenerateHkxFiles);
+        config.on_report_status(Status::GenerateHkxFiles);
         let hkx_errors_len = {
-            if let Err(hkx_errors) = generate_hkx_files(&options.output_dir, templates, ptr_map) {
+            if let Err(hkx_errors) =
+                generate_hkx_files(&config.output_dir, templates, variable_class_map)
+            {
                 let errors_len = hkx_errors.len();
                 all_errors.par_extend(hkx_errors);
                 errors_len
@@ -86,7 +89,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
         };
 
         if !all_errors.is_empty() {
-            write_errors(&options, &all_errors).await?;
+            write_errors(&config, &all_errors).await?;
 
             let err = Error::FailedToGenerateBehaviors {
                 adsf_errors_len,
@@ -95,12 +98,12 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Resul
                 apply_errors_len,
             };
 
-            options.on_report_status(Status::Error(err.to_string()));
+            config.on_report_status(Status::Error(err.to_string()));
             return Err(err);
         };
     };
 
-    options.on_report_status(Status::Done);
+    config.on_report_status(Status::Done);
 
     Ok(())
 }
@@ -136,7 +139,8 @@ mod tests {
             // "../../dummy/Data/Nemesis_Engine/mod/tudm",
             // "../../dummy/Data/Nemesis_Engine/mod/turn",
             // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
-            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
+            "D:/GAME/ModOrganizer Skyrim SE/mods/FlinchingSSE やられモーションを追加(要OnHit/Nemesis_Engine/mod/flinch",
+            // "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
         ]
         .into_par_iter()
         .map(|s| s.into())

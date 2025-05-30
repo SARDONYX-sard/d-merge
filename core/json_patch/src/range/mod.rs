@@ -33,6 +33,7 @@ impl fmt::Display for Range {
 
 impl Range {
     /// Checks if the range is valid for the given array length.
+    #[allow(unused)]
     pub(crate) const fn check_valid_range(&self, array_len: usize) -> Result<(), RangeError> {
         match self {
             Self::Index(index) => {

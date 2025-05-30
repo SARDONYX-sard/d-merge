@@ -5,10 +5,7 @@
   "[javascript][javascriptreact][typescript][typescriptreact]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "[json]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[jsonc]": {
+  "[json][jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[yaml]": {

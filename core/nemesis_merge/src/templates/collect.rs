@@ -1,6 +1,6 @@
-use crate::aliases::BorrowedTemplateMap;
 use crate::errors::{Error, FailedIoSnafu, JsonSnafu, NotFoundTemplateSnafu, Result};
 use crate::templates::tables::collect_table_paths;
+use crate::types::BorrowedTemplateMap;
 use dashmap::{DashMap, DashSet};
 use rayon::{iter::Either, prelude::*};
 use serde_hkx_features::ClassMap;
@@ -10,17 +10,15 @@ use std::path::PathBuf;
 use std::{fs, path::Path};
 
 pub fn collect_templates<'a>(
-    template_names: DashSet<String>,
+    template_names: DashSet<&'a str>,
     resource_dir: &Path,
 ) -> (BorrowedTemplateMap<'a>, Vec<Error>) {
     let template_behaviors = collect_table_paths(resource_dir);
-    // #[cfg(feature = "tracing")]
-    // tracing::trace!("{template_behaviors:#?}");
 
-    let results: Vec<Result<(String, (PathBuf, BorrowedValue<'static>))>> = template_names
+    let results: Vec<Result<(&str, (PathBuf, BorrowedValue<'static>))>> = template_names
         .into_par_iter()
         .map(|name| {
-            let value = template_xml_to_value(name.as_str(), resource_dir, &template_behaviors)?;
+            let value = template_xml_to_value(name, resource_dir, &template_behaviors)?;
             Ok((name, value))
         })
         .collect();

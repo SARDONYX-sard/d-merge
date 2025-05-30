@@ -1,6 +1,5 @@
 pub mod class_table;
 mod current_state;
-mod skip;
 
 use self::{
     class_table::{find_class_info, FieldInfo},

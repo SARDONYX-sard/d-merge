@@ -1,122 +1,114 @@
-use snafu::OptionExt as _;
 use std::path::Path;
 
-/// Represents the parsed result of a Nemesis Engine input path.
+use serde_hkx::errors::readable::ReadableError;
+use snafu::OptionExt;
+use winnow::{
+    ascii::Caseless,
+    combinator::{alt, repeat},
+    seq,
+    token::{any, take_until, take_while},
+    ModalResult, Parser as _,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NemesisPath {
-    /// The path relative to the Nemesis Engine directory,
-    /// - e.g., `mod/flinch/0_master/#0001.txt`
-    pub mod_code: String,
-    /// hkx file stem.
-    /// - e.g., `0_master`, `_1stperson/0_master`.
-    pub template_name: String,
-    /// class index
-    ///
-    /// e.g., `#0001.txt` -> `#0001`
-    pub index: String,
+pub struct NemesisPath<'a> {
+    pub mod_code: &'a str,
+    pub template_name: &'a str,
+    pub index: &'a str,
 }
 
-#[derive(Debug, PartialEq, Eq, snafu::Snafu)]
-#[snafu(visibility(pub))]
-#[allow(clippy::enum_variant_names)]
+#[derive(Debug, snafu::Snafu, PartialEq, Eq)]
 pub enum NemesisPathError {
-    NotFoundFileStem,
-    /// Path does not contain 'Nemesis_Engine'
-    NotContainEngineDir,
-    NotFoundTemplateName,
-    NotFoundIndexName,
+    /// Path must be utf-8
+    InvalidFormat,
+    #[snafu(display("{source}"))]
+    ReadableError { source: ReadableError },
 }
 
 type Result<T, E = NemesisPathError> = core::result::Result<T, E>;
 
-/// Parses a Nemesis path from a `&Path`.
-pub fn get_nemesis_id(path: &Path) -> Result<&str> {
-    let engine_index = path
-        .iter()
-        .position(|component| component.eq_ignore_ascii_case("Nemesis_Engine"))
-        .with_context(|| NotContainEngineDirSnafu)?;
+pub fn parse_nemesis_path(input: &Path) -> Result<NemesisPath> {
+    let input = input.to_str().context(InvalidFormatSnafu)?;
 
-    let mut path = path.iter().skip(engine_index + 2);
-    let mod_code = path
-        .next()
-        .and_then(|path| path.to_str())
-        .ok_or(NemesisPathError::NotFoundTemplateName)?;
-
-    Ok(mod_code)
+    parse_components
+        .parse(input)
+        .map_err(|e| NemesisPathError::ReadableError {
+            source: ReadableError::from_parse(e),
+        })
 }
 
-/// Parses a Nemesis path from a `&Path`.
-pub fn parse_nemesis_path(path: &Path) -> Result<NemesisPath> {
-    let engine_index = path
-        .iter()
-        .position(|component| component.eq_ignore_ascii_case("Nemesis_Engine"))
-        .with_context(|| NotContainEngineDirSnafu)?;
-    let file_stem = path
-        .file_stem()
-        .map(|path| path.to_string_lossy().to_string())
-        .with_context(|| NotFoundFileStemSnafu)?;
+/// return `_1stperson/0_master`
+fn parse_components<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
+    let first_person = seq!(
+        Caseless("_1stperson"),
+        alt(('/', '\\')),
+        take_while(1.., |c| !matches!(c, '/' | '\\')),
+    )
+    .take();
 
-    let mut path = path.iter().skip(engine_index + 2);
+    let mut template_name = alt((first_person, take_while(1.., |c| c != '/' && c != '\\')));
 
-    let mod_code = path
-        .next()
-        .map(|path| path.to_string_lossy().to_string())
-        .ok_or(NemesisPathError::NotFoundTemplateName)?;
+    // Parse prefix to Nemesis_Engine/mod/<mod_code>/
+    let mut parser = seq! {
+        NemesisPath {
+            _: take_until(0.., "Nemesis_Engine"),
+            _: "Nemesis_Engine",
+            _: alt(('/', '\\')),
+            _: "mod",
+            _: alt(('/', '\\')),
+            mod_code: take_while(1.., |c| !matches!(c, '/' | '\\')),
+            _: alt(('/', '\\')),
+            template_name: template_name,
+            _: alt(('/', '\\')),
+            index: take_while(1.., |c| !matches!(c, '.' | '/' | '\\')),
+            _: repeat::<_, _, (), _, _>(0.., any),
+        }
+    };
 
-    let template_name = path.next();
-    let template_name = if template_name
-        .map(|path| path.eq_ignore_ascii_case("_1stperson"))
-        .unwrap_or_default()
-    {
-        path.next()
-            .map(|path| format!("_1stperson/{}", path.to_string_lossy()))
-    } else {
-        template_name.map(|path| path.to_string_lossy().to_string())
-    }
-    .ok_or(NemesisPathError::NotFoundTemplateName)?;
-
-    Ok(NemesisPath {
-        mod_code,
-        template_name,
-        index: file_stem,
-    })
+    parser.parse_next(input)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn test_parse_nemesis_path(path: &str) -> NemesisPath<'_> {
+        parse_nemesis_path(Path::new(path)).unwrap_or_else(|e| panic!("{e}"))
+    }
+
     #[test]
     fn parse_nemesis_path_valid() {
-        let input_path = Path::new("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
+        let actual =
+            test_parse_nemesis_path("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
         assert_eq!(
-            parse_nemesis_path(input_path),
-            Ok(NemesisPath {
-                mod_code: "flinch".to_string(),
-                template_name: "0_master".to_string(),
-                index: "#0106".to_string(),
-            })
+            actual,
+            NemesisPath {
+                mod_code: "flinch",
+                template_name: "0_master",
+                index: "#0106",
+            }
         );
 
-        let input_path = Path::new("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
+        let actual = test_parse_nemesis_path("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
         assert_eq!(
-            parse_nemesis_path(input_path),
-            Ok(NemesisPath {
-                mod_code: "flinch".to_string(),
-                template_name: "0_master".to_string(),
-                index: "#0106".to_string(),
-            })
+            actual,
+            NemesisPath {
+                mod_code: "flinch",
+                template_name: "0_master",
+                index: "#0106",
+            }
         );
 
-        let input_path =
-            Path::new("/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt");
+        let actual = test_parse_nemesis_path(
+            "/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt",
+        );
         assert_eq!(
-            parse_nemesis_path(input_path),
-            Ok(NemesisPath {
-                mod_code: "flinch".to_string(),
-                template_name: "_1stperson/0_master".to_string(),
-                index: "#0106".to_string(),
-            })
+            actual,
+            NemesisPath {
+                mod_code: "flinch",
+                template_name: "_1stperson/0_master",
+                index: "#0106",
+            }
         );
     }
 

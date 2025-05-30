@@ -102,6 +102,14 @@ pub enum Error {
         source: serde_hkx::errors::ser::Error,
     },
 
+    /// (De)Serialize json error
+    #[snafu(display("{}:\n {source}", path.display()))]
+    JsonError {
+        /// input path
+        path: PathBuf,
+        source: simd_json::Error,
+    },
+
     #[snafu(transparent)]
     HkxDeError {
         source: serde_hkx::errors::de::Error,
@@ -114,14 +122,6 @@ pub enum Error {
 
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
-
-    /// (De)Serialize json error
-    #[snafu(display("{}:\n {source}", path.display()))]
-    JsonError {
-        /// input path
-        path: PathBuf,
-        source: simd_json::Error,
-    },
 }
 
 /// `Result` for this crate.

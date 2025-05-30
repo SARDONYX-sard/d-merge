@@ -1,9 +1,9 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 #![allow(clippy::mem_forget)]
 use crate::{
-    aliases::{BorrowedTemplateMap, PtrMap},
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
+    types::{BorrowedTemplateMap, VariableClassMap},
 };
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
@@ -12,13 +12,11 @@ use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 use std::{fs, path::Path};
 
-pub(crate) fn generate_hkx_files(
-    output_dir: impl AsRef<Path>,
-    templates: BorrowedTemplateMap<'_>,
-    ptr_map: PtrMap<'_>,
+pub(crate) fn generate_hkx_files<'a>(
+    output_dir: &Path,
+    templates: BorrowedTemplateMap<'a>,
+    variable_class_map: VariableClassMap<'a>,
 ) -> Result<(), Vec<Error>> {
-    let output_dir = output_dir.as_ref();
-
     let results = templates
         .into_par_iter()
         .map(|(file_stem, (inner_path, template_json))| {
@@ -57,7 +55,7 @@ pub(crate) fn generate_hkx_files(
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
-                if let Some(pair) = ptr_map.0.get(&file_stem) {
+                if let Some(pair) = variable_class_map.0.get(&file_stem) {
                     let ptr = pair.value();
 
                     // Create eventID & variableId maps from hkbBehaviorGraphStringData class

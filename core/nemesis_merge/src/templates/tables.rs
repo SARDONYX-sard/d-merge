@@ -32,7 +32,11 @@ fn get_key_value(path: &Path) -> Option<(String, PathBuf)> {
         let mut components = path.components();
         let is_1stperson = components.any(|c| c.as_os_str().eq_ignore_ascii_case("_1stPerson"));
         if is_1stperson {
-            format!("_1stperson/{file_stem}")
+            if path.to_str().is_some_and(|s| s.contains("\\")) {
+                format!("_1stperson\\{file_stem}")
+            } else {
+                format!("_1stperson/{file_stem}")
+            }
         } else {
             file_stem.to_string()
         }
