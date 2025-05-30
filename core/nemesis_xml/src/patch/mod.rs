@@ -350,26 +350,54 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse `Matrix3`, `Rotation`
     fn parse_matrix3(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
+        self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("y".into());
         obj.insert("y".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("z".into());
         obj.insert("z".into(), self.parse_vector4()?);
+        self.current.path.pop();
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     fn parse_matrix4(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
+        self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("y".into());
         obj.insert("y".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("z".into());
         obj.insert("z".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("w".into());
         obj.insert("w".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     fn parse_qs_transform(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
+        self.current.path.push("transition".into());
         obj.insert("transition".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
+        self.current.path.push("quaternion".into());
         obj.insert("quaternion".into(), self.parse_quaternion()?);
+        self.current.path.pop();
+
+        self.current.path.push("scale".into());
         obj.insert("scale".into(), self.parse_vector4()?);
+        self.current.path.pop();
 
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
@@ -377,10 +405,23 @@ impl<'de> PatchDeserializer<'de> {
     fn parse_quaternion(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
         self.parse_next(opt(delimited_multispace0("(")))?;
+
+        self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("y".into());
         obj.insert("y".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("z".into());
         obj.insert("z".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("scaler".into());
         obj.insert("scaler".into(), self.parse_real()?);
+        self.current.path.pop();
+
         self.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
@@ -388,19 +429,37 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_transform(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
+        self.current.path.push("rotation".into());
         obj.insert("rotation".into(), self.parse_matrix3()?);
+        self.current.path.pop();
+
+        self.current.path.push("transition".into());
         obj.insert("transition".into(), self.parse_vector4()?);
+        self.current.path.pop();
+
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
     fn parse_vector4(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-
         self.parse_next(opt(delimited_multispace0("(")))?;
+
+        self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("y".into());
         obj.insert("y".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("z".into());
         obj.insert("z".into(), self.parse_real()?);
+        self.current.path.pop();
+
+        self.current.path.push("w".into());
         obj.insert("w".into(), self.parse_real()?);
+        self.current.path.pop();
+
         self.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
