@@ -1,6 +1,7 @@
 use dashmap::DashMap;
 use indexmap::IndexMap;
 use json_patch::{JsonPath, Patch, ValueWithPriority};
+use rayon::prelude::*;
 use simd_json::BorrowedValue;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -111,6 +112,33 @@ impl<'a> PatchMap<'a> {
         }
 
         Ok(())
+    }
+
+    pub fn extend<I>(&self, key: JsonPath<'a>, new_values: I) -> Result<(), TypeError>
+    where
+        I: IntoParallelIterator<Item = ValueWithPriority<'a>>,
+    {
+        match self.0.entry(key) {
+            dashmap::Entry::Occupied(mut existing) => {
+                let old_patch = existing.get_mut();
+                match old_patch {
+                    Patch::Seq(old_items) => {
+                        old_items.par_extend(new_values);
+                        Ok(())
+                    }
+                    Patch::OneField(_) => {
+                        Err(TypeError {
+                            actual: PatchKind::OneField,
+                            expected: PatchKind::Seq,
+                        })
+                    }
+                }
+            }
+            dashmap::Entry::Vacant(ve) => {
+                ve.insert(Patch::Seq(new_values.into_par_iter().collect()));
+                Ok(())
+            }
+        }
     }
 }
 
