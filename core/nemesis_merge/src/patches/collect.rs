@@ -114,6 +114,9 @@ pub fn collect_borrowed_patches<'a>(
         owned_patches
             .par_iter()
             .map(|(path, (xml, priority))| {
+                // Since we could not make a destructing assignment, we have to write it this way.
+                let priority = *priority;
+
                 let (json_patches, ptr) = parse_nemesis_patch(xml, hack_options)
                     .with_context(|_| NemesisXmlErrSnafu { path })?;
 
@@ -134,11 +137,11 @@ pub fn collect_borrowed_patches<'a>(
                     match &value.op {
                         // Overwrite to match patch structure
                         json_patch::OpRangeKind::Pure(_) => {
-                            let value = ValueWithPriority::new(value, *priority);
+                            let value = ValueWithPriority::new(value, priority);
                             let _ = entry.value().insert(key, value, PatchKind::OneField);
                         }
                         json_patch::OpRangeKind::Seq(_) => {
-                            let value = ValueWithPriority::new(value, *priority);
+                            let value = ValueWithPriority::new(value, priority);
                             let _ = entry.value().insert(key, value, PatchKind::Seq);
                         }
                         json_patch::OpRangeKind::Discrete(range_vec) => {
@@ -161,7 +164,7 @@ pub fn collect_borrowed_patches<'a>(
                                         op: json_patch::OpRangeKind::Seq(range),
                                         value,
                                     };
-                                    let value = ValueWithPriority::new(value, *priority);
+                                    let value = ValueWithPriority::new(value, priority);
                                     value
                                 },
                             );
