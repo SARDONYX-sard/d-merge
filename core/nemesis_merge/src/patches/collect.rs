@@ -129,31 +129,19 @@ pub fn collect_borrowed_patches<'a>(
                     // Overwrite to match patch structure
                     json_patch::OpRangeKind::Pure(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
-                            let v = v.value();
-                            if let Err(_err) = v.insert(key, value, PatchKind::OneField) {
-                                #[cfg(feature = "tracing")]
-                                tracing::debug!("{_err:?}");
-                            };
-                        } else {
-                            let patch_map = PatchMap::new();
-                            let _ = patch_map.insert(key, value, PatchKind::OneField);
-                            let _ = patch_map_foreach_template.insert(template_name, patch_map);
-                        };
+                        let entry = patch_map_foreach_template
+                            .entry(template_name)
+                            .or_insert_with(PatchMap::new);
+                        let patch_map = entry.value();
+                        let _ = patch_map.insert(key, value, PatchKind::OneField);
                     }
                     json_patch::OpRangeKind::Seq(_) => {
                         let value = ValueWithPriority::new(value, *priority);
-                        if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
-                            let v = v.value();
-                            if let Err(_err) = v.insert(key, value, PatchKind::Seq) {
-                                #[cfg(feature = "tracing")]
-                                tracing::debug!("{_err:?}");
-                            };
-                        } else {
-                            let patch_map = PatchMap::new();
-                            let _ = patch_map.insert(key, value, PatchKind::Seq);
-                            let _ = patch_map_foreach_template.insert(template_name, patch_map);
-                        };
+                        let entry = patch_map_foreach_template
+                            .entry(template_name)
+                            .or_insert_with(PatchMap::new);
+                        let patch_map = entry.value();
+                        let _ = patch_map.insert(key, value, PatchKind::Seq);
                     }
                     json_patch::OpRangeKind::Discrete(range_vec) => {
                         let json_patch::JsonPatch { value, .. } = value;
@@ -171,17 +159,11 @@ pub fn collect_borrowed_patches<'a>(
                             };
                             let value = ValueWithPriority::new(value, *priority);
 
-                            if let Some(v) = patch_map_foreach_template.get_mut(template_name) {
-                                let v = v.value();
-                                if let Err(_err) = v.insert(key.clone(), value, PatchKind::Seq) {
-                                    #[cfg(feature = "tracing")]
-                                    tracing::debug!("{_err:?}");
-                                };
-                            } else {
-                                let patch_map = PatchMap::new();
-                                let _ = patch_map.insert(key.clone(), value, PatchKind::Seq);
-                                let _ = patch_map_foreach_template.insert(template_name, patch_map);
-                            };
+                            let entry = patch_map_foreach_template
+                                .entry(template_name)
+                                .or_insert_with(PatchMap::new);
+                            let patch_map = entry.value();
+                            let _ = patch_map.insert(key.clone(), value, PatchKind::Seq);
                         }
                     }
                 });
