@@ -126,12 +126,10 @@ impl<'a> PatchMap<'a> {
                         old_items.par_extend(new_values);
                         Ok(())
                     }
-                    Patch::OneField(_) => {
-                        Err(TypeError {
-                            actual: PatchKind::OneField,
-                            expected: PatchKind::Seq,
-                        })
-                    }
+                    Patch::OneField(_) => Err(TypeError {
+                        actual: PatchKind::OneField,
+                        expected: PatchKind::Seq,
+                    }),
                 }
             }
             dashmap::Entry::Vacant(ve) => {
