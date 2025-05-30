@@ -62,6 +62,9 @@ impl<'a> PatchMap<'a> {
         new_value: ValueWithPriority<'a>,
         kind: PatchKind,
     ) -> Result<(), TypeError> {
+        #[cfg(feature = "tracing")]
+        let cloned_key = key.clone();
+
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut existing) => {
                 let old_patch = existing.get_mut();
@@ -69,6 +72,11 @@ impl<'a> PatchMap<'a> {
                     Patch::OneField(old_value) => match kind {
                         PatchKind::OneField => {
                             if new_value.priority > old_value.priority {
+                                tracing::info!(
+                                "One Patch conflict at {cloned_key:?}: (priority {}) is overwritten by (priority {})",
+                                old_value.priority,
+                                new_value.priority
+                                );
                                 *old_value = new_value;
                             }
                         }

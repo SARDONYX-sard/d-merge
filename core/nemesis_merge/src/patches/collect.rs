@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening)]
 use crate::{
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
     paths::{
@@ -110,7 +111,7 @@ pub fn collect_borrowed_patches<'a>(
     let variable_class_map = VariableClassMap::new();
 
     let results: Vec<Result<()>> = owned_patches
-        .par_iter()
+        .iter()
         .map(|(path, (xml, priority))| {
             let (json_patches, ptr) = parse_nemesis_patch(xml, hack_options)
                 .with_context(|_| NemesisXmlErrSnafu { path })?;
