@@ -32,7 +32,7 @@ pub enum Error {
     NotFoundTemplate { template_name: String },
 
     /// Json patch error
-    #[snafu(display("[Apply patch Error to `{template_name}`]\n{source}\n"))]
+    #[snafu(display("[Apply patch Error to template file(`{template_name}`)]\n{source}\n"))]
     PatchError {
         template_name: String,
         source: json_patch::JsonPatchError,

@@ -28,7 +28,7 @@ pub fn apply_patches<'a, 'b: 'a>(
                 let template = &mut template_pair.value_mut().1;
 
                 for (path, patch) in patches.0 {
-                    apply_patch(template, path, patch)
+                    apply_patch(template_name, template, path, patch)
                         .with_context(|_| PatchSnafu { template_name })?;
                 }
             }

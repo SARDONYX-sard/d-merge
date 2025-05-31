@@ -9,7 +9,7 @@ pub type Result<T, E = JsonPatchError> = core::result::Result<T, E>;
 #[derive(snafu::Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum JsonPatchError {
     /// The specified path was not found in the JSON structure.
-    #[snafu(display("The specified path does not exist: {path}\n{value}"))]
+    #[snafu(display("No such path(`{path}`) in template.\n{value}"))]
     NotFoundTarget {
         /// The path in the JSON structure.
         path: String,

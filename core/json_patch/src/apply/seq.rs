@@ -16,10 +16,12 @@ const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed("##Mark_As_R
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
 pub(crate) fn apply_seq_by_priority<'a>(
+    file_name: &str,
     json: &mut Value<'a>,
     path: JsonPath<'a>,
     mut patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<()> {
+    let _ = file_name;
     let target = json
         .ptr_mut(&path)
         .ok_or_else(|| JsonPatchError::not_found_target_from(&path, &patches))?;
@@ -30,7 +32,13 @@ pub(crate) fn apply_seq_by_priority<'a>(
 
     sort_by_priority(patches.as_mut_slice());
     #[cfg(feature = "tracing")]
-    tracing::debug!("{}", visualize_ops(&patches));
+    tracing::debug!(
+        "Seq merge conflict resolution for `{file_name}` file:
+Path: {}
+{}",
+        path.join("/"),
+        visualize_ops(&patches)
+    );
 
     let patch_target_vec = core::mem::take(template_array);
     let patched_array = apply_ops_parallel(*patch_target_vec, patches)
@@ -168,8 +176,6 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> String {
         .unwrap_or(0);
 
     let mut output = String::new();
-
-    output.push_str("Legend: [+] = Add, [*] = Replace, [-] = Remove\n\n");
 
     // Index row
     for i in 1..=width {

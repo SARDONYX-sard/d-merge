@@ -16,12 +16,13 @@ use simd_json::BorrowedValue;
 /// # Panics
 #[inline]
 pub fn apply_patch<'v>(
+    file_name: &str,
     json: &mut BorrowedValue<'v>,
     path: JsonPath<'v>,
     patch: Patch<'v>,
 ) -> Result<()> {
     match patch {
         Patch::OneField(patch) => apply_one_field(json, path, patch),
-        Patch::Seq(patches) => apply_seq_by_priority(json, path, patches),
+        Patch::Seq(patches) => apply_seq_by_priority(file_name, json, path, patches),
     }
 }

@@ -90,7 +90,7 @@ pub(crate) fn generate_hkx_files<'a>(
             })?;
 
             #[cfg(feature = "tracing")]
-            tracing::info!("Generation complete: {}", output_path.display());
+            tracing::info!("Generated: {}", output_path.display());
             Ok(())
         })
         .collect();
