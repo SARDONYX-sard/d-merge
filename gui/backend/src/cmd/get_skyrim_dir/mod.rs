@@ -11,6 +11,7 @@ mod unix {
     #[inline]
     #[allow(clippy::missing_const_for_fn)]
     pub fn get_skyrim_data_dir(runtime: Runtime) -> Option<PathBuf> {
+        let _ = runtime;
         tracing::info!("Unsupported `get_skyrim_data_dir` on Unix. windows only");
         None
     }
