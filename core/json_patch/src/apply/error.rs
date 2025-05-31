@@ -12,6 +12,9 @@ pub enum JsonPatchError {
     /// Invalid index: {index}
     InvalidIndex { index: String },
 
+    /// mismatch apply_patch type. Expected pure. but got {unexpected:?}
+    MismatchApplyType { unexpected: crate::OpRangeKind },
+
     /// The range syntax can only be used for Arrays.
     UnsupportedRangeKind,
 
