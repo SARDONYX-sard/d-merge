@@ -31,6 +31,9 @@ pub(crate) fn apply_seq_by_priority<'a>(
     };
 
     sort_by_priority(patches.as_mut_slice());
+    #[cfg(feature = "tracing")]
+    tracing::debug!("{}", visualize_ops(&patches));
+
     let patch_target_vec = core::mem::take(template_array);
     let patched_array = apply_ops_parallel(*patch_target_vec, patches)
         .smart_iter()
@@ -155,58 +158,78 @@ fn apply_ops_parallel<'a>(
     base
 }
 
+#[cfg(any(feature = "tracing", test))]
+fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> String {
+    const CELL_WIDTH: usize = 4;
+    const OMITTED_COUNT: usize = 10;
+
+    let width = patches
+        .smart_iter()
+        .map(|v| v.patch.op.as_seq().range.end)
+        .max()
+        .unwrap_or(0);
+
+    let mut output = String::new();
+
+    output.push_str("Legend: [+] = Add, [*] = Replace, [-] = Remove\n\n");
+
+    // Index row
+    for i in 1..=width {
+        if width > OMITTED_COUNT * 2 && i > OMITTED_COUNT && i <= width - OMITTED_COUNT {
+            if i == OMITTED_COUNT + 1 {
+                output.push_str(" ... ");
+            }
+            continue;
+        }
+        output.push_str(&format!("{i:^width$}", width = CELL_WIDTH));
+    }
+    output.push_str("| Op      | priority |\n");
+
+    for value in patches {
+        let priority = value.priority;
+        let seq = value.patch.op.as_seq();
+        let op = seq.op;
+        let range = seq.range.clone();
+
+        for i in 1..=width {
+            if width > OMITTED_COUNT * 2 && i > OMITTED_COUNT && i <= width - OMITTED_COUNT {
+                if i == OMITTED_COUNT + 1 {
+                    output.push_str(" ... ");
+                }
+                continue;
+            }
+
+            let symbol = if i > range.start && i <= range.end {
+                match op {
+                    Op::Add => "[+] ",
+                    Op::Replace => "[*] ",
+                    Op::Remove => "[-] ",
+                }
+            } else {
+                "    "
+            };
+            output.push_str(symbol);
+        }
+
+        let label = format!(
+            "| {:<7} | {priority:>8} |",
+            match op {
+                Op::Add => "Add",
+                Op::Remove => "Remove",
+                Op::Replace => "Replace",
+            },
+        );
+        output.push_str(&label);
+        output.push('\n');
+    }
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{OpRange, OpRangeKind};
-
-    fn visualize_ops(ops: &[ValueWithPriority<'_>], width: usize) -> String {
-        let label_start: usize = 60;
-
-        let mut s = String::new();
-        s.push_str(&format!("Base index: [0..{}]\n", width - 1));
-
-        for value in ops {
-            let ValueWithPriority { patch, priority } = value;
-
-            let mut line = vec![' '; label_start + 40];
-
-            let seq = patch.op.as_seq();
-            let op = seq.op;
-            let range = seq.range.clone();
-
-            let start = range.start.min(width);
-            let end = range.end.min(width);
-            let label = format!(
-                "| op: {:<7} | priority({})",
-                match op {
-                    Op::Add => "add",
-                    Op::Remove => "remove",
-                    Op::Replace => "replace",
-                },
-                priority
-            );
-
-            for i in start..end {
-                let idx = i * 3;
-                if idx + 2 < label_start {
-                    line[idx] = '[';
-                    line[idx + 1] = '-';
-                    line[idx + 2] = ']';
-                }
-            }
-
-            for (i, c) in label.chars().enumerate() {
-                if label_start + i < line.len() {
-                    line[label_start + i] = c;
-                }
-            }
-            line.push('\n');
-            s.push_str(&line.smart_iter().collect::<String>());
-        }
-
-        s
-    }
 
     fn draw_box(data: &[Value<'_>]) -> String {
         data.smart_iter()
@@ -300,7 +323,7 @@ mod tests {
         let base_seq: Vec<Value<'_>> = base_seq.smart_iter().map(|i| i.into()).collect();
 
         sort_by_priority(&mut patches);
-        println!("Operation Map:\n{}", visualize_ops(&patches, 21));
+        println!("Operation Map:\n{}", visualize_ops(&patches));
         let result = apply_ops_parallel(base_seq, patches);
 
         println!("\nFinal Result:");
