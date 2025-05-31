@@ -4,16 +4,18 @@ mod windows;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod unix {
     use super::Runtime;
+    use std::io;
     use std::path::PathBuf;
 
     /// # Note
     /// Unsupported `get_skyrim_data_dir` on Unix. windows only
     #[inline]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn get_skyrim_data_dir(runtime: Runtime) -> Option<PathBuf> {
+    pub fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
         let _ = runtime;
-        tracing::info!("Unsupported `get_skyrim_data_dir` on Unix. windows only");
-        None
+        const ERR_MSG: &str = "Unsupported `get_skyrim_data_dir` on Unix. windows only";
+        tracing::info!(ERR_MSG);
+        Err(io::Error::new(io::ErrorKind::NotFound, ERR_MSG))
     }
 }
 
