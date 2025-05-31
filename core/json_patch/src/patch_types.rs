@@ -1,7 +1,6 @@
 pub use crate::operation::Op;
 
 use simd_json::BorrowedValue;
-use std::borrow::Cow;
 use std::ops::Range;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -85,5 +84,3 @@ pub struct JsonPatch<'a> {
     )]
     pub value: BorrowedValue<'a>,
 }
-
-pub type JsonPath<'a> = Vec<Cow<'a, str>>;

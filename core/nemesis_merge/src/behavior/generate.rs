@@ -1,7 +1,7 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
     config::{Config, Status},
-    errors::{write_errors::write_errors, Error, Result},
+    errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result},
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
@@ -22,53 +22,47 @@ use std::path::PathBuf;
 pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result<()> {
     let id_order = paths_to_priority_map(&nemesis_paths);
 
-    let mut all_errors = vec![];
-
-    // Collect all patches & templates xml
+    // Collect all patches file.
     config.on_report_status(Status::ReadingTemplatesAndPatches);
-    let (owned_adsf_patches, owned_patches) =
-        match collect_owned_patches(&nemesis_paths, &id_order).await {
-            Ok(owned_patches) => owned_patches,
-            Err(errors) => {
-                let err = Error::FailedToReadOwnedPatches {
-                    errors_len: errors.len(),
-                };
-                config.on_report_status(Status::Error(err.to_string()));
-
-                write_errors(&config, &errors).await?;
-                return Err(err);
-            }
-        };
+    let (owned_adsf_patches, owned_patches, owned_file_errors) =
+        collect_owned_patches(&nemesis_paths, &id_order).await;
 
     // - Patch to `animationdatasinglefile.txt`
     // - Patch to hkx( -> xml)
-    let (adsf_errors, hkx_result) = rayon::join(
+    let (adsf_errors, patched_hkx_errors) = rayon::join(
         || crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config),
         || apply_and_gen_patched_hkx(&owned_patches, &config),
     );
 
+    let owned_file_errors_len = owned_file_errors.len();
     let adsf_errors_len = adsf_errors.len();
     let Errors {
         patch_errors_len,
         apply_errors_len,
         hkx_errors_len,
         hkx_errors,
-    } = hkx_result;
+    } = patched_hkx_errors;
 
-    all_errors.par_extend(adsf_errors);
-    all_errors.par_extend(hkx_errors);
+    let all_errors = {
+        let mut all_errors = vec![];
+        all_errors.par_extend(owned_file_errors);
+        all_errors.par_extend(adsf_errors);
+        all_errors.par_extend(hkx_errors);
+        all_errors
+    };
 
     if !all_errors.is_empty() {
-        let err = Error::FailedToGenerateBehaviors {
+        let err = BehaviorGenerationError {
+            owned_file_errors_len,
             adsf_errors_len,
-            hkx_errors_len,
             patch_errors_len,
             apply_errors_len,
+            hkx_errors_len,
         };
         config.on_report_status(Status::Error(err.to_string()));
 
         write_errors(&config, &all_errors).await?;
-        return Err(err);
+        return Err(Error::FailedToGenerateBehaviors { source: err });
     };
 
     config.on_report_status(Status::Done);
@@ -136,15 +130,8 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    #[ignore = "unimplemented yet"]
-    #[cfg(feature = "tracing")]
-    async fn merge_test() {
-        let log_path = "../../dummy/merge_test.log";
-        crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
-
-        #[allow(clippy::iter_on_single_items)]
-        let ids = [
+    #[allow(clippy::iter_on_single_items)]
+    const MODS: &[&str] = &[
             // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
             // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
             // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
@@ -164,21 +151,24 @@ mod tests {
             // "D:/GAME/ModOrganizer Skyrim SE/mods/FlinchingSSE やられモーションを追加(要OnHit/Nemesis_Engine/mod/flinch",
             "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
             "D:/GAME/ModOrganizer Skyrim SE/mods/Eating Animations And Sounds SE 歩行しながら食べるモーション/Nemesis_Engine/mod/eaas"
-        ]
-        .into_par_iter()
-        .map(|s| s.into())
-        .collect();
+    ];
 
-        behavior_gen(
-            ids,
+    #[tokio::test]
+    #[ignore = "unimplemented yet"]
+    #[cfg(feature = "tracing")]
+    async fn merge_test() {
+        let log_path = "../../dummy/merge_test.log";
+        crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
+
+        let _ = behavior_gen(
+            MODS.into_par_iter().map(|s| s.into()).collect(),
             Config {
                 resource_dir: "../../resource/assets/templates".into(),
                 output_dir: "../../dummy/behavior_gen/output".into(),
-                status_report: Some(Box::new(|status| println!("{status}"))),
+                status_report: Some(crate::config::new_color_status_reporter()),
                 hack_options: Some(crate::HackOptions::enable_all()),
             },
         )
-        .await
-        .unwrap();
+        .await;
     }
 }

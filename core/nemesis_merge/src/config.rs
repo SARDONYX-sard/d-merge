@@ -84,12 +84,35 @@ impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ReadingTemplatesAndPatches => write!(f, "[1/4] Reading templates and patches..."),
-            Self::ApplyingPatches => write!(f, "[1/2]Applying patches..."),
-            Self::GenerateHkxFiles => write!(f, "[1/3]Generating HKX files..."),
+            Self::ApplyingPatches => write!(f, "[2/4] Applying patches..."),
+            Self::GenerateHkxFiles => write!(f, "[3/4] Generating HKX files..."),
             Self::Done => write!(f, "[4/4] Done."),
-            Self::Error(msg) => write!(f, "Error: {msg}"),
+            Self::Error(msg) => write!(f, "[Error] {msg}"),
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
+    Box::new(|status| {
+        match &status {
+            Status::ReadingTemplatesAndPatches => {
+                println!("\x1b[36m{status}\x1b[0m"); // Cyan
+            }
+            Status::ApplyingPatches => {
+                println!("\x1b[33m{status}\x1b[0m"); // Yellow
+            }
+            Status::GenerateHkxFiles => {
+                println!("\x1b[34m{status}\x1b[0m"); // Blue
+            }
+            Status::Done => {
+                println!("\x1b[32;1m{status}\x1b[0m"); // Bold Green
+            }
+            Status::Error(_) => {
+                println!("\x1b[31;1m{status}\x1b[0m"); // Bold Red
+            }
+        }
+    })
 }
 
 #[cfg(feature = "ts_serde")]

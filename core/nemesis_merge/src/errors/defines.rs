@@ -13,7 +13,7 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
 
-    /// Failed to read owned patches.(errors count: {errors_len})
+    /// Reading file Error count: {errors_len}
     FailedToReadOwnedPatches { errors_len: usize },
 
     /// Failed to read borrowed patches.(errors count: {errors_len})
@@ -25,30 +25,17 @@ pub enum Error {
     /// - Json patch error count: {patch_errors_len}
     /// - Failure to apply `patch -> XML template`.(error count: {apply_errors_len})
     /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
-    #[snafu(display(
-        "
-- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}
-
--       Json Patch Error Count: {patch_errors_len}
-- Apply Json Patch Error Count: {apply_errors_len}
--     Generate hkx Error Count: {hkx_errors_len}"
-    ))]
-    FailedToGenerateBehaviors {
-        adsf_errors_len: usize,
-        patch_errors_len: usize,
-        apply_errors_len: usize,
-        hkx_errors_len: usize,
-    },
+    #[snafu(display("{}", source))]
+    FailedToGenerateBehaviors { source: BehaviorGenerationError },
 
     /// No such template `{template_name}`.
     NotFoundTemplate { template_name: String },
 
     /// Json patch error
-    #[snafu(display("[Apply patch Error to `{template_name}`]:\n {source}\n patch: {patch}"))]
+    #[snafu(display("[Apply patch Error to `{template_name}`]\n{source}\n"))]
     PatchError {
-        source: json_patch::JsonPatchError,
         template_name: String,
-        patch: String,
+        source: json_patch::JsonPatchError,
     },
 
     /// Nemesis XML parsing error
@@ -125,6 +112,59 @@ pub enum Error {
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
 }
+
+#[derive(Debug, Clone)]
+pub struct BehaviorGenerationError {
+    pub owned_file_errors_len: usize,
+    pub adsf_errors_len: usize,
+    pub patch_errors_len: usize,
+    pub apply_errors_len: usize,
+    pub hkx_errors_len: usize,
+}
+
+impl core::fmt::Display for BehaviorGenerationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self {
+            owned_file_errors_len,
+            adsf_errors_len,
+            patch_errors_len,
+            apply_errors_len,
+            hkx_errors_len,
+        } = *self;
+
+        if adsf_errors_len == 0
+            && owned_file_errors_len == 0
+            && patch_errors_len == 0
+            && apply_errors_len == 0
+            && hkx_errors_len == 0
+        {
+            return write!(f, "No errors.");
+        }
+
+        writeln!(f, "Behavior generation failed with the following errors:")?;
+        if owned_file_errors_len > 0 {
+            writeln!(f, "-    Reading file Error count: {owned_file_errors_len}",)?;
+        }
+        if adsf_errors_len > 0 {
+            writeln!(
+                f,
+                "- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}",
+            )?;
+        }
+        if patch_errors_len > 0 {
+            writeln!(f, "-       Json Patch Error Count: {patch_errors_len}")?;
+        }
+        if apply_errors_len > 0 {
+            writeln!(f, "- Apply Json Patch Error Count: {apply_errors_len}")?;
+        }
+        if hkx_errors_len > 0 {
+            writeln!(f, "-     Generate hkx Error Count: {hkx_errors_len}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for BehaviorGenerationError {}
 
 /// `Result` for this crate.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

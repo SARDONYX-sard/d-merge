@@ -28,11 +28,8 @@ pub fn apply_patches<'a, 'b: 'a>(
                 let template = &mut template_pair.value_mut().1;
 
                 for (path, patch) in patches.0 {
-                    let patch_string = format!("{patch:#?}"); // TODO: Fix redundant copy
-                    apply_patch(template, path, patch).with_context(|_| PatchSnafu {
-                        template_name,
-                        patch: patch_string,
-                    })?;
+                    apply_patch(template, path, patch)
+                        .with_context(|_| PatchSnafu { template_name })?;
                 }
             }
 

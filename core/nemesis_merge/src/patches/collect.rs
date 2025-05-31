@@ -42,7 +42,7 @@ struct OwnedPath {
 pub async fn collect_owned_patches(
     nemesis_paths: &[PathBuf],
     id_order: &PriorityMap<'_>,
-) -> Result<(OwnedAdsfPatchMap, OwnedPatchMap), Vec<Error>> {
+) -> (OwnedAdsfPatchMap, OwnedPatchMap, Vec<Error>) {
     let mut handles = vec![];
     let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
     for (category, path) in paths {
@@ -95,11 +95,7 @@ pub async fn collect_owned_patches(
         }
     }
 
-    if errors.is_empty() {
-        Ok((adsf_patches, owned_patches))
-    } else {
-        Err(errors)
-    }
+    (adsf_patches, owned_patches, errors)
 }
 
 pub fn collect_borrowed_patches<'a>(

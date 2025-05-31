@@ -21,6 +21,8 @@ pub(super) fn apply_one_field<'v>(
         OpRangeKind::Pure(Op::Add) => apply_add(json, path, value),
         OpRangeKind::Pure(Op::Remove) => apply_remove(json, path),
         OpRangeKind::Pure(Op::Replace) => apply_replace(json, path, value),
-        unexpected => Err(JsonPatchError::MismatchApplyType { unexpected }),
+        unexpected => Err(JsonPatchError::mismatch_apply_type_from(
+            unexpected, &path, &value,
+        )),
     }
 }

@@ -22,12 +22,10 @@ pub(crate) fn apply_seq_by_priority<'a>(
 ) -> Result<()> {
     let target = json
         .ptr_mut(&path)
-        .ok_or_else(|| JsonPatchError::NotFoundTarget {
-            path: path.join("."),
-        })?;
+        .ok_or_else(|| JsonPatchError::not_found_target_from(&path, &patches))?;
 
     let Value::Array(template_array) = target else {
-        return Err(JsonPatchError::UnsupportedRangeKind);
+        return Err(JsonPatchError::unsupported_range_kind_from(&path, &patches));
     };
 
     sort_by_priority(patches.as_mut_slice());
