@@ -1,5 +1,5 @@
 use super::{bail, sender, time};
-use crate::error::NotFoundResourceDirSnafu;
+use crate::error::{NotFoundResourceDirSnafu, NotFoundSkyrimDataDirSnafu};
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
 use nemesis_merge::{behavior_gen, Config, HackOptions, Status};
 use snafu::ResultExt as _;
@@ -26,8 +26,12 @@ pub(crate) fn get_skyrim_data_dir(is_se: bool) -> Result<PathBuf, String> {
     use super::get_skyrim_dir::Runtime;
 
     let runtime = if is_se { Runtime::Se } else { Runtime::Vr };
-    crate::cmd::get_skyrim_dir::get_skyrim_data_dir(runtime)
-        .ok_or_else(|| "Failed to get skyrim data dir".into())
+    match crate::cmd::get_skyrim_dir::get_skyrim_data_dir(runtime)
+        .with_context(|_| NotFoundSkyrimDataDirSnafu)
+    {
+        Ok(path) => Ok(path),
+        Err(err) => bail!(err),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

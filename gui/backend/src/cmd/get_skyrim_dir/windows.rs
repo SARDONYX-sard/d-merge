@@ -1,18 +1,20 @@
 use std::ffi::OsString;
+use std::io;
 use std::os::windows::ffi::OsStringExt as _;
 use std::path::PathBuf;
 
 use crate::cmd::get_skyrim_dir::Runtime;
 
+/// Get the skyrim data directory.
 #[inline]
-pub fn get_skyrim_data_dir(runtime: Runtime) -> Option<PathBuf> {
+pub fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     get_skyrim_dir(runtime).map(|mut path| {
         path.push("Data");
         path
     })
 }
 
-fn get_skyrim_dir(runtime: Runtime) -> Option<PathBuf> {
+fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     use bindings::*;
 
     /// `SOFTWARE\\Bethesda Softworks\\Skyrim Special Edition\0` in UTF-16 LE
@@ -71,8 +73,7 @@ fn get_skyrim_dir(runtime: Runtime) -> Option<PathBuf> {
     };
 
     if status != ERROR_SUCCESS {
-        dbg!(std::io::Error::from_raw_os_error(status));
-        return None;
+        return Err(std::io::Error::from_raw_os_error(status));
     }
 
     // Convert UTF-16 buffer to PathBuf
@@ -80,7 +81,7 @@ fn get_skyrim_dir(runtime: Runtime) -> Option<PathBuf> {
     let os_string = OsString::from_wide(wide_slice)
         .to_string_lossy()
         .to_string();
-    Some(PathBuf::from(os_string.trim_end_matches('\0')))
+    Ok(PathBuf::from(os_string.trim_end_matches('\0')))
 }
 
 #[allow(non_upper_case_globals)]
@@ -110,8 +111,10 @@ mod bindings {
 mod tests {
     use super::*;
 
+    #[ignore = "Local only"]
     #[test]
     fn test_get_skyrim_dir() {
-        dbg!(get_skyrim_dir(Runtime::Se));
+        let path = get_skyrim_data_dir(Runtime::Se).unwrap_or_else(|e| panic!("{e}"));
+        dbg!(path); // == "D:\\STEAM\\steamapps\\common\\Skyrim Special Edition\\Data"
     }
 }
