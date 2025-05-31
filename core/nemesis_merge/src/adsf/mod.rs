@@ -44,6 +44,7 @@ impl<'a> Default for PatchKind<'a> {
 const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.txt";
 
 // "dmco", "slide"
+/// Patch to `animationdatasinglefile.txt`
 pub(crate) fn apply_adsf_patches(
     map: OwnedAdsfPatchMap,
     id_order: &PriorityMap,

@@ -80,6 +80,18 @@ pub enum Status {
     Error(String),
 }
 
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ReadingTemplatesAndPatches => write!(f, "[1/4] Reading templates and patches..."),
+            Self::ApplyingPatches => write!(f, "[1/2]Applying patches..."),
+            Self::GenerateHkxFiles => write!(f, "[1/3]Generating HKX files..."),
+            Self::Done => write!(f, "[4/4] Done."),
+            Self::Error(msg) => write!(f, "Error: {msg}"),
+        }
+    }
+}
+
 #[cfg(feature = "ts_serde")]
 #[cfg(test)]
 mod tests {

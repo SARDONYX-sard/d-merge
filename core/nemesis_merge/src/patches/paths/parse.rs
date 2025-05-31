@@ -10,35 +10,21 @@ use winnow::{
     ModalResult, Parser as _,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NemesisPath<'a> {
-    pub mod_code: &'a str,
-    pub template_name: &'a str,
-    pub index: &'a str,
-}
+use crate::errors::{Error, NonUtf8PathSnafu};
 
-#[derive(Debug, snafu::Snafu, PartialEq, Eq)]
-pub enum NemesisPathError {
-    /// Path must be utf-8
-    InvalidFormat,
-    #[snafu(display("{source}"))]
-    ReadableError { source: ReadableError },
-}
-
-type Result<T, E = NemesisPathError> = core::result::Result<T, E>;
-
-pub fn parse_nemesis_path(input: &Path) -> Result<NemesisPath> {
-    let input = input.to_str().context(InvalidFormatSnafu)?;
+/// Parse nemesis patch path.
+pub fn parse_nemesis_path(path: &Path) -> Result<&str, Error> {
+    let input = path.to_str().with_context(|| NonUtf8PathSnafu { path })?;
 
     parse_components
         .parse(input)
-        .map_err(|e| NemesisPathError::ReadableError {
+        .map_err(|e| Error::FailedParseNemesisPath {
             source: ReadableError::from_parse(e),
         })
 }
 
 /// return `_1stperson/0_master`
-fn parse_components<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
+fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let first_person = seq!(
         Caseless("_1stperson"),
         alt(('/', '\\')),
@@ -50,73 +36,60 @@ fn parse_components<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
 
     // Parse prefix to Nemesis_Engine/mod/<mod_code>/
     let mut parser = seq! {
-        NemesisPath {
             _: take_until(0.., "Nemesis_Engine"),
             _: "Nemesis_Engine",
             _: alt(('/', '\\')),
             _: "mod",
             _: alt(('/', '\\')),
-            mod_code: take_while(1.., |c| !matches!(c, '/' | '\\')),
+            _: take_while(1.., |c| !matches!(c, '/' | '\\')), // mod_code e.g. slide
             _: alt(('/', '\\')),
-            template_name: template_name,
-            _: alt(('/', '\\')),
-            index: take_while(1.., |c| !matches!(c, '.' | '/' | '\\')),
+            template_name,
             _: repeat::<_, _, (), _, _>(0.., any),
-        }
     };
 
-    parser.parse_next(input)
+    let (template_name,) = parser.parse_next(input)?;
+    Ok(template_name)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
-    fn test_parse_nemesis_path(path: &str) -> NemesisPath<'_> {
+    fn test_parse_nemesis_path(path: &str) -> &str {
         parse_nemesis_path(Path::new(path)).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
-    fn parse_nemesis_path_valid() {
+    fn parse_nemesis_path_valid_basic() {
         let actual =
             test_parse_nemesis_path("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
-        assert_eq!(
-            actual,
-            NemesisPath {
-                mod_code: "flinch",
-                template_name: "0_master",
-                index: "#0106",
-            }
-        );
-
-        let actual = test_parse_nemesis_path("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
-        assert_eq!(
-            actual,
-            NemesisPath {
-                mod_code: "flinch",
-                template_name: "0_master",
-                index: "#0106",
-            }
-        );
-
-        let actual = test_parse_nemesis_path(
-            "/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt",
-        );
-        assert_eq!(
-            actual,
-            NemesisPath {
-                mod_code: "flinch",
-                template_name: "_1stperson/0_master",
-                index: "#0106",
-            }
-        );
+        assert_eq!(actual, "0_master");
     }
 
     #[test]
-    fn parse_nemesis_path_invalid() {
+    fn parse_nemesis_path_valid_relative_path() {
+        let actual = test_parse_nemesis_path("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
+        assert_eq!(actual, "0_master");
+    }
+
+    #[test]
+    fn parse_nemesis_path_valid_nested_template_name() {
+        let actual = test_parse_nemesis_path(
+            "/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt",
+        );
+        assert_eq!(actual, "_1stperson/0_master");
+    }
+
+    #[test]
+    fn parse_nemesis_path_invalid_wrong_path() {
+        // Missing `Nemesis_Engine`
         let input_path = Path::new("/invalid/path/to/Engine/mod/flinch/0_master/#0106.txt");
         assert!(parse_nemesis_path(input_path).is_err());
+    }
 
+    #[test]
+    fn parse_nemesis_path_invalid_too_short() {
         let input_path = Path::new("Nemesis_Engine/mod/flinch");
         assert!(parse_nemesis_path(input_path).is_err());
     }

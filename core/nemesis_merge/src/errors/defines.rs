@@ -1,4 +1,5 @@
 //! errors of `This crate`
+use serde_hkx::errors::readable::ReadableError;
 use std::{io, path::PathBuf};
 
 /// `nemesis_merge` Error
@@ -65,14 +66,14 @@ pub enum Error {
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n {source}", path.display()))]
     FailedParseAdsfTemplate {
-        source: serde_hkx::errors::readable::ReadableError,
+        source: ReadableError,
         path: PathBuf,
     },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n {source}", path.display()))]
     FailedParseAdsfPatch {
-        source: serde_hkx::errors::readable::ReadableError,
+        source: ReadableError,
         path: PathBuf,
     },
 
@@ -91,11 +92,12 @@ pub enum Error {
         source: simd_json::Error,
     },
 
+    /// Path must be utf-8.
+    #[snafu(display("Expected utf-8 path. but got {}", path.display()))]
+    NonUtf8Path { path: PathBuf },
+
     /// Failed to parse path as nemesis path
-    #[snafu(transparent)]
-    FailedParseNemesisPath {
-        source: crate::paths::parse::NemesisPathError,
-    },
+    FailedParseNemesisPath { source: ReadableError },
 
     #[snafu(transparent)]
     ParsedAdsfPathError {

@@ -12,6 +12,7 @@
     "clippy",
     "dashmap",
     "defaultmale",
+    "firstperson",
     "havok",
     "hkcstring",
     "hkobject",
@@ -38,6 +39,7 @@
     "tauri",
     "Uninit",
     "unlisten",
+    "weapequip",
     "xorout"
   ]
 }

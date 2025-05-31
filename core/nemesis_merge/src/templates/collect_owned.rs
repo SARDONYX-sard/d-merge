@@ -5,30 +5,34 @@
 //!
 //! From here, we need to determine and load the xml to which the patch will be applied, so we use a table to load this.
 //! Note that the dir paths above `mesh` can be optionally specified and concatenated as resource paths later.
-use dashmap::DashMap;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::path::{Path, PathBuf};
 
-pub fn collect_table_paths<P>(path: P) -> DashMap<String, PathBuf>
+/// Return HashMap<template key, `meshes` inner path>
+pub fn collect_owned_templates<P>(path: P) -> dashmap::DashMap<String, PathBuf>
 where
     P: AsRef<Path>,
 {
-    let paths: Vec<PathBuf> = jwalk::WalkDir::new(path)
-        .into_iter()
-        .filter_map(|res| validate_template_path(res.ok()?.path()))
-        .collect();
+    use rayon::prelude::*;
 
-    paths
-        .into_par_iter()
-        .filter_map(|path| get_key_value(&path))
+    jwalk::WalkDir::new(path)
+        .into_iter()
+        .par_bridge()
+        .filter_map(|path| template_name_and_inner_path(&path.ok()?.path()))
         .collect()
 }
 
-// - key: (`_1stperson`) + file stem
-/// - value: Path after `mesh`
-fn get_key_value(path: &Path) -> Option<(String, PathBuf)> {
+/// Return (hashmap key, meshes inner path)
+fn template_name_and_inner_path(path: &Path) -> Option<(String, PathBuf)> {
+    let is_xml = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
+    if !is_xml {
+        return None;
+    }
+
     let key = {
         let file_stem = path.file_stem()?.to_string_lossy();
+
         let mut components = path.components();
         let is_1stperson = components.any(|c| c.as_os_str().eq_ignore_ascii_case("_1stPerson"));
         if is_1stperson {
@@ -42,7 +46,7 @@ fn get_key_value(path: &Path) -> Option<(String, PathBuf)> {
         }
     };
 
-    let value = {
+    let inner_path = {
         let mut value = None;
         let mut components = path.components();
 
@@ -59,65 +63,18 @@ fn get_key_value(path: &Path) -> Option<(String, PathBuf)> {
         value?
     };
 
-    Some((key, value))
-}
-
-/// Ignore
-/// - `meshes/actors/character/_1stperson/file_stem.xml` or
-/// - `meshes/actors/character/file_stem.xml`
-///
-/// Expected
-/// - `meshes/actors/character/_1stperson/<middle dir>/file_stem.xml` -> rev 1 skip, `_1stperson` -> valid 1st person
-/// - `meshes/actors/character/<middle dir>/file_stem.xml` -> rev 2 skip, then `actors` -> valid 3rd person
-pub fn validate_template_path(path: PathBuf) -> Option<PathBuf> {
-    let is_xml = path
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
-    if !is_xml {
-        return None;
-    }
-
-    // ignore until actors.next()
-    let mut components = path.components();
-    for comp in components.by_ref() {
-        if comp.as_os_str().eq_ignore_ascii_case("actors") {
-            break;
-        }
-    }
-
-    // Skip `components.next()` => e.g. `character`, `troll`
-    components.next();
-
-    // _1stperson or `<middle dir>`(3rd person)
-    let is_1stperson = components.next().is_some_and(|maybe_1stperson| {
-        maybe_1stperson
-            .as_os_str()
-            .eq_ignore_ascii_case("_1stperson")
-    });
-
-    if is_1stperson {
-        // skip middle dir for _1stperson (e.g. `characters`)
-        components.next();
-    }
-
-    let file_stem = components.next()?.as_os_str().to_str()?;
-    let ext_idx = file_stem.find('.')?;
-
-    file_stem[ext_idx + 1..]
-        .eq_ignore_ascii_case("xml")
-        .then_some(path)
+    Some((key, inner_path))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // behaviors/1hm_behavior => 1hm_behavior
     #[test]
     fn test_1st_person() {
         let path =
             Path::new("resource/assets/templates/meshes/actors/character/behaviors/weapequip.xml");
-        match get_key_value(path) {
+        match template_name_and_inner_path(path) {
             Some((key, value)) => {
                 assert_eq!(key, "weapequip");
                 assert_eq!(
@@ -129,13 +86,12 @@ mod tests {
         }
     }
 
-    // _1stperson/characters/firstperson => _1stperson/firstperson
     #[test]
     fn test_1st_person_character() {
         let path = Path::new(
             "resource/assets/templates/meshes/actors/character/_1stperson/characters/firstperson.xml",
         );
-        match get_key_value(path) {
+        match template_name_and_inner_path(path) {
             Some((key, value)) => {
                 assert_eq!(key, "_1stperson/firstperson");
                 assert_eq!(
@@ -145,13 +101,5 @@ mod tests {
             }
             None => panic!("Invalid path"),
         }
-    }
-
-    #[test]
-    fn test_parse() {
-        let path =
-            Path::new("templates/meshes/actors/character/_1stperson/characters/firstperson.xml")
-                .to_path_buf();
-        assert_eq!(validate_template_path(path.clone()), Some(path));
     }
 }

@@ -7,8 +7,9 @@ use crate::{
         apply::apply_patches,
         collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
     },
-    paths::id::paths_to_priority_map,
-    templates::collect::collect_templates,
+    path_id::paths_to_priority_map,
+    templates::collect::collect_borrowed_templates,
+    types::OwnedPatchMap,
 };
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -23,15 +24,15 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
 
     let mut all_errors = vec![];
 
-    // 1/4: Collect all patches & templates xml
+    // Collect all patches & templates xml
     config.on_report_status(Status::ReadingTemplatesAndPatches);
     let (owned_adsf_patches, owned_patches) =
         match collect_owned_patches(&nemesis_paths, &id_order).await {
             Ok(owned_patches) => owned_patches,
             Err(errors) => {
-                let errors_len = errors.len();
-
-                let err = Error::FailedToReadOwnedPatches { errors_len };
+                let err = Error::FailedToReadOwnedPatches {
+                    errors_len: errors.len(),
+                };
                 config.on_report_status(Status::Error(err.to_string()));
 
                 write_errors(&config, &errors).await?;
@@ -39,11 +40,53 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
             }
         };
 
-    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config);
-    let adsf_errors_len = adsf_errors.len();
-    all_errors.par_extend(adsf_errors);
+    // - Patch to `animationdatasinglefile.txt`
+    // - Patch to hkx( -> xml)
+    let (adsf_errors, hkx_result) = rayon::join(
+        || crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config),
+        || apply_and_gen_patched_hkx(&owned_patches, &config),
+    );
 
-    // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
+    let adsf_errors_len = adsf_errors.len();
+    let Errors {
+        patch_errors_len,
+        apply_errors_len,
+        hkx_errors_len,
+        hkx_errors,
+    } = hkx_result;
+
+    all_errors.par_extend(adsf_errors);
+    all_errors.par_extend(hkx_errors);
+
+    if !all_errors.is_empty() {
+        let err = Error::FailedToGenerateBehaviors {
+            adsf_errors_len,
+            hkx_errors_len,
+            patch_errors_len,
+            apply_errors_len,
+        };
+        config.on_report_status(Status::Error(err.to_string()));
+
+        write_errors(&config, &all_errors).await?;
+        return Err(err);
+    };
+
+    config.on_report_status(Status::Done);
+    Ok(())
+}
+
+struct Errors {
+    patch_errors_len: usize,
+    apply_errors_len: usize,
+    hkx_errors_len: usize,
+    hkx_errors: Vec<Error>,
+}
+
+fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
+    let mut all_errors = vec![];
+
+    // 1/2: Apply patches & Replace variables to indexes
+    config.on_report_status(Status::ApplyingPatches);
     let (
         BorrowedPatches {
             template_names,
@@ -52,60 +95,41 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(&owned_patches, config.hack_options);
+        let (patch_result, errors) = collect_borrowed_patches(owned_patches, config.hack_options);
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
     };
 
-    // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
-    // Therefore, reassign the local variable in the block to shorten the lifetime
-    {
-        let (templates, errors) = collect_templates(template_names, &config.resource_dir);
+    let (templates, errors) = collect_borrowed_templates(template_names, &config.resource_dir);
+    all_errors.par_extend(errors);
+
+    let mut apply_errors_len = 0;
+    if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {
+        apply_errors_len = errors.len();
         all_errors.par_extend(errors);
-
-        // 3/4: Apply patches & Replace variables to indexes
-        config.on_report_status(Status::ApplyingPatches);
-        let mut apply_errors_len = 0;
-        if let Err(errors) =
-            apply_patches(&templates, patch_map_foreach_template, &config.output_dir)
-        {
-            apply_errors_len = errors.len();
-            all_errors.par_extend(errors);
-        };
-
-        // 4/4: Generate hkx files.
-        config.on_report_status(Status::GenerateHkxFiles);
-        let hkx_errors_len = {
-            if let Err(hkx_errors) =
-                generate_hkx_files(&config.output_dir, templates, variable_class_map)
-            {
-                let errors_len = hkx_errors.len();
-                all_errors.par_extend(hkx_errors);
-                errors_len
-            } else {
-                0
-            }
-        };
-
-        if !all_errors.is_empty() {
-            write_errors(&config, &all_errors).await?;
-
-            let err = Error::FailedToGenerateBehaviors {
-                adsf_errors_len,
-                hkx_errors_len,
-                patch_errors_len,
-                apply_errors_len,
-            };
-
-            config.on_report_status(Status::Error(err.to_string()));
-            return Err(err);
-        };
     };
 
-    config.on_report_status(Status::Done);
+    // 2/2: Generate hkx files.
+    config.on_report_status(Status::GenerateHkxFiles);
+    let hkx_errors_len = {
+        if let Err(hkx_errors) =
+            generate_hkx_files(&config.output_dir, templates, variable_class_map)
+        {
+            let errors_len = hkx_errors.len();
+            all_errors.par_extend(hkx_errors);
+            errors_len
+        } else {
+            0
+        }
+    };
 
-    Ok(())
+    Errors {
+        patch_errors_len,
+        apply_errors_len,
+        hkx_errors_len,
+        hkx_errors: all_errors,
+    }
 }
 
 #[cfg(test)]
@@ -116,8 +140,6 @@ mod tests {
     #[ignore = "unimplemented yet"]
     #[cfg(feature = "tracing")]
     async fn merge_test() {
-        use nemesis_xml::hack::HackOptions;
-
         let log_path = "../../dummy/merge_test.log";
         crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
 
@@ -152,8 +174,8 @@ mod tests {
             Config {
                 resource_dir: "../../resource/assets/templates".into(),
                 output_dir: "../../dummy/behavior_gen/output".into(),
-                status_report: None,
-                hack_options: Some(HackOptions::enable_all()),
+                status_report: Some(Box::new(|status| println!("{status}"))),
+                hack_options: Some(crate::HackOptions::enable_all()),
             },
         )
         .await
