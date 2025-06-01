@@ -9,9 +9,6 @@ pub enum Category {
 
 /// Collects all relevant file paths within the given ID directory.
 ///
-/// # Arguments
-/// - `path`: Path to the directory containing Nemesis XML files.
-///
 /// # Errors
 /// Returns an error if path traversal fails.
 pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)> {
@@ -63,7 +60,7 @@ fn is_nemesis_file(path: &Path) -> bool {
 ///
 /// # Assumption.
 /// - The file is a file with a txt extension.
-pub fn is_adsf_patch_file(txt_path: &Path) -> bool {
+fn is_adsf_patch_file(txt_path: &Path) -> bool {
     // Check if any parent directory in the last 3 components is "animationdatasinglefile"
     let has_adsf_parent = txt_path
         .ancestors()

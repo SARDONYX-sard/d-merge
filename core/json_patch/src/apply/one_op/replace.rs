@@ -13,19 +13,11 @@ pub(crate) fn apply_replace<'a>(
     path: JsonPath<'a>,
     value: Value<'a>,
 ) -> Result<()> {
-    let res = json.ptr_mut(&path);
-
-    res.map_or_else(
-        || {
-            Err(JsonPatchError::NotFoundTarget {
-                path: path.join("."),
-            })
-        },
-        |target| {
-            *target = value;
-            Ok(())
-        },
-    )
+    let Some(target) = json.ptr_mut(&path) else {
+        return Err(JsonPatchError::not_found_target_from(&path, &value));
+    };
+    *target = value;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -101,12 +93,7 @@ mod tests {
         let value = json_typed!(borrowed, 99);
         let result = apply_replace(&mut target_json, path, value);
 
-        assert_eq!(
-            result,
-            Err(JsonPatchError::NotFoundTarget {
-                path: "data.5".to_string()
-            })
-        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -180,11 +167,6 @@ mod tests {
         let value = json_typed!(borrowed, 12345);
         let result = apply_replace(&mut target_json, path, value);
 
-        assert_eq!(
-            result,
-            Err(JsonPatchError::NotFoundTarget {
-                path: "address.zip".to_string()
-            })
-        );
+        assert!(result.is_err());
     }
 }

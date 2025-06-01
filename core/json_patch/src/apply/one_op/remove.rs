@@ -1,6 +1,7 @@
 use crate::apply::error::{JsonPatchError, Result};
 use crate::JsonPath;
 use simd_json::borrowed::Value;
+use simd_json::ValueBuilder;
 use std::borrow::Cow;
 
 /// Remove one value.
@@ -9,9 +10,8 @@ use std::borrow::Cow;
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
 pub(crate) fn apply_remove<'a>(json: &mut Value<'a>, path: JsonPath<'a>) -> Result<()> {
-    remove(json, &path).ok_or_else(|| JsonPatchError::NotFoundTarget {
-        path: path.join("."),
-    })?;
+    remove(json, &path)
+        .ok_or_else(|| JsonPatchError::not_found_target_from(&path, Value::null()))?;
     Ok(())
 }
 
@@ -148,7 +148,8 @@ mod tests {
         let result = apply_remove(&mut target_json, path);
 
         let expected = Err(JsonPatchError::NotFoundTarget {
-            path: "items.key3".to_string(),
+            path: "items/key3".to_string(),
+            value: format!("{:#?}", Value::null()),
         });
         assert_eq!(result, expected);
     }
@@ -165,7 +166,8 @@ mod tests {
         assert_eq!(
             result,
             Err(JsonPatchError::NotFoundTarget {
-                path: "missing".to_string()
+                path: "missing".to_string(),
+                value: format!("{:#?}", Value::null()),
             })
         );
     }

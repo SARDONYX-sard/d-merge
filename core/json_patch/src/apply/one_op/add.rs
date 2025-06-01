@@ -18,7 +18,7 @@ pub(crate) fn apply_add<'value>(
     value: Value<'value>,
 ) -> Result<()> {
     if path.is_empty() {
-        return Err(JsonPatchError::EmptyPointer);
+        return Err(JsonPatchError::empty_pointer_from(&path, &value));
     }
     let last_index = path.len() - 1;
 
@@ -48,9 +48,11 @@ pub(crate) fn apply_add<'value>(
                         target = &mut list[index];
                     }
                 } else {
-                    return Err(JsonPatchError::InvalidIndex {
-                        index: token.to_string(),
-                    });
+                    return Err(JsonPatchError::invalid_index_from(
+                        last_index,
+                        &[token],
+                        &value,
+                    ));
                 }
             }
             Value::String(ref mut s) => {
@@ -60,26 +62,43 @@ pub(crate) fn apply_add<'value>(
                             *s = s2;
                             return Ok(());
                         }
-                        _ => return Err(JsonPatchError::InvalidString),
+                        _ => return Err(JsonPatchError::invalid_string_from(&[token], &value)),
                     }
                 } else {
-                    return Err(JsonPatchError::InvalidString); // Can't go deeper in a String
+                    return Err(JsonPatchError::invalid_string_from(&[token], &value));
+                    // Can't go deeper in a String
                 }
             }
             Value::Static(ref mut static_node) => {
                 if i == last_index {
                     return {
+                        macro_rules! try_insert {
+                            ($n:ident, $try_exp:expr) => {
+                                match $try_exp {
+                                    Ok(v) => *$n = v,
+                                    Err(err) => {
+                                        return Err(JsonPatchError::try_type_from(
+                                            err,
+                                            &[token],
+                                            &value,
+                                        ))
+                                    }
+                                }
+                            };
+                        }
+
                         match static_node {
-                            StaticNode::I64(n) => *n = value.try_as_i64()?,
-                            StaticNode::U64(n) => *n = value.try_as_u64()?,
-                            StaticNode::F64(n) => *n = value.try_as_f64()?,
-                            StaticNode::Bool(b) => *b = value.try_as_bool()?,
+                            StaticNode::I64(n) => try_insert!(n, value.try_as_i64()),
+                            StaticNode::U64(n) => try_insert!(n, value.try_as_u64()),
+                            StaticNode::F64(n) => try_insert!(n, value.try_as_f64()),
+                            StaticNode::Bool(n) => try_insert!(n, value.try_as_bool()),
                             StaticNode::Null => {}
                         };
                         Ok(())
                     };
                 } else {
-                    return Err(JsonPatchError::InvalidTarget); // Can't go deeper in a static node
+                    return Err(JsonPatchError::invalid_target_from(&[token], &value));
+                    // Can't go deeper in a static node
                 }
             }
         }

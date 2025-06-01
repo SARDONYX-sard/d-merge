@@ -1,3 +1,5 @@
+pub type JsonPath<'a> = Vec<std::borrow::Cow<'a, str>>;
+
 /// A macro to create a JSON path as a vector of string slices.
 ///
 /// This macro helps construct a `Vec<Cow<'static, str>>` representing a JSON path.

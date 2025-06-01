@@ -1,4 +1,5 @@
 //! errors of `This crate`
+use serde_hkx::errors::readable::ReadableError;
 use std::{io, path::PathBuf};
 
 /// `nemesis_merge` Error
@@ -12,7 +13,7 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
 
-    /// Failed to read owned patches.(errors count: {errors_len})
+    /// Reading file Error count: {errors_len}
     FailedToReadOwnedPatches { errors_len: usize },
 
     /// Failed to read borrowed patches.(errors count: {errors_len})
@@ -24,34 +25,21 @@ pub enum Error {
     /// - Json patch error count: {patch_errors_len}
     /// - Failure to apply `patch -> XML template`.(error count: {apply_errors_len})
     /// - Failed to generate hkx of XML templates.(error count: {hkx_errors_len})
-    #[snafu(display(
-        "
-- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}
-
--       Json Patch Error Count: {patch_errors_len}
-- Apply Json Patch Error Count: {apply_errors_len}
--     Generate hkx Error Count: {hkx_errors_len}"
-    ))]
-    FailedToGenerateBehaviors {
-        adsf_errors_len: usize,
-        patch_errors_len: usize,
-        apply_errors_len: usize,
-        hkx_errors_len: usize,
-    },
+    #[snafu(display("{}", source))]
+    FailedToGenerateBehaviors { source: BehaviorGenerationError },
 
     /// No such template `{template_name}`.
     NotFoundTemplate { template_name: String },
 
     /// Json patch error
-    #[snafu(display("{template_name}:\n {source}\n patch: {patch}"))]
+    #[snafu(display("[Apply patch Error to template file(`{template_name}`)]\n{source}\n"))]
     PatchError {
-        source: json_patch::JsonPatchError,
         template_name: String,
-        patch: String,
+        source: json_patch::JsonPatchError,
     },
 
     /// Nemesis XML parsing error
-    #[snafu(display("{}:\n{source}\n", path.display()))]
+    #[snafu(display("[Nemesis XML Patch Parsing Error `{}`]:\n{source}\n", path.display()))]
     NemesisXmlErr {
         /// input path
         path: PathBuf,
@@ -62,36 +50,17 @@ pub enum Error {
     #[snafu(display("Failed to parse path: {}", path.display()))]
     MissingParseNemesisPath { path: PathBuf },
 
-    /// Failed to parse path as nemesis path
-    #[snafu(transparent)]
-    FailedParseNemesisPath {
-        source: crate::paths::parse::NemesisPathError,
-    },
-
-    /// dir strip error
-    #[snafu(transparent)]
-    StripPrefixError { source: std::path::StripPrefixError },
-
-    /// jwalk error
-    #[snafu(transparent)]
-    JwalkErr { source: jwalk::Error },
-
-    #[snafu(transparent)]
-    ParsedAdsfPathError {
-        source: crate::adsf::path_parser::ParseError,
-    },
-
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n {source}", path.display()))]
     FailedParseAdsfTemplate {
-        source: serde_hkx::errors::readable::ReadableError,
+        source: ReadableError,
         path: PathBuf,
     },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n {source}", path.display()))]
     FailedParseAdsfPatch {
-        source: serde_hkx::errors::readable::ReadableError,
+        source: ReadableError,
         path: PathBuf,
     },
 
@@ -101,6 +70,34 @@ pub enum Error {
         path: PathBuf,
         source: serde_hkx::errors::ser::Error,
     },
+
+    /// (De)Serialize json error
+    #[snafu(display("{}:\n {source}", path.display()))]
+    JsonError {
+        /// input path
+        path: PathBuf,
+        source: simd_json::Error,
+    },
+
+    /// Path must be utf-8.
+    #[snafu(display("Expected utf-8 path. but got {}", path.display()))]
+    NonUtf8Path { path: PathBuf },
+
+    /// Failed to parse path as nemesis path
+    FailedParseNemesisPath { source: ReadableError },
+
+    #[snafu(transparent)]
+    ParsedAdsfPathError {
+        source: crate::adsf::path_parser::ParseError,
+    },
+
+    /// dir strip error
+    #[snafu(transparent)]
+    StripPrefixError { source: std::path::StripPrefixError },
+
+    /// jwalk error
+    #[snafu(transparent)]
+    JwalkErr { source: jwalk::Error },
 
     #[snafu(transparent)]
     HkxDeError {
@@ -114,15 +111,60 @@ pub enum Error {
 
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
-
-    /// (De)Serialize json error
-    #[snafu(display("{}:\n {source}", path.display()))]
-    JsonError {
-        /// input path
-        path: PathBuf,
-        source: simd_json::Error,
-    },
 }
+
+#[derive(Debug, Clone)]
+pub struct BehaviorGenerationError {
+    pub owned_file_errors_len: usize,
+    pub adsf_errors_len: usize,
+    pub patch_errors_len: usize,
+    pub apply_errors_len: usize,
+    pub hkx_errors_len: usize,
+}
+
+impl core::fmt::Display for BehaviorGenerationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self {
+            owned_file_errors_len,
+            adsf_errors_len,
+            patch_errors_len,
+            apply_errors_len,
+            hkx_errors_len,
+        } = *self;
+
+        if adsf_errors_len == 0
+            && owned_file_errors_len == 0
+            && patch_errors_len == 0
+            && apply_errors_len == 0
+            && hkx_errors_len == 0
+        {
+            return write!(f, "No errors.");
+        }
+
+        writeln!(f, "Behavior generation failed with the following errors:")?;
+        if owned_file_errors_len > 0 {
+            writeln!(f, "-    Reading file Error count: {owned_file_errors_len}",)?;
+        }
+        if adsf_errors_len > 0 {
+            writeln!(
+                f,
+                "- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}",
+            )?;
+        }
+        if patch_errors_len > 0 {
+            writeln!(f, "-       Json Patch Error Count: {patch_errors_len}")?;
+        }
+        if apply_errors_len > 0 {
+            writeln!(f, "- Apply Json Patch Error Count: {apply_errors_len}")?;
+        }
+        if hkx_errors_len > 0 {
+            writeln!(f, "-     Generate hkx Error Count: {hkx_errors_len}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for BehaviorGenerationError {}
 
 /// `Result` for this crate.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

@@ -1,20 +1,44 @@
-# Merge Issues
+# Merge Memo
 
-## Separation of Path and Range
+```txt
+op: [[1..10], [15..20]]
+value: [[`dummy` * 9], [`dummy2` * 4]]
 
-- Difficult to construct a HashMap:
-  - Multiple `Range` objects may exist within a single array.
-- HashMap (key) → Retrieve identical patch `Path`s.
+issue: prev: 1..10, next: 2..10 => diff key
 
-### Path Specification Issues
+key: 1..10, value: ArrayMap[`dummy` * 9]
 
-- The current `Path` includes array indices as `Range`, but only the final segment is treated as a `Range` type.
-- Consider revising the patch creation specification:
-  - Support for parallelization.
-- Remove `Path` from JSON Patch (since it already exists as a key in the HashMap).
+1/3 par_iter cache arrays
+Dashmap<OpRange, ArrayMap>
 
-## Merge Strategy
+insert, then lock guard -> check range
+Apply Array: HashMap.iter -> each check range
 
-1. Sort patches by priority.
-2. Resolve conflicts **in parallel** within each group.
-3. Resolve conflicts **sequentially** using the winning patches from each group.
+nemesis_xml: parse
+   [1, 2, 3, 4]: slide(1) op: add
+                  [6, 7, 8, 9, 10]: slide(1) op: add
+
+                              [10, , 11, 12, 13, 14, 15]: 2  op: add
+                                                    [15, 16, 17, 18, 19, 20]: 2  op: add
+
+      [2, 3, 4, 5]: 3 op: remove
+
+let mut map = HashMapWrapper {
+        key: { Op, [1..10] }, value: (value: [], priority: 1)
+        key: { Op, [2..5]  }, value: (value: [], priority: 2)
+        key: { Op, [10..15] }, value: [], (value: [], priority: 3)
+};
+
+2/3 range battle(cannot par_iter)
+map.sort_by_priority();
+
+3/3. apply last vector(cannot par_iter)
+let new_value = ArrayMap::new();  // array[max_range]
+
+// add
+for (key, value) in map  // priority
+    new_value = value[range];
+
+// remove
+-> new_value.into_vec() -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+```

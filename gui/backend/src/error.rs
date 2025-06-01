@@ -9,16 +9,19 @@ pub enum Error {
     #[snafu(display("{source}: {}", path.display()))]
     FailedReadFile { source: io::Error, path: PathBuf },
 
+    /// Failed to get skyrim data dir: {source}
+    NotFoundSkyrimDataDir { source: io::Error },
+
     /// Standard io error
     #[snafu(transparent)]
     FailedIo { source: io::Error },
 
-    /// Not found resource dir
+    /// Not found resource dir. {source}
     NotFoundResourceDir { source: tauri::Error },
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Logger
-    /// Not found log dir
+    /// Not found log dir. {source}
     NotFoundLogDir { source: tauri::Error },
 
     /// Failed to initialize logger.
