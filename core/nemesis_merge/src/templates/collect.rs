@@ -13,6 +13,8 @@ pub fn collect_borrowed_templates<'a>(
     resource_dir: &Path,
 ) -> (BorrowedTemplateMap<'a>, Vec<Error>) {
     let template_behaviors = collect_owned_templates(resource_dir);
+    #[cfg(feature = "tracing")]
+    tracing::trace!("template_behaviors = {template_behaviors:#?}");
 
     let results: Vec<Result<(&str, (PathBuf, BorrowedValue<'static>))>> = template_names
         .into_par_iter()
