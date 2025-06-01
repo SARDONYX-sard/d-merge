@@ -20,7 +20,10 @@ phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_hkx = { workspace = true }
-serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
+serde_hkx_features = { workspace = true, features = [
+  "extra_fmt",
+  "serde_default",
+] }
 simd-json = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }

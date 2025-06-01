@@ -116,4 +116,31 @@ mod tests {
             None => panic!("Invalid path"),
         }
     }
+
+    #[ignore = "local only checker"]
+    #[test]
+    fn test_overwrite_path() {
+        let path = "../../resource/assets";
+
+        let mut map = indexmap::IndexMap::new();
+        let mut overwrite = vec![];
+        for result in jwalk::WalkDir::new(path) {
+            let path = result.unwrap().path();
+
+            if !path.is_file() {
+                continue;
+            }
+
+            let Some((template_name, inner_path)) = template_name_and_inner_path(&path) else {
+                continue;
+            };
+
+            if let Some(prev) = map.insert(template_name, inner_path.clone()) {
+                overwrite.push((inner_path, prev));
+            };
+        }
+
+        dbg!(&overwrite);
+        dbg!(overwrite.len());
+    }
 }

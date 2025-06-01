@@ -1635,7 +1635,7 @@ dependencies = [
 [[package]]
 name = "havok_classes"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "bitflags 2.9.1",
  "educe",
@@ -1651,7 +1651,7 @@ dependencies = [
 [[package]]
 name = "havok_serde"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "arrayvec",
  "havok_types",
@@ -1661,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "havok_types"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "lexical",
  "parse-display",
@@ -1674,7 +1674,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "havok_types_derive_proc_macros",
 ]
@@ -1682,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3737,7 +3737,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "annotate-snippets",
  "byteorder",
@@ -3754,7 +3754,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx_features"
 version = "0.8.4"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?tag=0.8.4#aeae66b091180ccb932fc28cb726d55c1ee37017"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=715f27#715f27163626226e09b93daf2c9b892deecebc55"
 dependencies = [
  "basic-toml",
  "encoding_rs_io",
