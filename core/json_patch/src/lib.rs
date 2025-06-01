@@ -1,3 +1,11 @@
+//! A module for prioritized JSON patch operations.
+//!
+//! This crate is designed for patching JSON structures where each patch has a
+//! priority value. Conflicting patches can be resolved based on their priority.
+//!
+//! `Patch::One` is used for scalar fields or single-class replacements,
+//! while `Patch::Seq` is used for editing arrays, with each operation targeting
+//! a specific index range.
 mod apply;
 pub mod json_path;
 mod operation;

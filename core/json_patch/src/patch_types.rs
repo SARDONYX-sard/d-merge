@@ -3,19 +3,41 @@ pub use crate::operation::Op;
 use simd_json::BorrowedValue;
 use std::ops::Range;
 
+/// A prioritized JSON patch.
+///
+/// This patch can either represent:
+///
+/// - `One`: a single field or C++ class (serialized as a JSON value),
+/// - `Seq`: a sequence of patch operations, intended to be applied to JSON arrays.
+///
+/// This enum allows merging multiple patches, each with an associated priority,
+/// and supports both scalar and sequence-style edits.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Patch<'a> {
-    /// - value: (json patch, priority)
+    /// A single patch targeting one field or one object.
+    ///
+    /// Typically used to modify a scalar value or an entire C++ object
+    /// serialized as a single JSON value.
+    /// - Priority is considered just before merging.
     #[cfg_attr(
         feature = "serde",
         serde(bound(deserialize = "ValueWithPriority<'a>: serde::Deserialize<'de>"))
     )]
-    OneField(ValueWithPriority<'a>),
-    /// - value: [(json patch, priority), (json patch, priority), ...]
+    One(ValueWithPriority<'a>),
+
+    /// A sequence of prioritized patches.
+    ///
+    /// Intended for patches that apply to JSON arrays, representing multiple
+    /// insertions, deletions, or replacements at specific ranges.
+    /// - Patch on the assumption that it has already been overwritten by the highest priority.
     Seq(Vec<ValueWithPriority<'a>>),
 }
 
+/// A JSON patch along with its associated priority.
+///
+/// The priority determines how conflicting patches should be resolved.
+/// Lower numbers indicate higher precedence.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ValueWithPriority<'a> {
@@ -24,6 +46,7 @@ pub struct ValueWithPriority<'a> {
         serde(bound(deserialize = "JsonPatch<'a>: serde::Deserialize<'de>"))
     )]
     pub patch: JsonPatch<'a>,
+    /// The priority of the patch. Lower values have higher precedence.
     pub priority: usize,
 }
 
@@ -34,27 +57,44 @@ impl<'a> ValueWithPriority<'a> {
     }
 }
 
+/// A JSON patch operation targeting a specific range in an array.
+///
+/// This is used only for array-based (sequence) operations.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OpRange {
+    /// The type of operation (Add, Remove, Replace).
     pub op: Op,
+    /// The target index range in the array (0-based, exclusive at the end).
     pub range: Range<usize>,
 }
 
+/// Represents the kind of patch operation, depending on the JSON data structure.
+///
+/// This enum allows distinguishing between patches on scalars vs. sequences.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OpRangeKind {
-    // Except for array
+    /// A non-array operation (e.g., replacing an object or scalar).
     Pure(Op),
-    // Sequence Array
+
+    /// An operation on a continuous range of array indices.
     Seq(OpRange),
-    // Discrete Array
+
+    /// An operation on discrete array ranges.
+    ///
+    /// Operations that remain due to compatibility issues.
+    /// Currently disassembled and merged in Seq.
+    ///
+    /// TODO: Remove this.
     Discrete(Vec<OpRange>),
 }
 
 impl OpRangeKind {
+    /// Returns the `OpRange` if the operation is of kind `Seq`.
+    ///
     /// # Panics
-    /// self is Pure
+    /// Panics if the kind is `Pure`, as no range information is available.
     #[inline]
     pub fn as_seq(&self) -> &OpRange {
         match self {
@@ -71,13 +111,16 @@ impl Default for OpRangeKind {
     }
 }
 
-/// Struct representing a JSON patch operation.
+/// Represents a single JSON patch operation.
+///
+/// This can be either a scalar update or an array modification.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct JsonPatch<'a> {
-    /// The type of operation to perform (Add, Remove, Replace).
+    /// The type and target of the operation (including range if applicable).
     pub op: OpRangeKind,
-    /// The value to be added or replaced in the JSON.
+
+    /// The value involved in the patch (e.g., value to add or replace).
     #[cfg_attr(
         feature = "serde",
         serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>"))

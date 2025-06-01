@@ -22,7 +22,7 @@ pub fn apply_patch<'v>(
     patch: Patch<'v>,
 ) -> Result<()> {
     match patch {
-        Patch::OneField(patch) => apply_one_field(json, path, patch),
+        Patch::One(patch) => apply_one_field(json, path, patch),
         Patch::Seq(patches) => apply_seq_by_priority(file_name, json, path, patches),
     }
 }

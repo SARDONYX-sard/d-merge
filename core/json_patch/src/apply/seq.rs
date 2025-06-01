@@ -166,62 +166,86 @@ fn apply_ops_parallel<'a>(
 
 #[cfg(any(feature = "tracing", test))]
 fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> String {
-    const CELL_WIDTH: usize = 4;
-    const OMITTED_COUNT: usize = 10;
+    use std::collections::BTreeSet;
 
-    let width = patches
-        .smart_iter()
-        .map(|v| v.patch.op.as_seq().range.end)
-        .max()
-        .unwrap_or(0);
+    const CELL_WIDTH: usize = 5;
+    const SPACE_SYMBOL: &str = "     ";
+    const ADD_SYMBOL: &str = " [+] ";
+    const REPLACE_SYMBOL: &str = " [*] ";
+    const REMOVE_SYMBOL: &str = " [-] ";
+    const MAX_INLINE_GAP: usize = 2;
 
-    let mut output = String::new();
+    const _: () = {
+        assert!(CELL_WIDTH == SPACE_SYMBOL.len());
+        assert!(CELL_WIDTH == ADD_SYMBOL.len());
+        assert!(CELL_WIDTH == REPLACE_SYMBOL.len());
+        assert!(CELL_WIDTH == REMOVE_SYMBOL.len());
+    };
 
-    // Index row
-    for i in 1..=width {
-        if width > OMITTED_COUNT * 2 && i > OMITTED_COUNT && i <= width - OMITTED_COUNT {
-            if i == OMITTED_COUNT + 1 {
-                output.push_str(" ... ");
-            }
-            continue;
+    // 1. collect all used indexes
+    let mut indices = BTreeSet::new();
+    let mut max_index = 0;
+
+    // 1. collect all used indices (0-based)
+    for patch in patches {
+        let seq = patch.patch.op.as_seq();
+        max_index = max_index.max(seq.range.end);
+        for i in seq.range.start..seq.range.end {
+            indices.insert(i);
         }
-        output.push_str(&format!("{i:^width$}", width = CELL_WIDTH));
+    }
+
+    // 2. build display index list with ellipsis
+    let mut display_indices = Vec::new();
+    let mut last = 0;
+    for &i in &indices {
+        if i > last + MAX_INLINE_GAP + 1 {
+            display_indices.push(0); // use 0 as marker for ellipsis
+        }
+        display_indices.push(i);
+        last = i;
+    }
+
+    // 3. render index row
+    let mut output = String::new();
+    for &i in &display_indices {
+        if i == 0 {
+            output.push_str(" ... ");
+        } else {
+            output.push_str(&format!("{i:^width$}", width = CELL_WIDTH));
+        }
     }
     output.push_str("| Op      | priority |\n");
 
-    for value in patches {
-        let priority = value.priority;
-        let seq = value.patch.op.as_seq();
-        let op = seq.op;
+    // 4. render each patch line
+    for patch in patches {
+        let seq = patch.patch.op.as_seq();
         let range = seq.range.clone();
+        let op = seq.op;
 
-        for i in 1..=width {
-            if width > OMITTED_COUNT * 2 && i > OMITTED_COUNT && i <= width - OMITTED_COUNT {
-                if i == OMITTED_COUNT + 1 {
-                    output.push_str(" ... ");
-                }
-                continue;
-            }
-
-            let symbol = if i > range.start && i <= range.end {
+        for &i in &display_indices {
+            let symbol = if i == 0 {
+                " ... "
+            } else if i >= range.start && i < range.end {
                 match op {
-                    Op::Add => "[+] ",
-                    Op::Replace => "[*] ",
-                    Op::Remove => "[-] ",
+                    Op::Add => ADD_SYMBOL,
+                    Op::Replace => REPLACE_SYMBOL,
+                    Op::Remove => REMOVE_SYMBOL,
                 }
             } else {
-                "    "
+                SPACE_SYMBOL
             };
             output.push_str(symbol);
         }
 
         let label = format!(
-            "| {:<7} | {priority:>8} |",
+            "| {:<7} | {:>8} |",
             match op {
                 Op::Add => "Add",
                 Op::Remove => "Remove",
                 Op::Replace => "Replace",
             },
+            patch.priority
         );
         output.push_str(&label);
         output.push('\n');

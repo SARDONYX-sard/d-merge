@@ -70,7 +70,7 @@ impl<'a> PatchMap<'a> {
             dashmap::Entry::Occupied(mut existing) => {
                 let old_patch = existing.get_mut();
                 match old_patch {
-                    Patch::OneField(old_value) => match kind {
+                    Patch::One(old_value) => match kind {
                         PatchKind::OneField => {
                             if new_value.priority > old_value.priority {
                                 tracing::info!(
@@ -103,7 +103,7 @@ impl<'a> PatchMap<'a> {
             }
             dashmap::Entry::Vacant(ve) => match kind {
                 PatchKind::OneField => {
-                    ve.insert(Patch::OneField(new_value));
+                    ve.insert(Patch::One(new_value));
                 }
                 PatchKind::Seq => {
                     ve.insert(Patch::Seq(vec![new_value]));
@@ -126,7 +126,7 @@ impl<'a> PatchMap<'a> {
                         old_items.par_extend(new_values);
                         Ok(())
                     }
-                    Patch::OneField(_) => Err(TypeError {
+                    Patch::One(_) => Err(TypeError {
                         actual: PatchKind::OneField,
                         expected: PatchKind::Seq,
                     }),
