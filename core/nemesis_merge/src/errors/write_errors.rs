@@ -25,15 +25,19 @@ pub(crate) async fn write_errors(_options: &crate::Config, errors: &[Error]) -> 
     #[cfg(feature = "tracing")]
     tracing::error!("{errors}");
 
-    #[cfg(not(feature = "tracing"))]
+    // #[cfg(not(feature = "tracing"))]
     {
         use crate::errors::FailedIoSnafu;
         use snafu::ResultExt as _;
+        use tokio::fs;
 
-        let error_output = _options.output_dir.join("d_merge_errors.log");
-        tokio::fs::write(&error_output, errors)
+        let mut error_output = _options.output_dir.join(".debug");
+        let _ = fs::create_dir_all(&error_output).await;
+        error_output.push("d_merge_errors.log");
+        fs::write(&error_output, errors)
             .await
             .with_context(|_| FailedIoSnafu { path: error_output })?;
     }
+
     Ok(())
 }
