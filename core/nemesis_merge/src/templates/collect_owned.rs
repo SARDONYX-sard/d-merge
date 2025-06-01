@@ -32,7 +32,12 @@ fn template_name_and_inner_path(path: &Path) -> Option<(String, PathBuf)> {
     // TODO: Other than this, specifications need to be determined. `Defaultmale.xml` and others have duplicate filenames.
     let is_behaviors = path.components().any(|c| {
         let c = c.as_os_str();
-        c.eq_ignore_ascii_case("behaviors") || c.eq_ignore_ascii_case("characters")
+        c.eq_ignore_ascii_case("behaviors")
+            // || c.eq_ignore_ascii_case("character assets female")
+            // || c.eq_ignore_ascii_case("character assets")
+            // || c.eq_ignore_ascii_case("characterassets")
+            || c.eq_ignore_ascii_case("characters female")
+            || c.eq_ignore_ascii_case("characters")
     });
     if !is_behaviors || !is_xml {
         return None;

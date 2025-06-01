@@ -95,10 +95,12 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         (patch_result, patch_errors_len)
     };
 
-    let (templates, errors) = collect_borrowed_templates(template_names, &config.resource_dir);
-    all_errors.par_extend(errors);
+    let (templates, template_errors) =
+        collect_borrowed_templates(template_names, &config.resource_dir);
+    let template_error_len = template_errors.len();
+    all_errors.par_extend(template_errors);
 
-    let mut apply_errors_len = 0;
+    let mut apply_errors_len = template_error_len;
     if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {
         apply_errors_len = errors.len();
         all_errors.par_extend(errors);
