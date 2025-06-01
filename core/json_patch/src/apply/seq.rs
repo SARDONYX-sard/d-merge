@@ -32,13 +32,16 @@ pub(crate) fn apply_seq_by_priority<'a>(
 
     sort_by_priority(patches.as_mut_slice());
     #[cfg(feature = "tracing")]
-    tracing::debug!(
-        "Seq merge conflict resolution for `{file_name}` file:
-Path: {}
-{}",
-        path.join("/"),
-        visualize_ops(&patches)
-    );
+    {
+        let path = path.join("/");
+        let target_len = template_array.len();
+        let visualizer = visualize_ops(&patches);
+        tracing::debug!(
+            "Seq merge conflict resolution for `{file_name}` file:
+Path: {path}, Seq target length: {target_len}
+{visualizer}"
+        );
+    }
 
     let patch_target_vec = core::mem::take(template_array);
     let patched_array = apply_ops_parallel(*patch_target_vec, patches)
@@ -259,29 +262,6 @@ mod tests {
     use super::*;
     use crate::{OpRange, OpRangeKind};
 
-    fn draw_box(data: &[Value<'_>]) -> String {
-        data.smart_iter()
-            .enumerate()
-            .map(|(idx, v)| {
-                let mut s = String::new();
-
-                if idx % 20 == 0 {
-                    if idx != 0 {
-                        s.push('\n');
-                    }
-                    s.push_str("    ");
-                }
-
-                match v {
-                    v if v == &MARK_AS_REMOVED => s.push_str("[ ]"),
-                    _ => s.push_str("[{}]"),
-                };
-
-                s
-            })
-            .collect()
-    }
-
     #[test]
     fn test_seq_patch() {
         let mut patches: Vec<ValueWithPriority<'_>> = vec![
@@ -353,9 +333,6 @@ mod tests {
         sort_by_priority(&mut patches);
         println!("Operation Map:\n{}", visualize_ops(&patches));
         let result = apply_ops_parallel(base_seq, patches);
-
-        println!("\nFinal Result:");
-        println!("{}", draw_box(&result));
 
         let result: Vec<_> = result
             .smart_iter()
