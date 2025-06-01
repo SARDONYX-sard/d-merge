@@ -1,5 +1,5 @@
 use super::{bail, sender, time};
-use crate::error::NotFoundResourceDirSnafu;
+use crate::error::{NotFoundResourceDirSnafu, NotFoundSkyrimDataDirSnafu};
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
 use nemesis_merge::{behavior_gen, Config, HackOptions, Status};
 use snafu::ResultExt as _;
@@ -18,6 +18,22 @@ pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
     Ok(info)
 }
 
+/// Get skyrim se/vr directory.
+///
+/// e.g. `D:\\STEAM\\steamapps\\common\\Skyrim Special Edition\\Data`
+#[tauri::command]
+pub(crate) fn get_skyrim_data_dir(is_se: bool) -> Result<PathBuf, String> {
+    use super::get_skyrim_dir::Runtime;
+
+    let runtime = if is_se { Runtime::Se } else { Runtime::Vr };
+    match crate::cmd::get_skyrim_dir::get_skyrim_data_dir(runtime)
+        .with_context(|_| NotFoundSkyrimDataDirSnafu)
+    {
+        Ok(path) => Ok(path),
+        Err(err) => bail!(err),
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 use once_cell::sync::Lazy;
@@ -26,8 +42,13 @@ use tauri::async_runtime::JoinHandle;
 
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
+/// - ids: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 #[tauri::command]
-pub(crate) async fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> Result<(), String> {
+pub(crate) async fn patch(
+    window: Window,
+    output: PathBuf,
+    ids: Vec<PathBuf>,
+) -> Result<(), String> {
     // Abort previous task if exists
     cancel_patch_inner()?;
 
@@ -50,7 +71,7 @@ pub(crate) async fn patch(window: Window, output: String, ids: Vec<PathBuf>) -> 
                 behavior_gen(
                     ids,
                     Config {
-                        output_dir: PathBuf::from(output),
+                        output_dir: output,
                         resource_dir,
                         status_report: Some(Box::new(status_reporter)),
                         hack_options: Some(HackOptions::enable_all()), // TODO: Create GUI hack control popup

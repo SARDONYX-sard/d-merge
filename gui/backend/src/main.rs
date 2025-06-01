@@ -27,6 +27,7 @@ fn main() {
             crate::cmd::log::change_log_level,
             crate::cmd::open::open,
             crate::cmd::patch::cancel_patch,
+            crate::cmd::patch::get_skyrim_data_dir,
             crate::cmd::patch::load_mods_info,
             crate::cmd::patch::patch,
         ])

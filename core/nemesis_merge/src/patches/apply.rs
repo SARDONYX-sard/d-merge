@@ -1,8 +1,8 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
-    aliases::{BorrowedTemplateMap, MergedPatchMap},
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
+    types::{BorrowedTemplateMap, PatchMapForEachTemplate},
 };
 use json_patch::apply_patch;
 use rayon::prelude::*;
@@ -12,30 +12,25 @@ use std::path::Path;
 /// Apply to hkx with merged json patch.
 pub fn apply_patches<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
-    patch_mod_map: MergedPatchMap<'b>,
+    patch_map_foreach_template: PatchMapForEachTemplate<'b>,
     output_dir: &Path,
 ) -> Result<(), Vec<Error>> {
-    let results = patch_mod_map // patches
+    let results = patch_map_foreach_template // patches
         .into_par_iter()
         .map(|(template_name, patches)| {
             let _output_dir = output_dir;
-
             #[cfg(feature = "debug")]
-            write_json_patch(_output_dir, &template_name, &patches)?;
+            write_json_patch(_output_dir, template_name, &patches)?;
 
             // template_name: e.g. 0_master.hkx -> 0_master
             // patches: patches for 0_master.hkx
             if let Some(mut template_pair) = templates.get_mut(&template_name) {
                 let template = &mut template_pair.value_mut().1;
 
-                for (path, patch) in patches {
-                    let patch_string = format!("{patch:#?}"); // TODO: Fix redundant copy
-                    apply_patch(template, path, patch).with_context(|_| PatchSnafu {
-                        template_name: template_name.clone(),
-                        patch: patch_string,
-                    })?;
+                for (path, patch) in patches.0 {
+                    apply_patch(template_name, template, path, patch)
+                        .with_context(|_| PatchSnafu { template_name })?;
                 }
-                // super::replace_vars::replace_var(template, &nemesis_vars);
             }
 
             Ok(())
@@ -49,10 +44,9 @@ pub fn apply_patches<'a, 'b: 'a>(
 fn write_json_patch(
     output_dir: &Path,
     template_name: &str,
-    patches: &crate::aliases::SortedPatchMap,
+    patches: &crate::types::PatchMap,
 ) -> Result<(), Error> {
     use crate::errors::FailedIoSnafu;
-    use crate::patches::generate::patch_map_to_json_value;
     use snafu::ResultExt as _;
 
     let output_dir = output_dir.join(".debug").join("patches");
@@ -64,8 +58,11 @@ fn write_json_patch(
     std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {
         path: output_dir.clone(),
     })?;
+
     let output_path = output_dir.join(format!("{template_name}.patch.json"));
-    let json = patch_map_to_json_value(&output_path, patches.clone())?;
+    let json = simd_json::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
+        path: output_path.clone(),
+    })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
 
     Ok(())

@@ -5,10 +5,7 @@
   "[javascript][javascriptreact][typescript][typescriptreact]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "[json]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[jsonc]": {
+  "[json][jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[yaml]": {
@@ -45,5 +42,6 @@
   ],
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.linkedProjects": ["Cargo.toml"]
+  "rust-analyzer.linkedProjects": ["Cargo.toml"],
+  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"] // Real time println! on test
 }

@@ -1,14 +1,15 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
     config::{Config, Status},
-    errors::{write_errors::write_errors, Error, Result},
+    errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result},
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
         collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
-        merge::{merge_patches, paths_to_ids},
     },
-    templates::collect::collect_templates,
+    path_id::paths_to_priority_map,
+    templates::collect::collect_borrowed_templates,
+    types::OwnedPatchMap,
 };
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -18,140 +19,111 @@ use std::path::PathBuf;
 ///
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
-pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, options: Config) -> Result<()> {
-    let mut all_errors = vec![];
+pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result<()> {
+    let id_order = paths_to_priority_map(&nemesis_paths);
 
-    // 1/4: Collect all patches & templates xml
-    options.on_report_status(Status::ReadingTemplatesAndPatches);
-    let (owned_adsf_patches, owned_patches) = match collect_owned_patches(&nemesis_paths).await {
-        Ok(owned_patches) => owned_patches,
-        Err(errors) => {
-            let errors_len = errors.len();
+    // Collect all patches file.
+    config.on_report_status(Status::ReadingTemplatesAndPatches);
+    let (owned_adsf_patches, owned_patches, owned_file_errors) =
+        collect_owned_patches(&nemesis_paths, &id_order).await;
 
-            let err = Error::FailedToReadOwnedPatches { errors_len };
-            options.on_report_status(Status::Error(err.to_string()));
+    // - Patch to `animationdatasinglefile.txt`
+    // - Patch to hkx( -> xml)
+    let (adsf_errors, patched_hkx_errors) = rayon::join(
+        || crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config),
+        || apply_and_gen_patched_hkx(&owned_patches, &config),
+    );
 
-            write_errors(&options, &errors).await?;
-            return Err(err);
-        }
+    let owned_file_errors_len = owned_file_errors.len();
+    let adsf_errors_len = adsf_errors.len();
+    let Errors {
+        patch_errors_len,
+        apply_errors_len,
+        hkx_errors_len,
+        hkx_errors,
+    } = patched_hkx_errors;
+
+    let all_errors = {
+        let mut all_errors = vec![];
+        all_errors.par_extend(owned_file_errors);
+        all_errors.par_extend(adsf_errors);
+        all_errors.par_extend(hkx_errors);
+        all_errors
     };
 
-    let ids = paths_to_ids(&nemesis_paths);
+    if !all_errors.is_empty() {
+        let err = BehaviorGenerationError {
+            owned_file_errors_len,
+            adsf_errors_len,
+            patch_errors_len,
+            apply_errors_len,
+            hkx_errors_len,
+        };
+        config.on_report_status(Status::Error(err.to_string()));
 
-    let adsf_errors = crate::adsf::apply_adsf_patches(owned_adsf_patches, &ids, &options);
-    let adsf_errors_len = adsf_errors.len();
-    all_errors.par_extend(adsf_errors);
+        write_errors(&config, &all_errors).await?;
+        return Err(Error::FailedToGenerateBehaviors { source: err });
+    };
 
+    config.on_report_status(Status::Done);
+    Ok(())
+}
+
+struct Errors {
+    patch_errors_len: usize,
+    apply_errors_len: usize,
+    hkx_errors_len: usize,
+    hkx_errors: Vec<Error>,
+}
+
+fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
+    let mut all_errors = vec![];
+
+    // 1/2: Apply patches & Replace variables to indexes
+    config.on_report_status(Status::ApplyingPatches);
     let (
         BorrowedPatches {
             template_names,
-            template_patch_map,
-            ptr_map,
+            patch_map_foreach_template,
+            variable_class_map,
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(&owned_patches, options.hack_options);
+        let (patch_result, errors) = collect_borrowed_patches(owned_patches, config.hack_options);
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
     };
 
-    // HACK: Lifetime inversion hack: `templates` require `patch_mod_map` to live longer than `templates`, but `templates` actually live longer than `templates`.
-    // Therefore, reassign the local variable in the block to shorten the lifetime
-    {
-        let (templates, errors) = collect_templates(template_names, &options.resource_dir);
+    let (templates, template_errors) =
+        collect_borrowed_templates(template_names, &config.resource_dir);
+    let template_error_len = template_errors.len();
+    all_errors.par_extend(template_errors);
+
+    let mut apply_errors_len = template_error_len;
+    if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {
+        apply_errors_len = errors.len();
         all_errors.par_extend(errors);
-
-        // 2/4: Priority joins between patches may allow templates to be processed in a parallel loop.
-        let patches = { merge_patches(template_patch_map, &ids)? };
-
-        // 3/4: Apply patches & Replace variables to indexes
-        options.on_report_status(Status::ApplyingPatches);
-        let mut apply_errors_len = 0;
-        if let Err(errors) = apply_patches(&templates, patches, &options.output_dir) {
-            apply_errors_len = errors.len();
-            all_errors.par_extend(errors);
-        };
-
-        // 4/4: Generate hkx files.
-        options.on_report_status(Status::GenerateHkxFiles);
-        let hkx_errors_len = {
-            if let Err(hkx_errors) = generate_hkx_files(&options.output_dir, templates, ptr_map) {
-                let errors_len = hkx_errors.len();
-                all_errors.par_extend(hkx_errors);
-                errors_len
-            } else {
-                0
-            }
-        };
-
-        if !all_errors.is_empty() {
-            write_errors(&options, &all_errors).await?;
-
-            let err = Error::FailedToGenerateBehaviors {
-                adsf_errors_len,
-                hkx_errors_len,
-                patch_errors_len,
-                apply_errors_len,
-            };
-
-            options.on_report_status(Status::Error(err.to_string()));
-            return Err(err);
-        };
     };
 
-    options.on_report_status(Status::Done);
+    // 2/2: Generate hkx files.
+    config.on_report_status(Status::GenerateHkxFiles);
+    let hkx_errors_len = {
+        if let Err(hkx_errors) =
+            generate_hkx_files(&config.output_dir, templates, variable_class_map)
+        {
+            let errors_len = hkx_errors.len();
+            all_errors.par_extend(hkx_errors);
+            errors_len
+        } else {
+            0
+        }
+    };
 
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore = "unimplemented yet"]
-    #[cfg(feature = "tracing")]
-    async fn merge_test() {
-        use nemesis_xml::hack::HackOptions;
-
-        let log_path = "../../dummy/merge_test.log";
-        crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
-
-        #[allow(clippy::iter_on_single_items)]
-        let ids = [
-            // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
-            // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
-            // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
-            // "../../dummy/Data/Nemesis_Engine/mod/gender",
-            // "../../dummy/Data/Nemesis_Engine/mod/hmce",
-            // "../../dummy/Data/Nemesis_Engine/mod/momo",
-            // "../../dummy/Data/Nemesis_Engine/mod/na1w",
-            // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
-            // "../../dummy/Data/Nemesis_Engine/mod/pscd",
-            // "../../dummy/Data/Nemesis_Engine/mod/rthf",
-            // "../../dummy/Data/Nemesis_Engine/mod/skice",
-            // "../../dummy/Data/Nemesis_Engine/mod/sscb",
-            // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
-            // "../../dummy/Data/Nemesis_Engine/mod/tudm",
-            // "../../dummy/Data/Nemesis_Engine/mod/turn",
-            // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
-            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
-        ]
-        .into_par_iter()
-        .map(|s| s.into())
-        .collect();
-
-        behavior_gen(
-            ids,
-            Config {
-                resource_dir: "../../resource/assets/templates".into(),
-                output_dir: "../../dummy/behavior_gen/output".into(),
-                status_report: None,
-                hack_options: Some(HackOptions::enable_all()),
-            },
-        )
-        .await
-        .unwrap();
+    Errors {
+        patch_errors_len,
+        apply_errors_len,
+        hkx_errors_len,
+        hkx_errors: all_errors,
     }
 }

@@ -10,16 +10,14 @@ use skyrim_anim_parser::adsf::ser::serialize_adsf;
 use skyrim_anim_parser::adsf::{Adsf, AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
 use snafu::ResultExt as _;
 
-use std::collections::HashMap;
 use std::path::Path;
 
-use crate::errors::{FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu};
-use crate::results::partition_results;
-use crate::{
-    aliases::AdsfPatchMap,
-    errors::{Error, FailedIoSnafu},
-    Config,
+use crate::errors::{
+    Error, FailedIoSnafu, FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu,
 };
+use crate::results::partition_results;
+use crate::types::{OwnedAdsfPatchMap, PriorityMap};
+use crate::Config;
 
 #[derive(Debug, PartialEq, Default)]
 pub struct AdsfPatch<'a> {
@@ -46,7 +44,12 @@ impl<'a> Default for PatchKind<'a> {
 const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.txt";
 
 // "dmco", "slide"
-pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[&str], config: &Config) -> Vec<Error> {
+/// Patch to `animationdatasinglefile.txt`
+pub(crate) fn apply_adsf_patches(
+    map: OwnedAdsfPatchMap,
+    id_order: &PriorityMap,
+    config: &Config,
+) -> Vec<Error> {
     // {
     //    "DefaultFemale": {
     //       add_anim_data_patches: [], //sorted by priority
@@ -62,7 +65,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[&str], config: &Confi
     let results: Vec<Result<AdsfPatch, Error>> = map
         .0
         .par_iter() // par iter
-        .map(|(path, adsf_patch)| {
+        .map(|(path, (adsf_patch, _priority))| {
             // 1. Parse adsf patch (1 loop with par_iter)
             let ParsedAdsfPatchPath {
                 target, // e.g. DefaultFemale
@@ -89,7 +92,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[&str], config: &Confi
     let (mut patches, mut errors) = partition_results(results);
 
     // 2. then sort by priority ids.(to vec 2 loop) => borrowed_map
-    sort_patches_by_priority(&mut patches, ids);
+    sort_patches_by_priority(&mut patches, id_order);
 
     macro_rules! ret_error {
         ($expr:expr) => {
@@ -135,9 +138,7 @@ pub(crate) fn apply_adsf_patches(map: AdsfPatchMap, ids: &[&str], config: &Confi
 }
 
 /// Sorts AdsfPatch list based on the given ID priority list.
-fn sort_patches_by_priority(patches: &mut [AdsfPatch], ids: &[&str]) {
-    let id_order: HashMap<_, _> = ids.iter().enumerate().map(|(i, &id)| (id, i)).collect();
-
+fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_order: &PriorityMap) {
     patches.sort_by_key(|patch| id_order.get(patch.id).copied().unwrap_or(usize::MAX));
 }
 
@@ -190,7 +191,10 @@ mod tests {
             },
         ];
 
-        sort_patches_by_priority(&mut patches, &ids);
+        sort_patches_by_priority(
+            &mut patches,
+            &ids.iter().enumerate().map(|(i, &p)| (p, i)).collect(),
+        );
 
         let sorted_ids: Vec<&str> = patches.iter().map(|p| p.id).collect();
         assert_eq!(sorted_ids, ids);

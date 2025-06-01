@@ -30,30 +30,16 @@ impl PointerMut for BorrowedValue<'_> {
     {
         ptr.into_iter()
             .try_fold(self, move |target, token| match target {
-                Self::Object(map) => {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("map = {map:#?}");
-                    map.get_mut(token.as_ref())
-                }
+                Self::Object(map) => map.get_mut(token.as_ref()),
                 Self::Array(list) => {
                     let token = token.as_ref();
                     let range = parse_range(token).ok()?;
-                    #[cfg(feature = "tracing")]
-                    {
-                        tracing::trace!("token = {token}");
-                        tracing::trace!("list = {list:#?}");
-                        tracing::trace!("range = {range:#?}");
-                    }
                     match range {
                         Range::Index(index) => list.get_mut(index),
                         _ => None,
                     }
                 }
-                _v => {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("static v = {_v:#?}");
-                    None
-                }
+                _v => None,
             })
     }
 }
