@@ -26,7 +26,14 @@ fn template_name_and_inner_path(path: &Path) -> Option<(String, PathBuf)> {
     let is_xml = path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"));
-    if !is_xml {
+
+    // Currently only supports XML in the `behaviors` dir.
+    // This is the standard supported template for Nemesis.
+    // TODO: Other than this, specifications need to be determined. `Defaultmale.xml` and others have duplicate filenames.
+    let is_behaviors = path
+        .components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case("behaviors"));
+    if !is_behaviors || !is_xml {
         return None;
     }
 
