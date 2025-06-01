@@ -33,6 +33,7 @@ fn template_name_and_inner_path(path: &Path) -> Option<(String, PathBuf)> {
     let is_behaviors = path.components().any(|c| {
         let c = c.as_os_str();
         c.eq_ignore_ascii_case("behaviors")
+            || c.eq_ignore_ascii_case("behaviors wolf")
             // || c.eq_ignore_ascii_case("character assets female")
             // || c.eq_ignore_ascii_case("character assets")
             // || c.eq_ignore_ascii_case("characterassets")
