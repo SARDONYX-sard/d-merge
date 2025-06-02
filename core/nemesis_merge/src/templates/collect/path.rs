@@ -79,9 +79,9 @@ mod tests {
     #[test]
     fn test_regular_path() {
         assert_template(
-            r"../../resource/assets/templates\meshes\actors\character\defaultmale_Project.bin",
+            r"../../resource/assets/templates/meshes/actors/character/defaultmale_Project.bin",
             "defaultmale_Project",
-            r"meshes\actors\character\defaultmale_Project.bin",
+            r"meshes/actors/character/defaultmale_Project.bin",
         );
 
         assert_template(
