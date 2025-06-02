@@ -210,14 +210,12 @@ mod tests {
         use crate::templates::collect::template_xml_to_value_inner;
 
         let output_dir = Path::new("./");
-        let nemesis_map = {
-            let nemesis_path = r"";
-            let creature_path = r"";
-
-            let mut nemesis_map = collect_owned_templates(nemesis_path);
-            let creature_map = collect_owned_templates(creature_path);
-            nemesis_map.par_extend(creature_map);
-            nemesis_map
+        let nemesis_map: Vec<PathBuf> = {
+            let paths = std::fs::read_to_string("../../dummy/templates_paths.txt").unwrap();
+            paths
+                .split("\n")
+                .flat_map(collect_owned_templates)
+                .collect()
         };
         nemesis_map.into_par_iter().for_each(|path| {
             let Some(inner_path) = get_meshes_relative_path(&path) else {
