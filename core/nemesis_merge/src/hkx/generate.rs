@@ -7,7 +7,9 @@ use crate::{
 };
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
-use serde_hkx_features::{id_maker::crate_maps_from_id_class, ClassMap};
+use serde_hkx_features::{
+    id_maker::crate_maps_from_id_class as create_maps_from_id_class, ClassMap,
+};
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 use std::{fs, path::Path};
@@ -61,7 +63,7 @@ pub(crate) fn generate_hkx_files<'a>(
                     // Create eventID & variableId maps from hkbBehaviorGraphStringData class
                     if let Some((event_map, var_map)) = class_map
                         .get(*ptr)
-                        .and_then(|class| crate_maps_from_id_class(class))
+                        .and_then(|class| create_maps_from_id_class(class))
                     {
                         event_id_map = Some(event_map);
                         variable_id_map = Some(var_map);

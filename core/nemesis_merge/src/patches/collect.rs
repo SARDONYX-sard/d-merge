@@ -133,6 +133,7 @@ pub fn collect_borrowed_patches<'a>(
 
                 match &value.op {
                     // Overwrite to match patch structure
+                    // Pure: no add and remove because of single value
                     json_patch::OpRangeKind::Pure(_) => {
                         let value = ValueWithPriority::new(value, priority);
                         let _ = entry.value().insert(key, value, PatchKind::OneField);

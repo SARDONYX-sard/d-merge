@@ -42,12 +42,13 @@ fn template_xml_to_value(
         .to_owned();
 
     let path = resource_dir.join(&inner_path);
-    let template_xml = fs::read_to_string(path).context(FailedIoSnafu {
-        path: inner_path.clone(),
-    })?;
-    let ast: serde_hkx_features::ClassMap = serde_hkx::from_str(&template_xml)?;
-    let value = to_borrowed_value(ast).with_context(|_| JsonSnafu {
-        path: inner_path.clone(),
-    })?;
+    let value = template_xml_to_value_inner(&path)?;
     Ok((inner_path, value))
+}
+
+pub(super) fn template_xml_to_value_inner(path: &Path) -> Result<BorrowedValue<'static>> {
+    let template_xml = fs::read_to_string(path).with_context(|_| FailedIoSnafu { path })?;
+    let ast: serde_hkx_features::ClassMap = serde_hkx::from_str(&template_xml)?;
+    let value = to_borrowed_value(ast).with_context(|_| JsonSnafu { path })?;
+    Ok(value)
 }

@@ -2467,6 +2467,7 @@ dependencies = [
  "pretty_assertions",
  "quick_tracing",
  "rayon",
+ "rmp-serde",
  "serde",
  "serde_hkx",
  "serde_hkx_features",

@@ -38,11 +38,12 @@ skyrim_anim_parser = { workspace = true }
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+rmp-serde = { workspace = true }
 tokio = { workspace = true, features = [
   "rt",
   "macros",
 ] } # Need rt & macros for test
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
