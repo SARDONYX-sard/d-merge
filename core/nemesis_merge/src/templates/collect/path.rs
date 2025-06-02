@@ -5,8 +5,14 @@
 //!
 //! From here, we need to determine and load the xml to which the patch will be applied, so we use a table to load this.
 //! Note that the dir paths above `mesh` can be optionally specified and concatenated as resource paths later.
+use serde_hkx::errors::readable::ReadableError;
 use snafu::{prelude::*, OptionExt};
 use std::path::Path;
+use winnow::{
+    combinator::repeat,
+    token::{any, take_until},
+    ModalResult, Parser as _,
+};
 
 /// Return (hashmap key, inner path starting from `meshes`)
 pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(String, &str), TemplateError> {
@@ -31,28 +37,26 @@ pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(String, &str)
         file_stem.to_string()
     };
 
-    let mut search_offset = 0;
-    for comp in path.components() {
-        let comp_str = comp.as_os_str().to_str().context(InvalidUtf8Snafu)?;
+    let inner_path = parse_template_path(path)?;
 
-        if comp_str.eq_ignore_ascii_case("meshes") || comp_str.eq_ignore_ascii_case("mesh") {
-            if let Some(pos) = path_str[search_offset..].find(comp_str) {
-                let idx = search_offset + pos;
-                let inner = &path_str[idx..];
-                return Ok((key, inner));
-            }
-        }
+    Ok((key, inner_path))
+}
 
-        // Safety: path_str is valid UTF-8, so this is safe
-        if let Some(comp_len) = comp.as_os_str().to_str().map(|s| s.len()) {
-            search_offset += comp_len;
-            if search_offset < path_str.len() {
-                search_offset += 1;
-            }
-        }
-    }
+pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {
+    let input = path.to_str().ok_or(TemplateError::InvalidUtf8)?;
 
-    Err(TemplateError::MissingMeshesDir)
+    parse_components
+        .parse(input)
+        .map_err(|e| TemplateError::MissingMeshesDir {
+            source: ReadableError::from_parse(e),
+        })
+}
+
+fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    take_until(0.., "meshes").parse_next(input)?;
+    let inner_path = *input;
+    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?;
+    Ok(inner_path)
 }
 
 #[derive(Debug, Snafu)]
@@ -61,8 +65,8 @@ pub enum TemplateError {
     InvalidUtf8,
     #[snafu(display("Missing file stem"))]
     MissingFileStem,
-    #[snafu(display("Could not find `meshes` directory"))]
-    MissingMeshesDir,
+    #[snafu(transparent)]
+    MissingMeshesDir { source: ReadableError },
 }
 
 #[cfg(test)]
@@ -109,11 +113,21 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_long_path() {
+        let path = r"\\?\D:\rust\d-merge\target\release-no-lto\assets\templates\meshes\actors\character\_1stperson\behaviors\blockbehavior.bin";
+        assert_template(
+            path,
+            r"_1stperson\blockbehavior",
+            r"meshes\actors\character\_1stperson\behaviors\blockbehavior.bin",
+        );
+    }
+
     #[test]
     fn test_missing_meshes_dir() {
         let path = Path::new("data/not_meshes_dir/character/skeleton.nif");
-        let err = template_name_and_inner_path(path).unwrap_err();
-        assert!(matches!(err, TemplateError::MissingMeshesDir));
+        assert!(template_name_and_inner_path(path).is_err());
     }
 
     #[ignore = "local only checker"]
