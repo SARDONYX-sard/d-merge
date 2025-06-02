@@ -74,7 +74,7 @@ fn remove_nemesis_prefix(path: &Path) -> Option<PathBuf> {
         new_path.set_file_name(new_file_name);
         Some(new_path)
     } else {
-        None
+        Some(path.to_path_buf())
     }
 }
 
@@ -108,8 +108,9 @@ mod tests {
     #[ignore = "local only"]
     #[test]
     fn test_create_bin_templates() {
-        let paths = std::fs::read_to_string("../../dummy/templates_paths.txt").unwrap();
+        // let paths = std::fs::read_to_string("../../dummy/templates_paths.txt").unwrap();
+        let paths = ["../../resource/xml"];
         let output_dir = Path::new("../../dummy/templates/bins");
-        create_bin_templates(paths.split("\n"), output_dir);
+        create_bin_templates(paths.iter(), output_dir);
     }
 }
