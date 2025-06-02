@@ -3992,6 +3992,7 @@ name = "skyrim_anim_parser"
 version = "0.1.0"
 dependencies = [
  "bitvec",
+ "dashmap",
  "indexmap 2.9.0",
  "pretty_assertions",
  "quick_tracing",

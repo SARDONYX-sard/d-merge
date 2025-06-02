@@ -27,7 +27,7 @@ pub fn paths_to_priority_map(paths: &[PathBuf]) -> PriorityMap<'_> {
         .collect()
 }
 
-/// Parses `"Nemesis_Engine/mod/<mod_code>"`.
+/// Get until `<mod_code>` path.
 /// - [Playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=3339ad634c5d66f91e54ba8bba3bf307)
 ///
 /// # Errors

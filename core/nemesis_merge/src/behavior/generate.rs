@@ -8,7 +8,6 @@ use crate::{
         collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
     },
     path_id::paths_to_priority_map,
-    templates::collect::collect_borrowed_templates,
     types::OwnedPatchMap,
 };
 use rayon::prelude::*;
@@ -34,14 +33,14 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
         || apply_and_gen_patched_hkx(&owned_patches, &config),
     );
 
-    let owned_file_errors_len = owned_file_errors.len();
-    let adsf_errors_len = adsf_errors.len();
     let Errors {
         patch_errors_len,
         apply_errors_len,
         hkx_errors_len,
         hkx_errors,
-    } = patched_hkx_errors;
+    } = patched_hkx_errors.await;
+    let owned_file_errors_len = owned_file_errors.len();
+    let adsf_errors_len = adsf_errors.len();
 
     let all_errors = {
         let mut all_errors = vec![];
@@ -76,7 +75,7 @@ struct Errors {
     hkx_errors: Vec<Error>,
 }
 
-fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
+async fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
     let mut all_errors = vec![];
 
     // 1/2: Apply patches & Replace variables to indexes
@@ -95,10 +94,26 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         (patch_result, patch_errors_len)
     };
 
-    let (templates, template_errors) =
-        collect_borrowed_templates(template_names, &config.resource_dir);
-    let template_error_len = template_errors.len();
-    all_errors.par_extend(template_errors);
+    let mut template_error_len;
+
+    let owned_templates = {
+        use crate::templates::collect::owned;
+        let template_dir = &config.resource_dir;
+        let (owned_templates, errors) =
+            owned::collect_templates(&template_dir, template_names).await;
+
+        template_error_len = errors.len();
+        all_errors.par_extend(errors);
+        owned_templates
+    };
+
+    let templates = {
+        use crate::templates::collect::borrowed;
+        let (templates, errors) = borrowed::collect_templates(&owned_templates);
+        template_error_len += errors.len();
+        all_errors.par_extend(errors);
+        templates
+    };
 
     let mut apply_errors_len = template_error_len;
     if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {

@@ -13,11 +13,12 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-dashmap = { version = "6.1.0", features = ["rayon"] }
+dashmap = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
+rmp-serde = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = [
@@ -38,7 +39,6 @@ skyrim_anim_parser = { workspace = true }
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
-rmp-serde = { workspace = true }
 tokio = { workspace = true, features = [
   "rt",
   "macros",

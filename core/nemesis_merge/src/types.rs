@@ -5,9 +5,13 @@ use rayon::prelude::*;
 use simd_json::BorrowedValue;
 use std::{collections::HashMap, path::PathBuf};
 
+/// - key: template file path
+/// - value: Content bytes
+pub type OwnedTemplateMap = HashMap<PathBuf, Vec<u8>>;
+
 /// - key: template file stem(e.g. `0_master`)
 /// - value: output_path(hkx file path), borrowed json (from template xml)
-pub type BorrowedTemplateMap<'a> = DashMap<&'a str, (PathBuf, BorrowedValue<'a>)>;
+pub type BorrowedTemplateMap<'a> = DashMap<String, (&'a str, BorrowedValue<'a>)>;
 
 /// - key: full path
 /// - value: nemesis xml
@@ -238,6 +242,6 @@ impl VariableClassMap<'_> {
     }
 }
 
-/// - key: template_name(e.g. `0_master`, `_1stperson/0_master`)
+/// - key: path until mod_code(e.g. `Nemesis_Engine/mod/slide`)
 /// - value: priority
 pub type PriorityMap<'a> = HashMap<&'a str, usize>;

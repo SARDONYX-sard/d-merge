@@ -1,2 +1,2 @@
 pub mod collect;
-pub mod collect_owned;
+pub mod gen_bin;
