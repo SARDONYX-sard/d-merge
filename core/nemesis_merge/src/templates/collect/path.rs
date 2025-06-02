@@ -9,9 +9,11 @@ use serde_hkx::errors::readable::ReadableError;
 use snafu::{prelude::*, OptionExt};
 use std::path::Path;
 use winnow::{
-    combinator::repeat,
-    token::{any, take_until},
-    ModalResult, Parser as _,
+    ascii::Caseless,
+    combinator::{alt, not, peek, repeat, seq},
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    token::any,
+    ModalResult, Parser,
 };
 
 /// Return (hashmap key, inner path starting from `meshes`)
@@ -52,10 +54,26 @@ pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {
         })
 }
 
+/// Case-insensitive take_until implementation using only winnow
+fn take_until_caseless<'s>(
+    tag: &'static str,
+) -> impl Parser<&'s str, &'s str, ErrMode<ContextError>> {
+    move |input: &mut &'s str| {
+        let end = not((Caseless(tag), alt(('/', '\\'))));
+        repeat::<_, _, (), _, _>(1.., (peek(end), any))
+            .take()
+            .parse_next(input)
+    }
+}
+
 fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    take_until(0.., "meshes").parse_next(input)?;
+    seq! {
+        _: take_until_caseless("meshes").context(Expected(StringLiteral("meshes"))),
+    }
+    .parse_next(input)?;
+
     let inner_path = *input;
-    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?;
+    repeat::<_, _, (), _, _>(1.., any).parse_next(input)?;
     Ok(inner_path)
 }
 
