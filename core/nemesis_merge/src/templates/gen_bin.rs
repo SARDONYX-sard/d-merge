@@ -105,6 +105,7 @@ fn get_meshes_relative_path(path: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    #[ignore = "local only"]
     #[test]
     fn test_create_bin_templates() {
         let paths = std::fs::read_to_string("../../dummy/templates_paths.txt").unwrap();
