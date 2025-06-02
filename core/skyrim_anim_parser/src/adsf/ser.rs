@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_serialize_alt_adsf() {
         let alt_adsf_bytes = include_bytes!(
-            "../../../../dummy/debug/animationdatasinglefile.bin" // "../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
+            "../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
         );
         let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
         let actual = serialize_alt_adsf(&alt_adsf);
