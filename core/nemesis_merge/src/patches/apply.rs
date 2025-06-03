@@ -15,29 +15,33 @@ pub fn apply_patches<'a, 'b: 'a>(
     patch_map_foreach_template: PatchMapForEachTemplate<'b>,
     output_dir: &Path,
 ) -> Result<(), Vec<Error>> {
-    let results = patch_map_foreach_template // patches
+    let results: Vec<Result<(), Error>> = patch_map_foreach_template // patches
         .into_par_iter()
-        .map(|(template_name, patches)| {
+        // template_name: e.g. 0_master.hkx -> 0_master
+        // patches: patches for 0_master.hkx
+        .flat_map(|(template_name, patches)| {
             let _output_dir = output_dir;
             #[cfg(feature = "debug")]
-            write_json_patch(_output_dir, template_name, &patches)?;
-
-            // template_name: e.g. 0_master.hkx -> 0_master
-            // patches: patches for 0_master.hkx
-            if let Some(mut template_pair) = templates.get_mut(template_name) {
-                let template = &mut template_pair.value_mut().1;
-
-                for (path, patch) in patches.0 {
-                    apply_patch(template_name, template, path, patch)
-                        .with_context(|_| PatchSnafu { template_name })?;
-                }
-            } else {
-                return Err(Error::NotFoundTemplate {
-                    template_name: template_name.to_string(),
-                });
+            if let Err(err) = write_json_patch(_output_dir, template_name, &patches) {
+                #[cfg(feature = "tracing")]
+                tracing::error!("{err}");
             }
 
-            Ok(())
+            patches
+                .0
+                .into_par_iter()
+                .map(|(path, patch)| {
+                    if let Some(mut template_pair) = templates.get_mut(template_name) {
+                        let template = &mut template_pair.value_mut().1;
+                        apply_patch(template_name, template, path, patch)
+                            .with_context(|_| PatchSnafu { template_name })
+                    } else {
+                        Err(Error::NotFoundTemplate {
+                            template_name: template_name.to_string(),
+                        })
+                    }
+                })
+                .collect::<Vec<Result<(), Error>>>()
         })
         .collect();
 
