@@ -115,6 +115,16 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         templates
     };
 
+    #[cfg(feature = "tracing")]
+    {
+        tracing::debug!("owned_templates_keys = {:#?}", owned_templates.keys());
+        tracing::debug!("borrowed_templates_keys = {:#?}", {
+            let borrowed_keys: Vec<String> =
+                templates.par_iter().map(|r| r.key().clone()).collect();
+            borrowed_keys
+        });
+    }
+
     let mut apply_errors_len = template_error_len;
     if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {
         apply_errors_len = errors.len();
