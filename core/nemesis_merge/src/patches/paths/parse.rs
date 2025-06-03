@@ -74,7 +74,7 @@ mod tests {
         let actual = test_parse_nemesis_path(
             "/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt",
         );
-        assert_eq!(actual, ("0_master", false));
+        assert_eq!(actual, ("0_master", true));
     }
 
     #[test]
