@@ -3,6 +3,7 @@ use crate::{
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
     types::{BorrowedTemplateMap, PatchMapForEachTemplate},
+    Config,
 };
 use json_patch::apply_patch;
 use rayon::prelude::*;
@@ -13,18 +14,18 @@ use std::path::Path;
 pub fn apply_patches<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
     patch_map_foreach_template: PatchMapForEachTemplate<'b>,
-    output_dir: &Path,
+    config: &Config,
 ) -> Result<(), Vec<Error>> {
     let results: Vec<Result<(), Error>> = patch_map_foreach_template // patches
         .into_par_iter()
         // template_name: e.g. 0_master.hkx -> 0_master
         // patches: patches for 0_master.hkx
         .flat_map(|(template_name, patches)| {
-            let _output_dir = output_dir;
-            #[cfg(feature = "debug")]
-            if let Err(err) = write_json_patch(_output_dir, template_name, &patches) {
-                #[cfg(feature = "tracing")]
-                tracing::error!("{err}");
+            if config.debug.output_patch_json {
+                if let Err(err) = write_json_patch(&config.output_dir, template_name, &patches) {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!("{err}");
+                }
             }
 
             patches
@@ -48,7 +49,6 @@ pub fn apply_patches<'a, 'b: 'a>(
     filter_results(results)
 }
 
-#[cfg(feature = "debug")]
 fn write_json_patch(
     output_dir: &Path,
     template_name: &str,

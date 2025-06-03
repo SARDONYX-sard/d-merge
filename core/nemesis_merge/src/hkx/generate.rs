@@ -3,6 +3,7 @@ use crate::{
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
     types::{BorrowedTemplateMap, VariableClassMap},
+    Config,
 };
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
@@ -11,17 +12,20 @@ use serde_hkx_features::{
 };
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub(crate) fn generate_hkx_files<'a, 'b>(
-    output_dir: &Path,
+    config: &Config,
     templates: BorrowedTemplateMap<'a>,
     variable_class_map: VariableClassMap<'b>,
 ) -> Result<(), Vec<Error>> {
     let results = templates
         .into_par_iter()
         .map(|(file_stem, (inner_path, template_json))| {
-            let mut output_path = output_dir.join(inner_path);
+            let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
                 fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
@@ -29,30 +33,21 @@ pub(crate) fn generate_hkx_files<'a, 'b>(
                 })?;
             }
 
-            #[cfg(feature = "debug")]
-            let debug_path = {
-                let debug_path = output_dir.join(".debug").join(inner_path);
-
-                if let Some(output_dir_all) = debug_path.parent() {
-                    fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
-                        path: output_dir_all,
-                    })?;
+            let hkx_bytes = {
+                if config.debug.output_merged_json {
+                    let debug_path = create_debug_dir_all(&config.output_dir, inner_path)?;
+                    write_patched_json(&debug_path, &template_json)?;
                 }
 
-                debug_path
-            };
-
-            #[cfg(feature = "debug")]
-            write_patched_json(&debug_path, &template_json)?;
-
-            let hkx_bytes = {
                 let mut class_map: ClassMap =
                     from_borrowed_value(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
                     })?;
 
-                // #[cfg(feature = "debug")]
-                // write_patched_xml(&debug_path, &class_map)?;
+                if config.debug.output_merged_xml {
+                    let debug_path = create_debug_dir_all(&config.output_dir, inner_path)?;
+                    write_patched_xml(&debug_path, &class_map)?;
+                };
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
@@ -99,7 +94,21 @@ pub(crate) fn generate_hkx_files<'a, 'b>(
     filter_results(results)
 }
 
-#[cfg(feature = "debug")]
+fn create_debug_dir_all(output_dir: &Path, inner_path: &str) -> Result<PathBuf> {
+    let debug_path = {
+        let debug_path = output_dir.join(".debug");
+        if let Some(output_dir_all) = debug_path.parent() {
+            fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
+                path: output_dir_all,
+            })?;
+        }
+
+        debug_path.join(inner_path)
+    };
+
+    Ok(debug_path)
+}
+
 /// Output template.json & template.json debug string
 fn write_patched_json(
     output_base: &Path,
@@ -120,8 +129,6 @@ fn write_patched_json(
     Ok(())
 }
 
-#[cfg(feature = "debug")]
-#[allow(unused)]
 fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()> {
     use serde_hkx::HavokSort as _;
 

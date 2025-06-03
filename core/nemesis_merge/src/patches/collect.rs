@@ -99,10 +99,10 @@ pub async fn collect_owned_patches(
     (adsf_patches, owned_patches, errors)
 }
 
-pub fn collect_borrowed_patches<'a>(
+pub fn collect_borrowed_patches<'a: 'b, 'b>(
     owned_patches: &'a OwnedPatchMap,
     hack_options: Option<HackOptions>,
-) -> (BorrowedPatches<'a>, Vec<Error>) {
+) -> (BorrowedPatches<'a, 'b>, Vec<Error>) {
     let patch_map_foreach_template = PatchMapForEachTemplate::new();
     let template_names = DashSet::new();
     let variable_class_map = VariableClassMap::new();
@@ -116,9 +116,9 @@ pub fn collect_borrowed_patches<'a>(
             let (json_patches, variable_class_index) = parse_nemesis_patch(xml, hack_options)
                 .with_context(|_| NemesisXmlErrSnafu { path })?;
 
-            let template_name = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
+            let (template_name, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
 
-            template_names.insert(template_name);
+            template_names.insert((template_name, is_1st_person));
             if let Some(class_index) = variable_class_index {
                 variable_class_map
                     .0
@@ -193,9 +193,12 @@ pub fn collect_borrowed_patches<'a>(
     )
 }
 
-pub struct BorrowedPatches<'a> {
+pub struct BorrowedPatches<'a, 'b> {
     /// Name of the template that needs to be read.
-    pub template_names: DashSet<&'a str>,
+    ///
+    /// - format: template_name, is_1st_person
+    /// - e.g. (`0_master`, false)
+    pub template_names: DashSet<(&'b str, bool)>,
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
     pub patch_map_foreach_template: PatchMapForEachTemplate<'a>,

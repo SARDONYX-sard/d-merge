@@ -75,6 +75,7 @@ pub(crate) async fn patch(
                         resource_dir,
                         status_report: Some(Box::new(status_reporter)),
                         hack_options: Some(HackOptions::enable_all()), // TODO: Create GUI hack control popup
+                        debug: nemesis_merge::DebugOptions::enable_all(),
                     },
                 ).await
             };

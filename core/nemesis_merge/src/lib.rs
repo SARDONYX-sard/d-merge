@@ -11,7 +11,7 @@ mod results;
 mod templates;
 
 pub use crate::behavior::generate::behavior_gen;
-pub use crate::config::{Config, Status};
+pub use crate::config::{Config, DebugOptions, Status};
 pub use crate::templates::gen_bin::create_bin_templates;
 pub use nemesis_xml::hack::HackOptions;
 
@@ -59,7 +59,12 @@ mod tests {
                 resource_dir: "../../resource/assets/templates".into(),
                 output_dir: "../../dummy/behavior_gen/output".into(),
                 status_report: Some(crate::config::new_color_status_reporter()),
-                hack_options: Some(crate::HackOptions::enable_all()),
+                hack_options: Some(HackOptions::enable_all()),
+                debug: DebugOptions {
+                    output_patch_json: true,
+                    output_merged_json: true,
+                    output_merged_xml: false,
+                },
             },
         )
         .await;

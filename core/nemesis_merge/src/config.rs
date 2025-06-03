@@ -4,29 +4,73 @@ use nemesis_xml::hack::HackOptions;
 
 /// A configuration structure used to specify various directories and a status report callback.
 ///
-/// The `Config` struct holds paths for resource and output directories, as well as an optional
-/// callback for reporting the current status of a process. This can be used to track and
-/// report status updates during an operation, such as applying patches or generating files.
+/// The `Config` struct holds paths for input resources and output directories, along with optional
+/// settings for debugging and compatibility. It is used to control behavior during operations such as
+/// patching HKX templates, merging JSON data, and generating final outputs.
 #[derive(Default)]
 pub struct Config {
-    /// The directory containing the hkx templates you want to patch
+    /// The directory containing the HKX templates you want to patch.
     ///
-    /// Select the directory where mesh is located(e.g. `assets/templates`, then use `assets/templates/meshes`)
+    /// Typically this is a directory like `assets/templates`. The actual patch target directory
+    /// should be a subdirectory such as `assets/templates/meshes`.
     pub resource_dir: PathBuf,
 
     /// The directory where the output files will be saved.
+    ///
+    /// This directory will also contain `.debug` subdirectory if debug output is enabled.
     pub output_dir: PathBuf,
 
     /// An optional callback function that reports the current status of the process.
     ///
-    /// This closure takes a `Status` enum and is invoked to report status updates.
+    /// The callback is invoked with `Status` updates, allowing consumers to track
+    /// progress, errors, or other runtime events.
     pub status_report: Option<Box<dyn Fn(Status) + Send + Sync>>,
 
     /// Enables lenient parsing for known issues in unofficial or modded patches.
     ///
-    /// This may fix common mistakes in community patches (e.g., misnamed fields),
-    /// but can also hide real data errors.
+    /// This setting allows the parser to work around common community patch errors
+    /// such as incorrect field names or missing values. Use with caution as it may
+    /// mask actual data issues.
     pub hack_options: Option<HackOptions>,
+
+    /// Options controlling the output of debug artifacts.
+    pub debug: DebugOptions,
+}
+
+/// A group of flags to enable debug output of intermediate files.
+#[derive(Default)]
+pub struct DebugOptions {
+    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This includes:
+    /// - `patch.json`: The raw parsed patch data.
+    ///   - For `One` patches, it reflects the result of priority-based overwriting.
+    ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
+    pub output_patch_json: bool,
+
+    /// If true, outputs the merged JSON to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This represents the state of the data after all patches have been applied and
+    /// conflicts resolved, but before converting to `.hkx` format.
+    pub output_merged_json: bool,
+
+    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This is the final XML representation of the patched and merged data,
+    /// just before conversion to the binary `.hkx` format.
+    pub output_merged_xml: bool,
+}
+
+impl DebugOptions {
+    /// Enable all debug options.
+    #[inline]
+    pub const fn enable_all() -> Self {
+        Self {
+            output_patch_json: true,
+            output_merged_json: true,
+            output_merged_xml: true,
+        }
+    }
 }
 
 impl Config {

@@ -4,7 +4,7 @@ use serde_hkx::errors::readable::ReadableError;
 use snafu::OptionExt;
 use winnow::{
     ascii::Caseless,
-    combinator::{alt, repeat},
+    combinator::{alt, opt, repeat},
     seq,
     token::{any, take_until, take_while},
     ModalResult, Parser as _,
@@ -13,7 +13,7 @@ use winnow::{
 use crate::errors::{Error, NonUtf8PathSnafu};
 
 /// Parse nemesis patch path.
-pub fn parse_nemesis_path(path: &Path) -> Result<&str, Error> {
+pub fn parse_nemesis_path(path: &Path) -> Result<(&str, bool), Error> {
     let input = path.to_str().with_context(|| NonUtf8PathSnafu { path })?;
 
     parse_components
@@ -24,15 +24,11 @@ pub fn parse_nemesis_path(path: &Path) -> Result<&str, Error> {
 }
 
 /// return `_1stperson/0_master`
-fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let first_person = seq!(
-        Caseless("_1stperson"),
-        alt(('/', '\\')),
-        take_while(1.., |c| !matches!(c, '/' | '\\')),
-    )
-    .take();
-
-    let mut template_name = alt((first_person, take_while(1.., |c| c != '/' && c != '\\')));
+fn parse_components<'a>(input: &mut &'a str) -> ModalResult<(&'a str, bool)> {
+    let mut template_name = seq! {
+        opt(seq!(Caseless("_1stperson"), alt(('/', '\\'))).take()),
+        take_while(1.., |c| c != '/' && c != '\\'),
+    };
 
     // Parse prefix to Nemesis_Engine/mod/<mod_code>/
     let mut parser = seq! {
@@ -47,8 +43,8 @@ fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
             _: repeat::<_, _, (), _, _>(0.., any),
     };
 
-    let (template_name,) = parser.parse_next(input)?;
-    Ok(template_name)
+    let ((is_1st_person, template_name),) = parser.parse_next(input)?;
+    Ok((template_name, is_1st_person.is_some()))
 }
 
 #[cfg(test)]
@@ -56,7 +52,7 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    fn test_parse_nemesis_path(path: &str) -> &str {
+    fn test_parse_nemesis_path(path: &str) -> (&str, bool) {
         parse_nemesis_path(Path::new(path)).unwrap_or_else(|e| panic!("{e}"))
     }
 
@@ -64,13 +60,13 @@ mod tests {
     fn parse_nemesis_path_valid_basic() {
         let actual =
             test_parse_nemesis_path("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
-        assert_eq!(actual, "0_master");
+        assert_eq!(actual, ("0_master", false));
     }
 
     #[test]
     fn parse_nemesis_path_valid_relative_path() {
         let actual = test_parse_nemesis_path("../Nemesis_Engine/mod/flinch/0_master/#0106.txt");
-        assert_eq!(actual, "0_master");
+        assert_eq!(actual, ("0_master", false));
     }
 
     #[test]
@@ -78,7 +74,7 @@ mod tests {
         let actual = test_parse_nemesis_path(
             "/some/path/to/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt",
         );
-        assert_eq!(actual, "_1stperson/0_master");
+        assert_eq!(actual, ("0_master", false));
     }
 
     #[test]

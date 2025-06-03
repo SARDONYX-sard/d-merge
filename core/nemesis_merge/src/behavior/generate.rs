@@ -105,7 +105,8 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     let owned_templates = {
         use crate::templates::collect::owned;
         let template_dir = &config.resource_dir;
-        owned::collect_templates(template_dir, template_names)
+        // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
+        owned::collect_templates(template_dir, template_names.into_par_iter().collect())
     };
 
     let template_error_len;
@@ -128,7 +129,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     }
 
     let mut apply_errors_len = template_error_len;
-    if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, &config.output_dir) {
+    if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, config) {
         apply_errors_len = errors.len();
         all_errors.par_extend(errors);
     };
@@ -136,9 +137,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     // 2/2: Generate hkx files.
     config.on_report_status(Status::GenerateHkxFiles);
     let hkx_errors_len = {
-        if let Err(hkx_errors) =
-            generate_hkx_files(&config.output_dir, templates, variable_class_map)
-        {
+        if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
             let errors_len = hkx_errors.len();
             all_errors.par_extend(hkx_errors);
             errors_len
