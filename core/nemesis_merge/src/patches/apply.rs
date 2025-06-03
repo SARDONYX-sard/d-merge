@@ -31,6 +31,10 @@ pub fn apply_patches<'a, 'b: 'a>(
                     apply_patch(template_name, template, path, patch)
                         .with_context(|_| PatchSnafu { template_name })?;
                 }
+            } else {
+                return Err(Error::NotFoundTemplate {
+                    template_name: template_name.to_string(),
+                });
             }
 
             Ok(())

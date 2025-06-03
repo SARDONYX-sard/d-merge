@@ -40,7 +40,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
         apply_errors_len,
         hkx_errors_len,
         hkx_errors,
-    } = patched_hkx_errors.await;
+    } = patched_hkx_errors;
     let owned_file_errors_len = owned_file_errors.len();
     let adsf_errors_len = adsf_errors.len();
 
@@ -77,7 +77,7 @@ struct Errors {
     hkx_errors: Vec<Error>,
 }
 
-async fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
+fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
     let mut all_errors = vec![];
 
     // 1/2: Apply patches & Replace variables to indexes
@@ -96,23 +96,17 @@ async fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Confi
         (patch_result, patch_errors_len)
     };
 
-    let mut template_error_len;
-
     let owned_templates = {
         use crate::templates::collect::owned;
         let template_dir = &config.resource_dir;
-        let (owned_templates, errors) =
-            owned::collect_templates(&template_dir, template_names).await;
-
-        template_error_len = errors.len();
-        all_errors.par_extend(errors);
-        owned_templates
+        owned::collect_templates(template_dir, template_names)
     };
 
+    let template_error_len;
     let templates = {
         use crate::templates::collect::borrowed;
         let (templates, errors) = borrowed::collect_templates(&owned_templates);
-        template_error_len += errors.len();
+        template_error_len = errors.len();
         all_errors.par_extend(errors);
         templates
     };

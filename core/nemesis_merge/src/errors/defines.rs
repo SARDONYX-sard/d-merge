@@ -28,7 +28,7 @@ pub enum Error {
     #[snafu(display("{}", source))]
     FailedToGenerateBehaviors { source: BehaviorGenerationError },
 
-    /// No such template `{template_name}`.
+    /// [Apply patch Error] No such template `{template_name}`.
     NotFoundTemplate { template_name: String },
 
     /// Json patch error
