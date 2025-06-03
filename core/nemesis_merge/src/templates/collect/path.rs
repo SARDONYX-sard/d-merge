@@ -1,7 +1,10 @@
 //! The Nemesis path consists of the following
 //!
-//! - Format: `Nemesis_Engine/mod/<id>/[1st_person/]<template name>/<patch index>.txt`
-//! - e.g.: `/some/path/to/Nemesis_Engine/mod/flinch/1st_person/0_master/#0106.txt`.
+//! - Format:
+//!   - message_pack JsonValue: `meshes/../[1st_person/]<template name>.bin`
+//!   -                    XML: `meshes/../[1st_person/]<template name>.xml`
+//!
+//! - e.g.: `../../resource/assets/templates/meshes/actors/character/defaultmale_Project.bin`.
 //!
 //! From here, we need to determine and load the xml to which the patch will be applied, so we use a table to load this.
 //! Note that the dir paths above `mesh` can be optionally specified and concatenated as resource paths later.
