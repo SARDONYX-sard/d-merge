@@ -17,14 +17,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(crate) fn generate_hkx_files<'a, 'b>(
+pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
     config: &Config,
     templates: BorrowedTemplateMap<'a>,
     variable_class_map: VariableClassMap<'b>,
 ) -> Result<(), Vec<Error>> {
     let results = templates
         .into_par_iter()
-        .map(|(file_stem, (inner_path, template_json))| {
+        .map(|(key, (inner_path, template_json))| {
             let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
@@ -51,7 +51,7 @@ pub(crate) fn generate_hkx_files<'a, 'b>(
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
-                if let Some(pair) = variable_class_map.0.get(file_stem.as_str()) {
+                if let Some(pair) = variable_class_map.0.get(&key) {
                     let ptr = pair.value();
 
                     // Create eventID & variableId maps from hkbBehaviorGraphStringData class

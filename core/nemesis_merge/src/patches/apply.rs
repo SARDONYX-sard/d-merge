@@ -2,7 +2,7 @@
 use crate::{
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
-    types::{BorrowedTemplateMap, PatchMapForEachTemplate},
+    types::{BorrowedTemplateMap, Key, RawBorrowedPatches},
     Config,
 };
 use json_patch::apply_patch;
@@ -11,18 +11,24 @@ use snafu::ResultExt;
 use std::path::Path;
 
 /// Apply to hkx with merged json patch.
+///
+/// # Lifetime
+/// In terms of code flow, the `patch` is longer lived than the `template`, but this inversion is achieved by
+/// shrinking the lifetime of the patch by the higher-level function.
+///
+/// Therefore, this seemingly strange lifetime annotation is intentional.
 pub fn apply_patches<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
-    patch_map_foreach_template: PatchMapForEachTemplate<'b>,
+    borrowed_patches: RawBorrowedPatches<'b>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
-    let results: Vec<Result<(), Error>> = patch_map_foreach_template // patches
+    let results: Vec<Result<(), Error>> = borrowed_patches // patches
         .into_par_iter()
         // template_name: e.g. 0_master.hkx -> 0_master
         // patches: patches for 0_master.hkx
-        .flat_map(|(template_name, patches)| {
+        .flat_map(|(key, patches)| {
             if config.debug.output_patch_json {
-                if let Err(err) = write_json_patch(&config.output_dir, template_name, &patches) {
+                if let Err(err) = write_json_patch(&config.output_dir, &key, &patches) {
                     #[cfg(feature = "tracing")]
                     tracing::error!("{err}");
                 }
@@ -32,13 +38,14 @@ pub fn apply_patches<'a, 'b: 'a>(
                 .0
                 .into_par_iter()
                 .map(|(path, patch)| {
-                    if let Some(mut template_pair) = templates.get_mut(template_name) {
+                    if let Some(mut template_pair) = templates.get_mut(&key) {
                         let template = &mut template_pair.value_mut().1;
-                        apply_patch(template_name, template, path, patch)
+                        let template_name = key.to_string();
+                        apply_patch(template_name.as_str(), template, path, patch)
                             .with_context(|_| PatchSnafu { template_name })
                     } else {
                         Err(Error::NotFoundTemplate {
-                            template_name: template_name.to_string(),
+                            template_name: key.to_string(),
                         })
                     }
                 })
@@ -51,23 +58,27 @@ pub fn apply_patches<'a, 'b: 'a>(
 
 fn write_json_patch(
     output_dir: &Path,
-    template_name: &str,
+    key: &Key,
     patches: &crate::types::PatchMap,
 ) -> Result<(), Error> {
     use crate::errors::FailedIoSnafu;
     use snafu::ResultExt as _;
 
-    let output_dir = output_dir.join(".debug").join("patches");
+    let output_dir = if key.is_1st_person {
+        let output_dir_1st_person = output_dir.join(".debug").join("patches").join("_1stperson");
+        std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
+            path: output_dir_1st_person.clone(),
+        })?;
+        output_dir_1st_person
+    } else {
+        output_dir.join(".debug").join("patches")
+    };
 
-    let output_dir_1st_person = output_dir.join("_1stperson");
-    std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
-        path: output_dir_1st_person,
-    })?;
     std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {
         path: output_dir.clone(),
     })?;
 
-    let output_path = output_dir.join(format!("{template_name}.patch.json"));
+    let output_path = output_dir.join(format!("{}.patch.json", key.template_name));
     let json = simd_json::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
         path: output_path.clone(),
     })?;

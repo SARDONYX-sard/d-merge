@@ -89,7 +89,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     let (
         BorrowedPatches {
             template_names,
-            patch_map_foreach_template,
+            borrowed_patches,
             variable_class_map,
         },
         patch_errors_len,
@@ -109,47 +109,54 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         owned::collect_templates(template_dir, template_names.into_par_iter().collect())
     };
 
-    let template_error_len;
-    let templates = {
-        use crate::templates::collect::borrowed;
-        let (templates, errors) = borrowed::collect_templates(&owned_templates);
-        template_error_len = errors.len();
-        all_errors.par_extend(errors);
-        templates
-    };
-
-    #[cfg(feature = "tracing")]
     {
-        tracing::debug!("owned_templates_keys = {:#?}", owned_templates.keys());
-        tracing::debug!("borrowed_templates_keys = {:#?}", {
-            let borrowed_keys: Vec<String> =
-                templates.par_iter().map(|r| r.key().clone()).collect();
-            borrowed_keys
-        });
-    }
+        // NOTE: Without this seemingly meaningless move, an lifetime error is made.
+        // Need `'owned_templates`: `'variable_class_map` & `'borrowed_patches`. So let's move here and shrink these lifetimes.
+        let variable_class_map = variable_class_map;
+        let borrowed_patches = borrowed_patches;
 
-    let mut apply_errors_len = template_error_len;
-    if let Err(errors) = apply_patches(&templates, patch_map_foreach_template, config) {
-        apply_errors_len = errors.len();
-        all_errors.par_extend(errors);
-    };
+        let template_error_len;
+        let templates = {
+            use crate::templates::collect::borrowed;
+            let (templates, errors) = borrowed::collect_templates(&owned_templates);
+            template_error_len = errors.len();
+            all_errors.par_extend(errors);
+            templates
+        };
 
-    // 2/2: Generate hkx files.
-    config.on_report_status(Status::GenerateHkxFiles);
-    let hkx_errors_len = {
-        if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
-            let errors_len = hkx_errors.len();
-            all_errors.par_extend(hkx_errors);
-            errors_len
-        } else {
-            0
+        #[cfg(feature = "tracing")]
+        {
+            tracing::debug!("owned_templates_keys = {:#?}", owned_templates.keys());
+            tracing::debug!("borrowed_templates_keys = {:#?}", {
+                let borrowed_keys: Vec<String> =
+                    templates.par_iter().map(|r| r.key().to_string()).collect();
+                borrowed_keys
+            });
         }
-    };
 
-    Errors {
-        patch_errors_len,
-        apply_errors_len,
-        hkx_errors_len,
-        hkx_errors: all_errors,
+        let mut apply_errors_len = template_error_len;
+        if let Err(errors) = apply_patches(&templates, borrowed_patches, config) {
+            apply_errors_len = errors.len();
+            all_errors.par_extend(errors);
+        };
+
+        // 2/2: Generate hkx files.
+        config.on_report_status(Status::GenerateHkxFiles);
+        let hkx_errors_len = {
+            if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
+                let errors_len = hkx_errors.len();
+                all_errors.par_extend(hkx_errors);
+                errors_len
+            } else {
+                0
+            }
+        };
+
+        Errors {
+            patch_errors_len,
+            apply_errors_len,
+            hkx_errors_len,
+            hkx_errors: all_errors,
+        }
     }
 }

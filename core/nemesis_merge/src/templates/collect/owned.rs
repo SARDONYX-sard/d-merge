@@ -1,10 +1,10 @@
 use rayon::prelude::*;
 use std::{collections::HashSet, path::Path};
 
-use crate::types::OwnedTemplateMap;
+use crate::types::{Key, OwnedTemplateMap};
 
 /// Return HashMap<template key, `meshes` inner path>
-pub fn collect_templates(path: &Path, template_names: HashSet<(&str, bool)>) -> OwnedTemplateMap {
+pub fn collect_templates(path: &Path, template_names: HashSet<Key<'_>>) -> OwnedTemplateMap {
     let map: OwnedTemplateMap = jwalk::WalkDir::new(path)
         .into_iter()
         .par_bridge()
@@ -23,7 +23,7 @@ pub fn collect_templates(path: &Path, template_names: HashSet<(&str, bool)>) -> 
             let is_1st_person = path
                 .components()
                 .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
-            template_names.get(&(file_stem.to_str()?, is_1st_person))?;
+            template_names.get(&Key::new(file_stem.to_str()?, is_1st_person))?;
 
             let bytes = std::fs::read(&path).ok()?;
             Some((path, bytes))

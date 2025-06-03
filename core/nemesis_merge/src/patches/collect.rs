@@ -8,8 +8,8 @@ use crate::{
     path_id::get_nemesis_id,
     results::filter_results,
     types::{
-        OwnedAdsfPatchMap, OwnedPatchMap, PatchKind, PatchMap, PatchMapForEachTemplate,
-        PriorityMap, VariableClassMap,
+        Key, OwnedAdsfPatchMap, OwnedPatchMap, PatchKind, PatchMap, PriorityMap,
+        RawBorrowedPatches, VariableClassMap,
     },
 };
 use dashmap::DashSet;
@@ -99,11 +99,11 @@ pub async fn collect_owned_patches(
     (adsf_patches, owned_patches, errors)
 }
 
-pub fn collect_borrowed_patches<'a: 'b, 'b>(
+pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     hack_options: Option<HackOptions>,
-) -> (BorrowedPatches<'a, 'b>, Vec<Error>) {
-    let patch_map_foreach_template = PatchMapForEachTemplate::new();
+) -> (BorrowedPatches<'a>, Vec<Error>) {
+    let raw_borrowed_patches = RawBorrowedPatches::new();
     let template_names = DashSet::new();
     let variable_class_map = VariableClassMap::new();
 
@@ -117,19 +117,20 @@ pub fn collect_borrowed_patches<'a: 'b, 'b>(
                 .with_context(|_| NemesisXmlErrSnafu { path })?;
 
             let (template_name, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
+            let key = Key::new(template_name, is_1st_person);
 
-            template_names.insert((template_name, is_1st_person));
+            template_names.insert(key.clone());
             if let Some(class_index) = variable_class_index {
                 variable_class_map
                     .0
-                    .entry(template_name)
+                    .entry(key.clone())
                     .or_insert(class_index);
             }
 
-            json_patches.into_par_iter().for_each(|(key, value)| {
+            json_patches.into_par_iter().for_each(|(json_path, value)| {
                 // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                let entry = patch_map_foreach_template
-                    .entry(template_name)
+                let entry = raw_borrowed_patches
+                    .entry(key.clone())
                     .or_insert_with(PatchMap::new);
 
                 match &value.op {
@@ -137,11 +138,11 @@ pub fn collect_borrowed_patches<'a: 'b, 'b>(
                     // Pure: no add and remove because of single value
                     json_patch::OpRangeKind::Pure(_) => {
                         let value = ValueWithPriority::new(value, priority);
-                        let _ = entry.value().insert(key, value, PatchKind::OneField);
+                        let _ = entry.value().insert(json_path, value, PatchKind::OneField);
                     }
                     json_patch::OpRangeKind::Seq(_) => {
                         let value = ValueWithPriority::new(value, priority);
-                        let _ = entry.value().insert(key, value, PatchKind::Seq);
+                        let _ = entry.value().insert(json_path, value, PatchKind::Seq);
                     }
                     json_patch::OpRangeKind::Discrete(range_vec) => {
                         let json_patch::JsonPatch { value, .. } = value;
@@ -169,7 +170,7 @@ pub fn collect_borrowed_patches<'a: 'b, 'b>(
                                     let value = ValueWithPriority::new(value, priority);
                                     value
                                 });
-                        let _ = entry.value().extend(key, iter);
+                        let _ = entry.value().extend(json_path, iter);
                     }
                 }
             });
@@ -186,22 +187,22 @@ pub fn collect_borrowed_patches<'a: 'b, 'b>(
     (
         BorrowedPatches {
             template_names,
-            patch_map_foreach_template,
+            borrowed_patches: raw_borrowed_patches,
             variable_class_map,
         },
         errors,
     )
 }
 
-pub struct BorrowedPatches<'a, 'b> {
+pub struct BorrowedPatches<'a> {
     /// Name of the template that needs to be read.
     ///
     /// - format: template_name, is_1st_person
     /// - e.g. (`0_master`, false)
-    pub template_names: DashSet<(&'b str, bool)>,
+    pub template_names: DashSet<Key<'a>>,
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
-    pub patch_map_foreach_template: PatchMapForEachTemplate<'a>,
+    pub borrowed_patches: RawBorrowedPatches<'a>,
     /// HashMap showing which index (e.g. `#0000`) of each template (e.g. `0_master.xml`)
     /// contains `hkbBehaviorGraphStringData
     ///

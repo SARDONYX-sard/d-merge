@@ -19,29 +19,20 @@ use winnow::{
     ModalResult, Parser,
 };
 
+use crate::types::Key;
+
 /// Return (hashmap key, inner path starting from `meshes`)
-pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(String, &str), TemplateError> {
+pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(Key<'_>, &str), TemplateError> {
     let file_stem = path
         .file_stem()
         .and_then(|s| s.to_str())
         .context(MissingFileStemSnafu)?;
 
-    let path_str = path.to_str().context(InvalidUtf8Snafu)?;
-
     let is_1stperson = path
         .components()
         .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
 
-    let key = if is_1stperson {
-        if path_str.contains('\\') {
-            format!("_1stperson\\{file_stem}")
-        } else {
-            format!("_1stperson/{file_stem}")
-        }
-    } else {
-        file_stem.to_string()
-    };
-
+    let key = Key::new(file_stem, is_1stperson);
     let inner_path = parse_template_path(path)?;
 
     Ok((key, inner_path))
@@ -94,10 +85,10 @@ pub enum TemplateError {
 mod tests {
     use super::*;
 
-    fn assert_template(path: &str, expected_key: &str, expected_inner: &str) {
+    fn assert_template(path: &str, expected_key: (&str, bool), expected_inner: &str) {
         let path = Path::new(path);
         let result = template_name_and_inner_path(path).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(result.0, expected_key);
+        assert_eq!(result.0, Key::new(expected_key.0, expected_key.1));
         assert_eq!(result.1, expected_inner);
     }
 
@@ -105,13 +96,13 @@ mod tests {
     fn test_regular_path() {
         assert_template(
             r"../../resource/assets/templates/meshes/actors/character/defaultmale_Project.bin",
-            "defaultmale_Project",
+            ("defaultmale_Project", false),
             r"meshes/actors/character/defaultmale_Project.bin",
         );
 
         assert_template(
             "data/meshes/actors/character/behaviors/weapequip.xml",
-            "weapequip",
+            ("weapequip", false),
             "meshes/actors/character/behaviors/weapequip.xml",
         );
     }
@@ -120,7 +111,7 @@ mod tests {
     fn test_with_backslashes_and_1stperson() {
         assert_template(
             r"data/meshes/actors/character/character assets/_1stperson/skeleton.nif",
-            "_1stperson/skeleton",
+            ("skeleton", true),
             r"meshes/actors/character/character assets/_1stperson/skeleton.nif",
         );
     }
@@ -129,7 +120,7 @@ mod tests {
     fn test_with_slashes_and_1stperson() {
         assert_template(
             "Data/Meshes/_1stPerson/something.nif",
-            "_1stperson/something",
+            ("something", true),
             "Meshes/_1stPerson/something.nif",
         );
     }
@@ -139,13 +130,13 @@ mod tests {
     fn windows_long_path() {
         assert_template(
             r"D:release-no-lto\assets\templates\meshes\actors\character\_1stperson\characters\firstperson.bin",
-            "_1stperson\\firstperson",
+            ("firstperson", true),
             r"meshes\actors\character\_1stperson\characters\firstperson.bin",
         );
         let path = r"\\?\D:\rust\d-merge\target\release-no-lto\assets\templates\meshes\actors\character\_1stperson\behaviors\blockbehavior.bin";
         assert_template(
             path,
-            r"_1stperson\blockbehavior",
+            ("blockbehavior", true),
             r"meshes\actors\character\_1stperson\behaviors\blockbehavior.bin",
         );
     }
@@ -170,11 +161,11 @@ mod tests {
                 continue;
             }
 
-            let Ok((template_name, inner_path)) = template_name_and_inner_path(&path) else {
+            let Ok((key, inner_path)) = template_name_and_inner_path(&path) else {
                 continue;
             };
 
-            if let Some(prev) = map.insert(template_name, inner_path.to_string()) {
+            if let Some(prev) = map.insert(key.to_string(), inner_path.to_string()) {
                 overwrite.push((inner_path.to_string(), prev));
             };
         }
