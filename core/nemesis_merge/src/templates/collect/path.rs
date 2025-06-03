@@ -136,7 +136,7 @@ mod tests {
     fn windows_long_path() {
         assert_template(
             r"D:release-no-lto\assets\templates\meshes\actors\character\_1stperson\characters\firstperson.bin",
-            "_1stperson/firstperson",
+            "_1stperson\\firstperson",
             r"meshes\actors\character\_1stperson\characters\firstperson.bin",
         );
         let path = r"\\?\D:\rust\d-merge\target\release-no-lto\assets\templates\meshes\actors\character\_1stperson\behaviors\blockbehavior.bin";
