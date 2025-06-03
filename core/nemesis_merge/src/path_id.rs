@@ -1,3 +1,15 @@
+//! Utilities for extracting mod identifiers from paths pointing to `Nemesis_Engine` folders.
+//!
+//! This module includes functionality to extract a unique mod code path from
+//! a file path, and convert multiple such paths into a priority map indexed by
+//! their order in the input list. It's primarily designed to work with paths
+//! from modding tools or engines like Nemesis for Skyrim SE.
+//!
+//! # Features
+//! - Parallel extraction of mod codes from paths using Rayon
+//! - Custom parsing logic with detailed error reporting using `winnow`
+//! - Friendly, readable error reporting via `ReadableError`
+
 use std::path::PathBuf;
 
 use rayon::prelude::*;
@@ -15,6 +27,16 @@ use winnow::{
 
 use crate::types::PriorityMap;
 
+/// Converts a slice of `PathBuf`s into a [`PriorityMap`] by extracting
+/// mod identifiers from each path.
+///
+/// The mod identifier is determined by parsing the path to locate the
+/// segment that follows the structure:
+/// `.../Nemesis_Engine/mod/<mod_code>/...`
+///
+/// Paths that do not match the expected format will be skipped.
+/// # Returns
+/// A `PriorityMap` where keys are the extracted mod codes and values are their index.
 pub fn paths_to_priority_map(paths: &[PathBuf]) -> PriorityMap<'_> {
     paths
         .par_iter()
@@ -27,11 +49,19 @@ pub fn paths_to_priority_map(paths: &[PathBuf]) -> PriorityMap<'_> {
         .collect()
 }
 
-/// Get until `<mod_code>` path.
-/// - [Playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=3339ad634c5d66f91e54ba8bba3bf307)
+/// Parses a string path to extract the mod ID in the format:
+/// `.../Nemesis_Engine/mod/<mod_code>/...`
 ///
 /// # Errors
-/// If parsing fails, returns human readable error.
+///
+/// Returns a [`ReadableError`] if the input string does not contain the expected
+/// `Nemesis_Engine/mod/<mod_code>` pattern.
+///
+/// # Examples
+///
+/// ```txt
+/// `D:\\...\\Nemesis_Engine\\mod\\abc\\somefile.txt` -> `D:\\...\\Nemesis_Engine\\mod\\abc`
+/// ```
 pub fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
     _get_nemesis_id
         .parse(input)
@@ -39,10 +69,12 @@ pub fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
 }
 
 fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    // Match either '/' or '\\' as path separator
     let mut sep = alt(('/', '\\'))
         .context(Expected(CharLiteral('/')))
         .context(Expected(CharLiteral('\\')));
 
+    // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {
         take_until(0.., "Nemesis_Engine").context(Expected(StringLiteral("Nemesis_Engine"))),
         "Nemesis_Engine",
@@ -54,7 +86,7 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     .take();
 
     let id = parser.parse_next(input)?;
-    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?;
+    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?; // consume remaining input
     Ok(id)
 }
 

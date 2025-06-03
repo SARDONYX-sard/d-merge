@@ -20,6 +20,8 @@ use std::path::PathBuf;
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result<()> {
     let id_order = paths_to_priority_map(&nemesis_paths);
+    #[cfg(feature = "tracing")]
+    tracing::trace!("id_order = {id_order:#?}");
 
     // Collect all patches file.
     config.on_report_status(Status::ReadingTemplatesAndPatches);
