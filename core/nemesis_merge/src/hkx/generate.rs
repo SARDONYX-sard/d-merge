@@ -35,7 +35,7 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
 
             let hkx_bytes = {
                 if config.debug.output_merged_json {
-                    let debug_path = create_debug_dir_all(&config.output_dir, inner_path)?;
+                    let debug_path = debug_file_path(&config.output_dir, inner_path);
                     write_patched_json(&debug_path, &template_json)?;
                 }
 
@@ -45,7 +45,7 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
                     })?;
 
                 if config.debug.output_merged_xml {
-                    let debug_path = create_debug_dir_all(&config.output_dir, inner_path)?;
+                    let debug_path = debug_file_path(&config.output_dir, inner_path);
                     write_patched_xml(&debug_path, &class_map)?;
                 };
 
@@ -94,33 +94,27 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
     filter_results(results)
 }
 
-fn create_debug_dir_all(output_dir: &Path, inner_path: &str) -> Result<PathBuf> {
-    let debug_path = {
-        let debug_path = output_dir.join(".debug");
-        if let Some(output_dir_all) = debug_path.parent() {
-            fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
-                path: output_dir_all,
-            })?;
-        }
-
-        debug_path.join(inner_path)
-    };
-
-    Ok(debug_path)
+fn debug_file_path(output_dir: &Path, inner_path: &str) -> PathBuf {
+    output_dir.join(".debug").join(inner_path)
 }
 
 /// Output template.json & template.json debug string
 fn write_patched_json(
-    output_base: &Path,
+    output_file: &Path,
     template_json: &simd_json::BorrowedValue<'_>,
 ) -> Result<()> {
+    if let Some(output_dir_all) = output_file.parent() {
+        fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
+            path: output_dir_all,
+        })?;
+    }
     if let Ok(pretty_json) = simd_json::to_string_pretty(&template_json) {
-        let mut json_path = output_base.to_path_buf();
+        let mut json_path = output_file.to_path_buf();
         json_path.set_extension("json");
         fs::write(&json_path, pretty_json).context(FailedIoSnafu { path: json_path })?;
     } else {
         // If pretty print fails, fall back to normal print
-        let mut debug_path = output_base.to_path_buf();
+        let mut debug_path = output_file.to_path_buf();
         debug_path.set_extension("debug_json.log");
         fs::write(&debug_path, format!("{template_json:#?}"))
             .context(FailedIoSnafu { path: debug_path })?;
@@ -141,6 +135,11 @@ fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()>
 
     let mut xml_path = output_path.to_path_buf();
     xml_path.set_extension("xml");
+    if let Some(output_dir_all) = xml_path.parent() {
+        fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
+            path: output_dir_all,
+        })?;
+    }
     fs::write(&xml_path, &xml).context(FailedIoSnafu {
         path: xml_path.clone(),
     })?;
