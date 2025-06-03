@@ -99,6 +99,8 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
     };
+    #[cfg(feature = "tracing")]
+    tracing::debug!("needed template_names = {template_names:#?}");
 
     let owned_templates = {
         use crate::templates::collect::owned;
