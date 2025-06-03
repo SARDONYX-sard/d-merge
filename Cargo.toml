@@ -23,6 +23,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+dashmap = { version = "6.1.0" }
 educe = { version = "0.6.0" }
 futures = { version = "0.3.31" }
 indexmap = { version = "2.9.0", features = ["rayon"] }

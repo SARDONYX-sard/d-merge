@@ -18,7 +18,7 @@ pub fn parse_nemesis_path(path: &Path) -> Result<&str, Error> {
 
     parse_components
         .parse(input)
-        .map_err(|e| Error::FailedParseNemesisPath {
+        .map_err(|e| Error::FailedParseNemesisPatchPath {
             source: ReadableError::from_parse(e),
         })
 }

@@ -293,9 +293,8 @@ mod tests {
 
     #[test]
     fn should_parse() {
-        let s = include_str!(
-            "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
-        );
+        let s =
+            include_str!("../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
         test_parse(s);
     }
 
@@ -304,9 +303,8 @@ mod tests {
     fn should_write_alt_adsf_json() {
         use crate::adsf::AltAdsf;
 
-        let input = include_str!(
-            "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
-        );
+        let input =
+            include_str!("../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
         let adsf = parse_adsf(input).unwrap_or_else(|err| {
             panic!("Failed to parse adsf:\n{err}");
         });

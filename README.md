@@ -2,53 +2,46 @@
 
 diff & merge => d_merge json patch-based hkx patcher
 
+![image](https://github.com/user-attachments/assets/1b8f0a0b-8aa2-4bd3-9cba-f75a6ff9095d)
+
 ## For Tester
 
 The patch page is under development, so there is no need to submit an issue.
 
-![image](https://github.com/user-attachments/assets/1b8f0a0b-8aa2-4bd3-9cba-f75a6ff9095d)
+- [Release](https://github.com/SARDONYX-sard/d-merge/releases)
 
-- [Release(For test)](https://github.com/SARDONYX-sard/d-merge/releases)
+## Patch Page Progress
 
-## Implementation
+The only thing we are considering at this time is support for the Nemesis patch.(Since I only use the Nemesis patch).
 
-- [ ] Patch page <- current working(79% Completed)
-- [x] Convert page
-- [x] settings page
+- GUI
 
-## Patch page detail
+  - [x] Basic frontend(patch, convert, settings)
+  - [ ] Support MO2 mode/Virtual file system mode(auto read settings file)
+  - [ ] hkx json/patch editor
 
-The only thing we are considering at this time is support for the Nemesis patch.
-(Since I only use the Nemesis patch).
+- AnimData(`animationdatasinglefile.txt`)
 
-- [x] frontend
-- asdsf (Not serialization),
-  - [ ] Serialization
-  - [x] Deserialization
-- adsf,
   - [x] Serialization
   - [x] Deserialization
-- [x] `info.txt` searcher.
+  - [ ] Add Operation
+  - [x] Replace Operation
 
-- Merge
+- AnimSetData(`animationsetdatasinglefile.txt`)
 
-  - [x] Parallel json patch
-  - [x] Fix range add operation of Array
-  - [ ] Prioritization and conflict resolution among patches, optimization by
-        merging(60%)
-    - [ ] Patch handling for non-contiguous arrays: apply multiple arrays to an array patch (e.g. `[0..3, 6..10]`)
+  - [ ] Serialization
+  - [x] Deserialization
+  - [ ] Add Operation
+  - [ ] Replace Operation
 
-## Todos after completion
+- hkx templates
 
-- [ ] Optimization
+  - [x] Change xml to message_pack bin.
 
-  - [ ] Redundant heap alloc: Omit clone()
-  - [ ] Change xml templates for bin file
+- Nemesis Patch
+  - [ ] Fix unknown merge race condition
 
-- [ ] hkx json/patch editor
-- [ ] Support Pandora patch
-
-## How to debug Nemesis Patches?
+## Debugging Nemesis Patches
 
 1. Generate hkx in Nemesis.
 2. Convert the required xml in Nemesis/resource to hkx and then to xml again.

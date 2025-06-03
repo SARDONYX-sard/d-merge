@@ -279,9 +279,8 @@ mod tests {
 
     #[test]
     fn should_parse() {
-        let s = include_str!(
-            "../../../resource/assets/templates/meshes/animationsetdatasinglefile.txt"
-        );
+        let s =
+            include_str!("../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt");
         test_parse(s);
     }
 }

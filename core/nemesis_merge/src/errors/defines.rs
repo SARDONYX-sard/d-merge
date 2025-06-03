@@ -46,19 +46,22 @@ pub enum Error {
         source: nemesis_xml::error::Error,
     },
 
-    /// Failed to parse path {}
-    #[snafu(display("Failed to parse path: {}", path.display()))]
-    MissingParseNemesisPath { path: PathBuf },
+    /// Failed to get `meshes` path from this template path.
+    #[snafu(display("Failed to get `meshes` path from this template path -> {source}: {}", path.display()))]
+    FailedToGetInnerPathFromTemplate {
+        path: PathBuf,
+        source: crate::templates::collect::path::TemplateError,
+    },
 
     /// Failed to parse adsf template
-    #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n {source}", path.display()))]
+    #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfTemplate {
-        source: ReadableError,
+        source: rmp_serde::decode::Error,
         path: PathBuf,
     },
 
     /// Failed to parse adsf patch
-    #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n {source}", path.display()))]
+    #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfPatch {
         source: ReadableError,
         path: PathBuf,
@@ -69,6 +72,14 @@ pub enum Error {
     HkxSerError {
         path: PathBuf,
         source: serde_hkx::errors::ser::Error,
+    },
+
+    /// Deserialize template error
+    #[snafu(display("[hkx template Parsing Error]{}:\n{source}", path.display()))]
+    TemplateError {
+        /// input path
+        path: PathBuf,
+        source: rmp_serde::decode::Error,
     },
 
     /// (De)Serialize json error
@@ -83,8 +94,13 @@ pub enum Error {
     #[snafu(display("Expected utf-8 path. but got {}", path.display()))]
     NonUtf8Path { path: PathBuf },
 
+    /// Unsupported Template path
+    #[snafu(display("Expected `.bin`, `.xml` extension template file. but got {}", path.display()))]
+    UnsupportedTemplatePath { path: PathBuf },
+
     /// Failed to parse path as nemesis path
-    FailedParseNemesisPath { source: ReadableError },
+    #[snafu(display("Failed to parse path as nemesis path:\n{source}"))]
+    FailedParseNemesisPatchPath { source: ReadableError },
 
     #[snafu(transparent)]
     ParsedAdsfPathError {

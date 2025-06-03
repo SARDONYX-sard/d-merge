@@ -26,6 +26,32 @@ pub fn serialize_adsf(adsf: &Adsf) -> String {
     output
 }
 
+#[cfg(feature = "alt_map")]
+/// Serializes to `animationdatasinglefile.txt` string.
+///
+/// # Errors
+/// Returns an error if serialization fails.
+pub fn serialize_alt_adsf(alt_adsf: &super::AltAdsf) -> String {
+    let mut output = String::new();
+    let project_names = alt_adsf.0.keys();
+    let anim_list = alt_adsf.0.values();
+
+    // Serialize project names
+    output.push_str(&format!("{}\r\n", project_names.len()));
+    for name in project_names {
+        let name = super::to_adsf_key(name.as_ref().into());
+        output.push_str(name.as_ref());
+        output.push_str("\r\n");
+    }
+
+    // Serialize animation data
+    for anim_data in anim_list {
+        output.push_str(&serialize_anim_data(anim_data));
+    }
+
+    output
+}
+
 /// Serializes animation data into a string.
 ///
 /// # Errors
@@ -245,10 +271,31 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "alt_map")]
+    #[test]
+    fn test_serialize_alt_adsf() {
+        let alt_adsf_bytes = include_bytes!(
+            "../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
+        );
+        let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
+        let actual = serialize_alt_adsf(&alt_adsf);
+
+        let expected = normalize_to_crlf(include_str!(
+            "../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
+        ));
+        let res = dbg!(actual == expected);
+        if !res {
+            let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+            std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            panic!("actual != expected");
+        }
+        assert!(res);
+    }
+
     #[test]
     fn test_serialize_adsf() {
         let expected = normalize_to_crlf(include_str!(
-            "../../../../resource/assets/templates/meshes/animationdatasinglefile.txt"
+            "../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
         ));
         let adsf = parse_adsf(&expected).unwrap_or_else(|e| panic!("{e}"));
         // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();

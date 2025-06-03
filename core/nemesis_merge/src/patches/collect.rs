@@ -20,11 +20,6 @@ use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-fn get_priority(path: &Path, ids: &PriorityMap<'_>) -> Option<usize> {
-    let id_str = get_nemesis_id(path.to_str()?).ok()?;
-    ids.get(id_str).copied()
-}
-
 struct OwnedPath {
     category: Category,
     path: PathBuf,
@@ -45,6 +40,12 @@ pub async fn collect_owned_patches(
 ) -> (OwnedAdsfPatchMap, OwnedPatchMap, Vec<Error>) {
     let mut handles = vec![];
     let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
+
+    fn get_priority(path: &Path, ids: &PriorityMap<'_>) -> Option<usize> {
+        let id_str = get_nemesis_id(path.to_str()?).ok()?;
+        ids.get(id_str).copied()
+    }
+
     for (category, path) in paths {
         let priority = get_priority(&path, id_order).unwrap_or(usize::MAX); // todo error handling
 

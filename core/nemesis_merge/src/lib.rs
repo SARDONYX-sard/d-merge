@@ -10,8 +10,9 @@ mod path_id;
 mod results;
 mod templates;
 
+pub use crate::behavior::generate::behavior_gen;
 pub use crate::config::{Config, Status};
-pub use behavior::generate::behavior_gen;
+pub use crate::templates::gen_bin::create_bin_templates;
 pub use nemesis_xml::hack::HackOptions;
 
 #[cfg(all(feature = "tracing", test))]

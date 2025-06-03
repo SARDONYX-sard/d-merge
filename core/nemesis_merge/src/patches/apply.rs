@@ -24,7 +24,7 @@ pub fn apply_patches<'a, 'b: 'a>(
 
             // template_name: e.g. 0_master.hkx -> 0_master
             // patches: patches for 0_master.hkx
-            if let Some(mut template_pair) = templates.get_mut(&template_name) {
+            if let Some(mut template_pair) = templates.get_mut(template_name) {
                 let template = &mut template_pair.value_mut().1;
 
                 for (path, patch) in patches.0 {
