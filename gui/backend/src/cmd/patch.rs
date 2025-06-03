@@ -64,21 +64,20 @@ pub(crate) async fn patch(
         };
 
         let status_reporter = sender::<Status>(window, "d_merge://progress/patch");
+        let config = Config {
+            output_dir: output,
+            resource_dir,
+            status_report: Some(Box::new(status_reporter)),
+            hack_options: Some(HackOptions::enable_all()), // TODO: Create GUI hack control popup
+            debug: nemesis_merge::DebugOptions {
+                output_patch_json: true,
+                output_merged_json: true,
+                output_merged_xml: false,
+            },
+        };
 
         async move {
-            let _ = time! {
-                "[patch]",
-                behavior_gen(
-                    ids,
-                    Config {
-                        output_dir: output,
-                        resource_dir,
-                        status_report: Some(Box::new(status_reporter)),
-                        hack_options: Some(HackOptions::enable_all()), // TODO: Create GUI hack control popup
-                        debug: nemesis_merge::DebugOptions::enable_all(),
-                    },
-                ).await
-            };
+            let _ = time!("[patch]", behavior_gen(ids, config).await);
         }
     });
 
