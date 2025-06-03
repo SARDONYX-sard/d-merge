@@ -72,7 +72,7 @@ jobs:
           mkdir -p ./build
           Move-Item -Path ./target/release/${{ env.APP_NAME }}.exe -Destination './build'
           Move-Item -Force -Path ./resource/assets -Destination ./build
-          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-${{ runner.os }}-portable'
+          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-${{ runner.os }}-portable.zip'
       # ----------------------------------------------------------------------------------------------------------------
       - name: Compress outputs(MacOS/Linux)
         shell: bash
@@ -81,7 +81,7 @@ jobs:
           mkdir -p ./build/assets
           mv ./target/release/${{ env.APP_NAME }} ./build
           mv ./resource/assets ./build
-          tar -czf ./${{ env.APP_NAME }}-${{ runner.os }}-portable -C ./build .
+          tar -czf ./${{ env.APP_NAME }}-${{ runner.os }}-portable.tar.gz -C ./build .
 
       # ----------------------------------------------------------------------------------------------------------------
       - name: Release a portable-version
