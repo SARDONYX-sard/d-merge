@@ -2,6 +2,7 @@ import OutputIcon from '@mui/icons-material/Output';
 import { Checkbox, type SxProps, Tooltip } from '@mui/material';
 import { useEffect, type ComponentPropsWithRef } from 'react';
 
+import { useDebounce } from '@/components/hooks/useDebounce';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
@@ -16,10 +17,10 @@ const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' 
 
 export const usePatchInputs = () => {
   const {
+    cacheModInfoDir,
+    setCacheModInfoDir,
     modInfoDir,
     setModInfoDir,
-    modInfoDirPrev,
-    setModInfoDirPrev,
     autoDetectEnabled,
     setAutoDetectEnabled,
     output,
@@ -28,8 +29,17 @@ export const usePatchInputs = () => {
   } = usePatchContext();
   const { t } = useTranslation();
 
+  const deferredAutoDetectEnabled = useDebounce(autoDetectEnabled, 450);
+
+  // If a setState with a branch is not wrapped in useEffect, purity(Returns same value) is lost and an error occurs.
   useEffect(() => {
-    if (!autoDetectEnabled) {
+    if (!deferredAutoDetectEnabled) {
+      setModInfoDir(cacheModInfoDir);
+    }
+  }, [cacheModInfoDir, deferredAutoDetectEnabled, setModInfoDir]);
+
+  useEffect(() => {
+    if (!deferredAutoDetectEnabled) {
       return;
     }
 
@@ -37,28 +47,20 @@ export const usePatchInputs = () => {
       try {
         const dir = await getSkyrimDir(patchOptions.outputTarget);
         setModInfoDir(dir);
-      } catch (_error) {
-        throw new Error(t('patch.autoDetectSkyrimData_error_massage'));
+      } catch (_) {
+        NOTIFY.error(t('patch.autoDetectSkyrimData_error_massage'));
       }
     };
 
-    NOTIFY.asyncTry(fetchDir);
-  }, [autoDetectEnabled, patchOptions.outputTarget, setModInfoDir, t]);
+    fetchDir();
+  }, [deferredAutoDetectEnabled, patchOptions.outputTarget, setModInfoDir, t]);
 
   const inputHandlers = {
     onClick: () =>
       NOTIFY.asyncTry(async () => await openPath(stripGlob(modInfoDir), { setPath: setModInfoDir, directory: true })),
     onIconClick: () => NOTIFY.asyncTry(async () => await open(stripGlob(modInfoDir))),
     onCheckboxToggle: () => {
-      setAutoDetectEnabled((prev) => {
-        const autoDetect = !prev;
-        if (autoDetect) {
-          setModInfoDirPrev(modInfoDir);
-        } else {
-          setModInfoDir(modInfoDirPrev);
-        }
-        return autoDetect;
-      });
+      setAutoDetectEnabled((prev) => !prev);
     },
   };
 
@@ -84,7 +86,12 @@ export const usePatchInputs = () => {
       onClick: inputHandlers.onClick,
       path: modInfoDir,
       placeholder: 'D:/Steam/steamapps/common/Skyrim Special Edition/Data',
-      setPath: setModInfoDir,
+      setPath: (path) => {
+        if (!autoDetectEnabled) {
+          setCacheModInfoDir(path);
+        }
+        setModInfoDir(path);
+      },
     },
     {
       icon: (

@@ -43,6 +43,7 @@ export type PatchOptions = {
     outputMergedXml: boolean;
   };
   outputTarget: 'SkyrimSE' | 'SkyrimLE';
+  /** Delete the meshes in the output destination each time the patch is run. */
   autoRemoveMeshes: boolean;
 };
 

@@ -17,19 +17,15 @@ type ContextType = {
   loading: boolean;
 
   /** Data dir of Skyrim where each Nemesis Mod exists */
+  cacheModInfoDir: string;
+  setCacheModInfoDir: Dispatch<SetStateAction<string>>;
+
   modInfoDir: string;
   setModInfoDir: Dispatch<SetStateAction<string>>;
-  /** It is there to cache the paths so that they can be reverted when auto detect is unchecked.  */
-  modInfoDirPrev: string;
-  setModInfoDirPrev: Dispatch<SetStateAction<string>>;
 
   /** Auto detect skyrim data directory.(To get modInfoDir) */
   autoDetectEnabled: boolean;
   setAutoDetectEnabled: Dispatch<SetStateAction<boolean>>;
-
-  /** Delete the meshes in the output destination each time the patch is run. */
-  autoRemoveMeshes: boolean;
-  setAutoRemoveMeshes: Dispatch<SetStateAction<boolean>>;
 
   modInfoList: ModInfo[];
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
@@ -47,10 +43,9 @@ const Context = createContext<ContextType | undefined>(undefined);
 
 export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
-  const [modInfoDir, setModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
-  const [modInfoDirPrev, setModInfoDirPrev] = useStorageState(PRIVATE_CACHE_OBJ.patchInputPrev, stringSchema);
+  const [cacheModInfoDir, setCacheModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+  const [modInfoDir, setModInfoDir] = useState(cacheModInfoDir);
   const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
-  const [autoRemoveMeshes, setAutoRemoveMeshes] = useStorageState(PUB_CACHE_OBJ.autoRemoveMeshes, boolSchema);
 
   const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
 
@@ -78,25 +73,30 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const context = {
     activateMods,
-    loading,
+    setActivateMods,
+
+    cacheModInfoDir,
+    setCacheModInfoDir,
+
     modInfoDir,
-    modInfoList: sortedModInfoList,
-    modInfoDirPrev,
-    setModInfoDirPrev,
+    setModInfoDir,
+
     autoDetectEnabled,
     setAutoDetectEnabled,
-    autoRemoveMeshes,
-    setAutoRemoveMeshes,
 
-    output,
-    priorities,
-    setActivateMods,
-    setModInfoDir,
-    setModInfoList,
-    setOutput,
-    setPriorities,
     patchOptions,
     setPatchOptions,
+
+    output,
+    setOutput,
+
+    priorities,
+    setPriorities,
+
+    modInfoList: sortedModInfoList,
+    setModInfoList,
+
+    loading,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;
