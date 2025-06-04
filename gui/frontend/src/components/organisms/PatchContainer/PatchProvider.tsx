@@ -44,7 +44,17 @@ const Context = createContext<ContextType | undefined>(undefined);
 export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
   const [cacheModInfoDir, setCacheModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+
+  // ⚠ Do NOT use `cacheModInfoDir` as the initial value.
+  //
+  // Initial state: dir = cacheModInfoDir
+  // → Grid selection logic runs (If mod info length > 0)
+  // → No matching id found → selection becomes empty
+  // → useEffect triggers (autoDetect === true)
+  // → Directory switches to SkyrimDir
+  // → id is still empty → invalid or inconsistent state
   const [modInfoDir, setModInfoDir] = useState('');
+
   const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
 
   const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
@@ -58,6 +68,11 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // NOTE: Use this instead of `useDeferredValue` to delay API calls.
   const deferredModInfoDir = useDebounce(modInfoDir, 450);
   useEffect(() => {
+    // fast skip
+    if (deferredModInfoDir === '') {
+      return;
+    }
+
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
         const modsInfo = await loadModsInfo(deferredModInfoDir);
