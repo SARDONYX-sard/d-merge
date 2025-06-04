@@ -11,7 +11,7 @@ import {
   useConvertContext,
 } from '@/components/organisms/ConvertForm/ConvertProvider';
 import { getAllLeafItemIds } from '@/components/organisms/ConvertForm/PathTreeSelector';
-import { ConvertNav } from '@/components/organisms/ConvertNav';
+import { BottomActionBar } from '@/components/organisms/BottomActionBar';
 import { NOTIFY } from '@/lib/notify';
 import { convert } from '@/services/api/serde_hkx';
 
@@ -42,7 +42,7 @@ const ProviderInner = () => {
       <Grid sx={{ width: '90vw' }}>
         <ConvertForm />
       </Grid>
-      <ConvertNav loading={loading} onClick={handleClick} />
+      <BottomActionBar loading={loading} onClick={handleClick} />
     </Box>
   );
 };

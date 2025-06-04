@@ -20,6 +20,11 @@ const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const PATCH_PUB_CACHE_KEYS_OBJ = {
+  patchOptions: 'patch-options',
+  modsGridState: 'patch-mod-grid-state',
+} as const;
+
 const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
   patchInput: 'patch-input',
   patchOutput: 'patch-output',
@@ -62,6 +67,7 @@ export const HIDDEN_CACHE_OBJ = {
 
 export const PUB_CACHE_OBJ = {
   ...CONVERT_PUB_CACHE_KEYS_OBJ,
+  ...PATCH_PUB_CACHE_KEYS_OBJ,
   ...SETTINGS_PUB_CACHE_KEYS_OBJ,
 } as const;
 

@@ -3,6 +3,7 @@ import { useGridApiRef } from '@mui/x-data-grid';
 import { memo, useCallback } from 'react';
 
 import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/DraggableDataGrid';
+import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 import { usePatchContext } from './PatchProvider';
 import { useColumns } from './useColumns';
@@ -58,8 +59,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
   );
 
   const apiRef = useGridApiRef();
-  const storageKey = 'modsGridState';
-  useGridStatePersistence(apiRef, storageKey);
+  useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
 
   return (
     <DraggableDataGrid

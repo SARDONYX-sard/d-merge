@@ -17,7 +17,7 @@ type Params = {
  * status updates, loading state, timer, and notifications.
  */
 export function usePatchHandler({ start, setLoading, onStatus, onError }: Params) {
-  const { output, activateMods } = usePatchContext();
+  const { output, activateMods, patchOptions } = usePatchContext();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async () => {
     start();
@@ -25,7 +25,7 @@ export function usePatchHandler({ start, setLoading, onStatus, onError }: Params
     await statusListener(
       'd_merge://progress/patch', // event name emitted from Tauri backend
       async () => {
-        await patch(output, activateMods);
+        await patch(output, activateMods, patchOptions);
       },
       {
         setLoading,

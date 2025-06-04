@@ -5,7 +5,7 @@ import { LogDirButton } from '@/components/molecules/LogDirButton';
 import { LogFileButton } from '@/components/molecules/LogFileButton';
 import { LogLevelList } from '@/components/organisms/LogLevelList';
 
-import type { ComponentPropsWithRef } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 
 const sx: SxProps<Theme> = {
   position: 'fixed',
@@ -18,10 +18,10 @@ const sx: SxProps<Theme> = {
   backgroundColor: '#252525d8',
 };
 
-type Props = ComponentPropsWithRef<typeof ConvertButton>;
+type Props = ComponentPropsWithRef<typeof ConvertButton & ReactNode>;
 
 const MenuPadding = () => <div style={{ height: '100px' }} />;
-export const ConvertNav = (props: Props) => {
+export const BottomActionBar = ({ children, ...others }: Props) => {
   return (
     <>
       <MenuPadding />
@@ -29,7 +29,8 @@ export const ConvertNav = (props: Props) => {
         <LogLevelList />
         <LogDirButton />
         <LogFileButton />
-        <ConvertButton {...props} />
+        {children}
+        <ConvertButton {...others} />
       </Box>
     </>
   );

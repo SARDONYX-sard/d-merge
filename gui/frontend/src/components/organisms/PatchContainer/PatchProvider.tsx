@@ -1,16 +1,13 @@
-import { type Dispatch, type SetStateAction, createContext, useContext, useMemo, useTransition } from 'react';
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect, createContext, useContext, useMemo, useTransition } from 'react';
 
+import { useDebounce } from '@/components/hooks/useDebounce';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
-import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
-import { type ModInfo, loadModsInfo } from '@/services/api/patch';
+import { type ModInfo, type PatchOptions, loadModsInfo, patchOptionsSchema } from '@/services/api/patch';
 
-import { useDebounce } from '../../hooks/useDebounce';
-
-import type React from 'react';
+import type { Dispatch, ReactNode, SetStateAction, FC } from 'react';
 
 type ContextType = {
   activateMods: string[];
@@ -24,14 +21,20 @@ type ContextType = {
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
   output: string;
   setOutput: Dispatch<SetStateAction<string>>;
+  /** priority ids */
   priorities: string[];
   setPriorities: Dispatch<SetStateAction<string[]>>;
+
+  patchOptions: PatchOptions;
+  setPatchOptions: Dispatch<SetStateAction<PatchOptions>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
 
-export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
   const [modInfoDir, setModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+
+  const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
 
   const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.patchOutput, stringSchema);
   const [priorities, setPriorities] = useStorageState(PRIVATE_CACHE_OBJ.patchPriorityIds, stringArraySchema);
@@ -67,6 +70,8 @@ export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setModInfoList,
     setOutput,
     setPriorities,
+    patchOptions,
+    setPatchOptions,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;

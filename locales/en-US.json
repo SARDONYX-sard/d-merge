@@ -117,7 +117,30 @@
     "patch_complete_message": "Patching complete.",
     "patch_error_message": "Error occurred while applying patches.",
     "patch_reading_message": "Reading templates and patches...",
-    "patching_button": "Patching..."
+    "patching_button": "Patching...",
+    "open_options_dialog": "Open Patch Options Dialog",
+    "options_title": "Patch Options",
+    "hack_options_label": "Hack Options",
+    "hack_options": {
+      "cast_ragdoll_event": "Enable compatibility hacks for BSRagdollContactListenerModifier",
+      "cast_ragdoll_event_help": "Corrects common field naming mistakes in patches (e.g. substituting 'event' with 'contactEvent', 'anotherBoneIndex' with 'bones'). Allows parsing of invalid data but may hide real errors."
+    },
+    "debug_options_label": "Debug Options",
+    "debug_options": {
+      "output_patch_json": "Output Patch JSON",
+      "output_patch_json_help": "Outputs the generated patch data in JSON format. Patch files are saved under `<output_dir>/.debug/patches/`.",
+      "output_merged_json": "Output Merged JSON",
+      "output_merged_json_help": "Outputs a merged JSON combining all patches for debugging purposes. Files are saved under `<output_dir>/.debug/meshes/`.",
+      "output_merged_xml": "Output Merged XML",
+      "output_merged_xml_help": "Outputs the merged patch data in XML format. Files are saved under `<output_dir>/.debug/meshes/`."
+    },
+    "output_target_label": "Output Target",
+    "output_target_aria_label": "Select output target",
+    "output_targets": {
+      "skyrim_se": "Skyrim SE",
+      "skyrim_le": "Skyrim LE"
+    },
+    "output_target_help": "Select the target game version for the output hkx."
   },
   "select_button": "Select",
   "tabs": {
