@@ -148,6 +148,7 @@ impl<'a> PatchMap<'a> {
         Ok(())
     }
 
+    /// Parallel extend
     pub fn extend<I>(&self, key: JsonPath<'a>, new_values: I) -> Result<(), TypeError>
     where
         I: IntoParallelIterator<Item = ValueWithPriority<'a>>,

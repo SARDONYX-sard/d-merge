@@ -11,9 +11,8 @@ mod results;
 mod templates;
 
 pub use crate::behavior::generate::behavior_gen;
-pub use crate::config::{Config, DebugOptions, Status};
+pub use crate::config::{Config, DebugOptions, HackOptions, OutPutTarget, Status};
 pub use crate::templates::gen_bin::create_bin_templates;
-pub use nemesis_xml::hack::HackOptions;
 
 #[cfg(all(feature = "tracing", test))]
 pub(crate) mod global_logger;
@@ -50,6 +49,8 @@ mod tests {
     #[ignore = "unimplemented yet"]
     #[cfg(feature = "tracing")]
     async fn merge_test() {
+        use crate::config::{Config, DebugOptions};
+
         let log_path = "../../dummy/merge_test.log";
         crate::global_logger::global_logger(log_path, tracing::Level::TRACE).unwrap();
 
@@ -65,6 +66,7 @@ mod tests {
                     output_merged_json: true,
                     output_merged_xml: false,
                 },
+                output_target: config::OutPutTarget::SkyrimSe,
             },
         )
         .await;

@@ -1,7 +1,5 @@
 use std::{fmt, path::PathBuf};
 
-use nemesis_xml::hack::HackOptions;
-
 /// A configuration structure used to specify various directories and a status report callback.
 ///
 /// The `Config` struct holds paths for input resources and output directories, along with optional
@@ -20,6 +18,9 @@ pub struct Config {
     /// This directory will also contain `.debug` subdirectory if debug output is enabled.
     pub output_dir: PathBuf,
 
+    /// Generation target
+    pub output_target: OutPutTarget,
+
     /// An optional callback function that reports the current status of the process.
     ///
     /// The callback is invoked with `Status` updates, allowing consumers to track
@@ -35,42 +36,6 @@ pub struct Config {
 
     /// Options controlling the output of debug artifacts.
     pub debug: DebugOptions,
-}
-
-/// A group of flags to enable debug output of intermediate files.
-#[derive(Default)]
-pub struct DebugOptions {
-    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `output_dir`.
-    ///
-    /// This includes:
-    /// - `patch.json`: The raw parsed patch data.
-    ///   - For `One` patches, it reflects the result of priority-based overwriting.
-    ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
-    pub output_patch_json: bool,
-
-    /// If true, outputs the merged JSON to the `.debug` subdirectory under `output_dir`.
-    ///
-    /// This represents the state of the data after all patches have been applied and
-    /// conflicts resolved, but before converting to `.hkx` format.
-    pub output_merged_json: bool,
-
-    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `output_dir`.
-    ///
-    /// This is the final XML representation of the patched and merged data,
-    /// just before conversion to the binary `.hkx` format.
-    pub output_merged_xml: bool,
-}
-
-impl DebugOptions {
-    /// Enable all debug options.
-    #[inline]
-    pub const fn enable_all() -> Self {
-        Self {
-            output_patch_json: true,
-            output_merged_json: true,
-            output_merged_xml: true,
-        }
-    }
 }
 
 impl Config {
@@ -99,6 +64,111 @@ impl fmt::Debug for Config {
             // Skip closure
             .finish()
     }
+}
+
+/// A collection of hack options that enable non-standard parsing behavior.
+///
+/// These options exist to handle cases where game mods or other tools produce
+/// invalid or inconsistent data. Enabling these may allow parsing to succeed
+/// in otherwise broken scenarios, at the risk of hiding real errors.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+#[derive(Debug, Copy, Clone, Default)]
+pub struct HackOptions {
+    /// Enables compatibility hacks for invalid fields in the `BSRagdollContactListenerModifier` class.
+    ///
+    /// This option activates targeted fixes for common field naming mistakes in patches:
+    /// - Substitutes `event` with `contactEvent`
+    /// - Substitutes `anotherBoneIndex` with `bones`
+    pub cast_ragdoll_event: bool,
+}
+
+impl HackOptions {
+    /// Enable all hack options.
+    #[inline]
+    pub const fn enable_all() -> Self {
+        Self {
+            cast_ragdoll_event: true,
+        }
+    }
+}
+
+impl From<HackOptions> for nemesis_xml::hack::HackOptions {
+    #[inline]
+    fn from(value: HackOptions) -> Self {
+        Self {
+            cast_ragdoll_event: value.cast_ragdoll_event,
+        }
+    }
+}
+
+/// A group of flags to enable debug output of intermediate files.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+#[derive(Debug, Clone)]
+pub struct DebugOptions {
+    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This includes:
+    /// - `patch.json`: The raw parsed patch data.
+    ///   - For `One` patches, it reflects the result of priority-based overwriting.
+    ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
+    pub output_patch_json: bool,
+
+    /// If true, outputs the merged JSON to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This represents the state of the data after all patches have been applied and
+    /// conflicts resolved, but before converting to `.hkx` format.
+    pub output_merged_json: bool,
+
+    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `output_dir`.
+    ///
+    /// This is the final XML representation of the patched and merged data,
+    /// just before conversion to the binary `.hkx` format.
+    pub output_merged_xml: bool,
+}
+
+impl Default for DebugOptions {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            output_patch_json: true,
+            output_merged_json: true,
+            output_merged_xml: false,
+        }
+    }
+}
+
+impl DebugOptions {
+    /// Enable all debug options.
+    #[inline]
+    pub const fn enable_all() -> Self {
+        Self {
+            output_patch_json: true,
+            output_merged_json: true,
+            output_merged_xml: true,
+        }
+    }
+}
+
+/// Output type
+///
+/// - feature = "ts_serde"
+///
+///  ```txt
+///  SkyrimSE | SkyrimLE
+///  ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Copy, Default)]
+pub enum OutPutTarget {
+    /// Amd64
+    #[default]
+    #[cfg_attr(feature = "serde", serde(rename = "SkyrimSE"))]
+    SkyrimSe,
+
+    /// Win32
+    #[cfg_attr(feature = "serde", serde(rename = "SkyrimLE"))]
+    SkyrimLe,
 }
 
 /// An enum representing various statuses during a process.
