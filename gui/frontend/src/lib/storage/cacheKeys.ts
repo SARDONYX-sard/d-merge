@@ -23,10 +23,13 @@ const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
 const PATCH_PUB_CACHE_KEYS_OBJ = {
   patchOptions: 'patch-options',
   modsGridState: 'patch-mod-grid-state',
+  autoDetectEnabled: 'patch-auto-detect-enabled',
+  autoRemoveMeshes: 'patch-auto-remove-meshes',
 } as const;
 
 const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
   patchInput: 'patch-input',
+  patchInputPrev: 'patch-input-previous',
   patchOutput: 'patch-output',
   patchActivateIds: 'patch-activate-ids',
   patchPriorityIds: 'patch-priority-ids',

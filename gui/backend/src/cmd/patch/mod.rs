@@ -21,6 +21,7 @@ pub(crate) struct GuiPatchOptions {
     hack_options: Option<HackOptions>,
     debug: DebugOptions,
     output_target: OutPutTarget,
+    auto_remove_meshes: bool,
 }
 
 /// - ids: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
@@ -32,6 +33,21 @@ pub(crate) async fn patch(
     options: GuiPatchOptions,
 ) -> Result<(), String> {
     cancel_patch_inner()?; // Abort previous task if exists
+
+    if options.auto_remove_meshes {
+        let meshes_path = output.join("meshes");
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = tokio::fs::remove_dir_all(meshes_path).await {
+                tracing::error!("{err}");
+            }
+        });
+        let debug_path = output.join(".debug");
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = tokio::fs::remove_dir_all(debug_path).await {
+                tracing::error!("{err}");
+            };
+        });
+    }
 
     let handle = tauri::async_runtime::spawn({
         let resource_dir = {
@@ -97,6 +113,7 @@ mod tests {
             hack_options: Some(HackOptions::enable_all()),
             debug: DebugOptions::enable_all(),
             output_target: OutPutTarget::SkyrimSe,
+            ..Default::default()
         };
         let json = serde_json::to_string_pretty(&gui_options).unwrap();
         println!("{json}");

@@ -7,12 +7,13 @@ import { Button } from '@/components/molecules/Button';
 type Props = {
   label: string;
   icon: ReactNode;
+  endIcon?: ReactNode;
   path: string;
   setPath: (path: string) => void;
   placeholder?: string;
 } & ComponentPropsWithRef<typeof Button>;
 
-export function InputField({ label, icon, path, setPath, placeholder, ...props }: Props) {
+export function InputField({ label, icon, endIcon, path, setPath, placeholder, disabled, ...props }: Props) {
   const id = useId();
 
   return (
@@ -20,6 +21,7 @@ export function InputField({ label, icon, path, setPath, placeholder, ...props }
       <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
         {icon}
         <TextField
+          disabled={disabled}
           id={id}
           label={label}
           onChange={({ target }) => setPath(target.value)}
@@ -28,7 +30,8 @@ export function InputField({ label, icon, path, setPath, placeholder, ...props }
           value={path}
           variant='standard'
         />
-        <Button {...props} sx={{ height: '50px', width: '125px' }} />
+        {endIcon}
+        <Button disabled={disabled} {...props} sx={{ height: '50px', width: '125px' }} />
       </Box>
     </Box>
   );

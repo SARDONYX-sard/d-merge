@@ -4,7 +4,7 @@ import { useDebounce } from '@/components/hooks/useDebounce';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
+import { boolSchema, stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
 import { type ModInfo, type PatchOptions, loadModsInfo, patchOptionsSchema } from '@/services/api/patch';
 
 import type { Dispatch, ReactNode, SetStateAction, FC } from 'react';
@@ -12,13 +12,28 @@ import type { Dispatch, ReactNode, SetStateAction, FC } from 'react';
 type ContextType = {
   activateMods: string[];
   setActivateMods: Dispatch<SetStateAction<string[]>>;
+
   /** Loading info.ini for each Nemesis Mod? */
   loading: boolean;
+
   /** Data dir of Skyrim where each Nemesis Mod exists */
   modInfoDir: string;
   setModInfoDir: Dispatch<SetStateAction<string>>;
+  /** It is there to cache the paths so that they can be reverted when auto detect is unchecked.  */
+  modInfoDirPrev: string;
+  setModInfoDirPrev: Dispatch<SetStateAction<string>>;
+
+  /** Auto detect skyrim data directory.(To get modInfoDir) */
+  autoDetectEnabled: boolean;
+  setAutoDetectEnabled: Dispatch<SetStateAction<boolean>>;
+
+  /** Delete the meshes in the output destination each time the patch is run. */
+  autoRemoveMeshes: boolean;
+  setAutoRemoveMeshes: Dispatch<SetStateAction<boolean>>;
+
   modInfoList: ModInfo[];
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
+
   output: string;
   setOutput: Dispatch<SetStateAction<string>>;
   /** priority ids */
@@ -33,6 +48,9 @@ const Context = createContext<ContextType | undefined>(undefined);
 export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
   const [modInfoDir, setModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+  const [modInfoDirPrev, setModInfoDirPrev] = useStorageState(PRIVATE_CACHE_OBJ.patchInputPrev, stringSchema);
+  const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
+  const [autoRemoveMeshes, setAutoRemoveMeshes] = useStorageState(PUB_CACHE_OBJ.autoRemoveMeshes, boolSchema);
 
   const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
 
@@ -63,6 +81,13 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
     loading,
     modInfoDir,
     modInfoList: sortedModInfoList,
+    modInfoDirPrev,
+    setModInfoDirPrev,
+    autoDetectEnabled,
+    setAutoDetectEnabled,
+    autoRemoveMeshes,
+    setAutoRemoveMeshes,
+
     output,
     priorities,
     setActivateMods,

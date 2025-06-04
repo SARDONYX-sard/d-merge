@@ -1,6 +1,19 @@
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
 
+/**
+ * Get skyrim directory
+ * @throws Error
+ */
+export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
+  switch (runtime) {
+    case 'SkyrimLE':
+      return await invoke<string>('get_skyrim_data_dir', { runtime: 'LE' });
+    default:
+      return await invoke<string>('get_skyrim_data_dir', { runtime: 'SE' });
+  }
+}
+
 export type ModInfo = {
   id: string;
   name: string;
@@ -30,6 +43,7 @@ export type PatchOptions = {
     outputMergedXml: boolean;
   };
   outputTarget: 'SkyrimSE' | 'SkyrimLE';
+  autoRemoveMeshes: boolean;
 };
 
 export const patchOptionsSchema = z
@@ -43,6 +57,7 @@ export const patchOptionsSchema = z
       outputMergedXml: z.boolean(),
     }),
     outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
+    autoRemoveMeshes: z.boolean(),
   })
   .catch({
     hackOptions: {
@@ -54,6 +69,7 @@ export const patchOptionsSchema = z
       outputMergedXml: false,
     },
     outputTarget: 'SkyrimSE',
+    autoRemoveMeshes: true,
   } as const satisfies PatchOptions);
 
 /**

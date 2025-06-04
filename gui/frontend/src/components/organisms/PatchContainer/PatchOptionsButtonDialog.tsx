@@ -52,20 +52,42 @@ export const PatchOptionsDialog = () => {
             <FormLabel component='legend' sx={{ mb: 1, fontWeight: 'bold' }}>
               {t('patch.output_target_label')}
             </FormLabel>
-            <Select
-              aria-label={t('patch.output_target_aria_label')}
-              fullWidth={true}
-              onChange={(e) =>
-                apply((draft) => {
-                  draft.outputTarget = e.target.value;
-                })
+            <FormGroup>
+              <Select
+                aria-label={t('patch.output_target_aria_label')}
+                fullWidth={true}
+                onChange={(e) =>
+                  apply((draft) => {
+                    draft.outputTarget = e.target.value;
+                  })
+                }
+                value={patchOptions.outputTarget}
+              >
+                <MenuItem value='SkyrimSE'>{t('patch.output_targets.skyrim_se')}</MenuItem>
+                <MenuItem value='SkyrimLE'>{t('patch.output_targets.skyrim_le')}</MenuItem>
+              </Select>
+              <FormHelperText sx={{ mt: 1 }}>{t('patch.output_target_help')}</FormHelperText>
+            </FormGroup>
+          </Box>
+
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={patchOptions.autoRemoveMeshes}
+                  name='autoRemoveMeshes'
+                  onChange={(e) =>
+                    apply((draft) => {
+                      draft.autoRemoveMeshes = e.target.checked;
+                    })
+                  }
+                />
               }
-              value={patchOptions.outputTarget}
-            >
-              <MenuItem value='SkyrimSE'>{t('patch.output_targets.skyrim_se')}</MenuItem>
-              <MenuItem value='SkyrimLE'>{t('patch.output_targets.skyrim_le')}</MenuItem>
-            </Select>
-            <FormHelperText sx={{ mt: 1 }}>{t('patch.output_target_help')}</FormHelperText>
+              label={t('patch.auto_remove_meshes_option_label')}
+            />
+            <FormHelperText sx={{ ml: 3, mb: 1, color: 'text.secondary' }}>
+              {t('patch.auto_remove_meshes_option_help')}
+            </FormHelperText>
           </Box>
 
           {/* Hack Options */}
