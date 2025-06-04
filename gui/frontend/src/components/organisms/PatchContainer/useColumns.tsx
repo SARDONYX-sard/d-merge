@@ -11,7 +11,7 @@ export const useColumns = () => {
   const { t } = useTranslation();
 
   const columns = [
-    { field: 'id', headerName: 'ID', width: 100, flex: 0.4 },
+    { field: 'id', headerName: 'ID', flex: 0.4 },
     {
       field: 'name',
       headerName: t('patch.columns.mod_name'),
