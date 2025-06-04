@@ -44,7 +44,7 @@ const Context = createContext<ContextType | undefined>(undefined);
 export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
   const [cacheModInfoDir, setCacheModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
-  const [modInfoDir, setModInfoDir] = useState(cacheModInfoDir);
+  const [modInfoDir, setModInfoDir] = useState('');
   const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
 
   const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
