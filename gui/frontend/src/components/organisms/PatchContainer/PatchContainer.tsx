@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
-import { ConvertNav } from '@/components/organisms/ConvertNav';
+import { BottomActionBar } from '@/components/organisms/BottomActionBar';
 import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
 import { usePatchHandler } from '@/components/organisms/PatchContainer/usePatchHandler';
 import { usePatchInputs } from '@/components/organisms/PatchContainer/usePatchInputs';
 import { NOTIFY } from '@/lib/notify';
 
-import { usePatchStatus } from './usePatchStatus'
+import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
+import { usePatchStatus } from './usePatchStatus';
 
 export const PatchContainer = () => {
   const { t } = useTranslation();
@@ -54,12 +55,9 @@ export const PatchContainer = () => {
         </Typography>
       )}
 
-      <ConvertNav
-        buttonText={t('patch.button')}
-        loading={loading}
-        loadingText={loadingText}
-        onClick={handleClick}
-      />
+      <BottomActionBar buttonText={t('patch.button')} loading={loading} loadingText={loadingText} onClick={handleClick}>
+        <PatchOptionsDialog />
+      </BottomActionBar>
     </>
   );
 };

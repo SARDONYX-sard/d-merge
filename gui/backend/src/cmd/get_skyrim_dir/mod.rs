@@ -24,8 +24,13 @@ pub use unix::get_skyrim_data_dir;
 #[cfg(target_os = "windows")]
 pub use windows::get_skyrim_data_dir;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Runtime {
+    /// Skyrim Legendary Edition(32bit)
+    Le,
+    /// Skyrim Special Edition(64bit)
     Se,
+    /// Skyrim VR(64bit)
     Vr,
 }

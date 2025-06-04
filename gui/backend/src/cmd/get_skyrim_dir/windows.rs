@@ -17,6 +17,22 @@ pub fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
 fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     use bindings::*;
 
+    /// `SOFTWARE\\Wow6432Node\\Bethesda Softworks\\Skyrim\0` in UTF-16 LE
+    #[rustfmt::skip]
+    const SKYRIM_LE_REG_KEY: &[u16] = &[
+        // "SOFTWARE\"
+        0x0053, 0x004F, 0x0046, 0x0054, 0x0057, 0x0041, 0x0052, 0x0045, 0x005C,
+        // "Wow6432Node\"
+        0x0057, 0x006F, 0x0077, 0x0036, 0x0034, 0x0033, 0x0032, 0x004E, 0x006F, 0x0064, 0x0065, 0x005C,
+        // "Bethesda Softworks\"
+        0x0042, 0x0065, 0x0074, 0x0068, 0x0065, 0x0073, 0x0064, 0x0061, 0x0020,
+        0x0053, 0x006F, 0x0066, 0x0074, 0x0077, 0x006F, 0x0072, 0x006B, 0x0073, 0x005C,
+        // "Skyrim"
+        0x0053, 0x006B, 0x0079, 0x0072, 0x0069, 0x006D,
+        // null terminator
+        0x0000,
+    ];
+
     /// `SOFTWARE\\Bethesda Softworks\\Skyrim Special Edition\0` in UTF-16 LE
     #[rustfmt::skip]
     const SKYRIM_SE_REG_KEY: &[u16] = &[
@@ -52,6 +68,7 @@ fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     ];
 
     let sub_key = match runtime {
+        Runtime::Le => SKYRIM_LE_REG_KEY,
         Runtime::Se => SKYRIM_SE_REG_KEY,
         Runtime::Vr => SKYRIM_VR_REG_KEY,
     };
@@ -114,7 +131,7 @@ mod tests {
     #[ignore = "Local only"]
     #[test]
     fn test_get_skyrim_dir() {
-        let path = get_skyrim_data_dir(Runtime::Se).unwrap_or_else(|e| panic!("{e}"));
+        let path = get_skyrim_data_dir(Runtime::Le).unwrap_or_else(|e| panic!("{e}"));
         dbg!(path); // == "D:\\STEAM\\steamapps\\common\\Skyrim Special Edition\\Data"
     }
 }

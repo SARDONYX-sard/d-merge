@@ -7,7 +7,7 @@
   "backup": {
     "dialog": {
       "all_checked_label": "全てチェック",
-      "public_checked_label": "公開のみ全てチェック"
+      "public_checked_label": "プライベート以外全てチェック"
     },
     "export": {
       "button_name": "エクスポート",
@@ -106,18 +106,47 @@
     "open_tooltip": "指定したディレクトリを開く"
   },
   "patch": {
-    "button": "パッチ",
+    "autoDetectSkyrimData_tooltip": "出力ターゲットに応じて、Steam版SkyrimのDataディレクトリを自動検出します。",
+    "autoDetectSkyrimData_error_massage": "SkyrimのDataディレクトリを自動検出できませんでした。レジストリが存在しないため、手動でパスを指定してください。",
+    "button": "パッチ済みhkxの生成",
     "columns": {
       "author": "作成者",
       "mod_name": "MOD名",
       "priority": "優先度",
       "site": "サイト"
     },
+    "input_directory": "Data ディレクトリ(Glob使用可: 例 `D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*`)",
     "patch_applying_message": "パッチを適用中...",
     "patch_complete_message": "パッチが適用されました。",
     "patch_error_message": "パッチの適用中にエラーが発生しました。",
     "patch_reading_message": "テンプレートとパッチを読み込み中...",
-    "patching_button": "パッチ適用中..."
+    "patching_button": "パッチ適用中...",
+
+    "open_options_dialog": "パッチオプションダイアログを開く",
+    "options_title": "パッチオプション",
+    "auto_remove_meshes_option_label": "出力先の`.debug`, `meshes`ディレクトリを事前削除",
+    "auto_remove_meshes_option_help": "パッチのたびに出力先の`.debug`, `meshes`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
+    "hack_options_label": "ハックオプション",
+    "hack_options": {
+      "cast_ragdoll_event": "BSRagdollContactListenerModifierの互換ハックを有効化",
+      "cast_ragdoll_event_help": "パッチでよくあるフィールド名の誤りを自動補正します(例: eventをcontactEventに、anotherBoneIndexをbonesに置換)。不正確なデータの解析を可能にしますが、実際のエラーを隠すリスクがあります。"
+    },
+    "debug_options_label": "デバッグオプション",
+    "debug_options": {
+      "output_patch_json": "パッチJSONを出力",
+      "output_patch_json_help": "各hkx用の優先度付きパッチデータをJSON形式で出力します。パッチファイルは `<出力先>/.debug/patches/` に保存されます。",
+      "output_merged_json": "マージ済みJSONを出力",
+      "output_merged_json_help": "変数(例 $variableID[ID]$)置換前のhkx化直前データをJSON形式で出力します。ファイルは `<出力先>/.debug/meshes/` に保存されます。",
+      "output_merged_xml": "マージ済みXMLを出力",
+      "output_merged_xml_help": "変数置換前のhkx化直前データをXML形式で出力します。ファイルは `<出力先>/.debug/meshes/` に保存されます。"
+    },
+    "output_target_label": "出力ターゲット",
+    "output_target_aria_label": "出力ターゲットを選択",
+    "output_targets": {
+      "skyrim_se": "Skyrim SE",
+      "skyrim_le": "Skyrim LE"
+    },
+    "output_target_help": "出力hkxの対象ゲームバージョンを選択してください。"
   },
   "select_button": "選択",
   "tabs": {

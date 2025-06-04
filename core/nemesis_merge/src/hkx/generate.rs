@@ -3,7 +3,7 @@ use crate::{
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
     types::{BorrowedTemplateMap, VariableClassMap},
-    Config,
+    Config, OutPutTarget,
 };
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
@@ -65,7 +65,10 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
                 }
 
                 // Convert to hkx bytes & Replace nemesis id.
-                let header = HkxHeader::new_skyrim_se();
+                let header = match config.output_target {
+                    OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
+                    OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
+                };
                 let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
                 let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
 

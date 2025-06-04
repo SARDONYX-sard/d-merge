@@ -100,12 +100,14 @@
   },
   "output": {
     "open_tooltip": "Open output directory",
-    "path_label": "Output"
+    "path_label": "Output Directory"
   },
   "directory": {
     "open_tooltip": "Open specified directory."
   },
   "patch": {
+    "autoDetectSkyrimData_tooltip": "Automatically detects the Data directory of the Steam version of Skyrim according to the output target.",
+    "autoDetectSkyrimData_error_massage": "The Skyrim Data directory could not be detected automatically. Please specify the path manually as the registry does not exist.",
     "button": "Patch",
     "columns": {
       "author": "Author",
@@ -113,11 +115,38 @@
       "priority": "Priority",
       "site": "Site"
     },
+    "input_directory": "Data directory(Can Glob: e.g. `D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*`)",
     "patch_applying_message": "Applying patches...",
     "patch_complete_message": "Patching complete.",
     "patch_error_message": "Error occurred while applying patches.",
     "patch_reading_message": "Reading templates and patches...",
-    "patching_button": "Patching..."
+    "patching_button": "Patching...",
+
+    "open_options_dialog": "Open Patch Options Dialog",
+    "options_title": "Patch Options",
+    "auto_remove_meshes_option_label": "Automatic deletion of the destination `meshes` & `.debug` directory",
+    "auto_remove_meshes_option_help": "Remove each time just before a patch to avoid unintended reflection of the previous hkx.",
+    "hack_options_label": "Hack Options",
+    "hack_options": {
+      "cast_ragdoll_event": "Enable compatibility hacks for BSRagdollContactListenerModifier",
+      "cast_ragdoll_event_help": "Corrects common field naming mistakes in patches (e.g. substituting 'event' with 'contactEvent', 'anotherBoneIndex' with 'bones'). Allows parsing of invalid data but may hide real errors."
+    },
+    "debug_options_label": "Debug Options",
+    "debug_options": {
+      "output_patch_json": "Output Patch JSON",
+      "output_patch_json_help": "Outputs prioritized patch data for each hkx in JSON format. The patch files are saved to `<output>/.debug/patches/`.",
+      "output_merged_json": "Output Merged JSON",
+      "output_merged_json_help": "Outputs the data before variable(e.g.$variableID[ID]$) substitution and right before HKX conversion in JSON format. The file is saved to `<output>/.debug/meshes/`.",
+      "output_merged_xml": "Output Merged XML",
+      "output_merged_xml_help": "Outputs the data before variable substitution and right before HKX conversion in XML format. The file is saved to `<output>/.debug/meshes/`."
+    },
+    "output_target_label": "Output Target",
+    "output_target_aria_label": "Select output target",
+    "output_targets": {
+      "skyrim_se": "Skyrim SE",
+      "skyrim_le": "Skyrim LE"
+    },
+    "output_target_help": "Select the target game version for the output hkx."
   },
   "select_button": "Select",
   "tabs": {

@@ -72,8 +72,9 @@ p.Mui-error {
 .MuiInputBase-root.MuiOutlinedInput-root.MuiInputBase-colorPrimary.Mui-focused>fieldset,
 [class$="MuiFormLabel-root"].Mui-focused,
 [class$="MuiInputBase-root-MuiInput-root"]::after,
-label.Mui-focused,
 a,
+label.Mui-focused,
+svg[data-testid="IndeterminateCheckBoxIcon"],
 span.Mui-checked>svg {
   color: var(--theme-color) !important;
   border-color: var(--theme-color);

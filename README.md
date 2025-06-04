@@ -55,15 +55,38 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic parallel merge.
   - [ ] Fix unknown merge race condition
 
-## Debugging Nemesis Patches
+## Licenses
 
-1. Generate hkx in Nemesis.
-2. Convert the required xml in Nemesis/resource to hkx and then to xml again.
-   This will generate xml that meets the d-merge specification.
-3. Output the xml generated in step 2 to json for 3.
-4. Use serde-hkx tool to output Nemesis hkx → json.
-5. Diff the results of 3 and 4.
+This project includes multiple crates with different licenses. The overall license of the `backend` crate is **GPL-3.0**, due to transitive dependencies on GPL-licensed components.
 
-## Converting page
+- [GPL-3.0](./LICENSE)
+- [MIT](./LICENSES/LICENSE-MIT)
+- [Apache2.0](./LICENSES/LICENSE-APACHE)
 
-![image](https://github.com/user-attachments/assets/1b8f0a0b-8aa2-4bd3-9cba-f75a6ff9095d)
+### License Tree
+
+```txt
+gui/backend (GPL-3.0)
+├── nemesis_merge (GPL-3.0)
+│   ├── skyrim_anim_parser (GPL-3.0)
+│   ├── nemesis_xml (MIT OR Apache-2.0)
+│   ├── skyrim_crc (MIT OR Apache-2.0)
+│   └── json_patch (MIT OR Apache-2.0)
+├── mod_info (MIT OR Apache-2.0)
+└── node_expr (MIT OR Apache-2.0)
+```
+
+### License Propagation
+
+- **`skyrim_anim_parser`**:
+  I understood the specification of this `animationdatasinglefile.txt` file from reading pandora. Therefore, I will keep it under GPL-3.0 just in case.
+
+- **`nemesis_merge`**:
+  This crate depends on both `skyrim_anim_parser` (GPL-3.0) and a GPL-licensed template(See `resource` dir). Thus, it is required to be **GPL-3.0**.
+
+- **`backend`**:
+  As a GUI frontend that depends on `nemesis_merge`, it inherits the **GPL-3.0** license through transitive dependency.
+
+Other utility crates (e.g., `mod_info`, `node_expr`, `json_patch`, etc.) are licensed under **MIT OR Apache-2.0**, but the presence of GPL-licensed dependencies requires that the final binary (the GUI/backend) must be distributed under **GPL-3.0**.
+
+Please ensure that your usage and redistribution of this software complies with the [**GPL-3.0**](./LICENSE) license terms.

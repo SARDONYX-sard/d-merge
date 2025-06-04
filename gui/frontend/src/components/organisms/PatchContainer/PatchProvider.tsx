@@ -1,37 +1,63 @@
-import { type Dispatch, type SetStateAction, createContext, useContext, useMemo, useTransition } from 'react';
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect, createContext, useContext, useMemo, useTransition } from 'react';
 
+import { useDebounce } from '@/components/hooks/useDebounce';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
-import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
-import { type ModInfo, loadModsInfo } from '@/services/api/patch';
+import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
+import { boolSchema, stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
+import { type ModInfo, type PatchOptions, loadModsInfo, patchOptionsSchema } from '@/services/api/patch';
 
-import { useDebounce } from '../../hooks/useDebounce';
-
-import type React from 'react';
+import type { Dispatch, ReactNode, SetStateAction, FC } from 'react';
 
 type ContextType = {
   activateMods: string[];
   setActivateMods: Dispatch<SetStateAction<string[]>>;
+
   /** Loading info.ini for each Nemesis Mod? */
   loading: boolean;
+
   /** Data dir of Skyrim where each Nemesis Mod exists */
+  cacheModInfoDir: string;
+  setCacheModInfoDir: Dispatch<SetStateAction<string>>;
+
   modInfoDir: string;
   setModInfoDir: Dispatch<SetStateAction<string>>;
+
+  /** Auto detect skyrim data directory.(To get modInfoDir) */
+  autoDetectEnabled: boolean;
+  setAutoDetectEnabled: Dispatch<SetStateAction<boolean>>;
+
   modInfoList: ModInfo[];
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
+
   output: string;
   setOutput: Dispatch<SetStateAction<string>>;
+  /** priority ids */
   priorities: string[];
   setPriorities: Dispatch<SetStateAction<string[]>>;
+
+  patchOptions: PatchOptions;
+  setPatchOptions: Dispatch<SetStateAction<PatchOptions>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
 
-export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
-  const [modInfoDir, setModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+  const [cacheModInfoDir, setCacheModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+
+  // ⚠ Do NOT use `cacheModInfoDir` as the initial value.
+  //
+  // Initial state: dir = cacheModInfoDir
+  // → Grid selection logic runs (If mod info length > 0)
+  // → No matching id found → selection becomes empty
+  // → useEffect triggers (autoDetect === true)
+  // → Directory switches to SkyrimDir
+  // → id is still empty → invalid or inconsistent state
+  const [modInfoDir, setModInfoDir] = useState('');
+
+  const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
+
+  const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
 
   const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.patchOutput, stringSchema);
   const [priorities, setPriorities] = useStorageState(PRIVATE_CACHE_OBJ.patchPriorityIds, stringArraySchema);
@@ -42,6 +68,11 @@ export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // NOTE: Use this instead of `useDeferredValue` to delay API calls.
   const deferredModInfoDir = useDebounce(modInfoDir, 450);
   useEffect(() => {
+    // fast skip
+    if (deferredModInfoDir === '') {
+      return;
+    }
+
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
         const modsInfo = await loadModsInfo(deferredModInfoDir);
@@ -57,16 +88,30 @@ export const PatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const context = {
     activateMods,
-    loading,
-    modInfoDir,
-    modInfoList: sortedModInfoList,
-    output,
-    priorities,
     setActivateMods,
+
+    cacheModInfoDir,
+    setCacheModInfoDir,
+
+    modInfoDir,
     setModInfoDir,
-    setModInfoList,
+
+    autoDetectEnabled,
+    setAutoDetectEnabled,
+
+    patchOptions,
+    setPatchOptions,
+
+    output,
     setOutput,
+
+    priorities,
     setPriorities,
+
+    modInfoList: sortedModInfoList,
+    setModInfoList,
+
+    loading,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;
