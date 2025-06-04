@@ -37,15 +37,11 @@ pub(crate) async fn patch(
     if options.auto_remove_meshes {
         let meshes_path = output.join("meshes");
         tauri::async_runtime::spawn(async move {
-            if let Err(err) = tokio::fs::remove_dir_all(meshes_path).await {
-                tracing::error!("{err}");
-            }
+            let _ = tokio::fs::remove_dir_all(meshes_path).await;
         });
         let debug_path = output.join(".debug");
         tauri::async_runtime::spawn(async move {
-            if let Err(err) = tokio::fs::remove_dir_all(debug_path).await {
-                tracing::error!("{err}");
-            };
+            let _ = tokio::fs::remove_dir_all(debug_path).await;
         });
     }
 
