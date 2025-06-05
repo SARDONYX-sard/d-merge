@@ -73,8 +73,8 @@ p.Mui-error {
 [class$="MuiFormLabel-root"].Mui-focused,
 [class$="MuiInputBase-root-MuiInput-root"]::after,
 a,
+input[aria-label="Select all rows"] + svg,
 label.Mui-focused,
-svg[data-testid="IndeterminateCheckBoxIcon"],
 span.Mui-checked>svg {
   color: var(--theme-color) !important;
   border-color: var(--theme-color);
