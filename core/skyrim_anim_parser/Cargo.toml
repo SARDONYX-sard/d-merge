@@ -23,10 +23,10 @@ tracing = { workspace = true, optional = true }
 winnow = { workspace = true }
 
 [dev-dependencies]
+diff = { workspace = true }
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
 rmp-serde = { workspace = true }
-serde_hkx_features = { workspace = true }
 serde_json = { workspace = true }
 
 [lints]

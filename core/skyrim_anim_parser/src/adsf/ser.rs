@@ -285,7 +285,7 @@ mod tests {
         ));
         let res = dbg!(actual == expected);
         if !res {
-            let diff = serde_hkx_features::diff::diff(&actual, &expected, false);
+            let diff = ::diff::diff(&actual, &expected);
             std::fs::write("../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
