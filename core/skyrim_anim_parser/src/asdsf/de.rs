@@ -193,13 +193,28 @@ fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ErrMod
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
+    // use rayon::prelude::*;
 
     fn test_parse(input: &str) {
         match parse_asdsf(input) {
-            Ok(res) => {
-                std::fs::create_dir_all("../dummy/debug").unwrap();
-                std::fs::write("../dummy/debug/asdsf_debug.txt", format!("{res:#?}")).unwrap();
+            Ok(asdsf) => {
+                std::fs::create_dir_all("../../../../dummy/debug").unwrap();
+
+                // Key value pair?
+                // let asdsf: HashMap<_, _> = asdsf
+                //     .txt_projects
+                //     .par_iter()
+                //     .zip(asdsf.anim_set_list)
+                //     .collect();
+
+                std::fs::write(
+                    "../../../../dummy/debug/asdsf_debug.log",
+                    format!("{asdsf:#?}"),
+                )
+                .unwrap();
             }
             Err(err) => panic!("{err}"),
         }
