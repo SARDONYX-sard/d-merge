@@ -193,10 +193,9 @@ fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ErrMod
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
     // use rayon::prelude::*;
+    // use std::collections::HashMap;
 
     fn test_parse(input: &str) {
         match parse_asdsf(input) {
