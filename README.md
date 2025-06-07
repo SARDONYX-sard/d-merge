@@ -42,9 +42,9 @@ The only thing we are considering at this time is support for the Nemesis patch.
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
 
-  - [ ] Serialization
+  - [x] Serialization
   - [x] Deserialization
-  - [ ] Add Operation
+  - [ ] Add Operation (Impossible unless the specification of the difference is understood.)
   - [ ] Replace Operation
 
 - hkx templates

@@ -5,7 +5,7 @@ use crate::{
     types::{BorrowedTemplateMap, Key, RawBorrowedPatches},
     Config,
 };
-use json_patch::apply_patch;
+use json_patch::{apply_patch, Patch};
 use rayon::prelude::*;
 use snafu::ResultExt;
 use std::path::Path;
@@ -24,8 +24,6 @@ pub fn apply_patches<'a, 'b: 'a>(
 ) -> Result<(), Vec<Error>> {
     let results: Vec<Result<(), Error>> = borrowed_patches // patches
         .into_par_iter()
-        // template_name: e.g. 0_master.hkx -> 0_master
-        // patches: patches for 0_master.hkx
         .flat_map(|(key, patches)| {
             if config.debug.output_patch_json {
                 if let Err(err) = write_json_patch(&config.output_dir, &key, &patches) {
@@ -34,8 +32,29 @@ pub fn apply_patches<'a, 'b: 'a>(
                 }
             }
 
+            // One vs Seq max priority
+            let mut patches: Vec<_> = patches.0.into_par_iter().collect();
+            patches.par_sort_by(|a, b| {
+                let priority_a = match &a.1 {
+                    Patch::One(v) => v.priority,
+                    Patch::Seq(values) => values
+                        .par_iter()
+                        .max_by_key(|v| v.priority)
+                        .map_or(0, |v| v.priority),
+                };
+
+                let priority_b = match &b.1 {
+                    Patch::One(v) => v.priority,
+                    Patch::Seq(values) => values
+                        .par_iter()
+                        .max_by_key(|v| v.priority)
+                        .map_or(0, |v| v.priority),
+                };
+
+                priority_a.cmp(&priority_b)
+            });
+
             patches
-                .0
                 .into_par_iter()
                 .map(|(path, patch)| {
                     if let Some(mut template_pair) = templates.get_mut(&key) {
