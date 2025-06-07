@@ -42,7 +42,7 @@ pub(crate) fn txt_one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
 
 /// Parse one line and then parse to T.
 #[inline]
-pub(crate) fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<&'a str>
+pub(crate) fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<Str<'a>>
 where
     T: FromStr,
 {
@@ -51,7 +51,7 @@ where
         .verify(|s: &str| s.parse::<T>().is_ok())
         .parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
-    Ok(line)
+    Ok(line.into())
 }
 
 /// Parse one line and then parse to T.

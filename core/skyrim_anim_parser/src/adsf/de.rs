@@ -143,9 +143,9 @@ fn clip_anim_block<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlock<'a>
     let block = seq! {ClipAnimDataBlock {
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        play_back_speed: verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))).map(|s| s.into()),
-        crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))).map(|s| s.into()),
-        crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))).map(|s| s.into()),
+        play_back_speed: verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))),
+        crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))),
+        crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))),
         trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
         _: line_ending.context(Expected(Description("empty line"))),
@@ -179,7 +179,7 @@ fn clip_motion_blocks<'a>(input: &mut &'a str) -> ModalResult<Vec<ClipMotionBloc
 fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>> {
     let block = seq! {ClipMotionBlock {
             clip_id: one_line.context(Expected(Description("clip_id: str"))),
-            duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))).map(|s| s.into()),
+            duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))),
             translation_len: parse_one_line.context(Expected(Description("translation_len: usize"))),
             translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
             rotation_len: parse_one_line.context(Expected(Description("rotation_len: usize"))),
@@ -199,9 +199,9 @@ fn translations<'a>(
         let mut translations = vec![];
         for _ in 0..line_len {
             let translation = seq! {Translation {
-                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
                 z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
                 _: opt(line_ending),
             }}
@@ -222,10 +222,10 @@ fn rotations<'a>(
         let mut rotations = vec![];
         for _ in 0..line_len {
             let rotation = seq! {Rotation {
-                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
-                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))).map(|s| s.into()),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
+                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))),
                 w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
                 _: opt(line_ending), // In the case of patches, this may not be present, so opt
             }}
@@ -239,19 +239,20 @@ fn rotations<'a>(
     }
 }
 
-/// Get a string up to a space and then consume the space.
-pub(crate) fn word_and_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let s = take_till(0.., |c| c == ' ').parse_next(input)?;
-    space1.parse_next(input)?;
-    Ok(s)
-}
-
 /// Get a string up to a space and parse to T, then consume the space.
 #[inline]
-pub(crate) fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<Str<'a>> {
+    /// Get a string up to a space and then consume the space.
+    fn word_and_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+        let s = take_till(0.., |c| c == ' ').parse_next(input)?;
+        space1.parse_next(input)?;
+        Ok(s)
+    }
+
     word_and_space
         .verify(|s: &str| s.parse::<T>().is_ok())
         .parse_next(input)
+        .map(|s| s.into())
 }
 
 #[cfg(test)]

@@ -30,7 +30,7 @@ fn lines<'a>(read_len: usize) -> impl Parser<&'a str, Vec<Str<'a>>, ErrMode<Cont
 }
 
 /// Parse one line and then parse to T.
-fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<&'a str>
+fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<Str<'a>>
 where
     T: FromStr,
 {
@@ -39,7 +39,7 @@ where
         .verify(|s: &str| s.parse::<T>().is_ok())
         .parse_next(input)?;
     opt(line_ending).parse_next(input)?; // skip line end
-    Ok(line)
+    Ok(line.into())
 }
 
 /// Parse one line and then parse to T.
@@ -71,9 +71,9 @@ fn clip_anim_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlo
         _: multispace0,
         name: one_line.context(Expected(Description("name: str"))),
         clip_id: one_line.context(Expected(Description("clip_id: str"))),
-        play_back_speed: verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))).map(|s| s.into()),
-        crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))).map(|s| s.into()),
-        crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))).map(|s| s.into()),
+        play_back_speed: verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))),
+        crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))),
+        crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))),
         trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
         trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
         _: multispace0,
@@ -102,7 +102,7 @@ fn clip_motion_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlo
     let block = seq! {ClipMotionBlock {
             _: multispace0,
             clip_id: one_line.context(Expected(Description("clip_id: str"))),
-            duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))).map(|s| s.into()),
+            duration: verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))),
             translation_len: parse_one_line.context(Expected(Description("translation_len: usize"))),
             translations: translations(translation_len).context(Expected(Description("translations: Vec<Translation>"))),
             rotation_len: parse_one_line.context(Expected(Description("rotation_len: usize"))),
@@ -122,9 +122,9 @@ fn translations<'a>(
         let mut translations = vec![];
         for _ in 0..line_len {
             let translation = seq! {Translation {
-                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
                 z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
                 _: opt(line_ending),
             }}
@@ -145,10 +145,10 @@ fn rotations<'a>(
         let mut rotations = vec![];
         for _ in 0..line_len {
             let rotation = seq! {Rotation {
-                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))).map(|s| s.into()),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))).map(|s| s.into()),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))).map(|s| s.into()),
-                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))).map(|s| s.into()),
+                time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
+                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
+                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
+                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))),
                 w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
                 _: opt(line_ending), // In the case of patches, this may not be present, so opt
             }}
