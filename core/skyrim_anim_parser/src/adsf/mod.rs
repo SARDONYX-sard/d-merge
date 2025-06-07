@@ -316,8 +316,8 @@ impl ClipAnimDataBlock<'_> {
     /// Returns the number of lines when serialized.
     ///
     /// ```txt
-    /// 1(name) + 1(clip_id) + 1(play_back_speed) + 1(crop_end_local_time)
-    ///         + n(trigger_names_len) + 1(empty_line)
+    /// 1(name) + 1(clip_id) + 1(play_back_speed) + 1(crop_start_local_time) + 1(crop_end_local_time) +
+    /// 1(trigger_names_len) + n(trigger_names)   + 1(empty_line)
     /// = 7 + n
     /// ```
     const fn to_line_len(&self) -> usize {
@@ -372,8 +372,8 @@ impl ClipMotionBlock<'_> {
     /// Returns the number of lines when serialized.
     ///
     /// ```txt
-    /// 1(clip_id) + 1(duration) + 1(translation_len size) + n_1(translations_len)
-    /// + 1(rotations_len size) + n_2(rotations_len) + 1(empty_line)
+    /// 1(clip_id)       +   1(duration)  + 1(translation_len) + n_1(translations) +
+    /// 1(rotations_len) + n_2(rotations) + 1(empty_line)
     /// = 5 + n_1 + n_2
     /// ```
     const fn to_line_len(&self) -> usize {
