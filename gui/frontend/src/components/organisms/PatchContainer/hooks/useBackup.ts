@@ -4,7 +4,6 @@ import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
 
 import { usePatchContext } from '@/components/organisms/PatchContainer/PatchProvider';
-import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 
@@ -33,11 +32,12 @@ export const useBackup = () => {
         const settings = await readTextFile(settingsPath);
         const newSettings = await BACKUP.importRaw(settings);
         if (newSettings) {
+          newSettings['last-path'] = undefined;
           STORAGE.setAll(newSettings);
         }
-      } catch (_) {
+      } catch (e) {
         // biome-ignore lint/suspicious/noConsole: <explanation>
-        console.info('Try to import backup. But not found yet.');
+        console.warn(`Import backup error ${e}.`);
       }
     };
 
@@ -53,13 +53,12 @@ export const useBackup = () => {
         return;
       }
       sessionStorage.setItem(key, 'true');
+
       // biome-ignore lint/suspicious/noConsole: <explanation>
       console.log('Export settings on window close once');
 
       await listen('tauri://close-requested', async () => {
-        await NOTIFY.asyncTry(async () => {
-          await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
-        });
+        await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
       });
     };
 
