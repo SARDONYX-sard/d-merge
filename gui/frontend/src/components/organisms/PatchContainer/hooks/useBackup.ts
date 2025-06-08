@@ -43,7 +43,7 @@ export const useBackup = () => {
 
     // Register export on close
     const registerCloseListener = async () => {
-      if (!(isTauri() && autoDetectEnabled) || modInfoDir || '') {
+      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
