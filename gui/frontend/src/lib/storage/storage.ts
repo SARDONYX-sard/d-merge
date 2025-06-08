@@ -62,6 +62,20 @@ export const createStorage = <
     },
 
     /**
+     * Sets all values in localStorage for a given caches.
+     * @param caches - The cache key value pairs.
+     * @example
+     * storage.setAll({ 'snackbar-limit': '5', "editor-mode": "vim" });
+     */
+    setAll(caches: LocalCache<K>) {
+      for (const [key, value] of Object.entries(caches)) {
+        if (value) {
+          localStorage.set(key, value);
+        }
+      }
+    },
+
+    /**
      * Removes a value from localStorage for a given cache key.
      * @param key - The cache key to remove.
      * @example
