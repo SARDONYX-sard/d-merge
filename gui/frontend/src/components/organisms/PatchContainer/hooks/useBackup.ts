@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { listen } from '@tauri-apps/api/event';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
 
@@ -8,51 +8,46 @@ import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 
-/**
- * @param enabled Enable auto backup read/write.
- */
 export const useBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    let unlistenFn: (() => void) | undefined;
+    const isFirstVisit = sessionStorage.getItem('visitedHome') !== 'true';
 
-    const listenTauriCreate = async () => {
-      unlistenFn = await getCurrentWebview().listen('tauri://webview-created', async () => {
-        if (typeof window !== 'undefined' && isTauri()) {
-          return;
+    if (!isFirstVisit) {
+      return;
+    }
+
+    sessionStorage.setItem('visitedHome', 'true');
+
+    // Import backup settings
+    const doImport = async () => {
+      // biome-ignore lint/suspicious/noConsole: <explanation>
+      console.log('Backup read once');
+
+      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+        return;
+      }
+
+      const importTask = async () => {
+        const settings = await readTextFile(settingsPath);
+        const newSettings = await BACKUP.importRaw(settings);
+        if (newSettings) {
+          STORAGE.setAll(newSettings);
         }
-        if (!autoDetectEnabled || modInfoDir === '') {
-          return;
-        }
+      };
 
-        const importTask = async () => {
-          const settings = await readTextFile(settingsPath);
-          const newSettings = await BACKUP.importRaw(settings);
-          if (newSettings) {
-            STORAGE.setAll(newSettings);
-          }
-        };
-
-        await NOTIFY.asyncTry(importTask);
-      });
+      await NOTIFY.asyncTry(importTask);
     };
 
-    listenTauriCreate();
+    // Register export on close
+    const registerCloseListener = async () => {
+      await listen('tauri://close-requested', async () => {
+        // biome-ignore lint/suspicious/noConsole: <explanation>
+        console.log('Export settings on window close');
 
-    return () => unlistenFn?.();
-  }, [autoDetectEnabled, modInfoDir, settingsPath]);
-
-  useEffect(() => {
-    let unlistenFn: (() => void) | undefined;
-
-    const listenTauriClose = async () => {
-      unlistenFn = await getCurrentWebview().listen('tauri://close-requested', async () => {
-        if (typeof window !== 'undefined' && isTauri()) {
-          return;
-        }
-        if (!autoDetectEnabled || modInfoDir === '') {
+        if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
           return;
         }
 
@@ -62,8 +57,8 @@ export const useBackup = () => {
       });
     };
 
-    listenTauriClose();
-
-    return () => unlistenFn?.();
+    // Run both in parallel
+    doImport();
+    registerCloseListener();
   }, [autoDetectEnabled, modInfoDir, settingsPath]);
 };
