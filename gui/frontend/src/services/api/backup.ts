@@ -12,6 +12,26 @@ export const BACKUP = {
   /** @throws Error | JsonParseError */
   async import(): Promise<Cache | undefined> {
     const settings = await readFile(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
+    return this.importRaw(settings);
+  },
+
+  /** @throws SaveError */
+  async export(settings: Cache) {
+    const cachedPath = STORAGE.get(PRIVATE_CACHE_OBJ.exportSettingsPath);
+    const path = await save({
+      defaultPath: cachedPath ?? 'settings.json',
+      filters: [{ name: SETTINGS_FILE_NAME, extensions: ['json'] }],
+    });
+
+    if (typeof path === 'string') {
+      await this.exportRaw(path, settings);
+      return path;
+    }
+    return null;
+  },
+
+  /** @throws Error | JsonParseError */
+  async importRaw(settings: string | null): Promise<Cache | undefined> {
     if (settings) {
       const json = stringToJsonSchema.parse(settings);
 
@@ -33,18 +53,11 @@ export const BACKUP = {
     }
   },
 
-  /** @throws SaveError */
-  async export(settings: Cache) {
-    const cachedPath = STORAGE.get(PRIVATE_CACHE_OBJ.exportSettingsPath);
-    const path = await save({
-      defaultPath: cachedPath ?? 'settings.json',
-      filters: [{ name: SETTINGS_FILE_NAME, extensions: ['json'] }],
-    });
-
-    if (typeof path === 'string') {
-      await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
-      return path;
-    }
-    return null;
+  /**
+   * - `path`: e.g. `<output_dir>/d_merge_settings.json`
+   * @throws SaveError
+   */
+  async exportRaw(path: string, settings: Cache) {
+    await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
   },
 } as const;

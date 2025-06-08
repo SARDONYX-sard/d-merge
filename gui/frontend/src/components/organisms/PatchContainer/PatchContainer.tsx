@@ -5,18 +5,20 @@ import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { BottomActionBar } from '@/components/organisms/BottomActionBar';
+import { usePatchHandler } from '@/components/organisms/PatchContainer/hooks/usePatchHandler';
+import { usePatchInputs } from '@/components/organisms/PatchContainer/hooks/usePatchInputs';
 import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
-import { usePatchHandler } from '@/components/organisms/PatchContainer/usePatchHandler';
-import { usePatchInputs } from '@/components/organisms/PatchContainer/usePatchInputs';
 import { NOTIFY } from '@/lib/notify';
 
+import { useBackup } from './hooks/useBackup';
+import { usePatchStatus } from './hooks/usePatchStatus';
 import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
-import { usePatchStatus } from './usePatchStatus';
 
 export const PatchContainer = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const { text: elapsedText, start, stop } = useTimer();
+  useBackup();
 
   const { status, statusText, handleStatus } = usePatchStatus(stop, setLoading);
   const inputFieldsProps = usePatchInputs();

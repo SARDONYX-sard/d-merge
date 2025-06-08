@@ -11,7 +11,7 @@ import { openPath } from '@/services/api/dialog';
 import { getSkyrimDir } from '@/services/api/patch';
 import { openPath as open } from '@/services/api/shell';
 
-import { usePatchContext } from './PatchProvider';
+import { usePatchContext } from '../PatchProvider';
 
 const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
 
