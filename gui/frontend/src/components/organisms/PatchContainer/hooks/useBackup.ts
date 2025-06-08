@@ -13,44 +13,50 @@ export const useBackup = () => {
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    const isFirstVisit = sessionStorage.getItem('visitedHome') !== 'true';
-
-    if (!isFirstVisit) {
-      return;
-    }
-
-    sessionStorage.setItem('visitedHome', 'true');
-
     // Import backup settings
     const doImport = async () => {
-      // biome-ignore lint/suspicious/noConsole: <explanation>
-      console.log('Backup read once');
-
       if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
-      const importTask = async () => {
+      const key = 'registeredAutoBackupImporter';
+      const once = sessionStorage.getItem(key) !== 'true';
+      if (!once) {
+        return;
+      }
+      sessionStorage.setItem(key, 'true');
+
+      // biome-ignore lint/suspicious/noConsole: <explanation>
+      console.log(`Backup read once from ${settingsPath}`);
+
+      try {
         const settings = await readTextFile(settingsPath);
         const newSettings = await BACKUP.importRaw(settings);
         if (newSettings) {
           STORAGE.setAll(newSettings);
         }
-      };
-
-      await NOTIFY.asyncTry(importTask);
+      } catch (_) {
+        // biome-ignore lint/suspicious/noConsole: <explanation>
+        console.info('Try to import backup. But not found yet.');
+      }
     };
 
     // Register export on close
     const registerCloseListener = async () => {
+      if (!(isTauri() && autoDetectEnabled) || modInfoDir || '') {
+        return;
+      }
+
+      const key = 'registeredAutoBackupExporter';
+      const once = sessionStorage.getItem(key) !== 'true';
+      if (!once) {
+        return;
+      }
+      sessionStorage.setItem(key, 'true');
+      // biome-ignore lint/suspicious/noConsole: <explanation>
+      console.log('Export settings on window close once');
+
       await listen('tauri://close-requested', async () => {
-        // biome-ignore lint/suspicious/noConsole: <explanation>
-        console.log('Export settings on window close');
-
-        if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
-          return;
-        }
-
         await NOTIFY.asyncTry(async () => {
           await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
         });
