@@ -10,7 +10,6 @@ import { BACKUP } from '@/services/api/backup';
 
 export const useBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
-  const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
     // Import backup settings
@@ -26,6 +25,7 @@ export const useBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
+      const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
       // biome-ignore lint/suspicious/noConsole: <explanation>
       console.log(`Backup read once from ${settingsPath}`);
 
@@ -34,7 +34,9 @@ export const useBackup = () => {
         const newSettings = await BACKUP.importRaw(settings);
         if (newSettings) {
           newSettings['last-path'] = undefined;
+          // TODO: It is better to use setState punishment for performance, but reload because there are too many providers.
           STORAGE.setAll(newSettings);
+          window.location.reload(); // To enable
         }
       } catch (e) {
         // biome-ignore lint/suspicious/noConsole: <explanation>
@@ -62,7 +64,10 @@ export const useBackup = () => {
       // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
       // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
-        await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
+        const settings = STORAGE.getAll();
+        const latestModInfoDir = settings['patch-input'];
+        const settingsPath = `${latestModInfoDir ?? modInfoDir}/.d_merge/settings.json` as const;
+        await BACKUP.exportRaw(settingsPath, settings);
         await getCurrentWindow().destroy();
       });
     };
@@ -70,5 +75,5 @@ export const useBackup = () => {
     // Run both in parallel
     doImport();
     registerCloseListener();
-  }, [autoDetectEnabled, modInfoDir, settingsPath]);
+  }, [autoDetectEnabled, modInfoDir]);
 };
