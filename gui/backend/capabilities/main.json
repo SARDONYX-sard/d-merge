@@ -17,6 +17,12 @@
     "dialog:allow-save",
     "fs:allow-resource-read-recursive",
     "fs:scope-appdata-recursive",
-    { "identifier": "fs:allow-read-text-file", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] }
+    "opener:allow-open-url",
+    { "identifier": "fs:allow-exists", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
+    { "identifier": "fs:allow-read-text-file", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }]
+    }
   ]
 }

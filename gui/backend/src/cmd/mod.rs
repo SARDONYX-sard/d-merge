@@ -2,7 +2,6 @@ pub(crate) mod conversion;
 pub(crate) mod fs;
 pub(crate) mod get_skyrim_dir;
 pub(crate) mod log;
-pub(crate) mod open;
 pub(crate) mod patch;
 
 use tauri::{Emitter as _, Window};

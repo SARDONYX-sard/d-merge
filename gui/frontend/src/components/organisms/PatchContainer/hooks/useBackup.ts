@@ -1,10 +1,11 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
 
 import { usePatchContext } from '@/components/organisms/PatchContainer/PatchProvider';
+import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 
@@ -13,7 +14,7 @@ export const useBackup = () => {
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    // Import backup settings
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
     const doImport = async () => {
       if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
         return;
@@ -26,21 +27,23 @@ export const useBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
-      // biome-ignore lint/suspicious/noConsole: <explanation>
-      console.log(`Backup read once from ${settingsPath}`);
+      if (!exists(settingsPath)) {
+        return;
+      }
+
+      NOTIFY.info('Backup auto reading...(Auto reload when finished.)');
 
       try {
         const settings = await readTextFile(settingsPath);
         const newSettings = await BACKUP.importRaw(settings);
         if (newSettings) {
-          newSettings['last-path'] = undefined;
+          newSettings['last-path'] = '/';
           // TODO: It is better to use setState punishment for performance, but reload because there are too many providers.
           STORAGE.setAll(newSettings);
           window.location.reload(); // To enable
         }
       } catch (e) {
-        // biome-ignore lint/suspicious/noConsole: <explanation>
-        console.warn(`Import backup error ${e}.`);
+        NOTIFY.warn(`Import backup error ${e}.`);
       }
     };
 
@@ -57,14 +60,12 @@ export const useBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
-      // biome-ignore lint/suspicious/noConsole: <explanation>
-      console.log('Export settings on window close once');
-
       // NOTE
       // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
       // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
         try {
+          NOTIFY.info(`Backup auto writing to ${settingsPath}...`);
           await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
         } catch (e) {
           // biome-ignore lint/suspicious/noConsole: <explanation>
