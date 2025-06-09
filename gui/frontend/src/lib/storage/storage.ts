@@ -1,4 +1,5 @@
-// import { CACHE_KEYS, HIDDEN_CACHE_KEYS } from './cacheKeys';
+import { OBJECT } from '@/lib/object-utils';
+
 import type { CacheKey, HiddenCacheKey, LocalCache } from './types';
 
 /**
@@ -68,9 +69,9 @@ export const createStorage = <
      * storage.setAll({ 'snackbar-limit': '5', "editor-mode": "vim" });
      */
     setAll(caches: LocalCache<K>) {
-      for (const [key, value] of Object.entries(caches)) {
+      for (const [key, value] of OBJECT.entries(caches)) {
         if (value) {
-          localStorage.set(key, value);
+          localStorage.setItem(key, value);
         }
       }
     },

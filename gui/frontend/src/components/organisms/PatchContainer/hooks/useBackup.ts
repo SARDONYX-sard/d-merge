@@ -64,8 +64,14 @@ export const useBackup = () => {
       // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
       // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
-        await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
-        await getCurrentWindow().destroy();
+        try {
+          await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
+        } catch (e) {
+          // biome-ignore lint/suspicious/noConsole: <explanation>
+          console.error(e);
+        } finally {
+          await getCurrentWindow().destroy();
+        }
       });
     };
 
