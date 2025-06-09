@@ -1,5 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
 
@@ -57,8 +58,12 @@ export const useBackup = () => {
       // biome-ignore lint/suspicious/noConsole: <explanation>
       console.log('Export settings on window close once');
 
+      // NOTE
+      // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
+      // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
         await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
+        await getCurrentWindow().destroy();
       });
     };
 

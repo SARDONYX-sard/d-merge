@@ -19,6 +19,7 @@ fn main() {
                 .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
                 .build(),
         )
+        .on_window_event(prevent_close_window)
         .invoke_handler(tauri::generate_handler![
             crate::cmd::conversion::convert,
             crate::cmd::conversion::is_supported_extra_fmt,
@@ -36,5 +37,16 @@ fn main() {
     {
         tracing::error!("Error: {err}");
         std::process::exit(1);
+    }
+}
+
+/// This is there to wait until the front end saves the current status.
+///
+/// Since the window cannot be closed, it is necessary to call `getCurrentWindow().destination()` in js to close the Window.
+/// To prevent exit application by X button.
+fn prevent_close_window<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tauri::WindowEvent) {
+    let _ = window;
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        api.prevent_close();
     }
 }
