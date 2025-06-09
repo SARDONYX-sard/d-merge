@@ -15,8 +15,8 @@
     "core:window:allow-show",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:allow-read-text-file",
     "fs:allow-resource-read-recursive",
-    "fs:scope-appdata-recursive"
+    "fs:scope-appdata-recursive",
+    { "identifier": "fs:allow-read-text-file", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] }
   ]
 }

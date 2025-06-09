@@ -10,6 +10,7 @@ import { BACKUP } from '@/services/api/backup';
 
 export const useBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
+  const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
     // Import backup settings
@@ -25,7 +26,6 @@ export const useBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
-      const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
       // biome-ignore lint/suspicious/noConsole: <explanation>
       console.log(`Backup read once from ${settingsPath}`);
 
@@ -64,10 +64,7 @@ export const useBackup = () => {
       // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
       // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
-        const settings = STORAGE.getAll();
-        const latestModInfoDir = settings['patch-input'];
-        const settingsPath = `${latestModInfoDir ?? modInfoDir}/.d_merge/settings.json` as const;
-        await BACKUP.exportRaw(settingsPath, settings);
+        await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
         await getCurrentWindow().destroy();
       });
     };
@@ -75,5 +72,5 @@ export const useBackup = () => {
     // Run both in parallel
     doImport();
     registerCloseListener();
-  }, [autoDetectEnabled, modInfoDir]);
+  }, [autoDetectEnabled, modInfoDir, settingsPath]);
 };
