@@ -95,3 +95,11 @@ export async function patch(output: string, ids: ModIds, options: PatchOptions) 
 export async function cancelPatch() {
   await invoke('cancel_patch');
 }
+
+/**
+ * set vfs mode flag.(If enabled, close window manually.)
+ * @throws Error
+ */
+export async function setVfsMode(value: boolean) {
+  await invoke('set_vfs_mode', { value });
+}

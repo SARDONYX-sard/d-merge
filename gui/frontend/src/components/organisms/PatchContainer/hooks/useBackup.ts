@@ -8,6 +8,7 @@ import { usePatchContext } from '@/components/organisms/PatchContainer/PatchProv
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
+import { setVfsMode } from '@/services/api/patch';
 
 export const useBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
@@ -31,7 +32,7 @@ export const useBackup = () => {
         return;
       }
 
-      NOTIFY.info('Backup auto reading...(Auto reload when finished.)');
+      NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
 
       try {
         const settings = await readTextFile(settingsPath);
@@ -59,13 +60,14 @@ export const useBackup = () => {
         return;
       }
       sessionStorage.setItem(key, 'true');
+      setVfsMode(true);
 
       // NOTE
       // - Get close event in backend but prevent execution. After saving the current data to a file, close the window with destination.
       // - The listener exists only once globally. (To avoid calling unlisten by return)
       await listen('tauri://close-requested', async () => {
         try {
-          NOTIFY.info(`Backup auto writing to ${settingsPath}...`);
+          NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
           await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
         } catch (e) {
           // biome-ignore lint/suspicious/noConsole: <explanation>
