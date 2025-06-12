@@ -18,9 +18,8 @@ import { produce } from 'immer';
 import { useState } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { usePatchContext } from '@/components/providers/PatchProvider';
 import type { PatchOptions } from '@/services/api/patch';
-
-import { usePatchContext } from './PatchProvider';
 
 export const PatchOptionsDialog = () => {
   const [open, setOpen] = useState(false);

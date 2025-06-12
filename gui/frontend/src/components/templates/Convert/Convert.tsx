@@ -3,7 +3,7 @@ import { Box, Grid, type SxProps, type Theme } from '@mui/material';
 import { listen } from '@tauri-apps/api/event';
 import { type MouseEventHandler, useState } from 'react';
 
-import { useInjectJs } from '@/components/hooks/useInjectJs';
+import { BottomActionBar } from '@/components/organisms/BottomActionBar';
 import { ConvertForm } from '@/components/organisms/ConvertForm';
 import {
   ConvertProvider,
@@ -11,13 +11,10 @@ import {
   useConvertContext,
 } from '@/components/organisms/ConvertForm/ConvertProvider';
 import { getAllLeafItemIds } from '@/components/organisms/ConvertForm/PathTreeSelector';
-import { BottomActionBar } from '@/components/organisms/BottomActionBar';
 import { NOTIFY } from '@/lib/notify';
 import { convert } from '@/services/api/serde_hkx';
 
 export const Convert = () => {
-  useInjectJs();
-
   return (
     <ConvertProvider>
       <ProviderInner />

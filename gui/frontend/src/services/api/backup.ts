@@ -12,6 +12,11 @@ export const BACKUP = {
   /** @throws Error | JsonParseError */
   async import(): Promise<Cache | undefined> {
     const settings = await readFile(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
+    return this.fromStr(settings);
+  },
+
+  /** @throws Error | JsonParseError */
+  fromStr(settings: string | null): Cache | undefined {
     if (settings) {
       const json = stringToJsonSchema.parse(settings);
 
@@ -42,9 +47,18 @@ export const BACKUP = {
     });
 
     if (typeof path === 'string') {
-      await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
+      await this.exportRaw(path, settings);
       return path;
     }
     return null;
+  },
+
+  /**
+   * Write to path.
+   * - `path`: e.g. `<output_dir>/d_merge_settings.json`
+   * @throws SaveError
+   */
+  async exportRaw(path: string, settings: Cache) {
+    await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
   },
 } as const;

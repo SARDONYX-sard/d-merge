@@ -6,6 +6,7 @@ import { EditorModeProvider } from '@/components/providers/EditorModeProvider';
 import { JsProvider } from '@/components/providers/JsProvider';
 import { LogLevelProvider } from '@/components/providers/LogLevelProvider';
 import NotifyProvider from '@/components/providers/NotifyProvider';
+import { PatchProvider } from '@/components/providers/PatchProvider';
 import { TabProvider } from '@/components/providers/TabProvider';
 
 import type { ComponentProps, ReactNode } from 'react';
@@ -43,7 +44,7 @@ export const GlobalProvider = ({ children }: Props) => {
             <JsProvider>
               <CssProvider>
                 <CssBaseline />
-                {children}
+                <PatchProvider>{children}</PatchProvider>
               </CssProvider>
             </JsProvider>
           </EditorModeProvider>

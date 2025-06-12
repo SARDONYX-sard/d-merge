@@ -1,3 +1,4 @@
+// NOTE: This state is not normally necessary globally, but it must be placed globally because it needs to be accessible to everything for automatic backup.
 import { useState, useEffect, createContext, useContext, useMemo, useTransition } from 'react';
 
 import { useDebounce } from '@/components/hooks/useDebounce';

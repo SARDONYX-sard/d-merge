@@ -9,11 +9,20 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:path:allow-resolve-directory",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-hide",
     "core:window:allow-show",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:allow-read-text-file",
     "fs:allow-resource-read-recursive",
-    "fs:scope-appdata-recursive"
+    "fs:scope-appdata-recursive",
+    "opener:allow-open-url",
+    { "identifier": "fs:allow-exists", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
+    { "identifier": "fs:allow-read-text-file", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }]
+    }
   ]
 }
