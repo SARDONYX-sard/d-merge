@@ -3,7 +3,6 @@ import { Box, type SxProps, type Theme } from '@mui/material';
 import Grid from '@mui/material/Grid';
 
 import { Help } from '@/components/atoms/Help';
-import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { CodeEditorTab } from '@/components/organisms/CodeEditorTab';
 import { Tabs } from '@/components/organisms/Tabs';
 import { useTabContext } from '@/components/providers/TabProvider';
@@ -23,7 +22,6 @@ const sx: SxProps<Theme> = {
 };
 
 export const Settings = () => {
-  useInjectJs();
   const { tabPos } = useTabContext();
 
   return (

@@ -1,6 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import { useState } from 'react';
 
+import { useBackup } from '@/components/hooks/useBackup';
 import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
@@ -10,7 +11,6 @@ import { usePatchInputs } from '@/components/organisms/PatchContainer/hooks/useP
 import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
 import { NOTIFY } from '@/lib/notify';
 
-import { useBackup } from './hooks/useBackup';
 import { usePatchStatus } from './hooks/usePatchStatus';
 import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
 

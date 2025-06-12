@@ -5,13 +5,12 @@ import { useEffect, type ComponentPropsWithRef } from 'react';
 import { useDebounce } from '@/components/hooks/useDebounce';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { InputField } from '@/components/molecules/InputField/InputField';
+import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { stripGlob } from '@/lib/path';
 import { openPath } from '@/services/api/dialog';
 import { getSkyrimDir } from '@/services/api/patch';
 import { openPath as open } from '@/services/api/shell';
-
-import { usePatchContext } from '../PatchProvider';
 
 const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' };
 
