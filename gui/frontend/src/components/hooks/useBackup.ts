@@ -61,6 +61,7 @@ const useAutoExportBackup = () => {
 
   useEffect(() => {
     if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+      setVfsMode(false);
       return;
     }
 
