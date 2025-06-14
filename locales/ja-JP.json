@@ -146,7 +146,10 @@
       "skyrim_se": "Skyrim SE",
       "skyrim_le": "Skyrim LE"
     },
-    "output_target_help": "出力hkxの対象ゲームバージョンを選択してください。"
+    "output_target_help": "出力hkxの対象ゲームバージョンを選択してください。",
+    "toolbar": {
+      "locked_due_to_sorting_help": "ソート中のため編集できません。クリックで解除できます。"
+    }
   },
   "select_button": "選択",
   "tabs": {

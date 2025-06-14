@@ -10,7 +10,7 @@ import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
  */
 const createPreset = <T extends string>(css: T) => {
   return /* css */ `:root {
-  ${css}
+  ${css.trim()}
 }
 
 .MuiDataGrid-container--top,
@@ -61,9 +61,10 @@ main {
 
 p.Mui-error {
   background-color: #2f2e2eba;
-  color: var(--error-color);
+  color: var(--mui-palette-error-main);
 }
 
+.MuiIconButton-colorPrimary,
 .Mui-checked,
 .Mui-selected,
 .MuiButton-outlined,
@@ -76,8 +77,8 @@ a,
 input[aria-label="Select all rows"] + svg,
 label.Mui-focused,
 span.Mui-checked>svg {
-  color: var(--theme-color) !important;
-  border-color: var(--theme-color);
+  color: var(--mui-palette-primary-main) !important;
+  border-color: var(--mui-palette-primary-main);
 }
 
 .MuiButton-outlined {
@@ -101,56 +102,84 @@ span.Mui-checked>svg {
 
 .MuiLinearProgress-bar,
 .MuiTabs-indicator {
-  background-color: var(--theme-color);
+  background-color: var(--mui-palette-primary-main);
 }
 ` as const;
 };
 
-const preset1 = createPreset(
-  `--autofill-color: #691c3747;
+const preset1 = createPreset(`
+  --mui-palette-primary-main: #ff8e16;
+  --mui-palette-error-main: #ff1655;
+  --mui-palette-background-default: #2223;
+  --mui-palette-secondary-main: #ab2b7e6e;
+  --mui-filled-input-background: #2424248c;
+  --mui-focus-visible: #c9623db3;
+  --mui-palette-primary-dark: #cd2c6c95;
+
+  --autofill-color: #691c3747;
   --convert-btn-color: #ab2b7e6e;
-  --error-color: #ff1655;
   --hover-btn-color: #c9623db3;
   --hover-convert-btn-color: #cd2c6c95;
   --image-size: cover;
   --image-url: url("https://i.redd.it/red-forest-1920-1080-v0-s9u8ki2rr70a1.jpg?s=139edf608c428656505a143635a0687dec086229");
   --main-bg-color: #2223;
-  --theme-color: #ff8e16;`,
-);
+`);
 
-const preset2 = createPreset(
-  `--autofill-color: #5eb1ef24;
+const preset2 = createPreset(`
+  --mui-palette-primary-main: #5a9ab9;
+  --mui-palette-background-default: #2226;
+  --mui-palette-secondary-main: #0288d162;
+  --mui-filled-input-background: #26323866;
+  --mui-focus-visible: #01579b80;
+  --mui-palette-primary-dark: #1c2c3a;
+
+  --autofill-color: #5eb1ef24;
   --convert-btn-color: #3369ad7d;
   --hover-btn-color: #1d5aa58b;
   --hover-convert-btn-color: #2665b5d1;
   --image-size: cover;
-  --image-url: url("https://images.pexels.com/photos/2817421/pexels-photo-2817421.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750& dpr=1");
-  --main-bg-color: #2223;
-  --theme-color: #5a9ab9;`,
-);
+  /** --image-url: url("https://images.pexels.com/photos/2817421/pexels-photo-2817421.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750& dpr=1"); */
+  --image-url: url("https://images.unsplash.com/photo-1506744038136-46273834b3fb");
+  --main-bg-color: #2222228e;
+`);
 
-const preset3 = createPreset(
-  `--autofill-color: #eb37ff1c;
+const preset3 = createPreset(`
+  --mui-palette-primary-main:#9644f1;
+  --mui-palette-error-main: #9c27b0;
+  --mui-palette-background-default: #2225;
+  --mui-palette-secondary-main: #4a148c5c;
+  --mui-filled-input-background: #3c003fa8;
+  --mui-focus-visible: #673ab7c2;
+  --mui-palette-primary-dark: #330066;
+
+  --autofill-color: #eb37ff1c;
   --convert-btn-color: #ab2b7e6e;
   --hover-btn-color: #8b51fb8b;
   --hover-convert-btn-color: #7d00c9a3;
   --image-size: cover;
-  --image-url: url("https://images.pexels.com/photos/6162265/pexels-photo-6162265.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1");
+  --image-url: url("https://images.pexels.com/photos/6162265/pexels-photo-6162265.jpeg?auto=compress&cs=tinysrgb");
   --main-bg-color: #2223;
-  --theme-color: #9644f1;`,
-);
+`);
 
-const preset4 = createPreset(
-  `--autofill-color: #a19c0038;
+const preset4 = createPreset(`
+  --mui-palette-primary-main: rgb(185, 185, 90);
+  --mui-palette-error-main: #ff5722;
+  --mui-palette-background-default: #2020208a;
+  --mui-palette-secondary-main: #64dd178a;
+  --mui-filled-input-background: #31313161;
+  --mui-focus-visible: #6d6d6d94;
+  --mui-palette-primary-dark: #3dcb5e;
+
+  --autofill-color: #a19c0038;
   --convert-btn-color: #94ce7c6e;
-  --hover-btn-color: #cefb518b;
+  --hover-btn-color:rgba(161, 196, 66, 0.31);
   --hover-convert-btn-color: #81c462a3;
   --image-position-x: center;
   --image-position-y: center;
+  --image-size: cover;
   --image-url: url('https://images.pexels.com/photos/973324/pexels-photo-973324.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
   --main-bg-color: #222a;
-  --theme-color: rgb(185, 185, 90);`,
-);
+`);
 
 const PRESETS = {
   '0': STORAGE.get(PUB_CACHE_OBJ.customCss) ?? '',

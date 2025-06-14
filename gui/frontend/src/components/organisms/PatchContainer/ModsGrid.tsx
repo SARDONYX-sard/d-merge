@@ -6,6 +6,7 @@ import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/Draggabl
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
+import { CustomToolbar } from './GridToolbar';
 import { useColumns } from './hooks/useColumns';
 import { useGridStatePersistence } from './hooks/useGridStatePersistence';
 
@@ -65,7 +66,6 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
     <DraggableDataGrid
       apiRef={apiRef}
       columns={columns}
-      density='compact'
       initialState={{
         columns: {
           columnVisibilityModel: {
@@ -74,6 +74,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
           },
         },
       }}
+      keepNonExistentRowsSelected={true}
       loading={loading}
       onDragEnd={handleDragEnd}
       onRowSelectionModelChange={handleRowSelectionModelChange}
@@ -82,6 +83,8 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         type: 'include',
       }}
       rows={modInfoList}
+      showToolbar={true}
+      slots={{ toolbar: CustomToolbar }}
       {...props}
     />
   );

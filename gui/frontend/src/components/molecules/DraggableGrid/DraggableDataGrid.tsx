@@ -48,7 +48,7 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
         <SortableContext items={rows} strategy={verticalListSortingStrategy}>
           <DataGrid
             checkboxSelection={true}
-            disableColumnSorting={true} // Because they cannot be reordered when reordering is applied: https://github.com/mui/mui-x/issues/10706
+            // disableColumnSorting={true} // Because they cannot be reordered when reordering is applied: https://github.com/mui/mui-x/issues/10706
             disableRowSelectionOnClick={true}
             rowBufferPx={2000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
