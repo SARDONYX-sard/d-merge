@@ -9,7 +9,7 @@
   "scripts": {
     "build": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,debug --no-bundle -- --profile release-no-lto",
     "build:front": "next build ./gui/frontend",
-    "build:icons": "cargo tauri icon ./gui/backend/icons/icon.png",
+    "build:icons": "tauri icon ./gui/backend/icons/icon.svg",
     "dev": "tauri dev",
     "dev:front": "next ./gui/frontend",
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
