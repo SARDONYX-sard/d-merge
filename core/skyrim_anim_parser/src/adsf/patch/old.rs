@@ -1,6 +1,6 @@
 //! Why separate modules?
 //! Patches need to be parsed fairly loosely; modders may not put in line breaks.
-use super::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
+use crate::adsf::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
 use crate::{adsf::de::from_word_and_space, lines::Str};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;

@@ -19,8 +19,13 @@ indexmap = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true, optional = true }                         # Implement (De)Serializer
 serde_hkx = { workspace = true }
+simd-json = { workspace = true }
+snafu = { workspace = true }
 tracing = { workspace = true, optional = true }
 winnow = { workspace = true }
+
+# workspace members
+json_patch = { workspace = true }
 
 [dev-dependencies]
 diff = { workspace = true }
@@ -33,7 +38,7 @@ serde_json = { workspace = true }
 workspace = true
 
 [features]
-default = ["tracing", "serde", "alt_map"] # for debug
+# default = ["tracing", "serde", "alt_map"] # for debug
 
 # alternative to adsf indexmap
 alt_map = ["serde", "indexmap/serde", "bitvec/serde", "dep:dashmap"]

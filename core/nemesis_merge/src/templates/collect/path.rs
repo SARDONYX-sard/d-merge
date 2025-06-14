@@ -13,8 +13,8 @@ use snafu::{prelude::*, OptionExt};
 use std::path::Path;
 use winnow::{
     ascii::Caseless,
-    combinator::{alt, not, peek, repeat, seq},
-    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    combinator::{alt, repeat, seq},
+    error::{StrContext::*, StrContextValue::*},
     token::any,
     ModalResult, Parser,
 };
@@ -48,21 +48,28 @@ pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {
         })
 }
 
-/// Case-insensitive take_until implementation using only winnow
-fn take_until_caseless<'s>(
-    tag: &'static str,
-) -> impl Parser<&'s str, &'s str, ErrMode<ContextError>> {
-    move |input: &mut &'s str| {
-        let end = not((Caseless(tag), alt(('/', '\\'))));
-        repeat::<_, _, (), _, _>(1.., (peek(end), any))
-            .take()
-            .parse_next(input)
-    }
+/// take_until implementation using only winnow
+fn take_until_ext<Input, Output, Error, ParseNext>(
+    occurrences: impl Into<winnow::stream::Range>,
+    parser: ParseNext,
+) -> impl Parser<Input, Input::Slice, Error>
+where
+    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
+    Error: winnow::error::ParserError<Input>,
+    ParseNext: Parser<Input, Output, Error>,
+{
+    use winnow::combinator::{not, peek, repeat, trace};
+    use winnow::token::any;
+
+    trace(
+        "take_until_ext",
+        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
+    )
 }
 
 fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     seq! {
-        _: take_until_caseless("meshes").context(Expected(StringLiteral("meshes"))),
+        _: take_until_ext(1.., (Caseless("meshes"), alt(('/', '\\')))).context(Expected(StringLiteral("meshes"))),
     }
     .parse_next(input)?;
 

@@ -50,10 +50,9 @@ fn is_txt_file(path: &Path) -> bool {
 fn is_nemesis_file(path: &Path) -> bool {
     let is_sharp_prefix = path
         .file_stem()
-        .and_then(|name| name.to_str().map(|name| name.starts_with('#')))
-        .unwrap_or_default();
+        .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')));
 
-    path.is_file() && is_sharp_prefix
+    is_sharp_prefix
 }
 
 /// Check `<name>~<anim_data_clip_id>.txt` or `<anim_data_clip_id>.txt` format.
@@ -82,6 +81,12 @@ fn is_adsf_patch_file(txt_path: &Path) -> bool {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn test_is_nemesis_patch_file() {
+        let path = r"mod/Nemesis_engine/mod/id/shout_behavior/#id$0.txt";
+        assert!(is_nemesis_file(Path::new(path)));
+    }
 
     #[test]
     fn test_is_adsf_patch_file_valid_cases() {

@@ -4156,6 +4156,7 @@ dependencies = [
  "dashmap",
  "diff 0.8.5",
  "indexmap 2.9.0",
+ "json_patch",
  "pretty_assertions",
  "quick_tracing",
  "rayon",
@@ -4163,6 +4164,8 @@ dependencies = [
  "serde",
  "serde_hkx",
  "serde_json",
+ "simd-json",
+ "snafu",
  "tracing",
  "winnow 0.7.10",
 ]

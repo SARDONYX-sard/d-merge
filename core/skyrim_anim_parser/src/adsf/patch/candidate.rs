@@ -1,0 +1,503 @@
+use crate::{
+    adsf::{
+        de::from_word_and_space,
+        patch::{
+            comment::{close_comment, comment_kind, take_till_close, CommentKind},
+            current_state::{CurrentState, PartialRotations, PartialTranslations},
+            error::{Error, Result},
+        },
+    },
+    lines::{one_line, verify_line_parses_to},
+};
+use json_patch::{Op, OpRange};
+use serde_hkx::errors::readable::ReadableError;
+use std::borrow::Cow;
+use winnow::{
+    ascii::{line_ending, multispace0, till_line_ending},
+    combinator::{eof, opt},
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    Parser,
+};
+
+/// Parse animationdatasinglefile.txt patch.
+///
+/// # Return
+/// Return (patches, root class ptr if `hkbBehaviorGraphStringData` to replace nemesis variable)
+///
+/// # Errors
+/// Parse failed.
+pub fn parse_adsf_patch(input: &str) -> Result<AdsfPatch<'_>, Error> {
+    let mut deserializer = Deserializer::new(input);
+    deserializer
+        .root()
+        .map_err(|err| deserializer.to_readable_err(err))?;
+    Ok(deserializer.output_patches)
+}
+
+/// Nemesis patch deserializer
+#[derive(Debug)]
+struct Deserializer<'a> {
+    /// mutable pointer to str
+    input: &'a str,
+    /// This is readonly for error report. Not move position.
+    original: &'a str,
+
+    /// Output
+    output_patches: AdsfPatch<'a>,
+
+    /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
+    /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
+    pub current: CurrentState<'a>,
+}
+
+impl<'de> Deserializer<'de> {
+    fn new(input: &'de str) -> Self {
+        Self {
+            input,
+            original: input,
+            output_patches: AdsfPatch::DEFAULT,
+            current: CurrentState::new(),
+        }
+    }
+
+    fn parse_next<O>(
+        &mut self,
+        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
+    ) -> Result<O> {
+        parser
+            .parse_next(&mut self.input)
+            .map_err(|err| Error::Context { err })
+    }
+
+    /// Parse by argument parser no consume.
+    ///
+    /// If an error occurs, it is converted to [`ReadableError`] and returned.
+    fn parse_peek<O>(
+        &self,
+        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
+    ) -> Result<O> {
+        let (_, res) = parser
+            .parse_peek(self.input)
+            .map_err(|err| Error::Context { err })?;
+        Ok(res)
+    }
+
+    /// Convert Visitor errors to position-assigned errors.
+    ///
+    /// # Why is this necessary?
+    /// Because Visitor errors that occur within each `Deserialize` implementation cannot indicate the error location in XML.
+    #[cold]
+    fn to_readable_err(&self, err: Error) -> Error {
+        let readable = match err {
+            Error::Context { err } => ReadableError::from_context(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+            Error::Readable { source } => source,
+            err => ReadableError::from_display(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+        };
+
+        Error::Readable { source: readable }
+    }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// Parse 1 file patch
+    fn root(&mut self) -> Result<()> {
+        self.parse_next(multispace0)?;
+
+        while let Some(line_kind) = self.current.next() {
+            match line_kind {
+                LineKind::ClipId => {
+                    let should_take = self.parse_opt_start_comment()?;
+
+                    let clip_id =
+                        self.parse_next(one_line.context(Expected(Description("clip_id: Str"))))?;
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!("clip_id = {clip_id:#?}");
+
+                    if should_take {
+                        self.current.replace_one(clip_id)?;
+                        self.parse_opt_close_comment()?;
+                    }
+                }
+                LineKind::Duration => {
+                    let should_take = self.parse_opt_start_comment()?;
+                    self.parse_next(multispace0)?;
+
+                    let duration = self.parse_next(
+                        verify_line_parses_to::<f32>
+                            .context(Expected(Description("duration: f32"))),
+                    )?;
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!("duration = {duration:#?}");
+
+                    if should_take {
+                        self.current.replace_one(duration)?;
+                        self.parse_opt_close_comment()?;
+                    }
+                    self.parse_next(multispace0)?;
+                }
+                LineKind::TranslationLen | LineKind::RotationLen => {
+                    let _len = self.parse_next(
+                        verify_line_parses_to::<usize>
+                            .context(Expected(Description("length: usize"))),
+                    )?;
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!("{line_kind:#?} = {_len:#?}");
+                }
+                LineKind::Translation => {
+                    // until transition/rotation length line
+                    let mut start_index = 0;
+                    while self
+                        .parse_peek(opt(verify_line_parses_to::<usize>))?
+                        .is_none()
+                    {
+                        let diff_start = self.parse_opt_start_comment()?;
+                        if diff_start {
+                            self.current.set_range_start(start_index)?;
+                        }
+
+                        let transition = self.transition()?;
+                        #[cfg(feature = "tracing")]
+                        tracing::trace!("transition = {transition:?}");
+
+                        if self.current.mode_code.is_some() {
+                            self.current.push_as_transition(transition)?;
+                        }
+                        self.parse_opt_close_comment()?;
+                        self.parse_next(multispace0)?;
+                        start_index += 1;
+                    }
+                }
+                LineKind::Rotation => {
+                    let mut start_index = 0;
+                    while self.parse_peek(opt(eof))?.is_none() {
+                        let diff_start = self.parse_opt_start_comment()?;
+                        if diff_start {
+                            self.current.set_range_start(start_index)?;
+                        }
+                        self.rotation()?;
+
+                        self.parse_opt_close_comment()?;
+                        self.parse_next(multispace0)?;
+                        start_index += 1;
+                    }
+                    break;
+                }
+            };
+        }
+
+        self.parse_next(multispace0)?;
+        if !self.input.is_empty() {
+            return Err(Error::IncompleteParse);
+        }
+
+        Ok(())
+    }
+
+    fn transition(&mut self) -> Result<[Cow<'de, str>; 4]> {
+        let time = self
+            .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
+        let x =
+            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("x: f32"))))?;
+        let y =
+            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("y: f32"))))?;
+        let z = {
+            let w_parser = till_line_ending
+                .verify(|s: &str| s.parse::<f32>().is_ok())
+                .context(Expected(Description("z: f32")));
+            self.parse_next(w_parser)?
+        }
+        .into();
+        self.parse_next(opt(line_ending))?;
+
+        Ok([time, x, y, z])
+    }
+
+    fn rotation(&mut self) -> Result<()> {
+        let time = self
+            .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
+        let x =
+            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("x: f32"))))?;
+        let y =
+            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("y: f32"))))?;
+        let z =
+            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("z: f32"))))?;
+
+        let w = {
+            let w_parser = till_line_ending
+                .verify(|s: &str| s.parse::<f32>().is_ok())
+                .context(Expected(Description("w: f32")));
+            self.parse_next(w_parser)?
+        }
+        .into();
+        self.parse_next(opt(line_ending))?;
+
+        let rotation = [time, x, y, z, w];
+        #[cfg(feature = "tracing")]
+        tracing::trace!("rotation = {rotation:?}");
+
+        if self.current.mode_code.is_some() {
+            self.current.push_as_rotation(rotation)?;
+        }
+        Ok(())
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// # Return
+    /// Is the mode code comment?
+    fn parse_opt_start_comment(&mut self) -> Result<bool> {
+        if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(?comment_ty);
+            match comment_ty {
+                CommentKind::ModCode(id) => {
+                    self.current.mode_code = Some(id);
+                    // When there are no additional differences, it is 100% Remove.
+                    let found_end_diff_sym = self.parse_opt_close_comment()?;
+                    if found_end_diff_sym {
+                        self.current.force_removed = true;
+                    };
+                    return Ok(true);
+                }
+                _ => return Ok(false),
+            }
+        }
+        Ok(false)
+    }
+
+    /// Processes the close comment (`ORIGINAL` or `CLOSE`) depending on whether it was encountered,
+    /// and returns whether it was encountered or not.
+    fn parse_opt_close_comment(&mut self) -> Result<bool> {
+        if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(?comment_ty);
+            match comment_ty {
+                CommentKind::Original => {
+                    self.current.set_is_passed_original();
+                    let op = self.current.judge_operation();
+                    if op != Op::Remove {
+                        self.parse_next(take_till_close)?;
+                        self.merge_to_output()?;
+                    }
+                    return Ok(true);
+                }
+                CommentKind::Close => {
+                    self.merge_to_output()?;
+                    return Ok(true);
+                }
+                _ => {}
+            }
+        }
+        Ok(false)
+    }
+
+    /// This is the method that is called when a single differential change comment pair finishes calling.
+    fn merge_to_output(&mut self) -> Result<(), Error> {
+        let op = self.current.judge_operation();
+        if let Some(mut partial_patch) = self.current.patch.take() {
+            match self.current.current_kind()? {
+                LineKind::ClipId => {
+                    if let Some(clip_id) = partial_patch.clip_id.take() {
+                        self.output_patches.clip_id.replace(clip_id);
+                    }
+                }
+                LineKind::Duration => {
+                    if let Some(duration) = partial_patch.duration.take() {
+                        self.output_patches.duration.replace(duration);
+                    }
+                }
+                LineKind::TranslationLen | LineKind::RotationLen => {}
+                LineKind::Translation => {
+                    if let Some(transitions) = partial_patch.transitions.take() {
+                        let PartialTranslations { range, values } = transitions;
+                        let values = if op == Op::Remove { vec![] } else { values };
+                        self.output_patches.translations = Some(DiffTransitions {
+                            op: OpRange { op, range },
+                            values,
+                        });
+                    }
+                }
+                LineKind::Rotation => {
+                    if let Some(rotations) = partial_patch.rotations.take() {
+                        let PartialRotations { range, values } = rotations;
+                        let values = if op == Op::Remove { vec![] } else { values };
+                        self.output_patches.rotations = Some(DiffRotations {
+                            op: OpRange { op, range },
+                            values,
+                        });
+                    }
+                }
+            }
+
+            self.current.clear_flags(); // new patch is generated so clear flags.
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Default)]
+pub struct AdsfPatch<'a> {
+    clip_id: Option<Cow<'a, str>>,
+    duration: Option<Cow<'a, str>>,
+    translations: Option<DiffTransitions<'a>>,
+    rotations: Option<DiffRotations<'a>>,
+}
+
+impl AdsfPatch<'_> {
+    const DEFAULT: Self = Self {
+        clip_id: None,
+        duration: None,
+        translations: None,
+        rotations: None,
+    };
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DiffTransitions<'a> {
+    op: OpRange,
+    values: Vec<[Cow<'a, str>; 4]>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DiffRotations<'a> {
+    op: OpRange,
+    values: Vec<[Cow<'a, str>; 5]>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) enum LineKind {
+    #[default]
+    ClipId,
+    Duration,
+
+    TranslationLen,
+    Translation,
+
+    RotationLen,
+    Rotation,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // #[quick_tracing::init]
+    #[test]
+    fn test_patch_modes_extended() {
+        // 100                    // clip_id
+        // <!-- ORIGINAL -->
+        // 93                     // clip_id
+        // <!-- CLOSE -->
+        // 2                      // duration
+        // 1                      // transition len
+        // 2 0 0 0                // transition
+        // 1                      // rotation len
+        // <!-- MOD_CODE ~test~ OPEN -->
+        // 6 0 0 0 5              // rotation
+        // 6 0 0 0 5              // rotation
+        // 6 0 0 0 5              // rotation
+        // <!-- ORIGINAL -->
+        // 2 0 0 0 1              // rotation
+        // <!-- CLOSE -->
+        let input = "
+        <!-- MOD_CODE ~test~ OPEN -->
+100
+<!-- ORIGINAL -->
+93
+<!-- CLOSE -->
+2
+1
+2 0 0 0
+1
+<!-- MOD_CODE ~test~ OPEN -->
+6 0 0 0 5
+6 0 0 0 5
+6 0 0 0 5
+<!-- ORIGINAL -->
+2 0 0 0 1
+<!-- CLOSE -->
+";
+
+        let patches = parse_adsf_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            patches,
+            AdsfPatch {
+                clip_id: Some("100".into()),
+                duration: None,
+                translations: None,
+                rotations: Some(DiffRotations {
+                    op: OpRange {
+                        op: Op::Replace,
+                        range: 0..3,
+                    },
+                    values: vec![
+                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
+                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
+                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
+                    ],
+                })
+            }
+        );
+    }
+
+    // #[quick_tracing::init]
+    #[test]
+    fn test_patch_modes() {
+        let input = "
+99
+<!-- MOD_CODE ~test~ OPEN -->
+1.25
+<!-- ORIGINAL -->
+2
+<!-- CLOSE -->
+1
+<!-- MOD_CODE ~test~ OPEN -->
+0.43 0 0 0
+0.50 0 0 0
+1.32 0 0 0
+<!-- ORIGINAL -->
+2 0 0 0
+<!-- CLOSE -->
+1
+<!-- MOD_CODE ~test~ OPEN -->
+<!-- ORIGINAL -->
+2 0 0 0 1
+<!-- CLOSE -->
+";
+
+        let patches = parse_adsf_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        let expected = AdsfPatch {
+            duration: Some("1.25".into()),
+            translations: Some(DiffTransitions {
+                op: OpRange {
+                    op: Op::Replace,
+                    range: 0..3,
+                },
+                values: vec![
+                    ["0.43".into(), "0".into(), "0".into(), "0".into()],
+                    ["0.50".into(), "0".into(), "0".into(), "0".into()],
+                    ["1.32".into(), "0".into(), "0".into(), "0".into()],
+                ],
+            }),
+            rotations: Some(DiffRotations {
+                op: OpRange {
+                    op: Op::Remove,
+                    range: 0..1,
+                },
+                values: vec![],
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(patches, expected);
+    }
+}

@@ -1,4 +1,3 @@
-use super::delimited_multispace0;
 use winnow::{
     ascii::Caseless,
     combinator::{alt, delimited, terminated},
@@ -82,29 +81,31 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
     terminated(
-        take_until_ext(0.., Caseless("<!-- CLOSE -->")),
+        take_until(0.., "<!-- CLOSE -->"),
         Caseless("<!-- CLOSE -->"),
     )
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Comment(e.g. `<!-- CLOSE -->`)",
+    )))
     .parse_next(input)
 }
 
-/// take_until implementation using only winnow
-fn take_until_ext<Input, Output, Error, ParseNext>(
-    occurrences: impl Into<winnow::stream::Range>,
-    parser: ParseNext,
-) -> impl Parser<Input, Input::Slice, Error>
+pub fn delimited_multispace0<Input, Output, Error, ParseNext>(
+    mut parser: ParseNext,
+) -> impl Parser<Input, Output, Error>
 where
     Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
     Error: winnow::error::ParserError<Input>,
     ParseNext: Parser<Input, Output, Error>,
+    <Input as winnow::stream::Stream>::Token: winnow::stream::AsChar + Clone,
 {
-    use winnow::combinator::{not, peek, repeat, trace};
-    use winnow::token::any;
+    use winnow::ascii::multispace0;
 
-    trace(
-        "take_until_ext",
-        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
-    )
+    winnow::combinator::trace("delimited_multispace0", move |input: &mut Input| {
+        let _ = multispace0.parse_next(input)?;
+        let o2 = parser.parse_next(input)?;
+        multispace0.parse_next(input).map(|_| o2)
+    })
 }
 
 #[cfg(test)]

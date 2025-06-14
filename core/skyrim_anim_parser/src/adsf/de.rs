@@ -273,14 +273,17 @@ mod tests {
         dbg!(project_names);
     }
 
+    #[cfg(feature = "tracing")]
     #[quick_tracing::init(level = "DEBUG", file = "./log/test.log", stdio = false)]
     fn test_parse(input: &str) {
         let adsf = parse_adsf(input).unwrap_or_else(|err| {
             panic!("Failed to parse adsf:\n{err}");
         });
 
-        tracing::debug!("project_names = {}", adsf.project_names.len());
-        tracing::debug!("anim_list ={}", adsf.anim_list.len());
+        {
+            tracing::debug!("project_names = {}", adsf.project_names.len());
+            tracing::debug!("anim_list ={}", adsf.anim_list.len());
+        }
         for anim_data in adsf.anim_list {
             tracing::debug!("assets_len = {}", anim_data.header.project_assets.len());
             tracing::debug!("project_assets = {:?}", anim_data.header.project_assets);
@@ -292,6 +295,7 @@ mod tests {
         // std::fs::write("../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
     }
 
+    #[cfg(feature = "tracing")]
     #[test]
     fn should_parse() {
         let s =
