@@ -1,4 +1,10 @@
-# D Merge(Diff & Merge json based hkx patcher)
+# D Merge(Diff & Merge) hkx patcher
+
+<div align="center">
+    <a align="center" href="https://github.com/SARDONYX-sard/d-merge/releases">
+      <img src="./gui/backend/icons/icon.svg" alt="D merge"/>
+    </a>
+</div>
 
 <div>
     <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/release-gui.yaml">
@@ -10,10 +16,7 @@
     <a href="https://opensource.org/licenses/GPL-3.0">
         <img src="https://img.shields.io/badge/License-GPL_v3.0-blue.svg" alt="License">
     </a>
-
 </div>
-
-![patch_page](https://github.com/user-attachments/assets/48b4d85d-ce79-4a46-87de-55a9c7e27436)
 
 ## For Tester
 
@@ -54,6 +57,8 @@ The only thing we are considering at this time is support for the Nemesis patch.
 - Nemesis Patch
   - [x] Basic parallel merge.
   - [ ] Fix unknown merge race condition
+
+![patch_page](https://github.com/user-attachments/assets/48b4d85d-ce79-4a46-87de-55a9c7e27436)
 
 ## Licenses
 
