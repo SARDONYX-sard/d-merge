@@ -263,7 +263,7 @@ fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
 
         let target = patch.target;
         let inner_path = format!(
-            "patches/animationdatasinglefile/{target}/{kind}{patch_id:03}_{action}{index_str}.json",
+            "patches/animationdatasinglefile/{target}/{kind}{patch_id:04}_{action}{index_str}.json",
         );
         debug_path.push(inner_path);
         if let Err(_err) = write_patched_json(&debug_path, patch) {
