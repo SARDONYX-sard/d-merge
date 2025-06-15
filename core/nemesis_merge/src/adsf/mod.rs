@@ -87,7 +87,7 @@ pub(crate) fn apply_adsf_patches(
         for (index, patch) in borrowed_patches.iter().enumerate() {
             let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
             let inner_path = format!(
-                "mesh/animationdatasinglefile/{}/{}_{index}.json",
+                "patches/animationdatasinglefile/{}/{}_{index}.json",
                 patch.target, patch.id,
             );
             debug_path.push(inner_path);
