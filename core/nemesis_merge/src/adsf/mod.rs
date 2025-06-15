@@ -83,7 +83,7 @@ pub(crate) fn apply_adsf_patches(
     sort_patches_by_priority(&mut borrowed_patches, id_order);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
-    if config.debug.output_merged_json {
+    if config.debug.output_patch_json {
         for (index, patch) in borrowed_patches.iter().enumerate() {
             let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
             let inner_path = format!(
