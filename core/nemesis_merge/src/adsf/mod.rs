@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 pub struct AdsfPatch<'a> {
     /// e.g. `DefaultMale`, `DefaultFemale`
     pub target: &'a str,
-    /// e.g. `dmco`, `slide`
+    /// e.g. `/some/Nemesis_Engine/mod/slide`
     pub id: &'a str,
     patch: PatchKind<'a>,
 }
@@ -85,10 +85,16 @@ pub(crate) fn apply_adsf_patches(
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
     if config.debug.output_patch_json {
-        for (index, patch) in borrowed_patches.iter().enumerate() {
+        for (nth, patch) in borrowed_patches.iter().enumerate() {
             let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
+            let (kind, index) = match &patch.patch {
+                PatchKind::AddAnim(_) => ("clip_anim_add", 0),
+                PatchKind::AddMotion(_) => ("clip_motion_add", 0),
+                PatchKind::EditAnim(edit_anim) => ("edit_anim", edit_anim.index),
+                PatchKind::EditMotion(edit_motion) => ("edit_motion", edit_motion.index),
+            };
             let inner_path = format!(
-                "patches/animationdatasinglefile/{}/{index}.json",
+                "patches/animationdatasinglefile/{}/{kind}_{index}_{nth}th.json",
                 patch.target,
             );
             debug_path.push(inner_path);

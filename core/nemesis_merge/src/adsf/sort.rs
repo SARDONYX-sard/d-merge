@@ -5,23 +5,28 @@ use crate::adsf::{AdsfPatch, PatchKind};
 
 #[derive(Hash, Eq, PartialEq)]
 enum PatchKey<'a> {
-    // (target, id)
-    EditAnim(&'a str, &'a str),
-    // (target, id)
-    EditMotion(&'a str, &'a str),
-    AddAnim(&'a str),
-    AddMotion(&'a str),
+    // (target, id, index)
+    EditAnim(&'a str, &'a str, usize),
+    // (target, id, index)
+    EditMotion(&'a str, &'a str, usize),
+    // (target, id, index)
+    AddAnim(&'a str, &'a str, usize),
+    // (target, id, index)
+    AddMotion(&'a str, &'a str, usize),
 }
 
 pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Vec<AdsfPatch<'a>> {
     patches
         .into_par_iter()
-        .fold(HashMap::new, |mut map, patch| {
+        .enumerate()
+        .fold(HashMap::new, |mut map, (idx, patch)| {
             let key = match &patch.patch {
-                PatchKind::EditAnim(_) => PatchKey::EditAnim(patch.target, patch.id),
-                PatchKind::EditMotion(_) => PatchKey::EditMotion(patch.target, patch.id),
-                PatchKind::AddAnim(_) => PatchKey::AddAnim(patch.target),
-                PatchKind::AddMotion(_) => PatchKey::AddMotion(patch.target),
+                PatchKind::EditAnim(edit) => PatchKey::EditAnim(patch.target, patch.id, edit.index),
+                PatchKind::EditMotion(edit) => {
+                    PatchKey::EditMotion(patch.target, patch.id, edit.index)
+                }
+                PatchKind::AddAnim(_) => PatchKey::AddAnim(patch.target, patch.id, idx),
+                PatchKind::AddMotion(_) => PatchKey::AddMotion(patch.target, patch.id, idx),
             };
 
             map.entry(key)
