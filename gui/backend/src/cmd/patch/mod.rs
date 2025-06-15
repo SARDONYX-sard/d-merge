@@ -10,8 +10,8 @@ use nemesis_merge::{behavior_gen, Config, DebugOptions, HackOptions, OutPutTarge
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use tauri::{async_runtime::JoinHandle, Manager, Window};
+use tokio::sync::Mutex;
 
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
@@ -32,7 +32,7 @@ pub(crate) async fn patch(
     ids: Vec<PathBuf>,
     options: GuiPatchOptions,
 ) -> Result<(), String> {
-    cancel_patch_inner()?; // Abort previous task if exists
+    cancel_patch_inner().await?; // Abort previous task if exists
 
     if options.auto_remove_meshes {
         let meshes_path = output.join("meshes");
@@ -70,33 +70,26 @@ pub(crate) async fn patch(
         }
     });
 
-    match PATCH_TASK.lock() {
-        Ok(mut guard) => {
-            guard.replace(handle);
-            Ok(())
-        }
-        Err(err) => bail!(format!("Failed to acquire lock: {err}")),
-    }
+    PATCH_TASK.lock().await.replace(handle);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn cancel_patch() -> Result<(), String> {
-    cancel_patch_inner()
+    cancel_patch_inner().await
 }
 
-fn cancel_patch_inner() -> Result<(), String> {
-    match PATCH_TASK.lock() {
-        Ok(mut guard) => {
-            if let Some(handle) = guard.take() {
-                handle.abort();
-            }
-
-            Ok(())
-        }
-        Err(err) => {
-            bail!(format!("Failed to acquire lock: {err}"));
+#[allow(clippy::significant_drop_tightening)] // Even if we set it to inline, we'll still get a warning, so turn it off.
+async fn cancel_patch_inner() -> Result<(), String> {
+    let mut guard = PATCH_TASK.lock().await;
+    if let Some(handle) = guard.take() {
+        handle.abort();
+        if let Err(err) = handle.await {
+            tracing::error!("patch task panicked: {err}");
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
