@@ -74,15 +74,44 @@ impl<'a> ClipAnimDiffPatch<'a> {
             let OpRange { op, range } = trigger_patch.op.clone();
             match op {
                 Op::Add => {
-                    anim_block
-                        .trigger_names
-                        .splice(range.start..range.start, trigger_patch.values);
+                    if range.start >= anim_block.trigger_names.len() {
+                        // Out-of-bounds → append at the end
+                        anim_block.trigger_names.extend(trigger_patch.values);
+                    } else {
+                        // In-bounds → insert at the middle
+                        anim_block
+                            .trigger_names
+                            .splice(range.start..range.start, trigger_patch.values);
+                    }
                 }
                 Op::Replace => {
-                    anim_block.trigger_names.splice(range, trigger_patch.values);
+                    let vec_len = anim_block.trigger_names.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+
+                    let (replace_vals, append_vals) = {
+                        let replace_count = end.saturating_sub(start);
+                        let mut values = trigger_patch.values.into_iter();
+                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
+                        let append_vals: Vec<_> = values.collect();
+                        (replace_vals, append_vals)
+                    };
+
+                    // Replace within the valid range
+                    anim_block.trigger_names.splice(start..end, replace_vals);
+
+                    // Append any remaining values (out-of-range)
+                    if !append_vals.is_empty() {
+                        anim_block.trigger_names.extend(append_vals);
+                    }
                 }
                 Op::Remove => {
-                    anim_block.trigger_names.drain(range);
+                    let vec_len = anim_block.trigger_names.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+                    if start < end {
+                        anim_block.trigger_names.drain(start..end);
+                    }
                 }
             }
         }
