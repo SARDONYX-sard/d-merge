@@ -231,15 +231,15 @@ fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: &AltAdsf) -> Result<(),
 /// | Field         | Description                                                                 | Example                       |
 /// |---------------|-----------------------------------------------------------------------------|-------------------------------|
 /// | `clip_anim`   | Category of the patch (`clip_anim` or `clip_motion`)                        | `clip_anim`                   |
-/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
 /// | `edit`/`add`  | Indicates whether the patch modifies existing data or adds new content      | `edit`, `add`                 |
 /// | `_idxNNN`     | Only included for `Edit` patches; shows the index of the edited entry       | `_idx044`                     |
+/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
 ///
 /// ### Full Filename Examples
 ///
-/// - `clip_anim_patch07_add.json`
-/// - `clip_anim_patch07_edit_idx044.json`
-/// - `clip_motion_patch12_edit_idx005.json`
+/// - `clip_anim_add_patch07.json`
+/// - `clip_anim_edit_idx044_patch07.json`
+/// - `clip_motion_edit_idx005_patch12.json`
 ///
 /// This naming convention helps ensure:
 ///
@@ -263,7 +263,7 @@ fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
 
         let target = patch.target;
         let inner_path = format!(
-            "patches/animationdatasinglefile/{target}/{kind}{patch_id:04}_{action}{index_str}.json",
+            "patches/animationdatasinglefile/{target}/{kind}_{action}{index_str}_{patch_id:04}.json",
         );
         debug_path.push(inner_path);
         if let Err(_err) = write_patched_json(&debug_path, patch) {
