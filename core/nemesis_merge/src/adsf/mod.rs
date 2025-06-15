@@ -255,10 +255,8 @@ fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
         let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
             PatchKind::AddAnim(_) => ("clip_anim", "".into()),
             PatchKind::AddMotion(_) => ("clip_motion", "".into()),
-            PatchKind::EditAnim(edit) => ("clip_anim", format!("_idx{:04}", edit.name_clip).into()),
-            PatchKind::EditMotion(edit) => {
-                ("clip_motion", format!("_idx{:04}", edit.clip_id).into())
-            }
+            PatchKind::EditAnim(edit) => ("clip_anim", format!("_id{}", edit.name_clip).into()),
+            PatchKind::EditMotion(edit) => ("clip_motion", format!("_id{}", edit.clip_id).into()),
         };
 
         let action = match &patch.patch {
