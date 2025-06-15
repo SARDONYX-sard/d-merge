@@ -1,4 +1,4 @@
-import { openUrl as _openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
+import { openUrl as _openUrl, openPath as _openPath } from '@tauri-apps/plugin-opener';
 
 import { NOTIFY } from '@/lib/notify';
 
@@ -27,5 +27,5 @@ export async function openUrl(path: string) {
  * @param {string} [openWith]
  */
 export async function openPath(path: string) {
-  await NOTIFY.asyncTry(async () => await revealItemInDir(path));
+  await NOTIFY.asyncTry(async () => await _openPath(path));
 }

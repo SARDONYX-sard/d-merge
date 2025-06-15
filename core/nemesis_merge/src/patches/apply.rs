@@ -63,13 +63,17 @@ fn write_json_patch(
     use snafu::ResultExt as _;
 
     let output_dir = if key.is_1st_person {
-        let output_dir_1st_person = output_dir.join(".debug").join("patches").join("_1stperson");
+        let output_dir_1st_person = output_dir
+            .join(".d_merge")
+            .join(".debug")
+            .join("patches")
+            .join("_1stperson");
         std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
             path: output_dir_1st_person.clone(),
         })?;
         output_dir_1st_person
     } else {
-        output_dir.join(".debug").join("patches")
+        output_dir.join(".d_merge").join(".debug").join("patches")
     };
 
     std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {

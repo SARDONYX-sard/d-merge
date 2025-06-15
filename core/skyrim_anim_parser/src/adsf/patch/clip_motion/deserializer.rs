@@ -1,17 +1,20 @@
-use crate::{
-    adsf::{
-        de::from_word_and_space,
-        patch::{
-            comment::{close_comment, comment_kind, take_till_close, CommentKind},
+use crate::adsf::{
+    patch::{
+        clip_motion::{
             current_state::{CurrentState, PartialRotations, PartialTranslations},
-            error::{Error, Result},
+            ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
         },
+        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        error::{Error, Result},
     },
+    Rotation, Translation,
+};
+use crate::{
+    adsf::de::from_word_and_space,
     lines::{one_line, verify_line_parses_to},
 };
 use json_patch::{Op, OpRange};
 use serde_hkx::errors::readable::ReadableError;
-use std::borrow::Cow;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::{eof, opt},
@@ -19,14 +22,11 @@ use winnow::{
     Parser,
 };
 
-/// Parse animationdatasinglefile.txt patch.
-///
-/// # Return
-/// Return (patches, root class ptr if `hkbBehaviorGraphStringData` to replace nemesis variable)
+/// Parse animationdatasinglefile.txt clip motion block patch.
 ///
 /// # Errors
 /// Parse failed.
-pub fn parse_adsf_patch(input: &str) -> Result<AdsfPatch<'_>, Error> {
+pub fn parse_clip_motion_diff_patch(input: &str) -> Result<ClipMotionDiffPatch<'_>, Error> {
     let mut deserializer = Deserializer::new(input);
     deserializer
         .root()
@@ -43,7 +43,7 @@ struct Deserializer<'a> {
     original: &'a str,
 
     /// Output
-    output_patches: AdsfPatch<'a>,
+    output_patches: ClipMotionDiffPatch<'a>,
 
     /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
     /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
@@ -55,7 +55,7 @@ impl<'de> Deserializer<'de> {
         Self {
             input,
             original: input,
-            output_patches: AdsfPatch::DEFAULT,
+            output_patches: ClipMotionDiffPatch::DEFAULT,
             current: CurrentState::new(),
         }
     }
@@ -168,7 +168,7 @@ impl<'de> Deserializer<'de> {
                         tracing::trace!("transition = {transition:?}");
 
                         if self.current.mode_code.is_some() {
-                            self.current.push_as_transition(transition)?;
+                            self.current.push_as_translation(transition)?;
                         }
                         self.parse_opt_close_comment()?;
                         self.parse_next(multispace0)?;
@@ -201,7 +201,7 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
 
-    fn transition(&mut self) -> Result<[Cow<'de, str>; 4]> {
+    fn transition(&mut self) -> Result<Translation<'de>> {
         let time = self
             .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
         let x =
@@ -217,7 +217,7 @@ impl<'de> Deserializer<'de> {
         .into();
         self.parse_next(opt(line_ending))?;
 
-        Ok([time, x, y, z])
+        Ok(Translation { time, x, y, z })
     }
 
     fn rotation(&mut self) -> Result<()> {
@@ -239,7 +239,7 @@ impl<'de> Deserializer<'de> {
         .into();
         self.parse_next(opt(line_ending))?;
 
-        let rotation = [time, x, y, z, w];
+        let rotation = Rotation { time, x, y, z, w };
         #[cfg(feature = "tracing")]
         tracing::trace!("rotation = {rotation:?}");
 
@@ -316,7 +316,7 @@ impl<'de> Deserializer<'de> {
                 }
                 LineKind::TranslationLen | LineKind::RotationLen => {}
                 LineKind::Translation => {
-                    if let Some(transitions) = partial_patch.transitions.take() {
+                    if let Some(transitions) = partial_patch.translations.take() {
                         let PartialTranslations { range, values } = transitions;
                         let values = if op == Op::Remove { vec![] } else { values };
                         self.output_patches.translations = Some(DiffTransitions {
@@ -342,48 +342,6 @@ impl<'de> Deserializer<'de> {
 
         Ok(())
     }
-}
-
-#[derive(Debug, PartialEq, Default)]
-pub struct AdsfPatch<'a> {
-    clip_id: Option<Cow<'a, str>>,
-    duration: Option<Cow<'a, str>>,
-    translations: Option<DiffTransitions<'a>>,
-    rotations: Option<DiffRotations<'a>>,
-}
-
-impl AdsfPatch<'_> {
-    const DEFAULT: Self = Self {
-        clip_id: None,
-        duration: None,
-        translations: None,
-        rotations: None,
-    };
-}
-
-#[derive(Debug, PartialEq)]
-pub struct DiffTransitions<'a> {
-    op: OpRange,
-    values: Vec<[Cow<'a, str>; 4]>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct DiffRotations<'a> {
-    op: OpRange,
-    values: Vec<[Cow<'a, str>; 5]>,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub(super) enum LineKind {
-    #[default]
-    ClipId,
-    Duration,
-
-    TranslationLen,
-    Translation,
-
-    RotationLen,
-    Rotation,
 }
 
 #[cfg(test)]
@@ -427,10 +385,10 @@ mod tests {
 <!-- CLOSE -->
 ";
 
-        let patches = parse_adsf_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             patches,
-            AdsfPatch {
+            ClipMotionDiffPatch {
                 clip_id: Some("100".into()),
                 duration: None,
                 translations: None,
@@ -440,9 +398,27 @@ mod tests {
                         range: 0..3,
                     },
                     values: vec![
-                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
-                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
-                        ["6".into(), "0".into(), "0".into(), "0".into(), "5".into()],
+                        Rotation {
+                            time: "6".into(),
+                            x: "0".into(),
+                            y: "0".into(),
+                            z: "0".into(),
+                            w: "5".into()
+                        },
+                        Rotation {
+                            time: "6".into(),
+                            x: "0".into(),
+                            y: "0".into(),
+                            z: "0".into(),
+                            w: "5".into()
+                        },
+                        Rotation {
+                            time: "6".into(),
+                            x: "0".into(),
+                            y: "0".into(),
+                            z: "0".into(),
+                            w: "5".into()
+                        },
                     ],
                 })
             }
@@ -474,8 +450,8 @@ mod tests {
 <!-- CLOSE -->
 ";
 
-        let patches = parse_adsf_patch(input).unwrap_or_else(|e| panic!("{e}"));
-        let expected = AdsfPatch {
+        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        let expected = ClipMotionDiffPatch {
             duration: Some("1.25".into()),
             translations: Some(DiffTransitions {
                 op: OpRange {
@@ -483,9 +459,24 @@ mod tests {
                     range: 0..3,
                 },
                 values: vec![
-                    ["0.43".into(), "0".into(), "0".into(), "0".into()],
-                    ["0.50".into(), "0".into(), "0".into(), "0".into()],
-                    ["1.32".into(), "0".into(), "0".into(), "0".into()],
+                    Translation {
+                        time: "0.43".into(),
+                        x: "0".into(),
+                        y: "0".into(),
+                        z: "0".into(),
+                    },
+                    Translation {
+                        time: "0.50".into(),
+                        x: "0".into(),
+                        y: "0".into(),
+                        z: "0".into(),
+                    },
+                    Translation {
+                        time: "1.32".into(),
+                        x: "0".into(),
+                        y: "0".into(),
+                        z: "0".into(),
+                    },
                 ],
             }),
             rotations: Some(DiffRotations {

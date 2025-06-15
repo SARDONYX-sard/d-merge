@@ -1,40 +1,69 @@
 pub mod path_parser;
+mod sort;
 
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
-use rayon::prelude::*;
-use skyrim_anim_parser::adsf::patch::{parse_clip_anim_block_patch, parse_clip_motion_block_patch};
-use skyrim_anim_parser::adsf::ser::serialize_alt_adsf;
-use skyrim_anim_parser::adsf::{AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
-use snafu::ResultExt as _;
-
-use std::path::{Path, PathBuf};
-
+use crate::adsf::sort::dedup_patches_by_priority_parallel;
 use crate::errors::{
     Error, FailedIoSnafu, FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu,
+    FailedParseEditAdsfPatchSnafu,
 };
+use crate::hkx::generate::write_patched_json;
 use crate::results::partition_results;
 use crate::types::{OwnedAdsfPatchMap, PriorityMap};
 use crate::Config;
+use rayon::prelude::*;
+use skyrim_anim_parser::adsf::patch::{
+    parse_clip_anim_block_patch, parse_clip_anim_diff_patch, parse_clip_motion_block_patch,
+    parse_clip_motion_diff_patch, ClipAnimDiffPatch, ClipMotionDiffPatch,
+};
+use skyrim_anim_parser::adsf::ser::serialize_alt_adsf;
+use skyrim_anim_parser::adsf::{AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
+use snafu::ResultExt as _;
+use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub struct AdsfPatch<'a> {
     /// e.g. `DefaultMale`, `DefaultFemale`
     pub target: &'a str,
-    /// e.g. `dmco`, `slide`
+    /// e.g. `/some/Nemesis_Engine/mod/slide`
     pub id: &'a str,
-    pub patch: PatchKind<'a>,
+    patch: PatchKind<'a>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum PatchKind<'a> {
-    Anim(ClipAnimDataBlock<'a>),
-    Motion(ClipMotionBlock<'a>),
+#[derive(serde::Serialize, Debug, Clone, PartialEq)]
+enum PatchKind<'a> {
+    AddAnim(ClipAnimDataBlock<'a>),
+    /// diff patch, priority
+    EditAnim(EditAnim<'a>),
+    AddMotion(ClipMotionBlock<'a>),
+    /// diff patch, priority
+    EditMotion(EditMotion<'a>),
+}
+
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
+struct EditAnim<'a> {
+    patch: ClipAnimDiffPatch<'a>,
+    priority: usize,
+    /// `<Name>~<clip_id>`
+    /// - e.g. `Jump~42`
+    ///
+    /// NOTE: Unlike Motion, Anim sometimes references the same clip_id, so it cannot be used as an id.
+    /// Therefore, Name is used instead
+    name_clip: &'a str,
+}
+
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
+struct EditMotion<'a> {
+    patch: ClipMotionDiffPatch<'a>,
+    priority: usize,
+    clip_id: &'a str,
 }
 
 impl<'a> Default for PatchKind<'a> {
     #[inline]
     fn default() -> Self {
-        Self::Anim(ClipAnimDataBlock::default())
+        Self::AddAnim(ClipAnimDataBlock::default())
     }
 }
 
@@ -58,6 +87,11 @@ pub(crate) fn apply_adsf_patches(
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
     sort_patches_by_priority(&mut borrowed_patches, id_order);
+    let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
+
+    if config.debug.output_patch_json {
+        output_debug_patch_json(&borrowed_patches, config);
+    }
 
     macro_rules! bail {
         ($expr:expr) => {
@@ -83,13 +117,30 @@ pub(crate) fn apply_adsf_patches(
     for adsf_patch in borrowed_patches {
         if let Some(anim_data) = alt_adsf.0.get_mut(adsf_patch.target) {
             match adsf_patch.patch {
-                PatchKind::Anim(clip_anim_data_block) => {
+                PatchKind::AddAnim(clip_anim_data_block) => {
                     anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
                 }
-                PatchKind::Motion(clip_motion_block) => {
+                PatchKind::EditAnim(edit_anim) => {
+                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.name_clip) {
+                        edit_anim.patch.into_apply(anim);
+                    }
+                }
+                PatchKind::AddMotion(clip_motion_block) => {
                     anim_data.add_clip_motion_blocks.push(clip_motion_block);
                 }
+                PatchKind::EditMotion(edit_motion) => {
+                    if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id)
+                    {
+                        edit_motion.patch.into_apply(motion);
+                    }
+                }
             };
+        }
+    }
+
+    if config.debug.output_merged_json {
+        if let Err(_err) = output_merged_alt_adsf(&alt_adsf, config) {
+            tracing::error!("{_err}");
         }
     }
 
@@ -102,24 +153,45 @@ pub(crate) fn apply_adsf_patches(
 }
 
 fn parse_anim_data_patch<'a>(
-    (path, (adsf_patch, _priority)): (&'a PathBuf, &'a (String, usize)),
+    (path, (adsf_patch, priority)): (&'a PathBuf, &'a (String, usize)),
 ) -> Result<AdsfPatch<'a>, Error> {
+    let priority = *priority;
+
     let ParsedAdsfPatchPath {
         target, // e.g. DefaultFemale
         id,     // e.g. slide
         parser_type,
-        op: _,
     } = parse_adsf_path(path)?;
 
     let patch = match parser_type {
-        ParserType::Anim => PatchKind::Anim(
+        ParserType::AddAnim => PatchKind::AddAnim(
             parse_clip_anim_block_patch(adsf_patch)
                 .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
         ),
-        ParserType::Motion => PatchKind::Motion(
+        ParserType::EditAnim(index) => {
+            let patch = parse_clip_anim_diff_patch(adsf_patch)
+                .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
+            PatchKind::EditAnim(EditAnim {
+                patch,
+                priority,
+                name_clip: index,
+            })
+        }
+
+        ParserType::AddMotion => PatchKind::AddMotion(
             parse_clip_motion_block_patch(adsf_patch)
                 .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
         ),
+        ParserType::EditMotion(index) => {
+            let patch = parse_clip_motion_diff_patch(adsf_patch)
+                .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
+            PatchKind::EditMotion(EditMotion {
+                patch,
+                priority,
+                clip_id: index,
+            })
+        }
+
         ParserType::AnimHeader => {
             return Err(Error::Custom {
                 msg: "Unsupported $header$ yet.".to_owned(),
@@ -154,6 +226,69 @@ fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: &AltAdsf) -> Result<(),
         path: path.to_path_buf(),
     })?;
     Ok(())
+}
+
+/// Outputs debug JSON files for each patch in the provided slice.
+///
+/// Each file is written to a subdirectory under `.d_merge/.debug/` and is
+/// categorized by patch type and target. The filenames are structured to support
+/// easy sorting and searching, using a shared patch identifier (`patchXX`) across
+/// both `Add` and `Edit` variants.
+///
+/// ### Filename Format
+///
+/// | Field         | Description                                                                 | Example                       |
+/// |---------------|-----------------------------------------------------------------------------|-------------------------------|
+/// | `clip_anim`   | Category of the patch (`clip_anim` or `clip_motion`)                        | `clip_anim`                   |
+/// | `edit`/`add`  | Indicates whether the patch modifies existing data or adds new content      | `edit`, `add`                 |
+/// | `_idxNNN`     | Only included for `Edit` patches; shows the index of the edited entry       | `_idx044`                     |
+/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
+///
+/// ### Full Filename Examples
+///
+/// - `clip_anim_add_patch07.json`
+/// - `clip_anim_edit_idx044_patch07.json`
+/// - `clip_motion_edit_idx005_patch12.json`
+///
+/// This naming convention helps ensure:
+///
+/// - Easy grouping and lookup by `patchXX`
+/// - Clear distinction between `add` and `edit` actions
+/// - Fine-grained identification of edits via index
+fn output_debug_patch_json(borrowed_patches: &[AdsfPatch], config: &Config) {
+    for (patch_id, patch) in borrowed_patches.iter().enumerate() {
+        let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
+        let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
+            PatchKind::AddAnim(_) => ("clip_anim", "".into()),
+            PatchKind::AddMotion(_) => ("clip_motion", "".into()),
+            PatchKind::EditAnim(edit) => ("clip_anim", format!("_id{}", edit.name_clip).into()),
+            PatchKind::EditMotion(edit) => ("clip_motion", format!("_id{}", edit.clip_id).into()),
+        };
+
+        let action = match &patch.patch {
+            PatchKind::AddAnim(_) | PatchKind::AddMotion(_) => "add",
+            PatchKind::EditAnim(_) | PatchKind::EditMotion(_) => "edit",
+        };
+
+        let target = patch.target;
+        let inner_path = format!(
+            "patches/animationdatasinglefile/{target}/{kind}_{action}{index_str}_{patch_id:04}.json",
+        );
+        debug_path.push(inner_path);
+        if let Err(_err) = write_patched_json(&debug_path, patch) {
+            #[cfg(feature = "tracing")]
+            tracing::error!("{_err}");
+        };
+    }
+}
+
+fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
+    let adsf_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join(ADSF_INNER_PATH);
+    write_patched_json(&adsf_path, alt_adsf)
 }
 
 #[cfg(test)]

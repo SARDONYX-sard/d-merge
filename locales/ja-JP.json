@@ -125,7 +125,7 @@
     "open_options_dialog": "パッチオプションダイアログを開く",
     "options_title": "パッチオプション",
     "auto_remove_meshes_option_label": "出力先の`.debug`, `meshes`ディレクトリを事前削除",
-    "auto_remove_meshes_option_help": "パッチのたびに出力先の`.debug`, `meshes`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
+    "auto_remove_meshes_option_help": "パッチのたびに出力先の`meshes` & `.d_merge/.debug`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
     "hack_options_label": "ハックオプション",
     "hack_options": {
       "cast_ragdoll_event": "BSRagdollContactListenerModifierの互換ハックを有効化",
@@ -134,11 +134,11 @@
     "debug_options_label": "デバッグオプション",
     "debug_options": {
       "output_patch_json": "パッチJSONを出力",
-      "output_patch_json_help": "各hkx用の優先度付きパッチデータをJSON形式で出力します。パッチファイルは `<出力先>/.debug/patches/` に保存されます。",
+      "output_patch_json_help": "各hkx用の優先度付きパッチデータをJSON形式で出力します。パッチファイルは `<出力先>/.d_merge/.debug/patches/` に保存されます。",
       "output_merged_json": "マージ済みJSONを出力",
-      "output_merged_json_help": "変数(例 $variableID[ID]$)置換前のhkx化直前データをJSON形式で出力します。ファイルは `<出力先>/.debug/meshes/` に保存されます。",
+      "output_merged_json_help": "変数(例 $variableID[ID]$)置換前のhkx化直前データをJSON形式で出力します。ファイルは `<出力先>/.d_merge/.debug/meshes/` に保存されます。",
       "output_merged_xml": "マージ済みXMLを出力",
-      "output_merged_xml_help": "変数置換前のhkx化直前データをXML形式で出力します。ファイルは `<出力先>/.debug/meshes/` に保存されます。"
+      "output_merged_xml_help": "変数置換前のhkx化直前データをXML形式で出力します。ファイルは `<出力先>/.d_merge/.debug/meshes/` に保存されます。"
     },
     "output_target_label": "出力ターゲット",
     "output_target_aria_label": "出力ターゲットを選択",

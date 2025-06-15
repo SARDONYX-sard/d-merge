@@ -6,11 +6,14 @@ use winnow::{
     ascii::Caseless,
     combinator::{alt, opt, repeat},
     seq,
-    token::{any, take_until, take_while},
-    ModalResult, Parser as _,
+    token::{any, take_while},
+    ModalResult, Parser,
 };
 
-use crate::errors::{Error, NonUtf8PathSnafu};
+use crate::{
+    errors::{Error, NonUtf8PathSnafu},
+    path_id::take_until_ext,
+};
 
 /// Parse nemesis patch path.
 pub fn parse_nemesis_path(path: &Path) -> Result<(&str, bool), Error> {
@@ -32,8 +35,8 @@ fn parse_components<'a>(input: &mut &'a str) -> ModalResult<(&'a str, bool)> {
 
     // Parse prefix to Nemesis_Engine/mod/<mod_code>/
     let mut parser = seq! {
-            _: take_until(0.., "Nemesis_Engine"),
-            _: "Nemesis_Engine",
+            _: take_until_ext(0.., Caseless("Nemesis_Engine")),
+            _: Caseless("Nemesis_Engine"),
             _: alt(('/', '\\')),
             _: "mod",
             _: alt(('/', '\\')),
@@ -59,7 +62,7 @@ mod tests {
     #[test]
     fn parse_nemesis_path_valid_basic() {
         let actual =
-            test_parse_nemesis_path("/some/path/to/Nemesis_Engine/mod/flinch/0_master/#0106.txt");
+            test_parse_nemesis_path("/some/path/to/Nemesis_engine/mod/flinch/0_master/#0106.txt");
         assert_eq!(actual, ("0_master", false));
     }
 

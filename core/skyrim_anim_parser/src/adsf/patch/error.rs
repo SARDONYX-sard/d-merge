@@ -2,7 +2,6 @@
 
 /// GUI Error
 #[derive(Debug, snafu::Snafu)]
-#[snafu(visibility(pub))]
 pub enum Error {
     /// Mismatched type. Expected one, but got array patch
     ExpectedOne,
