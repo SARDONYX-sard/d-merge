@@ -40,14 +40,14 @@ pub enum ParserType {
     AddAnim,
 
     /// Indicates a motion ID replacement or override (e.g., ???) // TODO:
-    /// - include index
+    /// - include 1-based index
     EditAnim(usize),
 
     /// Indicates a motion ID add(e.g., `slide$10.txt`)
     AddMotion,
 
     /// Indicates a motion ID replacement or override (e.g., `10.txt` 10 is AnimInfo index)
-    /// - include index
+    /// - include 1-based index
     EditMotion(usize),
 
     /// Indicates the special `$header$/$header$.txt`override

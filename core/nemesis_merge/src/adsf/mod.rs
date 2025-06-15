@@ -51,6 +51,7 @@ struct EditAnim<'a> {
 struct EditMotion<'a> {
     patch: ClipMotionDiffPatch<'a>,
     priority: usize,
+    /// NOTE: 1 based index
     index: usize,
 }
 
@@ -126,7 +127,7 @@ pub(crate) fn apply_adsf_patches(
                     anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
                 }
                 PatchKind::EditAnim(edit_anim) => {
-                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.index) {
+                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.index - 1) {
                         edit_anim.patch.into_apply(anim);
                     }
                 }
@@ -134,7 +135,9 @@ pub(crate) fn apply_adsf_patches(
                     anim_data.add_clip_motion_blocks.push(clip_motion_block);
                 }
                 PatchKind::EditMotion(edit_motion) => {
-                    if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.index) {
+                    if let Some(motion) =
+                        anim_data.clip_motion_blocks.get_mut(edit_motion.index - 1)
+                    {
                         edit_motion.patch.into_apply(motion);
                     }
                 }
