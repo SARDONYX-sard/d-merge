@@ -110,33 +110,33 @@ pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, Pa
         });
     };
 
-    let file_name = components
-        .last()
-        .ok_or_else(|| ParseError::TooShortPathFormat {
+    let file_stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+        ParseError::TooShortPathFormat {
             path: path.to_path_buf(),
-        })?;
+        }
+    })?;
 
-    let parser_type = if file_name.eq_ignore_ascii_case("$header$.txt") {
+    let parser_type = if file_stem.eq_ignore_ascii_case("$header$") {
         ParserType::AnimHeader
-    } else if file_name.contains('~') {
+    } else if file_stem.contains('~') {
         // e.g. Jump~42
-        let mut parts = file_name.rsplitn(2, '~');
+        let mut parts = file_stem.rsplitn(2, '~');
         // rsplitn is reverse getter. -> 42, jump
         if let (Some(index_str), Some(_name)) = (parts.next(), parts.next()) {
-            if let Ok(index) = index_str.parse::<usize>() {
-                ParserType::EditAnim(index)
-            } else {
-                ParserType::AddAnim
+            match index_str.parse::<usize>() {
+                Ok(index) => ParserType::EditAnim(index),
+                Err(_) => ParserType::AddAnim,
             }
         } else {
             ParserType::AddAnim
         }
-    } else if file_name.contains('$') {
+    } else if file_stem.contains('$') {
         ParserType::AddMotion
     } else {
-        let index = file_name
-            .parse()
-            .with_context(|_| IndexMustBeNumberSnafu { path })?;
+        let index = file_stem.parse().with_context(|_| IndexMustBeNumberSnafu {
+            index_str: (*file_stem).to_string(),
+            path,
+        })?;
         ParserType::EditMotion(index)
     };
 
@@ -185,9 +185,10 @@ Expected format: D:/mod/<id>/animationdatasinglefile/<target>~1/...",
     SplitTilde { path: PathBuf },
 
     /// Target component doesn't follow the expected `Target~1` format
-    #[snafu(display( "Replace/Remove Edit patches expect index, i.e., numeric filenames. However, this path is different. {}", path.display()))]
+    #[snafu(display( "Replace/Remove Edit patches expect index, i.e., numeric filenames. However, this {index_str} of path is different. {}", path.display()))]
     IndexMustBeNumber {
         source: ParseIntError,
+        index_str: String,
         path: PathBuf,
     },
 }
