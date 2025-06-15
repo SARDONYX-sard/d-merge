@@ -19,6 +19,7 @@ use skyrim_anim_parser::adsf::patch::{
 use skyrim_anim_parser::adsf::ser::serialize_alt_adsf;
 use skyrim_anim_parser::adsf::{AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
 use snafu::ResultExt as _;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -85,24 +86,7 @@ pub(crate) fn apply_adsf_patches(
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
     if config.debug.output_patch_json {
-        for (nth, patch) in borrowed_patches.iter().enumerate() {
-            let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
-            let (kind, index) = match &patch.patch {
-                PatchKind::AddAnim(_) => ("clip_anim_add", 0),
-                PatchKind::AddMotion(_) => ("clip_motion_add", 0),
-                PatchKind::EditAnim(edit_anim) => ("edit_anim", edit_anim.index),
-                PatchKind::EditMotion(edit_motion) => ("edit_motion", edit_motion.index),
-            };
-            let inner_path = format!(
-                "patches/animationdatasinglefile/{}/{kind}_{index}_{nth}th.json",
-                patch.target,
-            );
-            debug_path.push(inner_path);
-            if let Err(_err) = write_patched_json(&debug_path, patch) {
-                #[cfg(feature = "tracing")]
-                tracing::error!("{_err}");
-            };
-        }
+        output_debug_json(&borrowed_patches, config);
     }
 
     macro_rules! bail {
@@ -233,6 +217,60 @@ fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: &AltAdsf) -> Result<(),
         path: path.to_path_buf(),
     })?;
     Ok(())
+}
+
+/// Outputs debug JSON files for each patch in the provided slice.
+///
+/// Each file is written to a subdirectory under `.d_merge/.debug/` and is
+/// categorized by patch type and target. The filenames are structured to support
+/// easy sorting and searching, using a shared patch identifier (`patchXX`) across
+/// both `Add` and `Edit` variants.
+///
+/// ### Filename Format
+///
+/// | Field         | Description                                                                 | Example                       |
+/// |---------------|-----------------------------------------------------------------------------|-------------------------------|
+/// | `clip_anim`   | Category of the patch (`clip_anim` or `clip_motion`)                        | `clip_anim`                   |
+/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
+/// | `edit`/`add`  | Indicates whether the patch modifies existing data or adds new content      | `edit`, `add`                 |
+/// | `_idxNNN`     | Only included for `Edit` patches; shows the index of the edited entry       | `_idx044`                     |
+///
+/// ### Full Filename Examples
+///
+/// - `clip_anim_patch07_add.json`
+/// - `clip_anim_patch07_edit_idx044.json`
+/// - `clip_motion_patch12_edit_idx005.json`
+///
+/// This naming convention helps ensure:
+///
+/// - Easy grouping and lookup by `patchXX`
+/// - Clear distinction between `add` and `edit` actions
+/// - Fine-grained identification of edits via index
+fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
+    for (patch_id, patch) in borrowed_patches.iter().enumerate() {
+        let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
+        let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
+            PatchKind::AddAnim(_) => ("clip_anim", "".into()),
+            PatchKind::AddMotion(_) => ("clip_motion", "".into()),
+            PatchKind::EditAnim(edit) => ("clip_anim", format!("_idx{:04}", edit.index).into()),
+            PatchKind::EditMotion(edit) => ("clip_motion", format!("_idx{:04}", edit.index).into()),
+        };
+
+        let action = match &patch.patch {
+            PatchKind::AddAnim(_) | PatchKind::AddMotion(_) => "add",
+            PatchKind::EditAnim(_) | PatchKind::EditMotion(_) => "edit",
+        };
+
+        let target = patch.target;
+        let inner_path = format!(
+            "patches/animationdatasinglefile/{target}/{kind}{patch_id:03}_{action}{index_str}.json",
+        );
+        debug_path.push(inner_path);
+        if let Err(_err) = write_patched_json(&debug_path, patch) {
+            #[cfg(feature = "tracing")]
+            tracing::error!("{_err}");
+        };
+    }
 }
 
 #[cfg(test)]
