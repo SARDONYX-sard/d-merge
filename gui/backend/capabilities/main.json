@@ -21,7 +21,7 @@
     { "identifier": "fs:allow-exists", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
     { "identifier": "fs:allow-read-text-file", "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }] },
     {
-      "identifier": "opener:allow-reveal-item-in-dir",
+      "identifier": "opener:allow-open-path",
       "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**/*" }]
     }
   ]
