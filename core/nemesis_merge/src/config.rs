@@ -107,7 +107,7 @@ impl From<HackOptions> for nemesis_xml::hack::HackOptions {
 #[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
 #[derive(Debug, Clone)]
 pub struct DebugOptions {
-    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `output_dir`.
+    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
     /// This includes:
     /// - `patch.json`: The raw parsed patch data.
@@ -115,13 +115,13 @@ pub struct DebugOptions {
     ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
     pub output_patch_json: bool,
 
-    /// If true, outputs the merged JSON to the `.debug` subdirectory under `output_dir`.
+    /// If true, outputs the merged JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
     /// This represents the state of the data after all patches have been applied and
     /// conflicts resolved, but before converting to `.hkx` format.
     pub output_merged_json: bool,
 
-    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `output_dir`.
+    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
     /// This is the final XML representation of the patched and merged data,
     /// just before conversion to the binary `.hkx` format.

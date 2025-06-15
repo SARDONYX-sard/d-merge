@@ -134,11 +134,11 @@
     "debug_options_label": "Debug Options",
     "debug_options": {
       "output_patch_json": "Output Patch JSON",
-      "output_patch_json_help": "Outputs prioritized patch data for each hkx in JSON format. The patch files are saved to `<output>/.debug/patches/`.",
+      "output_patch_json_help": "Outputs prioritized patch data for each hkx in JSON format. The patch files are saved to `<output>/.d_merge/.debug/patches/`.",
       "output_merged_json": "Output Merged JSON",
-      "output_merged_json_help": "Outputs the data before variable(e.g.$variableID[ID]$) substitution and right before HKX conversion in JSON format. The file is saved to `<output>/.debug/meshes/`.",
+      "output_merged_json_help": "Outputs the data before variable(e.g.$variableID[ID]$) substitution and right before HKX conversion in JSON format. The file is saved to `<output>/.d_merge/.debug/meshes/`.",
       "output_merged_xml": "Output Merged XML",
-      "output_merged_xml_help": "Outputs the data before variable substitution and right before HKX conversion in XML format. The file is saved to `<output>/.debug/meshes/`."
+      "output_merged_xml_help": "Outputs the data before variable substitution and right before HKX conversion in XML format. The file is saved to `<output>/.d_merge/.debug/meshes/`."
     },
     "output_target_label": "Output Target",
     "output_target_aria_label": "Select output target",

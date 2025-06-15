@@ -7,6 +7,7 @@ use json_patch::{Op, OpRange};
 
 use crate::adsf::{ClipMotionBlock, Rotation, Translation};
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipMotionDiffPatch<'a> {
     clip_id: Option<Cow<'a, str>>,
@@ -143,12 +144,14 @@ impl<'a> ClipMotionDiffPatch<'a> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffTransitions<'a> {
     op: OpRange,
     values: Vec<Translation<'a>>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffRotations<'a> {
     op: OpRange,

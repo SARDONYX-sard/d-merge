@@ -98,14 +98,14 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
 }
 
 fn debug_file_path(output_dir: &Path, inner_path: &str) -> PathBuf {
-    output_dir.join(".debug").join(inner_path)
+    output_dir.join(".d_merge").join(".debug").join(inner_path)
 }
 
 /// Output template.json & template.json debug string
-fn write_patched_json(
-    output_file: &Path,
-    template_json: &simd_json::BorrowedValue<'_>,
-) -> Result<()> {
+pub fn write_patched_json<S>(output_file: &Path, template_json: S) -> Result<()>
+where
+    S: serde::Serialize + core::fmt::Debug,
+{
     if let Some(output_dir_all) = output_file.parent() {
         fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
             path: output_dir_all,

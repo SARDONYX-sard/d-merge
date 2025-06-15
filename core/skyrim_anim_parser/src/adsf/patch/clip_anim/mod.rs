@@ -6,6 +6,7 @@ use std::borrow::Cow;
 
 use crate::adsf::ClipAnimDataBlock;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipAnimDiffPatch<'a> {
     name: Option<Cow<'a, str>>,
@@ -118,6 +119,7 @@ impl<'a> ClipAnimDiffPatch<'a> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffTriggerNames<'a> {
     op: OpRange,

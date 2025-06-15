@@ -7,6 +7,7 @@ use crate::errors::{
     Error, FailedIoSnafu, FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu,
     FailedParseEditAdsfPatchSnafu,
 };
+use crate::hkx::generate::write_patched_json;
 use crate::results::partition_results;
 use crate::types::{OwnedAdsfPatchMap, PriorityMap};
 use crate::Config;
@@ -20,7 +21,7 @@ use skyrim_anim_parser::adsf::{AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
 use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub struct AdsfPatch<'a> {
     /// e.g. `DefaultMale`, `DefaultFemale`
     pub target: &'a str,
@@ -29,7 +30,7 @@ pub struct AdsfPatch<'a> {
     patch: PatchKind<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(serde::Serialize, Debug, Clone, PartialEq)]
 enum PatchKind<'a> {
     AddAnim(ClipAnimDataBlock<'a>),
     /// diff patch, priority
@@ -39,14 +40,14 @@ enum PatchKind<'a> {
     EditMotion(EditMotion<'a>),
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 struct EditAnim<'a> {
     patch: ClipAnimDiffPatch<'a>,
     priority: usize,
     index: usize,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 struct EditMotion<'a> {
     patch: ClipMotionDiffPatch<'a>,
     priority: usize,
@@ -81,6 +82,21 @@ pub(crate) fn apply_adsf_patches(
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
     sort_patches_by_priority(&mut borrowed_patches, id_order);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
+
+    if config.debug.output_merged_json {
+        for (index, patch) in borrowed_patches.iter().enumerate() {
+            let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
+            let inner_path = format!(
+                "mesh/animationdatasinglefile/{}/{}_{index}.json",
+                patch.target, patch.id,
+            );
+            debug_path.push(inner_path);
+            if let Err(_err) = write_patched_json(&debug_path, patch) {
+                #[cfg(feature = "tracing")]
+                tracing::error!("{_err}");
+            };
+        }
+    }
 
     macro_rules! bail {
         ($expr:expr) => {
