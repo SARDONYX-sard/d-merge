@@ -19,7 +19,7 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::types::Key;
+use crate::{path_id::take_until_ext, types::Key};
 
 /// Return (hashmap key, inner path starting from `meshes`)
 pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(Key<'_>, &str), TemplateError> {
@@ -46,25 +46,6 @@ pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {
         .map_err(|e| TemplateError::MissingMeshesDir {
             source: ReadableError::from_parse(e),
         })
-}
-
-/// take_until implementation using only winnow
-fn take_until_ext<Input, Output, Error, ParseNext>(
-    occurrences: impl Into<winnow::stream::Range>,
-    parser: ParseNext,
-) -> impl Parser<Input, Input::Slice, Error>
-where
-    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
-    Error: winnow::error::ParserError<Input>,
-    ParseNext: Parser<Input, Output, Error>,
-{
-    use winnow::combinator::{not, peek, repeat, trace};
-    use winnow::token::any;
-
-    trace(
-        "take_until_ext",
-        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
-    )
 }
 
 fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {

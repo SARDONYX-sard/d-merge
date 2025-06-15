@@ -24,25 +24,23 @@ mod tests {
 
     #[allow(clippy::iter_on_single_items)]
     const MODS: &[&str] = &[
-            // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
-            // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
-            // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
-            // "../../dummy/Data/Nemesis_Engine/mod/gender",
-            // "../../dummy/Data/Nemesis_Engine/mod/hmce",
-            // "../../dummy/Data/Nemesis_Engine/mod/momo",
-            // "../../dummy/Data/Nemesis_Engine/mod/na1w",
-            // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
-            // "../../dummy/Data/Nemesis_Engine/mod/pscd",
-            // "../../dummy/Data/Nemesis_Engine/mod/rthf",
-            // "../../dummy/Data/Nemesis_Engine/mod/skice",
-            // "../../dummy/Data/Nemesis_Engine/mod/sscb",
-            // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
-            // "../../dummy/Data/Nemesis_Engine/mod/tudm",
-            // "../../dummy/Data/Nemesis_Engine/mod/turn",
-            // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
-            // "D:/GAME/ModOrganizer Skyrim SE/mods/FlinchingSSE やられモーションを追加(要OnHit/Nemesis_Engine/mod/flinch",
-            "D:/GAME/ModOrganizer Skyrim SE/mods/Crouch Sliding スプリント→しゃがみでスライディング/Nemesis_Engine/mod/slide",
-            "D:/GAME/ModOrganizer Skyrim SE/mods/Eating Animations And Sounds SE 歩行しながら食べるモーション/Nemesis_Engine/mod/eaas"
+        // "../../dummy/Data/Nemesis_Engine/mod/aaaaa",
+        // "../../dummy/Data/Nemesis_Engine/mod/bcbi",
+        // "../../dummy/Data/Nemesis_Engine/mod/cbbi",
+        // "../../dummy/Data/Nemesis_Engine/mod/gender",
+        // "../../dummy/Data/Nemesis_Engine/mod/hmce",
+        // "../../dummy/Data/Nemesis_Engine/mod/momo",
+        // "../../dummy/Data/Nemesis_Engine/mod/na1w",
+        // "../../dummy/Data/Nemesis_Engine/mod/nemesis",
+        // "../../dummy/Data/Nemesis_Engine/mod/pscd",
+        // "../../dummy/Data/Nemesis_Engine/mod/rthf",
+        // "../../dummy/Data/Nemesis_Engine/mod/skice",
+        // "../../dummy/Data/Nemesis_Engine/mod/sscb",
+        // "../../dummy/Data/Nemesis_Engine/mod/tkuc",
+        // "../../dummy/Data/Nemesis_Engine/mod/tudm",
+        // "../../dummy/Data/Nemesis_Engine/mod/turn",
+        // "../../dummy/Data/Nemesis_Engine/mod/zcbe",
+        "D:/GAME/ModOrganizer Skyrim SE/mods/Thu'um - Animated Shouts シャウト時のアニメ変更/Nemesis_engine/mod/thuum",
     ];
 
     #[tokio::test]

@@ -14,16 +14,12 @@ use std::path::PathBuf;
 
 use rayon::prelude::*;
 use serde_hkx::errors::readable::ReadableError;
+use winnow::ascii::Caseless;
 use winnow::combinator::repeat;
 use winnow::error::StrContext::*;
 use winnow::error::StrContextValue::*;
 use winnow::token::any;
-use winnow::{
-    combinator::alt,
-    prelude::*,
-    seq,
-    token::{take_until, take_while},
-};
+use winnow::{combinator::alt, prelude::*, seq, token::take_while};
 
 use crate::types::PriorityMap;
 
@@ -68,6 +64,25 @@ pub fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
         .map_err(|e| ReadableError::from_parse(e))
 }
 
+/// take_until implementation using only winnow
+pub fn take_until_ext<Input, Output, Error, ParseNext>(
+    occurrences: impl Into<winnow::stream::Range>,
+    parser: ParseNext,
+) -> impl Parser<Input, Input::Slice, Error>
+where
+    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
+    Error: winnow::error::ParserError<Input>,
+    ParseNext: Parser<Input, Output, Error>,
+{
+    use winnow::combinator::{not, peek, repeat, trace};
+    use winnow::token::any;
+
+    trace(
+        "take_until_ext",
+        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
+    )
+}
+
 fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // Match either '/' or '\\' as path separator
     let mut sep = alt(('/', '\\'))
@@ -76,8 +91,8 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
     // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {
-        take_until(0.., "Nemesis_Engine").context(Expected(StringLiteral("Nemesis_Engine"))),
-        "Nemesis_Engine",
+        take_until_ext(0.., Caseless("Nemesis_Engine")).context(Expected(StringLiteral("Nemesis_Engine"))),
+        Caseless("Nemesis_Engine"),
         sep,
         "mod".context(Expected(StringLiteral("mod"))),
         sep,

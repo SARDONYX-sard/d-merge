@@ -49,36 +49,94 @@ impl<'a> ClipMotionDiffPatch<'a> {
             motion_block.duration = duration;
         }
 
-        if let Some(trans_patch) = self.translations {
-            let OpRange { op, range } = trans_patch.op.clone();
+        if let Some(translations) = self.translations {
+            let OpRange { op, range } = translations.op.clone();
             match op {
                 Op::Add => {
-                    motion_block
-                        .translations
-                        .splice(range.start..range.start, trans_patch.values);
+                    if range.start >= motion_block.translations.len() {
+                        // Out-of-bounds → append at the end
+                        motion_block.translations.extend(translations.values);
+                    } else {
+                        // In-bounds → insert at the middle
+                        motion_block
+                            .translations
+                            .splice(range.start..range.start, translations.values);
+                    }
                 }
                 Op::Replace => {
-                    motion_block.translations.splice(range, trans_patch.values);
+                    let vec_len = motion_block.translations.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+
+                    let (replace_vals, append_vals) = {
+                        let replace_count = end.saturating_sub(start);
+                        let mut values = translations.values.into_iter();
+                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
+                        let append_vals: Vec<_> = values.collect();
+                        (replace_vals, append_vals)
+                    };
+
+                    // Replace within the valid range
+                    motion_block.translations.splice(start..end, replace_vals);
+
+                    // Append any remaining values (out-of-range)
+                    if !append_vals.is_empty() {
+                        motion_block.translations.extend(append_vals);
+                    }
                 }
                 Op::Remove => {
-                    motion_block.translations.drain(range);
+                    let vec_len = motion_block.translations.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+                    if start < end {
+                        motion_block.translations.drain(start..end);
+                    }
                 }
             }
         }
 
-        if let Some(rot_patch) = self.rotations {
-            let OpRange { op, range } = rot_patch.op.clone();
+        if let Some(rotations) = self.rotations {
+            let OpRange { op, range } = rotations.op.clone();
             match op {
                 Op::Add => {
-                    motion_block
-                        .rotations
-                        .splice(range.start..range.start, rot_patch.values);
+                    if range.start >= motion_block.rotations.len() {
+                        // Out-of-bounds → append at the end
+                        motion_block.rotations.extend(rotations.values);
+                    } else {
+                        // In-bounds → insert at the middle
+                        motion_block
+                            .rotations
+                            .splice(range.start..range.start, rotations.values);
+                    }
                 }
                 Op::Replace => {
-                    motion_block.rotations.splice(range, rot_patch.values);
+                    let vec_len = motion_block.rotations.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+
+                    let (replace_vals, append_vals) = {
+                        let replace_count = end.saturating_sub(start);
+                        let mut values = rotations.values.into_iter();
+                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
+                        let append_vals: Vec<_> = values.collect();
+                        (replace_vals, append_vals)
+                    };
+
+                    // Replace within the valid range
+                    motion_block.rotations.splice(start..end, replace_vals);
+
+                    // Append any remaining values (out-of-range)
+                    if !append_vals.is_empty() {
+                        motion_block.rotations.extend(append_vals);
+                    }
                 }
                 Op::Remove => {
-                    motion_block.rotations.drain(range);
+                    let vec_len = motion_block.rotations.len();
+                    let start = range.start.min(vec_len);
+                    let end = range.end.min(vec_len);
+                    if start < end {
+                        motion_block.rotations.drain(start..end);
+                    }
                 }
             }
         }
