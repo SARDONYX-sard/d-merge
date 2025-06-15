@@ -88,8 +88,8 @@ pub(crate) fn apply_adsf_patches(
         for (index, patch) in borrowed_patches.iter().enumerate() {
             let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
             let inner_path = format!(
-                "patches/animationdatasinglefile/{}/{}_{index}.json",
-                patch.target, patch.id,
+                "patches/animationdatasinglefile/{}/{index}.json",
+                patch.target,
             );
             debug_path.push(inner_path);
             if let Err(_err) = write_patched_json(&debug_path, patch) {
