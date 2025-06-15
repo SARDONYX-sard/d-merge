@@ -80,7 +80,7 @@ pub(crate) async fn patch(
 }
 
 #[tauri::command]
-pub fn cancel_patch() -> Result<(), String> {
+pub async fn cancel_patch() -> Result<(), String> {
     cancel_patch_inner()
 }
 
