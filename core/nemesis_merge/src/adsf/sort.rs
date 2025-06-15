@@ -26,12 +26,12 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
 
             map.entry(key)
                 .and_modify(|existing: &mut AdsfPatch<'a>| {
-                    match (&existing.patch, &patch.patch) {
+                    match (&existing.patch, patch.patch.clone()) {
                         (PatchKind::EditAnim(edit_anim), PatchKind::EditAnim(edit_anim2))
                             if edit_anim2.priority > edit_anim.priority =>
                         {
                             if let PatchKind::EditAnim(edit_anim) = &mut existing.patch {
-                                edit_anim.patch.merge(edit_anim2.patch.clone());
+                                edit_anim.patch.merge(edit_anim2.patch);
                                 edit_anim.index = edit_anim2.index;
                                 edit_anim.priority = edit_anim2.priority;
                             }
@@ -41,7 +41,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
                             PatchKind::EditMotion(edit_motion2),
                         ) if edit_motion2.priority > edit_motion.priority => {
                             if let PatchKind::EditMotion(edit_motion) = &mut existing.patch {
-                                edit_motion.patch.merge(edit_motion2.patch.clone());
+                                edit_motion.patch.merge(edit_motion2.patch);
                                 edit_motion.index = edit_motion2.index;
                                 edit_motion.priority = edit_motion2.priority;
                             }
