@@ -45,15 +45,19 @@ enum PatchKind<'a> {
 struct EditAnim<'a> {
     patch: ClipAnimDiffPatch<'a>,
     priority: usize,
-    index: usize,
+    /// `<Name>~<clip_id>`
+    /// - e.g. `Jump~42`
+    ///
+    /// NOTE: Unlike Motion, Anim sometimes references the same clip_id, so it cannot be used as an id.
+    /// Therefore, Name is used instead
+    name_clip: &'a str,
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 struct EditMotion<'a> {
     patch: ClipMotionDiffPatch<'a>,
     priority: usize,
-    /// NOTE: 1 based index
-    index: usize,
+    clip_id: &'a str,
 }
 
 impl<'a> Default for PatchKind<'a> {
@@ -117,7 +121,7 @@ pub(crate) fn apply_adsf_patches(
                     anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
                 }
                 PatchKind::EditAnim(edit_anim) => {
-                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.index - 1) {
+                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.name_clip) {
                         edit_anim.patch.into_apply(anim);
                     }
                 }
@@ -125,8 +129,7 @@ pub(crate) fn apply_adsf_patches(
                     anim_data.add_clip_motion_blocks.push(clip_motion_block);
                 }
                 PatchKind::EditMotion(edit_motion) => {
-                    if let Some(motion) =
-                        anim_data.clip_motion_blocks.get_mut(edit_motion.index - 1)
+                    if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id)
                     {
                         edit_motion.patch.into_apply(motion);
                     }
@@ -165,7 +168,7 @@ fn parse_anim_data_patch<'a>(
             PatchKind::EditAnim(EditAnim {
                 patch,
                 priority,
-                index,
+                name_clip: index,
             })
         }
 
@@ -179,7 +182,7 @@ fn parse_anim_data_patch<'a>(
             PatchKind::EditMotion(EditMotion {
                 patch,
                 priority,
-                index,
+                clip_id: index,
             })
         }
 
@@ -252,8 +255,10 @@ fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
         let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
             PatchKind::AddAnim(_) => ("clip_anim", "".into()),
             PatchKind::AddMotion(_) => ("clip_motion", "".into()),
-            PatchKind::EditAnim(edit) => ("clip_anim", format!("_idx{:04}", edit.index).into()),
-            PatchKind::EditMotion(edit) => ("clip_motion", format!("_idx{:04}", edit.index).into()),
+            PatchKind::EditAnim(edit) => ("clip_anim", format!("_idx{:04}", edit.name_clip).into()),
+            PatchKind::EditMotion(edit) => {
+                ("clip_motion", format!("_idx{:04}", edit.clip_id).into())
+            }
         };
 
         let action = match &patch.patch {

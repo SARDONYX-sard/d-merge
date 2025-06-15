@@ -43,6 +43,6 @@ workspace = true
 # alternative to adsf indexmap
 alt_map = ["serde", "indexmap/serde", "bitvec/serde", "dep:dashmap"]
 
-serde = ["dep:serde"]
+serde = ["dep:serde", "json_patch/serde"]
 
 tracing = ["dep:tracing"]

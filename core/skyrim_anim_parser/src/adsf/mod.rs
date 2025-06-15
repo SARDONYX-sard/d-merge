@@ -1,7 +1,12 @@
+#[cfg(feature = "alt_map")]
+mod alt;
 pub mod clip_id_manager;
 pub mod de;
 pub mod patch;
 pub mod ser;
+
+#[cfg(feature = "alt_map")]
+pub use alt::{to_adsf_key, AltAdsf, AltAnimData};
 
 use crate::lines::Str;
 use rayon::prelude::*;
@@ -20,161 +25,6 @@ pub struct Adsf<'a> {
 
     /// A list of animation data corresponding to each project.
     pub anim_list: Vec<AnimData<'a>>,
-}
-
-/// Represents the alternative animation data structure.
-///
-/// Unlike [`Adsf`], which stores project names as strings with `.txt` extensions,
-/// this structure uses a map keyed by project names without the `.txt` suffix.
-/// Duplicate project names are disambiguated by appending `[n]` where `n` starts from 1.
-///
-/// This table shows how keys map from `Adsf` to `AltAdsf`:
-///
-/// | Adsf key           | AltAdsf key       | Description                          |
-/// |--------------------|-------------------|--------------------------------------|
-/// | `DefaultMale.txt`  | `DefaultMale~1`   | First occurrence (0th), no extension |
-/// | `DefaultMale.txt`  | `DefaultMale~2`   | Second occurrence (1st duplicate)    |
-/// | `DefaultMale.txt`  | `DefaultMale~3`   | Third occurrence (2nd duplicate)     |
-/// | `Walk.txt`         | `Walk~1`          | Unique, no extension                 |
-/// | `Walk.txt`         | `Walk~2`          | Duplicate occurrence                 |
-///
-/// This approach removes `.txt` from keys for efficiency and appends
-/// numeric indices in brackets to avoid key collisions.
-///
-/// # Reasoning
-///
-/// This key design comes from how patch paths are parsed and referenced in memory.
-/// According to Nemesis patch specs, the patch path format is:
-///
-/// ```text
-/// <any>/<id>/animationdatasinglefile/<project_name>~<n th of project_name>/<array index>.txt
-/// ```
-///
-/// When multiple entries share the same `project_name`, the `~n` suffix,
-/// where `n` is 1-based and indicates the nth occurrence (with `1` meaning the first).
-///
-/// This allows most keys to be accessed as slices (partial string references)
-/// pointing directly into the patch path without needing to allocate new strings via `to_string()`.
-/// Consequently, `get` operations can be done efficiently with minimal allocations.
-///
-/// # Note
-/// This allows fast O(1) access without extra heap allocations during patching.
-#[cfg(feature = "alt_map")]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct AltAdsf<'a>(pub indexmap::IndexMap<Str<'a>, AnimData<'a>>);
-
-#[cfg(feature = "alt_map")]
-impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
-    /// Converts [`Adsf`] into [`AltAdsf`] by transforming the parallel `Vec` fields
-    /// into a map.
-    ///
-    /// Duplicate project names are disambiguated by appending `[n]`
-    /// to their names, where `n` is the number of times the name has occurred so far.
-    ///
-    /// For example:
-    /// ```text
-    /// ["walk.txt", "run.txt", "walk.txt"] -> {"walk~1": ..., "run~1": ..., "walk~2": ...}
-    /// ```
-    /// This avoids key collisions in the map while preserving the original order.
-    ///
-    /// # NOTE
-    /// The dir spec for the Nemesis adsf patch is 1based_index, but here it is 0based_index.
-    #[inline]
-    fn from(adsf: Adsf<'a>) -> Self {
-        let Adsf {
-            project_names,
-            anim_list,
-        } = adsf;
-
-        debug_assert_eq!(
-            project_names.len(),
-            anim_list.len(),
-            "Need to be the same length. but got project_names.len() != anim_list.len()"
-        );
-
-        use std::collections::HashMap;
-
-        let mut map = indexmap::IndexMap::with_capacity(project_names.len());
-        let mut counter: HashMap<String, usize> = HashMap::new();
-
-        for (name, anim) in project_names.into_iter().zip(anim_list) {
-            let name_str = name.as_ref();
-            let base = name_str.strip_suffix(".txt").unwrap_or(name_str);
-
-            let count = counter.entry(base.to_string()).or_insert(1);
-
-            let key = if *count == 1 {
-                Str::Owned(format!("{base}~1"))
-            } else {
-                Str::Owned(format!("{base}~{count}"))
-            };
-
-            *count += 1;
-            map.insert(key, anim);
-        }
-
-        Self(map)
-    }
-}
-
-#[cfg(feature = "alt_map")]
-impl<'a> From<AltAdsf<'a>> for Adsf<'a> {
-    /// Converts [`AltAdsf`] back into [`Adsf`] by recovering the original project names.
-    ///
-    /// Any suffix in the form `[n]` (where `n` is digits) after `.txt` is removed
-    /// to restore the original name as accurately as possible.
-    ///
-    /// For example:
-    /// ```text
-    /// "walk" -> "walk.txt"
-    /// "walk[1]" -> "walk.txt"
-    /// ```
-    ///
-    /// If the name does not follow the `[n]` pattern, it is left unchanged.
-    ///
-    /// # NOTE
-    /// The dir spec for the Nemesis adsf patch is 1based_index, but here it is 0based_index.
-    #[inline]
-    fn from(alt_adsf: AltAdsf<'a>) -> Self {
-        let mut project_names = Vec::with_capacity(alt_adsf.0.len());
-        let mut anim_list = Vec::with_capacity(alt_adsf.0.len());
-
-        for (key, anim) in alt_adsf.0 {
-            project_names.push(to_adsf_key(key));
-            anim_list.push(anim);
-        }
-
-        Adsf {
-            project_names,
-            anim_list,
-        }
-    }
-}
-
-#[cfg(feature = "alt_map")]
-/// Removes a trailing numeric index from a filename if it matches the pattern `.txt[<digits>]`.
-///
-/// This function is used when converting from [`AltAdsf`] back to [`Adsf`] to recover
-/// the original project name before duplicate-disambiguation.
-///
-/// For example:
-/// - `"walk~1"` becomes `"walk.txt"`
-/// - `"jump.txt"` remains unchanged
-///
-/// If the input does not match this pattern, it is returned as-is.
-///
-/// # Returns
-///
-/// A `Cow<str>` containing the cleaned project name with the numeric index removed,
-/// or the original `key` as a borrowed string if no match is found.
-fn to_adsf_key<'a>(key: std::borrow::Cow<'a, str>) -> std::borrow::Cow<'a, str> {
-    (|| {
-        let start_index = key.rfind('~')?;
-        let base = &key[..start_index];
-        Some(std::borrow::Cow::Owned(format!("{base}.txt")))
-    })()
-    .unwrap_or(key)
 }
 
 /// Represents individual animation data.

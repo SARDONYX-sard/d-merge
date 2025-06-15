@@ -5,10 +5,10 @@ use crate::adsf::{AdsfPatch, PatchKind};
 
 #[derive(Hash, Eq, PartialEq)]
 enum PatchKey<'a> {
-    // (target, id, index)
-    EditAnim(&'a str, &'a str, usize),
-    // (target, id, index)
-    EditMotion(&'a str, &'a str, usize),
+    // (target, id, clip_id)
+    EditAnim(&'a str, &'a str, &'a str),
+    // (target, id, clip_id)
+    EditMotion(&'a str, &'a str, &'a str),
     // (target, id, index)
     AddAnim(&'a str, &'a str, usize),
     // (target, id, index)
@@ -21,9 +21,11 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
         .enumerate()
         .fold(HashMap::new, |mut map, (idx, patch)| {
             let key = match &patch.patch {
-                PatchKind::EditAnim(edit) => PatchKey::EditAnim(patch.target, patch.id, edit.index),
+                PatchKind::EditAnim(edit) => {
+                    PatchKey::EditAnim(patch.target, patch.id, edit.name_clip)
+                }
                 PatchKind::EditMotion(edit) => {
-                    PatchKey::EditMotion(patch.target, patch.id, edit.index)
+                    PatchKey::EditMotion(patch.target, patch.id, edit.clip_id)
                 }
                 PatchKind::AddAnim(_) => PatchKey::AddAnim(patch.target, patch.id, idx),
                 PatchKind::AddMotion(_) => PatchKey::AddMotion(patch.target, patch.id, idx),
@@ -37,7 +39,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
                         {
                             if let PatchKind::EditAnim(edit_anim) = &mut existing.patch {
                                 edit_anim.patch.merge(edit_anim2.patch);
-                                edit_anim.index = edit_anim2.index;
+                                edit_anim.name_clip = edit_anim2.name_clip;
                                 edit_anim.priority = edit_anim2.priority;
                             }
                         }
@@ -47,7 +49,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
                         ) if edit_motion2.priority > edit_motion.priority => {
                             if let PatchKind::EditMotion(edit_motion) = &mut existing.patch {
                                 edit_motion.patch.merge(edit_motion2.patch);
-                                edit_motion.index = edit_motion2.index;
+                                edit_motion.clip_id = edit_motion2.clip_id;
                                 edit_motion.priority = edit_motion2.priority;
                             }
                         }

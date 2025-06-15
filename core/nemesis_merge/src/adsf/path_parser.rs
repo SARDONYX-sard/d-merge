@@ -35,20 +35,20 @@ use crate::{adsf::path_parser::parse_error::IndexMustBeNumberSnafu, path_id::get
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
-pub enum ParserType {
+pub enum ParserType<'a> {
     /// Indicates an individual animation (e.g., `Run~slide.txt`)
     AddAnim,
 
     /// Indicates a motion ID replacement or override (e.g., ???) // TODO:
     /// - include 1-based index
-    EditAnim(usize),
+    EditAnim(&'a str),
 
     /// Indicates a motion ID add(e.g., `slide$10.txt`)
     AddMotion,
 
     /// Indicates a motion ID replacement or override (e.g., `10.txt` 10 is AnimInfo index)
     /// - include 1-based index
-    EditMotion(usize),
+    EditMotion(&'a str),
 
     /// Indicates the special `$header$/$header$.txt`override
     AnimHeader,
@@ -68,7 +68,7 @@ pub struct ParsedAdsfPatchPath<'a> {
     /// project_names ends with `.txt` and it is sometimes a duplicate name. So, it seems to make the index be specified.
     pub target: &'a str,
     /// Type of parser logic required
-    pub parser_type: ParserType,
+    pub parser_type: ParserType<'a>,
 }
 
 /// Parses an ADSF(`animationdatasinglefile`) patch path and extracts the relevant metadata.
@@ -124,7 +124,7 @@ pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, Pa
         // rsplitn is reverse getter. -> 42, jump
         if let (Some(index_str), Some(_name)) = (parts.next(), parts.next()) {
             match index_str.parse::<usize>() {
-                Ok(index) => ParserType::EditAnim(index),
+                Ok(_) => ParserType::EditAnim(file_stem),
                 Err(_) => ParserType::AddAnim,
             }
         } else {
@@ -133,11 +133,11 @@ pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, Pa
     } else if file_stem.contains('$') {
         ParserType::AddMotion
     } else {
-        let index = file_stem.parse().with_context(|_| IndexMustBeNumberSnafu {
+        let _index: usize = file_stem.parse().with_context(|_| IndexMustBeNumberSnafu {
             index_str: (*file_stem).to_string(),
             path,
         })?;
-        ParserType::EditMotion(index)
+        ParserType::EditMotion(file_stem)
     };
 
     Ok(ParsedAdsfPatchPath {
@@ -241,7 +241,7 @@ mod tests {
             ParsedAdsfPatchPath {
                 id: "/some/mods/Nemesis_Engine/mod/slide",
                 target: "Default~1",
-                parser_type: ParserType::EditAnim(42),
+                parser_type: ParserType::EditAnim("Jump~42"),
             }
         );
     }
@@ -268,7 +268,7 @@ mod tests {
             ParsedAdsfPatchPath {
                 id: "Nemesis_Engine/mod/slide",
                 target: "Default~1",
-                parser_type: ParserType::EditMotion(10),
+                parser_type: ParserType::EditMotion("10"),
             }
         );
     }
