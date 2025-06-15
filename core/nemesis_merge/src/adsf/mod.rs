@@ -90,7 +90,7 @@ pub(crate) fn apply_adsf_patches(
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
     if config.debug.output_patch_json {
-        output_debug_json(&borrowed_patches, config);
+        output_debug_patch_json(&borrowed_patches, config);
     }
 
     macro_rules! bail {
@@ -135,6 +135,12 @@ pub(crate) fn apply_adsf_patches(
                     }
                 }
             };
+        }
+    }
+
+    if config.debug.output_merged_json {
+        if let Err(_err) = output_merged_alt_adsf(&alt_adsf, config) {
+            tracing::error!("{_err}");
         }
     }
 
@@ -249,7 +255,7 @@ fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: &AltAdsf) -> Result<(),
 /// - Easy grouping and lookup by `patchXX`
 /// - Clear distinction between `add` and `edit` actions
 /// - Fine-grained identification of edits via index
-fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
+fn output_debug_patch_json(borrowed_patches: &[AdsfPatch], config: &Config) {
     for (patch_id, patch) in borrowed_patches.iter().enumerate() {
         let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
         let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
@@ -274,6 +280,15 @@ fn output_debug_json(borrowed_patches: &[AdsfPatch], config: &Config) {
             tracing::error!("{_err}");
         };
     }
+}
+
+fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
+    let adsf_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join(ADSF_INNER_PATH);
+    write_patched_json(&adsf_path, alt_adsf)
 }
 
 #[cfg(test)]
