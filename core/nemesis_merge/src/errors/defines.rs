@@ -61,6 +61,13 @@ pub enum Error {
     },
 
     /// Failed to parse adsf patch
+    #[snafu(display("[animationdatasinglefile patch Parse edit Error]{}:\n{source}", path.display()))]
+    FailedParseEditAdsfPatch {
+        source: skyrim_anim_parser::adsf::patch::error::Error,
+        path: PathBuf,
+    },
+
+    /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfPatch {
         source: ReadableError,

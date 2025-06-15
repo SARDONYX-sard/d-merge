@@ -1,5 +1,7 @@
-use crate::adsf::patch::{candidate::LineKind, error::Error};
-
+use crate::adsf::{
+    patch::{clip_motion::LineKind, error::Error},
+    Rotation, Translation,
+};
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
 
@@ -37,7 +39,7 @@ const LINE_KINDS: [LineKind; 6] = [
 pub struct PartialAdsfPatch<'a> {
     pub clip_id: Option<Cow<'a, str>>,
     pub duration: Option<Cow<'a, str>>,
-    pub transitions: Option<PartialTranslations<'a>>,
+    pub translations: Option<PartialTranslations<'a>>,
     pub rotations: Option<PartialRotations<'a>>,
 }
 
@@ -45,14 +47,14 @@ pub struct PartialAdsfPatch<'a> {
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialTranslations<'input> {
     pub range: Range<usize>,
-    pub values: Vec<[Cow<'input, str>; 4]>,
+    pub values: Vec<Translation<'input>>,
 }
 
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialRotations<'input> {
     pub range: Range<usize>,
-    pub values: Vec<[Cow<'input, str>; 5]>,
+    pub values: Vec<Rotation<'input>>,
 }
 
 impl<'de> CurrentState<'de> {
@@ -68,7 +70,7 @@ impl<'de> CurrentState<'de> {
         }
     }
 
-    pub fn next(&mut self) -> Option<LineKind> {
+    pub(super) fn next(&mut self) -> Option<LineKind> {
         let next = self.line_kinds.next().copied();
         self.current_kind = next;
         #[cfg(feature = "tracing")]
@@ -76,7 +78,7 @@ impl<'de> CurrentState<'de> {
         next
     }
 
-    pub fn current_kind(&self) -> Result<LineKind, Error> {
+    pub(super) fn current_kind(&self) -> Result<LineKind, Error> {
         self.current_kind.ok_or(Error::EndOfLineKind)
     }
 
@@ -103,7 +105,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_as_transition(&mut self, value: [Cow<'de, str>; 4]) -> Result<(), Error> {
+    pub fn push_as_translation(&mut self, value: Translation<'de>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         #[cfg(feature = "tracing")]
         tracing::trace!("{self:#?}");
@@ -117,7 +119,7 @@ impl<'de> CurrentState<'de> {
                 let transition = self
                     .patch
                     .get_or_insert_default()
-                    .transitions
+                    .translations
                     .get_or_insert_default();
 
                 transition.range.end += 1;
@@ -132,7 +134,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_as_rotation(&mut self, value: [Cow<'de, str>; 5]) -> Result<(), Error> {
+    pub fn push_as_rotation(&mut self, value: Rotation<'de>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
@@ -168,7 +170,7 @@ impl<'de> CurrentState<'de> {
                 let transitions = self
                     .patch
                     .get_or_insert_default()
-                    .transitions
+                    .translations
                     .get_or_insert_default();
                 transitions.range.start = start;
                 transitions.range.end = start;
