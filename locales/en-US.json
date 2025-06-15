@@ -124,7 +124,7 @@
 
     "open_options_dialog": "Open Patch Options Dialog",
     "options_title": "Patch Options",
-    "auto_remove_meshes_option_label": "Automatic deletion of the destination `meshes` & `.debug` directory",
+    "auto_remove_meshes_option_label": "Automatic deletion of the destination `meshes` & `.d_merge/.debug` directory",
     "auto_remove_meshes_option_help": "Remove each time just before a patch to avoid unintended reflection of the previous hkx.",
     "hack_options_label": "Hack Options",
     "hack_options": {

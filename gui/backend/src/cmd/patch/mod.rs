@@ -39,7 +39,7 @@ pub(crate) async fn patch(
         tauri::async_runtime::spawn(async move {
             let _ = tokio::fs::remove_dir_all(meshes_path).await;
         });
-        let debug_path = output.join(".debug");
+        let debug_path = output.join(".d_merge").join(".debug");
         tauri::async_runtime::spawn(async move {
             let _ = tokio::fs::remove_dir_all(debug_path).await;
         });

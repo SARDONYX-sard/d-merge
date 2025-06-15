@@ -125,7 +125,7 @@
     "open_options_dialog": "パッチオプションダイアログを開く",
     "options_title": "パッチオプション",
     "auto_remove_meshes_option_label": "出力先の`.debug`, `meshes`ディレクトリを事前削除",
-    "auto_remove_meshes_option_help": "パッチのたびに出力先の`.debug`, `meshes`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
+    "auto_remove_meshes_option_help": "パッチのたびに出力先の`meshes` & `.d_merge/.debug`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
     "hack_options_label": "ハックオプション",
     "hack_options": {
       "cast_ragdoll_event": "BSRagdollContactListenerModifierの互換ハックを有効化",
