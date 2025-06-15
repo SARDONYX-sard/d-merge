@@ -33,22 +33,24 @@ The only thing we are considering at this time is support for the Nemesis patch.
 - GUI
 
   - [x] Basic frontend(patch, convert, settings)
-  - [ ] Support MO2 mode/Virtual file system mode(auto read settings file)
+  - [x] Support MO2 mode/Virtual file system mode(auto read settings file) when use auto detect(Current: windows only)
   - [ ] hkx json/patch editor
+  - [ ] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
 
 - AnimData(`animationdatasinglefile.txt`)
 
   - [x] Serialization
   - [x] Deserialization
   - [x] Add Operation
-  - [ ] Replace Operation
+  - [x] Replace/Remove Operation
+  - [ ] Conflict resolver
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
 
   - [x] Serialization
   - [x] Deserialization
   - [ ] Add Operation (Impossible unless the specification of the difference is understood.)
-  - [ ] Replace Operation
+  - [ ] Replace/Remove Operation(Same issue)
 
 - hkx templates
 
