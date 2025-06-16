@@ -20,7 +20,7 @@ runs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        mkdir -p ./build/interfaces
+        mkdir -p ./build/interface
         Move-Item -Path ./target/${{ inputs.build_profile }}/${{ inputs.app_name }}.exe -Destination './build'
         Move-Item -Force -Path ./resource/assets -Destination ./build
 
@@ -29,6 +29,6 @@ runs:
       shell: bash
       run: |
         mkdir -p ./build/assets
-        mkdir -p ./build/interfaces
+        mkdir -p ./build/interface
         mv ./target/${{ inputs.build_profile }}/${{ inputs.app_name }} ./build
         mv ./resource/assets ./build
