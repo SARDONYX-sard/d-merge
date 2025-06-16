@@ -36,7 +36,9 @@ fn main() {
     }
 }
 
-/// Avoid auto show(To avoid white flash screen): https://github.com/tauri-apps/plugins-workspace/issues/344
+/// -ref: [Avoid auto show(To avoid white flash screen) issue](https://github.com/tauri-apps/plugins-workspace/issues/344)
+///
+/// And it's necessary to call `show()` in frontend to show the Window.
 fn tauri_plugin_window_state_init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     use tauri_plugin_window_state::StateFlags;
     tauri_plugin_window_state::Builder::default()
@@ -46,7 +48,7 @@ fn tauri_plugin_window_state_init<R: tauri::Runtime>() -> tauri::plugin::TauriPl
 
 /// This is there to wait until the front end saves the current status.
 ///
-/// Since the window cannot be closed, it is necessary to call `getCurrentWindow().destination()` in js to close the Window.
+/// Since the window cannot be closed, it is necessary to call `getCurrentWindow().destroy()` in js to close the Window.
 /// To prevent exit application by X button.
 fn prevent_close_window<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tauri::WindowEvent) {
     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
