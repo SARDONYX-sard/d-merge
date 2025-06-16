@@ -1,0 +1,34 @@
+name: 'Setup release'
+description: 'Setup to release outputs based on platform'
+
+inputs:
+  platform:
+    description: 'GitHub runner platform'
+    required: true
+  app_name:
+    description: 'Application binary name'
+    required: true
+  build_profile:
+    description: 'Rust build profile'
+    required: false
+    default: 'release'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Compress outputs (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        mkdir -p ./build/interfaces
+        Move-Item -Path ./target/${{ inputs.build_profile }}/${{ inputs.app_name }}.exe -Destination './build'
+        Move-Item -Force -Path ./resource/assets -Destination ./build
+
+    - name: Compress outputs (macOS/Linux)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        mkdir -p ./build/assets
+        mkdir -p ./build/interfaces
+        mv ./target/${{ inputs.build_profile }}/${{ inputs.app_name }} ./build
+        mv ./resource/assets ./build

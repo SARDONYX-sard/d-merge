@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Setup environment
-        uses: ./.github/workflows/common_setup.yaml
+        uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
           build_profile: ${{ env.BUILD_PROFILE }}
@@ -34,7 +34,7 @@ jobs:
           prerelease: false
 
       - name: Move exe -> ./build
-        uses: ./.github/workflows/common_setup_release.yaml
+        uses: ./.github/actions/setup-release
         with:
           app_name: d_merge
           build_profile: release

@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Setup environment
-        uses: ./.github/workflows/common_setup.yaml
+        uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
           build_profile: ${{ env.BUILD_PROFILE }}
@@ -39,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Setup environment
-        uses: ./.github/workflows/common_setup.yaml
+        uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
           build_profile: ${{ env.BUILD_PROFILE }}
@@ -67,7 +67,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Setup environment
-        uses: ./.github/workflows/common_setup.yaml
+        uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
           build_profile: ${{ env.BUILD_PROFILE }}
@@ -78,7 +78,7 @@ jobs:
         run: npm run build
 
       - name: Move exe -> ./build
-        uses: ./.github/workflows/common_setup_release.yaml
+        uses: ./.github/workflows/setup-release.yaml
         with:
           app_name: d_merge
           build_profile: ${{ env.BUILD_PROFILE }}

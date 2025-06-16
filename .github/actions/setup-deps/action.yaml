@@ -1,0 +1,73 @@
+name: 'Setup Deps'
+description: 'Performs common setup tasks such as checkout, rust toolchain, caching, and frontend setup.'
+
+inputs:
+  platform:
+    description: 'GitHub runner platform'
+    required: true
+  build_profile:
+    description: 'Rust build profile'
+    required: false
+    default: 'release'
+  cargo_cache_key_prefix:
+    description: 'Cargo cache key prefix'
+    required: false
+    default: ''
+  install_front_deps:
+    description: 'Whether to install frontend dependencies'
+    required: false
+    default: 'true'
+
+outputs:
+  platform:
+    description: 'The platform used'
+    value: ${{ inputs.platform }}
+  build_profile:
+    description: 'The build profile used'
+    value: ${{ inputs.build_profile }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4.2.2
+      with:
+        submodules: true
+
+    - name: Install dependencies (ubuntu only)
+      if: ${{ inputs.platform == 'ubuntu-latest' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libwebkit2gtk-4.1-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          libxdo-dev \
+          libssl-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev
+
+    - name: Rust setup
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2.7.8
+      with:
+        prefix-key: cargo${{ inputs.cargo_cache_key_prefix }}-${{ inputs.build_profile }}-${{ inputs.platform }}
+
+    - name: Sync node version and setup cache
+      if: ${{ inputs.install_front_deps == 'true' }}
+      uses: actions/setup-node@v4.4.0
+      with:
+        node-version: 'lts/*'
+        cache: 'npm'
+
+    - name: Next.js cache
+      if: ${{ inputs.install_front_deps == 'true' }}
+      uses: actions/cache@v4.2.3
+      with:
+        path: ${{ github.workspace }}/gui/frontend/.next/cache
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('gui/frontend/src/**/*.[jt]s', 'gui/frontend/src/**/*.[jt]sx') }}
+        restore-keys: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
