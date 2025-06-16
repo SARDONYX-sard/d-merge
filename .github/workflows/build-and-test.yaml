@@ -19,6 +19,9 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
       - name: Setup environment
         uses: ./.github/workflows/common_setup.yaml
         with:
@@ -38,6 +41,9 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
       - name: Setup environment
         uses: ./.github/workflows/common_setup.yaml
         with:
@@ -66,6 +72,9 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
       - name: Setup environment
         uses: ./.github/workflows/common_setup.yaml
         with:
