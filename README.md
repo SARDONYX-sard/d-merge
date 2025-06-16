@@ -1,13 +1,13 @@
 # D Merge(Diff & Merge) hkx patcher
 
 <div align="center">
-  <a href="https://github.com/SARDONYX-sard/d-merge">
-    <img src="./gui/backend/icons/icon.svg" alt="D Merge" height="100"/>
+  <a href="https://github.com/SARDONYX-sard/d-merge/release">
+    <img src="./gui/backend/icons/icon.svg" alt="D Merge"/>
   </a>
 
-  <!-- 🚀 Release Badges -->
+  <!-- Release Badges -->
   <p>
-    <a href="https://github.com/SARDONYX-sard/d-merge/releases">
+    <a href="https://github.com/SARDONYX-sard/d-merge/releases/latest">
       <img src="https://img.shields.io/github/v/release/SARDONYX-sard/d-merge?style=flat-square" alt="Latest Release">
     </a>
     <a href="https://github.com/SARDONYX-sard/d-merge/releases">
@@ -24,7 +24,7 @@
     </a>
   </p>
 
-  <!-- 🔧 Development Badges -->
+  <!-- Development Badges -->
   <p>
     <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml">
       <img src="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml/badge.svg?style=flat-square" alt="Build & Test Status">
