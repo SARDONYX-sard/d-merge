@@ -3,6 +3,7 @@ pub(crate) mod fs;
 pub(crate) mod get_skyrim_dir;
 pub(crate) mod log;
 pub(crate) mod patch;
+pub(crate) mod updater;
 
 use std::sync::atomic::AtomicBool;
 use tauri::{Emitter as _, Window};

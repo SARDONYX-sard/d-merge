@@ -32,6 +32,7 @@
     "refin",
     "refout",
     "repr",
+    "requwest",
     "rsplitn",
     "rustflags",
     "serde",
