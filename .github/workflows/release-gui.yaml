@@ -69,7 +69,7 @@ jobs:
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          mkdir -p ./build
+          mkdir -p ./build/interfaces
           Move-Item -Path ./target/release/${{ env.APP_NAME }}.exe -Destination './build'
           Move-Item -Force -Path ./resource/assets -Destination ./build
           Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-${{ runner.os }}-portable.zip'

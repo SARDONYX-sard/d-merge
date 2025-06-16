@@ -133,7 +133,7 @@ jobs:
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          mkdir -p ./build
+          mkdir -p ./build/interfaces
           Move-Item -Path ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }}.exe -Destination './build'
           Move-Item -Force -Path ./resource/assets -Destination ./build
       # ----------------------------------------------------------------------------------------------------------------
@@ -142,6 +142,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p ./build/assets
+          mkdir -p ./build/interfaces
           mv ./target/${{ env.BUILD_PROFILE }}/${{ env.APP_NAME }} ./build
           mv ./resource/assets ./build
       # ----------------------------------------------------------------------------------------------------------------
