@@ -9,10 +9,6 @@ inputs:
     description: 'Rust build profile'
     required: false
     default: 'release'
-  cargo_cache_key_prefix:
-    description: 'Cargo cache key prefix'
-    required: false
-    default: ''
   install_front_deps:
     description: 'Whether to install frontend dependencies'
     required: false
@@ -51,7 +47,7 @@ runs:
     - name: Rust cache
       uses: Swatinem/rust-cache@v2.7.8
       with:
-        prefix-key: cargo${{ inputs.cargo_cache_key_prefix }}-${{ inputs.build_profile }}-${{ inputs.platform }}
+        prefix-key: cargo-${{ inputs.build_profile }}-${{ inputs.platform }}
 
     - name: Sync node version and setup cache
       if: ${{ inputs.install_front_deps == 'true' }}

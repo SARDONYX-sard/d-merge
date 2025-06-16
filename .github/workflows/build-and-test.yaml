@@ -26,8 +26,7 @@ jobs:
         uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
-          build_profile: ${{ env.BUILD_PROFILE }}
-          cargo_cache_key_prefix: -debug
+          build_profile: debug
           install_front_deps: false
 
       - name: Check format
@@ -48,8 +47,7 @@ jobs:
         uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
-          build_profile: ${{ env.BUILD_PROFILE }}
-          cargo_cache_key_prefix: -debug
+          build_profile: debug
           install_front_deps: false
 
       - name: Install nextest(Parallel Test Execution CLI)
