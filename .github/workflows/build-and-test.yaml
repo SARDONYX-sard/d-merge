@@ -85,7 +85,7 @@ jobs:
         run: npm run build
 
       - name: Move exe -> ./build
-        uses: ./.github/workflows/setup-release
+        uses: ./.github/actions/setup-release
         with:
           app_name: d_merge
           build_profile: ${{ env.BUILD_PROFILE }}
