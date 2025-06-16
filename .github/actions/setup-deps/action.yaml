@@ -29,10 +29,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v4.2.2
-      with:
-        submodules: true
-
     - name: Install dependencies (ubuntu only)
       if: ${{ inputs.platform == 'ubuntu-latest' }}
       shell: bash
