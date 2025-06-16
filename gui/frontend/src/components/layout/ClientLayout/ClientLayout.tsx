@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Luma <lumakernel@gmail.com>
 // SPDX-License-Identifier: MIT or Apache-2.0
 import { useBackup } from '@/components/hooks/useBackup';
-import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { PageNavigation } from '@/components/organisms/PageNavigation';
 import { GlobalProvider } from '@/components/providers';
 import { LANG } from '@/lib/i18n';
@@ -29,8 +28,8 @@ const ClientLayout = ({ children }: Props) => {
 };
 
 const ClientLayoutProviderInner = ({ children }: Props) => {
+  // NOTE: If you place useInjectJS here, it will only be executed once.
   // NOTE: The following hooks will not be able to retrieve the state unless they are within GlobalProvider and will result in an error.
-  useInjectJs();
   useBackup();
 
   return <>{children}</>;
