@@ -1,26 +1,56 @@
 # D Merge(Diff & Merge) hkx patcher
 
 <div align="center">
-    <a align="center" href="https://github.com/SARDONYX-sard/d-merge/releases">
-      <img src="./gui/backend/icons/icon.svg" alt="D merge"/>
-    </a>
-</div>
+  <a href="https://github.com/SARDONYX-sard/d-merge">
+    <img src="./gui/backend/icons/icon.svg" alt="D Merge" height="100"/>
+  </a>
 
-<div>
-    <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/release-gui.yaml">
-        <img src="https://github.com/SARDONYX-sard/d-merge/actions/workflows/release-gui.yaml/badge.svg" alt="Release GUI">
+  <!-- 🚀 Release Badges -->
+  <p>
+    <a href="https://github.com/SARDONYX-sard/d-merge/releases">
+      <img src="https://img.shields.io/github/v/release/SARDONYX-sard/d-merge?style=flat-square" alt="Latest Release">
     </a>
-    <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml">
-        <img src="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml/badge.svg" alt="Build & Test">
+    <a href="https://github.com/SARDONYX-sard/d-merge/releases">
+      <img src="https://img.shields.io/github/downloads/SARDONYX-sard/d-merge/total?style=flat-square" alt="Total Downloads">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/release-gui.yaml">
+      <img src="https://github.com/SARDONYX-sard/d-merge/actions/workflows/release-gui.yaml/badge.svg?style=flat-square" alt="Release GUI Status">
     </a>
     <a href="https://opensource.org/licenses/GPL-3.0">
-        <img src="https://img.shields.io/badge/License-GPL_v3.0-blue.svg" alt="License">
+      <img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square" alt="License: GPL v3">
     </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/stargazers">
+      <img src="https://img.shields.io/github/stars/SARDONYX-sard/d-merge?style=social" alt="GitHub Stars">
+    </a>
+  </p>
+
+  <!-- 🔧 Development Badges -->
+  <p>
+    <a href="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml">
+      <img src="https://github.com/SARDONYX-sard/d-merge/actions/workflows/build-and-test.yaml/badge.svg?style=flat-square" alt="Build & Test Status">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/issues">
+      <img src="https://img.shields.io/github/issues/SARDONYX-sard/d-merge?style=flat-square" alt="Open Issues">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/pulls">
+      <img src="https://img.shields.io/github/issues-pr/SARDONYX-sard/d-merge?style=flat-square" alt="Open PRs">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/commits/main">
+      <img src="https://img.shields.io/github/last-commit/SARDONYX-sard/d-merge?style=flat-square" alt="Last Commit">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge/graphs/contributors">
+      <img src="https://img.shields.io/github/contributors/SARDONYX-sard/d-merge?style=flat-square" alt="Contributors">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge">
+      <img src="https://img.shields.io/github/languages/top/SARDONYX-sard/d-merge?style=flat-square" alt="Top Language">
+    </a>
+    <a href="https://github.com/SARDONYX-sard/d-merge">
+      <img src="https://img.shields.io/github/languages/code-size/SARDONYX-sard/d-merge?style=flat-square" alt="Code Size">
+    </a>
+  </p>
 </div>
 
-## For Tester
-
-The patch page is under development, so there is no need to submit an issue.
+## Release
 
 - [Early Release](https://github.com/SARDONYX-sard/d-merge/releases)
 
@@ -83,7 +113,7 @@ gui/backend (GPL-3.0)
 └── node_expr (MIT OR Apache-2.0)
 ```
 
-### License Propagation
+#### License Propagation
 
 - **`skyrim_anim_parser`**:
   I understood the specification of this `animationdatasinglefile.txt` file from reading pandora. Therefore, I will keep it under GPL-3.0 just in case.
