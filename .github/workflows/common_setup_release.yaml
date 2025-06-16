@@ -1,0 +1,36 @@
+name: Common Compress
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      app_name:
+        required: true
+        type: string
+      build_profile:
+        required: false
+        type: string
+        default: release
+
+jobs:
+  compress:
+    runs-on: ${{ inputs.platform }}
+    steps:
+      - name: Compress outputs(Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p ./build/interfaces
+          Move-Item -Path ./target/${{ inputs.build_profile }}/${{ inputs.app_name }}.exe -Destination './build'
+          Move-Item -Force -Path ./resource/assets -Destination ./build
+
+      - name: Compress outputs(MacOS/Linux)
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p ./build/assets
+          mkdir -p ./build/interfaces
+          mv ./target/${{ inputs.build_profile }}/${{ inputs.app_name }} ./build
+          mv ./resource/assets ./build
