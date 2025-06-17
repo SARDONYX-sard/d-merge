@@ -1,5 +1,9 @@
 use bitvec::prelude::*;
 
+/// # Why is this necessary?
+/// Since `clip_id` is undecided at the mod patch stage, it is replaced with the Nemesis variable. If the variable exists, it needs to be replaced with an unused id.
+///
+/// In other words, it is used at the serialization stage of animationdatasinglefile.txt.
 pub struct ClipIdManager {
     used_ids: BitVec,
     current: usize,
