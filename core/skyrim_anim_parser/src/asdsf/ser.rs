@@ -33,14 +33,12 @@ fn write_projects(out: &mut String, projects: &[Str<'_>]) {
 }
 
 fn write_file_names(out: &mut String, anim_set: &AnimSetData<'_>) {
-    if let Some(len) = anim_set.file_names_len {
-        out.push_str(&len.to_string());
+    if let Some(file_names) = &anim_set.file_names {
+        out.push_str(&file_names.len().to_string());
         out.push_str(NEW_LINE);
-        if let Some(names) = &anim_set.file_names {
-            for name in names {
-                out.push_str(name);
-                out.push_str(NEW_LINE);
-            }
+        for name in file_names {
+            out.push_str(name);
+            out.push_str(NEW_LINE);
         }
     }
 }
@@ -51,7 +49,7 @@ fn write_version(out: &mut String, version: &Str<'_>) {
 }
 
 fn write_triggers(out: &mut String, anim_set: &AnimSetData<'_>) {
-    out.push_str(&anim_set.triggers_len.to_string());
+    out.push_str(&anim_set.triggers.len().to_string());
     out.push_str(NEW_LINE);
     for trig in &anim_set.triggers {
         out.push_str(trig);
