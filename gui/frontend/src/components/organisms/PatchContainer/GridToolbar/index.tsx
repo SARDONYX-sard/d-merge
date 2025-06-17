@@ -59,7 +59,7 @@ const StyledTextField = styled(TextField)<{
 }));
 
 export const CustomToolbar = () => {
-  const apiRef = useGridApiContext(); // ← 追加
+  const apiRef = useGridApiContext();
   const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
   const exportMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const SortClearButton = useSortClearButton();
