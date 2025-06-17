@@ -14,9 +14,13 @@ use crate::Config;
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
-use skyrim_anim_parser::adsf::patch::{
-    parse_clip_anim_block_patch, parse_clip_anim_diff_patch, parse_clip_motion_block_patch,
-    parse_clip_motion_diff_patch, ClipAnimDiffPatch, ClipMotionDiffPatch,
+pub use skyrim_anim_parser::adsf::patch::de::add::parse_clip_anim_block_patch;
+pub use skyrim_anim_parser::adsf::patch::de::add::parse_clip_motion_block_patch;
+pub use skyrim_anim_parser::adsf::patch::de::others::clip_anim::{
+    deserializer::parse_clip_anim_diff_patch, ClipAnimDiffPatch,
+};
+pub use skyrim_anim_parser::adsf::patch::de::others::clip_motion::{
+    deserializer::parse_clip_motion_diff_patch, ClipMotionDiffPatch,
 };
 use snafu::ResultExt as _;
 use std::borrow::Cow;

@@ -1,4 +1,4 @@
-pub mod current_state;
+mod current_state;
 pub mod deserializer;
 
 use std::borrow::Cow;

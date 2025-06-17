@@ -1,4 +1,4 @@
-pub mod current_state;
+mod current_state;
 pub mod deserializer;
 
 use json_patch::{Op, OpRange};

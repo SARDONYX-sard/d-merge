@@ -1,5 +1,5 @@
-use crate::adsf::patch::clip_anim::LineKind;
-use crate::adsf::patch::error::Error;
+use crate::adsf::normal::{Rotation, Translation};
+use crate::adsf::patch::de::{error::Error, others::clip_motion::LineKind};
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
 
@@ -24,31 +24,35 @@ pub struct CurrentState<'input> {
     pub force_removed: bool,
 }
 
-const LINE_KINDS: [LineKind; 7] = [
-    LineKind::Name,
+const LINE_KINDS: [LineKind; 6] = [
     LineKind::ClipId,
-    LineKind::PlayBackSpeed,
-    LineKind::CropStartLocalTime,
-    LineKind::CropEndLocalTime,
-    LineKind::TriggerNamesLen,
-    LineKind::TriggerNames,
+    LineKind::Duration,
+    LineKind::TranslationLen,
+    LineKind::Translation,
+    LineKind::RotationLen,
+    LineKind::Rotation,
 ];
 
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAdsfPatch<'a> {
-    pub name: Option<Cow<'a, str>>,
     pub clip_id: Option<Cow<'a, str>>,
-    pub play_back_speed: Option<Cow<'a, str>>,
-    pub crop_start_local_time: Option<Cow<'a, str>>,
-    pub crop_end_local_time: Option<Cow<'a, str>>,
-    pub trigger_names: Option<PartialRotations<'a>>,
+    pub duration: Option<Cow<'a, str>>,
+    pub translations: Option<PartialTranslations<'a>>,
+    pub rotations: Option<PartialRotations<'a>>,
+}
+
+/// not judge operation yet at this time.
+#[derive(Debug, PartialEq, Default)]
+pub struct PartialTranslations<'input> {
+    pub range: Range<usize>,
+    pub values: Vec<Translation<'input>>,
 }
 
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialRotations<'input> {
     pub range: Range<usize>,
-    pub values: Vec<Cow<'input, str>>,
+    pub values: Vec<Rotation<'input>>,
 }
 
 impl<'de> CurrentState<'de> {
@@ -88,21 +92,9 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::Name) => {
-                self.patch.get_or_insert_default().name = Some(value);
-            }
             Some(LineKind::ClipId) => self.patch.get_or_insert_default().clip_id = Some(value),
-            Some(LineKind::PlayBackSpeed) => {
-                self.patch.get_or_insert_default().play_back_speed = Some(value);
-            }
-            Some(LineKind::CropStartLocalTime) => {
-                self.patch.get_or_insert_default().crop_start_local_time = Some(value);
-            }
-            Some(LineKind::CropEndLocalTime) => {
-                self.patch.get_or_insert_default().crop_end_local_time = Some(value);
-            }
-
-            Some(LineKind::TriggerNamesLen) => {}
+            Some(LineKind::Duration) => self.patch.get_or_insert_default().duration = Some(value),
+            Some(LineKind::TranslationLen | LineKind::RotationLen) => {}
             _ => return Err(Error::ExpectedOne),
         };
         Ok(())
@@ -111,23 +103,52 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_as_trigger_name(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
+    pub fn push_as_translation(&mut self, value: Translation<'de>) -> Result<(), Error> {
+        let is_in_diff = self.mode_code.is_some();
+        #[cfg(feature = "tracing")]
+        tracing::trace!("{self:#?}");
+        if !is_in_diff {
+            return Err(Error::NeedInModDiff);
+        }
+
+        match self.current_kind {
+            Some(LineKind::TranslationLen | LineKind::RotationLen) => {}
+            Some(LineKind::Translation) => {
+                let transition = self
+                    .patch
+                    .get_or_insert_default()
+                    .translations
+                    .get_or_insert_default();
+
+                transition.range.end += 1;
+                transition.values.push(value);
+            }
+            _ => return Err(Error::ExpectedTransition),
+        };
+
+        Ok(())
+    }
+
+    /// The following is an additional element, so push.
+    /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
+    /// - `<!-- ORIGINAL --!> is not found yet.
+    pub fn push_as_rotation(&mut self, value: Rotation<'de>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
 
         match self.current_kind {
-            Some(LineKind::TriggerNamesLen) => {}
-            Some(LineKind::TriggerNames) => {
-                let trigger_names = self
+            Some(LineKind::TranslationLen | LineKind::RotationLen) => {}
+            Some(LineKind::Rotation) => {
+                let rotations = self
                     .patch
                     .get_or_insert_default()
-                    .trigger_names
+                    .rotations
                     .get_or_insert_default();
 
-                trigger_names.range.end += 1;
-                trigger_names.values.push(value);
+                rotations.range.end += 1;
+                rotations.values.push(value);
             }
             _ => return Err(Error::ExpectedTransition),
         };
@@ -143,11 +164,20 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::TriggerNames) => {
+            Some(LineKind::Translation) => {
+                let transitions = self
+                    .patch
+                    .get_or_insert_default()
+                    .translations
+                    .get_or_insert_default();
+                transitions.range.start = start;
+                transitions.range.end = start;
+            }
+            Some(LineKind::Rotation) => {
                 let rotations = self
                     .patch
                     .get_or_insert_default()
-                    .trigger_names
+                    .rotations
                     .get_or_insert_default();
                 rotations.range.start = start;
                 rotations.range.end = start;

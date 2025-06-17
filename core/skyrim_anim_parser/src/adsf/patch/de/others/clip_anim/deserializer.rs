@@ -1,12 +1,10 @@
-use crate::adsf::patch::clip_anim::{ClipAnimDiffPatch, DiffTriggerNames, LineKind};
-use crate::{
-    adsf::patch::{
-        clip_anim::current_state::{CurrentState, PartialRotations},
-        comment::{close_comment, comment_kind, take_till_close, CommentKind},
-        error::{Error, Result},
-    },
-    lines::{one_line, verify_line_parses_to},
+use crate::adsf::patch::de::comment::{close_comment, comment_kind, take_till_close, CommentKind};
+use crate::adsf::patch::de::error::{Error, Result};
+use crate::adsf::patch::de::others::clip_anim::{
+    current_state::{CurrentState, PartialRotations},
+    ClipAnimDiffPatch, DiffTriggerNames, LineKind,
 };
+use crate::lines::{one_line, verify_line_parses_to};
 use json_patch::{Op, OpRange};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{

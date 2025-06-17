@@ -1,6 +1,6 @@
-//! errors of `This crate`
+//! errors of `patch de`
 
-/// GUI Error
+/// Patch deserializer error
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
     /// Mismatched type. Expected one, but got array patch

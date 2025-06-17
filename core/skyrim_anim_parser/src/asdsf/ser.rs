@@ -120,6 +120,8 @@ mod tests {
             "../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
         ));
         let asdsf = parse_asdsf(&expected).unwrap_or_else(|e| panic!("{e}"));
+        dbg!(asdsf.txt_projects.len());
+        dbg!(asdsf.anim_set_list.len());
 
         // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();
         let actual = serialize_asdsf(&asdsf);

@@ -1,12 +1,12 @@
 use crate::adsf::{
     normal::{Rotation, Translation},
-    patch::{
-        clip_motion::{
+    patch::de::{
+        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        error::{Error, Result},
+        others::clip_motion::{
             current_state::{CurrentState, PartialRotations, PartialTranslations},
             ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
         },
-        comment::{close_comment, comment_kind, take_till_close, CommentKind},
-        error::{Error, Result},
     },
 };
 use crate::{
