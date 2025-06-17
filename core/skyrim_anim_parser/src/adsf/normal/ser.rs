@@ -1,14 +1,7 @@
-#[cfg(feature = "alt_map")]
-mod alt;
-
-#[cfg(feature = "alt_map")]
-pub use self::alt::serialize_alt_adsf;
-
-use std::borrow::Cow;
-
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
+use std::borrow::Cow;
 
 /// Serializes the animation data structure into a string.
 ///
@@ -50,7 +43,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     // Hints:
     // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
 
-    let mut clip_id_manager = super::clip_id_manager::ClipIdManager::new();
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new();
     let mut clip_id_map = std::collections::HashMap::new();
     for block in &anim_data.add_clip_anim_blocks {
         let new_id = clip_id_manager.next_id();
@@ -102,7 +95,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
+pub(crate) fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
     let mut output = String::new();
 
     output.push_str(&line_range.to_string());
@@ -125,7 +118,7 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
 }
 
 /// Serializes a clip animation data block into a string.
-fn serialize_clip_anim_block(
+pub(crate) fn serialize_clip_anim_block(
     block: &ClipAnimDataBlock,
     replace_clip_id: Option<Cow<'_, str>>,
 ) -> String {
@@ -170,7 +163,7 @@ fn serialize_clip_anim_block(
 }
 
 /// Serializes a clip motion block into a string.
-fn serialize_clip_motion_block(
+pub(crate) fn serialize_clip_motion_block(
     block: &ClipMotionBlock,
     replace_clip_id: Option<Cow<'_, str>>,
 ) -> String {
@@ -241,7 +234,7 @@ fn serialize_rotation(ser: &mut String, rotation: &Rotation) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adsf::de::parse_adsf;
+    use crate::adsf::normal::de::parse_adsf;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
         if input.contains("\r\n") {

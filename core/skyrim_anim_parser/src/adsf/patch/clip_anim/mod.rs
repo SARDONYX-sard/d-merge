@@ -4,7 +4,7 @@ pub mod deserializer;
 use json_patch::{Op, OpRange};
 use std::borrow::Cow;
 
-use crate::adsf::ClipAnimDataBlock;
+use crate::adsf::normal::ClipAnimDataBlock;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]

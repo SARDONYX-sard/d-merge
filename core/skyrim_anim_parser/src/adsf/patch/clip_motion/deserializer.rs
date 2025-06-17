@@ -1,4 +1,5 @@
 use crate::adsf::{
+    normal::{Rotation, Translation},
     patch::{
         clip_motion::{
             current_state::{CurrentState, PartialRotations, PartialTranslations},
@@ -7,10 +8,9 @@ use crate::adsf::{
         comment::{close_comment, comment_kind, take_till_close, CommentKind},
         error::{Error, Result},
     },
-    Rotation, Translation,
 };
 use crate::{
-    adsf::de::from_word_and_space,
+    adsf::normal::de::from_word_and_space,
     lines::{one_line, verify_line_parses_to},
 };
 use json_patch::{Op, OpRange};

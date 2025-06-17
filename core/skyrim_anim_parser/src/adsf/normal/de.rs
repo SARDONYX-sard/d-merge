@@ -302,26 +302,4 @@ mod tests {
             include_str!("../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
         test_parse(s);
     }
-
-    #[test]
-    #[cfg(feature = "alt_map")]
-    fn should_write_alt_adsf_json() {
-        use crate::adsf::AltAdsf;
-
-        let input =
-            include_str!("../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
-        let adsf = parse_adsf(input).unwrap_or_else(|err| {
-            panic!("Failed to parse adsf:\n{err}");
-        });
-        let alt_adsf: AltAdsf = adsf.into();
-
-        std::fs::create_dir_all("../../dummy/debug/").unwrap();
-        let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
-            panic!("Failed to serialize adsf to JSON:\n{err}");
-        });
-        std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
-
-        let bin = rmp_serde::to_vec(&alt_adsf).unwrap();
-        std::fs::write("../../dummy/debug/animationdatasinglefile.bin", bin).unwrap();
-    }
 }

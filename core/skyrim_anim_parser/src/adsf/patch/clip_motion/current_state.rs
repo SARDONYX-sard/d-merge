@@ -1,6 +1,6 @@
 use crate::adsf::{
+    normal::{Rotation, Translation},
     patch::{clip_motion::LineKind, error::Error},
-    Rotation, Translation,
 };
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};

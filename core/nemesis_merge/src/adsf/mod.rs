@@ -12,12 +12,12 @@ use crate::results::partition_results;
 use crate::types::{OwnedAdsfPatchMap, PriorityMap};
 use crate::Config;
 use rayon::prelude::*;
+use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
+use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
 use skyrim_anim_parser::adsf::patch::{
     parse_clip_anim_block_patch, parse_clip_anim_diff_patch, parse_clip_motion_block_patch,
     parse_clip_motion_diff_patch, ClipAnimDiffPatch, ClipMotionDiffPatch,
 };
-use skyrim_anim_parser::adsf::ser::serialize_alt_adsf;
-use skyrim_anim_parser::adsf::{AltAdsf, ClipAnimDataBlock, ClipMotionBlock};
 use snafu::ResultExt as _;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};

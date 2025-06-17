@@ -1,6 +1,6 @@
 use crate::adsf::{
-    ser::{serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block},
-    AltAdsf, AltAnimData,
+    alt::{to_adsf_key, AltAdsf, AltAnimData},
+    normal::ser::{serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block},
 };
 
 /// Serializes to `animationdatasinglefile.txt` string.
@@ -15,7 +15,7 @@ pub fn serialize_alt_adsf(alt_adsf: &AltAdsf) -> String {
     // Serialize project names
     output.push_str(&format!("{}\r\n", project_names.len()));
     for name in project_names {
-        let name = crate::adsf::to_adsf_key(name.as_ref().into());
+        let name = to_adsf_key(name.as_ref().into());
         output.push_str(name.as_ref());
         output.push_str("\r\n");
     }
@@ -106,7 +106,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "alt_map")]
     #[test]
     fn test_serialize_alt_adsf() {
         let alt_adsf_bytes = include_bytes!(
@@ -125,5 +124,27 @@ mod tests {
             panic!("actual != expected");
         }
         assert!(res);
+    }
+
+    #[test]
+    fn should_write_alt_adsf_json() {
+        use crate::adsf::alt::AltAdsf;
+
+        let input = include_str!(
+            "../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
+        );
+        let adsf = crate::adsf::normal::de::parse_adsf(input).unwrap_or_else(|err| {
+            panic!("Failed to parse adsf:\n{err}");
+        });
+        let alt_adsf: AltAdsf = adsf.into();
+
+        std::fs::create_dir_all("../../dummy/debug/").unwrap();
+        let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
+            panic!("Failed to serialize adsf to JSON:\n{err}");
+        });
+        std::fs::write("../../dummy/debug/animationdatasinglefile.json", json).unwrap();
+
+        let bin = rmp_serde::to_vec(&alt_adsf).unwrap();
+        std::fs::write("../../dummy/debug/animationdatasinglefile.bin", bin).unwrap();
     }
 }

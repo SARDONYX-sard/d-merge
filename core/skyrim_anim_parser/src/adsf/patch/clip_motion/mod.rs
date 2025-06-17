@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use json_patch::{Op, OpRange};
 
-use crate::adsf::{ClipMotionBlock, Rotation, Translation};
+use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
