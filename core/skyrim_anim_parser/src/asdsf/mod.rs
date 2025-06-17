@@ -3,20 +3,33 @@
 //! This module provides structures and parsers for reading animation data
 //! from a file formatted in a specific way. The primary structure is [`Asdsf`],
 //! which contains a list of projects and their corresponding animation data.
+mod alt_key;
 pub mod de;
 pub mod ser;
+
+use indexmap::IndexMap;
 
 use crate::lines::Str;
 
 /// Represents the entire animation data structure.
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// Before merging the `animationsetdatasinglefile.txt` file, it exists in `meshes/animationsetdata` in Animation.bsa.
+///
+/// However, please note that there are no txt references such as Vampire in the `animationsetdatasinglefile.txt` file.
+#[derive(Debug, Default, Clone)]
 pub struct Asdsf<'a> {
     /// A list of project names parsed from the input.
-    pub txt_projects: Vec<Str<'a>>,
-
-    /// A list of animation data corresponding to each project.
-    pub anim_set_list: Vec<AnimSetData<'a>>,
+    pub txt_projects: TxtProjects<'a>,
 }
+
+/// - key: project data file names: e.g. `ChickenProjectData\\ChickenProject.txt`
+#[derive(Debug, Default, Clone)]
+pub struct TxtProjects<'a>(IndexMap<Str<'a>, AnimSetList<'a>>);
+
+/// A list of animation data corresponding to each project.
+/// - key: file_name(e.g. `full_body.txt`)
+#[derive(Debug, Default, Clone)]
+pub struct AnimSetList<'a>(IndexMap<Str<'a>, AnimSetData<'a>>);
 
 /// Represents individual animation data.
 ///
@@ -25,8 +38,6 @@ pub struct Asdsf<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnimSetData<'a> {
-    pub file_names_len: Option<usize>,
-    pub file_names: Option<Vec<Str<'a>>>,
     /// always `V3`
     pub version: Str<'a>,
     pub triggers_len: usize,

@@ -1,6 +1,9 @@
 //! Parses animation data from asdsf(animationsetdatasinglefile.txt)
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
-use crate::lines::{lines, num_bool_line, one_line, parse_one_line, Str};
+use crate::{
+    asdsf::{AnimSetList, TxtProjects},
+    lines::{lines, num_bool_line, one_line, parse_one_line, Str},
+};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
@@ -17,27 +20,24 @@ pub fn parse_asdsf(input: &str) -> Result<Asdsf<'_>, ReadableError> {
 }
 
 fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
-    let txt_projects = txt_projects.parse_next(input)?;
+    let txt_projects_ = txt_projects.parse_next(input)?;
 
-    let mut anim_set_list = vec![];
-    #[cfg(feature = "tracing")]
-    let mut i = 0;
-    while let Ok(anim_set_data) = anim_set_data
-        .context(Label("AnimSetData"))
-        .parse_next(input)
-    {
-        #[cfg(feature = "tracing")]
-        {
-            tracing::debug!(i);
-            tracing::debug!(?anim_set_data);
-            i += 1;
+    let mut txt_projects = indexmap::IndexMap::new();
+    for txt_project in txt_projects_ {
+        let mut anim_set_list = indexmap::IndexMap::new();
+
+        for file_name in file_names.parse_next(input)? {
+            let anim_set_data = anim_set_data
+                .context(Label("AnimSetData"))
+                .parse_next(input)?;
+            anim_set_list.insert(file_name, anim_set_data);
         }
-        anim_set_list.push(anim_set_data);
+
+        txt_projects.insert(txt_project, AnimSetList(anim_set_list));
     }
 
     Ok(Asdsf {
-        txt_projects,
-        anim_set_list,
+        txt_projects: TxtProjects(txt_projects),
     })
 }
 
@@ -62,7 +62,7 @@ fn txt_projects<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     Ok(txt_projects)
 }
 
-fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
+fn file_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     let file_names_len = opt(one_line
         .verify(|line: &str| line != "V3")
         .try_map(|s| s.as_ref().parse::<usize>())
@@ -78,6 +78,10 @@ fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
         );
     }
 
+    Ok(file_names.unwrap_or_default())
+}
+
+fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
     let version = one_line
         .verify(|line: &str| line == "V3")
         .context(Expected(Description("version == V3")))
@@ -112,8 +116,6 @@ fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
         .parse_next(input)?;
 
     Ok(AnimSetData {
-        file_names_len,
-        file_names,
         version,
         triggers_len,
         triggers,
@@ -200,7 +202,7 @@ mod tests {
     fn test_parse(input: &str) {
         match parse_asdsf(input) {
             Ok(asdsf) => {
-                std::fs::create_dir_all("../../../../dummy/debug").unwrap();
+                std::fs::create_dir_all("../../dummy/debug").unwrap();
 
                 // Key value pair?
                 // let asdsf: HashMap<_, _> = asdsf
@@ -209,11 +211,7 @@ mod tests {
                 //     .zip(asdsf.anim_set_list)
                 //     .collect();
 
-                std::fs::write(
-                    "../../../../dummy/debug/asdsf_debug.log",
-                    format!("{asdsf:#?}"),
-                )
-                .unwrap();
+                std::fs::write("../../dummy/debug/asdsf_debug.log", format!("{asdsf:#?}")).unwrap();
             }
             Err(err) => panic!("{err}"),
         }

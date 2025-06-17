@@ -1,5 +1,5 @@
 use crate::{
-    asdsf::{AnimInfo, AnimSetData, Asdsf, Attack, Condition},
+    asdsf::{AnimInfo, AnimSetList, Asdsf, Attack, Condition, TxtProjects},
     lines::Str,
 };
 
@@ -11,35 +11,41 @@ pub fn serialize_asdsf(data: &Asdsf<'_>) -> String {
 
     write_projects(&mut out, &data.txt_projects);
 
-    for anim_set in &data.anim_set_list {
-        write_file_names(&mut out, anim_set);
-        write_version(&mut out, &anim_set.version);
-        write_triggers(&mut out, anim_set);
-        write_conditions(&mut out, &anim_set.conditions);
-        write_attacks(&mut out, &anim_set.attacks);
-        write_anim_infos(&mut out, &anim_set.anim_infos);
+    for (_, anim_set_list) in &data.txt_projects.0 {
+        write_file_names(&mut out, anim_set_list);
+        for (_, anim_set) in &anim_set_list.0 {
+            write_version(&mut out, &anim_set.version);
+            write_triggers(&mut out, &anim_set.triggers);
+            write_conditions(&mut out, &anim_set.conditions);
+            write_attacks(&mut out, &anim_set.attacks);
+            write_anim_infos(&mut out, &anim_set.anim_infos);
+        }
     }
 
     out
 }
 
-fn write_projects(out: &mut String, projects: &[Str<'_>]) {
-    out.push_str(&projects.len().to_string());
+fn write_projects(out: &mut String, projects: &TxtProjects) {
+    out.push_str(&projects.0.len().to_string());
     out.push_str(NEW_LINE);
-    for project in projects {
-        out.push_str(project);
+    for (project_name, _) in &projects.0 {
+        out.push_str(project_name);
         out.push_str(NEW_LINE);
     }
 }
 
-fn write_file_names(out: &mut String, anim_set: &AnimSetData<'_>) {
-    if let Some(file_names) = &anim_set.file_names {
-        out.push_str(&file_names.len().to_string());
+fn write_file_names(out: &mut String, anim_set_list: &AnimSetList<'_>) {
+    let file_names_len = anim_set_list.0.len();
+    if file_names_len == 0 {
+        return;
+    }
+
+    out.push_str(&file_names_len.to_string());
+    out.push_str(NEW_LINE);
+
+    for name in anim_set_list.0.keys() {
+        out.push_str(name);
         out.push_str(NEW_LINE);
-        for name in file_names {
-            out.push_str(name);
-            out.push_str(NEW_LINE);
-        }
     }
 }
 
@@ -48,10 +54,10 @@ fn write_version(out: &mut String, version: &Str<'_>) {
     out.push_str(NEW_LINE);
 }
 
-fn write_triggers(out: &mut String, anim_set: &AnimSetData<'_>) {
-    out.push_str(&anim_set.triggers.len().to_string());
+fn write_triggers(out: &mut String, triggers: &[Str<'_>]) {
+    out.push_str(&triggers.len().to_string());
     out.push_str(NEW_LINE);
-    for trig in &anim_set.triggers {
+    for trig in triggers {
         out.push_str(trig);
         out.push_str(NEW_LINE);
     }
@@ -120,8 +126,6 @@ mod tests {
             "../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
         ));
         let asdsf = parse_asdsf(&expected).unwrap_or_else(|e| panic!("{e}"));
-        dbg!(asdsf.txt_projects.len());
-        dbg!(asdsf.anim_set_list.len());
 
         // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();
         let actual = serialize_asdsf(&asdsf);
