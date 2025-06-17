@@ -110,7 +110,7 @@ pub struct Condition<'a> {
 /// - `Solo`: Unarmed
 /// -  `1HM`: OneHand Sword
 /// -  `MRh`: RightHand Magic
-/// -  `MLh`: RightHand Magic
+/// -  `MLh`: LeftHand Magic
 ///
 /// e.g. `MRhShield.txt`: right hand Magic, left hand shield
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
