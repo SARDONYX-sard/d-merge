@@ -158,7 +158,7 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode
             let attack = seq! {
                     Attack {
                         attack_trigger: one_line.context(Expected(Description("attack_trigger: str"))),
-                        unknown: num_bool_line.context(Expected(Description("unknown: 0 | 1"))),
+                        is_contextual: num_bool_line.context(Expected(Description("unknown: 0 | 1"))),
                         clip_names_len: parse_one_line.context(Expected(Description("clip_names_len: usize"))),
                         clip_names: lines(clip_names_len).context(Expected(Description("clip_names: Vec<str>"))),
                     }

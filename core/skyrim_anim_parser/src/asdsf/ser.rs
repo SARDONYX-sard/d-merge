@@ -82,7 +82,7 @@ fn write_attacks(out: &mut String, attacks: &[Attack<'_>]) {
     for atk in attacks {
         out.push_str(&atk.attack_trigger);
         out.push_str(NEW_LINE);
-        out.push_str(if atk.unknown { "1" } else { "0" });
+        out.push_str(if atk.is_contextual { "1" } else { "0" });
         out.push_str(NEW_LINE);
         out.push_str(&atk.clip_names_len.to_string());
         out.push_str(NEW_LINE);
