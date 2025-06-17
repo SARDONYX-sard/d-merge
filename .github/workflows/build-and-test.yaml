@@ -101,5 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ env.APP_NAME }}-${{ runner.os }}
+          # to include .keep file
+          include-hidden-files: true
           path: |
             ./build/
