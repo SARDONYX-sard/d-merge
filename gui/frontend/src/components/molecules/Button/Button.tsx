@@ -1,5 +1,5 @@
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
-import { type ButtonProps, Button as Button_, type SxProps, type Theme } from '@mui/material';
+import { Button as Button_, type ButtonProps, type SxProps, type Theme } from '@mui/material';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 

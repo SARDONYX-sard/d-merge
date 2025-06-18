@@ -1,9 +1,7 @@
-import { listen } from '@tauri-apps/api/event';
-
-import { NOTIFY } from '@/lib/notify';
-
 import type { EventCallback, EventName } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import type { ReactNode } from 'react';
+import { NOTIFY } from '@/lib/notify';
 
 type ListenerProps = {
   setLoading: (b: boolean) => void;

@@ -1,17 +1,17 @@
 import SettingsIcon from '@mui/icons-material/Settings';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Select,
-  MenuItem,
-  IconButton,
-  FormControlLabel,
-  Switch,
-  FormGroup,
-  FormLabel,
-  FormHelperText,
   Box,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  FormLabel,
+  IconButton,
+  MenuItem,
+  Select,
+  Switch,
   Tooltip,
 } from '@mui/material';
 import { produce } from 'immer';

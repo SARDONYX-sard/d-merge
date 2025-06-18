@@ -1,10 +1,8 @@
+import type { SnackbarOrigin } from 'notistack';
 import { STORAGE } from '@/lib/storage';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-
 import { snackbarLimitSchema, snackbarOriginSchema } from './schema';
-
-import type { SnackbarOrigin } from 'notistack';
 
 /**
  * Type representing the configuration for the notification system.

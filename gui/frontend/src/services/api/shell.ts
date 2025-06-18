@@ -1,4 +1,4 @@
-import { openUrl as _openUrl, openPath as _openPath } from '@tauri-apps/plugin-opener';
+import { openPath as _openPath, openUrl as _openUrl } from '@tauri-apps/plugin-opener';
 
 import { NOTIFY } from '@/lib/notify';
 

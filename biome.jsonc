@@ -1,16 +1,17 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
   "extends": [],
   "files": {
-    "ignore": [
-      "**/gen",
-      ".next",
-      "cspell.jsonc",
-      "monaco-vim.d.ts", //Automatic generation by devtool and LM, so any is used
-      "node_modules",
-      "out",
-      "schema.json",
-      "target"
+    "includes": [
+      "**",
+      "!gui/frontend/gen",
+      "!gui/frontend/.next",
+      "!gui/frontend/cspell.jsonc",
+      "!gui/frontend/monaco-vim.d.ts",
+      "!gui/frontend/node_modules",
+      "!gui/frontend/out",
+      "!gui/frontend/schema.json",
+      "!gui/frontend/target"
     ],
     "ignoreUnknown": true
   },
@@ -40,35 +41,40 @@
     }
   },
   "linter": {
-    "ignore": ["./tools/version_up.js"],
+    "includes": ["gui/frontend/**/", "tools/version_up.js"],
     "rules": {
-      "all": true,
       "correctness": {
         "noUndeclaredDependencies": "off",
         "useImportExtensions": "off"
       },
-      "nursery": {
-        "all": false
-      },
+      "nursery": {},
       "performance": {
         "noBarrelFile": "off",
         "noReExportAll": "off"
       },
       "style": {
-        "noDefaultExport": "off"
+        "noDefaultExport": "off",
+        "noParameterAssign": "error",
+        "useAsConstAssertion": "error",
+        "useDefaultParameterLast": "error",
+        "useEnumInitializers": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "noUnusedTemplateLiteral": "error",
+        "useNumberNamespace": "error",
+        "noInferrableTypes": "error",
+        "noUselessElse": "error"
       },
       "suspicious": {
-        "noConsoleLog": "off", // Configuration to be removed in due course.
-        "noReactSpecificProps": "off" // It's for Solid.js, so turn it off in React.
+        "noReactSpecificProps": "off", // It's for Solid.js, so turn it off in React.,
+        "noConsole": { "level": "off", "options": { "allow": ["log"] } }
       }
     }
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "overrides": [
     {
-      "include": ["./gui/frontend/src/components/**/*"],
+      "includes": ["gui/frontend/src/components/**/*"],
       "linter": {
         "rules": {
           "style": {

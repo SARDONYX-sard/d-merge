@@ -1,11 +1,9 @@
 import { Button, Tooltip } from '@mui/material';
-
+import type { GridColDef } from '@mui/x-data-grid';
+import type { MouseEventHandler } from 'react';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { ModInfo } from '@/services/api/patch';
 import { openUrl } from '@/services/api/shell';
-
-import type { GridColDef } from '@mui/x-data-grid';
-import type { MouseEventHandler } from 'react';
 
 export const useColumns = () => {
   const { t } = useTranslation();

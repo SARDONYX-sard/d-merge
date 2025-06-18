@@ -1,12 +1,9 @@
 import { Box, Chip } from '@mui/material';
-
+import type { ComponentPropsWithRef } from 'react';
 import { hashDjb2 } from '@/lib/hash-djb2';
-
 import { useConvertContext } from './ConvertProvider';
 import { PathTreeSelector } from './PathTreeSelector';
 import { renderStatusIcon } from './renderStatusIcon';
-
-import type { ComponentPropsWithRef } from 'react';
 
 export const PathSelector = () => {
   const { selectionType, selectedFiles, setSelectedFiles, selectedDirs, setSelectedDirs, convertStatuses } =

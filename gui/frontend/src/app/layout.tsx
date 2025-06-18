@@ -1,8 +1,8 @@
 export { metadata } from '@/components/meta/meta';
-import ClientLayout from '@/components/layout/ClientLayout';
-import { inter } from '@/components/meta/font';
 
 import type { ReactNode } from 'react';
+import ClientLayout from '@/components/layout/ClientLayout';
+import { inter } from '@/components/meta/font';
 
 import '@/app/globals.css';
 

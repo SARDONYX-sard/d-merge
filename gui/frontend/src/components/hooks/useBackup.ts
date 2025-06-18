@@ -20,7 +20,6 @@ const useAutoImportBackup = () => {
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
     const doImport = async () => {
       if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
         return;

@@ -16,11 +16,8 @@
 //   node ./tools/version_up.cjs minor                # e.g. 1.2.3 → 1.3.0
 //   node ./tools/version_up.cjs patch --dry-run      # Simulate patch bump
 
-// biome-ignore lint/correctness/noNodejsModules: <explanation>
 const fs = require('node:fs');
-// biome-ignore lint/correctness/noNodejsModules: <explanation>
 const path = require('node:path');
-// biome-ignore lint/correctness/noNodejsModules: <explanation>
 const { execSync } = require('node:child_process');
 
 const baseDir = path.resolve(__dirname, '..');
@@ -64,7 +61,6 @@ function main() {
  * @returns {string} The new version.
  */
 function bumpVersion(current, type) {
-  // biome-ignore lint/performance/useTopLevelRegex: <explanation>
   const match = current.match(/^(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?$/);
   if (!match) {
     throw new Error(`Invalid version format: ${current}`);
@@ -85,7 +81,6 @@ function bumpVersion(current, type) {
       throw new Error(`Current version does not have a prerelease: ${current}`);
     }
 
-    // biome-ignore lint/performance/useTopLevelRegex: <explanation>
     const preMatch = pre.match(/^([\w]+)\.(\d+)$/);
     if (!preMatch) {
       throw new Error(`Unsupported prerelease format: ${pre}`);
@@ -139,7 +134,6 @@ function updateJsonVersion(filePath, version) {
 function updateCargoToml(filePath, version) {
   const content = fs.readFileSync(filePath, 'utf8');
   const replaced = content.replace(
-    // biome-ignore lint/performance/useTopLevelRegex: <explanation>
     /\[workspace\.package\]\nversion = ".*?"/,
     `[workspace.package]\nversion = "${version}"`,
   );
@@ -153,7 +147,6 @@ function updateCargoToml(filePath, version) {
  */
 function updateIssueTemplate(filePath, version) {
   const content = fs.readFileSync(filePath, 'utf8');
-  // biome-ignore lint/performance/useTopLevelRegex: <explanation>
   const match = content.match(/options:\n((\s+- .*\n)+)/);
   if (!match) {
     throw new Error('Cannot find options list in issue template.');
@@ -193,6 +186,5 @@ function commitAndTag(oldVer, newVer) {
  * @param {string} msg - The message to log.
  */
 function log(msg) {
-  // biome-ignore lint/suspicious/noConsole: <explanation>
   console.log(`[version_up] ${msg}`);
 }

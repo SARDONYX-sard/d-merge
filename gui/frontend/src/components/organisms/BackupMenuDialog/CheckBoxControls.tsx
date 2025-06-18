@@ -1,8 +1,6 @@
 import { Box, Checkbox, FormControlLabel } from '@mui/material';
-
-import { useTranslation } from '@/components/hooks/useTranslation';
-
 import type { MouseEventHandler } from 'react';
+import { useTranslation } from '@/components/hooks/useTranslation';
 
 type Props = {
   isAllChecked: boolean;
