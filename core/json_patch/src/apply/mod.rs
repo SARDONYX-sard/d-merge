@@ -4,7 +4,7 @@ mod seq;
 
 use self::error::Result;
 use self::one_op::apply_one_field;
-use self::seq::apply_seq_by_priority;
+pub use self::seq::apply_seq_by_priority;
 use crate::{JsonPath, Patch};
 use simd_json::BorrowedValue;
 

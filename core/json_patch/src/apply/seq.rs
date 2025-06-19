@@ -15,7 +15,10 @@ const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed("##Mark_As_R
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
-pub(crate) fn apply_seq_by_priority<'a>(
+///
+/// # Errors
+/// - If the target is not found, or if the target is not an `Array`.
+pub fn apply_seq_by_priority<'a>(
     file_name: &str,
     json: &mut Value<'a>,
     path: JsonPath<'a>,

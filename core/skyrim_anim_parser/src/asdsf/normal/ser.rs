@@ -1,6 +1,6 @@
 use crate::{
-    asdsf::{AnimInfo, AnimSetList, Asdsf, Attack, Condition, TxtProjects},
-    lines::Str,
+    asdsf::normal::{AnimInfo, AnimSetData, AnimSetList, Asdsf, Attack, Condition, TxtProjects},
+    common_parser::lines::Str,
 };
 
 const NEW_LINE: &str = "\r\n";
@@ -14,11 +14,7 @@ pub fn serialize_asdsf(data: &Asdsf<'_>) -> String {
     for (_, anim_set_list) in &data.txt_projects.0 {
         write_file_names(&mut out, anim_set_list);
         for (_, anim_set) in &anim_set_list.0 {
-            write_version(&mut out, &anim_set.version);
-            write_triggers(&mut out, &anim_set.triggers);
-            write_conditions(&mut out, &anim_set.conditions);
-            write_attacks(&mut out, &anim_set.attacks);
-            write_anim_infos(&mut out, &anim_set.anim_infos);
+            write_anim_set(&mut out, anim_set);
         }
     }
 
@@ -34,7 +30,7 @@ fn write_projects(out: &mut String, projects: &TxtProjects) {
     }
 }
 
-fn write_file_names(out: &mut String, anim_set_list: &AnimSetList<'_>) {
+pub(crate) fn write_file_names(out: &mut String, anim_set_list: &AnimSetList<'_>) {
     let file_names_len = anim_set_list.0.len();
     if file_names_len == 0 {
         return;
@@ -47,6 +43,14 @@ fn write_file_names(out: &mut String, anim_set_list: &AnimSetList<'_>) {
         out.push_str(name);
         out.push_str(NEW_LINE);
     }
+}
+
+pub(crate) fn write_anim_set(out: &mut String, anim_set: &AnimSetData<'_>) {
+    write_version(out, &anim_set.version);
+    write_triggers(out, &anim_set.triggers);
+    write_conditions(out, &anim_set.conditions);
+    write_attacks(out, &anim_set.attacks);
+    write_anim_infos(out, &anim_set.anim_infos);
 }
 
 fn write_version(out: &mut String, version: &Str<'_>) {
@@ -108,7 +112,7 @@ fn write_anim_infos(out: &mut String, infos: &[AnimInfo]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::asdsf::de::parse_asdsf;
+    use crate::asdsf::normal::de::parse_asdsf;
 
     use super::*;
 
@@ -123,7 +127,7 @@ mod tests {
     #[test]
     fn test_serialize_asdsf() {
         let expected = normalize_to_crlf(include_str!(
-            "../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
+            "../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
         ));
         let asdsf = parse_asdsf(&expected).unwrap_or_else(|e| panic!("{e}"));
 
@@ -136,7 +140,7 @@ mod tests {
         let res = dbg!(actual == expected);
         if !res {
             let diff = ::diff::diff(&actual, &expected);
-            std::fs::write("../../dummy/diff.txt", diff).unwrap();
+            std::fs::write("../../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
         assert!(res);

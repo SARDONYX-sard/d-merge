@@ -1,8 +1,8 @@
 //! Parses animation data from asdsf(animationsetdatasinglefile.txt)
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
 use crate::{
-    asdsf::{AnimSetList, TxtProjects},
-    lines::{lines, num_bool_line, one_line, parse_one_line, Str},
+    asdsf::normal::{AnimSetList, TxtProjects},
+    common_parser::lines::{lines, num_bool_line, one_line, parse_one_line, Str},
 };
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn should_parse() {
         let s = include_str!(
-            "../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
+            "../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
         );
         test_parse(s);
     }

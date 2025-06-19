@@ -1,12 +1,10 @@
-#![allow(unused)]
-
 /// Converts a `~`-separated identifier into a `\`-separated vanilla-style path,
 /// appending `.txt` at the end. Writes the result into the provided `&mut String`.
 ///
 /// # Returns
 /// * `Some(())` if the conversion succeeded
 /// * `None` if the input did not contain a `~` separator
-pub fn to_path_into(s: &str, out: &mut String) -> Option<()> {
+pub fn to_normal_txt_project_name(s: &str, out: &mut String) -> Option<()> {
     let (a, b) = s.split_once('~')?;
     out.reserve(a.len() + b.len() + 5); // "\\" + ".txt" + margin
     out.push_str(a);
@@ -23,7 +21,7 @@ pub fn to_path_into(s: &str, out: &mut String) -> Option<()> {
 ///
 /// * `Some(())` if the conversion succeeded and the path format was valid
 /// * `None` if the
-pub fn from_path_into(path: &str, out: &mut String) -> Option<()> {
+pub fn to_alt_txt_project_name(path: &str, out: &mut String) -> Option<()> {
     let path = path.strip_suffix(".txt")?;
     let mut parts = path.split('\\');
     let first = parts.next()?;
@@ -43,30 +41,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_to_path_into() {
+    fn test_to_normal_txt_project_name() {
         let input = "DefaultMaleData~DefaultMale";
         let expected = "DefaultMaleData\\DefaultMale.txt";
         let mut buf = String::new();
-        to_path_into(input, &mut buf).unwrap();
+        to_normal_txt_project_name(input, &mut buf).unwrap();
         assert_eq!(buf, expected);
     }
 
     #[test]
-    fn test_from_path_into() {
+    fn test_to_alt_txt_project_name() {
         let input = "DefaultMaleData\\DefaultMale.txt";
         let expected = "DefaultMaleData~DefaultMale";
         let mut buf = String::new();
-        from_path_into(input, &mut buf).unwrap();
+        to_alt_txt_project_name(input, &mut buf).unwrap();
         assert_eq!(buf, expected);
     }
 
     #[test]
-    fn test_invalid_from_path() {
+    fn test_invalid_to_alt_txt_project_name() {
         let input = "A\\B\\C.txt";
         let mut buf = String::new();
-        assert_eq!(from_path_into(input, &mut buf), None);
+        assert_eq!(to_alt_txt_project_name(input, &mut buf), None);
 
         let input2 = "A\\B";
-        assert_eq!(from_path_into(input2, &mut buf), None);
+        assert_eq!(to_alt_txt_project_name(input2, &mut buf), None);
     }
 }
