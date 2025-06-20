@@ -37,6 +37,15 @@ pub struct DiffPatchAnimSetData<'a> {
             bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
         )
     )]
+    attacks_patches: Vec<ValueWithPriority<'a>>,
+
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            borrow,
+            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
+        )
+    )]
     anim_infos_patches: Vec<ValueWithPriority<'a>>,
 }
 
@@ -51,6 +60,9 @@ impl DiffPatchAnimSetData<'_> {
         }
         if !other.conditions_patches.is_empty() {
             self.conditions_patches.par_extend(other.conditions_patches);
+        }
+        if !other.attacks_patches.is_empty() {
+            self.attacks_patches.par_extend(other.attacks_patches);
         }
         if !other.anim_infos_patches.is_empty() {
             self.anim_infos_patches.par_extend(other.anim_infos_patches);
@@ -74,7 +86,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
 
             let triggers = core::mem::take(&mut anim_set_data.triggers);
             let mut template = simd_json::serde::to_borrowed_value(triggers)?;
-            apply_seq_by_priority("", &mut template, vec!["triggers".into()], patches)?;
+            apply_seq_by_priority("triggers", &mut template, vec!["triggers".into()], patches)?;
             anim_set_data.triggers = simd_json::serde::from_borrowed_value(template)?;
         }
 
@@ -84,7 +96,12 @@ impl<'a> DiffPatchAnimSetData<'a> {
 
             let conditions = core::mem::take(&mut anim_set_data.conditions);
             let mut template = simd_json::serde::to_borrowed_value(conditions)?;
-            apply_seq_by_priority("", &mut template, vec!["conditions".into()], patches)?;
+            apply_seq_by_priority(
+                "conditions",
+                &mut template,
+                vec!["conditions".into()],
+                patches,
+            )?;
 
             anim_set_data.conditions = simd_json::serde::from_borrowed_value(template)?;
         }
@@ -95,7 +112,12 @@ impl<'a> DiffPatchAnimSetData<'a> {
 
             let anim_infos = core::mem::take(&mut anim_set_data.anim_infos);
             let mut template = simd_json::serde::to_borrowed_value(anim_infos)?;
-            apply_seq_by_priority("", &mut template, vec!["anim_infos".into()], patches)?;
+            apply_seq_by_priority(
+                "anim_infos",
+                &mut template,
+                vec!["anim_infos".into()],
+                patches,
+            )?;
 
             anim_set_data.anim_infos = simd_json::serde::from_borrowed_value(template)?;
         }

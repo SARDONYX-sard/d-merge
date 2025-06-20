@@ -64,24 +64,24 @@ impl OwnedAdsfPatchMap {
 }
 
 /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
-/// - value: Map<jsonPath, (patch, priority)>
+/// - value: `Map<jsonPath, { patch, priority }>`
 ///
 /// # Intended
-/// ```txt
-/// - "0_master": {
-///      ["#0001", "hkbProjectData", "variable"]: OneFIeld { patch, priority },
-///      ["#0001", "hkbProjectData", "variableNames", "[0:10]"]: Seq {
-///              [(patch, priority), (patch, priority)]
-///          }
-///   }
-/// - "_1stperson/0_master": {
-///      ["#0001", "hkbProjectData", "variable"]: { patch, priority }
-///   }
+/// ```json
+/// "0_master": {
+///     ["#0001", "hkbProjectData", "variable"]: OneFField { op, patch, priority },
+///     ["#0001", "hkbProjectData", "variableNames"]: Seq {
+///         [{ op, patch, priority }, { op, patch, priority }]
+///     }
+/// },
+/// "_1stperson/0_master": {
+///     ["#0001", "hkbProjectData", "variable"]: { op, patch, priority }
+/// }
 /// ```
 pub type RawBorrowedPatches<'a> = DashMap<Key<'a>, PatchMap<'a>>;
 
 /// - key: json path. e.g. `["#0001", "hkbProjectData", "[0:10]"]`
-/// - value: `Map<jsonPath, { patch, priority }>`
+/// - value: `{ patch, priority }`
 #[derive(Debug, Clone)]
 pub struct PatchMap<'a>(pub DashMap<JsonPath<'a>, Patch<'a>>);
 
