@@ -4,8 +4,9 @@ mod current_state;
 mod error;
 
 use self::error::Error;
-use json_patch::{apply_seq_by_priority, ValueWithPriority};
+use json_patch::{apply_seq_by_priority, JsonPath, ValueWithPriority};
 use rayon::prelude::*;
+use simd_json::serde::{from_borrowed_value, to_borrowed_value};
 
 use crate::{asdsf::normal::AnimSetData, common_parser::lines::Str};
 
@@ -34,10 +35,10 @@ pub struct DiffPatchAnimSetData<'a> {
         feature = "serde",
         serde(
             borrow,
-            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
+            bound(deserialize = "NestedPatches<'a>: serde::Deserialize<'de>")
         )
     )]
-    attacks_patches: Vec<ValueWithPriority<'a>>,
+    attacks_patches: NestedPatches<'a>,
 
     #[cfg_attr(
         feature = "serde",
@@ -47,6 +48,29 @@ pub struct DiffPatchAnimSetData<'a> {
         )
     )]
     anim_infos_patches: Vec<ValueWithPriority<'a>>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq)]
+struct NestedPatches<'a> {
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            borrow,
+            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
+        )
+    )]
+    base: Vec<ValueWithPriority<'a>>,
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            borrow,
+            bound(
+                deserialize = "Vec<(JsonPath<'a>, ValueWithPriority<'a>)>: serde::Deserialize<'de>"
+            )
+        )
+    )]
+    children: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 }
 
 impl DiffPatchAnimSetData<'_> {
@@ -61,9 +85,18 @@ impl DiffPatchAnimSetData<'_> {
         if !other.conditions_patches.is_empty() {
             self.conditions_patches.par_extend(other.conditions_patches);
         }
-        if !other.attacks_patches.is_empty() {
-            self.attacks_patches.par_extend(other.attacks_patches);
+
+        if !other.attacks_patches.base.is_empty() {
+            self.attacks_patches
+                .base
+                .par_extend(other.attacks_patches.base);
         }
+        if !other.attacks_patches.children.is_empty() {
+            self.attacks_patches
+                .children
+                .par_extend(other.attacks_patches.children);
+        }
+
         if !other.anim_infos_patches.is_empty() {
             self.anim_infos_patches.par_extend(other.anim_infos_patches);
         }
@@ -82,28 +115,49 @@ impl<'a> DiffPatchAnimSetData<'a> {
 
         if !self.triggers_patches.is_empty() {
             // take & change condition to json -> marge
+            let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.triggers))?;
             let patches = core::mem::take(&mut self.triggers_patches);
 
-            let triggers = core::mem::take(&mut anim_set_data.triggers);
-            let mut template = simd_json::serde::to_borrowed_value(triggers)?;
-            apply_seq_by_priority("triggers", &mut template, vec!["triggers".into()], patches)?;
-            anim_set_data.triggers = simd_json::serde::from_borrowed_value(template)?;
+            apply_seq_by_priority(
+                "triggers",
+                &mut template,
+                &vec!["triggers".into()],
+                patches,
+                vec![],
+            )?;
+
+            anim_set_data.triggers = from_borrowed_value(template)?;
         }
 
-        if !self.triggers_patches.is_empty() {
+        if !self.conditions_patches.is_empty() {
             // take & change condition to json -> marge
+            let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.conditions))?;
             let patches = core::mem::take(&mut self.conditions_patches);
 
-            let conditions = core::mem::take(&mut anim_set_data.conditions);
-            let mut template = simd_json::serde::to_borrowed_value(conditions)?;
             apply_seq_by_priority(
                 "conditions",
                 &mut template,
-                vec!["conditions".into()],
+                &vec!["conditions".into()],
                 patches,
+                vec![],
             )?;
 
-            anim_set_data.conditions = simd_json::serde::from_borrowed_value(template)?;
+            anim_set_data.conditions = from_borrowed_value(template)?;
+        }
+
+        if !self.attacks_patches.base.is_empty() || !self.attacks_patches.children.is_empty() {
+            let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.attacks))?;
+            let NestedPatches { base, children } = core::mem::take(&mut self.attacks_patches);
+
+            apply_seq_by_priority(
+                "attacks",
+                &mut template,
+                &vec!["attacks".into()],
+                base,
+                children,
+            )?;
+
+            anim_set_data.conditions = from_borrowed_value(template)?;
         }
 
         if !self.anim_infos_patches.is_empty() {
@@ -111,15 +165,16 @@ impl<'a> DiffPatchAnimSetData<'a> {
             let patches = core::mem::take(&mut self.anim_infos_patches);
 
             let anim_infos = core::mem::take(&mut anim_set_data.anim_infos);
-            let mut template = simd_json::serde::to_borrowed_value(anim_infos)?;
+            let mut template = to_borrowed_value(anim_infos)?;
             apply_seq_by_priority(
                 "anim_infos",
                 &mut template,
-                vec!["anim_infos".into()],
+                &vec!["anim_infos".into()],
                 patches,
+                vec![],
             )?;
 
-            anim_set_data.anim_infos = simd_json::serde::from_borrowed_value(template)?;
+            anim_set_data.anim_infos = from_borrowed_value(template)?;
         }
 
         Ok(())

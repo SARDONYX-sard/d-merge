@@ -5,7 +5,11 @@ use crate::{
     types::{BorrowedTemplateMap, Key, RawBorrowedPatches},
     Config,
 };
-use json_patch::apply_patch;
+use json_patch::{
+    apply_one_field, apply_seq_by_priority,
+    json_path::nested_path::{sort_nested_json_path, PathType},
+    Patch,
+};
 use rayon::prelude::*;
 use snafu::ResultExt;
 use std::path::Path;
@@ -17,12 +21,12 @@ use std::path::Path;
 /// shrinking the lifetime of the patch by the higher-level function.
 ///
 /// Therefore, this seemingly strange lifetime annotation is intentional.
-pub fn apply_patches<'a, 'b: 'a>(
+pub fn apply_patches<'a>(
     templates: &BorrowedTemplateMap<'a>,
-    borrowed_patches: RawBorrowedPatches<'b>,
+    borrowed_patches: RawBorrowedPatches<'a>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
-    let results: Vec<Result<(), Error>> = borrowed_patches // patches
+    let results: Vec<Result<(), Error>> = borrowed_patches
         .into_par_iter()
         .flat_map(|(key, patches)| {
             if config.debug.output_patch_json {
@@ -32,22 +36,108 @@ pub fn apply_patches<'a, 'b: 'a>(
                 }
             }
 
-            patches
-                .0
-                .into_iter()
-                .map(|(path, patch)| {
-                    if let Some(mut template_pair) = templates.get_mut(&key) {
+            // 1/4: grouping_nested_patch
+            let path_types = {
+                let entries = patches.0.iter().map(|r| r.key().clone()).collect();
+                sort_nested_json_path(entries)
+            };
+
+            let mut results = vec![];
+            for path_type in path_types {
+                match path_type {
+                    PathType::Simple(path) => {
+                        let Some((path, patch)) = patches.0.remove(&path) else {
+                            results.push(Err(Error::NotFoundTemplate {
+                                template_name: key.to_string(),
+                            }));
+                            continue;
+                        };
+                        let patch = match patch {
+                            json_patch::Patch::One(patch) => patch,
+                            json_patch::Patch::Seq(_) => {
+                                results.push(Err(Error::NotFoundTemplate {
+                                    template_name: key.to_string(),
+                                }));
+                                continue;
+                            }
+                        };
+
+                        match templates.get_mut(&key) {
+                            Some(mut template_pair) => {
+                                let template = &mut template_pair.value_mut().1;
+                                let template_name = key.to_string();
+                                results.push(
+                                    apply_one_field(template, path, patch)
+                                        .with_context(|_| PatchSnafu { template_name }),
+                                );
+                            }
+                            None => results.push(Err(Error::NotFoundTemplate {
+                                template_name: key.to_string(),
+                            })),
+                        }
+                    }
+                    PathType::Nested((base, children)) => {
+                        // paths = vec![
+                        //    ["#0001", "hkbStringData", "eventTriggers"], value: vec![ValueWithPriority] -> replace-> one patch -> add&remove
+                        //    ["#0001", "hkbStringData", "eventTriggers", "[5]", "local_time"] // modify f32
+                        //    ["#0001", "hkbStringData", "eventTriggers", "[5]", "triggers", [0], "animations", [3], "time"] // modify f32
+                        // ]
+
+                        // ["#0001", "hkbStringData", "eventTriggers"], value: vec![ValueWithPriority] -> replace-> one patch -> add&remove
+                        let Some((path, patch)) = patches.0.remove(&base) else {
+                            results.push(Err(Error::NotFoundTemplate {
+                                template_name: key.to_string(),
+                            }));
+                            continue;
+                        };
+                        let Some(mut template_pair) = templates.get_mut(&key) else {
+                            results.push(Err(Error::NotFoundTemplate {
+                                template_name: key.to_string(),
+                            }));
+                            continue;
+                        };
+                        let mut child_patches = vec![];
+                        for child in &children {
+                            let Some((path, Patch::One(patch))) = patches.0.remove(child) else {
+                                results.push(Err(Error::NotFoundTemplate {
+                                    template_name: key.to_string(),
+                                }));
+                                continue;
+                            };
+
+                            child_patches.push((path, patch));
+                        }
+
+                        let patches = match patch {
+                            Patch::One(_) => {
+                                results.push(Err(Error::NotFoundTemplate {
+                                    template_name: key.to_string(),
+                                }));
+                                continue;
+                            }
+                            Patch::Seq(patches) => patches,
+                        };
+
                         let template = &mut template_pair.value_mut().1;
                         let template_name = key.to_string();
-                        apply_patch(template_name.as_str(), template, path, patch)
-                            .with_context(|_| PatchSnafu { template_name })
-                    } else {
-                        Err(Error::NotFoundTemplate {
-                            template_name: key.to_string(),
-                        })
+
+                        if let Err(err) = apply_seq_by_priority(
+                            &template_name,
+                            template,
+                            &path,
+                            patches,
+                            child_patches,
+                        )
+                        .with_context(|_| PatchSnafu {
+                            template_name: template_name.clone(),
+                        }) {
+                            results.push(Err(err));
+                        };
                     }
-                })
-                .collect::<Vec<Result<(), Error>>>()
+                }
+            }
+
+            results
         })
         .collect();
 

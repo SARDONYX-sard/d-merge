@@ -21,19 +21,21 @@ const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed("##Mark_As_R
 pub fn apply_seq_by_priority<'a>(
     file_name: &str,
     json: &mut Value<'a>,
-    path: JsonPath<'a>,
+    path: &JsonPath<'a>,
     mut patches: Vec<ValueWithPriority<'a>>,
+    child_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 ) -> Result<()> {
-    let _ = file_name;
     let target = json
-        .ptr_mut(&path)
-        .ok_or_else(|| JsonPatchError::not_found_target_from(&path, &patches))?;
+        .ptr_mut(path)
+        .ok_or_else(|| JsonPatchError::not_found_target_from(path, &patches))?;
 
     let Value::Array(template_array) = target else {
-        return Err(JsonPatchError::unsupported_range_kind_from(&path, &patches));
+        return Err(JsonPatchError::unsupported_range_kind_from(path, &patches));
     };
 
     sort_by_priority(patches.as_mut_slice());
+
+    let _ = file_name;
     #[cfg(feature = "tracing")]
     {
         let path = path.join("/");
@@ -47,17 +49,31 @@ Path: {path}, Seq target length: {target_len}
     }
 
     let patch_target_vec = core::mem::take(template_array);
-    let patched_array = apply_ops_parallel(*patch_target_vec, patches)
-        .smart_iter()
-        .filter(|v| v != &MARK_AS_REMOVED);
 
-    template_array.smart_extend(patched_array);
+    // check_nested_path
+    // one patch
+    // ["[5]", "local_time"] // modify f32
+    // ["[5]", "triggers", [0], "animations", [3], "time"] // modify f32
+    let (mut patched_array, add_ops) = apply_ops_parallel(*patch_target_vec, patches);
+    for (path, patch) in child_patches {
+        if let Err(err) = crate::apply_one_field(target, path, patch) {
+            #[cfg(feature = "tracing")]
+            tracing::warn!("Failed to apply child patch path(`{file_name}`): {err}",);
+        };
+    }
+
+    // breaking change indexes
+    let Value::Array(template_array) = target else {
+        return Err(JsonPatchError::unsupported_range_kind_from(path, ""));
+    };
+    add_patch(&mut patched_array, add_ops);
+    remove_mark_as_removed(template_array, patched_array);
 
     Ok(())
 }
 
 // Separate sorted ops into Add and others
-fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
+pub fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
     #[cfg(feature = "rayon")]
     patches.par_sort_unstable_by(|a, b| {
         let ValueWithPriority {
@@ -103,10 +119,13 @@ fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
 ///
 /// # Assumptions
 /// - patches are sorted.
+///
+/// # Panics
+/// patches is not seq.
 fn apply_ops_parallel<'a>(
     base: Vec<Value<'a>>,
     patches: Vec<ValueWithPriority<'a>>,
-) -> Vec<Value<'a>> {
+) -> (Vec<Value<'a>>, Vec<ValueWithPriority<'a>>) {
     use std::sync::{Arc, Mutex};
 
     let (non_add_ops, add_ops): (Vec<_>, Vec<_>) = patches
@@ -146,11 +165,19 @@ fn apply_ops_parallel<'a>(
             }
         });
 
-    // Add
-    let mut base = Arc::try_unwrap(base)
+    let base = Arc::try_unwrap(base)
         .expect("No other Arc references")
         .into_inner()
         .unwrap();
+
+    (base, add_ops)
+}
+
+// Add(move index)
+///
+/// # Panics
+/// patch must be seq.
+fn add_patch<'a>(base: &mut Vec<Value<'a>>, add_ops: Vec<ValueWithPriority<'a>>) {
     let mut offset = 0;
     for value in add_ops {
         let ValueWithPriority { patch, .. } = value;
@@ -166,12 +193,16 @@ fn apply_ops_parallel<'a>(
             base.smart_extend(values);
         }
     }
+}
 
-    base
+/// Remove `MARK_AS_REMOVED`(move index)
+fn remove_mark_as_removed<'a>(join_target: &mut Vec<Value<'a>>, patched_array: Vec<Value<'a>>) {
+    let filter = patched_array.smart_iter().filter(|v| v != &MARK_AS_REMOVED);
+    join_target.smart_extend(filter);
 }
 
 #[cfg(any(feature = "tracing", test))]
-fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> String {
+pub fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> String {
     use std::collections::BTreeSet;
 
     const CELL_WIDTH: usize = 5;
@@ -335,12 +366,18 @@ mod tests {
 
         sort_by_priority(&mut patches);
         println!("Operation Map:\n{}", visualize_ops(&patches));
-        let result = apply_ops_parallel(base_seq, patches);
 
-        let result: Vec<_> = result
-            .smart_iter()
-            .filter(|v| v != &MARK_AS_REMOVED)
-            .collect();
+        let (mut patched_array, add_ops) = apply_ops_parallel(base_seq, patches);
+
+        // check_nested_path
+        // one patch
+        // ["#0001", "Class", "array_field", "[0]", "inner_field"] -> if failed,  then removed
+
+        add_patch(&mut patched_array, add_ops);
+
+        let mut result = vec![];
+        remove_mark_as_removed(&mut result, patched_array);
+
         println!("{result:#?}");
     }
 }
