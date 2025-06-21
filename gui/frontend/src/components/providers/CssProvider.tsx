@@ -1,8 +1,6 @@
-import { createContext, useContext } from 'react';
-
-import { useInjectCss } from '@/components/hooks/useInjectCss';
-
 import type React from 'react';
+import { createContext, useContext } from 'react';
+import { useInjectCss } from '@/components/hooks/useInjectCss';
 
 type ContextType = ReturnType<typeof useInjectCss>;
 const Context = createContext<ContextType | undefined>(undefined);

@@ -1,9 +1,7 @@
 import { Typography } from '@mui/material';
-
+import type { ComponentPropsWithoutRef } from 'react';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
-
-import type { ComponentPropsWithoutRef } from 'react';
 
 export type EditorInfo = {
   css: Props;

@@ -1,6 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
-
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
+import { invoke } from '@tauri-apps/api/core';
 
 export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json' | 'yaml';
 

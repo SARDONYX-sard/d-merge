@@ -2,10 +2,8 @@
 
 // NOTE: From next15, { ssr: false } can only be called by the Client component.
 import dynamic from 'next/dynamic';
-
-import Loading from '@/components/templates/Loading';
-
 import type { ReactNode } from 'react';
+import Loading from '@/components/templates/Loading';
 
 const DynClientLayout = dynamic(() => import('@/components/layout/ClientLayout/ClientLayout'), {
   loading: () => <Loading />,

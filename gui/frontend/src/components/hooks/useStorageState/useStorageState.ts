@@ -1,9 +1,7 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
-
+import type { ZodCatch, ZodType } from 'zod';
 import type { CacheKeyWithHide } from '@/lib/storage';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-
-import type { ZodCatch, ZodType } from 'zod';
 
 /**
  * A custom React hook that syncs state with `localStorage`.

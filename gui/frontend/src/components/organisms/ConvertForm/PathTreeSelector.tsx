@@ -13,7 +13,7 @@ import {
 import { TreeItemIcon } from '@mui/x-tree-view/TreeItemIcon';
 import { TreeItemProvider } from '@mui/x-tree-view/TreeItemProvider';
 import { type UseTreeItemParameters, useTreeItem } from '@mui/x-tree-view/useTreeItem';
-import { type HTMLAttributes, type Ref, type SyntheticEvent, memo, useCallback, useRef } from 'react';
+import { type HTMLAttributes, memo, type Ref, type SyntheticEvent, useCallback, useRef } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { hashDjb2 } from '@/lib/hash-djb2';
@@ -45,7 +45,6 @@ export const getAllLeafItemIds = (selectedItems: string[], items: TreeViewBaseIt
 
 const getItemDescendantsIds = (item: TreeViewBaseItem) => {
   const ids: string[] = [];
-  // biome-ignore lint/complexity/noForEach: <explanation>
   item.children?.forEach((child) => {
     ids.push(child.id);
     ids.push(...getItemDescendantsIds(child));

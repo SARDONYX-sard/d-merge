@@ -1,6 +1,5 @@
-import { enqueueSnackbar } from 'notistack';
-
 import type { OptionsObject, SnackbarMessage } from 'notistack';
+import { enqueueSnackbar } from 'notistack';
 
 /**
  * Wrapper to simplify refactoring of libraries such as snackbar and toast

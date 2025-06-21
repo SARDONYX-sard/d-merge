@@ -1,6 +1,5 @@
-import { type RefObject, useEffect } from 'react';
-
 import type { GridApi, GridInitialState } from '@mui/x-data-grid';
+import { type RefObject, useEffect } from 'react';
 
 export function useGridStatePersistence(apiRef: RefObject<GridApi | null>, storageKey: string) {
   useEffect(() => {
@@ -10,7 +9,6 @@ export function useGridStatePersistence(apiRef: RefObject<GridApi | null>, stora
         const state: GridInitialState = JSON.parse(saved);
         apiRef.current?.restoreState(state);
       } catch (e) {
-        // biome-ignore lint/suspicious/noConsole: <explanation>
         console.warn('Failed to restore grid state:', e);
       }
     }
@@ -22,7 +20,6 @@ export function useGridStatePersistence(apiRef: RefObject<GridApi | null>, stora
         const state = apiRef.current?.exportState();
         localStorage.setItem(storageKey, JSON.stringify(state));
       } catch (e) {
-        // biome-ignore lint/suspicious/noConsole: <explanation>
         console.warn('Failed to export grid state:', e);
       }
     };

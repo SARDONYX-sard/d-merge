@@ -17,7 +17,11 @@ export const SelectionTypeRadios = () => {
   };
 
   const options = [
-    { label: t('convert.selection_type.directories'), value: 'dir', tooltip: t('convert.selection_type.directories_tooltip') },
+    {
+      label: t('convert.selection_type.directories'),
+      value: 'dir',
+      tooltip: t('convert.selection_type.directories_tooltip'),
+    },
     { label: t('convert.selection_type.tree'), value: 'tree', tooltip: t('convert.selection_type.tree_tooltip') },
     { label: t('convert.selection_type.files'), value: 'files', tooltip: t('convert.selection_type.files_tooltip') },
   ];

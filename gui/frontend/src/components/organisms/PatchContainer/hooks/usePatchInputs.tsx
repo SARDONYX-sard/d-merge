@@ -1,6 +1,6 @@
 import OutputIcon from '@mui/icons-material/Output';
 import { Checkbox, type SxProps, Tooltip } from '@mui/material';
-import { useEffect, type ComponentPropsWithRef } from 'react';
+import { type ComponentPropsWithRef, useEffect } from 'react';
 
 import { useDebounce } from '@/components/hooks/useDebounce';
 import { useTranslation } from '@/components/hooks/useTranslation';

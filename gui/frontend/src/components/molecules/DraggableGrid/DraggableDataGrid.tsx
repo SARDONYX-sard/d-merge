@@ -1,12 +1,10 @@
 // Forked: https://codesandbox.io/p/sandbox/mui-datagrid-dnd-kit-ctqzj8?file=%2Fsrc%2FApp.tsx%3A1%2C1-71%2C1&from-embed
-import { DndContext, MouseSensor, type UniqueIdentifier, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCorners, DndContext, MouseSensor, type UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core';
+import type { Props as DndCtxProps } from '@dnd-kit/core/dist/components/DndContext/DndContext';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DataGrid, type DataGridProps } from '@mui/x-data-grid';
 import { memo } from 'react';
-
 import { DraggableGridRow } from './DraggableGridRow';
-
-import type { Props as DndCtxProps } from '@dnd-kit/core/dist/components/DndContext/DndContext';
 
 type Id =
   | UniqueIdentifier

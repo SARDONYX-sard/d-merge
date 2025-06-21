@@ -3,7 +3,7 @@ import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
 import { Box } from '@mui/material';
 import Tab from '@mui/material/Tab';
-
+import type { SyntheticEvent } from 'react';
 import { useStorageState } from '@/components/hooks/useStorageState/useStorageState';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { ImportLangButton } from '@/components/molecules/ImportLangButton';
@@ -16,10 +16,7 @@ import { I18nList } from '@/components/organisms/I18nList';
 import { NotifyList } from '@/components/organisms/NotifyList';
 import { TabPositionList } from '@/components/organisms/TabPositionList';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-
 import { TabSchema } from './schema';
-
-import type { SyntheticEvent } from 'react';
 
 export const Tabs = () => {
   const [selectedTab, setSelectedTab] = useStorageState(PUB_CACHE_OBJ.settingsTabSelect, TabSchema);

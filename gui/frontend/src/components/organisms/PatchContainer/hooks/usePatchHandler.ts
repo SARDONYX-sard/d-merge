@@ -1,8 +1,7 @@
+import type { MouseEventHandler } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { patch } from '@/services/api/patch';
-import { statusListener, type Status } from '@/services/api/patch_listener';
-
-import type { MouseEventHandler } from 'react';
+import { type Status, statusListener } from '@/services/api/patch_listener';
 
 type Params = {
   start: () => void;

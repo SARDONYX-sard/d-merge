@@ -6,7 +6,7 @@
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
-use crate::lines::{
+use crate::common_parser::lines::{
     lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
 };
 use core::str::FromStr;

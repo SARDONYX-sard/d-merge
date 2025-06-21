@@ -25,13 +25,12 @@ describe('Template', () => {
 
 describe('Organisms', () => {
   function asserts(container: HTMLElement) {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).not.toBeAtom();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeMolecule();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).toBeOrganism();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeTemplate();
   }
   test('<nav>(role=navigation)', () => {
@@ -81,7 +80,6 @@ describe('Organisms', () => {
   });
   test('<form>(role=search)', () => {
     const { container } = render(
-      // biome-ignore lint/a11y/useSemanticElements: <explanation>
       <form role='search'>
         <h2>Test</h2>
         <button type='button'>+1</button>
@@ -93,13 +91,12 @@ describe('Organisms', () => {
 
 describe('Molecules', () => {
   function asserts(container: HTMLElement) {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).not.toBeAtom();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).toBeMolecule();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeOrganism();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeTemplate();
   }
   test('<form>(role=none)', () => {
@@ -113,7 +110,6 @@ describe('Molecules', () => {
   });
   test('<div>(role=group)', () => {
     const { container } = render(
-      // biome-ignore lint/a11y/useSemanticElements: <explanation>
       <div role='group'>
         <h2>Test</h2>
       </div>,
@@ -156,7 +152,6 @@ describe('Molecules', () => {
   test('<div>(role=tablist)', () => {
     const { container } = render(
       <div role='tablist'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: <explanation> */}
         <p role='tab' tabIndex={0} />
       </div>,
     );
@@ -206,13 +201,9 @@ describe('Molecules', () => {
 describe('Organisms or Molecules', () => {
   // MEMO: header footer は構成 Node によって AsNonLandmark になりえるため
   function asserts(container: HTMLElement) {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).not.toBeAtom();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).toBeMolecule();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).toBeOrganism();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).not.toBeTemplate();
   }
   test('<header>(role=banner)', () => {
@@ -237,13 +228,12 @@ describe('Organisms or Molecules', () => {
 
 describe('Atoms', () => {
   function asserts(container: HTMLElement) {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
     expect(container).toBeAtom();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeMolecule();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeOrganism();
-    // biome-ignore lint/suspicious/noMisplacedAssertion: <explanation>
+
     expect(container).not.toBeTemplate();
   }
   test('<dialog>(role=dialog)', () => {
@@ -264,7 +254,6 @@ describe('Atoms', () => {
     asserts(container);
   });
   test('<a>(role=link)', () => {
-    // biome-ignore lint/a11y/useValidAnchor: <explanation>
     const { container } = render(<a href='#'>test</a>);
     asserts(container);
   });

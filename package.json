@@ -13,8 +13,8 @@
     "dev": "tauri dev",
     "dev:front": "next ./gui/frontend",
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
-    "lint": "next lint ./gui/frontend -c ./gui/frontend/eslint.config.mjs && biome lint ./ && cargo clippy --workspace",
-    "lint:fix": "npm run fmt && biome check --write ./ && next lint ./gui/frontend --fix -c ./gui/frontend/eslint.config.mjs && cargo clippy --workspace --fix --allow-staged --allow-dirty",
+    "lint": "biome lint ./ && cargo clippy --workspace",
+    "lint:fix": "npm run fmt && biome check --write ./ && cargo clippy --workspace --fix --allow-staged --allow-dirty",
     "tauri": "tauri",
     "test": "vitest run",
     "test:all": "npm test && npm run test:back",
@@ -48,7 +48,7 @@
     "zod": "3.25.67"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.0.0",
     "@tauri-apps/cli": "2.5.0",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.3.0",
@@ -56,14 +56,12 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "19.1.6",
     "@vitejs/plugin-react-swc": "3.10.2",
-    "eslint": "9.29.0",
-    "eslint-config-next": "15.3.3",
     "jsdom": "26.1.0",
     "prettier": "3.5.3",
     "rimraf": "^6",
     "typescript": "5.8.3",
     "vite-tsconfig-paths": "5.1.4",
-    "vitest": "3.2.3"
+    "vitest": "3.2.4"
   },
   "overrides": {
     "monaco-editor": "^0.49.0"

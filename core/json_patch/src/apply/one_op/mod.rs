@@ -10,8 +10,12 @@ use crate::operation::Op;
 use crate::{JsonPatch, JsonPatchError, JsonPath, OpRangeKind, ValueWithPriority};
 use simd_json::BorrowedValue;
 
+/// Applies a JSON patch operation to a mutable reference to a JSON value.
+///
+/// # Errors
+/// If the patch operation fails due to an invalid operation or path not found.
 #[inline]
-pub(super) fn apply_one_field<'v>(
+pub fn apply_one_field<'v>(
     json: &mut BorrowedValue<'v>,
     path: JsonPath<'v>,
     patch: ValueWithPriority<'v>,

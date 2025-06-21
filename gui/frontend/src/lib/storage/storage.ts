@@ -16,7 +16,10 @@ export const createStorage = <
   H extends readonly string[] = never[], // Ensure K has a value specified
 >({
   cacheKeys,
-}: { cacheKeys: K; _hiddenKeys?: H }) => {
+}: {
+  cacheKeys: K;
+  _hiddenKeys?: H;
+}) => {
   return {
     /**
      * Retrieves the value from localStorage for the given cache key.

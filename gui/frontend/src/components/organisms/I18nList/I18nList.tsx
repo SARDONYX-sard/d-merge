@@ -1,11 +1,9 @@
+import type { SelectChangeEvent } from '@mui/material/Select';
 import { changeLanguage } from 'i18next';
 import { useState } from 'react';
-
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { LANG } from '@/lib/i18n';
-
-import type { SelectChangeEvent } from '@mui/material/Select';
 
 export const I18nList = () => {
   const [lang, setLang] = useState(LANG.get());

@@ -1,8 +1,7 @@
+import type React from 'react';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-
-import type React from 'react';
 
 // Function to calculate the height based on the number of lines in the value
 const calculateHeight = (value: string, lineHeight = 20, minHeight = 40, maxHeight = 500): string => {

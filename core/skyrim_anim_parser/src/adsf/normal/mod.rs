@@ -1,7 +1,7 @@
 pub mod de;
 pub mod ser;
 
-use crate::lines::Str;
+use crate::common_parser::lines::Str;
 use rayon::prelude::*;
 
 // NOTE: Since f32 is very slow if it is made into str, only check that it is f32 and allocate it as `&str`.

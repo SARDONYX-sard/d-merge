@@ -1,7 +1,6 @@
-import { createTheme, ThemeProvider, CssBaseline } from '@mui/material';
-import { jaJP } from '@mui/x-data-grid/locales';
-import { enUS } from '@mui/x-data-grid/locales';
-import { useMemo, type ReactNode } from 'react';
+import { CssBaseline, createTheme, ThemeProvider } from '@mui/material';
+import { enUS, jaJP } from '@mui/x-data-grid/locales';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {

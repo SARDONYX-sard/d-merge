@@ -1,9 +1,7 @@
+import type { FormControlLabelProps } from '@mui/material';
 import { Checkbox, FormControlLabel, Tooltip } from '@mui/material';
-
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { useJsContext } from '@/components/providers/JsProvider';
-
-import type { FormControlLabelProps } from '@mui/material';
 
 type Props = Omit<FormControlLabelProps, 'control' | 'label'>;
 const CACHE_KEY = 'run-script';

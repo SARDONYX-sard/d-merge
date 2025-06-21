@@ -9,9 +9,7 @@ export const stringSchema = z.string().catch('');
  * [Enum From Object Literal Keys](https://github.com/colinhacks/zod/discussions/839)
  */
 export const enumFromKeys = <
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   Rec extends Record<string, any>,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   K extends string = Rec extends Record<infer R, any> ? R : never,
 >(
   input: Rec,
