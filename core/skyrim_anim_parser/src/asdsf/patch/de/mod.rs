@@ -1,6 +1,5 @@
-#![allow(unused)] // TODO: Remove this line.
 mod current_state;
-// pub mod deserializer;
+pub mod deserializer;
 mod error;
 
 use self::error::Error;
@@ -14,6 +13,9 @@ use crate::{asdsf::normal::AnimSetData, common_parser::lines::Str};
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct DiffPatchAnimSetData<'a> {
     version: Option<Str<'a>>,
+
+    /// # Why are triggers vec?
+    /// This is so that multiple seq patches can be resolved simultaneously later.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -53,6 +55,8 @@ pub struct DiffPatchAnimSetData<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 struct NestedPatches<'a> {
+    /// struct Attack
+    /// - sample json_path: `["attacks"]`
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -61,6 +65,8 @@ struct NestedPatches<'a> {
         )
     )]
     base: Vec<ValueWithPriority<'a>>,
+
+    /// - sample json_path: `["clip_names", ["0"]]`
     #[cfg_attr(
         feature = "serde",
         serde(

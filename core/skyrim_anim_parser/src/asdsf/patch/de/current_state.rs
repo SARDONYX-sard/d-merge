@@ -1,5 +1,5 @@
 #![allow(unused)] // TODO: Remove this line.
-use crate::adsf::patch::de::error::Error;
+use crate::asdsf::patch::de::error::Error;
 use crate::asdsf::patch::de::LineKind;
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
@@ -20,9 +20,15 @@ pub struct CurrentState<'input> {
     /// is added or deleted until a comment comes in, this is a place to temporarily save them.
     ///
     /// None is nothing diff.
-    pub patch: Option<PartialAdsfPatch<'input>>,
+    pub patch: Option<PartialAsdsfPatch<'input>>,
 
     pub force_removed: bool,
+}
+
+impl<'de> Default for CurrentState<'de> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 const LINE_KINDS: [LineKind; 9] = [
@@ -38,18 +44,35 @@ const LINE_KINDS: [LineKind; 9] = [
 ];
 
 #[derive(Debug, PartialEq, Default)]
-pub struct PartialAdsfPatch<'a> {
-    pub name: Option<Cow<'a, str>>,
-    pub clip_id: Option<Cow<'a, str>>,
-    pub play_back_speed: Option<Cow<'a, str>>,
-    pub crop_start_local_time: Option<Cow<'a, str>>,
-    pub crop_end_local_time: Option<Cow<'a, str>>,
-    pub trigger_names: Option<PartialRotations<'a>>,
+pub struct PartialAsdsfPatch<'a> {
+    pub version: Option<Cow<'a, str>>,
+    pub triggers: Option<PartialTriggers<'a>>,
+    pub conditions: Option<PartialConditions<'a>>,
+    pub attacks: Option<PartialAttacks<'a>>,
+    pub anim_infos: Option<PartialAnimInfos<'a>>,
 }
 
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
-pub struct PartialRotations<'input> {
+pub struct PartialTriggers<'input> {
+    pub range: Range<usize>,
+    pub values: Vec<Cow<'input, str>>,
+}
+/// not judge operation yet at this time.
+#[derive(Debug, PartialEq, Default)]
+pub struct PartialConditions<'input> {
+    pub range: Range<usize>,
+    pub values: Vec<Cow<'input, str>>,
+}
+/// not judge operation yet at this time.
+#[derive(Debug, PartialEq, Default)]
+pub struct PartialAttacks<'input> {
+    pub range: Range<usize>,
+    pub values: Vec<Cow<'input, str>>,
+}
+/// not judge operation yet at this time.
+#[derive(Debug, PartialEq, Default)]
+pub struct PartialAnimInfos<'input> {
     pub range: Range<usize>,
     pub values: Vec<Cow<'input, str>>,
 }
@@ -92,7 +115,7 @@ impl<'de> CurrentState<'de> {
 
         match self.current_kind {
             Some(LineKind::Version) => {
-                self.patch.get_or_insert_default().name = Some(value);
+                self.patch.get_or_insert_default().version = Some(value);
             }
 
             Some(LineKind::TriggersLen) => {}
@@ -104,7 +127,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_as_trigger_name(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
+    pub fn push_as_trigger(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
@@ -116,13 +139,13 @@ impl<'de> CurrentState<'de> {
                 let trigger_names = self
                     .patch
                     .get_or_insert_default()
-                    .trigger_names
+                    .triggers
                     .get_or_insert_default();
 
                 trigger_names.range.end += 1;
                 trigger_names.values.push(value);
             }
-            _ => return Err(Error::ExpectedTransition),
+            _ => return Err(Error::ExpectedTrigger),
         };
 
         Ok(())
@@ -140,7 +163,7 @@ impl<'de> CurrentState<'de> {
                 let rotations = self
                     .patch
                     .get_or_insert_default()
-                    .trigger_names
+                    .triggers
                     .get_or_insert_default();
                 rotations.range.start = start;
                 rotations.range.end = start;

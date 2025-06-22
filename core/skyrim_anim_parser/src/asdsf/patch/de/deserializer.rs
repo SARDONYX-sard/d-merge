@@ -1,11 +1,11 @@
-use crate::adsf::patch::de::error::{Error, Result};
-use crate::adsf::patch::de::others::clip_anim::{
-    current_state::{CurrentState, PartialRotations},
-    ClipAnimDiffPatch, DiffTriggerNames, LineKind,
+use crate::asdsf::patch::de::error::{Error, Result};
+use crate::asdsf::patch::de::{
+    current_state::{CurrentState, PartialTriggers},
+    DiffPatchAnimSetData, LineKind,
 };
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
 use crate::common_parser::lines::{one_line, verify_line_parses_to};
-use json_patch::{Op, OpRange};
+use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
@@ -14,12 +14,15 @@ use winnow::{
     Parser,
 };
 
-/// Parse animationdatasinglefile.txt clip animation block patch.
+/// Parse animationsetdatasinglefile.txt patch.
 ///
 /// # Errors
 /// Parse failed.
-pub fn parse_clip_anim_diff_patch(input: &str) -> Result<ClipAnimDiffPatch<'_>, Error> {
-    let mut deserializer = Deserializer::new(input);
+pub fn parse_anim_set_diff_patch(
+    input: &str,
+    priority: usize,
+) -> Result<DiffPatchAnimSetData<'_>, Error> {
+    let mut deserializer = Deserializer::new(input, priority);
     deserializer
         .root()
         .map_err(|err| deserializer.to_readable_err(err))?;
@@ -35,20 +38,23 @@ struct Deserializer<'a> {
     original: &'a str,
 
     /// Output
-    output_patches: ClipAnimDiffPatch<'a>,
+    output_patches: DiffPatchAnimSetData<'a>,
 
     /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
     /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
     pub current: CurrentState<'a>,
+
+    priority: usize,
 }
 
 impl<'de> Deserializer<'de> {
-    fn new(input: &'de str) -> Self {
+    fn new(input: &'de str, priority: usize) -> Self {
         Self {
             input,
             original: input,
-            output_patches: ClipAnimDiffPatch::DEFAULT,
+            output_patches: DiffPatchAnimSetData::default(),
             current: CurrentState::new(),
+            priority,
         }
     }
 
@@ -105,103 +111,39 @@ impl<'de> Deserializer<'de> {
 
         while let Some(line_kind) = self.current.next() {
             match line_kind {
-                LineKind::Name => {
+                LineKind::Version => {
                     let should_take = self.parse_opt_start_comment()?;
 
-                    let name =
-                        self.parse_next(one_line.context(Expected(Description("name: Str"))))?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("name = {name:#?}");
+                    let version = self
+                        .parse_next(one_line.context(Expected(Description("version: \"V3\""))))?;
 
                     if should_take {
-                        self.current.replace_one(name)?;
+                        self.current.replace_one(version)?;
                         self.parse_opt_close_comment()?;
                     }
                 }
-                LineKind::ClipId => {
-                    let should_take = self.parse_opt_start_comment()?;
-
-                    let clip_id =
-                        self.parse_next(one_line.context(Expected(Description("clip_id: Str"))))?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("clip_id = {clip_id:#?}");
-
-                    if should_take {
-                        self.current.replace_one(clip_id)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                }
-                LineKind::PlayBackSpeed => {
-                    let should_take = self.parse_opt_start_comment()?;
-                    self.parse_next(multispace0)?;
-
-                    let duration = self.parse_next(
-                        verify_line_parses_to::<f32>
-                            .context(Expected(Description("duration: f32"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("duration = {duration:#?}");
-
-                    if should_take {
-                        self.current.replace_one(duration)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                    self.parse_next(multispace0)?;
-                }
-                LineKind::CropStartLocalTime => {
-                    let should_take = self.parse_opt_start_comment()?;
-                    self.parse_next(multispace0)?;
-
-                    let crop_start_local_time = self.parse_next(
-                        verify_line_parses_to::<f32>
-                            .context(Expected(Description("crop_start_local_time: f32"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("crop_start_local_time = {crop_start_local_time:#?}");
-
-                    if should_take {
-                        self.current.replace_one(crop_start_local_time)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                    self.parse_next(multispace0)?;
-                }
-                LineKind::CropEndLocalTime => {
-                    let should_take = self.parse_opt_start_comment()?;
-                    self.parse_next(multispace0)?;
-
-                    let crop_end_local_time = self.parse_next(
-                        verify_line_parses_to::<f32>
-                            .context(Expected(Description("crop_end_local_time: f32"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("crop_end_local_time = {crop_end_local_time:#?}");
-
-                    if should_take {
-                        self.current.replace_one(crop_end_local_time)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                    self.parse_next(multispace0)?;
-                }
-                LineKind::TriggerNamesLen => {
+                LineKind::TriggersLen
+                | LineKind::ConditionsLen
+                | LineKind::AttacksLen
+                | LineKind::AnimInfosLen => {
                     let _len = self.parse_next(
                         verify_line_parses_to::<usize>
-                            .context(Expected(Description("length: usize"))),
+                            .context(Expected(Description("length_line: usize"))),
                     )?;
                     #[cfg(feature = "tracing")]
                     tracing::trace!("{line_kind:#?} = {_len:#?}");
                 }
-                LineKind::TriggerNames => {
+                LineKind::Triggers => {
                     let mut start_index = 0;
                     while self.parse_peek(opt(eof))?.is_none() {
                         let diff_start = self.parse_opt_start_comment()?;
                         if diff_start {
                             self.current.set_range_start(start_index)?;
                         }
-                        let trigger_name = self.parse_next(
-                            one_line.context(Expected(Description("trigger_name: Str"))),
-                        )?;
+                        let trigger = self
+                            .parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
                         if self.current.mode_code.is_some() {
-                            self.current.push_as_trigger_name(trigger_name)?;
+                            self.current.push_as_trigger(trigger)?;
                         }
 
                         self.parse_opt_close_comment()?;
@@ -210,6 +152,7 @@ impl<'de> Deserializer<'de> {
                     }
                     break;
                 }
+                _ => todo!(),
             };
         }
 
@@ -276,46 +219,31 @@ impl<'de> Deserializer<'de> {
         let op = self.current.judge_operation();
         if let Some(mut partial_patch) = self.current.patch.take() {
             match self.current.current_kind()? {
-                LineKind::Name => {
-                    if let Some(name) = partial_patch.name.take() {
-                        self.output_patches.name.replace(name);
+                LineKind::Version => {
+                    if let Some(version) = partial_patch.version.take() {
+                        self.output_patches.version.replace(version);
                     }
                 }
-                LineKind::ClipId => {
-                    if let Some(clip_id) = partial_patch.clip_id.take() {
-                        self.output_patches.clip_id.replace(clip_id);
-                    }
-                }
-                LineKind::PlayBackSpeed => {
-                    if let Some(duration) = partial_patch.play_back_speed.take() {
-                        self.output_patches.play_back_speed.replace(duration);
-                    }
-                }
-                LineKind::CropStartLocalTime => {
-                    if let Some(crop_start_time) = partial_patch.crop_start_local_time.take() {
-                        self.output_patches
-                            .crop_start_local_time
-                            .replace(crop_start_time);
-                    }
-                }
-                LineKind::CropEndLocalTime => {
-                    if let Some(crop_end_local_time) = partial_patch.crop_end_local_time.take() {
-                        self.output_patches
-                            .crop_end_local_time
-                            .replace(crop_end_local_time);
-                    }
-                }
-                LineKind::TriggerNamesLen => {}
-                LineKind::TriggerNames => {
-                    if let Some(trigger_names) = partial_patch.trigger_names.take() {
-                        let PartialRotations { range, values } = trigger_names;
+                LineKind::TriggersLen
+                | LineKind::ConditionsLen
+                | LineKind::AttacksLen
+                | LineKind::AnimInfosLen => {}
+                LineKind::Triggers => {
+                    if let Some(triggers) = partial_patch.triggers.take() {
+                        let PartialTriggers { range, values } = triggers;
                         let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.trigger_names = Some(DiffTriggerNames {
-                            op: OpRange { op, range },
-                            values,
-                        });
+                        self.output_patches
+                            .triggers_patches
+                            .push(ValueWithPriority {
+                                patch: JsonPatch {
+                                    op: OpRangeKind::Seq(OpRange { op, range }),
+                                    value: simd_json::json_typed!(borrowed, values),
+                                },
+                                priority: self.priority,
+                            });
                     }
                 }
+                LineKind::Conditions | LineKind::Attacks | LineKind::AnimInfos => todo!(),
             }
 
             self.current.clear_flags(); // new patch is generated so clear flags.
@@ -328,76 +256,176 @@ impl<'de> Deserializer<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::asdsf::patch::de::NestedPatches;
+    use json_patch::{json_path, JsonPatch, OpRangeKind, ValueWithPriority};
+
+    // V3                             <- version
+    // 0                              <- triggers_len
+    // 0                              <- conditions_len
+    // 4                              <- attacks_len
+    //
+    // attackStart_Attack1            <- attack_trigger[0]
+    // 0                              <- is_contextual
+    // 1                              <- clip_names_len
+    // Attack1                        <- clip_names[0]
+    //
+    // attackStart_Attack2            <- attack_trigger[1]
+    // 0                              <- is_contextual
+    // 1                              <- clip_names_len
+    // Attack1_Mirrored               <- clip_names[0]
+    //
+    // attackStart_MC_1HMLeft         <- attack_trigger[2]
+    // 0                              <- is_contextual
+    // 1                              <- clip_names_len
+    // MC_1HM_AttackLeft02            <- clip_names[0]
+    //
+    // attackStart_MC_1HMRight        <- attack_trigger[3]
+    // 0                              <- is_contextual
+    // 1                              <- clip_names_len
+    // MC 1HM AttackRight01           <- clip_names[0]
+    //
+    // 2                              <- anim_infos_len
+    //
+    // 3064642194                     <- hashed_path[0]
+    // 1047251415                     <- hashed_file_name[0]
+    // 7891816                        <- ascii_extension[0]
+    //
+    // 3064642194                     <- hashed_path[1]
+    // 19150068                       <- hashed_file_name[1]
+    // 7891816                        <- ascii_extension[1]
 
     // #[quick_tracing::init]
+    #[ignore = "Not complete yet"]
     #[test]
     fn test_replace_anim_block_diff_patch() {
         let input = "
-<!-- MOD_CODE ~test~ OPEN -->
-TurnRight[test]
-<!-- ORIGINAL -->
-TurnRight[mirrored]
-<!-- CLOSE -->
-18
-1
+V3
 0
+0
+4
+attackStart_Attack1
+0
+1
+<!-- MOD_CODE ~test~ OPEN -->
+AttackTestReplacedClipName
+<!-- ORIGINAL -->
+Attack1
+<!-- CLOSE -->
+attackStart_Attack2
+0
+1
+Attack1_Mirrored
+attackStart_MC_1HMLeft
+0
+1
+MC_1HM_AttackLeft02
+attackStart_MC_1HMRight
+0
+1
+MC 1HM AttackRight01
 2
-clipStart:6.65767
 <!-- MOD_CODE ~test~ OPEN -->
-clipEnd:8.1234
+4000000000
+2000000000
+7891816
 <!-- ORIGINAL -->
-clipEnd:6.65767
+3995179646
+1440038008
+7891816
+<!-- CLOSE -->
+
+3064642194
+19150068
+3064642194
+7891816
+
+<!-- MOD_CODE ~test~ OPEN -->
+4000000003
+2000000003
+7891816
+
+4000000004
+2000000004
+7891816
+
+4000000005
+2000000005
+7891816
 <!-- CLOSE -->
 ";
 
-        let patches = parse_clip_anim_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
-        let expected = ClipAnimDiffPatch {
-            name: Some("TurnRight[test]".into()),
-            trigger_names: Some(DiffTriggerNames {
-                op: OpRange {
-                    op: Op::Replace,
-                    range: 1..2,
+        let patches = parse_anim_set_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+        let expected = DiffPatchAnimSetData {
+            version: None,
+            triggers_patches: vec![],
+            conditions_patches: vec![],
+            attacks_patches: NestedPatches {
+                base: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        op: OpRangeKind::Seq(OpRange {
+                            op: Op::Replace,
+                            range: 0..4,
+                        }),
+                        value: simd_json::json_typed!(borrowed, []),
+                    },
+                    priority: 0,
+                }],
+                children: vec![(
+                    json_path!["attack_trigger"],
+                    ValueWithPriority {
+                        patch: JsonPatch {
+                            op: OpRangeKind::Pure(Op::Replace),
+                            value: simd_json::json_typed!(borrowed, "AttackTestReplacedClipName"),
+                        },
+                        priority: 0,
+                    },
+                )],
+            },
+            anim_infos_patches: vec![
+                ValueWithPriority {
+                    patch: JsonPatch {
+                        op: OpRangeKind::Seq(OpRange {
+                            op: Op::Replace,
+                            range: 0..1,
+                        }),
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "hashed_path": "4000000000",
+                                "hashed_file_name": "2000000000",
+                                "ascii_extension": "7891816"
+                            },
+                        ]),
+                    },
+                    priority: 0,
                 },
-                values: vec!["clipEnd:8.1234".into()],
-            }),
-            ..Default::default()
-        };
-
-        assert_eq!(patches, expected);
-    }
-
-    // #[quick_tracing::init]
-    #[test]
-    fn test_add_anim_block_diff_patch() {
-        let input = "
-<!-- MOD_CODE ~test~ OPEN -->
-TurnRight[test]
-<!-- ORIGINAL -->
-TurnRight[mirrored]
-<!-- CLOSE -->
-18
-1
-0
-0
-<!-- MOD_CODE ~test~ OPEN -->
-clipStart:6.65767
-clipEnd:6.65767
-<!-- CLOSE -->
-";
-
-        let patches = parse_clip_anim_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
-        let expected = ClipAnimDiffPatch {
-            name: Some("TurnRight[test]".into()),
-            trigger_names: Some(DiffTriggerNames {
-                op: OpRange {
-                    op: Op::Add,
-                    range: 0..2,
+                ValueWithPriority {
+                    patch: JsonPatch {
+                        op: OpRangeKind::Seq(OpRange {
+                            op: Op::Add,
+                            range: 3..6,
+                        }),
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "hashed_path": "4000000003",
+                                "hashed_file_name": "2000000003",
+                                "ascii_extension": "7891816"
+                            },
+                            {
+                                "hashed_path": "4000000004",
+                                "hashed_file_name": "2000000004",
+                                "ascii_extension": "7891816"
+                            },
+                            {
+                                "hashed_path": "4000000005",
+                                "hashed_file_name": "2000000005",
+                                "ascii_extension": "7891816"
+                            },
+                        ]),
+                    },
+                    priority: 0,
                 },
-                values: vec!["clipStart:6.65767".into(), "clipEnd:6.65767".into()],
-            }),
-            ..Default::default()
+            ],
         };
-
         assert_eq!(patches, expected);
     }
 }

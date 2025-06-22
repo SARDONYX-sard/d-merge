@@ -1,7 +1,7 @@
 # D Merge(Diff & Merge) hkx patcher
 
 <div align="center">
-  <a href="https://github.com/SARDONYX-sard/d-merge/release">
+  <a href="https://github.com/SARDONYX-sard/d-merge/releases">
     <img src="./gui/backend/icons/icon.svg" alt="D Merge"/>
   </a>
 

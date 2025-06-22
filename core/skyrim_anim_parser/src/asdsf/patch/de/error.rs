@@ -9,8 +9,8 @@ pub enum Error {
     /// Mismatched type. Expected transitions/rotation, but got one replacer type.
     ExpectedArray,
 
-    /// Mismatched type. Expected transitions, but got other type
-    ExpectedTransition,
+    /// Mismatched type. Expected Trigger(`Str`), but got other type
+    ExpectedTrigger,
 
     /// Mismatched type. Expected rotations, but got other type
     ExpectedRotation,
@@ -50,3 +50,6 @@ pub enum Error {
     #[snafu(transparent)]
     JsonPatch { source: json_patch::JsonPatchError },
 }
+
+/// Result type alias for AnimSetData patch error.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
