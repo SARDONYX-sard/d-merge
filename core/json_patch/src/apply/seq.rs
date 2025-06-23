@@ -56,9 +56,9 @@ Path: {path}, Seq target length: {target_len}
     // ["[5]", "triggers", [0], "animations", [3], "time"] // modify f32
     let (mut patched_array, add_ops) = apply_ops_parallel(*patch_target_vec, patches);
     for (path, patch) in child_patches {
-        if let Err(err) = crate::apply_one_field(target, path, patch) {
+        if let Err(_err) = crate::apply_one_field(target, path, patch) {
             #[cfg(feature = "tracing")]
-            tracing::warn!("Failed to apply child patch path(`{file_name}`): {err}",);
+            tracing::warn!("Failed to apply child patch path(`{file_name}`): {_err}",);
         };
     }
 

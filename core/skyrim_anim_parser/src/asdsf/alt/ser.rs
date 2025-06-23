@@ -27,7 +27,7 @@ fn write_projects(out: &mut String, projects: &AltTxtProjects) {
     for (project_name, _) in &projects.0 {
         if to_normal_txt_project_name(project_name, out).is_none() {
             #[cfg(feature = "tracing")]
-            tracing::error!("Failed to convert path: {name}");
+            tracing::error!("Failed to convert path: {project_name}");
         }
         out.push_str(NEW_LINE);
     }

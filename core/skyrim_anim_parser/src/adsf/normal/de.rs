@@ -298,8 +298,9 @@ mod tests {
     #[cfg(feature = "tracing")]
     #[test]
     fn should_parse() {
-        let s =
-            include_str!("../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
+        let s = include_str!(
+            "../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
+        );
         test_parse(s);
     }
 }
