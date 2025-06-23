@@ -1,6 +1,6 @@
 #![allow(unused)] // TODO: Remove this line.
-use crate::asdsf::patch::de::error::Error;
 use crate::asdsf::patch::de::LineKind;
+use crate::{asdsf::patch::de::error::Error, common_parser::lines::Str};
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
 
@@ -56,25 +56,32 @@ pub struct PartialAsdsfPatch<'a> {
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialTriggers<'input> {
     pub range: Range<usize>,
-    pub values: Vec<Cow<'input, str>>,
+    pub values: Vec<Str<'input>>,
 }
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialConditions<'input> {
     pub range: Range<usize>,
-    pub values: Vec<Cow<'input, str>>,
+    pub values: Vec<Str<'input>>,
 }
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAttacks<'input> {
     pub range: Range<usize>,
-    pub values: Vec<Cow<'input, str>>,
+    pub values: Vec<Str<'input>>,
 }
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAnimInfos<'input> {
     pub range: Range<usize>,
-    pub values: Vec<Cow<'input, str>>,
+    pub values: Vec<Str<'input>>,
+}
+/// not judge operation yet at this time.
+#[derive(Debug, PartialEq, Default)]
+pub struct PartialAnimInfo<'input> {
+    pub hashed_path: Option<Str<'input>>,
+    pub hashed_file_name: Option<Str<'input>>,
+    pub ascii_extension: Option<Str<'input>>,
 }
 
 impl<'de> CurrentState<'de> {
