@@ -1,15 +1,17 @@
+use crate::asdsf::normal::AnimInfo;
 use crate::asdsf::patch::de::error::{Error, Result};
 use crate::asdsf::patch::de::{
     current_state::{CurrentState, PartialTriggers},
-    DiffPatchAnimSetData, LineKind,
+    DiffPatchAnimSetData, ParserKind,
 };
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
-use crate::common_parser::lines::{one_line, verify_line_parses_to};
+use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line, verify_line_parses_to};
 use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
+use winnow::combinator::eof;
 use winnow::{
     ascii::multispace0,
-    combinator::{eof, opt},
+    combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
 };
@@ -80,6 +82,19 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
 
+    /// Parse by argument parser no consume.
+    ///
+    /// If an error occurs, it is converted to [`ReadableError`] and returned.
+    fn parse_peek2<O>(
+        &self,
+        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
+    ) -> Result<(&'de str, O)> {
+        let (remain, ret) = parser
+            .parse_peek(self.input)
+            .map_err(|err| Error::Context { err })?;
+        Ok((remain, ret))
+    }
+
     /// Convert Visitor errors to position-assigned errors.
     ///
     /// # Why is this necessary?
@@ -111,21 +126,24 @@ impl<'de> Deserializer<'de> {
 
         while let Some(line_kind) = self.current.next() {
             match line_kind {
-                LineKind::Version => {
+                ParserKind::Version => {
                     let should_take = self.parse_opt_start_comment()?;
 
-                    let version = self
-                        .parse_next(one_line.context(Expected(Description("version: \"V3\""))))?;
+                    let version = self.parse_next(
+                        one_line
+                            .verify(|s: &str| s.eq_ignore_ascii_case("V3"))
+                            .context(Expected(Description("version: \"V3\""))),
+                    )?;
 
                     if should_take {
                         self.current.replace_one(version)?;
                         self.parse_opt_close_comment()?;
                     }
                 }
-                LineKind::TriggersLen
-                | LineKind::ConditionsLen
-                | LineKind::AttacksLen
-                | LineKind::AnimInfosLen => {
+                ParserKind::TriggersLen
+                | ParserKind::ConditionsLen
+                | ParserKind::AttacksLen
+                | ParserKind::AnimInfosLen => {
                     let _len = self.parse_next(
                         verify_line_parses_to::<usize>
                             .context(Expected(Description("length_line: usize"))),
@@ -133,9 +151,9 @@ impl<'de> Deserializer<'de> {
                     #[cfg(feature = "tracing")]
                     tracing::trace!("{line_kind:#?} = {_len:#?}");
                 }
-                LineKind::Triggers => {
+                ParserKind::Triggers => {
                     let mut start_index = 0;
-                    while self.parse_peek(opt(eof))?.is_none() {
+                    while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
                         let diff_start = self.parse_opt_start_comment()?;
                         if diff_start {
                             self.current.set_range_start(start_index)?;
@@ -150,9 +168,111 @@ impl<'de> Deserializer<'de> {
                         self.parse_next(multispace0)?;
                         start_index += 1;
                     }
+                }
+                ParserKind::Conditions => {
+                    let mut start_index = 0;
+                    while {
+                        // NOTE: The condition is that value_b: i32 and attacks_len: usize are the boundaries, and both are numeric values.
+                        // Read two lines ahead and peek len + attack_trigger: Str. If Str exists (and is not i32),
+                        let (remain, _) = self.parse_peek2(opt(parse_one_line::<usize>))?;
+                        let (_, maybe_value_b) = opt(parse_one_line::<usize>)
+                            .parse_peek(remain)
+                            .map_err(|err| Error::Context { err })?;
+                        maybe_value_b.is_some()
+                    } {
+                        // TODO:
+                        let diff_start = self.parse_opt_start_comment()?;
+                        if diff_start {
+                            self.current.set_range_start(start_index)?;
+                        }
+                        let trigger = self
+                            .parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
+                        if self.current.mode_code.is_some() {
+                            self.current.push_as_trigger(trigger)?;
+                        }
+
+                        self.parse_opt_close_comment()?;
+                        self.parse_next(multispace0)?;
+                        start_index += 1;
+                    }
+                }
+                ParserKind::Attacks => {
+                    let mut start_index = 0;
+                    while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
+                        let diff_start = self.parse_opt_start_comment()?;
+                        if diff_start {
+                            self.current.set_range_start(start_index)?;
+                        }
+                        let attack_trigger = self.parse_next(
+                            one_line
+                                .verify(|s: &str| s.starts_with("attackStart"))
+                                .context(Label("trigger: Str"))
+                                .context(Expected(Description("start_with(\"attackStart\""))),
+                        )?;
+                        if self.current.mode_code.is_some() {
+                            // self.current.push_as_trigger(attack_trigger)?;
+                        }
+
+                        self.parse_opt_close_comment()?;
+                        self.parse_next(multispace0)?;
+
+                        let _is_contextual = self.parse_next(
+                            num_bool_line.context(Expected(Description("is_contextual: bool"))),
+                        )?;
+                        let _clip_names_len = self.parse_next(
+                            parse_one_line::<usize>
+                                .context(Expected(Description("clip_names_len: usize"))),
+                        )?;
+                        tracing::debug!(?attack_trigger, ?_is_contextual, ?_clip_names_len);
+
+                        let mut clip_names_start_index = 0;
+                        while {
+                            let is_attack_trigger = self
+                                .parse_peek(opt(
+                                    one_line.verify(|s: &str| s.starts_with("attackStart"))
+                                ))?
+                                .is_some();
+                            let is_anim_info_len =
+                                self.parse_peek(opt(parse_one_line::<usize>))?.is_some();
+                            !is_attack_trigger && !is_anim_info_len
+                        } {
+                            let diff_start = self.parse_opt_start_comment()?;
+                            if diff_start {
+                                self.current.set_range_start(clip_names_start_index)?;
+                            }
+                            let clip_name = self.parse_next(
+                                one_line.context(Expected(Description("clip_name: Str"))),
+                            )?;
+                            if self.current.mode_code.is_some() {
+                                let _ = clip_name; // TODO: push
+                                                   // self.current.push_as_trigger(clip_name)?;
+                            }
+
+                            self.parse_opt_close_comment()?;
+                            self.parse_next(multispace0)?;
+                            clip_names_start_index += 1;
+                            tracing::debug!(?clip_name);
+                        }
+
+                        start_index += 1;
+                    }
+                }
+                ParserKind::AnimInfos => {
+                    let mut start_index = 0;
+                    while self.parse_peek(opt(eof))?.is_none() {
+                        let diff_start = self.parse_opt_start_comment()?;
+                        if diff_start {
+                            self.current.set_range_start(start_index)?;
+                        }
+                        let anim_info = self.anim_info()?;
+                        tracing::debug!(?anim_info);
+
+                        self.parse_opt_close_comment()?;
+                        self.parse_next(multispace0)?;
+                        start_index += 1;
+                    }
                     break;
                 }
-                _ => todo!(),
             };
         }
 
@@ -162,6 +282,44 @@ impl<'de> Deserializer<'de> {
         }
 
         Ok(())
+    }
+
+    fn anim_info(&mut self) -> Result<AnimInfo<'de>> {
+        let should_take_in_this = self.parse_opt_start_comment()?;
+        let hashed_path = self.parse_next(
+            verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
+        )?;
+        if should_take_in_this {
+            self.current.replace_one(hashed_path.clone())?; // FIXME: correct clone?
+        }
+        self.parse_opt_close_comment()?;
+
+        let should_take_in_this = self.parse_opt_start_comment()?;
+        let hashed_file_name = self.parse_next(
+            verify_line_parses_to::<u32>.context(Expected(Description("hashed_file_name: u32"))),
+        )?;
+        if should_take_in_this {
+            self.current.replace_one(hashed_file_name.clone())?;
+        }
+        self.parse_opt_close_comment()?;
+
+        let should_take_in_this = self.parse_opt_start_comment()?;
+        let ascii_extension = self.parse_next(
+            one_line
+                .verify(|s: &str| s == "7891816")
+                .context(Label("ascii_extension: u32"))
+                .context(Expected(StringLiteral("7891816"))),
+        )?;
+        if should_take_in_this {
+            self.current.replace_one(ascii_extension.clone())?;
+        }
+        self.parse_opt_close_comment()?;
+
+        Ok(AnimInfo {
+            hashed_path,
+            hashed_file_name,
+            ascii_extension,
+        })
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,17 +376,18 @@ impl<'de> Deserializer<'de> {
     fn merge_to_output(&mut self) -> Result<(), Error> {
         let op = self.current.judge_operation();
         if let Some(mut partial_patch) = self.current.patch.take() {
+            #[allow(clippy::match_same_arms)] // TODO: Remove this
             match self.current.current_kind()? {
-                LineKind::Version => {
+                ParserKind::Version => {
                     if let Some(version) = partial_patch.version.take() {
                         self.output_patches.version.replace(version);
                     }
                 }
-                LineKind::TriggersLen
-                | LineKind::ConditionsLen
-                | LineKind::AttacksLen
-                | LineKind::AnimInfosLen => {}
-                LineKind::Triggers => {
+                ParserKind::TriggersLen
+                | ParserKind::ConditionsLen
+                | ParserKind::AttacksLen
+                | ParserKind::AnimInfosLen => {}
+                ParserKind::Triggers => {
                     if let Some(triggers) = partial_patch.triggers.take() {
                         let PartialTriggers { range, values } = triggers;
                         let values = if op == Op::Remove { vec![] } else { values };
@@ -243,7 +402,9 @@ impl<'de> Deserializer<'de> {
                             });
                     }
                 }
-                LineKind::Conditions | LineKind::Attacks | LineKind::AnimInfos => todo!(),
+                ParserKind::Conditions => {} // TODO
+                ParserKind::Attacks => {}    // TODO:
+                ParserKind::AnimInfos => {}  // TODO:
             }
 
             self.current.clear_flags(); // new patch is generated so clear flags.
@@ -256,7 +417,7 @@ impl<'de> Deserializer<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::asdsf::patch::de::NestedPatches;
+    use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff, NestedPatches};
     use json_patch::{json_path, JsonPatch, OpRangeKind, ValueWithPriority};
 
     // V3                             <- version
@@ -294,7 +455,7 @@ mod tests {
     // 19150068                       <- hashed_file_name[1]
     // 7891816                        <- ascii_extension[1]
 
-    // #[quick_tracing::init]
+    #[quick_tracing::init]
     #[ignore = "Not complete yet"]
     #[test]
     fn test_replace_anim_block_diff_patch() {
@@ -333,12 +494,9 @@ MC 1HM AttackRight01
 1440038008
 7891816
 <!-- CLOSE -->
-
 3064642194
 19150068
-3064642194
 7891816
-
 <!-- MOD_CODE ~test~ OPEN -->
 4000000003
 2000000003
@@ -358,7 +516,7 @@ MC 1HM AttackRight01
         let expected = DiffPatchAnimSetData {
             version: None,
             triggers_patches: vec![],
-            conditions_patches: vec![],
+            conditions_patches: ConditionsDiff::default(),
             attacks_patches: NestedPatches {
                 base: vec![ValueWithPriority {
                     patch: JsonPatch {
@@ -381,50 +539,53 @@ MC 1HM AttackRight01
                     },
                 )],
             },
-            anim_infos_patches: vec![
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        op: OpRangeKind::Seq(OpRange {
-                            op: Op::Replace,
-                            range: 0..1,
-                        }),
-                        value: simd_json::json_typed!(borrowed, [
-                            {
-                                "hashed_path": "4000000000",
-                                "hashed_file_name": "2000000000",
-                                "ascii_extension": "7891816"
-                            },
-                        ]),
+            anim_infos_patches: AnimInfosDiff {
+                one: Default::default(),
+                seq: vec![
+                    ValueWithPriority {
+                        patch: JsonPatch {
+                            op: OpRangeKind::Seq(OpRange {
+                                op: Op::Replace,
+                                range: 0..1,
+                            }),
+                            value: simd_json::json_typed!(borrowed, [
+                                {
+                                    "hashed_path": "4000000000",
+                                    "hashed_file_name": "2000000000",
+                                    "ascii_extension": "7891816"
+                                },
+                            ]),
+                        },
+                        priority: 0,
                     },
-                    priority: 0,
-                },
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        op: OpRangeKind::Seq(OpRange {
-                            op: Op::Add,
-                            range: 3..6,
-                        }),
-                        value: simd_json::json_typed!(borrowed, [
-                            {
-                                "hashed_path": "4000000003",
-                                "hashed_file_name": "2000000003",
-                                "ascii_extension": "7891816"
-                            },
-                            {
-                                "hashed_path": "4000000004",
-                                "hashed_file_name": "2000000004",
-                                "ascii_extension": "7891816"
-                            },
-                            {
-                                "hashed_path": "4000000005",
-                                "hashed_file_name": "2000000005",
-                                "ascii_extension": "7891816"
-                            },
-                        ]),
+                    ValueWithPriority {
+                        patch: JsonPatch {
+                            op: OpRangeKind::Seq(OpRange {
+                                op: Op::Add,
+                                range: 3..6,
+                            }),
+                            value: simd_json::json_typed!(borrowed, [
+                                {
+                                    "hashed_path": "4000000003",
+                                    "hashed_file_name": "2000000003",
+                                    "ascii_extension": "7891816"
+                                },
+                                {
+                                    "hashed_path": "4000000004",
+                                    "hashed_file_name": "2000000004",
+                                    "ascii_extension": "7891816"
+                                },
+                                {
+                                    "hashed_path": "4000000005",
+                                    "hashed_file_name": "2000000005",
+                                    "ascii_extension": "7891816"
+                                },
+                            ]),
+                        },
+                        priority: 0,
                     },
-                    priority: 0,
-                },
-            ],
+                ],
+            },
         };
         assert_eq!(patches, expected);
     }

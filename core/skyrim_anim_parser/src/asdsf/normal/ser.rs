@@ -101,11 +101,11 @@ fn write_anim_infos(out: &mut String, infos: &[AnimInfo]) {
     out.push_str(&infos.len().to_string());
     out.push_str(NEW_LINE);
     for info in infos {
-        out.push_str(&info.hashed_path.to_string());
+        out.push_str(info.hashed_path.as_ref());
         out.push_str(NEW_LINE);
-        out.push_str(&info.hashed_file_name.to_string());
+        out.push_str(info.hashed_file_name.as_ref());
         out.push_str(NEW_LINE);
-        out.push_str(&info.ascii_extension.to_string());
+        out.push_str(info.ascii_extension.as_ref());
         out.push_str(NEW_LINE);
     }
 }

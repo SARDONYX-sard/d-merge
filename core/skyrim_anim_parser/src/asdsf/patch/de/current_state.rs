@@ -1,5 +1,4 @@
-#![allow(unused)] // TODO: Remove this line.
-use crate::asdsf::patch::de::LineKind;
+use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff, ParserKind};
 use crate::{asdsf::patch::de::error::Error, common_parser::lines::Str};
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
@@ -7,8 +6,8 @@ use std::{borrow::Cow, ops::Range, slice::Iter};
 #[derive(Debug)]
 pub struct CurrentState<'input> {
     /// current parsing filed kind
-    line_kinds: Iter<'static, LineKind>,
-    current_kind: Option<LineKind>,
+    line_kinds: Iter<'static, ParserKind>,
+    current_kind: Option<ParserKind>,
 
     /// When present, this signals the start of a differential change
     pub mode_code: Option<&'input str>,
@@ -31,25 +30,25 @@ impl<'de> Default for CurrentState<'de> {
     }
 }
 
-const LINE_KINDS: [LineKind; 9] = [
-    LineKind::Version,
-    LineKind::TriggersLen,
-    LineKind::Triggers,
-    LineKind::ConditionsLen,
-    LineKind::Conditions,
-    LineKind::AttacksLen,
-    LineKind::Attacks,
-    LineKind::AnimInfosLen,
-    LineKind::AnimInfos,
+const LINE_KINDS: [ParserKind; 9] = [
+    ParserKind::Version,
+    ParserKind::TriggersLen,
+    ParserKind::Triggers,
+    ParserKind::ConditionsLen,
+    ParserKind::Conditions,
+    ParserKind::AttacksLen,
+    ParserKind::Attacks,
+    ParserKind::AnimInfosLen,
+    ParserKind::AnimInfos,
 ];
 
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAsdsfPatch<'a> {
     pub version: Option<Cow<'a, str>>,
     pub triggers: Option<PartialTriggers<'a>>,
-    pub conditions: Option<PartialConditions<'a>>,
+    pub conditions: ConditionsDiff<'a>,
     pub attacks: Option<PartialAttacks<'a>>,
-    pub anim_infos: Option<PartialAnimInfos<'a>>,
+    pub anim_infos: AnimInfosDiff<'a>,
 }
 
 /// not judge operation yet at this time.
@@ -58,30 +57,24 @@ pub struct PartialTriggers<'input> {
     pub range: Range<usize>,
     pub values: Vec<Str<'input>>,
 }
-/// not judge operation yet at this time.
-#[derive(Debug, PartialEq, Default)]
-pub struct PartialConditions<'input> {
-    pub range: Range<usize>,
-    pub values: Vec<Str<'input>>,
-}
+
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAttacks<'input> {
     pub range: Range<usize>,
     pub values: Vec<Str<'input>>,
 }
-/// not judge operation yet at this time.
-#[derive(Debug, PartialEq, Default)]
-pub struct PartialAnimInfos<'input> {
-    pub range: Range<usize>,
-    pub values: Vec<Str<'input>>,
-}
-/// not judge operation yet at this time.
-#[derive(Debug, PartialEq, Default)]
-pub struct PartialAnimInfo<'input> {
-    pub hashed_path: Option<Str<'input>>,
-    pub hashed_file_name: Option<Str<'input>>,
-    pub ascii_extension: Option<Str<'input>>,
+
+#[allow(unused)]
+enum OnePatchRequest {
+    Version,
+    ConditionVariableName,
+    ConditionValueA,
+    ConditionValueB,
+
+    AnimInfoHashedPath,
+    AnimInfoHashedFileName,
+    AnimInfoAsciiExtension,
 }
 
 impl<'de> CurrentState<'de> {
@@ -97,7 +90,7 @@ impl<'de> CurrentState<'de> {
         }
     }
 
-    pub(super) fn next(&mut self) -> Option<LineKind> {
+    pub(super) fn next(&mut self) -> Option<ParserKind> {
         let next = self.line_kinds.next().copied();
         self.current_kind = next;
         #[cfg(feature = "tracing")]
@@ -105,7 +98,7 @@ impl<'de> CurrentState<'de> {
         next
     }
 
-    pub(super) fn current_kind(&self) -> Result<LineKind, Error> {
+    pub(super) fn current_kind(&self) -> Result<ParserKind, Error> {
         self.current_kind.ok_or(Error::EndOfLineKind)
     }
 
@@ -121,11 +114,24 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::Version) => {
+            Some(ParserKind::Version) => {
                 self.patch.get_or_insert_default().version = Some(value);
             }
-
-            Some(LineKind::TriggersLen) => {}
+            Some(ParserKind::TriggersLen) => {}
+            Some(ParserKind::Conditions) => {
+                self.patch
+                    .get_or_insert_default()
+                    .conditions
+                    .one
+                    .insert(0, Default::default());
+            }
+            Some(ParserKind::AnimInfos) => {
+                self.patch
+                    .get_or_insert_default()
+                    .anim_infos
+                    .one
+                    .insert(0, Default::default());
+            }
             _ => return Err(Error::ExpectedOne),
         };
         Ok(())
@@ -141,8 +147,8 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::TriggersLen) => {}
-            Some(LineKind::Triggers) => {
+            Some(ParserKind::TriggersLen) => {}
+            Some(ParserKind::Triggers) => {
                 let trigger_names = self
                     .patch
                     .get_or_insert_default()
@@ -166,15 +172,16 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::Triggers) => {
-                let rotations = self
+            Some(ParserKind::Triggers | ParserKind::Conditions | ParserKind::Attacks) => {
+                let triggers = self
                     .patch
                     .get_or_insert_default()
                     .triggers
                     .get_or_insert_default();
-                rotations.range.start = start;
-                rotations.range.end = start;
+                triggers.range.start = start;
+                triggers.range.end = start;
             }
+            Some(ParserKind::AnimInfos) => {}
             _ => return Err(Error::ExpectedArray),
         }
 

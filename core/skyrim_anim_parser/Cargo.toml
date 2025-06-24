@@ -39,10 +39,11 @@ workspace = true
 
 [features]
 # default = ["tracing", "serde", "alt_map"] # for debug
+default = ["tracing", "serde"] # for debug
 
 # alternative to adsf indexmap
-alt_map = ["serde", "indexmap/serde", "bitvec/serde", "dep:dashmap"]
+alt_map = ["serde", "bitvec/serde", "dep:dashmap"]
 
-serde = ["dep:serde", "json_patch/serde"]
+serde = ["dep:serde", "json_patch/serde", "indexmap/serde"]
 
 tracing = ["dep:tracing"]

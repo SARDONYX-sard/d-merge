@@ -49,7 +49,7 @@ pub struct AnimSetData<'a> {
     pub attacks_len: usize,
     pub attacks: Vec<Attack<'a>>,
     pub anim_infos_len: usize,
-    pub anim_infos: Vec<AnimInfo>,
+    pub anim_infos: Vec<AnimInfo<'a>>,
 }
 
 /// A conditional expression used in `AnimSetData` to determine whether an animation set applies.
@@ -193,17 +193,19 @@ pub struct Attack<'a> {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AnimInfo {
+pub struct AnimInfo<'a> {
     /// CRC32 representation path
-    pub hashed_path: u32,
+    /// - type: [`u32`]
+    pub hashed_path: Str<'a>,
     /// CRC32 representation file name
-    pub hashed_file_name: u32,
-    /// u32 (le_bytes ASCII) representation extension
+    /// - type: [`u32`]
+    pub hashed_file_name: Str<'a>,
+    /// u32 (le_bytes ASCII) representation extension. Always `7891816`
+    /// - type: [`u32`]
     ///
-    /// Always `7891816`
     /// ```
     /// assert_eq!(core::str::from_utf8(&u32::to_le_bytes(7891816)), Ok("hkx\0"));
     /// assert_eq!(core::str::from_utf8(&[0x78, 0x6b, 0x68]), Ok("xkh"));
     /// ```
-    pub ascii_extension: u32,
+    pub ascii_extension: Str<'a>,
 }

@@ -2,7 +2,9 @@
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
 use crate::{
     asdsf::normal::{AnimSetList, TxtProjects},
-    common_parser::lines::{lines, num_bool_line, one_line, parse_one_line, Str},
+    common_parser::lines::{
+        lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str,
+    },
 };
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -172,16 +174,18 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode
     }
 }
 
-fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo>, ErrMode<ContextError>> {
+fn anim_infos<'a>(
+    line_len: usize,
+) -> impl Parser<&'a str, Vec<AnimInfo<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut anim_infos = vec![];
         for _ in 0..line_len {
             anim_infos.push(
                 seq! {
                     AnimInfo {
-                        hashed_path: parse_one_line.context(Expected(Description("hashed_path: u32"))),
-                        hashed_file_name: parse_one_line.context(Expected(Description("hashed_file_name: u32"))),
-                        ascii_extension: parse_one_line.context(Expected(Description("ascii_extension: u32"))),
+                        hashed_path: verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
+                        hashed_file_name: verify_line_parses_to::<u32>.context(Expected(Description("hashed_file_name: u32"))),
+                        ascii_extension: verify_line_parses_to::<u32>.context(Expected(Description("ascii_extension: u32"))),
                     }
                 }
                 .context(Label("AnimInfo"))

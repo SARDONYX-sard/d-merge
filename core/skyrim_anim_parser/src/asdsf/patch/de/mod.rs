@@ -2,6 +2,8 @@ mod current_state;
 pub mod deserializer;
 mod error;
 
+use std::collections::HashMap;
+
 use self::error::Error;
 use json_patch::{apply_seq_by_priority, JsonPath, ValueWithPriority};
 use rayon::prelude::*;
@@ -28,10 +30,10 @@ pub struct DiffPatchAnimSetData<'a> {
         feature = "serde",
         serde(
             borrow,
-            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
+            bound(deserialize = "ConditionsDiff<'a>: serde::Deserialize<'de>")
         )
     )]
-    conditions_patches: Vec<ValueWithPriority<'a>>,
+    conditions_patches: ConditionsDiff<'a>,
 
     #[cfg_attr(
         feature = "serde",
@@ -46,10 +48,43 @@ pub struct DiffPatchAnimSetData<'a> {
         feature = "serde",
         serde(
             borrow,
+            bound(deserialize = "AnimInfosDiff<'a>: serde::Deserialize<'de>")
+        )
+    )]
+    anim_infos_patches: AnimInfosDiff<'a>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ConditionsDiff<'a> {
+    /// - key: replace target index
+    /// - value: Partial change request
+    one: HashMap<usize, ConditionDiff<'a>>,
+
+    /// A request to change all elements of an array.
+    ///
+    /// This is processed after partial patching is complete.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            borrow,
             bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
         )
     )]
-    anim_infos_patches: Vec<ValueWithPriority<'a>>,
+    seq: Vec<ValueWithPriority<'a>>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ConditionDiff<'a> {
+    /// The name of the variable used in the condition.
+    pub variable_name: Option<Str<'a>>,
+
+    /// The **start** of the allowed range (inclusive) for the condition value.
+    /// - type: [`i32`]
+    pub value_a: Option<Str<'a>>,
+    /// - type: [`i32`]
+    pub value_b: Option<Str<'a>>,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -79,6 +114,40 @@ struct NestedPatches<'a> {
     children: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct AnimInfosDiff<'a> {
+    /// - key: replace target index
+    /// - value: Partial change request
+    one: HashMap<usize, AnimInfoDiff<'a>>,
+
+    /// A request to change all elements of an array.
+    ///
+    /// This is processed after partial patching is complete.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            borrow,
+            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
+        )
+    )]
+    seq: Vec<ValueWithPriority<'a>>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AnimInfoDiff<'a> {
+    /// CRC32 representation path
+    /// - type: [`u32`]
+    pub hashed_path: Option<Str<'a>>,
+    /// CRC32 representation file name
+    /// - type: [`u32`]
+    pub hashed_file_name: Option<Str<'a>>,
+    /// Always `7891816`
+    /// - type: [`u32`]
+    pub ascii_extension: Option<Str<'a>>,
+}
+
 impl DiffPatchAnimSetData<'_> {
     #[inline]
     pub fn merge(&mut self, other: Self) {
@@ -88,8 +157,16 @@ impl DiffPatchAnimSetData<'_> {
         if !other.triggers_patches.is_empty() {
             self.triggers_patches.par_extend(other.triggers_patches);
         }
-        if !other.conditions_patches.is_empty() {
-            self.conditions_patches.par_extend(other.conditions_patches);
+
+        if !other.conditions_patches.one.is_empty() {
+            self.conditions_patches
+                .one
+                .par_extend(other.conditions_patches.one);
+        }
+        if !other.conditions_patches.seq.is_empty() {
+            self.conditions_patches
+                .seq
+                .par_extend(other.conditions_patches.seq);
         }
 
         if !other.attacks_patches.base.is_empty() {
@@ -103,8 +180,15 @@ impl DiffPatchAnimSetData<'_> {
                 .par_extend(other.attacks_patches.children);
         }
 
-        if !other.anim_infos_patches.is_empty() {
-            self.anim_infos_patches.par_extend(other.anim_infos_patches);
+        if !other.anim_infos_patches.one.is_empty() {
+            self.anim_infos_patches
+                .one
+                .par_extend(other.anim_infos_patches.one);
+        }
+        if !other.anim_infos_patches.seq.is_empty() {
+            self.anim_infos_patches
+                .seq
+                .par_extend(other.anim_infos_patches.seq);
         }
     }
 }
@@ -135,10 +219,10 @@ impl<'a> DiffPatchAnimSetData<'a> {
             anim_set_data.triggers = from_borrowed_value(template)?;
         }
 
-        if !self.conditions_patches.is_empty() {
+        if !self.conditions_patches.seq.is_empty() {
             // take & change condition to json -> marge
             let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.conditions))?;
-            let patches = core::mem::take(&mut self.conditions_patches);
+            let patches = core::mem::take(&mut self.conditions_patches.seq);
 
             apply_seq_by_priority(
                 "conditions",
@@ -166,9 +250,9 @@ impl<'a> DiffPatchAnimSetData<'a> {
             anim_set_data.conditions = from_borrowed_value(template)?;
         }
 
-        if !self.anim_infos_patches.is_empty() {
+        if !self.anim_infos_patches.seq.is_empty() {
             // take & change condition to json -> marge
-            let patches = core::mem::take(&mut self.anim_infos_patches);
+            let patches = core::mem::take(&mut self.anim_infos_patches.seq);
 
             let anim_infos = core::mem::take(&mut anim_set_data.anim_infos);
             let mut template = to_borrowed_value(anim_infos)?;
@@ -188,28 +272,28 @@ impl<'a> DiffPatchAnimSetData<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub(super) enum LineKind {
-    /// Str
+pub(super) enum ParserKind {
+    /// - type: `Str`
     #[default]
     Version,
 
-    /// usize
+    /// - type: `usize`
     TriggersLen,
-    /// Vec<Str>
+    /// - type: `Vec<Str>`
     Triggers,
 
-    /// usize
+    /// - type: [`usize`]
     ConditionsLen,
-    /// Vec<Condition>
+    /// - type: `Vec<Condition>`
     Conditions,
 
-    /// usize
+    /// - type: [`usize`]
     AttacksLen,
-    /// Vec<Attack>
+    /// - type: `Vec<Attack>`
     Attacks,
 
-    /// usize
+    /// - type: [`usize`]
     AnimInfosLen,
-    /// Vec<AnimInfo>
+    /// - type: `Vec<AnimInfo>`
     AnimInfos,
 }
