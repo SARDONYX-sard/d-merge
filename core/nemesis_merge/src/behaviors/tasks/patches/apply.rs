@@ -26,11 +26,15 @@ pub fn apply_patches<'a, 'b: 'a>(
     borrowed_patches: RawBorrowedPatches<'b>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
-    let status_reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::ApplyingPatches,
-        borrowed_patches.len(),
-    );
+    let status_report = &config.status_report;
+    // Optimization: If we don't use the progress bar, there is no need to calculate.
+    let total = match status_report {
+        Some(_) => borrowed_patches.len(),
+        None => 0,
+    };
+
+    let status_reporter =
+        StatusReportCounter::new(status_report, ReportType::ApplyingPatches, total);
 
     let results: Vec<Result<(), Error>> = borrowed_patches
         .0
