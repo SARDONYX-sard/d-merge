@@ -1,4 +1,5 @@
 pub use crate::operation::Op;
+use crate::JsonPatchError;
 
 use simd_json::BorrowedValue;
 use std::ops::Range;
@@ -96,11 +97,12 @@ impl OpRangeKind {
     /// # Panics
     /// Panics if the kind is `Pure`, as no range information is available.
     #[inline]
-    pub fn as_seq(&self) -> &OpRange {
+    pub fn as_seq(&self) -> Result<&OpRange, JsonPatchError> {
         match self {
-            Self::Pure(op) => panic!("Expected Seq. But got Pure: op: {op:?}"),
-            Self::Seq(op_range) => op_range,
-            Self::Discrete(_) => todo!(),
+            Self::Seq(op_range) => Ok(op_range),
+            _ => Err(JsonPatchError::ExpectedSeq {
+                unexpected: self.clone(),
+            }),
         }
     }
 }
