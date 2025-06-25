@@ -88,7 +88,8 @@ export const PatchOptionsDialog = () => {
               {t('patch.auto_remove_meshes_option_help')}
             </FormHelperText>
 
-            <FormControlLabel
+            {/* FIXME: The button cannot be pressed unless “Done” is sent, so it is not possible at this time. */}
+            {/* <FormControlLabel
               control={
                 <Switch
                   checked={patchOptions.useProgressReporter}
@@ -104,7 +105,7 @@ export const PatchOptionsDialog = () => {
             />
             <FormHelperText sx={{ ml: 3, mb: 1, color: 'text.secondary' }}>
               {t('patch.use_progress_reporter_option_help')}
-            </FormHelperText>
+            </FormHelperText> */}
           </Box>
 
           {/* Hack Options */}
