@@ -54,20 +54,21 @@ Path: {path}, Seq target length: {target_len}
     // one patch
     // ["[5]", "local_time"] // modify f32
     // ["[5]", "triggers", [0], "animations", [3], "time"] // modify f32
-    let (mut patched_array, add_ops) = apply_ops_parallel(*patch_target_vec, patches);
+    let (patched_array, add_ops) = apply_ops_parallel(*patch_target_vec, patches);
+    let mut patched_array = patched_array.into();
     for (path, patch) in child_patches {
-        if let Err(_err) = crate::apply_one_field(target, path, patch) {
+        if let Err(_err) = crate::apply_one_field(&mut patched_array, path, patch) {
             #[cfg(feature = "tracing")]
             tracing::warn!("Failed to apply child patch path(`{file_name}`): {_err}",);
         };
     }
 
     // breaking change indexes
-    let Value::Array(template_array) = target else {
+    let Value::Array(mut patched_array) = patched_array else {
         return Err(JsonPatchError::unsupported_range_kind_from(path, ""));
     };
     add_patch(&mut patched_array, add_ops);
-    remove_mark_as_removed(template_array, patched_array);
+    remove_mark_as_removed(template_array, *patched_array);
 
     Ok(())
 }

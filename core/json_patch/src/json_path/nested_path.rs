@@ -25,7 +25,7 @@ pub enum PathType<'a> {
     Simple(JsonPath<'a>),
     /// Represents a nested path with an array index, e.g., `"#0001.hkbStringData.eventTriggers[5].triggers[0].animations[3].time"`
     /// - (base array, children)
-    Nested((JsonPath<'a>, Vec<JsonPath<'a>>)),
+    Nested((JsonPath<'a>, Vec<(JsonPath<'a>, JsonPath<'a>)>)),
 }
 
 pub fn sort_nested_json_path<'a>(paths: Vec<JsonPath<'a>>) -> Vec<PathType<'a>> {
@@ -56,10 +56,13 @@ pub fn sort_nested_json_path<'a>(paths: Vec<JsonPath<'a>>) -> Vec<PathType<'a>> 
     for (key, group) in nested_cache {
         // Split into parent vs nested
         let parent_opt = group.iter().find(|p| p.len() <= 3).cloned();
-        let nested_paths: Vec<Vec<Cow<'a, str>>> = group
+        let nested_paths: Vec<_> = group
             .into_iter()
             .filter(|p| p.len() > 3)
-            .map(|p| p.iter().skip(3).cloned().collect())
+            .map(|p| {
+                let children = p.iter().skip(3).cloned().collect();
+                (p, children)
+            })
             .collect();
 
         if !nested_paths.is_empty() {
@@ -139,10 +142,10 @@ mod tests {
         );
 
         assert_eq!(
-            nested_paths.1[0],
+            nested_paths.1[0].1,
             cow_path(&["[5]", "triggers", "[0]", "animations", "[3]", "time"])
         );
-        assert_eq!(nested_paths.1[1], cow_path(&["[5]", "local_time"]));
+        assert_eq!(nested_paths.1[1].1, cow_path(&["[5]", "local_time"]));
 
         // Check simple path #0002
         let simple_2 = sorted

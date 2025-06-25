@@ -47,16 +47,16 @@ pub fn apply_patches<'a>(
                 match path_type {
                     PathType::Simple(path) => {
                         let Some((path, patch)) = patches.0.remove(&path) else {
-                            results.push(Err(Error::NotFoundTemplate {
-                                template_name: key.to_string(),
+                            results.push(Err(Error::Custom {
+                                msg: format!("not found this path patch: {path:?}"),
                             }));
                             continue;
                         };
                         let patch = match patch {
                             json_patch::Patch::One(patch) => patch,
                             json_patch::Patch::Seq(_) => {
-                                results.push(Err(Error::NotFoundTemplate {
-                                    template_name: key.to_string(),
+                                results.push(Err(Error::Custom {
+                                    msg: "Expected One patch but got seq".to_string(),
                                 }));
                                 continue;
                             }
@@ -85,8 +85,8 @@ pub fn apply_patches<'a>(
 
                         // ["#0001", "hkbStringData", "eventTriggers"], value: vec![ValueWithPriority] -> replace-> one patch -> add&remove
                         let Some((path, patch)) = patches.0.remove(&base) else {
-                            results.push(Err(Error::NotFoundTemplate {
-                                template_name: key.to_string(),
+                            results.push(Err(Error::Custom {
+                                msg: format!("not found this path patch base: {base:?}"),
                             }));
                             continue;
                         };
@@ -97,10 +97,11 @@ pub fn apply_patches<'a>(
                             continue;
                         };
                         let mut child_patches = vec![];
-                        for child in &children {
-                            let Some((path, Patch::One(patch))) = patches.0.remove(child) else {
-                                results.push(Err(Error::NotFoundTemplate {
-                                    template_name: key.to_string(),
+                        for (full_child_path, child) in &children {
+                            let Some((path, Patch::One(patch))) = patches.0.remove(full_child_path)
+                            else {
+                                results.push(Err(Error::Custom {
+                                    msg: format!("not found this path patch child: {child:?}"),
                                 }));
                                 continue;
                             };
@@ -109,9 +110,9 @@ pub fn apply_patches<'a>(
                         }
 
                         let patches = match patch {
-                            Patch::One(_) => {
-                                results.push(Err(Error::NotFoundTemplate {
-                                    template_name: key.to_string(),
+                            Patch::One(patch) => {
+                                results.push(Err(Error::Custom {
+                                    msg: format!("Expected One patch but got Seq:\n{patch:#?}"),
                                 }));
                                 continue;
                             }
