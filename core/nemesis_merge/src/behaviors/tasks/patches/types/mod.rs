@@ -57,7 +57,7 @@ impl RawBorrowedPatches<'_> {
                 let (one, seq) = pair.value();
                 one.0.len() + seq.0.len()
             })
-            .reduce(|| 0, |a, b| a + b)
+            .sum()
     }
 }
 
