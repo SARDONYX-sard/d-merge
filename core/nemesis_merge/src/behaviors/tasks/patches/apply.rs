@@ -69,11 +69,8 @@ fn apply_to_one_template<'a, 'b: 'a>(
     // After that, sequence patches can be applied reliably.
     let (one_patch_map, seq_patch_map) = patches;
     let total = one_patch_map.0.len() + seq_patch_map.0.len();
-    let status_reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::ApplyingPatches,
-        total,
-    );
+    let status_reporter =
+        StatusReportCounter::new(&config.status_report, ReportType::ApplyingPatches, total);
 
     let one_patch_results = process_one_patch(templates, key, one_patch_map, &status_reporter);
     let seq_patch_results = process_seq_patch(templates, key, seq_patch_map, &status_reporter);
