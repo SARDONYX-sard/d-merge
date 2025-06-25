@@ -1,5 +1,3 @@
-pub mod nested_path;
-
 pub type JsonPath<'a> = Vec<std::borrow::Cow<'a, str>>;
 
 /// A macro to create a JSON path as a vector of string slices.

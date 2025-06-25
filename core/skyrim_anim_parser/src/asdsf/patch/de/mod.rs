@@ -208,13 +208,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.triggers))?;
             let patches = core::mem::take(&mut self.triggers_patches);
 
-            apply_seq_by_priority(
-                "triggers",
-                &mut template,
-                &vec!["triggers".into()],
-                patches,
-                vec![],
-            )?;
+            apply_seq_by_priority("triggers", &mut template, vec!["triggers".into()], patches)?;
 
             anim_set_data.triggers = from_borrowed_value(template)?;
         }
@@ -227,9 +221,8 @@ impl<'a> DiffPatchAnimSetData<'a> {
             apply_seq_by_priority(
                 "conditions",
                 &mut template,
-                &vec!["conditions".into()],
+                vec!["conditions".into()],
                 patches,
-                vec![],
             )?;
 
             anim_set_data.conditions = from_borrowed_value(template)?;
@@ -237,15 +230,9 @@ impl<'a> DiffPatchAnimSetData<'a> {
 
         if !self.attacks_patches.base.is_empty() || !self.attacks_patches.children.is_empty() {
             let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.attacks))?;
-            let NestedPatches { base, children } = core::mem::take(&mut self.attacks_patches);
+            let NestedPatches { base, children: _ } = core::mem::take(&mut self.attacks_patches);
 
-            apply_seq_by_priority(
-                "attacks",
-                &mut template,
-                &vec!["attacks".into()],
-                base,
-                children,
-            )?;
+            apply_seq_by_priority("attacks", &mut template, vec!["attacks".into()], base)?;
 
             anim_set_data.conditions = from_borrowed_value(template)?;
         }
@@ -259,9 +246,8 @@ impl<'a> DiffPatchAnimSetData<'a> {
             apply_seq_by_priority(
                 "anim_infos",
                 &mut template,
-                &vec!["anim_infos".into()],
+                vec!["anim_infos".into()],
                 patches,
-                vec![],
             )?;
 
             anim_set_data.anim_infos = from_borrowed_value(template)?;
