@@ -1,12 +1,16 @@
 //! Parses an adsf path and returns target and id as &str references.
 //!
 //! rule:
-//! anim block header:
+//! txt projects:
 //! - format: <any>/<id>/animationdatasinglefile/$header$/$header$.txt
 //!   (e.g. D:/mod/slide/animationdatasinglefile/$header$/$header$.txt)
 //!
+//! anim block header:
+//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/$header$.txt
+//!   (e.g. D:/mod/slide/animationdatasinglefile/<target>~<index>/$header$.txt)
+//!
 //! add anim block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~1/<name>~<anim_data_clip_id>.txt
+//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<anim_data_clip_id>.txt
 //!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt)
 //!
 //! replace anim block path:
@@ -37,6 +41,12 @@ use crate::behaviors::priority_ids::get_nemesis_id;
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
 pub enum ParserType<'a> {
+    /// Indicates the special `$header$/$header$.txt`override
+    TxtProjectHeader,
+
+    /// Indicates the special `<target>~<index>/$header$.txt`override
+    AnimHeader,
+
     /// Indicates an individual animation (e.g., `Run~slide.txt`)
     AddAnim,
 
@@ -50,9 +60,6 @@ pub enum ParserType<'a> {
     /// Indicates a motion ID replacement or override (e.g., `10.txt` 10 is AnimInfo index)
     /// - include 1-based index
     EditMotion(&'a str),
-
-    /// Indicates the special `$header$/$header$.txt`override
-    AnimHeader,
 }
 
 /// Represents the parsed result of an animation patch path.
@@ -116,8 +123,11 @@ pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, Pa
             path: path.to_path_buf(),
         }
     })?;
+    let is_header_file = file_stem.eq_ignore_ascii_case("$header$");
 
-    let parser_type = if file_stem.eq_ignore_ascii_case("$header$") {
+    let parser_type = if target == "$header$" && is_header_file {
+        ParserType::TxtProjectHeader
+    } else if is_header_file {
         ParserType::AnimHeader
     } else if file_stem.contains('~') {
         // e.g. Jump~42
@@ -203,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn test_anim_header_add() {
+    fn test_txt_project_header_add() {
         let parsed = parse(
             "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/$header$/$header$.txt",
         );
@@ -212,6 +222,21 @@ mod tests {
             ParsedAdsfPatchPath {
                 id: "/some/mods/Nemesis_Engine/mod/slide",
                 target: "$header$",
+                parser_type: ParserType::TxtProjectHeader,
+            }
+        );
+    }
+
+    #[test]
+    fn test_anim_header_add() {
+        let parsed = parse(
+            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultMale~3/$header$.txt",
+        );
+        assert_eq!(
+            parsed,
+            ParsedAdsfPatchPath {
+                id: "/some/mods/Nemesis_Engine/mod/slide",
+                target: "DefaultMale~3",
                 parser_type: ParserType::AnimHeader,
             }
         );

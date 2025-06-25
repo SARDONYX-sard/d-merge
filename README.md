@@ -71,6 +71,8 @@ The only thing we are considering at this time is support for the Nemesis patch.
 
   - [x] Serialization
   - [x] Deserialization
+  - [ ] txt project header patch
+  - [ ] anim header patch
   - [x] Add Operation
   - [x] Replace/Remove Operation
   - [ ] Conflict resolver

@@ -198,7 +198,7 @@ fn parse_anim_data_patch<'a>(
             })
         }
 
-        ParserType::AnimHeader => {
+        ParserType::TxtProjectHeader | ParserType::AnimHeader => {
             return Err(Error::Custom {
                 msg: "Unsupported $header$ yet.".to_owned(),
             })
