@@ -42,5 +42,6 @@
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
-  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"] // Real time println! on test
+  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"],
+  "i18n-ally.sourceLanguage": "en" // Real time println! on test
 }

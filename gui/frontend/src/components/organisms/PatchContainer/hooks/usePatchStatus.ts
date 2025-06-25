@@ -9,46 +9,51 @@ export const usePatchStatus = (stop: () => string, setLoading: (v: boolean) => v
   const [status, setStatus] = useState<Status | null>(null);
   const [statusText, setStatusText] = useState('');
 
-  const handleStatus = (status: Status, unlisten: (() => void) | null) => {
-    setStatus(status);
+  const handleStatus = (nextStatus: Status, unlisten: (() => void) | null) => {
+    // NOTE: Unfortunately, when attempting to display the `index` and `total` in real time,
+    // it does not display in time and is not used at all.
+    //
+    // const { index, total } = nextStatus.content;
 
-    switch (status.type) {
-      case 'ReadingTemplatesAndPatches':
-        let { index, total } = status.content;
-        setStatusText(`${t('patch.patch_reading_message')} (${index}/${total})`);
+    if (nextStatus === status) {
+      return;
+    }
+    setStatus(nextStatus);
+
+    let nextText = '';
+    switch (nextStatus.type) {
+      case 'ReadingPatches':
+        nextText = t('patch.patch_reading_message');
         break;
-      case 'ParsingPatches': {
-        const { index, total } = status.content;
-        setStatusText(`${t('patch.patch_parsing_message')} (${index}/${total})`);
+      case 'ParsingPatches':
+        nextText = t('patch.patch_parsing_message');
         break;
-      }
-      case 'ApplyingPatches': {
-        const { index, total } = status.content;
-        setStatusText(`${t('patch.patch_applying_message')} (${index}/${total})`);
+      case 'ApplyingPatches':
+        nextText = t('patch.patch_applying_message');
         break;
-      }
-      case 'GenerateHkxFiles': {
-        const { index, total } = status.content;
-        setStatusText(`${t('patch.patch_generating_message')} (${index}/${total})`);
+      case 'GeneratingHkxFiles':
+        nextText = t('patch.patch_generating_message');
         break;
-      }
       case 'Done': {
-        setStatusText(`${t('patch.patch_complete_message')} (${stop()})`);
+        nextText = `${t('patch.patch_complete_message')} (${stop()})`;
         setLoading(false);
         unlisten?.();
         break;
       }
       case 'Error': {
+        nextText = `${t('patch.patch_error_message')} (${stop()})`;
         setLoading(false);
         unlisten?.();
-        setStatusText(`${t('patch.patch_error_message')} (${stop()})`);
-        NOTIFY.error(status.content);
+        NOTIFY.error(nextStatus.content);
         break;
       }
       default:
         break;
     }
-  };
 
+    if (nextText && nextText !== statusText) {
+      setStatusText(nextText);
+    }
+  };
   return { status, statusText, handleStatus };
 };
