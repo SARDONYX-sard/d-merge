@@ -1,17 +1,18 @@
-#![allow(clippy::significant_drop_tightening)]
 use super::paths::{
     collect::{collect_nemesis_paths, Category},
     parse::parse_nemesis_path,
 };
 use crate::{
+    behaviors::priority_ids::get_nemesis_id,
+    behaviors::priority_ids::types::PriorityMap,
+    behaviors::tasks::adsf::types::OwnedAdsfPatchMap,
+    behaviors::tasks::patches::types::{
+        BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, RawBorrowedPatches,
+    },
+    behaviors::tasks::templates::types::TemplateKey,
     config::HackOptions,
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
-    path_id::get_nemesis_id,
     results::filter_results,
-    types::{
-        Key, OwnedAdsfPatchMap, OwnedPatchMap, PatchKind, PatchMap, PriorityMap,
-        RawBorrowedPatches, VariableClassMap,
-    },
 };
 use dashmap::DashSet;
 use json_patch::ValueWithPriority;
@@ -106,7 +107,7 @@ pub fn collect_borrowed_patches<'a>(
 ) -> (BorrowedPatches<'a>, Vec<Error>) {
     let raw_borrowed_patches = RawBorrowedPatches::new();
     let template_names = DashSet::new();
-    let variable_class_map = VariableClassMap::new();
+    let variable_class_map = BehaviorStringDataMap::new();
 
     let results: Vec<Result<()>> =
         owned_patches
@@ -120,7 +121,7 @@ pub fn collect_borrowed_patches<'a>(
                         .with_context(|_| NemesisXmlErrSnafu { path })?;
 
                 let (template_name, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
-                let key = Key::new(template_name, is_1st_person);
+                let key = TemplateKey::new(template_name, is_1st_person);
 
                 template_names.insert(key.clone());
                 if let Some(class_index) = variable_class_index {
@@ -132,20 +133,18 @@ pub fn collect_borrowed_patches<'a>(
 
                 json_patches.into_par_iter().for_each(|(json_path, value)| {
                     // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                    let entry = raw_borrowed_patches
-                        .entry(key.clone())
-                        .or_insert_with(PatchMap::new);
+                    let entry = raw_borrowed_patches.entry(key.clone()).or_default();
 
                     match &value.op {
                         // Overwrite to match patch structure
                         // Pure: no add and remove because of single value
                         json_patch::OpRangeKind::Pure(_) => {
                             let value = ValueWithPriority::new(value, priority);
-                            let _ = entry.value().insert(json_path, value, PatchKind::OneField);
+                            entry.value().0.insert(json_path, value);
                         }
                         json_patch::OpRangeKind::Seq(_) => {
                             let value = ValueWithPriority::new(value, priority);
-                            let _ = entry.value().insert(json_path, value, PatchKind::Seq);
+                            entry.value().1.insert(json_path, value);
                         }
                         json_patch::OpRangeKind::Discrete(range_vec) => {
                             let json_patch::JsonPatch { value, .. } = value;
@@ -171,7 +170,7 @@ pub fn collect_borrowed_patches<'a>(
                                     value
                                 },
                             );
-                            let _ = entry.value().extend(json_path, iter);
+                            entry.value().1.extend(json_path, iter);
                         }
                     }
                 });
@@ -189,24 +188,8 @@ pub fn collect_borrowed_patches<'a>(
         BorrowedPatches {
             template_names,
             borrowed_patches: raw_borrowed_patches,
-            variable_class_map,
+            behavior_string_data_map: variable_class_map,
         },
         errors,
     )
-}
-
-pub struct BorrowedPatches<'a> {
-    /// Name of the template that needs to be read.
-    ///
-    /// - format: template_name, is_1st_person
-    /// - e.g. (`0_master`, false)
-    pub template_names: DashSet<Key<'a>>,
-    /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
-    /// - value: `Map<jsonPath, { patch, priority }>`
-    pub borrowed_patches: RawBorrowedPatches<'a>,
-    /// HashMap showing which index (e.g. `#0000`) of each template (e.g. `0_master.xml`)
-    /// contains `hkbBehaviorGraphStringData
-    ///
-    /// This information exists because it is needed to replace variables such as the Nemesis variable `$variableID[]$`.
-    pub variable_class_map: VariableClassMap<'a>,
 }

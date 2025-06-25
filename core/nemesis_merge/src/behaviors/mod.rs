@@ -1,15 +1,22 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-use crate::{
-    config::{Config, Status},
-    errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result},
+mod priority_ids;
+mod tasks;
+
+pub(crate) use tasks::adsf::path_parser::ParseError;
+pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
+
+use self::priority_ids::paths_to_priority_map;
+use self::tasks::{
     hkx::generate::generate_hkx_files,
     patches::{
         apply::apply_patches,
-        collect::{collect_borrowed_patches, collect_owned_patches, BorrowedPatches},
+        collect::{collect_borrowed_patches, collect_owned_patches},
+        types::{BorrowedPatches, OwnedPatchMap},
     },
-    path_id::paths_to_priority_map,
-    types::OwnedPatchMap,
 };
+use crate::behaviors::tasks::adsf::apply_adsf_patches;
+use crate::config::{Config, Status};
+use crate::errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -35,7 +42,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
     // - Patch to `animationdatasinglefile.txt`
     // - Patch to hkx( -> xml)
     let (adsf_errors, patched_hkx_errors) = rayon::join(
-        || crate::adsf::apply_adsf_patches(owned_adsf_patches, &id_order, &config),
+        || apply_adsf_patches(owned_adsf_patches, &id_order, &config),
         || apply_and_gen_patched_hkx(&owned_patches, &config),
     );
 
@@ -90,7 +97,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         BorrowedPatches {
             template_names,
             borrowed_patches,
-            variable_class_map,
+            behavior_string_data_map: variable_class_map,
         },
         patch_errors_len,
     ) = {
@@ -103,7 +110,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     tracing::debug!("needed template_names = {template_names:#?}");
 
     let owned_templates = {
-        use crate::templates::collect::owned;
+        use self::tasks::templates::collect::owned;
         let template_dir = &config.resource_dir;
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
         owned::collect_templates(template_dir, template_names.into_par_iter().collect())
@@ -117,7 +124,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
 
         let template_error_len;
         let templates = {
-            use crate::templates::collect::borrowed;
+            use self::tasks::templates::collect::borrowed;
             let (templates, errors) = borrowed::collect_templates(&owned_templates);
             template_error_len = errors.len();
             all_errors.par_extend(errors);

@@ -1,11 +1,12 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
+    behaviors::tasks::patches::types::{OnePatchMap, RawBorrowedPatches, SeqPatchMap},
+    behaviors::tasks::templates::types::{BorrowedTemplateMap, TemplateKey},
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
-    types::{BorrowedTemplateMap, Key, RawBorrowedPatches},
     Config,
 };
-use json_patch::apply_patch;
+use json_patch::{apply_one_field, apply_seq_by_priority};
 use rayon::prelude::*;
 use snafu::ResultExt;
 use std::path::Path;
@@ -32,22 +33,38 @@ pub fn apply_patches<'a, 'b: 'a>(
                 }
             }
 
-            patches
-                .0
-                .into_iter()
-                .map(|(path, patch)| {
-                    if let Some(mut template_pair) = templates.get_mut(&key) {
-                        let template = &mut template_pair.value_mut().1;
-                        let template_name = key.to_string();
-                        apply_patch(template_name.as_str(), template, path, patch)
-                            .with_context(|_| PatchSnafu { template_name })
-                    } else {
-                        Err(Error::NotFoundTemplate {
-                            template_name: key.to_string(),
-                        })
-                    }
-                })
-                .collect::<Vec<Result<(), Error>>>()
+            let (one_patch_map, seq_patch_map) = patches;
+            let mut results: Vec<Result<(), Error>> = vec![];
+
+            let iter = one_patch_map.0.into_iter().map(|(path, patch)| {
+                if let Some(mut template_pair) = templates.get_mut(&key) {
+                    let template = &mut template_pair.value_mut().1;
+                    let template_name = key.to_string();
+                    apply_one_field(template, path, patch)
+                        .with_context(|_| PatchSnafu { template_name })
+                } else {
+                    Err(Error::NotFoundTemplate {
+                        template_name: key.to_string(),
+                    })
+                }
+            });
+            results.par_extend(iter.collect::<Vec<Result<(), Error>>>());
+
+            let iter = seq_patch_map.0.into_iter().map(|(path, patches)| {
+                if let Some(mut template_pair) = templates.get_mut(&key) {
+                    let template = &mut template_pair.value_mut().1;
+                    let template_name = key.to_string();
+                    apply_seq_by_priority(template_name.as_str(), template, path, patches)
+                        .with_context(|_| PatchSnafu { template_name })
+                } else {
+                    Err(Error::NotFoundTemplate {
+                        template_name: key.to_string(),
+                    })
+                }
+            });
+            results.par_extend(iter.collect::<Vec<Result<(), Error>>>());
+
+            results
         })
         .collect();
 
@@ -56,8 +73,8 @@ pub fn apply_patches<'a, 'b: 'a>(
 
 fn write_json_patch(
     output_dir: &Path,
-    key: &Key,
-    patches: &crate::types::PatchMap,
+    key: &TemplateKey,
+    patches: &(OnePatchMap, SeqPatchMap),
 ) -> Result<(), Error> {
     use crate::errors::FailedIoSnafu;
     use snafu::ResultExt as _;

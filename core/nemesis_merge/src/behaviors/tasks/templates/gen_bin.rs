@@ -1,4 +1,4 @@
-use crate::templates::collect::borrowed::template_xml_to_value;
+use crate::behaviors::tasks::templates::collect::borrowed::template_xml_to_value;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 

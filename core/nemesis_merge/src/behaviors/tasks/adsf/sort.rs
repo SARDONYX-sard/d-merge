@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-use crate::adsf::{AdsfPatch, PatchKind};
+use super::{AdsfPatch, PatchKind};
 
 #[derive(Hash, Eq, PartialEq)]
 enum PatchKey<'a> {

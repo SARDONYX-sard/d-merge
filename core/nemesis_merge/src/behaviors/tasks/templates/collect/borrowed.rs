@@ -1,8 +1,10 @@
+use crate::behaviors::tasks::templates::collect::path::template_name_and_inner_path;
+use crate::behaviors::tasks::templates::types::{
+    BorrowedTemplateMap, OwnedTemplateMap, TemplateKey,
+};
 use crate::errors::{
     Error, FailedToGetInnerPathFromTemplateSnafu, JsonSnafu, Result, TemplateSnafu,
 };
-use crate::templates::collect::path::template_name_and_inner_path;
-use crate::types::{BorrowedTemplateMap, Key, OwnedTemplateMap};
 use rayon::{iter::Either, prelude::*};
 use simd_json::{serde::to_borrowed_value, BorrowedValue};
 use snafu::ResultExt as _;
@@ -11,7 +13,7 @@ use std::path::Path;
 /// Return  Map<name, (inner_path, value)>
 pub fn collect_templates(templates: &OwnedTemplateMap) -> (BorrowedTemplateMap<'_>, Vec<Error>) {
     templates.into_par_iter().partition_map(|(path, bytes)| {
-        let parse_template = || -> Result<(Key, (&str, BorrowedValue<'_>))> {
+        let parse_template = || -> Result<(TemplateKey, (&str, BorrowedValue<'_>))> {
             fn is_value_bin(path: &Path) -> bool {
                 path.extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("bin"))

@@ -29,7 +29,8 @@ use std::{
 
 use snafu::ResultExt;
 
-use crate::{adsf::path_parser::parse_error::IndexMustBeNumberSnafu, path_id::get_nemesis_id};
+use super::path_parser::parse_error::IndexMustBeNumberSnafu;
+use crate::behaviors::priority_ids::get_nemesis_id;
 
 // TODO: Support replace operation
 

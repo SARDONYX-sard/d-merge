@@ -9,6 +9,7 @@
 //! - Parallel extraction of mod codes from paths using Rayon
 //! - Custom parsing logic with detailed error reporting using `winnow`
 //! - Friendly, readable error reporting via `ReadableError`
+pub mod types;
 
 use std::path::PathBuf;
 
@@ -21,7 +22,7 @@ use winnow::error::StrContextValue::*;
 use winnow::token::any;
 use winnow::{combinator::alt, prelude::*, seq, token::take_while};
 
-use crate::types::PriorityMap;
+use self::types::PriorityMap;
 
 /// Converts a slice of `PathBuf`s into a [`PriorityMap`] by extracting
 /// mod identifiers from each path.

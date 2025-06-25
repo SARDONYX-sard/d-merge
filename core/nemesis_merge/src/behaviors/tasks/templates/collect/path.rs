@@ -19,10 +19,13 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::{path_id::take_until_ext, types::Key};
+use crate::behaviors::priority_ids::take_until_ext;
+use crate::behaviors::tasks::templates::types::TemplateKey;
 
 /// Return (hashmap key, inner path starting from `meshes`)
-pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(Key<'_>, &str), TemplateError> {
+pub(super) fn template_name_and_inner_path(
+    path: &Path,
+) -> Result<(TemplateKey<'_>, &str), TemplateError> {
     let file_stem = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -32,7 +35,7 @@ pub(super) fn template_name_and_inner_path(path: &Path) -> Result<(Key<'_>, &str
         .components()
         .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
 
-    let key = Key::new(file_stem, is_1stperson);
+    let key = TemplateKey::new(file_stem, is_1stperson);
     let inner_path = parse_template_path(path)?;
 
     Ok((key, inner_path))
@@ -76,7 +79,7 @@ mod tests {
     fn assert_template(path: &str, expected_key: (&str, bool), expected_inner: &str) {
         let path = Path::new(path);
         let result = template_name_and_inner_path(path).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(result.0, Key::new(expected_key.0, expected_key.1));
+        assert_eq!(result.0, TemplateKey::new(expected_key.0, expected_key.1));
         assert_eq!(result.1, expected_inner);
     }
 

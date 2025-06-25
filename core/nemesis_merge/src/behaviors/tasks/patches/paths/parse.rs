@@ -11,8 +11,8 @@ use winnow::{
 };
 
 use crate::{
+    behaviors::priority_ids::take_until_ext,
     errors::{Error, NonUtf8PathSnafu},
-    path_id::take_until_ext,
 };
 
 /// Parse nemesis patch path.

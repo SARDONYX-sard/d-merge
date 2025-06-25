@@ -1,15 +1,17 @@
 pub mod path_parser;
 mod sort;
+pub mod types;
 
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
-use crate::adsf::sort::dedup_patches_by_priority_parallel;
+use self::sort::dedup_patches_by_priority_parallel;
+use self::types::OwnedAdsfPatchMap;
+use crate::behaviors::priority_ids::types::PriorityMap;
+use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     Error, FailedIoSnafu, FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu,
     FailedParseEditAdsfPatchSnafu,
 };
-use crate::hkx::generate::write_patched_json;
 use crate::results::partition_results;
-use crate::types::{OwnedAdsfPatchMap, PriorityMap};
 use crate::Config;
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
