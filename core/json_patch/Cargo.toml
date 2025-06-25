@@ -13,7 +13,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-parking_lot = "0.12.4"
 rayon = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }   # Implement (De)Serializer
 simd-json = { workspace = true }

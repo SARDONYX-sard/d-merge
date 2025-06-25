@@ -27,7 +27,8 @@ async fn merge_test() {
         Config {
             resource_dir: "../../resource/assets/templates".into(),
             output_dir: "../../dummy/behavior_gen/output".into(),
-            status_report: Some(new_color_status_reporter()),
+            status_report: Some(new_color_status_reporter()), // +2s
+            // status_report: None,
             hack_options: Some(HackOptions::enable_all()),
             debug: DebugOptions {
                 output_patch_json: true,

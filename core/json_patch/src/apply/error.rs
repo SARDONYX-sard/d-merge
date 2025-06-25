@@ -73,15 +73,16 @@ pub enum JsonPatchError {
         value: String,
     },
 
+    /// Attempted to access a range that is out of bounds in an array.
+    #[snafu(display("Valid range is [0, {actual_len}), but got {patch_range:?}"))]
+    UnexpectedRange {
+        patch_range: std::ops::Range<usize>,
+        actual_len: usize,
+    },
+
     /// Invalid matrix operation: attempted to simulate 2D array in a flat structure.
     #[snafu(display("Tried to put Alary for array index, but that is invalid. 2D arrays do not exist in the C++ class.\n{path}\n{value}"))]
     WrongMatrix { path: String, value: String },
-
-    /// The reference count for the Seq patch is still remaining (this is an implementation bug).
-    ArcStillExist,
-
-    /// Seq patch lock is poisoned.
-    LockPoisoned,
 
     #[snafu(display("Expected Seq. but got {unexpected:#?}"))]
     ExpectedSeq { unexpected: crate::OpRangeKind },
@@ -169,25 +170,5 @@ impl JsonPatchError {
             path,
             value,
         }
-    }
-
-    /// Creates an `OutOfRange` error from the given source error, path, and value.
-    pub fn out_of_range_from<'a>(
-        source: crate::range::error::RangeError,
-        path: &[Cow<'a, str>],
-        value: impl core::fmt::Debug,
-    ) -> Self {
-        let (path, value) = Self::format_path_value(path, value);
-        Self::OutOfRange {
-            source,
-            path,
-            value,
-        }
-    }
-
-    /// Creates a `WrongMatrix` error from the given path and value.
-    pub fn wrong_matrix_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
-        let (path, value) = Self::format_path_value(path, value);
-        Self::WrongMatrix { path, value }
     }
 }

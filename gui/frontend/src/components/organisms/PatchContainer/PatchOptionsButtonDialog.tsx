@@ -87,6 +87,24 @@ export const PatchOptionsDialog = () => {
             <FormHelperText sx={{ ml: 3, mb: 1, color: 'text.secondary' }}>
               {t('patch.auto_remove_meshes_option_help')}
             </FormHelperText>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={patchOptions.useProgressReporter}
+                  name='useProgressReporter'
+                  onChange={(e) =>
+                    apply((draft) => {
+                      draft.useProgressReporter = e.target.checked;
+                    })
+                  }
+                />
+              }
+              label={t('patch.use_progress_reporter_option_label')}
+            />
+            <FormHelperText sx={{ ml: 3, mb: 1, color: 'text.secondary' }}>
+              {t('patch.use_progress_reporter_option_help')}
+            </FormHelperText>
           </Box>
 
           {/* Hack Options */}

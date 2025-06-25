@@ -45,6 +45,8 @@ export type PatchOptions = {
   outputTarget: 'SkyrimSE' | 'SkyrimLE';
   /** Delete the meshes in the output destination each time the patch is run. */
   autoRemoveMeshes: boolean;
+  /** Report progress status +2s */
+  useProgressReporter: boolean;
 };
 
 export const patchOptionsSchema = z
@@ -59,6 +61,7 @@ export const patchOptionsSchema = z
     }),
     outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
     autoRemoveMeshes: z.boolean(),
+    useProgressReporter: z.boolean(),
   })
   .catch({
     hackOptions: {
@@ -71,6 +74,7 @@ export const patchOptionsSchema = z
     },
     outputTarget: 'SkyrimSE',
     autoRemoveMeshes: true,
+    useProgressReporter: true,
   } as const satisfies PatchOptions);
 
 /**

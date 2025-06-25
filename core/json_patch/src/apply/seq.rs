@@ -106,63 +106,56 @@ fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
 /// # Assumptions
 /// - patches are sorted.
 fn apply_ops_parallel<'a>(
-    base: Vec<Value<'a>>,
+    mut base: Vec<Value<'a>>,
     patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<Vec<Value<'a>>> {
-    use parking_lot::Mutex;
-    use rayon::prelude::*;
-    use std::sync::Arc;
-
     let (non_add_ops, add_ops): (Vec<_>, Vec<_>) =
         patches
-            .into_iter()
+            .into_par_iter()
             .partition(|ValueWithPriority { patch, .. }| {
                 patch.op.try_as_seq().map(|op| op.op).unwrap_or_default() != Op::Add
             });
 
-    let base = Arc::new(Mutex::new(base));
-
     // Replace, Remove
-    non_add_ops
-        .into_par_iter()
-        .try_for_each(|ValueWithPriority { patch, .. }| {
-            let JsonPatch { op, value } = patch;
-            let seq = op.try_as_seq()?;
-            match seq.op {
-                Op::Replace => {
-                    let values = value
-                        .try_into_array()
-                        .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
-                    let mut base = base.lock();
-                    seq.range
-                        .clone()
-                        .zip(values.into_iter())
-                        .for_each(|(i, v)| {
-                            if i < base.len() {
-                                base[i] = v;
-                            }
-                        });
-                    drop(base);
-                }
-                Op::Remove => {
-                    let mut base = base.lock();
-                    seq.range.clone().for_each(|i| {
-                        if i < base.len() {
-                            base[i] = MARK_AS_REMOVED;
-                        }
+    for ValueWithPriority { patch, .. } in non_add_ops {
+        let JsonPatch { op, value } = patch;
+        let seq = op.try_as_seq()?;
+        match seq.op {
+            Op::Replace => {
+                let values = value
+                    .try_into_array()
+                    .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
+                let range = seq.range.clone();
+                let Some(slice) = base.get_mut(range.clone()) else {
+                    return Err(JsonPatchError::UnexpectedRange {
+                        patch_range: range,
+                        actual_len: base.len(),
                     });
-                    drop(base);
-                }
-                Op::Add => {}
-            };
-            Ok(())
-        })?;
+                };
+                slice
+                    .par_iter_mut()
+                    .zip(values)
+                    .for_each(|(element, patch)| {
+                        *element = patch;
+                    });
+            }
+            Op::Remove => {
+                let range = seq.range.clone();
+                let Some(slice) = base.get_mut(range.clone()) else {
+                    return Err(JsonPatchError::UnexpectedRange {
+                        patch_range: range,
+                        actual_len: base.len(),
+                    });
+                };
+                slice.par_iter_mut().for_each(|element| {
+                    *element = MARK_AS_REMOVED;
+                });
+            }
+            Op::Add => {}
+        };
+    }
 
     // Add
-    let mut base = Arc::try_unwrap(base)
-        .map_err(|_| JsonPatchError::ArcStillExist)?
-        .into_inner();
-
     let mut offset = 0;
     for value in add_ops {
         let seq = value.patch.op.try_as_seq()?;

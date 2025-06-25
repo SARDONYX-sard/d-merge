@@ -34,7 +34,7 @@ pub struct BorrowedPatches<'a> {
 /// # Intended
 /// ```json
 /// "0_master": {
-///     ["#0001", "hkbProjectData", "variable"]: OneFField { op, patch, priority },
+///     ["#0001", "hkbProjectData", "variable"]: OneField { op, patch, priority },
 ///     ["#0001", "hkbProjectData", "variableNames"]: Seq {
 ///         [{ op, patch, priority }, { op, patch, priority }]
 ///     }

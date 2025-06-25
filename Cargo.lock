@@ -2482,7 +2482,6 @@ dependencies = [
 name = "json_patch"
 version = "0.1.0"
 dependencies = [
- "parking_lot",
  "pretty_assertions",
  "quick_tracing",
  "rayon",

@@ -128,6 +128,8 @@
     "options_title": "パッチオプション",
     "auto_remove_meshes_option_label": "出力先の`.debug`, `meshes`ディレクトリを事前削除",
     "auto_remove_meshes_option_help": "パッチのたびに出力先の`meshes` & `.d_merge/.debug`ディレクトリを事前に自動削除することで、直前のhkxの意図しない反映を回避できます。",
+    "use_progress_reporter_option_label": "進捗状況の表示",
+    "use_progress_reporter_option_help": "進行状況を表示します。（+約2秒以上遅延します)",
     "hack_options_label": "ハックオプション",
     "hack_options": {
       "cast_ragdoll_event": "BSRagdollContactListenerModifierの互換ハックを有効化",

@@ -128,6 +128,8 @@
     "options_title": "Patch Options",
     "auto_remove_meshes_option_label": "Automatic deletion of the destination `meshes` & `.d_merge/.debug` directory",
     "auto_remove_meshes_option_help": "Remove each time just before a patch to avoid unintended reflection of the previous hkx.",
+    "use_progress_reporter_option_label": "Display progress status",
+    "use_progress_reporter_option_help": "Displays progress status. (+ about 2 seconds delay or more)",
     "hack_options_label": "Hack Options",
     "hack_options": {
       "cast_ragdoll_event": "Enable compatibility hacks for BSRagdollContactListenerModifier",
