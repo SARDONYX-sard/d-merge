@@ -12,8 +12,6 @@ use simd_json::BorrowedValue;
 ///
 /// # Errors
 /// If the patch operation fails due to an invalid operation or path not found.
-///
-/// # Panics
 #[inline]
 pub fn apply_patch<'v>(
     file_name: &str,

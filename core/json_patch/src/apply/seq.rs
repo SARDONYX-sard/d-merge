@@ -89,11 +89,13 @@ fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
             priority: b_priority,
         } = b;
 
-        let op_rank = |patch: &JsonPatch<'_>| match patch.op.as_seq().op {
-            Op::Replace => 0,
-            Op::Remove => 1,
-            Op::Add => 2,
-        };
+        let op_rank =
+            |patch: &JsonPatch<'_>| match patch.op.try_as_seq().map(|op| op.op).unwrap_or_default()
+            {
+                Op::Replace => 0,
+                Op::Remove => 1,
+                Op::Add => 2,
+            };
 
         a_priority.cmp(b_priority).then(op_rank(a).cmp(&op_rank(b)))
     });
