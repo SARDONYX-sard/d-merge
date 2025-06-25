@@ -1,7 +1,9 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
-    behaviors::tasks::patches::types::BehaviorStringDataMap,
-    behaviors::tasks::templates::types::BorrowedTemplateMap,
+    behaviors::tasks::{
+        patches::types::BehaviorStringDataMap, templates::types::BorrowedTemplateMap,
+    },
+    config::{ReportType, StatusReportCounter},
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
     Config, OutPutTarget,
@@ -23,9 +25,16 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
     templates: BorrowedTemplateMap<'a>,
     variable_class_map: BehaviorStringDataMap<'b>,
 ) -> Result<(), Vec<Error>> {
+    let reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::GeneratingHkxFiles,
+        templates.len(),
+    );
+
     let results = templates
         .into_par_iter()
         .map(|(key, (inner_path, template_json))| {
+            reporter.increment();
             let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {

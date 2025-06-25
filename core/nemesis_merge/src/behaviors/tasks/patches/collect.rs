@@ -3,16 +3,20 @@ use super::paths::{
     parse::parse_nemesis_path,
 };
 use crate::{
-    behaviors::priority_ids::get_nemesis_id,
-    behaviors::priority_ids::types::PriorityMap,
-    behaviors::tasks::adsf::types::OwnedAdsfPatchMap,
-    behaviors::tasks::patches::types::{
-        BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, RawBorrowedPatches,
+    behaviors::{
+        priority_ids::{get_nemesis_id, types::PriorityMap},
+        tasks::{
+            adsf::types::OwnedAdsfPatchMap,
+            patches::types::{
+                BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, RawBorrowedPatches,
+            },
+            templates::types::TemplateKey,
+        },
     },
-    behaviors::tasks::templates::types::TemplateKey,
-    config::HackOptions,
+    config::{ReportType, StatusReportCounter},
     errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
     results::filter_results,
+    Config,
 };
 use dashmap::DashSet;
 use json_patch::ValueWithPriority;
@@ -39,6 +43,7 @@ struct OwnedPath {
 pub async fn collect_owned_patches(
     nemesis_paths: &[PathBuf],
     id_order: &PriorityMap<'_>,
+    config: &Config,
 ) -> (OwnedAdsfPatchMap, OwnedPatchMap, Vec<Error>) {
     let mut handles = vec![];
     let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
@@ -69,7 +74,15 @@ pub async fn collect_owned_patches(
     let mut adsf_patches = OwnedAdsfPatchMap::new();
     let mut errors = vec![];
 
+    let reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::ReadingPatches,
+        handles.len(),
+    );
+
     for handle in handles {
+        reporter.increment();
+
         let result = match handle.await {
             Ok(result) => result,
             Err(err) => {
@@ -103,21 +116,28 @@ pub async fn collect_owned_patches(
 
 pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
-    hack_options: Option<HackOptions>,
+    config: &Config,
 ) -> (BorrowedPatches<'a>, Vec<Error>) {
     let raw_borrowed_patches = RawBorrowedPatches::new();
     let template_names = DashSet::new();
     let variable_class_map = BehaviorStringDataMap::new();
 
+    let reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::ParsingPatches,
+        owned_patches.len(),
+    );
+
     let results: Vec<Result<()>> =
         owned_patches
             .par_iter()
             .map(|(path, (xml, priority))| {
+                reporter.increment();
                 // Since we could not make a destructing assignment, we have to write it this way.
                 let priority = *priority;
 
                 let (json_patches, variable_class_index) =
-                    parse_nemesis_patch(xml, hack_options.map(Into::into))
+                    parse_nemesis_patch(xml, config.hack_options.map(Into::into))
                         .with_context(|_| NemesisXmlErrSnafu { path })?;
 
                 let (template_name, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace

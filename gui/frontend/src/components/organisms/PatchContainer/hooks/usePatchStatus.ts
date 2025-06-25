@@ -14,11 +14,24 @@ export const usePatchStatus = (stop: () => string, setLoading: (v: boolean) => v
 
     switch (status.type) {
       case 'ReadingTemplatesAndPatches':
-        setStatusText(t('patch.patch_reading_message'));
+        let { index, total } = status.content;
+        setStatusText(`${t('patch.patch_reading_message')} (${index}/${total})`);
         break;
-      case 'ApplyingPatches':
-        setStatusText(t('patch.patch_applying_message'));
+      case 'ParsingPatches': {
+        const { index, total } = status.content;
+        setStatusText(`${t('patch.patch_parsing_message')} (${index}/${total})`);
         break;
+      }
+      case 'ApplyingPatches': {
+        const { index, total } = status.content;
+        setStatusText(`${t('patch.patch_applying_message')} (${index}/${total})`);
+        break;
+      }
+      case 'GenerateHkxFiles': {
+        const { index, total } = status.content;
+        setStatusText(`${t('patch.patch_generating_message')} (${index}/${total})`);
+        break;
+      }
       case 'Done': {
         setStatusText(`${t('patch.patch_complete_message')} (${stop()})`);
         setLoading(false);
@@ -29,7 +42,7 @@ export const usePatchStatus = (stop: () => string, setLoading: (v: boolean) => v
         setLoading(false);
         unlisten?.();
         setStatusText(`${t('patch.patch_error_message')} (${stop()})`);
-        NOTIFY.error(status.message);
+        NOTIFY.error(status.content);
         break;
       }
       default:

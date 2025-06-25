@@ -1,5 +1,7 @@
 use std::{fmt, path::PathBuf};
 
+use crate::{config::StatusReporterFn, Status};
+
 /// A configuration structure used to specify various directories and a status report callback.
 ///
 /// The `Config` struct holds paths for input resources and output directories, along with optional
@@ -25,7 +27,7 @@ pub struct Config {
     ///
     /// The callback is invoked with `Status` updates, allowing consumers to track
     /// progress, errors, or other runtime events.
-    pub status_report: Option<Box<dyn Fn(Status) + Send + Sync>>,
+    pub status_report: StatusReporterFn,
 
     /// Enables lenient parsing for known issues in unofficial or modded patches.
     ///
@@ -169,75 +171,4 @@ pub enum OutPutTarget {
     /// Win32
     #[cfg_attr(feature = "serde", serde(rename = "SkyrimLE"))]
     SkyrimLe,
-}
-
-/// An enum representing various statuses during a process.
-///
-/// This enum is used to track and report the current state of an ongoing process, such as
-/// reading templates, applying patches, generating files, or completing the task.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "message"))]
-#[derive(Debug, Clone)]
-pub enum Status {
-    /// Status when reading templates and patches.
-    ReadingTemplatesAndPatches,
-
-    /// Status when applying patches.
-    ApplyingPatches,
-
-    /// Status when generating HKX files.
-    GenerateHkxFiles,
-
-    /// Status when the process is completed.
-    Done,
-
-    Error(String),
-}
-
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ReadingTemplatesAndPatches => write!(f, "[1/4] Reading templates and patches..."),
-            Self::ApplyingPatches => write!(f, "[2/4] Applying patches..."),
-            Self::GenerateHkxFiles => write!(f, "[3/4] Generating HKX files..."),
-            Self::Done => write!(f, "[4/4] Done."),
-            Self::Error(msg) => write!(f, "[Error] {msg}"),
-        }
-    }
-}
-
-#[cfg(test)]
-pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
-    Box::new(|status| {
-        match &status {
-            Status::ReadingTemplatesAndPatches => {
-                println!("\x1b[36m{status}\x1b[0m"); // Cyan
-            }
-            Status::ApplyingPatches => {
-                println!("\x1b[33m{status}\x1b[0m"); // Yellow
-            }
-            Status::GenerateHkxFiles => {
-                println!("\x1b[34m{status}\x1b[0m"); // Blue
-            }
-            Status::Done => {
-                println!("\x1b[32;1m{status}\x1b[0m"); // Bold Green
-            }
-            Status::Error(_) => {
-                println!("\x1b[31;1m{status}\x1b[0m"); // Bold Red
-            }
-        }
-    })
-}
-
-#[cfg(feature = "ts_serde")]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn serialize_status() {
-        let status = Status::Error("Error message".to_string());
-        let serialized = simd_json::to_string(&status).unwrap();
-        assert_eq!(serialized, r#"{"type":"Error","message":"Error message"}"#);
-    }
 }

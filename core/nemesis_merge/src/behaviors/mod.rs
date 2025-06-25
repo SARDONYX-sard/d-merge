@@ -35,9 +35,8 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
     }
 
     // Collect all patches file.
-    config.on_report_status(Status::ReadingTemplatesAndPatches);
     let (owned_adsf_patches, owned_patches, owned_file_errors) =
-        collect_owned_patches(&nemesis_paths, &id_order).await;
+        collect_owned_patches(&nemesis_paths, &id_order, &config).await;
 
     // - Patch to `animationdatasinglefile.txt`
     // - Patch to hkx( -> xml)
@@ -91,8 +90,7 @@ struct Errors {
 fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
     let mut all_errors = vec![];
 
-    // 1/2: Apply patches & Replace variables to indexes
-    config.on_report_status(Status::ApplyingPatches);
+    // 1/3: Parse nemesis patches
     let (
         BorrowedPatches {
             template_names,
@@ -101,7 +99,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(owned_patches, config.hack_options);
+        let (patch_result, errors) = collect_borrowed_patches(owned_patches, config);
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
         (patch_result, patch_errors_len)
@@ -141,14 +139,14 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
             });
         }
 
+        // 2/3: Apply patches & Replace variables to indexes
         let mut apply_errors_len = template_error_len;
         if let Err(errors) = apply_patches(&templates, borrowed_patches, config) {
             apply_errors_len = errors.len();
             all_errors.par_extend(errors);
         };
 
-        // 2/2: Generate hkx files.
-        config.on_report_status(Status::GenerateHkxFiles);
+        // 2/3: Generate hkx files.
         let hkx_errors_len = {
             if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
                 let errors_len = hkx_errors.len();

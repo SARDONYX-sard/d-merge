@@ -1,7 +1,10 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
-    behaviors::tasks::patches::types::{OnePatchMap, RawBorrowedPatches, SeqPatchMap},
-    behaviors::tasks::templates::types::{BorrowedTemplateMap, TemplateKey},
+    behaviors::tasks::{
+        patches::types::{OnePatchMap, RawBorrowedPatches, SeqPatchMap},
+        templates::types::{BorrowedTemplateMap, TemplateKey},
+    },
+    config::{ReportType, StatusReportCounter},
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
     Config,
@@ -49,8 +52,6 @@ fn apply_to_one_template<'a, 'b: 'a>(
         }
     }
 
-    let (one_patch_map, seq_patch_map) = patches;
-
     // Single-field patches must be applied first to account for array index shifts.
     //
     // Why? Because a single-field patch can only ever be a replacement.
@@ -66,8 +67,16 @@ fn apply_to_one_template<'a, 'b: 'a>(
     // so it must be applied first. This ensures the index layout is stable
     // before applying sequence patches that manipulate array elements.
     // After that, sequence patches can be applied reliably.
-    let one_patch_results = process_one_patch(templates, key, one_patch_map);
-    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map);
+    let (one_patch_map, seq_patch_map) = patches;
+    let total = one_patch_map.0.len() + seq_patch_map.0.len();
+    let status_reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::ApplyingPatches,
+        total,
+    );
+
+    let one_patch_results = process_one_patch(templates, key, one_patch_map, &status_reporter);
+    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map, &status_reporter);
 
     one_patch_results.into_par_iter().chain(seq_patch_results)
 }
@@ -77,21 +86,23 @@ fn process_one_patch<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
     key: &TemplateKey<'a>,
     one_patch_map: OnePatchMap<'b>,
+    status_reporter: &StatusReportCounter,
 ) -> Vec<Result<(), Error>> {
     one_patch_map
         .0
         .into_par_iter()
-        .map(|(path, patch)| {
-            if let Some(mut template_pair) = templates.get_mut(key) {
+        .map(|(path, patch)| match templates.get_mut(key) {
+            Some(mut template_pair) => {
                 let template = &mut template_pair.value_mut().1;
-                let template_name = key.to_string();
-                apply_one_field(template, path, patch)
-                    .with_context(|_| PatchSnafu { template_name })
-            } else {
-                Err(Error::NotFoundTemplate {
+                let result = apply_one_field(template, path, patch).with_context(|_| PatchSnafu {
                     template_name: key.to_string(),
-                })
+                });
+                status_reporter.increment();
+                result
             }
+            None => Err(Error::NotFoundTemplate {
+                template_name: key.to_string(),
+            }),
         })
         .collect()
 }
@@ -101,24 +112,28 @@ fn process_seq_patch<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
     key: &TemplateKey<'a>,
     seq_patch_map: SeqPatchMap<'b>,
+    status_reporter: &StatusReportCounter,
 ) -> Vec<Result<(), Error>> {
     seq_patch_map
         .0
         .into_par_iter()
-        .map(|(path, patches)| {
-            if let Some(mut template_pair) = templates.get_mut(key) {
+        .map(|(path, patches)| match templates.get_mut(key) {
+            Some(mut template_pair) => {
                 let template = &mut template_pair.value_mut().1;
                 let template_name = key.to_string();
-                apply_seq_by_priority(template_name.as_str(), template, path, patches)
-                    .with_context(|_| PatchSnafu { template_name })
-            } else {
-                Err(Error::NotFoundTemplate {
-                    template_name: key.to_string(),
-                })
+                let result = apply_seq_by_priority(template_name.as_str(), template, path, patches)
+                    .with_context(|_| PatchSnafu { template_name });
+                status_reporter.increment();
+                result
             }
+            None => Err(Error::NotFoundTemplate {
+                template_name: key.to_string(),
+            }),
         })
         .collect()
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn write_debug_json_patch(
     output_dir: &Path,
