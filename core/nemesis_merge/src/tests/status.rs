@@ -1,4 +1,4 @@
-use crate::Status;
+use crate::{Config, DebugOptions, HackOptions, OutPutTarget, Status};
 
 // =======================
 // ANSI Color Constants
@@ -40,4 +40,37 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
             }
         }
     })
+}
+
+#[allow(unused)]
+pub(crate) fn fastest_config() -> Config {
+    Config {
+        resource_dir: "../../resource/assets/templates".into(),
+        output_dir: "../../dummy/behavior_gen/output".into(),
+        status_report: None,
+        hack_options: Some(HackOptions::enable_all()),
+        debug: DebugOptions {
+            output_patch_json: false,
+            output_merged_json: false,
+            output_merged_xml: false,
+        },
+        output_target: OutPutTarget::SkyrimSe,
+    }
+}
+
+#[allow(unused)]
+pub(crate) fn slow_debug_config() -> Config {
+    Config {
+        resource_dir: "../../resource/assets/templates".into(),
+        output_dir: "../../dummy/behavior_gen/output".into(),
+        status_report: Some(new_color_status_reporter()), // +2s
+        // status_report: None,
+        hack_options: Some(HackOptions::enable_all()),
+        debug: DebugOptions {
+            output_patch_json: true,
+            output_merged_json: true,
+            output_merged_xml: false,
+        },
+        output_target: OutPutTarget::SkyrimSe,
+    }
 }
