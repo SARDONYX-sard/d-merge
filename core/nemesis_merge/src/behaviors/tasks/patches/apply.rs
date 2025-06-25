@@ -23,55 +23,104 @@ pub fn apply_patches<'a, 'b: 'a>(
     borrowed_patches: RawBorrowedPatches<'b>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
-    let results: Vec<Result<(), Error>> = borrowed_patches // patches
+    let results: Vec<Result<(), Error>> = borrowed_patches
         .into_par_iter()
-        .flat_map(|(key, patches)| {
-            if config.debug.output_patch_json {
-                if let Err(err) = write_json_patch(&config.output_dir, &key, &patches) {
-                    #[cfg(feature = "tracing")]
-                    tracing::error!("{err}");
-                }
-            }
-
-            let (one_patch_map, seq_patch_map) = patches;
-            let mut results: Vec<Result<(), Error>> = vec![];
-
-            let iter = one_patch_map.0.into_iter().map(|(path, patch)| {
-                if let Some(mut template_pair) = templates.get_mut(&key) {
-                    let template = &mut template_pair.value_mut().1;
-                    let template_name = key.to_string();
-                    apply_one_field(template, path, patch)
-                        .with_context(|_| PatchSnafu { template_name })
-                } else {
-                    Err(Error::NotFoundTemplate {
-                        template_name: key.to_string(),
-                    })
-                }
-            });
-            results.par_extend(iter.collect::<Vec<Result<(), Error>>>());
-
-            let iter = seq_patch_map.0.into_iter().map(|(path, patches)| {
-                if let Some(mut template_pair) = templates.get_mut(&key) {
-                    let template = &mut template_pair.value_mut().1;
-                    let template_name = key.to_string();
-                    apply_seq_by_priority(template_name.as_str(), template, path, patches)
-                        .with_context(|_| PatchSnafu { template_name })
-                } else {
-                    Err(Error::NotFoundTemplate {
-                        template_name: key.to_string(),
-                    })
-                }
-            });
-            results.par_extend(iter.collect::<Vec<Result<(), Error>>>());
-
-            results
-        })
+        .flat_map(|(key, patches)| apply_to_one_template(config, templates, &key, patches))
         .collect();
 
     filter_results(results)
 }
 
-fn write_json_patch(
+type ChainError = rayon::iter::Chain<
+    rayon::vec::IntoIter<Result<(), Error>>,
+    rayon::vec::IntoIter<Result<(), Error>>,
+>;
+
+fn apply_to_one_template<'a, 'b: 'a>(
+    config: &Config,
+    templates: &BorrowedTemplateMap<'a>,
+    key: &TemplateKey<'a>,
+    patches: (OnePatchMap<'b>, SeqPatchMap<'b>),
+) -> ChainError {
+    if config.debug.output_patch_json {
+        if let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches) {
+            #[cfg(feature = "tracing")]
+            tracing::error!("{err}");
+        }
+    }
+
+    let (one_patch_map, seq_patch_map) = patches;
+
+    // Single-field patches must be applied first to account for array index shifts.
+    //
+    // Why? Because a single-field patch can only ever be a replacement.
+    // When array indices are added or removed, subsequent patches relying on specific indices
+    // may break unless we apply the replacements first.
+    //
+    // For example:
+    // - `["#0001", "hkbStringData", "eventTriggers"], value: vec![ValueWithPriority]` // add/remove index 5
+    // - `["#0001", "hkbStringData", "eventTriggers", "[5]", "local_time"]`           // modify f32
+    // - `["#0001", "hkbStringData", "eventTriggers", "[5]", "triggers", "[0]", "animations", "[3]", "time"]` // modify f32
+    //
+    // In these examples, the single-field patch (`local_time` or `time`) is always a replacement,
+    // so it must be applied first. This ensures the index layout is stable
+    // before applying sequence patches that manipulate array elements.
+    // After that, sequence patches can be applied reliably.
+    let one_patch_results = process_one_patch(templates, key, one_patch_map);
+    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map);
+
+    one_patch_results.into_par_iter().chain(seq_patch_results)
+}
+
+/// Processes the one_patch map.
+fn process_one_patch<'a, 'b: 'a>(
+    templates: &BorrowedTemplateMap<'a>,
+    key: &TemplateKey<'a>,
+    one_patch_map: OnePatchMap<'b>,
+) -> Vec<Result<(), Error>> {
+    one_patch_map
+        .0
+        .into_par_iter()
+        .map(|(path, patch)| {
+            if let Some(mut template_pair) = templates.get_mut(key) {
+                let template = &mut template_pair.value_mut().1;
+                let template_name = key.to_string();
+                apply_one_field(template, path, patch)
+                    .with_context(|_| PatchSnafu { template_name })
+            } else {
+                Err(Error::NotFoundTemplate {
+                    template_name: key.to_string(),
+                })
+            }
+        })
+        .collect()
+}
+
+/// Processes the seq_patch map.
+fn process_seq_patch<'a, 'b: 'a>(
+    templates: &BorrowedTemplateMap<'a>,
+    key: &TemplateKey<'a>,
+    seq_patch_map: SeqPatchMap<'b>,
+) -> Vec<Result<(), Error>> {
+    seq_patch_map
+        .0
+        .into_par_iter()
+        .map(|(path, patches)| {
+            if let Some(mut template_pair) = templates.get_mut(key) {
+                let template = &mut template_pair.value_mut().1;
+                let template_name = key.to_string();
+                apply_seq_by_priority(template_name.as_str(), template, path, patches)
+                    .with_context(|_| PatchSnafu { template_name })
+            } else {
+                Err(Error::NotFoundTemplate {
+                    template_name: key.to_string(),
+                })
+            }
+        })
+        .collect()
+}
+
+fn write_debug_json_patch(
     output_dir: &Path,
     key: &TemplateKey,
     patches: &(OnePatchMap, SeqPatchMap),
