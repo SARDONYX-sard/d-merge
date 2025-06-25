@@ -12,28 +12,28 @@ pub type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
 pub enum Status {
     /// Status when reading patches.
     ReadingPatches {
-        /// 1 based index
+        /// 0 based index
         index: usize,
         total: usize,
     },
 
     /// Status when Parsing patches.
     ParsingPatches {
-        /// 1 based index
+        /// 0 based index
         index: usize,
         total: usize,
     },
 
     /// Status when applying patches.
     ApplyingPatches {
-        /// 1 based index
+        /// 0 based index
         index: usize,
         total: usize,
     },
 
     /// Status when generating HKX files.
     GeneratingHkxFiles {
-        /// 1 based index
+        /// 0 based index
         index: usize,
         total: usize,
     },
@@ -65,6 +65,7 @@ impl fmt::Display for Status {
     }
 }
 
+#[cfg(feature = "ts_serde")]
 #[cfg(test)]
 mod tests {
     use super::*;

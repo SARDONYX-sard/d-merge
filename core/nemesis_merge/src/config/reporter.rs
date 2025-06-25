@@ -5,7 +5,7 @@ pub(crate) struct StatusReportCounter<'a> {
     status_reporter: &'a StatusReporterFn,
     kind: ReportType,
     total: usize,
-    /// 1 based index
+    /// 0 based index
     counter: std::sync::atomic::AtomicUsize,
 }
 
@@ -33,7 +33,7 @@ impl<'a> StatusReportCounter<'a> {
         Self {
             status_reporter,
             total,
-            counter: std::sync::atomic::AtomicUsize::new(1),
+            counter: std::sync::atomic::AtomicUsize::new(0),
             kind,
         }
     }
