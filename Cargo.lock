@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge"
-version = "0.1.0-alpha.8"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "futures",
