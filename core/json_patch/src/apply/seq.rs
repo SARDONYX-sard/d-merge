@@ -109,8 +109,9 @@ fn apply_ops_parallel<'a>(
     base: Vec<Value<'a>>,
     patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<Vec<Value<'a>>> {
+    use parking_lot::Mutex;
     use rayon::prelude::*;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     let (non_add_ops, add_ops): (Vec<_>, Vec<_>) =
         patches
@@ -132,26 +133,25 @@ fn apply_ops_parallel<'a>(
                     let values = value
                         .try_into_array()
                         .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
-                    seq.range.clone().zip(values.into_iter()).try_for_each(
-                        |(i, v)| -> Result<(), JsonPatchError> {
-                            let mut base = base.lock().map_err(|_| JsonPatchError::LockPoisoned)?;
+                    let mut base = base.lock();
+                    seq.range
+                        .clone()
+                        .zip(values.into_iter())
+                        .for_each(|(i, v)| {
                             if i < base.len() {
                                 base[i] = v;
-                                drop(base);
                             }
-                            Ok(())
-                        },
-                    )?;
+                        });
+                    drop(base);
                 }
                 Op::Remove => {
-                    seq.range.clone().try_for_each(|i| {
-                        let mut base = base.lock().map_err(|_| JsonPatchError::LockPoisoned)?;
+                    let mut base = base.lock();
+                    seq.range.clone().for_each(|i| {
                         if i < base.len() {
                             base[i] = MARK_AS_REMOVED;
-                            drop(base);
                         }
-                        Ok(())
-                    })?;
+                    });
+                    drop(base);
                 }
                 Op::Add => {}
             };
@@ -161,8 +161,7 @@ fn apply_ops_parallel<'a>(
     // Add
     let mut base = Arc::try_unwrap(base)
         .map_err(|_| JsonPatchError::ArcStillExist)?
-        .into_inner()
-        .map_err(|_| JsonPatchError::LockPoisoned)?;
+        .into_inner();
 
     let mut offset = 0;
     for value in add_ops {
