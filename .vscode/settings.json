@@ -13,9 +13,8 @@
   },
   "editor.codeActionsOnSave": {
     "quickfix.biome": "explicit",
-    "source.fixAll.eslint": "explicit",
     "source.fixAll.sortJSON": "never",
-    "source.organizeImports.biome": "never"
+    "source.organizeImports.biome": "explicit"
   },
   "editor.formatOnSave": true,
   "evenBetterToml.formatter.alignComments": true,

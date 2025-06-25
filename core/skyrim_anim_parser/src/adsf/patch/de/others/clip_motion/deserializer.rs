@@ -1,7 +1,6 @@
 use crate::adsf::{
     normal::{Rotation, Translation},
     patch::de::{
-        comment::{close_comment, comment_kind, take_till_close, CommentKind},
         error::{Error, Result},
         others::clip_motion::{
             current_state::{CurrentState, PartialRotations, PartialTranslations},
@@ -11,7 +10,10 @@ use crate::adsf::{
 };
 use crate::{
     adsf::normal::de::from_word_and_space,
-    lines::{one_line, verify_line_parses_to},
+    common_parser::{
+        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        lines::{one_line, verify_line_parses_to},
+    },
 };
 use json_patch::{Op, OpRange};
 use serde_hkx::errors::readable::ReadableError;

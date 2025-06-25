@@ -1,18 +1,15 @@
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import OutputIcon from '@mui/icons-material/Output';
 import { Button, Tooltip } from '@mui/material';
-
+import type { ComponentPropsWithRef } from 'react';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
 import { NOTIFY } from '@/lib/notify';
 import { openPath } from '@/services/api/dialog';
 import { openPath as open } from '@/services/api/shell';
-
 import { CONVERT_TREE_INIT_VALUES, useConvertContext } from './ConvertProvider';
 import { PathSelector } from './PathSelector';
 import { PathSelectorButtons } from './PathSelectorButtons';
-
-import type { ComponentPropsWithRef } from 'react';
 
 export const ConvertForm = () => {
   const { setSelectedFiles, setSelectedDirs, setSelectedTree, setOutput, setConvertStatuses, selectionType } =

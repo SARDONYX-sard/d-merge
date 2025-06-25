@@ -1,9 +1,7 @@
-import { listen } from '@tauri-apps/api/event';
-
-import { NOTIFY } from '@/lib/notify';
-
 import type { EventCallback, EventName } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import type { ReactNode } from 'react';
+import { NOTIFY } from '@/lib/notify';
 
 type ListenerProps = {
   setLoading: (b: boolean) => void;
@@ -13,21 +11,26 @@ type ListenerProps = {
   error?: string | ReactNode;
 };
 
+type StatusIndexing = {
+  /** 1 based index */
+  index: number;
+  total: number;
+};
+/** Error message from the backend */
+type ErrorPayload = string;
+
 /**
  * Backend status enum for merge operation (defined in Rust).
  *
  * The backend emits these status values using `window.emit(...)` during various stages.
  */
 export type Status =
-  | { type: 'ReadingTemplatesAndPatches' }
-  | { type: 'ApplyingPatches' }
-  | { type: 'GenerateHkxFiles' }
+  | { type: 'ReadingTemplatesAndPatches'; content: StatusIndexing }
+  | { type: 'ParsingPatches'; content: StatusIndexing }
+  | { type: 'ApplyingPatches'; content: StatusIndexing }
+  | { type: 'GenerateHkxFiles'; content: StatusIndexing }
   | { type: 'Done' }
-  | {
-      type: 'Error';
-      /** Error message from the backend */
-      message: string;
-    };
+  | { type: 'Error'; content: ErrorPayload };
 
 type StatusPayload = Status;
 

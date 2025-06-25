@@ -1,7 +1,7 @@
 //! Why separate modules?
 //! Patches need to be parsed fairly loosely; modders may not put in line breaks.
 use crate::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
-use crate::{adsf::normal::de::from_word_and_space, lines::Str};
+use crate::{adsf::normal::de::from_word_and_space, common_parser::lines::Str};
 use core::str::FromStr;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{

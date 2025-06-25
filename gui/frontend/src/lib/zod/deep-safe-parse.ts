@@ -1,4 +1,4 @@
-import { type z, type ZodTypeAny, ZodObject, ZodArray, ZodDefault, ZodEffects, ZodOptional, ZodNullable } from 'zod';
+import { ZodArray, ZodDefault, ZodEffects, ZodNullable, ZodObject, ZodOptional, type ZodTypeAny, type z } from 'zod';
 
 export type ParseError = {
   path: (string | number)[];
@@ -32,17 +32,14 @@ export function deepSafeParse<T extends ZodTypeAny>(schema: T, input: unknown): 
   function unwrap(s: ZodTypeAny): ZodTypeAny {
     while (s instanceof ZodDefault || s instanceof ZodOptional || s instanceof ZodNullable || s instanceof ZodEffects) {
       if (s instanceof ZodEffects) {
-        // biome-ignore lint/style/noParameterAssign: <explanation>
         s = s._def.schema;
       } else {
-        // biome-ignore lint/style/noParameterAssign: <explanation>
         s = s._def.innerType;
       }
     }
     return s;
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
   function walk<S extends ZodTypeAny>(s: S, val: unknown, path: (string | number)[]): InferPartial<S> | undefined {
     const base = unwrap(s);
 

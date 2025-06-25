@@ -4,15 +4,12 @@
 // issue: https://github.com/suren-atoyan/monaco-react/issues/136#issuecomment-731420078
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { isTauri } from '@tauri-apps/api/core';
-import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
-
-import { openUrl } from '@/services/api/shell';
-
-import { atomOneDarkPro } from './atom_onedark_pro';
-import { loadVimKeyBindings } from './vim_key_bindings';
-
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import type { VimEnvironment } from 'monaco-vim';
+import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
+import { openUrl } from '@/services/api/shell';
+import { atomOneDarkPro } from './atom_onedark_pro';
+import { loadVimKeyBindings } from './vim_key_bindings';
 
 export type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
 export type VimModeRef = MutableRefObject<VimEnvironment | null>;

@@ -23,4 +23,4 @@
 //! - `de`: Deserialization logic
 pub mod adsf;
 pub mod asdsf;
-mod lines;
+pub(crate) mod common_parser;

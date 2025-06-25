@@ -1,8 +1,7 @@
+import type { SelectChangeEvent } from '@mui/material/Select';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { tabPosSchema, useTabContext } from '@/components/providers/TabProvider';
-
-import type { SelectChangeEvent } from '@mui/material/Select';
 
 export const TabPositionList = () => {
   const { t } = useTranslation();
@@ -18,11 +17,6 @@ export const TabPositionList = () => {
   ] as const;
 
   return (
-    <SelectWithLabel
-      label={t('tabs.position_label')}
-      menuItems={menuItems}
-      onChange={handleChange}
-      value={tabPos}
-    />
+    <SelectWithLabel label={t('tabs.position_label')} menuItems={menuItems} onChange={handleChange} value={tabPos} />
   );
 };

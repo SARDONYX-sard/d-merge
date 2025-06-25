@@ -1,6 +1,6 @@
 import CloseIcon from '@mui/icons-material/Close';
 import { Alert, AlertTitle, IconButton, type SxProps, type Theme } from '@mui/material';
-import { type CustomContentProps, type SnackbarKey, SnackbarProvider, closeSnackbar } from 'notistack';
+import { type CustomContentProps, closeSnackbar, type SnackbarKey, SnackbarProvider } from 'notistack';
 import { forwardRef, memo } from 'react';
 
 import { NOTIFY_CONFIG } from '@/lib/notify/config';

@@ -50,7 +50,7 @@ pub enum Error {
     #[snafu(display("Failed to get `meshes` path from this template path -> {source}: {}", path.display()))]
     FailedToGetInnerPathFromTemplate {
         path: PathBuf,
-        source: crate::templates::collect::path::TemplateError,
+        source: crate::behaviors::TemplateError,
     },
 
     /// Failed to parse adsf template
@@ -111,7 +111,7 @@ pub enum Error {
 
     #[snafu(transparent)]
     ParsedAdsfPathError {
-        source: crate::adsf::path_parser::ParseError,
+        source: crate::behaviors::ParseError,
     },
 
     /// dir strip error

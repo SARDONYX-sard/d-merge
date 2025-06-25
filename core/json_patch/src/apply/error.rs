@@ -76,6 +76,15 @@ pub enum JsonPatchError {
     /// Invalid matrix operation: attempted to simulate 2D array in a flat structure.
     #[snafu(display("Tried to put Alary for array index, but that is invalid. 2D arrays do not exist in the C++ class.\n{path}\n{value}"))]
     WrongMatrix { path: String, value: String },
+
+    /// The reference count for the Seq patch is still remaining (this is an implementation bug).
+    ArcStillExist,
+
+    /// Seq patch lock is poisoned.
+    LockPoisoned,
+
+    #[snafu(display("Expected Seq. but got {unexpected:#?}"))]
+    ExpectedSeq { unexpected: crate::OpRangeKind },
 }
 
 impl JsonPatchError {

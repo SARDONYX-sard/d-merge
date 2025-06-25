@@ -1,7 +1,7 @@
 pub mod ser;
 
 use crate::adsf::normal::{Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock};
-use crate::lines::Str;
+use crate::common_parser::lines::Str;
 use indexmap::IndexMap;
 use rayon::prelude::*;
 

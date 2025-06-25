@@ -1,38 +1,8 @@
 pub use crate::operation::Op;
+use crate::JsonPatchError;
 
 use simd_json::BorrowedValue;
 use std::ops::Range;
-
-/// A prioritized JSON patch.
-///
-/// This patch can either represent:
-///
-/// - `One`: a single field or C++ class (serialized as a JSON value),
-/// - `Seq`: a sequence of patch operations, intended to be applied to JSON arrays.
-///
-/// This enum allows merging multiple patches, each with an associated priority,
-/// and supports both scalar and sequence-style edits.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub enum Patch<'a> {
-    /// A single patch targeting one field or one object.
-    ///
-    /// Typically used to modify a scalar value or an entire C++ object
-    /// serialized as a single JSON value.
-    /// - Priority is considered just before merging.
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "ValueWithPriority<'a>: serde::Deserialize<'de>"))
-    )]
-    One(ValueWithPriority<'a>),
-
-    /// A sequence of prioritized patches.
-    ///
-    /// Intended for patches that apply to JSON arrays, representing multiple
-    /// insertions, deletions, or replacements at specific ranges.
-    /// - Patch on the assumption that it has already been overwritten by the highest priority.
-    Seq(Vec<ValueWithPriority<'a>>),
-}
 
 /// A JSON patch along with its associated priority.
 ///
@@ -93,14 +63,15 @@ pub enum OpRangeKind {
 impl OpRangeKind {
     /// Returns the `OpRange` if the operation is of kind `Seq`.
     ///
-    /// # Panics
-    /// Panics if the kind is `Pure`, as no range information is available.
+    /// # Errors
+    /// If not the kind is `Seq.
     #[inline]
-    pub fn as_seq(&self) -> &OpRange {
+    pub fn try_as_seq(&self) -> Result<&OpRange, JsonPatchError> {
         match self {
-            Self::Pure(op) => panic!("Expected Seq. But got Pure: op: {op:?}"),
-            Self::Seq(op_range) => op_range,
-            Self::Discrete(_) => todo!(),
+            Self::Seq(op_range) => Ok(op_range),
+            _ => Err(JsonPatchError::ExpectedSeq {
+                unexpected: self.clone(),
+            }),
         }
     }
 }

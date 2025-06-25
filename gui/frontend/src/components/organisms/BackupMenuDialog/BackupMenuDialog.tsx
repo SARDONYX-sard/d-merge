@@ -9,17 +9,14 @@ import {
   IconButton,
   List,
 } from '@mui/material';
-
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { OBJECT } from '@/lib/object-utils';
 import type { Cache, CacheKey } from '@/lib/storage';
-
 import { CacheItem } from './CacheItem';
 import { CacheValueItem } from './CacheValueItem';
 import { CheckBoxControls } from './CheckBoxControls';
 import { useCheckBoxState } from './useCheckBoxState';
-
-import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 export type DialogClickHandler = (checkedKeys: readonly CacheKey[]) => void;
 export type BackupMenuDialogProps = {

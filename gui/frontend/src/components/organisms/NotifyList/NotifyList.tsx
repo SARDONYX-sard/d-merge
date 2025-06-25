@@ -1,12 +1,9 @@
+import type { SnackbarOrigin } from 'notistack';
 import { type ComponentPropsWithRef, useCallback, useState } from 'react';
-
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
 import { NOTIFY_CONFIG } from '@/lib/notify/config';
-
 import { MaxSnackField } from './MaxSnackField';
-
-import type { SnackbarOrigin } from 'notistack';
 
 type PosChangeHandler = Exclude<ComponentPropsWithRef<typeof SelectWithLabel>['onChange'], undefined>;
 type SnackChangeHandler = ComponentPropsWithRef<typeof MaxSnackField>['onChange'];
