@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.1.0-alpha.8"
+version = "0.1.0"
 description = ""
 categories = ["games", "parsing"]
 authors = ["SARDONYX-sard"]

@@ -48,15 +48,15 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p ./build/interfaces
-          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-${{ runner.os }}-Portable.zip'
+          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-${{ runner.os }}-v${{ github.ref_name }}-Portable.zip'
       - name: Release Portable Version(Windows)
         uses: ncipollo/release-action@v1.16.0
         if: runner.os == 'Windows'
         with:
           allowUpdates: true
           artifacts: ./*.zip
-          name: '${{ env.APP_NAME }} v${{ github.ref_type }}'
-          tag: ${{ github.ref_type }}
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
+          tag: ${{ github.ref_name }}
 
       - name: Compress outputs(MacOS/Linux)
         shell: bash
@@ -69,5 +69,5 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./*.tar.gz
-          name: '${{ env.APP_NAME }} v${{ github.ref_type }}'
-          tag: ${{ github.ref_type }}
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
+          tag: ${{ github.ref_name }}
