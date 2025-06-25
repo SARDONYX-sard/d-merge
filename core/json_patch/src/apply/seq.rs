@@ -68,7 +68,8 @@ fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
         } = b;
 
         let op_rank =
-            |patch: &JsonPatch<'_>| match patch.op.as_seq().map(|op| op.op).unwrap_or_default() {
+            |patch: &JsonPatch<'_>| match patch.op.try_as_seq().map(|op| op.op).unwrap_or_default()
+            {
                 Op::Replace => 0,
                 Op::Remove => 1,
                 Op::Add => 2,
@@ -113,7 +114,7 @@ fn apply_ops_parallel<'a>(
         patches
             .into_iter()
             .partition(|ValueWithPriority { patch, .. }| {
-                patch.op.as_seq().map(|op| op.op).unwrap_or_default() != Op::Add
+                patch.op.try_as_seq().map(|op| op.op).unwrap_or_default() != Op::Add
             });
 
     let base = Arc::new(Mutex::new(base));
@@ -123,7 +124,7 @@ fn apply_ops_parallel<'a>(
         .into_par_iter()
         .try_for_each(|ValueWithPriority { patch, .. }| {
             let JsonPatch { op, value } = patch;
-            let seq = op.as_seq()?;
+            let seq = op.try_as_seq()?;
             match seq.op {
                 Op::Replace => {
                     let values = value
@@ -163,7 +164,7 @@ fn apply_ops_parallel<'a>(
 
     let mut offset = 0;
     for value in add_ops {
-        let seq = value.patch.op.as_seq()?;
+        let seq = value.patch.op.try_as_seq()?;
         let values = value
             .patch
             .value
@@ -207,7 +208,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> Result<String, JsonPatchE
 
     // 1. collect all used indices (0-based)
     for patch in patches {
-        let seq = patch.patch.op.as_seq()?;
+        let seq = patch.patch.op.try_as_seq()?;
         max_index = max_index.max(seq.range.end);
         for i in seq.range.start..seq.range.end {
             indices.insert(i);
@@ -238,7 +239,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> Result<String, JsonPatchE
 
     // 4. render each patch line
     for patch in patches {
-        let seq = patch.patch.op.as_seq()?;
+        let seq = patch.patch.op.try_as_seq()?;
         let range = seq.range.clone();
         let op = seq.op;
 

@@ -94,10 +94,10 @@ pub enum OpRangeKind {
 impl OpRangeKind {
     /// Returns the `OpRange` if the operation is of kind `Seq`.
     ///
-    /// # Panics
-    /// Panics if the kind is `Pure`, as no range information is available.
+    /// # Errors
+    /// If not the kind is `Seq.
     #[inline]
-    pub fn as_seq(&self) -> Result<&OpRange, JsonPatchError> {
+    pub fn try_as_seq(&self) -> Result<&OpRange, JsonPatchError> {
         match self {
             Self::Seq(op_range) => Ok(op_range),
             _ => Err(JsonPatchError::ExpectedSeq {
