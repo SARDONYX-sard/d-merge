@@ -26,9 +26,18 @@ pub fn apply_patches<'a, 'b: 'a>(
     borrowed_patches: RawBorrowedPatches<'b>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
+    let status_reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::ApplyingPatches,
+        borrowed_patches.len(),
+    );
+
     let results: Vec<Result<(), Error>> = borrowed_patches
+        .0
         .into_par_iter()
-        .flat_map(|(key, patches)| apply_to_one_template(config, templates, &key, patches))
+        .flat_map(|(key, patches)| {
+            apply_to_one_template(config, templates, &key, patches, &status_reporter)
+        })
         .collect();
 
     filter_results(results)
@@ -44,6 +53,7 @@ fn apply_to_one_template<'a, 'b: 'a>(
     templates: &BorrowedTemplateMap<'a>,
     key: &TemplateKey<'a>,
     patches: (OnePatchMap<'b>, SeqPatchMap<'b>),
+    status_reporter: &StatusReportCounter,
 ) -> ChainError {
     if config.debug.output_patch_json {
         if let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches) {
@@ -68,12 +78,9 @@ fn apply_to_one_template<'a, 'b: 'a>(
     // before applying sequence patches that manipulate array elements.
     // After that, sequence patches can be applied reliably.
     let (one_patch_map, seq_patch_map) = patches;
-    let total = one_patch_map.0.len() + seq_patch_map.0.len();
-    let status_reporter =
-        StatusReportCounter::new(&config.status_report, ReportType::ApplyingPatches, total);
 
-    let one_patch_results = process_one_patch(templates, key, one_patch_map, &status_reporter);
-    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map, &status_reporter);
+    let one_patch_results = process_one_patch(templates, key, one_patch_map, status_reporter);
+    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map, status_reporter);
 
     one_patch_results.into_par_iter().chain(seq_patch_results)
 }

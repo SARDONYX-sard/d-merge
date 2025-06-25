@@ -146,7 +146,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
             all_errors.par_extend(errors);
         };
 
-        // 2/3: Generate hkx files.
+        // 3/3: Generate hkx files.
         let hkx_errors_len = {
             if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
                 let errors_len = hkx_errors.len();

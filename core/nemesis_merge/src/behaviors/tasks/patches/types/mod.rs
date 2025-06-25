@@ -43,7 +43,23 @@ pub struct BorrowedPatches<'a> {
 ///     ["#0001", "hkbProjectData", "variable"]: { op, patch, priority }
 /// }
 /// ```
-pub type RawBorrowedPatches<'a> = DashMap<TemplateKey<'a>, (OnePatchMap<'a>, SeqPatchMap<'a>)>;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct RawBorrowedPatches<'a>(
+    pub DashMap<TemplateKey<'a>, (OnePatchMap<'a>, SeqPatchMap<'a>)>,
+);
+
+impl RawBorrowedPatches<'_> {
+    pub(crate) fn len(&self) -> usize {
+        use rayon::prelude::*;
+        self.0
+            .par_iter()
+            .map(|pair| {
+                let (one, seq) = pair.value();
+                one.0.len() + seq.0.len()
+            })
+            .reduce(|| 0, |a, b| a + b)
+    }
+}
 
 /// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
 /// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphStringData`.

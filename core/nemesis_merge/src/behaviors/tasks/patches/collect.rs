@@ -118,7 +118,7 @@ pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
 ) -> (BorrowedPatches<'a>, Vec<Error>) {
-    let raw_borrowed_patches = RawBorrowedPatches::new();
+    let raw_borrowed_patches = RawBorrowedPatches::default();
     let template_names = DashSet::new();
     let variable_class_map = BehaviorStringDataMap::new();
 
@@ -153,7 +153,7 @@ pub fn collect_borrowed_patches<'a>(
 
                 json_patches.into_par_iter().for_each(|(json_path, value)| {
                     // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                    let entry = raw_borrowed_patches.entry(key.clone()).or_default();
+                    let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
 
                     match &value.op {
                         // Overwrite to match patch structure
