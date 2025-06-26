@@ -129,13 +129,13 @@ mod tests {
     #[test]
     fn test_is_asdsf_patch_file_valid_cases() {
         // Pattern: <clip_id>~<anim_data_id>.txt
-        assert!(is_adsf_patch_file(Path::new(
-            r"/mod/slide/animationsetdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"
+        assert!(is_asdsf_patch_file(Path::new(
+            r"/mod/slide/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt"
         )));
 
         // Pattern: <anim_data_id>.txt
-        assert!(is_adsf_patch_file(Path::new(
-            r"/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt"
+        assert!(is_asdsf_patch_file(Path::new(
+            r"/mod/slide/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt"
         )));
     }
 
