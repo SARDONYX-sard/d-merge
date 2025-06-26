@@ -7,7 +7,7 @@ pub type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
 /// This enum is used to track and report the current state of an ongoing process, such as
 /// reading templates, applying patches, generating files, or completing the task.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "message"))]
+#[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone)]
 pub enum Status {
     /// Status when reading patches.
@@ -75,7 +75,7 @@ mod tests {
     fn serialize_status() {
         let status = Status::Error("Error message".to_string());
         let serialized = simd_json::to_string(&status).unwrap();
-        assert_eq!(serialized, r#"{"type":"Error","message":"Error message"}"#);
+        assert_eq!(serialized, r#"{"type":"Error","content":"Error message"}"#);
 
         let status = Status::ReadingPatches {
             index: 0,
@@ -84,7 +84,7 @@ mod tests {
         let serialized = simd_json::to_string(&status).unwrap();
         assert_eq!(
             serialized,
-            r#"{"type":"ReadingPatches","message":{"index":0,"total":100}}"#
+            r#"{"type":"ReadingPatches","content":{"index":0,"total":100}}"#
         );
     }
 }
