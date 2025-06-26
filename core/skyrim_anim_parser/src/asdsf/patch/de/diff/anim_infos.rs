@@ -35,35 +35,3 @@ pub struct AnimInfoDiff<'a> {
     /// - type: [`u32`]
     pub ascii_extension: Option<Str<'a>>,
 }
-
-// impl<'a> TryFrom<AnimInfoDiff<'a>> for Value<'a> {
-//     type Error = DiffCastError;
-
-//     #[inline]
-//     fn try_from(value: AnimInfoDiff<'a>) -> Result<Self, Self::Error> {
-//         let mut obj = Object::new();
-
-//         let hashed_path = value.hashed_path.ok_or(DiffCastError::MissingField {
-//             field: "hashed_path",
-//         })?;
-//         obj.insert("hashed_path".into(), Value::String(hashed_path.into()));
-
-//         let hashed_file_name = value.hashed_file_name.ok_or(DiffCastError::MissingField {
-//             field: "hashed_file_name",
-//         })?;
-//         obj.insert(
-//             "hashed_file_name".into(),
-//             Value::String(hashed_file_name.into()),
-//         );
-
-//         let ascii_extension = value.ascii_extension.ok_or(DiffCastError::MissingField {
-//             field: "ascii_extension",
-//         })?;
-//         obj.insert(
-//             "ascii_extension".into(),
-//             Value::String(ascii_extension.into()),
-//         );
-
-//         Ok(Value::Object(Box::new(obj)))
-//     }
-// }

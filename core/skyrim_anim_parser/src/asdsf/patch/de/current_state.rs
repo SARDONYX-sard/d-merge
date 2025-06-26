@@ -80,9 +80,9 @@ pub(super) enum FieldKind<'a> {
     /// - type: `Str`
     ConditionVariableName(Str<'a>),
     /// - type: [`i32`]
-    ConditionVariableA(Str<'a>),
+    ConditionValueA(Str<'a>),
     /// - type: [`i32`]
-    ConditionVariableB(Str<'a>),
+    ConditionValueB(Str<'a>),
 
     // -- Attack
     /// - type: `Str`
@@ -192,7 +192,7 @@ impl<'de> CurrentState<'de> {
         Ok(())
     }
 
-    /// Sets the range start index for either transitions or rotations.
+    /// Sets the range start index.
     ///
     /// # Errors
     /// - If it is not included in diff (if it does not pass `MOD_CODE`).
@@ -234,27 +234,21 @@ impl<'de> CurrentState<'de> {
             .ok_or(Error::NeedMainRangeInformation)
     }
 
-    /// Sets the range start index for either transitions or rotations.
+    /// Sets the range start index.
     ///
     /// # Errors
     /// - If it is not included in diff (if it does not pass `MOD_CODE`).
-    /// - If it is called with a type that is not an array.
+    /// - If it is called with a type that is not an `Attacks`.
     pub const fn set_sub_range_start(&mut self, start: usize) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
 
-        match self.current_kind {
-            Some(
-                ParserKind::Triggers
-                | ParserKind::Conditions
-                | ParserKind::Attacks
-                | ParserKind::AnimInfos,
-            ) => {
-                self.main_range = Some(start..start + 1);
-            }
-            _ => return Err(Error::ExpectedArray),
+        if matches!(self.current_kind, Some(ParserKind::Attacks)) {
+            self.main_range = Some(start..start + 1);
+        } else {
+            return Err(Error::InvalidSubRangeUsage);
         }
 
         Ok(())

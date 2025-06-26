@@ -6,14 +6,13 @@ pub use self::anim_infos::*;
 pub use self::conditions::*;
 pub use self::error::*;
 
-use crate::common_parser::lines::Str;
-use json_patch::ValueWithPriority;
-
 use crate::asdsf::normal::AnimSetData;
 use crate::asdsf::patch::de::error::Error;
-use json_patch::apply_seq_by_priority;
+use crate::common_parser::lines::Str;
+use json_patch::{apply_seq_array_directly, ValueWithPriority};
 use rayon::prelude::*;
-use simd_json::serde::{from_borrowed_value, to_borrowed_value};
+use simd_json::borrowed::Value;
+use simd_json::serde::from_borrowed_value;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -94,45 +93,32 @@ impl<'a> DiffPatchAnimSetData<'a> {
             anim_set_data.version = version;
         }
 
+        // take & change condition to json -> marge
         if !self.triggers_patches.is_empty() {
-            // take & change condition to json -> marge
-            let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.triggers))?;
             let patches = core::mem::take(&mut self.triggers_patches);
 
-            apply_seq_by_priority("triggers", &mut template, vec!["triggers".into()], patches)?;
-
-            anim_set_data.triggers = from_borrowed_value(template)?;
+            let triggers = core::mem::take(&mut anim_set_data.triggers);
+            let mut template: Vec<Value> = triggers.into_iter().map(Into::into).collect();
+            apply_seq_array_directly(&mut template, patches)?;
+            anim_set_data.triggers = from_borrowed_value(template.into())?;
         }
 
         if !self.conditions_patches.seq.is_empty() {
-            // take & change condition to json -> marge
-            let mut template = to_borrowed_value(core::mem::take(&mut anim_set_data.conditions))?;
             let patches = core::mem::take(&mut self.conditions_patches.seq);
 
-            apply_seq_by_priority(
-                "conditions",
-                &mut template,
-                vec!["conditions".into()],
-                patches,
-            )?;
-
-            anim_set_data.conditions = from_borrowed_value(template)?;
+            let conditions = core::mem::take(&mut anim_set_data.conditions);
+            let mut template: Vec<Value> = conditions.into_iter().map(Into::into).collect();
+            apply_seq_array_directly(&mut template, patches)?;
+            anim_set_data.conditions = from_borrowed_value(template.into())?;
         }
 
         if !self.anim_infos_patches.seq.is_empty() {
-            // take & change condition to json -> marge
             let patches = core::mem::take(&mut self.anim_infos_patches.seq);
 
             let anim_infos = core::mem::take(&mut anim_set_data.anim_infos);
-            let mut template = to_borrowed_value(anim_infos)?;
-            apply_seq_by_priority(
-                "anim_infos",
-                &mut template,
-                vec!["anim_infos".into()],
-                patches,
-            )?;
-
-            anim_set_data.anim_infos = from_borrowed_value(template)?;
+            let mut template: Vec<Value> = anim_infos.into_par_iter().map(Into::into).collect();
+            apply_seq_array_directly(&mut template, patches)?;
+            anim_set_data.anim_infos = from_borrowed_value(template.into())?;
         }
 
         Ok(())

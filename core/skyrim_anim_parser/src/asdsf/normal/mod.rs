@@ -104,6 +104,17 @@ pub struct Condition<'a> {
     pub value_b: i32,
 }
 
+impl<'a> From<Condition<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: Condition<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("variable_name".into(), value.variable_name.into());
+        obj.insert("value_a".into(), value.value_a.into());
+        obj.insert("value_b".into(), value.value_b.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
+}
+
 /// Condition hand type
 ///
 /// When `iLeftHandType` | `iRightHandType`, it's `HandType` range(NOTE: contain end range)

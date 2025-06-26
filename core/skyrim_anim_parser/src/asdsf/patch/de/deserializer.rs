@@ -219,18 +219,18 @@ impl<'de> Deserializer<'de> {
             }
             self.parse_opt_close_comment()?;
 
-            let variable_a = self.parse_next(
-                verify_line_parses_to::<i32>.context(Expected(Description("variable_a: i32"))),
+            let value_a = self.parse_next(
+                verify_line_parses_to::<i32>.context(Expected(Description("value_a: i32"))),
             )?;
 
-            let variable_b = self.parse_next(
-                verify_line_parses_to::<i32>.context(Expected(Description("variable_b: i32"))),
+            let value_b = self.parse_next(
+                verify_line_parses_to::<i32>.context(Expected(Description("value_b: i32"))),
             )?;
 
             // TODO:
             if diff_start {
                 #[cfg(feature = "tracing")]
-                tracing::debug!(?variable_name, ?variable_a, ?variable_b);
+                tracing::debug!(?variable_name, ?value_a, ?value_b);
             }
 
             self.parse_opt_close_comment()?;

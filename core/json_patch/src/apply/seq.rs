@@ -54,6 +54,25 @@ Path: {path}, Seq target length: {target_len}
     Ok(())
 }
 
+/// Resolve conflicts in order of priority and apply them to the array.
+///
+/// This function is applied directly to the target array without specifying a JSON path.
+///
+/// # Errors
+/// Returns an error if applying the patches fails.
+pub fn apply_seq_array_directly<'a>(
+    target_array: &mut Vec<Value<'a>>,
+    mut patches: Vec<ValueWithPriority<'a>>,
+) -> Result<()> {
+    let patch_target_vec = core::mem::take(target_array);
+    sort_by_priority(patches.as_mut_slice());
+    let patched_array = apply_ops_parallel(patch_target_vec, patches)?
+        .smart_iter()
+        .filter(|v| v != &MARK_AS_REMOVED);
+    target_array.smart_extend(patched_array);
+    Ok(())
+}
+
 // Separate sorted ops into Add and others
 fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
     #[cfg(feature = "rayon")]
@@ -339,16 +358,11 @@ mod tests {
         ];
 
         let base_seq: Vec<String> = (0..21).map(|i| i.to_string()).collect();
-        let base_seq: Vec<Value<'_>> = base_seq.smart_iter().map(|i| i.into()).collect();
+        let mut base_seq: Vec<Value<'_>> = base_seq.smart_iter().map(|i| i.into()).collect();
 
-        sort_by_priority(&mut patches);
         println!("Operation Map:\n{}", visualize_ops(&patches).unwrap());
-        let result = apply_ops_parallel(base_seq, patches).unwrap();
-
-        let result: Vec<_> = result
-            .smart_iter()
-            .filter(|v| v != &MARK_AS_REMOVED)
-            .collect();
-        println!("{result:#?}");
+        sort_by_priority(&mut patches);
+        apply_seq_array_directly(&mut base_seq, patches).unwrap();
+        println!("{base_seq:#?}");
     }
 }
