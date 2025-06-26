@@ -20,7 +20,6 @@ runs:
     - name: Ensure ./build/interface/ is retained
       shell: bash
       run: |
-        mkdir -p ./build/assets
         mkdir -p ./build/interface
         touch ./build/interface/.keep
 
