@@ -22,18 +22,26 @@ export const usePatchStatus = (stop: () => string, setLoading: (v: boolean) => v
 
     let nextText = '';
     switch (nextStatus.type) {
-      case 'ReadingPatches':
-        nextText = t('patch.patch_reading_message');
+      case 'ReadingPatches': {
+        const { index, total } = nextStatus.content;
+        nextText = `${t('patch.patch_reading_message')} (${index}/${total})`;
         break;
-      case 'ParsingPatches':
-        nextText = t('patch.patch_parsing_message');
+      }
+      case 'ParsingPatches': {
+        const { index, total } = nextStatus.content;
+        nextText = `${t('patch.patch_parsing_message')} (${index}/${total})`;
         break;
-      case 'ApplyingPatches':
-        nextText = t('patch.patch_applying_message');
+      }
+      case 'ApplyingPatches': {
+        const { index, total } = nextStatus.content;
+        nextText = `${t('patch.patch_applying_message')} (${index}/${total})`;
         break;
-      case 'GeneratingHkxFiles':
-        nextText = t('patch.patch_generating_message');
+      }
+      case 'GeneratingHkxFiles': {
+        const { index, total } = nextStatus.content;
+        nextText = `${t('patch.patch_generating_message')} (${index}/${total})`;
         break;
+      }
       case 'Done': {
         nextText = `${t('patch.patch_complete_message')} (${stop()})`;
         setLoading(false);
