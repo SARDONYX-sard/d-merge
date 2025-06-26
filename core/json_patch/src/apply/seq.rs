@@ -64,6 +64,18 @@ pub fn apply_seq_array_directly<'a>(
     target_array: &mut Vec<Value<'a>>,
     mut patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<()> {
+    let visualizer = visualize_ops(&patches)?;
+
+    #[cfg(feature = "tracing")]
+    {
+        let target_len = target_array.len();
+        tracing::debug!(
+            "Seq merge conflict resolution:
+Path: maybe asdsf, Seq target length: {target_len}
+{visualizer}"
+        );
+    }
+
     let patch_target_vec = core::mem::take(target_array);
     sort_by_priority(patches.as_mut_slice());
     let patched_array = apply_ops_parallel(patch_target_vec, patches)?
@@ -185,7 +197,7 @@ fn apply_ops_parallel<'a>(
             .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
         let insert_at = seq.range.start + offset;
 
-        if insert_at <= base.len() {
+        if insert_at < base.len() {
             let values_len = values.len();
             base.splice(insert_at..insert_at, values);
             offset += values_len;
