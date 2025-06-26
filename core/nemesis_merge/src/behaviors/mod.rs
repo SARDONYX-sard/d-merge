@@ -2,7 +2,8 @@
 mod priority_ids;
 mod tasks;
 
-pub(crate) use tasks::adsf::path_parser::ParseError;
+pub(crate) use tasks::adsf::path_parser::ParseError as AsdfPathParseError;
+pub(crate) use tasks::asdsf::path_parser::ParseError as AsdsfPathParseError;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
 
 use self::priority_ids::paths_to_priority_map;
@@ -15,6 +16,8 @@ use self::tasks::{
     },
 };
 use crate::behaviors::tasks::adsf::apply_adsf_patches;
+use crate::behaviors::tasks::asdsf::apply_asdsf_patches;
+use crate::behaviors::tasks::patches::types::OwnedPatches;
 use crate::config::{Config, Status};
 use crate::errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
@@ -35,29 +38,38 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
     }
 
     // Collect all patches file.
-    let (owned_adsf_patches, owned_patches, owned_file_errors) =
-        collect_owned_patches(&nemesis_paths, &id_order, &config).await;
+    let OwnedPatches {
+        owned_patches,
+        adsf_patches: owned_adsf_patches,
+        asdsf_patches: owned_asdsf_patches,
+        errors: owned_file_errors,
+    } = collect_owned_patches(&nemesis_paths, &id_order, &config).await;
 
-    // - Patch to `animationdatasinglefile.txt`
-    // - Patch to hkx( -> xml)
-    let (adsf_errors, patched_hkx_errors) = rayon::join(
-        || apply_adsf_patches(owned_adsf_patches, &id_order, &config),
-        || apply_and_gen_patched_hkx(&owned_patches, &config),
-    );
+    let mut adsf_errors = vec![];
+    let mut asdsf_errors = vec![];
+    let mut patched_hkx_errors = None;
+
+    rayon::scope(|s| {
+        s.spawn(|_| adsf_errors = apply_adsf_patches(owned_adsf_patches, &id_order, &config));
+        s.spawn(|_| asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &id_order, &config));
+        s.spawn(|_| patched_hkx_errors = Some(apply_and_gen_patched_hkx(&owned_patches, &config)));
+    });
 
     let Errors {
         patch_errors_len,
         apply_errors_len,
         hkx_errors_len,
         hkx_errors,
-    } = patched_hkx_errors;
+    } = patched_hkx_errors.unwrap_or_default();
     let owned_file_errors_len = owned_file_errors.len();
     let adsf_errors_len = adsf_errors.len();
+    let asdsf_errors_len = asdsf_errors.len();
 
     let all_errors = {
         let mut all_errors = vec![];
         all_errors.par_extend(owned_file_errors);
         all_errors.par_extend(adsf_errors);
+        all_errors.par_extend(asdsf_errors);
         all_errors.par_extend(hkx_errors);
         all_errors
     };
@@ -66,6 +78,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
         let err = BehaviorGenerationError {
             owned_file_errors_len,
             adsf_errors_len,
+            asdsf_errors_len,
             patch_errors_len,
             apply_errors_len,
             hkx_errors_len,
@@ -80,6 +93,7 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
     Ok(())
 }
 
+#[derive(Default)]
 struct Errors {
     patch_errors_len: usize,
     apply_errors_len: usize,

@@ -34,7 +34,7 @@ pub struct AltAsdsf<'a> {
 ///   e.g. `ChickenProjectData~ChickenProject`, `DefaultMale~DefaultMale`
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone)]
-pub struct AltTxtProjects<'a>(IndexMap<Str<'a>, AnimSetList<'a>>);
+pub struct AltTxtProjects<'a>(pub IndexMap<Str<'a>, AnimSetList<'a>>);
 
 impl<'a> TryFrom<Asdsf<'a>> for AltAsdsf<'a> {
     type Error = String;

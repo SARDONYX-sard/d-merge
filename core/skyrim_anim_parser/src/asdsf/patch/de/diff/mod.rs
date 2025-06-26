@@ -1,10 +1,8 @@
 mod anim_infos;
 mod conditions;
-mod error;
 
 pub use self::anim_infos::*;
 pub use self::conditions::*;
-pub use self::error::*;
 
 use crate::asdsf::normal::AnimSetData;
 use crate::asdsf::patch::de::error::Error;

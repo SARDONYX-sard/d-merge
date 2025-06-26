@@ -7,8 +7,10 @@ use crate::{
         priority_ids::{get_nemesis_id, types::PriorityMap},
         tasks::{
             adsf::types::OwnedAdsfPatchMap,
+            asdsf::types::OwnedAsdsfPatchMap,
             patches::types::{
-                BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, RawBorrowedPatches,
+                BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, OwnedPatches,
+                RawBorrowedPatches,
             },
             templates::types::TemplateKey,
         },
@@ -44,7 +46,7 @@ pub async fn collect_owned_patches(
     nemesis_paths: &[PathBuf],
     id_order: &PriorityMap<'_>,
     config: &Config,
-) -> (OwnedAdsfPatchMap, OwnedPatchMap, Vec<Error>) {
+) -> OwnedPatches {
     let mut handles = vec![];
     let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
 
@@ -72,6 +74,7 @@ pub async fn collect_owned_patches(
 
     let mut owned_patches = OwnedPatchMap::new();
     let mut adsf_patches = OwnedAdsfPatchMap::new();
+    let mut asdsf_patches = OwnedAsdsfPatchMap::new();
     let mut errors = vec![];
 
     let reporter = StatusReportCounter::new(
@@ -104,6 +107,9 @@ pub async fn collect_owned_patches(
                 Category::Adsf => {
                     adsf_patches.insert(path, (content, priority));
                 }
+                Category::Asdsf => {
+                    asdsf_patches.insert(path, (content, priority));
+                }
             },
             Err(err) => {
                 errors.push(err);
@@ -111,7 +117,12 @@ pub async fn collect_owned_patches(
         }
     }
 
-    (adsf_patches, owned_patches, errors)
+    OwnedPatches {
+        owned_patches,
+        adsf_patches,
+        asdsf_patches,
+        errors,
+    }
 }
 
 pub fn collect_borrowed_patches<'a>(

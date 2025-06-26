@@ -5,6 +5,7 @@ use rayon::prelude::*;
 pub enum Category {
     Nemesis,
     Adsf,
+    Asdsf,
 }
 
 /// Collects all relevant file paths within the given ID directory.
@@ -26,6 +27,9 @@ pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)>
             }
             if is_adsf_patch_file(&txt_path) {
                 return Some((Category::Adsf, txt_path));
+            }
+            if is_asdsf_patch_file(&txt_path) {
+                return Some((Category::Asdsf, txt_path));
             }
 
             None
@@ -77,6 +81,27 @@ fn is_adsf_patch_file(txt_path: &Path) -> bool {
     txt_path.file_stem().is_some_and(|s| !s.is_empty()) // Allow either `<clip>~<anim_data_id>` or just `<anim_data_id>`
 }
 
+// Check if any parent directory in the last 3 components is "animationdatasinglefile"
+///
+/// # Assumption.
+/// - The file is a file with a txt extension.
+fn is_asdsf_patch_file(txt_path: &Path) -> bool {
+    let has_adsf_parent = txt_path
+        .ancestors()
+        .take(3) // includes self, parent, grandparent, great-grandparent
+        .any(|ancestor| {
+            ancestor
+                .file_name() // Intend: Get the final component dir name.
+                .is_some_and(|name| name.eq_ignore_ascii_case("animationsetdatasinglefile"))
+        });
+    if !has_adsf_parent {
+        return false;
+    }
+
+    // File stem should be non-empty and optionally contain a ~
+    txt_path.file_stem().is_some_and(|s| !s.is_empty()) // Allow either `<clip>~<anim_data_id>` or just `<anim_data_id>`
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +118,19 @@ mod tests {
         // Pattern: <clip_id>~<anim_data_id>.txt
         assert!(is_adsf_patch_file(Path::new(
             r"/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"
+        )));
+
+        // Pattern: <anim_data_id>.txt
+        assert!(is_adsf_patch_file(Path::new(
+            r"/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt"
+        )));
+    }
+
+    #[test]
+    fn test_is_asdsf_patch_file_valid_cases() {
+        // Pattern: <clip_id>~<anim_data_id>.txt
+        assert!(is_adsf_patch_file(Path::new(
+            r"/mod/slide/animationsetdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"
         )));
 
         // Pattern: <anim_data_id>.txt
