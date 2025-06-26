@@ -61,14 +61,21 @@ pub enum Error {
     },
 
     /// Failed to parse adsf patch
-    #[snafu(display("[animationdatasinglefile patch Parse edit Error]{}:\n{source}", path.display()))]
+    #[snafu(display("[animationdatasinglefile edit(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseEditAdsfPatch {
         source: skyrim_anim_parser::adsf::patch::de::error::Error,
         path: PathBuf,
     },
 
     /// Failed to parse adsf patch
-    #[snafu(display("[animationdatasinglefile patch Parse Error]{}:\n{source}", path.display()))]
+    #[snafu(display("[animationsetdatasinglefile edit(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
+    FailedParseEditAsdsfPatch {
+        source: skyrim_anim_parser::asdsf::patch::de::error::Error,
+        path: PathBuf,
+    },
+
+    /// Failed to parse adsf patch
+    #[snafu(display("[animationdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfPatch {
         source: ReadableError,
         path: PathBuf,
@@ -111,7 +118,12 @@ pub enum Error {
 
     #[snafu(transparent)]
     ParsedAdsfPathError {
-        source: crate::behaviors::ParseError,
+        source: crate::behaviors::AsdfPathParseError,
+    },
+
+    #[snafu(transparent)]
+    ParsedAsdsfPathError {
+        source: crate::behaviors::AsdsfPathParseError,
     },
 
     /// dir strip error
@@ -140,6 +152,7 @@ pub enum Error {
 pub struct BehaviorGenerationError {
     pub owned_file_errors_len: usize,
     pub adsf_errors_len: usize,
+    pub asdsf_errors_len: usize,
     pub patch_errors_len: usize,
     pub apply_errors_len: usize,
     pub hkx_errors_len: usize,
@@ -150,12 +163,14 @@ impl core::fmt::Display for BehaviorGenerationError {
         let Self {
             owned_file_errors_len,
             adsf_errors_len,
+            asdsf_errors_len,
             patch_errors_len,
             apply_errors_len,
             hkx_errors_len,
         } = *self;
 
         if adsf_errors_len == 0
+            && asdsf_errors_len == 0
             && owned_file_errors_len == 0
             && patch_errors_len == 0
             && apply_errors_len == 0
@@ -172,6 +187,12 @@ impl core::fmt::Display for BehaviorGenerationError {
             writeln!(
                 f,
                 "- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}",
+            )?;
+        }
+        if asdsf_errors_len > 0 {
+            writeln!(
+                f,
+                "- `animationsetdatasinglefile.txt` Error Count: {asdsf_errors_len}",
             )?;
         }
         if patch_errors_len > 0 {

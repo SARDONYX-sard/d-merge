@@ -5,7 +5,29 @@ use indexmap::IndexMap;
 use std::path::PathBuf;
 
 pub use self::patch_map::{OnePatchMap, SeqPatchMap};
-use crate::behaviors::tasks::templates::types::TemplateKey;
+use crate::behaviors::tasks::{
+    adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::types::TemplateKey,
+};
+
+pub struct OwnedPatches {
+    /// Name of the template that needs to be read.
+    ///
+    /// - format: template_name, is_1st_person
+    /// - e.g. (`0_master`, false)
+    pub owned_patches: OwnedPatchMap,
+
+    /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
+    /// - value: `Map<jsonPath, { patch, priority }>`
+    pub adsf_patches: OwnedAdsfPatchMap,
+
+    /// HashMap showing which index (e.g. `#0000`) of each template (e.g. `0_master.xml`)
+    /// contains `hkbBehaviorGraphStringData
+    ///
+    /// This information exists because it is needed to replace variables
+    /// such as the Nemesis variable `$variableID[]$`, `$eventID[]$`.
+    pub asdsf_patches: OwnedAsdsfPatchMap,
+    pub errors: Vec<crate::errors::Error>,
+}
 
 /// - key: full path
 /// - value: nemesis xml

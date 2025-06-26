@@ -43,6 +43,7 @@ pub trait SmartIntoIter {
 // === Vec<T> Implementation ===
 
 impl<T: Send> SmartExtend<T> for Vec<T> {
+    #[inline]
     fn smart_extend<I>(&mut self, iter: I)
     where
         I: SmartIntoIter<Item = T>,
@@ -69,6 +70,7 @@ where
     type Item = T;
     type Iter = I::IntoIter;
 
+    #[inline]
     fn smart_iter(self) -> Self::Iter {
         self.into_iter()
     }
@@ -85,7 +87,71 @@ where
     type Item = T;
     type Iter = I::Iter;
 
+    #[inline]
     fn smart_iter(self) -> Self::Iter {
         self.into_par_iter()
+    }
+}
+
+/// A trait that abstracts over obtaining a mutable iterator (and potentially parallel
+/// mutable iterator) from a container.
+pub trait SmartIterMut<'a, T: 'a> {
+    /// The item type of the iterator.
+    type Item;
+
+    /// The iterator type, either sequential or parallel depending on the `rayon` feature.
+    #[cfg(not(feature = "rayon"))]
+    type Iter: Iterator<Item = &'a mut T>;
+
+    #[cfg(feature = "rayon")]
+    type Iter: ParallelIterator<Item = &'a mut T>;
+
+    /// Returns an iterator over mutable references to the elements.
+    fn smart_iter_mut(self) -> Self::Iter;
+}
+
+// === SmartIterMut Implementation for Vec<T> ===
+
+#[cfg(not(feature = "rayon"))]
+impl<'a, T> SmartIterMut<'a, T> for &'a mut Vec<T> {
+    type Item = &'a mut T;
+    type Iter = std::slice::IterMut<'a, T>;
+
+    #[inline]
+    fn smart_iter_mut(self) -> Self::Iter {
+        self.iter_mut()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T: Send> SmartIterMut<'a, T> for &'a mut Vec<T> {
+    type Item = &'a mut T;
+    type Iter = rayon::slice::IterMut<'a, T>;
+
+    #[inline]
+    fn smart_iter_mut(self) -> Self::Iter {
+        self.par_iter_mut()
+    }
+}
+
+#[cfg(not(feature = "rayon"))]
+impl<'a, T> SmartIterMut<'a, T> for &'a mut [T] {
+    type Item = &'a mut T;
+    type Iter = std::slice::IterMut<'a, T>;
+
+    #[inline]
+    fn smart_iter_mut(self) -> Self::Iter {
+        self.iter_mut()
+    }
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, T: Send> SmartIterMut<'a, T> for &'a mut [T] {
+    type Item = &'a mut T;
+    type Iter = rayon::slice::IterMut<'a, T>;
+
+    #[inline]
+    fn smart_iter_mut(self) -> Self::Iter {
+        self.par_iter_mut()
     }
 }

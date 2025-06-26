@@ -90,6 +90,7 @@ pub struct Condition<'a> {
     /// When `variable_name` is:
     /// - `iLeftHandType` or `iRightHandType`, this corresponds to a [`HandType`] variant.
     /// - `iWantMountedWeaponAnims`, this corresponds to a [`MountedAttackPermission`] variant.
+    /// - `bWantMountedWeaponAnims` is boolean.
     ///
     /// Used together with `value_b` to define a closed range (`value_a..=value_b`).
     pub value_a: i32,
@@ -99,9 +100,21 @@ pub struct Condition<'a> {
     /// When `variable_name` is:
     /// - `iLeftHandType` or `iRightHandType`, this corresponds to a [`HandType`] variant.
     /// - `iWantMountedWeaponAnims`, this corresponds to a [`MountedAttackPermission`] variant.
+    /// - `bWantMountedWeaponAnims` is boolean.
     ///
     /// If `value_a == value_b`, the condition checks for a single exact value.
     pub value_b: i32,
+}
+
+impl<'a> From<Condition<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: Condition<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("variable_name".into(), value.variable_name.into());
+        obj.insert("value_a".into(), value.value_a.into());
+        obj.insert("value_b".into(), value.value_b.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
 }
 
 /// Condition hand type
@@ -208,4 +221,15 @@ pub struct AnimInfo<'a> {
     /// assert_eq!(core::str::from_utf8(&[0x78, 0x6b, 0x68]), Ok("xkh"));
     /// ```
     pub ascii_extension: Str<'a>,
+}
+
+impl<'a> From<AnimInfo<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: AnimInfo<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("hashed_path".into(), value.hashed_path.into());
+        obj.insert("hashed_file_name".into(), value.hashed_file_name.into());
+        obj.insert("ascii_extension".into(), value.ascii_extension.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
 }

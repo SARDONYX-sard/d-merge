@@ -1,5 +1,5 @@
 use crate::ptr_mut::PointerMut as _;
-use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _};
+use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _};
 use crate::{JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -51,6 +51,37 @@ Path: {path}, Seq target length: {target_len}
 
     template_array.smart_extend(patched_array);
 
+    Ok(())
+}
+
+/// Resolve conflicts in order of priority and apply them to the array.
+///
+/// This function is applied directly to the target array without specifying a JSON path.
+///
+/// # Errors
+/// Returns an error if applying the patches fails.
+pub fn apply_seq_array_directly<'a>(
+    target_array: &mut Vec<Value<'a>>,
+    mut patches: Vec<ValueWithPriority<'a>>,
+) -> Result<()> {
+    let visualizer = visualize_ops(&patches)?;
+
+    #[cfg(feature = "tracing")]
+    {
+        let target_len = target_array.len();
+        tracing::debug!(
+            "Seq merge conflict resolution:
+Path: maybe asdsf, Seq target length: {target_len}
+{visualizer}"
+        );
+    }
+
+    let patch_target_vec = core::mem::take(target_array);
+    sort_by_priority(patches.as_mut_slice());
+    let patched_array = apply_ops_parallel(patch_target_vec, patches)?
+        .smart_iter()
+        .filter(|v| v != &MARK_AS_REMOVED);
+    target_array.smart_extend(patched_array);
     Ok(())
 }
 
@@ -133,7 +164,7 @@ fn apply_ops_parallel<'a>(
                     });
                 };
                 slice
-                    .par_iter_mut()
+                    .smart_iter_mut()
                     .zip(values)
                     .for_each(|(element, patch)| {
                         *element = patch;
@@ -147,7 +178,7 @@ fn apply_ops_parallel<'a>(
                         actual_len: base.len(),
                     });
                 };
-                slice.par_iter_mut().for_each(|element| {
+                slice.smart_iter_mut().for_each(|element| {
                     *element = MARK_AS_REMOVED;
                 });
             }
@@ -166,7 +197,7 @@ fn apply_ops_parallel<'a>(
             .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
         let insert_at = seq.range.start + offset;
 
-        if insert_at <= base.len() {
+        if insert_at < base.len() {
             let values_len = values.len();
             base.splice(insert_at..insert_at, values);
             offset += values_len;
@@ -339,16 +370,11 @@ mod tests {
         ];
 
         let base_seq: Vec<String> = (0..21).map(|i| i.to_string()).collect();
-        let base_seq: Vec<Value<'_>> = base_seq.smart_iter().map(|i| i.into()).collect();
+        let mut base_seq: Vec<Value<'_>> = base_seq.smart_iter().map(|i| i.into()).collect();
 
-        sort_by_priority(&mut patches);
         println!("Operation Map:\n{}", visualize_ops(&patches).unwrap());
-        let result = apply_ops_parallel(base_seq, patches).unwrap();
-
-        let result: Vec<_> = result
-            .smart_iter()
-            .filter(|v| v != &MARK_AS_REMOVED)
-            .collect();
-        println!("{result:#?}");
+        sort_by_priority(&mut patches);
+        apply_seq_array_directly(&mut base_seq, patches).unwrap();
+        println!("{base_seq:#?}");
     }
 }

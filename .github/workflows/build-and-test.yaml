@@ -90,13 +90,6 @@ jobs:
           app_name: d_merge
           build_profile: ${{ env.BUILD_PROFILE }}
 
-      # Since upload-artifact cannot include empty directories, put the files in
-      - name: Ensure ./build/interface/ is retained
-        shell: bash
-        run: |
-          mkdir -p ./build/interface
-          touch ./build/interface/.keep
-
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.6.2
         with:
