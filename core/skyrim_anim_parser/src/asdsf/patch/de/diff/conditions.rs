@@ -31,7 +31,7 @@ pub struct ConditionDiff<'a> {
 
     /// The **start** of the allowed range (inclusive) for the condition value.
     /// - type: [`i32`]
-    pub value_a: Option<Str<'a>>,
+    pub value_a: Option<i32>,
     /// - type: [`i32`]
-    pub value_b: Option<Str<'a>>,
+    pub value_b: Option<i32>,
 }

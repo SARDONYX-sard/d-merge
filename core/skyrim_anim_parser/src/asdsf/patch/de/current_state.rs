@@ -80,9 +80,9 @@ pub(super) enum FieldKind<'a> {
     /// - type: `Str`
     ConditionVariableName(Str<'a>),
     /// - type: [`i32`]
-    ConditionValueA(Str<'a>),
+    ConditionValueA(i32),
     /// - type: [`i32`]
-    ConditionValueB(Str<'a>),
+    ConditionValueB(i32),
 
     // -- Attack
     /// - type: `Str`

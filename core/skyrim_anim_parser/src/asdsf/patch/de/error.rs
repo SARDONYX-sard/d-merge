@@ -15,6 +15,9 @@ pub enum Error {
     /// The only thing that can be arranged in a double array is attacks. (This is a bug in the implementation.)
     InvalidSubRangeUsage,
 
+    /// Mismatched type. Expected 1 field of `struct Condition`, but got other one field patch: {other}
+    ExpectedOneFieldOfCondition { other: String },
+
     /// Mismatched type. Expected 1 field of `struct AnimInfo`, but got other one field patch: {other}
     ExpectedOneFieldOfAnimInfo { other: String },
 

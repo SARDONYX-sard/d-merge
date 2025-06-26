@@ -1,10 +1,10 @@
 use crate::asdsf::normal::{AnimInfo, Condition};
 use crate::asdsf::patch::de::error::{Error, Result};
-use crate::asdsf::patch::de::AnimInfoDiff;
 use crate::asdsf::patch::de::{
     current_state::{CurrentState, FieldKind, ParserKind},
     DiffPatchAnimSetData,
 };
+use crate::asdsf::patch::de::{AnimInfoDiff, ConditionDiff};
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
 use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line, verify_line_parses_to};
 use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
@@ -213,28 +213,53 @@ impl<'de> Deserializer<'de> {
                 self.current.set_main_range_start(start_index)?;
             }
 
-            let should_take_in_this = self.parse_opt_start_comment()?;
-            let variable_name = self.parse_next(
-                one_line
-                    .verify(|s: &str| is_variable_name_starts(s))
-                    .context(Label("variable_name: Str"))
-                    .context(Expected(StringLiteral("iLeftHandType")))
-                    .context(Expected(StringLiteral("iRightHandType")))
-                    .context(Expected(StringLiteral("iWantMountedWeaponAnims")))
-                    .context(Expected(StringLiteral("bWantMountedWeaponAnims"))),
-            )?;
+            let variable_name = {
+                let should_take_in_this = self.parse_opt_start_comment()?;
+                let variable_name = self.parse_next(
+                    one_line
+                        .verify(|s: &str| is_variable_name_starts(s))
+                        .context(Label("variable_name: Str"))
+                        .context(Expected(StringLiteral("iLeftHandType")))
+                        .context(Expected(StringLiteral("iRightHandType")))
+                        .context(Expected(StringLiteral("iWantMountedWeaponAnims")))
+                        .context(Expected(StringLiteral("bWantMountedWeaponAnims"))),
+                )?;
 
-            if should_take_in_this {
-                self.current.one_field_patch =
-                    Some(FieldKind::ConditionVariableName(variable_name.clone()));
-            }
-            self.parse_opt_close_comment()?;
+                if should_take_in_this {
+                    self.current.one_field_patch =
+                        Some(FieldKind::ConditionVariableName(variable_name.clone()));
+                    self.parse_opt_close_comment()?;
+                }
+                variable_name
+            };
 
-            let value_a = self
-                .parse_next(parse_one_line::<i32>.context(Expected(Description("value_a: i32"))))?;
+            let value_a = {
+                let should_take_in_this = self.parse_opt_start_comment()?;
 
-            let value_b = self
-                .parse_next(parse_one_line::<i32>.context(Expected(Description("value_b: i32"))))?;
+                let value_a = self.parse_next(
+                    parse_one_line::<i32>.context(Expected(Description("value_a: i32"))),
+                )?;
+
+                if should_take_in_this {
+                    self.current.one_field_patch = Some(FieldKind::ConditionValueA(value_a));
+                    self.parse_opt_close_comment()?;
+                }
+                value_a
+            };
+
+            let value_b = {
+                let should_take_in_this = self.parse_opt_start_comment()?;
+
+                let value_b = self.parse_next(
+                    parse_one_line::<i32>.context(Expected(Description("value_b: i32"))),
+                )?;
+
+                if should_take_in_this {
+                    self.current.one_field_patch = Some(FieldKind::ConditionValueA(value_b));
+                    self.parse_opt_close_comment()?;
+                }
+                value_b
+            };
 
             #[cfg(feature = "tracing")]
             tracing::trace!(?variable_name, ?value_a, ?value_b);
@@ -485,8 +510,57 @@ impl<'de> Deserializer<'de> {
                     };
                     self.output_patches.triggers_patches.push(values);
                 }
-                ParserKind::Conditions => {} // TODO
-                ParserKind::Attacks => {}    // TODO:
+                ParserKind::Conditions => {
+                    let one_diff = match self.current.one_field_patch.take() {
+                        Some(FieldKind::ConditionVariableName(variable_name)) => {
+                            Some(ConditionDiff {
+                                variable_name: Some(variable_name),
+                                ..Default::default()
+                            })
+                        }
+                        Some(FieldKind::ConditionValueA(value_a)) => Some(ConditionDiff {
+                            value_a: Some(value_a),
+                            ..Default::default()
+                        }),
+                        Some(FieldKind::ConditionValueB(value_b)) => Some(ConditionDiff {
+                            value_b: Some(value_b),
+                            ..Default::default()
+                        }),
+                        None => None,
+                        unexpected => {
+                            return Err(Error::ExpectedOneFieldOfCondition {
+                                other: format!("{unexpected:?}"),
+                            })
+                        }
+                    };
+
+                    let range = self.current.take_main_range()?;
+                    if let Some(diff) = one_diff {
+                        // one_patch
+                        if op == Op::Replace {
+                            self.output_patches
+                                .conditions_patches
+                                .one
+                                .insert(range.start, diff);
+                        } else {
+                            // one_diff なのに Replace 以外ならエラーするなど検討もできる
+                            return Err(Error::InvalidOpForOneField { op });
+                        }
+                    } else {
+                        // seq pattern
+                        let conditions = core::mem::take(&mut partial_patch.conditions);
+                        let values = if op == Op::Remove { vec![] } else { conditions };
+                        let values = ValueWithPriority {
+                            patch: JsonPatch {
+                                op: OpRangeKind::Seq(OpRange { op, range }),
+                                value: values.into(),
+                            },
+                            priority: self.priority,
+                        };
+                        self.output_patches.conditions_patches.seq.push(values);
+                    }
+                }
+                ParserKind::Attacks => {} // TODO:
                 ParserKind::AnimInfos => {
                     let one_diff = match self.current.one_field_patch.take() {
                         Some(FieldKind::AnimInfoAsciiExtension(ascii_extension)) => {
