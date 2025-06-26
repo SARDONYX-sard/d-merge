@@ -197,13 +197,16 @@ impl<'de> Deserializer<'de> {
     fn conditions(&mut self) -> Result<(), Error> {
         let mut start_index = 0;
         while {
-            // NOTE: The condition is that value_b: i32 and attacks_len: usize are the boundaries, and both are numeric values.
-            // Read two lines ahead and peek len + attack_trigger: Str. If Str exists (and is not i32),
-            let (remain, _) = self.parse_peek2(opt(parse_one_line::<usize>))?;
-            let (_, maybe_value_b) = opt(parse_one_line::<usize>)
+            // NOTE: In the case of patches, `attack_len: usize` cannot be trusted, so it is necessary to parse ahead.
+            let (remain, variable_name) =
+                self.parse_peek2(opt(one_line.verify(|s: &str| is_variable_name_starts(s))))?;
+            let (remain, _value_a) = opt(parse_one_line::<usize>)
                 .parse_peek(remain)
                 .map_err(|err| Error::Context { err })?;
-            maybe_value_b.is_some()
+            let (_, value_b) = opt(parse_one_line::<usize>)
+                .parse_peek(remain)
+                .map_err(|err| Error::Context { err })?;
+            variable_name.is_some() && _value_a.is_some() && value_b.is_some()
         } {
             let diff_start = self.parse_opt_start_comment()?;
             if diff_start {
@@ -211,8 +214,16 @@ impl<'de> Deserializer<'de> {
             }
 
             let should_take_in_this = self.parse_opt_start_comment()?;
-            let variable_name =
-                self.parse_next(one_line.context(Expected(Description("variable_name: Str"))))?;
+            let variable_name = self.parse_next(
+                one_line
+                    .verify(|s: &str| is_variable_name_starts(s))
+                    .context(Label("variable_name: Str"))
+                    .context(Expected(StringLiteral("iLeftHandType")))
+                    .context(Expected(StringLiteral("iRightHandType")))
+                    .context(Expected(StringLiteral("iWantMountedWeaponAnims")))
+                    .context(Expected(StringLiteral("bWantMountedWeaponAnims"))),
+            )?;
+
             if should_take_in_this {
                 self.current.one_field_patch =
                     Some(FieldKind::ConditionVariableName(variable_name.clone()));
@@ -226,6 +237,9 @@ impl<'de> Deserializer<'de> {
             let value_b = self.parse_next(
                 verify_line_parses_to::<i32>.context(Expected(Description("value_b: i32"))),
             )?;
+
+            #[cfg(feature = "tracing")]
+            tracing::trace!(?variable_name, ?value_a, ?value_b);
 
             // TODO:
             if diff_start {
@@ -252,9 +266,11 @@ impl<'de> Deserializer<'de> {
             }
             let attack_trigger = self.parse_next(
                 one_line
-                    .verify(|s: &str| s.starts_with("attackStart"))
+                    .verify(|s: &str| is_attack_starts(s))
                     .context(Label("trigger: Str"))
-                    .context(Expected(Description("start_with(\"attackStart\""))),
+                    .context(Expected(Description("start_with(`bashPowerStart`)")))
+                    .context(Expected(Description("start_with(`attackStart`)")))
+                    .context(Expected(Description("start_with(`attackPowerStart`)"))),
             )?;
             if self.current.mode_code.is_some() {
                 // self.current.push_as_trigger(attack_trigger)?;
@@ -273,8 +289,9 @@ impl<'de> Deserializer<'de> {
             let mut clip_names_start_index = 0;
             while {
                 let is_attack_trigger = self
-                    .parse_peek(opt(one_line.verify(|s: &str| s.starts_with("attackStart"))))?
+                    .parse_peek(opt(one_line.verify(|s: &str| is_attack_starts(s))))?
                     .is_some();
+
                 let is_anim_info_len = self.parse_peek(opt(parse_one_line::<usize>))?.is_some();
                 !is_attack_trigger && !is_anim_info_len
             } {
@@ -525,6 +542,31 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+/// In the case of patches, attack_len cannot be trusted, so we have no choice but to parse ahead.
+///
+/// To do so, we need to limit the variables that can be used.
+/// Fortunately, these are the only variables that appear in asdsf.
+/// However, this also means that other variables cannot be changed in the patch.
+fn is_variable_name_starts(s: &str) -> bool {
+    s.starts_with("iLeftHandType")
+        || s.starts_with("iRightHandType")
+        || s.starts_with("iWantMountedWeaponAnims")
+        || s.starts_with("bWantMountedWeaponAnims")
+}
+
+fn is_attack_starts(s: &str) -> bool {
+    starts_with_ignore_ascii(s, "attackStart")
+        || starts_with_ignore_ascii(s, "attackPowerStart")
+        || starts_with_ignore_ascii(s, "bashStart")
+        || starts_with_ignore_ascii(s, "bashPowerStart")
+}
+
+fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
+    s.len() >= prefix.len()
+        && s.get(..prefix.len())
+            .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -622,8 +664,13 @@ MC 1HM AttackRight01
 7891816
 <!-- CLOSE -->
 ";
-
         let patches = parse_anim_set_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        // For local file test
+        // let path = r#""#;
+        // let input = std::fs::read_to_string(path).unwrap();
+        // let patches = parse_anim_set_diff_patch(&input, 0).unwrap_or_else(|e| panic!("{e}"));
+
         let expected = DiffPatchAnimSetData {
             version: None,
             triggers_patches: vec![],

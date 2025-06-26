@@ -170,6 +170,7 @@ impl core::fmt::Display for BehaviorGenerationError {
         } = *self;
 
         if adsf_errors_len == 0
+            && asdsf_errors_len == 0
             && owned_file_errors_len == 0
             && patch_errors_len == 0
             && apply_errors_len == 0

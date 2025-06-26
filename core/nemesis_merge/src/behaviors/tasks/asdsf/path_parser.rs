@@ -10,17 +10,8 @@
 //!   (e.g. D:/GAME/Test mod name/Nemesis_Engine/mod/id/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt)
 //!
 //! Parses an adsf path and returns target, id, and parser type.
-use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
-
-use snafu::ResultExt;
-
-use super::path_parser::parse_error::IndexMustBeNumberSnafu;
 use crate::behaviors::priority_ids::get_nemesis_id;
-
-// TODO: Support replace operation
+use std::path::{Path, PathBuf};
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
@@ -86,21 +77,17 @@ pub fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, 
         target_component
     };
 
-    let file_stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+    let file_name = path.file_name().and_then(|s| s.to_str()).ok_or_else(|| {
         ParseError::TooShortPathFormat {
             path: path.to_path_buf(),
         }
     })?;
-    let is_header_file = file_stem.eq_ignore_ascii_case("$header$");
+    let is_header_file = file_name.eq_ignore_ascii_case("$header$.txt");
 
-    let parser_type = if target == "$header$" && is_header_file {
+    let parser_type = if is_header_file {
         ParserType::TxtProjectHeader
     } else {
-        let _index: usize = file_stem.parse().with_context(|_| IndexMustBeNumberSnafu {
-            index_str: (*file_stem).to_string(),
-            path,
-        })?;
-        ParserType::EditAnimSet(file_stem)
+        ParserType::EditAnimSet(file_name)
     };
 
     Ok(ParsedAsdsfPatchPath {
@@ -138,22 +125,6 @@ Expected format: D:/mod/<id>/animationsetdatasinglefile/<target>~1/...",
         path.display()
     ))]
     TooShortPathFormat { path: PathBuf },
-
-    /// Target component doesn't follow the expected `Target~1` format
-    #[snafu(display(
-        "The target segment in path '{}' does not follow the expected '<target>~1' format.\
-        Example: 'DefaultFemale~1'\n",
-        path.display()
-    ))]
-    SplitTilde { path: PathBuf },
-
-    /// Target component doesn't follow the expected `Target~1` format
-    #[snafu(display( "Replace/Remove Edit patches expect index, i.e., numeric filenames. However, this {index_str} of path is different. {}", path.display()))]
-    IndexMustBeNumber {
-        source: ParseIntError,
-        index_str: String,
-        path: PathBuf,
-    },
 }
 
 #[cfg(test)]
@@ -167,7 +138,7 @@ mod tests {
     #[test]
     fn test_txt_project_header_add() {
         let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/$header$/$header$.txt",
+            "/some/mods/Nemesis_Engine/mod/slide/animationsetdatasinglefile/$header$/$header$.txt",
         );
         assert_eq!(
             parsed,

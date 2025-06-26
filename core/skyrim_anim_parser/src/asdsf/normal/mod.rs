@@ -90,6 +90,7 @@ pub struct Condition<'a> {
     /// When `variable_name` is:
     /// - `iLeftHandType` or `iRightHandType`, this corresponds to a [`HandType`] variant.
     /// - `iWantMountedWeaponAnims`, this corresponds to a [`MountedAttackPermission`] variant.
+    /// - `bWantMountedWeaponAnims` is boolean.
     ///
     /// Used together with `value_b` to define a closed range (`value_a..=value_b`).
     pub value_a: i32,
@@ -99,6 +100,7 @@ pub struct Condition<'a> {
     /// When `variable_name` is:
     /// - `iLeftHandType` or `iRightHandType`, this corresponds to a [`HandType`] variant.
     /// - `iWantMountedWeaponAnims`, this corresponds to a [`MountedAttackPermission`] variant.
+    /// - `bWantMountedWeaponAnims` is boolean.
     ///
     /// If `value_a == value_b`, the condition checks for a single exact value.
     pub value_b: i32,

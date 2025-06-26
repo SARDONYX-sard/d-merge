@@ -14,7 +14,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
         let paths = std::fs::read_to_string("../../dummy/ids.txt")?;
         paths.split("\n").map(Into::into).collect()
     };
-    // behavior_gen(mods, slow_debug_config()).await?;
-    behavior_gen(mods, fastest_config()).await?;
+    behavior_gen(mods, slow_debug_config()).await?;
+    // behavior_gen(mods, fastest_config()).await?;
     Ok(())
 }
