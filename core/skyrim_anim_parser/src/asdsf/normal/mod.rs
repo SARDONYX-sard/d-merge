@@ -209,3 +209,14 @@ pub struct AnimInfo<'a> {
     /// ```
     pub ascii_extension: Str<'a>,
 }
+
+impl<'a> From<AnimInfo<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: AnimInfo<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("hashed_path".into(), value.hashed_path.into());
+        obj.insert("hashed_file_name".into(), value.hashed_file_name.into());
+        obj.insert("ascii_extension".into(), value.ascii_extension.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
+}

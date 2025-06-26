@@ -1,17 +1,17 @@
 use crate::asdsf::normal::AnimInfo;
 use crate::asdsf::patch::de::error::{Error, Result};
+use crate::asdsf::patch::de::AnimInfoDiff;
 use crate::asdsf::patch::de::{
-    current_state::{CurrentState, PartialTriggers},
-    DiffPatchAnimSetData, ParserKind,
+    current_state::{CurrentState, FieldKind, ParserKind},
+    DiffPatchAnimSetData,
 };
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
 use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line, verify_line_parses_to};
 use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
-use winnow::combinator::eof;
 use winnow::{
     ascii::multispace0,
-    combinator::opt,
+    combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
 };
@@ -126,20 +126,7 @@ impl<'de> Deserializer<'de> {
 
         while let Some(line_kind) = self.current.next() {
             match line_kind {
-                ParserKind::Version => {
-                    let should_take = self.parse_opt_start_comment()?;
-
-                    let version = self.parse_next(
-                        one_line
-                            .verify(|s: &str| s.eq_ignore_ascii_case("V3"))
-                            .context(Expected(Description("version: \"V3\""))),
-                    )?;
-
-                    if should_take {
-                        self.current.replace_one(version)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                }
+                ParserKind::Version => self.version()?,
                 ParserKind::TriggersLen
                 | ParserKind::ConditionsLen
                 | ParserKind::AttacksLen
@@ -151,126 +138,11 @@ impl<'de> Deserializer<'de> {
                     #[cfg(feature = "tracing")]
                     tracing::trace!("{line_kind:#?} = {_len:#?}");
                 }
-                ParserKind::Triggers => {
-                    let mut start_index = 0;
-                    while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-                        let trigger = self
-                            .parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
-                        if self.current.mode_code.is_some() {
-                            self.current.push_as_trigger(trigger)?;
-                        }
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-                        start_index += 1;
-                    }
-                }
-                ParserKind::Conditions => {
-                    let mut start_index = 0;
-                    while {
-                        // NOTE: The condition is that value_b: i32 and attacks_len: usize are the boundaries, and both are numeric values.
-                        // Read two lines ahead and peek len + attack_trigger: Str. If Str exists (and is not i32),
-                        let (remain, _) = self.parse_peek2(opt(parse_one_line::<usize>))?;
-                        let (_, maybe_value_b) = opt(parse_one_line::<usize>)
-                            .parse_peek(remain)
-                            .map_err(|err| Error::Context { err })?;
-                        maybe_value_b.is_some()
-                    } {
-                        // TODO:
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-                        let trigger = self
-                            .parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
-                        if self.current.mode_code.is_some() {
-                            self.current.push_as_trigger(trigger)?;
-                        }
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-                        start_index += 1;
-                    }
-                }
-                ParserKind::Attacks => {
-                    let mut start_index = 0;
-                    while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-                        let attack_trigger = self.parse_next(
-                            one_line
-                                .verify(|s: &str| s.starts_with("attackStart"))
-                                .context(Label("trigger: Str"))
-                                .context(Expected(Description("start_with(\"attackStart\""))),
-                        )?;
-                        if self.current.mode_code.is_some() {
-                            // self.current.push_as_trigger(attack_trigger)?;
-                        }
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-
-                        let _is_contextual = self.parse_next(
-                            num_bool_line.context(Expected(Description("is_contextual: bool"))),
-                        )?;
-                        let _clip_names_len = self.parse_next(
-                            parse_one_line::<usize>
-                                .context(Expected(Description("clip_names_len: usize"))),
-                        )?;
-                        tracing::debug!(?attack_trigger, ?_is_contextual, ?_clip_names_len);
-
-                        let mut clip_names_start_index = 0;
-                        while {
-                            let is_attack_trigger = self
-                                .parse_peek(opt(
-                                    one_line.verify(|s: &str| s.starts_with("attackStart"))
-                                ))?
-                                .is_some();
-                            let is_anim_info_len =
-                                self.parse_peek(opt(parse_one_line::<usize>))?.is_some();
-                            !is_attack_trigger && !is_anim_info_len
-                        } {
-                            let diff_start = self.parse_opt_start_comment()?;
-                            if diff_start {
-                                self.current.set_range_start(clip_names_start_index)?;
-                            }
-                            let clip_name = self.parse_next(
-                                one_line.context(Expected(Description("clip_name: Str"))),
-                            )?;
-                            if self.current.mode_code.is_some() {
-                                let _ = clip_name; // TODO: push
-                                                   // self.current.push_as_trigger(clip_name)?;
-                            }
-
-                            self.parse_opt_close_comment()?;
-                            self.parse_next(multispace0)?;
-                            clip_names_start_index += 1;
-                            tracing::debug!(?clip_name);
-                        }
-
-                        start_index += 1;
-                    }
-                }
+                ParserKind::Triggers => self.triggers()?,
+                ParserKind::Conditions => self.conditions()?,
+                ParserKind::Attacks => self.attacks()?,
                 ParserKind::AnimInfos => {
-                    let mut start_index = 0;
-                    while self.parse_peek(opt(eof))?.is_none() {
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-                        let anim_info = self.anim_info()?;
-                        tracing::debug!(?anim_info);
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-                        start_index += 1;
-                    }
+                    self.anim_infos()?;
                     break;
                 }
             };
@@ -284,36 +156,222 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
 
-    fn anim_info(&mut self) -> Result<AnimInfo<'de>> {
-        let should_take_in_this = self.parse_opt_start_comment()?;
-        let hashed_path = self.parse_next(
-            verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
-        )?;
-        if should_take_in_this {
-            self.current.replace_one(hashed_path.clone())?; // FIXME: correct clone?
-        }
-        self.parse_opt_close_comment()?;
+    fn version(&mut self) -> Result<()> {
+        let should_take = self.parse_opt_start_comment()?;
 
-        let should_take_in_this = self.parse_opt_start_comment()?;
-        let hashed_file_name = self.parse_next(
-            verify_line_parses_to::<u32>.context(Expected(Description("hashed_file_name: u32"))),
-        )?;
-        if should_take_in_this {
-            self.current.replace_one(hashed_file_name.clone())?;
-        }
-        self.parse_opt_close_comment()?;
-
-        let should_take_in_this = self.parse_opt_start_comment()?;
-        let ascii_extension = self.parse_next(
+        let version = self.parse_next(
             one_line
-                .verify(|s: &str| s == "7891816")
-                .context(Label("ascii_extension: u32"))
-                .context(Expected(StringLiteral("7891816"))),
+                .verify(|s: &str| s.eq_ignore_ascii_case("V3"))
+                .context(Label("version"))
+                .context(Expected(StringLiteral("V3"))),
         )?;
-        if should_take_in_this {
-            self.current.replace_one(ascii_extension.clone())?;
+
+        if should_take {
+            self.current.replace_one(FieldKind::Version(version))?;
+            self.parse_opt_close_comment()?;
         }
-        self.parse_opt_close_comment()?;
+        Ok(())
+    }
+
+    fn triggers(&mut self) -> Result<(), Error> {
+        let mut start_index = 0;
+        // until `condition_len`(usize)
+        while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
+            let diff_start = self.parse_opt_start_comment()?;
+            if diff_start {
+                self.current.set_main_range_start(start_index)?;
+            }
+            let trigger =
+                self.parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
+            if self.current.mode_code.is_some() {
+                self.current.push_as_trigger(trigger)?;
+            }
+
+            self.parse_opt_close_comment()?;
+            self.parse_next(multispace0)?;
+            start_index += 1;
+        }
+        Ok(())
+    }
+
+    fn conditions(&mut self) -> Result<(), Error> {
+        let mut start_index = 0;
+        while {
+            // NOTE: The condition is that value_b: i32 and attacks_len: usize are the boundaries, and both are numeric values.
+            // Read two lines ahead and peek len + attack_trigger: Str. If Str exists (and is not i32),
+            let (remain, _) = self.parse_peek2(opt(parse_one_line::<usize>))?;
+            let (_, maybe_value_b) = opt(parse_one_line::<usize>)
+                .parse_peek(remain)
+                .map_err(|err| Error::Context { err })?;
+            maybe_value_b.is_some()
+        } {
+            let diff_start = self.parse_opt_start_comment()?;
+            if diff_start {
+                self.current.set_main_range_start(start_index)?;
+            }
+
+            let should_take_in_this = self.parse_opt_start_comment()?;
+            let variable_name =
+                self.parse_next(one_line.context(Expected(Description("variable_name: Str"))))?;
+            if should_take_in_this {
+                self.current.one_field_patch =
+                    Some(FieldKind::ConditionVariableName(variable_name.clone()));
+            }
+            self.parse_opt_close_comment()?;
+
+            let variable_a = self.parse_next(
+                verify_line_parses_to::<i32>.context(Expected(Description("variable_a: i32"))),
+            )?;
+
+            let variable_b = self.parse_next(
+                verify_line_parses_to::<i32>.context(Expected(Description("variable_b: i32"))),
+            )?;
+
+            // TODO:
+            if diff_start {
+                #[cfg(feature = "tracing")]
+                tracing::debug!(?variable_name, ?variable_a, ?variable_b);
+            }
+
+            self.parse_opt_close_comment()?;
+            self.parse_next(multispace0)?;
+            start_index += 1;
+            self.current.increment_main_range();
+        }
+        self.current.one_field_patch = None;
+
+        Ok(())
+    }
+
+    fn attacks(&mut self) -> Result<(), Error> {
+        let mut start_index = 0;
+        while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
+            let diff_start = self.parse_opt_start_comment()?;
+            if diff_start {
+                self.current.set_main_range_start(start_index)?;
+            }
+            let attack_trigger = self.parse_next(
+                one_line
+                    .verify(|s: &str| s.starts_with("attackStart"))
+                    .context(Label("trigger: Str"))
+                    .context(Expected(Description("start_with(\"attackStart\""))),
+            )?;
+            if self.current.mode_code.is_some() {
+                // self.current.push_as_trigger(attack_trigger)?;
+            }
+
+            self.parse_opt_close_comment()?;
+            self.parse_next(multispace0)?;
+
+            let _is_contextual = self
+                .parse_next(num_bool_line.context(Expected(Description("is_contextual: bool"))))?;
+            let _clip_names_len = self.parse_next(
+                parse_one_line::<usize>.context(Expected(Description("clip_names_len: usize"))),
+            )?;
+            tracing::debug!(?attack_trigger, ?_is_contextual, ?_clip_names_len);
+
+            let mut clip_names_start_index = 0;
+            while {
+                let is_attack_trigger = self
+                    .parse_peek(opt(one_line.verify(|s: &str| s.starts_with("attackStart"))))?
+                    .is_some();
+                let is_anim_info_len = self.parse_peek(opt(parse_one_line::<usize>))?.is_some();
+                !is_attack_trigger && !is_anim_info_len
+            } {
+                let diff_start = self.parse_opt_start_comment()?;
+                if diff_start {
+                    self.current.set_main_range_start(clip_names_start_index)?;
+                }
+                let clip_name =
+                    self.parse_next(one_line.context(Expected(Description("clip_name: Str"))))?;
+                if self.current.mode_code.is_some() {
+                    let _ = clip_name; // TODO: push
+                                       // self.current.push_as_trigger(clip_name)?;
+                }
+
+                self.parse_opt_close_comment()?;
+                self.parse_next(multispace0)?;
+                clip_names_start_index += 1;
+                tracing::debug!(?clip_name);
+            }
+
+            start_index += 1;
+        }
+        Ok(())
+    }
+
+    fn anim_infos(&mut self) -> Result<(), Error> {
+        let mut start_index = 0;
+        while self.parse_peek(opt(eof))?.is_none() {
+            let diff_start = self.parse_opt_start_comment()?;
+            if diff_start {
+                self.current.set_main_range_start(start_index)?;
+            }
+            let anim_info = self.anim_info()?;
+
+            #[cfg(feature = "tracing")]
+            tracing::debug!(?anim_info);
+
+            if self.current.mode_code.is_some() {
+                self.current
+                    .patch
+                    .get_or_insert_default()
+                    .anim_infos
+                    .push(anim_info);
+            }
+
+            self.parse_opt_close_comment()?;
+            self.parse_next(multispace0)?;
+            start_index += 1;
+            self.current.increment_main_range();
+        }
+        Ok(())
+    }
+
+    fn anim_info(&mut self) -> Result<AnimInfo<'de>> {
+        let hashed_path = {
+            let should_take_in_this = self.parse_opt_start_comment()?;
+            let hashed_path = self.parse_next(
+                verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
+            )?;
+            if should_take_in_this {
+                // FIXME: correct clone?
+                self.current
+                    .replace_one(FieldKind::AnimInfoHashedPath(hashed_path.clone()))?;
+                self.parse_opt_close_comment()?;
+            }
+            hashed_path
+        };
+
+        let hashed_file_name = {
+            let should_take_in_this = self.parse_opt_start_comment()?;
+            let hashed_file_name = self.parse_next(
+                verify_line_parses_to::<u32>
+                    .context(Expected(Description("hashed_file_name: u32"))),
+            )?;
+            if should_take_in_this {
+                self.current
+                    .replace_one(FieldKind::AnimInfoHashedFileName(hashed_file_name.clone()))?;
+                self.parse_opt_close_comment()?;
+            }
+            hashed_file_name
+        };
+
+        let ascii_extension = {
+            let should_take_in_this = self.parse_opt_start_comment()?;
+            let ascii_extension = self.parse_next(
+                one_line
+                    .verify(|s: &str| s == "7891816")
+                    .context(Label("ascii_extension: u32"))
+                    .context(Expected(StringLiteral("7891816"))),
+            )?;
+            if should_take_in_this {
+                self.current
+                    .replace_one(FieldKind::AnimInfoAsciiExtension(ascii_extension.clone()))?;
+                self.parse_opt_close_comment()?;
+            }
+            ascii_extension
+        };
 
         Ok(AnimInfo {
             hashed_path,
@@ -356,6 +414,8 @@ impl<'de> Deserializer<'de> {
                 CommentKind::Original => {
                     self.current.set_is_passed_original();
                     let op = self.current.judge_operation();
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!(?op, ?self.current);
                     if op != Op::Remove {
                         self.parse_next(take_till_close)?;
                         self.merge_to_output()?;
@@ -388,23 +448,74 @@ impl<'de> Deserializer<'de> {
                 | ParserKind::AttacksLen
                 | ParserKind::AnimInfosLen => {}
                 ParserKind::Triggers => {
-                    if let Some(triggers) = partial_patch.triggers.take() {
-                        let PartialTriggers { range, values } = triggers;
-                        let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches
-                            .triggers_patches
-                            .push(ValueWithPriority {
-                                patch: JsonPatch {
-                                    op: OpRangeKind::Seq(OpRange { op, range }),
-                                    value: simd_json::json_typed!(borrowed, values),
-                                },
-                                priority: self.priority,
-                            });
-                    }
+                    let triggers = core::mem::take(&mut partial_patch.triggers);
+                    let values = if op == Op::Remove { vec![] } else { triggers };
+                    let values = ValueWithPriority {
+                        patch: JsonPatch {
+                            op: OpRangeKind::Seq(OpRange {
+                                op,
+                                range: self.current.take_main_range()?,
+                            }),
+                            value: values.into(),
+                        },
+                        priority: self.priority,
+                    };
+                    self.output_patches.triggers_patches.push(values);
                 }
                 ParserKind::Conditions => {} // TODO
                 ParserKind::Attacks => {}    // TODO:
-                ParserKind::AnimInfos => {}  // TODO:
+                ParserKind::AnimInfos => {
+                    let one_diff = match self.current.one_field_patch.take() {
+                        Some(FieldKind::AnimInfoAsciiExtension(ascii_extension)) => {
+                            Some(AnimInfoDiff {
+                                ascii_extension: Some(ascii_extension),
+                                ..Default::default()
+                            })
+                        }
+                        Some(FieldKind::AnimInfoHashedFileName(hashed_file_name)) => {
+                            Some(AnimInfoDiff {
+                                hashed_file_name: Some(hashed_file_name),
+                                ..Default::default()
+                            })
+                        }
+                        Some(FieldKind::AnimInfoHashedPath(hashed_path)) => Some(AnimInfoDiff {
+                            hashed_path: Some(hashed_path),
+                            ..Default::default()
+                        }),
+                        None => None,
+                        unexpected => {
+                            return Err(Error::ExpectedOneFieldOfAnimInfo {
+                                other: format!("{unexpected:?}"),
+                            })
+                        }
+                    };
+
+                    let range = self.current.take_main_range()?;
+                    if let Some(diff) = one_diff {
+                        // one_patch
+                        if op == Op::Replace {
+                            self.output_patches
+                                .anim_infos_patches
+                                .one
+                                .insert(range.start, diff);
+                        } else {
+                            // one_diff なのに Replace 以外ならエラーするなど検討もできる
+                            return Err(Error::InvalidOpForOneField { op });
+                        }
+                    } else {
+                        // seq pattern
+                        let anim_infos = core::mem::take(&mut partial_patch.anim_infos);
+                        let values = if op == Op::Remove { vec![] } else { anim_infos };
+                        let values = ValueWithPriority {
+                            patch: JsonPatch {
+                                op: OpRangeKind::Seq(OpRange { op, range }),
+                                value: values.into(),
+                            },
+                            priority: self.priority,
+                        };
+                        self.output_patches.anim_infos_patches.seq.push(values);
+                    }
+                }
             }
 
             self.current.clear_flags(); // new patch is generated so clear flags.
@@ -417,8 +528,8 @@ impl<'de> Deserializer<'de> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff, NestedPatches};
-    use json_patch::{json_path, JsonPatch, OpRangeKind, ValueWithPriority};
+    use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff};
+    use json_patch::{JsonPatch, OpRangeKind, ValueWithPriority};
 
     // V3                             <- version
     // 0                              <- triggers_len
@@ -517,28 +628,7 @@ MC 1HM AttackRight01
             version: None,
             triggers_patches: vec![],
             conditions_patches: ConditionsDiff::default(),
-            attacks_patches: NestedPatches {
-                base: vec![ValueWithPriority {
-                    patch: JsonPatch {
-                        op: OpRangeKind::Seq(OpRange {
-                            op: Op::Replace,
-                            range: 0..4,
-                        }),
-                        value: simd_json::json_typed!(borrowed, []),
-                    },
-                    priority: 0,
-                }],
-                children: vec![(
-                    json_path!["attack_trigger"],
-                    ValueWithPriority {
-                        patch: JsonPatch {
-                            op: OpRangeKind::Pure(Op::Replace),
-                            value: simd_json::json_typed!(borrowed, "AttackTestReplacedClipName"),
-                        },
-                        priority: 0,
-                    },
-                )],
-            },
+            attacks_patches: (),
             anim_infos_patches: AnimInfosDiff {
                 one: Default::default(),
                 seq: vec![
@@ -562,7 +652,7 @@ MC 1HM AttackRight01
                         patch: JsonPatch {
                             op: OpRangeKind::Seq(OpRange {
                                 op: Op::Add,
-                                range: 3..6,
+                                range: 2..5,
                             }),
                             value: simd_json::json_typed!(borrowed, [
                                 {

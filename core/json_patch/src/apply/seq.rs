@@ -1,5 +1,5 @@
 use crate::ptr_mut::PointerMut as _;
-use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _};
+use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _};
 use crate::{JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -133,7 +133,7 @@ fn apply_ops_parallel<'a>(
                     });
                 };
                 slice
-                    .par_iter_mut()
+                    .smart_iter_mut()
                     .zip(values)
                     .for_each(|(element, patch)| {
                         *element = patch;
@@ -147,7 +147,7 @@ fn apply_ops_parallel<'a>(
                         actual_len: base.len(),
                     });
                 };
-                slice.par_iter_mut().for_each(|element| {
+                slice.smart_iter_mut().for_each(|element| {
                     *element = MARK_AS_REMOVED;
                 });
             }

@@ -1,5 +1,7 @@
-use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff, ParserKind};
-use crate::{asdsf::patch::de::error::Error, common_parser::lines::Str};
+#![allow(unused)] // FIXME: Support other formats besides anim_info.
+use crate::asdsf::normal::{AnimInfo, Condition};
+use crate::asdsf::patch::de::error::Error;
+use crate::common_parser::lines::Str;
 use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
 
@@ -8,6 +10,7 @@ pub struct CurrentState<'input> {
     /// current parsing filed kind
     line_kinds: Iter<'static, ParserKind>,
     current_kind: Option<ParserKind>,
+    pub one_field_patch: Option<FieldKind<'input>>,
 
     /// When present, this signals the start of a differential change
     pub mode_code: Option<&'input str>,
@@ -21,6 +24,18 @@ pub struct CurrentState<'input> {
     /// None is nothing diff.
     pub patch: Option<PartialAsdsfPatch<'input>>,
 
+    /// Used only when handling arrays such as `triggers`, `conditions`, `attacks` and `anim_infos`.
+    ///
+    /// # NOTE
+    /// This represents only the continuous partial patches where changes have been made.
+    pub main_range: Option<Range<usize>>,
+
+    /// Counts the range of arrays within arrays, such as clip_names in attacks.
+    ///
+    /// # NOTE
+    /// This represents only the continuous partial patches where changes have been made.
+    pub sub_range: Option<Range<usize>>,
+
     pub force_removed: bool,
 }
 
@@ -28,6 +43,64 @@ impl<'de> Default for CurrentState<'de> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) enum ParserKind {
+    /// - type: `Str`
+    #[default]
+    Version,
+
+    /// - type: `usize`
+    TriggersLen,
+    /// - type: `Vec<Str>`
+    Triggers,
+
+    /// - type: [`usize`]
+    ConditionsLen,
+    /// - type: `Vec<Condition>`
+    Conditions,
+
+    /// - type: [`usize`]
+    AttacksLen,
+    /// - type: `Vec<Attack>`
+    Attacks,
+
+    /// - type: [`usize`]
+    AnimInfosLen,
+    /// - type: `Vec<AnimInfo>`
+    AnimInfos,
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum FieldKind<'a> {
+    Version(Str<'a>),
+
+    // -- Condition
+    /// - type: `Str`
+    ConditionVariableName(Str<'a>),
+    /// - type: [`i32`]
+    ConditionVariableA(Str<'a>),
+    /// - type: [`i32`]
+    ConditionVariableB(Str<'a>),
+
+    // -- Attack
+    /// - type: `Str`
+    AttackAttackTrigger(Str<'a>),
+    /// - type: [`bool`]
+    AttackIsContextual(Str<'a>),
+    /// - type: [`usize`]
+    AttackClipNamesLen(Str<'a>),
+    /// - type: `Vec<Str>`
+    AttackClipNames,
+
+    // -- AnimInfo
+    /// - type: [`u32`]
+    AnimInfoHashedPath(Str<'a>),
+    /// - type: [`u32`]
+    AnimInfoHashedFileName(Str<'a>),
+    /// - type: [`u32`]
+    AnimInfoAsciiExtension(Str<'a>),
 }
 
 const LINE_KINDS: [ParserKind; 9] = [
@@ -45,36 +118,16 @@ const LINE_KINDS: [ParserKind; 9] = [
 #[derive(Debug, PartialEq, Default)]
 pub struct PartialAsdsfPatch<'a> {
     pub version: Option<Cow<'a, str>>,
-    pub triggers: Option<PartialTriggers<'a>>,
-    pub conditions: ConditionsDiff<'a>,
-    pub attacks: Option<PartialAttacks<'a>>,
-    pub anim_infos: AnimInfosDiff<'a>,
-}
+    pub triggers: Vec<Str<'a>>,
 
-/// not judge operation yet at this time.
-#[derive(Debug, PartialEq, Default)]
-pub struct PartialTriggers<'input> {
-    pub range: Range<usize>,
-    pub values: Vec<Str<'input>>,
-}
+    /// one/seq patch
+    pub conditions: Vec<Condition<'a>>,
 
-/// not judge operation yet at this time.
-#[derive(Debug, PartialEq, Default)]
-pub struct PartialAttacks<'input> {
-    pub range: Range<usize>,
-    pub values: Vec<Str<'input>>,
-}
+    // TODO: Consider an intermediate structure for a valid patch for a nested array.
+    pub attacks: Option<()>,
 
-#[allow(unused)]
-enum OnePatchRequest {
-    Version,
-    ConditionVariableName,
-    ConditionValueA,
-    ConditionValueB,
-
-    AnimInfoHashedPath,
-    AnimInfoHashedFileName,
-    AnimInfoAsciiExtension,
+    /// one/seq patch
+    pub anim_infos: Vec<AnimInfo<'a>>,
 }
 
 impl<'de> CurrentState<'de> {
@@ -83,10 +136,13 @@ impl<'de> CurrentState<'de> {
         Self {
             line_kinds: LINE_KINDS.iter(),
             current_kind: None,
+            one_field_patch: None,
             mode_code: None,
             is_passed_original: false,
             patch: None,
             force_removed: false,
+            main_range: None,
+            sub_range: None,
         }
     }
 
@@ -105,7 +161,8 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn replace_one(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
+    #[inline]
+    pub fn replace_one(&mut self, value: FieldKind<'de>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         #[cfg(feature = "tracing")]
         tracing::trace!("{self:#?}");
@@ -113,27 +170,7 @@ impl<'de> CurrentState<'de> {
             return Err(Error::NeedInModDiff);
         }
 
-        match self.current_kind {
-            Some(ParserKind::Version) => {
-                self.patch.get_or_insert_default().version = Some(value);
-            }
-            Some(ParserKind::TriggersLen) => {}
-            Some(ParserKind::Conditions) => {
-                self.patch
-                    .get_or_insert_default()
-                    .conditions
-                    .one
-                    .insert(0, Default::default());
-            }
-            Some(ParserKind::AnimInfos) => {
-                self.patch
-                    .get_or_insert_default()
-                    .anim_infos
-                    .one
-                    .insert(0, Default::default());
-            }
-            _ => return Err(Error::ExpectedOne),
-        };
+        self.one_field_patch = Some(value);
         Ok(())
     }
 
@@ -146,46 +183,87 @@ impl<'de> CurrentState<'de> {
             return Err(Error::NeedInModDiff);
         }
 
-        match self.current_kind {
-            Some(ParserKind::TriggersLen) => {}
-            Some(ParserKind::Triggers) => {
-                let trigger_names = self
-                    .patch
-                    .get_or_insert_default()
-                    .triggers
-                    .get_or_insert_default();
-
-                trigger_names.range.end += 1;
-                trigger_names.values.push(value);
-            }
-            _ => return Err(Error::ExpectedTrigger),
+        if matches!(self.current_kind, Some(ParserKind::Triggers)) {
+            self.patch.get_or_insert_default().triggers.push(value);
+        } else {
+            return Err(Error::ExpectedTrigger);
         };
 
         Ok(())
     }
 
     /// Sets the range start index for either transitions or rotations.
-    pub fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
+    ///
+    /// # Errors
+    /// - If it is not included in diff (if it does not pass `MOD_CODE`).
+    /// - If it is called with a type that is not an array.
+    pub const fn set_main_range_start(&mut self, start: usize) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
 
         match self.current_kind {
-            Some(ParserKind::Triggers | ParserKind::Conditions | ParserKind::Attacks) => {
-                let triggers = self
-                    .patch
-                    .get_or_insert_default()
-                    .triggers
-                    .get_or_insert_default();
-                triggers.range.start = start;
-                triggers.range.end = start;
+            Some(
+                ParserKind::Triggers
+                | ParserKind::Conditions
+                | ParserKind::Attacks
+                | ParserKind::AnimInfos,
+            ) => {
+                self.main_range = Some(start..start + 1);
             }
-            Some(ParserKind::AnimInfos) => {}
             _ => return Err(Error::ExpectedArray),
         }
 
         Ok(())
+    }
+
+    pub const fn increment_main_range(&mut self) {
+        if let Some(range_end) = &mut self.main_range {
+            range_end.end += 1;
+        };
+    }
+
+    /// takes range in `Option`
+    ///
+    /// # Errors
+    /// If `Option::is_none`
+    pub fn take_main_range(&mut self) -> Result<Range<usize>, Error> {
+        self.main_range
+            .take()
+            .ok_or(Error::NeedMainRangeInformation)
+    }
+
+    /// Sets the range start index for either transitions or rotations.
+    ///
+    /// # Errors
+    /// - If it is not included in diff (if it does not pass `MOD_CODE`).
+    /// - If it is called with a type that is not an array.
+    pub const fn set_sub_range_start(&mut self, start: usize) -> Result<(), Error> {
+        let is_in_diff = self.mode_code.is_some();
+        if !is_in_diff {
+            return Err(Error::NeedInModDiff);
+        }
+
+        match self.current_kind {
+            Some(
+                ParserKind::Triggers
+                | ParserKind::Conditions
+                | ParserKind::Attacks
+                | ParserKind::AnimInfos,
+            ) => {
+                self.main_range = Some(start..start + 1);
+            }
+            _ => return Err(Error::ExpectedArray),
+        }
+
+        Ok(())
+    }
+
+    pub const fn increment_sub_range(&mut self) {
+        if let Some(range_end) = &mut self.sub_range {
+            range_end.end += 1;
+        };
     }
 
     /// - `<!-- ORIGINAL --!> is found.

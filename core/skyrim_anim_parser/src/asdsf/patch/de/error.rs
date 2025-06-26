@@ -4,7 +4,7 @@
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
     /// Mismatched type. Expected one, but got array patch
-    ExpectedOne,
+    InvalidOpForOneField { op: json_patch::Op },
 
     /// Mismatched type. Expected transitions/rotation, but got one replacer type.
     ExpectedArray,
@@ -12,8 +12,11 @@ pub enum Error {
     /// Mismatched type. Expected Trigger(`Str`), but got other type
     ExpectedTrigger,
 
-    /// Mismatched type. Expected rotations, but got other type
-    ExpectedRotation,
+    /// Mismatched type. Expected 1 field of `struct AnimInfo`, but got other one field patch: {other}
+    ExpectedOneFieldOfAnimInfo { other: String },
+
+    /// It should be a patch that requires range, but for some reason the information was missing.
+    NeedMainRangeInformation,
 
     /// Iterator end. The following parsing target is required but could not be found.
     EndOfLineKind,
