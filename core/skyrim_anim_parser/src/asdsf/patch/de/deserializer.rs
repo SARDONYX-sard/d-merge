@@ -1,4 +1,4 @@
-use crate::asdsf::normal::AnimInfo;
+use crate::asdsf::normal::{AnimInfo, Condition};
 use crate::asdsf::patch::de::error::{Error, Result};
 use crate::asdsf::patch::de::AnimInfoDiff;
 use crate::asdsf::patch::de::{
@@ -230,21 +230,27 @@ impl<'de> Deserializer<'de> {
             }
             self.parse_opt_close_comment()?;
 
-            let value_a = self.parse_next(
-                verify_line_parses_to::<i32>.context(Expected(Description("value_a: i32"))),
-            )?;
+            let value_a = self
+                .parse_next(parse_one_line::<i32>.context(Expected(Description("value_a: i32"))))?;
 
-            let value_b = self.parse_next(
-                verify_line_parses_to::<i32>.context(Expected(Description("value_b: i32"))),
-            )?;
+            let value_b = self
+                .parse_next(parse_one_line::<i32>.context(Expected(Description("value_b: i32"))))?;
 
             #[cfg(feature = "tracing")]
             tracing::trace!(?variable_name, ?value_a, ?value_b);
 
-            // TODO:
-            if diff_start {
-                #[cfg(feature = "tracing")]
-                tracing::debug!(?variable_name, ?value_a, ?value_b);
+            if self.current.mode_code.is_some() {
+                let condition = Condition {
+                    variable_name,
+                    value_a,
+                    value_b,
+                };
+
+                self.current
+                    .patch
+                    .get_or_insert_default()
+                    .conditions
+                    .push(condition);
             }
 
             self.parse_opt_close_comment()?;
