@@ -879,6 +879,7 @@ dependencies = [
  "pyo3",
  "pyo3-async-runtimes",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
