@@ -1,4 +1,3 @@
-mod global_logger;
 mod status;
 
 #[tokio::test]
@@ -6,7 +5,8 @@ mod status;
 #[cfg(feature = "tracing")]
 async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
     use crate::behavior_gen;
-    use crate::tests::{global_logger::global_logger, status::*};
+    use crate::global_logger::global_logger;
+    use crate::tests::status::*;
 
     global_logger("../../dummy/merge_test.log", tracing::Level::TRACE)?;
 

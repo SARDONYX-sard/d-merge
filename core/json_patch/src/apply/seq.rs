@@ -257,7 +257,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> Result<String, JsonPatchE
         if i == 0 {
             output.push_str(" ... ");
         } else {
-            output.push_str(&format!("{i:^width$}", width = CELL_WIDTH));
+            output.push_str(&format!("{i:^CELL_WIDTH$}"));
         }
     }
     output.push_str("| Op      | priority |\n");

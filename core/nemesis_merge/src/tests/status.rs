@@ -10,7 +10,7 @@ const BLUE: &str = "\x1b[34m";
 const GREEN_BOLD: &str = "\x1b[32;1m";
 const RED_BOLD: &str = "\x1b[31;1m";
 const RESET: &str = "\x1b[0m";
-const CLEAR_LINE: &str = "\r\x1b[2K"; // 行全体を消して行頭へ
+const CLEAR_LINE: &str = "\r\x1b[2K"; // Delete the entire line and move to the beginning of the line.
 
 pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
     Box::new(|status| {

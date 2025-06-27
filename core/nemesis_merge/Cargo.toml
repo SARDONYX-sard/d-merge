@@ -29,6 +29,7 @@ simd-json = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
 winnow = { workspace = true }
 
 # workspace members
@@ -43,7 +44,6 @@ tokio = { workspace = true, features = [
   "rt",
   "macros",
 ] } # Need rt & macros for test
-tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
@@ -55,7 +55,7 @@ default = ["debug"]
 debug = ["serde", "tracing", "dashmap/serde"]
 
 # tracing = ["dep:tracing", "json_patch/tracing", "serde_hkx/tracing"]
-tracing = ["dep:tracing", "json_patch/tracing"]
+tracing = ["dep:tracing", "dep:tracing-subscriber", "json_patch/tracing"]
 
 serde = ["dep:serde", "json_patch/serde"]
 

@@ -3,8 +3,11 @@ use std::{fs::File, path::Path};
 use tracing::{level_filters::LevelFilter, Level};
 use tracing_subscriber::{fmt, layer::SubscriberExt as _, reload, util::SubscriberInitExt as _};
 
-#[allow(unused)]
-pub(crate) fn global_logger<I, P>(path: P, level: I) -> std::io::Result<()>
+/// Init tracing as global
+///
+/// # Errors
+/// logging failed.
+pub fn global_logger<I, P>(path: P, level: I) -> std::io::Result<()>
 where
     I: Into<Level>,
     P: AsRef<Path>,

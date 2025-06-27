@@ -19,6 +19,7 @@ members = [
   "core/skyrim_anim_parser",
   "core/skyrim_crc",
   "gui/backend",
+  "ffi/python",
 ]
 resolver = "2"
 
