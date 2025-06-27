@@ -3,6 +3,7 @@ mod mod_info_loader;
 pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
+use tauri::path::BaseDirectory;
 
 use crate::cmd::{bail, time};
 use crate::error::NotFoundResourceDirSnafu;
@@ -59,12 +60,11 @@ pub(crate) async fn patch(
 
     let handle = tauri::async_runtime::spawn({
         let resource_dir = {
-            let resolver = window.app_handle().path();
-            resolver
-                .resource_dir()
+            let app = window.app_handle();
+            app.path()
+                .resolve("assets/templates", BaseDirectory::Resource)
                 .context(NotFoundResourceDirSnafu)
                 .or_else(|err| bail!(err))?
-                .join("assets/templates/")
         };
 
         async move {
