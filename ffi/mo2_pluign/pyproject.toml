@@ -1,0 +1,24 @@
+[project]
+name = "d_merge_mo2_plugin"
+version = "0.1.0"
+description = "MO2 plugin"
+authors = [{ name = "SARDONYX" }]
+requires-python = ">=3.10"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pyqt6 = "6.7.1"
+mobase-stubs = "2.5.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.12.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+extend-select = ["B", "Q", "I"]
