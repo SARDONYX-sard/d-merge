@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// A Python module implemented in Rust.
-#[pymodule]
+#[pymodule(name = "d_merge_ffi")] // https://github.com/PyO3/maturin/issues/2455
 fn ffi_d_merge(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOutPutTarget>()?;
     m.add_class::<PyConfig>()?;
