@@ -56,10 +56,10 @@ impl core::fmt::Display for Status {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::ReadingPatches { index, total } => {
-                write!(f, "[1/4] Reading templates and patches...({index}/{total})")
+                write!(f, "[1/5] Reading templates and patches...({index}/{total})")
             }
             Self::ParsingPatches { index, total } => {
-                write!(f, "[2/4] Parsing patches...({index}/{total})")
+                write!(f, "[2/5] Parsing patches...({index}/{total})")
             }
             Self::ApplyingPatches { index, total } => {
                 write!(f, "[3/5] Applying patches...({index}/{total})")

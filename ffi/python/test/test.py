@@ -14,7 +14,20 @@ python ./test/test.py
 from d_merge_python import Config, LogLevel, OutPutTarget, Status, behavior_gen
 
 
+import time
+
+start_time = None
+
+
 def on_status(status: Status):
+    global start_time
+
+    if start_time is None:
+        start_time = time.time()
+
+    elapsed = time.time() - start_time
+    elapsed_str = f"{elapsed:.1f}s: "
+
     CYAN = "\x1b[36m"
     MAGENTA = "\x1b[35m"
     YELLOW = "\x1b[33m"
@@ -22,25 +35,26 @@ def on_status(status: Status):
     GREEN_BOLD = "\x1b[32;1m"
     RED_BOLD = "\x1b[31;1m"
     RESET = "\x1b[0m"
-    CLEAR_LINE = (
-        "\r\x1b[2K"  # Delete the entire line and move to the beginning of the line.
-    )
+    CLEAR_LINE = "\r\x1b[2K"
 
-    text = repr(status)
-    if "ReadingPatches" in text:
-        print(f"{CLEAR_LINE}{CYAN}{text}{RESET}", end="")
-    elif "ParsingPatches" in text:
-        print(f"{CLEAR_LINE}{MAGENTA}{text}{RESET}", end="")
-    elif "ApplyingPatches" in text:
-        print(f"{CLEAR_LINE}{YELLOW}{text}{RESET}", end="")
-    elif "GeneratingHkxFiles" in text:
-        print(f"{CLEAR_LINE}{BLUE}{text}{RESET}", end="")
-    elif "Done" in text:
-        print(f"{CLEAR_LINE}{GREEN_BOLD}{text}{RESET}")
+    text = str(status)
+
+    display_text = elapsed_str + text
+
+    if "[1/5]" in text:
+        print(f"{CLEAR_LINE}{CYAN}{display_text}{RESET}", end="")
+    elif "[2/5]" in text:
+        print(f"{CLEAR_LINE}{MAGENTA}{display_text}{RESET}", end="")
+    elif "[3/5]" in text:
+        print(f"{CLEAR_LINE}{YELLOW}{display_text}{RESET}", end="")
+    elif "[4/5]" in text:
+        print(f"{CLEAR_LINE}{BLUE}{display_text}{RESET}", end="")
+    elif "[5/5]" in text:
+        print(f"{CLEAR_LINE}{GREEN_BOLD}{display_text}{RESET}")
     elif "Error" in text:
-        print(f"{CLEAR_LINE}{RED_BOLD}{text}{RESET}")
+        print(f"{CLEAR_LINE}{RED_BOLD}{display_text}{RESET}")
     else:
-        print(text)
+        print(display_text)
 
 
 def test_behavior_gen():

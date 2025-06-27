@@ -42,13 +42,6 @@ class Status:
     Instances of this class are passed to the `status_report` callback to notify
     clients about the current operation and progress metrics.
 
-    Note:
-        - The string representation (`str`) of this object is designed to provide
-          a concise human-readable status message.
-        - The representation (`repr`) shows debug information.
-        - There is a known issue where calling `str()` on this object does not
-          properly enable ANSI color codes in terminal output.
-
     Factory Methods:
         ReadingPatches(index: int, total: int) -> Status
             Create a status indicating reading patches progress.
@@ -244,10 +237,45 @@ def behavior_gen(
     Example:
         ```python
         from d_merge_python import Config, OutPutTarget, LogLevel, Status, behavior_gen
-        import asyncio
+        import asyncio, time
+
+        start_time = None
 
         def on_status(status: Status):
-            print("Status:", status)
+            global start_time
+
+            if start_time is None:
+                start_time = time.time()
+
+            elapsed = time.time() - start_time
+            elapsed_str = f"{elapsed:.1f}s: "
+
+            CYAN = "\x1b[36m"
+            MAGENTA = "\x1b[35m"
+            YELLOW = "\x1b[33m"
+            BLUE = "\x1b[34m"
+            GREEN_BOLD = "\x1b[32;1m"
+            RED_BOLD = "\x1b[31;1m"
+            RESET = "\x1b[0m"
+            CLEAR_LINE = "\r\x1b[2K"
+
+            text = str(status)
+            display_text = elapsed_str + text
+
+            if "[1/5]" in text:
+                print(f"{CLEAR_LINE}{CYAN}{display_text}{RESET}", end="")
+            elif "[2/5]" in text:
+                print(f"{CLEAR_LINE}{MAGENTA}{display_text}{RESET}", end="")
+            elif "[3/5]" in text:
+                print(f"{CLEAR_LINE}{YELLOW}{display_text}{RESET}", end="")
+            elif "[4/5]" in text:
+                print(f"{CLEAR_LINE}{BLUE}{display_text}{RESET}", end="")
+            elif "[5/5]" in text:
+                print(f"{CLEAR_LINE}{GREEN_BOLD}{display_text}{RESET}")
+            elif "Error" in text:
+                print(f"{CLEAR_LINE}{RED_BOLD}{display_text}{RESET}")
+            else:
+                print(display_text)
 
         config = Config(
             resource_dir="../../resource/assets/templates",
@@ -264,7 +292,7 @@ def behavior_gen(
         nemesis_paths = open("../../dummy/ids.txt", "r", encoding="utf-8").read().splitlines()
 
         async def run():
-            # NOTE: If you forget to use await here, generation will not be possible!
+            # IMPORTANT: Don't forget to await this!
             await behavior_gen(nemesis_paths, config, status_report=on_status)
 
         asyncio.run(run())
