@@ -94,7 +94,7 @@ impl JsonPatchError {
         path: &[Cow<'a, str>],
         value: impl core::fmt::Debug,
     ) -> (String, String) {
-        (path.join("/"), format!("{:#?}", value))
+        (path.join("/"), format!("{value:#?}"))
     }
 
     /// Creates a `NotFoundTarget` error from the given path and value.
