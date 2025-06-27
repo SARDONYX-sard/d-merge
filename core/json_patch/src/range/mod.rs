@@ -22,7 +22,7 @@ pub(crate) enum Range {
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Index(index) => write!(f, "[{index}]", ),
+            Self::Index(index) => write!(f, "[{index}]"),
             Self::FromTo(range) => write!(f, "[{}..{}]", range.start, range.end),
             Self::From(range) => write!(f, "[..{}]", range.start),
             Self::To(range) => write!(f, "[..{}]", range.end),
