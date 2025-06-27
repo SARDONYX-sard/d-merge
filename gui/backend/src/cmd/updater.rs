@@ -125,6 +125,6 @@ mod tests {
         assert!(result.is_ok());
 
         let versions = result.unwrap();
-        println!("Versions: {:?}", versions);
+        println!("Versions: {versions:?}");
     }
 }
