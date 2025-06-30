@@ -37,7 +37,7 @@ serde_repr = { workspace = true } # Implement (De)Serializer
 snafu = { workspace = true } # Implement error types
 tauri = { version = "2.5.1", features = ["devtools"] } # For GUI
 tauri-plugin-dialog = "2.2.2" # https://github.com/tauri-apps/plugins-workspace
-tauri-plugin-fs = "2.3.0"
+tauri-plugin-fs = "2.4.0"
 tauri-plugin-opener = "2.3.0"
 tauri-plugin-window-state = "2.2.3"
 tokio = { workspace = true }
