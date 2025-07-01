@@ -1,19 +1,22 @@
-use crate::adsf::{
-    normal::{Rotation, Translation},
-    patch::de::{
-        error::{Error, Result},
-        others::clip_motion::{
-            current_state::{CurrentState, PartialRotations, PartialTranslations},
-            ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
-        },
-    },
-};
 use crate::{
     adsf::normal::de::from_word_and_space,
     common_parser::{
         comment::{close_comment, comment_kind, take_till_close, CommentKind},
         lines::{one_line, verify_line_parses_to},
     },
+};
+use crate::{
+    adsf::{
+        normal::{Rotation, Translation},
+        patch::de::{
+            error::{Error, Result},
+            others::clip_motion::{
+                current_state::{CurrentState, PartialRotations, PartialTranslations},
+                ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
+            },
+        },
+    },
+    common_parser::delete_line::delete_this_line,
 };
 use json_patch::{Op, OpRange};
 use serde_hkx::errors::readable::ReadableError;
@@ -165,9 +168,12 @@ impl<'de> Deserializer<'de> {
                             self.current.set_range_start(start_index)?;
                         }
 
+                        if self.parse_next(opt(delete_this_line))?.is_some() {
+                            start_index += 1;
+                            continue;
+                        }
+
                         let transition = self.transition()?;
-                        #[cfg(feature = "tracing")]
-                        tracing::trace!("transition = {transition:?}");
 
                         if self.current.mode_code.is_some() {
                             self.current.push_as_translation(transition)?;
@@ -184,6 +190,11 @@ impl<'de> Deserializer<'de> {
                         if diff_start {
                             self.current.set_range_start(start_index)?;
                         }
+                        if self.parse_next(opt(delete_this_line))?.is_some() {
+                            start_index += 1;
+                            continue;
+                        }
+
                         self.rotation()?;
 
                         self.parse_opt_close_comment()?;

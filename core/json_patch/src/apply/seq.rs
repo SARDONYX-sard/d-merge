@@ -64,10 +64,9 @@ pub fn apply_seq_array_directly<'a>(
     target_array: &mut Vec<Value<'a>>,
     mut patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<()> {
-    let visualizer = visualize_ops(&patches)?;
-
     #[cfg(feature = "tracing")]
     {
+        let visualizer = visualize_ops(&patches)?;
         let target_len = target_array.len();
         tracing::debug!(
             "Seq merge conflict resolution:
