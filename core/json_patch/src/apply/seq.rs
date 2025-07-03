@@ -1,6 +1,10 @@
 use crate::ptr_mut::PointerMut as _;
+use crate::range::split_range::split_range_at_len;
 use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _};
-use crate::{JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority};
+use crate::{
+    JsonPatch, JsonPatchError, JsonPath, Op, OpRange, OpRangeKind, Result, ValueWithPriority,
+};
+use core::ops::Range;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use simd_json::{borrowed::Value, derived::ValueTryIntoArray};
@@ -139,15 +143,15 @@ fn apply_ops_parallel<'a>(
     mut base: Vec<Value<'a>>,
     patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<Vec<Value<'a>>> {
-    let (non_add_ops, add_ops): (Vec<_>, Vec<_>) =
+    let (non_add_ops, mut add_ops): (Vec<_>, Vec<_>) =
         patches
-            .into_par_iter()
+            .smart_iter()
             .partition(|ValueWithPriority { patch, .. }| {
                 patch.op.try_as_seq().map(|op| op.op).unwrap_or_default() != Op::Add
             });
 
     // Replace, Remove
-    for ValueWithPriority { patch, .. } in non_add_ops {
+    for ValueWithPriority { patch, priority } in non_add_ops {
         let JsonPatch { op, value } = patch;
         let seq = op.try_as_seq()?;
         match seq.op {
@@ -155,19 +159,12 @@ fn apply_ops_parallel<'a>(
                 let values = value
                     .try_into_array()
                     .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
-                let range = seq.range.clone();
-                let Some(slice) = base.get_mut(range.clone()) else {
-                    return Err(JsonPatchError::UnexpectedRange {
-                        patch_range: range,
-                        actual_len: base.len(),
-                    });
-                };
-                slice
-                    .smart_iter_mut()
-                    .zip(values)
-                    .for_each(|(element, patch)| {
-                        *element = patch;
-                    });
+
+                if let Some(add_patch) =
+                    apply_replace_with_overflow(&mut base, seq.range.clone(), values, priority)?
+                {
+                    add_ops.push(add_patch);
+                }
             }
             Op::Remove => {
                 let range = seq.range.clone();
@@ -206,6 +203,90 @@ fn apply_ops_parallel<'a>(
     }
 
     Ok(base)
+}
+
+type SplitValue<'a> = (
+    Option<(Range<usize>, Vec<Value<'a>>)>,
+    Option<(Range<usize>, Vec<Value<'a>>)>,
+);
+
+/// Splits a replacement operation into two parts:
+/// - one that applies within bounds of `base`
+/// - one that overflows and should be handled separately
+///
+/// # Returns
+/// - `(in_bounds_range, in_bounds_values)`
+/// - `(overflow_range, overflow_values)`
+fn split_for_replace<'a>(
+    range: Range<usize>,
+    base_len: usize,
+    values: Vec<Value<'a>>,
+) -> SplitValue<'a> {
+    let (in_range, overflow_range) = split_range_at_len(range, base_len);
+
+    match (in_range, overflow_range) {
+        (Some(in_r), Some(over_r)) => {
+            let in_len = in_r.len();
+            let (in_vals, overflow_vals) = values.split_at(in_len);
+            (
+                Some((in_r, in_vals.to_vec())),
+                Some((over_r, overflow_vals.to_vec())),
+            )
+        }
+        (Some(in_r), None) => (Some((in_r, values)), None),
+        (None, Some(over_r)) => (None, Some((over_r, values))),
+        (None, None) => (None, None), // Should never happen
+    }
+}
+
+fn apply_replace_with_overflow<'a>(
+    base: &mut Vec<Value<'a>>,
+    range: Range<usize>,
+    values: Vec<Value<'a>>,
+    priority: usize,
+) -> Result<Option<ValueWithPriority<'a>>> {
+    let (in_bounds_opt, overflow_opt) = split_for_replace(range.clone(), base.len(), values);
+
+    if let Some((in_bounds_range, in_bounds_values)) = in_bounds_opt {
+        let Some(slice) = base.get_mut(in_bounds_range) else {
+            return Err(JsonPatchError::UnexpectedRange {
+                patch_range: range,
+                actual_len: base.len(),
+            });
+        };
+
+        slice
+            .smart_iter_mut()
+            .zip(in_bounds_values)
+            .for_each(|(element, patch)| {
+                *element = patch;
+            });
+    }
+
+    if let Some((_overflow_range, overflow_values)) = overflow_opt {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            "Replace overflow: attempted to write to range {range:?} (base.len() = {}); \
+                 overflowed into range {_overflow_range:?} with {} remaining values",
+            base.len(),
+            overflow_values.len()
+        );
+
+        if !overflow_values.is_empty() {
+            return Ok(Some(ValueWithPriority {
+                patch: JsonPatch {
+                    op: OpRangeKind::Seq(OpRange {
+                        op: Op::Add,
+                        range: base.len()..base.len(),
+                    }),
+                    value: overflow_values.into(),
+                },
+                priority,
+            }));
+        }
+    }
+
+    Ok(None)
 }
 
 #[cfg(any(feature = "tracing", test))]
