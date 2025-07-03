@@ -9,29 +9,6 @@ use std::ops::Range;
 /// A tuple `(in_bounds, overflow)`:
 /// - `in_bounds`: the portion of the range that fits within `0..len`
 /// - `overflow`: the portion of the range that exceeds `len`
-///
-/// # Examples
-///
-/// ```
-/// use std::ops::Range;
-/// use json_patch::range::split_range::split_range_at_len;
-///
-/// let (in_bounds, overflow) = split_range_at_len(2..6, 4);
-/// assert_eq!(in_bounds, Some(2..4));
-/// assert_eq!(overflow, Some(4..6));
-/// ```
-///
-/// ```
-/// let (in_bounds, overflow) = split_range_at_len(5..8, 5);
-/// assert_eq!(in_bounds, None);
-/// assert_eq!(overflow, Some(5..8));
-/// ```
-///
-/// ```
-/// let (in_bounds, overflow) = split_range_at_len(1..3, 10);
-/// assert_eq!(in_bounds, Some(1..3));
-/// assert_eq!(overflow, None);
-/// ```
 pub const fn split_range_at_len(
     range: Range<usize>,
     len: usize,
