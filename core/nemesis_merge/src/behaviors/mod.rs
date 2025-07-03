@@ -135,7 +135,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         let borrowed_patches = borrowed_patches;
 
         let template_error_len;
-        let templates = {
+        let mut templates = {
             use self::tasks::templates::collect::borrowed;
             let (templates, errors) = borrowed::collect_templates(&owned_templates);
             template_error_len = errors.len();
@@ -155,7 +155,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
 
         // 2/3: Apply patches & Replace variables to indexes
         let mut apply_errors_len = template_error_len;
-        if let Err(errors) = apply_patches(&templates, borrowed_patches, config) {
+        if let Err(errors) = apply_patches(&mut templates, borrowed_patches, config) {
             apply_errors_len = errors.len();
             all_errors.par_extend(errors);
         };
