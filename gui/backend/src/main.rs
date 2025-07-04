@@ -6,10 +6,8 @@ mod error;
 mod libs;
 mod log;
 
-#[tokio::main] // NOTE: Starting the runtime early may prevent delays in starting async cmd.
-async fn main() {
-    tauri::async_runtime::set(tokio::runtime::Handle::current());
-
+// NOTE: For some reason, other tasks freeze after executing async cmd, so I don't use #[tokio::main].
+fn main() {
     #[allow(clippy::large_stack_frames)]
     if let Err(err) = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
