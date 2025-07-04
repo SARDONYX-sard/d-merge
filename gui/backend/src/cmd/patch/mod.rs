@@ -10,7 +10,7 @@ use crate::error::NotFoundResourceDirSnafu;
 use nemesis_merge::{behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, Status};
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{async_runtime::JoinHandle, Manager, Window};
 use tokio::sync::Mutex;
 
@@ -49,13 +49,8 @@ pub(crate) async fn patch(
 
     if options.auto_remove_meshes {
         let meshes_path = output.join("meshes");
-        tauri::async_runtime::spawn(async move {
-            let _ = tokio::fs::remove_dir_all(meshes_path).await;
-        });
         let debug_path = output.join(".d_merge").join(".debug");
-        tauri::async_runtime::spawn(async move {
-            let _ = tokio::fs::remove_dir_all(debug_path).await;
-        });
+        tokio::join!(remove_if_exists(meshes_path), remove_if_exists(debug_path),);
     }
 
     let handle = tauri::async_runtime::spawn({
@@ -88,6 +83,21 @@ pub(crate) async fn patch(
 
     PATCH_TASK.lock().await.replace(handle);
     Ok(())
+}
+
+/// Removes a directory if it exists, with debug logging.
+async fn remove_if_exists<P>(path: P)
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    if path.exists() {
+        tracing::debug!("Starting removal of `{}`", path.display());
+        match tokio::fs::remove_dir_all(path).await {
+            Ok(_) => tracing::debug!("Successfully removed at `{}`", path.display()),
+            Err(e) => tracing::error!("Failed to remove at `{}`: {e}", path.display()),
+        }
+    }
 }
 
 #[tauri::command]
