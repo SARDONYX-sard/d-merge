@@ -4,9 +4,9 @@ from typing import List
 import mobase  # type: ignore
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication, QListWidget, QMessageBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 
-# from .data_grid import PatchSelector
+from .data_grid import PatchSelector
 
 ModList = typing.Iterable[typing.Optional[str]]
 
@@ -49,7 +49,10 @@ class DMergePlugin(mobase.IPluginTool):
             return False
 
     def settings(self) -> List[mobase.PluginSetting]:
-        return [mobase.PluginSetting("enabled", "enable this plugin", True)]
+        return [
+            mobase.PluginSetting("enabled", "enable this plugin", True),
+            mobase.PluginSetting("d_merge_path", "d_merge.exe path", ""),
+        ]
 
     def localizedName(self) -> str:
         return self.__tr("D_Merge")
@@ -58,8 +61,7 @@ class DMergePlugin(mobase.IPluginTool):
         return QApplication.translate("D_MergePlugin", txt)
 
     def icon(self: mobase.IPluginTool) -> QIcon:
-        # return QIcon("plugins/d_merge_mo2_plugin/icon.ico")
-        return QIcon()
+        return QIcon("plugins/d_merge_mo2_plugin/icon.ico")
 
     def tooltip(self: mobase.IPluginTool) -> str:
         return "Alterative Nemesis patcher"
@@ -72,7 +74,8 @@ class DMergePlugin(mobase.IPluginTool):
 
     def display(self) -> None:
         try:
-            self.show_mod_list(self._organizer.modList().allMods())
+            # self.run_merge_tool()
+            self.show_mod_list(self._organizer.modList().allModsByProfilePriority())
 
         except Exception as e:
             QMessageBox.critical(
@@ -82,15 +85,42 @@ class DMergePlugin(mobase.IPluginTool):
             )
 
     def show_mod_list(self, items: ModList):
-        self._modListWindow = QWidget()
-        self._modListWindow.setWindowTitle("Mod List")
+        self._modListWindow = PatchSelector()
+        self._modListWindow.setWindowTitle("D_Merge")
         self._modListWindow.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-
-        layout = QVBoxLayout()
-        list_widget = QListWidget()
-        list_widget.addItems(items)
-        layout.addWidget(list_widget)
-
-        self._modListWindow.setLayout(layout)
-        self._modListWindow.resize(400, 300)
         self._modListWindow.show()
+
+    def run_merge_tool(self):
+        merge_path_variant = self._organizer.pluginSetting(self.name(), "d_merge_path")
+        if not merge_path_variant:
+            QMessageBox.warning(
+                self.__parentWidget,
+                self.__tr("実行エラー"),
+                self.__tr("d_merge.exe のパスが設定されていません。"),
+            )
+            return
+
+        merge_path = str(merge_path_variant)
+
+        args: List[str] = []
+        try:
+            handle = self._organizer.startApplication(
+                merge_path, args, ignoreCustomOverwrite=True
+            )
+            result, exitCode = self._organizer.waitForApplication(handle)
+
+            if not result or exitCode != 0:
+                QMessageBox.warning(
+                    self.__parentWidget,
+                    self.__tr("実行失敗"),
+                    self.__tr(
+                        f"d_merge.exe の実行に失敗しました。終了コード: {exitCode}"
+                    ),
+                )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.__parentWidget,
+                self.__tr("実行エラー"),
+                self.__tr(f"d_merge.exe の起動に失敗しました: {e}"),
+            )

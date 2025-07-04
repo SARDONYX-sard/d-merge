@@ -1,5 +1,5 @@
 import sys
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from PyQt6.QtCore import (
     QAbstractTableModel,
@@ -18,19 +18,20 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# データの型: (id:int, modname:str, url:str, priority:int, checked:bool)
+# データの型: (id:int, mod_name:str, url:str, priority:int, checked:bool)
 PatchDataType = Tuple[int, str, str, int, bool]
+ModGridData = Optional[List[PatchDataType]]
 
 
 class PatchTableModel(QAbstractTableModel):
-    def __init__(self, data: Optional[List[PatchDataType]] = None) -> None:
+    def __init__(self, data: ModGridData = None) -> None:
         super().__init__()
         self.patch_data: List[PatchDataType] = data or []
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return len(self.patch_data)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return 5
 
     def data(
@@ -55,9 +56,9 @@ class PatchTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.CheckStateRole and col == 0:
             return (
-                Qt.CheckState.Checked
+                Qt.CheckState.Checked.value
                 if self.patch_data[row][4]
-                else Qt.CheckState.Unchecked
+                else Qt.CheckState.Unchecked.value
             )
 
         return None
@@ -114,18 +115,18 @@ class PatchTableModel(QAbstractTableModel):
     def mimeTypes(self) -> List[str]:
         return ["application/x-qabstractitemmodeldatalist"]
 
-    def mimeData(self, indexes: List[QModelIndex]) -> QMimeData:
-        mimedata = QMimeData()
+    def mimeData(self, indexes: Iterable[QModelIndex]) -> Optional[QMimeData]:
+        mime_data = QMimeData()
         rows = {index.row() for index in indexes}
         row = list(rows)[0]
-        mimedata.setData(
+        mime_data.setData(
             "application/x-qabstractitemmodeldatalist", bytes(str(row), "utf-8")
         )
-        return mimedata
+        return mime_data
 
     def dropMimeData(
         self,
-        data: QMimeData,
+        data: Optional["QMimeData"],
         action: Qt.DropAction,
         row: int,
         column: int,
@@ -133,14 +134,17 @@ class PatchTableModel(QAbstractTableModel):
     ) -> bool:
         if action == Qt.DropAction.IgnoreAction:
             return True
+
+        if not data:
+            return False
         if not data.hasFormat("application/x-qabstractitemmodeldatalist"):
             return False
 
         try:
             from_row = int(
-                bytes(data.data("application/x-qabstractitemmodeldatalist")).decode(
-                    "utf-8"
-                )
+                data.data("application/x-qabstractitemmodeldatalist")
+                .data()
+                .decode("utf-8")
             )
         except Exception:
             return False
@@ -176,7 +180,7 @@ class PatchTableModel(QAbstractTableModel):
 
 
 class PatchSelector(QWidget):
-    def __init__(self) -> None:
+    def __init__(self, items: ModGridData = None) -> None:
         super().__init__()
         self.setWindowTitle("パッチ選択 UI - 正しい行ドラッグ対応")
         self.resize(800, 400)
@@ -190,6 +194,8 @@ class PatchSelector(QWidget):
                 (2, "FNIS Patch B", "https://example.com/fnis_b", 20, False),
                 (3, "FNIS Patch C", "https://example.com/fnis_c", 5, False),
             ]
+            if items is None
+            else items
         )
 
         self.table.setModel(self.model)
@@ -203,17 +209,17 @@ class PatchSelector(QWidget):
 
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
 
-        # ヘッダークリックで全選択・全解除トグル
-        self.table.horizontalHeader().sectionClicked.connect(self.toggle_all_checkboxes)
+        header = self.table.horizontalHeader()
+        if header:
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            # ヘッダークリックで全選択・全解除トグル
+            header.sectionClicked.connect(self.toggle_all_checkboxes)  # type: ignore
 
         layout.addWidget(self.table)
 
         self.patchButton = QPushButton("選択されたパッチを実行")
-        self.patchButton.clicked.connect(self.run_patch)
+        self.patchButton.clicked.connect(self.run_patch)  # type: ignore
         layout.addWidget(self.patchButton)
 
     def toggle_all_checkboxes(self, section: int) -> None:
