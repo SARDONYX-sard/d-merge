@@ -105,10 +105,13 @@ pub async fn cancel_patch() -> Result<(), String> {
     cancel_patch_inner().await
 }
 
-#[allow(clippy::significant_drop_tightening)] // Even if we set it to inline, we'll still get a warning, so turn it off.
 async fn cancel_patch_inner() -> Result<(), String> {
-    let mut guard = PATCH_TASK.lock().await;
-    if let Some(handle) = guard.take() {
+    let handle = {
+        let mut guard = PATCH_TASK.lock().await;
+        guard.take()
+    };
+
+    if let Some(handle) = handle {
         handle.abort();
         if let Err(err) = handle.await {
             tracing::error!("patch task panicked: {err}");
