@@ -143,7 +143,7 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::TriggerNames) => {
+            Some(LineKind::TriggerNamesLen | LineKind::TriggerNames) => {
                 let rotations = self
                     .patch
                     .get_or_insert_default()

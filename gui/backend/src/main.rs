@@ -6,6 +6,7 @@ mod error;
 mod libs;
 mod log;
 
+// NOTE: For some reason, other tasks freeze after executing async cmd, so I don't use #[tokio::main].
 fn main() {
     #[allow(clippy::large_stack_frames)]
     if let Err(err) = tauri::Builder::default()

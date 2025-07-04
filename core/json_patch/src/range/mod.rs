@@ -1,5 +1,6 @@
 pub mod error;
 pub(crate) mod parse;
+pub mod split_range;
 
 use self::error::RangeError;
 use core::fmt;

@@ -81,12 +81,12 @@ fn is_adsf_patch_file(txt_path: &Path) -> bool {
     txt_path.file_stem().is_some_and(|s| !s.is_empty()) // Allow either `<clip>~<anim_data_id>` or just `<anim_data_id>`
 }
 
-// Check if any parent directory in the last 3 components is "animationdatasinglefile"
+// Check if any parent directory in the last 3 components is "animationsetdatasinglefile"
 ///
 /// # Assumption.
 /// - The file is a file with a txt extension.
 fn is_asdsf_patch_file(txt_path: &Path) -> bool {
-    let has_adsf_parent = txt_path
+    let has_asdsf_parent = txt_path
         .ancestors()
         .take(3) // includes self, parent, grandparent, great-grandparent
         .any(|ancestor| {
@@ -94,12 +94,11 @@ fn is_asdsf_patch_file(txt_path: &Path) -> bool {
                 .file_name() // Intend: Get the final component dir name.
                 .is_some_and(|name| name.eq_ignore_ascii_case("animationsetdatasinglefile"))
         });
-    if !has_adsf_parent {
+    if !has_asdsf_parent {
         return false;
     }
 
-    // File stem should be non-empty and optionally contain a ~
-    txt_path.file_stem().is_some_and(|s| !s.is_empty()) // Allow either `<clip>~<anim_data_id>` or just `<anim_data_id>`
+    txt_path.file_stem().is_some_and(|s| !s.is_empty())
 }
 
 #[cfg(test)]

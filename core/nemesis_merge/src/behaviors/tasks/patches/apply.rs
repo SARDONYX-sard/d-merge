@@ -11,6 +11,7 @@ use crate::{
 };
 use json_patch::{apply_one_field, apply_seq_by_priority};
 use rayon::prelude::*;
+use simd_json::borrowed::Value;
 use snafu::ResultExt;
 use std::path::Path;
 
@@ -22,7 +23,7 @@ use std::path::Path;
 ///
 /// Therefore, this seemingly strange lifetime annotation is intentional.
 pub fn apply_patches<'a, 'b: 'a>(
-    templates: &BorrowedTemplateMap<'a>,
+    templates: &mut BorrowedTemplateMap<'a>,
     borrowed_patches: RawBorrowedPatches<'b>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
@@ -36,29 +37,53 @@ pub fn apply_patches<'a, 'b: 'a>(
     let status_reporter =
         StatusReportCounter::new(status_report, ReportType::ApplyingPatches, total);
 
-    let results: Vec<Result<(), Error>> = borrowed_patches
+    // Step 1: Remove templates and build working set
+    let working_set: Vec<_> = borrowed_patches
         .0
-        .into_par_iter()
-        .flat_map(|(key, patches)| {
-            apply_to_one_template(config, templates, &key, patches, &status_reporter)
+        .into_iter()
+        .filter_map(|(key, patches)| {
+            templates
+                .remove(&key)
+                .map(|(_, template)| (key, patches, template))
         })
         .collect();
 
-    filter_results(results)
+    // Step 2: Apply patches in parallel
+    let (results, updated_templates): (Vec<_>, Vec<_>) = working_set
+        .into_par_iter()
+        .map(|(key, patches, (template_name, mut template_value))| {
+            let patch_results = apply_to_one_template(
+                config,
+                &key,
+                template_name,
+                &mut template_value,
+                patches,
+                &status_reporter,
+            );
+            (patch_results, (key, (template_name, template_value)))
+        })
+        .unzip();
+
+    // Step 3: Put patched templates back
+    templates.par_extend(updated_templates);
+
+    // Step 4: Return aggregated results
+    let flat: Vec<_> = results.into_par_iter().flatten().collect();
+    filter_results(flat)
 }
 
-type ChainError = rayon::iter::Chain<
-    rayon::vec::IntoIter<Result<(), Error>>,
-    rayon::vec::IntoIter<Result<(), Error>>,
->;
-
+/// Applies one-field and sequence patches to a single template.
+///
+/// # Returns
+/// Parallel iterator of patch results (success or error).
 fn apply_to_one_template<'a, 'b: 'a>(
     config: &Config,
-    templates: &BorrowedTemplateMap<'a>,
     key: &TemplateKey<'a>,
+    template_name: &'a str,
+    template_value: &mut Value<'a>,
     patches: (OnePatchMap<'b>, SeqPatchMap<'b>),
     status_reporter: &StatusReportCounter,
-) -> ChainError {
+) -> Vec<Result<(), Error>> {
     if config.debug.output_patch_json {
         if let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches) {
             #[cfg(feature = "tracing")]
@@ -66,79 +91,30 @@ fn apply_to_one_template<'a, 'b: 'a>(
         }
     }
 
-    // Single-field patches must be applied first to account for array index shifts.
-    //
-    // Why? Because a single-field patch can only ever be a replacement.
-    // When array indices are added or removed, subsequent patches relying on specific indices
-    // may break unless we apply the replacements first.
-    //
-    // For example:
-    // - `["#0001", "hkbStringData", "eventTriggers"], value: vec![ValueWithPriority]` // add/remove index 5
-    // - `["#0001", "hkbStringData", "eventTriggers", "[5]", "local_time"]`           // modify f32
-    // - `["#0001", "hkbStringData", "eventTriggers", "[5]", "triggers", "[0]", "animations", "[3]", "time"]` // modify f32
-    //
-    // In these examples, the single-field patch (`local_time` or `time`) is always a replacement,
-    // so it must be applied first. This ensures the index layout is stable
-    // before applying sequence patches that manipulate array elements.
-    // After that, sequence patches can be applied reliably.
     let (one_patch_map, seq_patch_map) = patches;
 
-    let one_patch_results = process_one_patch(templates, key, one_patch_map, status_reporter);
-    let seq_patch_results = process_seq_patch(templates, key, seq_patch_map, status_reporter);
+    let mut results = Vec::with_capacity(one_patch_map.0.len() + seq_patch_map.0.len());
 
-    one_patch_results.into_par_iter().chain(seq_patch_results)
-}
+    // NOTE: Why not use par_iter here?
+    // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
+    for (path, patch) in one_patch_map.0 {
+        let result = apply_one_field(template_value, path, patch).with_context(|_| PatchSnafu {
+            template_name: key.to_string(),
+        });
+        status_reporter.increment();
+        results.push(result);
+    }
 
-/// Processes the one_patch map.
-fn process_one_patch<'a, 'b: 'a>(
-    templates: &BorrowedTemplateMap<'a>,
-    key: &TemplateKey<'a>,
-    one_patch_map: OnePatchMap<'b>,
-    status_reporter: &StatusReportCounter,
-) -> Vec<Result<(), Error>> {
-    one_patch_map
-        .0
-        .into_par_iter()
-        .map(|(path, patch)| match templates.get_mut(key) {
-            Some(mut template_pair) => {
-                let template = &mut template_pair.value_mut().1;
-                let result = apply_one_field(template, path, patch).with_context(|_| PatchSnafu {
-                    template_name: key.to_string(),
-                });
-                status_reporter.increment();
-                result
-            }
-            None => Err(Error::NotFoundTemplate {
-                template_name: key.to_string(),
-            }),
-        })
-        .collect()
-}
+    for (path, patches) in seq_patch_map.0 {
+        let result = apply_seq_by_priority(template_name, template_value, path, patches)
+            .with_context(|_| PatchSnafu {
+                template_name: template_name.to_string(),
+            });
+        status_reporter.increment();
+        results.push(result);
+    }
 
-/// Processes the seq_patch map.
-fn process_seq_patch<'a, 'b: 'a>(
-    templates: &BorrowedTemplateMap<'a>,
-    key: &TemplateKey<'a>,
-    seq_patch_map: SeqPatchMap<'b>,
-    status_reporter: &StatusReportCounter,
-) -> Vec<Result<(), Error>> {
-    seq_patch_map
-        .0
-        .into_par_iter()
-        .map(|(path, patches)| match templates.get_mut(key) {
-            Some(mut template_pair) => {
-                let template = &mut template_pair.value_mut().1;
-                let template_name = key.to_string();
-                let result = apply_seq_by_priority(template_name.as_str(), template, path, patches)
-                    .with_context(|_| PatchSnafu { template_name });
-                status_reporter.increment();
-                result
-            }
-            None => Err(Error::NotFoundTemplate {
-                template_name: key.to_string(),
-            }),
-        })
-        .collect()
+    results
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

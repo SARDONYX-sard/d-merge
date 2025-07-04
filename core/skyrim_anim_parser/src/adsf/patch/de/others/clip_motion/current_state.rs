@@ -150,7 +150,7 @@ impl<'de> CurrentState<'de> {
                 rotations.range.end += 1;
                 rotations.values.push(value);
             }
-            _ => return Err(Error::ExpectedTransition),
+            _ => return Err(Error::ExpectedRotation),
         };
 
         Ok(())
@@ -164,7 +164,7 @@ impl<'de> CurrentState<'de> {
         }
 
         match self.current_kind {
-            Some(LineKind::Translation) => {
+            Some(LineKind::TranslationLen | LineKind::Translation) => {
                 let transitions = self
                     .patch
                     .get_or_insert_default()
@@ -173,7 +173,7 @@ impl<'de> CurrentState<'de> {
                 transitions.range.start = start;
                 transitions.range.end = start;
             }
-            Some(LineKind::Rotation) => {
+            Some(LineKind::RotationLen | LineKind::Rotation) => {
                 let rotations = self
                     .patch
                     .get_or_insert_default()

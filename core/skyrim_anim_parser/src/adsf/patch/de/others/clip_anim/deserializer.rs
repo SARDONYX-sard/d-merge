@@ -183,6 +183,10 @@ impl<'de> Deserializer<'de> {
                     self.parse_next(multispace0)?;
                 }
                 LineKind::TriggerNamesLen => {
+                    let diff_start = self.parse_opt_start_comment()?;
+                    if diff_start {
+                        self.current.set_range_start(0)?;
+                    }
                     let _len = self.parse_next(
                         verify_line_parses_to::<usize>
                             .context(Expected(Description("length: usize"))),
