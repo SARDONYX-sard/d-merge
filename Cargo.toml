@@ -38,7 +38,7 @@ serde_json = "1.0.140" # gui: To avoid generate_context error.
 serde_repr = "0.1.20" # C like Serialize enum into numbers.(Using progress reporting)
 simd-json = "0.15.1"
 snafu = "0.8.6"
-tokio = { version = "1.45.1", features = [ "fs", "rt-multi-thread", ] } # Async runtime
+tokio = { version = "1.45.1", features = [ "fs", "rt-multi-thread" ] } # Async runtime
 tracing = { version = "0.1.41" } # logger
 tracing-subscriber = "0.3.19"
 winnow = { version = "0.7.11", features = ["simd"] }
