@@ -11,16 +11,35 @@ import { SelectionTypeRadios } from './SelectionTypeRadios';
 export const PathSelectorButtons = () => {
   const {
     selectionType,
+
     selectedFiles,
     setSelectedFiles,
+
     selectedDirs,
     setSelectedDirs,
+
+    treeDirInput,
+    setTreeDirInput,
     selectedTree,
     setSelectedTree,
+
     setConvertStatuses,
   } = useConvertContext();
   const isDirMode = selectionType === 'dir';
-  const selectedPaths = isDirMode ? selectedDirs : selectedFiles;
+  const defaultPath = (() => {
+    switch (selectionType) {
+      case 'dir':
+        return selectedDirs.at(0);
+        break;
+      case 'files':
+        return selectedFiles.at(0);
+      case 'tree':
+        return treeDirInput;
+      default:
+        break;
+    }
+  })();
+
   const setSelectedPaths = isDirMode ? setSelectedDirs : setSelectedFiles;
 
   const handlePathSelect = async () => {
@@ -29,10 +48,14 @@ export const PathSelectorButtons = () => {
       filters: [{ name: '', extensions: ['hkx', 'xml', 'json', 'yaml'] }],
       multiple: true,
       directory: ['dir', 'tree'].includes(selectionType),
-      defaultPath: selectedPaths.at(0),
+      defaultPath,
     });
 
     if (selectionType === 'tree') {
+      if (newSelectedPaths !== null) {
+        setTreeDirInput(newSelectedPaths[0]);
+      }
+
       const roots = (() => {
         if (Array.isArray(newSelectedPaths)) {
           return newSelectedPaths;

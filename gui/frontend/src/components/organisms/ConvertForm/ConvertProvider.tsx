@@ -33,12 +33,21 @@ export const CONVERT_TREE_INIT_VALUES = {
 type ContextType = {
   selectionType: SelectionType;
   setSelectionType: (pathMode: SelectionType) => void;
+
+  // When `file` mode
   selectedFiles: string[];
   setSelectedFiles: (value: string[]) => void;
+
+  // When `dir` mode
   selectedDirs: string[];
   setSelectedDirs: (value: string[]) => void;
+
+  // When `tree` mode
+  treeDirInput: string;
+  setTreeDirInput: (value: string) => void;
   selectedTree: SelectedTree;
   setSelectedTree: (value: SelectedTree) => void;
+
   output: string;
   setOutput: (value: string) => void;
   fmt: OutFormat;
@@ -54,6 +63,7 @@ export const ConvertProvider = ({ children }: Props) => {
   const [selectionType, setSelectionType] = useStorageState(PUB_CACHE_OBJ.convertSelectionType, selectionTypeSchema);
   const [selectedFiles, setSelectedFiles] = useStorageState(PRIVATE_CACHE_OBJ.convertSelectedFiles, stringArraySchema);
   const [selectedDirs, setSelectedDirs] = useStorageState(PRIVATE_CACHE_OBJ.convertSelectedDirs, stringArraySchema);
+  const [treeDirInput, setTreeDirInput] = useStorageState(PRIVATE_CACHE_OBJ.convertInputDirForTree, stringSchema);
   const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.convertOutput, stringSchema);
   const [fmt, setFmt] = useStorageState(PUB_CACHE_OBJ.convertOutFmt, outFormatSchema);
 
@@ -66,14 +76,21 @@ export const ConvertProvider = ({ children }: Props) => {
       value={{
         selectionType,
         setSelectionType,
+
         selectedFiles,
         setSelectedFiles,
+
         selectedDirs,
         setSelectedDirs,
+
+        treeDirInput,
+        setTreeDirInput,
         selectedTree,
         setSelectedTree,
+
         output,
         setOutput,
+
         fmt,
         setFmt,
 

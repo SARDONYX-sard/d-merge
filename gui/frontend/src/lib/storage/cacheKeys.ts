@@ -15,6 +15,7 @@ const CONVERT_PUB_CACHE_KEYS_OBJ = {
 const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
   convertSelectedDirs: 'convert-selected-dirs',
   convertSelectedFiles: 'convert-selected-files',
+  convertInputDirForTree: 'convert-input-dir-for-tree',
   convertOutput: 'convert-output',
 } as const;
 
