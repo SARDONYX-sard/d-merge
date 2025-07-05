@@ -1,7 +1,8 @@
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
 import { invoke } from '@tauri-apps/api/core';
 
-export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json' | 'yaml';
+// NOTE: Do not use yaml because it cannot be reversed.
+export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
 
 /**
  * Convert xml/hkx => hkx/xml.

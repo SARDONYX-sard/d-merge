@@ -24,7 +24,7 @@ export const OutFormatList = () => {
         case 'win32':
         case 'xml':
         case 'json':
-        case 'yaml':
+          // case 'yaml': // NOTE: Do not use yaml because it cannot be reversed.
           setFmt(target.value);
           break;
         default:
@@ -38,7 +38,7 @@ export const OutFormatList = () => {
   const extra = isSupportedExtra
     ? ([
         { value: 'json', label: 'Json' },
-        { value: 'yaml', label: 'Yaml' },
+        // { value: 'yaml', label: 'Yaml' }, // NOTE: Do not use yaml because it cannot be reversed.
       ] as const)
     : ([] as const);
 
