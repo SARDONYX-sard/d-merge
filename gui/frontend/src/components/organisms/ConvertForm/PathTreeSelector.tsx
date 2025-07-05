@@ -68,17 +68,28 @@ const getAllItemItemIds = (items: TreeViewBaseItem[]) => {
  * https://mui.com/x/react-tree-view/rich-tree-view/customization/#custom-icons
  */
 export const PathTreeSelector = memo(function PathTreeSelector() {
-  const { selectedTree, setSelectedTree } = useConvertContext();
+  const { treeDirInput, selectedTree, setSelectedTree } = useConvertContext();
   const toggledItemRef = useRef<{ [itemId: string]: boolean }>({});
   const apiRef = useTreeViewApiRef();
   const { t } = useTranslation();
+
+  const computedTree = (() => {
+    if (selectedTree.roots.length === 0) {
+      return {
+        ...selectedTree,
+        root: [...selectedTree.roots, treeDirInput],
+      };
+    } else {
+      return selectedTree;
+    }
+  })();
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const [expandedItems, setExpandedItems] = [
     selectedTree.expandedItems,
     (expandedItems: string[]) => {
       setSelectedTree({
-        ...selectedTree,
+        ...computedTree,
         expandedItems,
       });
     },
