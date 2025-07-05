@@ -13,12 +13,12 @@ import {
 import { TreeItemIcon } from '@mui/x-tree-view/TreeItemIcon';
 import { TreeItemProvider } from '@mui/x-tree-view/TreeItemProvider';
 import { type UseTreeItemParameters, useTreeItem } from '@mui/x-tree-view/useTreeItem';
-import { type HTMLAttributes, memo, type Ref, type SyntheticEvent, useCallback, useRef } from 'react';
+import { type HTMLAttributes, memo, type Ref, type SyntheticEvent, useCallback, useEffect, useRef } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { hashDjb2 } from '@/lib/hash-djb2';
 import { OBJECT } from '@/lib/object-utils';
-
+import { loadDirNode } from '@/services/api/serde_hkx';
 import { useConvertContext } from './ConvertProvider';
 import { renderStatusIcon } from './renderStatusIcon';
 
@@ -73,23 +73,26 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
   const apiRef = useTreeViewApiRef();
   const { t } = useTranslation();
 
-  const computedTree = (() => {
-    if (selectedTree.roots.length === 0) {
-      return {
-        ...selectedTree,
-        root: [...selectedTree.roots, treeDirInput],
-      };
-    } else {
-      return selectedTree;
+  useEffect(() => {
+    if (selectedTree.tree.length !== 0 || treeDirInput === '') {
+      return;
     }
-  })();
+
+    (async () => {
+      const loadedTree = await loadDirNode([treeDirInput]);
+      setSelectedTree((prev) => ({
+        ...prev,
+        tree: loadedTree,
+      }));
+    })();
+  }, [treeDirInput, selectedTree.tree.length, setSelectedTree]);
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const [expandedItems, setExpandedItems] = [
     selectedTree.expandedItems,
     (expandedItems: string[]) => {
       setSelectedTree({
-        ...computedTree,
+        ...selectedTree,
         expandedItems,
       });
     },
@@ -220,7 +223,7 @@ const CustomTreeItem = memo(function CustomTreeItem(props: CustomTreeItemProps, 
             <TreeItemLabel {...getLabelProps()} />
           </Box>
         </CustomTreeItemContent>
-        {children && <TreeItemGroupTransition {...getGroupTransitionProps()} />}
+        {children && <TreeItemGroupTransition {...getGroupTransitionProps()} sx={{ ml: 2 }} />}
       </TreeItemRoot>
     </TreeItemProvider>
   );

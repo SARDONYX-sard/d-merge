@@ -46,7 +46,7 @@ type ContextType = {
   treeDirInput: string;
   setTreeDirInput: (value: string) => void;
   selectedTree: SelectedTree;
-  setSelectedTree: (value: SelectedTree) => void;
+  setSelectedTree: Dispatch<SetStateAction<SelectedTree>>;
 
   output: string;
   setOutput: (value: string) => void;
