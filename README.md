@@ -92,7 +92,7 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic parallel merge.
   - [ ] Fix unknown merge race condition
 
-![patch_page](https://github.com/user-attachments/assets/48b4d85d-ce79-4a46-87de-55a9c7e27436)
+![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
 
 ## Licenses
 
