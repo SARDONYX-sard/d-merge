@@ -14,19 +14,9 @@ type Id =
 type Props = DataGridProps & {
   rows: Id[];
   onDragEnd: DndCtxProps['onDragEnd'];
-  /**
-   * @default true
-   */
-  isDraggable?: boolean;
 };
 
-export const DraggableDataGrid = memo(function DraggableGrid({
-  rows,
-  onDragEnd,
-  isDraggable = true,
-  slots,
-  ...props
-}: Props) {
+export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, slots, ...props }: Props) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -56,12 +46,11 @@ export const DraggableDataGrid = memo(function DraggableGrid({
         <SortableContext items={rows} strategy={verticalListSortingStrategy}>
           <DataGrid
             checkboxSelection={true}
-            // disableColumnSorting={true} // Because they cannot be reordered when reordering is applied: https://github.com/mui/mui-x/issues/10706
             disableRowSelectionOnClick={true}
-            rowBufferPx={2000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
+            rowBufferPx={4000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
             showCellVerticalBorder={true}
-            slots={{ ...slots, row: isDraggable ? DraggableGridRow : undefined }}
+            slots={{ ...slots, row: DraggableGridRow }}
             {...props}
           />
         </SortableContext>

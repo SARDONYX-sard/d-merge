@@ -59,8 +59,6 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
   const apiRef = useGridApiRef();
   useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
 
-  const isDraggable = apiRef.current?.getSortModel()?.length == 0; // 0 or undefined, then can
-
   return (
     <DraggableDataGrid
       apiRef={apiRef}
@@ -73,7 +71,6 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
           },
         },
       }}
-      isDraggable={isDraggable}
       keepNonExistentRowsSelected={true}
       loading={loading}
       onDragEnd={handleDragEnd}
