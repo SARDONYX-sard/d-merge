@@ -63,11 +63,13 @@ skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.
 [profile.release]
-codegen-units = 1
+# NOTE: Optimizing to the limit reduces the size of the binary, but for some reason,
+# the second async fn cannot be executed, resulting in an error, so it is turned off.
+# codegen-units = 1
 debug = false
-lto = true
+# lto = true
 opt-level = 3
-panic = 'abort'
+# panic = 'abort'
 strip = true
 
 # Use release mode during development to prevent `serde-hkx` stack overflow
