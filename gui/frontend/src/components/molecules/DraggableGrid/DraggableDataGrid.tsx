@@ -14,9 +14,19 @@ type Id =
 type Props = DataGridProps & {
   rows: Id[];
   onDragEnd: DndCtxProps['onDragEnd'];
+  /**
+   * @default true
+   */
+  isDraggable?: boolean;
 };
 
-export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, slots, ...props }: Props) {
+export const DraggableDataGrid = memo(function DraggableGrid({
+  rows,
+  onDragEnd,
+  isDraggable = true,
+  slots,
+  ...props
+}: Props) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -51,7 +61,7 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
             rowBufferPx={2000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
             showCellVerticalBorder={true}
-            slots={{ ...slots, row: DraggableGridRow }}
+            slots={{ ...slots, row: isDraggable ? DraggableGridRow : undefined }}
             {...props}
           />
         </SortableContext>
