@@ -52,7 +52,7 @@
 
 ## Release
 
-- [Early Release](https://github.com/SARDONYX-sard/d-merge/releases)
+- [Click assets](https://github.com/SARDONYX-sard/d-merge/releases)
 
 ## Patch Page Progress
 
@@ -61,14 +61,12 @@ This currently works to some extent(Sliding, Paraglider, MCO, DMCO-Dodge, ...), 
 The only thing we are considering at this time is support for the Nemesis patch.(Since I only use the Nemesis patch).
 
 - GUI
-
   - [x] Basic frontend(patch, convert, settings)
   - [x] Support MO2 mode/Virtual file system mode(auto read settings file) when use auto detect(Current: windows only)
   - [ ] hkx json/patch editor
   - [ ] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
 
 - AnimData(`animationdatasinglefile.txt`)
-
   - [x] Serialization
   - [x] Deserialization
   - [ ] txt project header patch
@@ -78,19 +76,17 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [ ] Conflict resolver
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
-
   - [x] Serialization
   - [x] Deserialization
-  - [ ] Add Operation (Impossible unless the specification of the difference is understood.)
-  - [ ] Replace/Remove Operation(Same issue)
+  - [x] Add Operation (Support Triggers & AnimInfos, other is unsupported)
+  - [x] Replace/Remove Operation(Support Triggers & AnimInfos, other is unsupported)
 
 - hkx templates
-
   - [x] Change xml to message_pack bin.
 
 - Nemesis Patch
   - [x] Basic parallel merge.
-  - [ ] Fix unknown merge race condition
+  - [x] Fix unknown merge race condition(The cause was a deadlock in applying patches.)
 
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
 
