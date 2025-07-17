@@ -596,7 +596,6 @@ impl<'de> Deserializer<'de> {
                                 .one
                                 .insert(range.start, diff);
                         } else {
-                            // one_diff なのに Replace 以外ならエラーするなど検討もできる
                             return Err(Error::InvalidOpForOneField { op });
                         }
                     } else {
