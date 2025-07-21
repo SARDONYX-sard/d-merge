@@ -18,7 +18,7 @@ dist = false # To run CI and build separately from CLI (cargo dist)
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.3.0", features = [] }
+tauri-build = { version = "2.3.1", features = [] }
 
 [dependencies]
 chrono = "0.4.41"
