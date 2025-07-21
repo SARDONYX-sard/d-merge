@@ -33,7 +33,7 @@
     "@mui/material": "7.2.0",
     "@mui/x-data-grid": "8.8.0",
     "@mui/x-tree-view": "8.7.0",
-    "@tauri-apps/api": "2.6.0",
+    "@tauri-apps/api": "2.7.0",
     "@tauri-apps/plugin-dialog": "2.3.0",
     "@tauri-apps/plugin-fs": "2.4.0",
     "@tauri-apps/plugin-opener": "^2.4.0",
