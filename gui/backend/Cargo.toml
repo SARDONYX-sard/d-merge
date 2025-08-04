@@ -39,7 +39,7 @@ tauri = { version = "2.6.2", features = ["devtools"] } # For GUI
 tauri-plugin-dialog = "2.3.0" # https://github.com/tauri-apps/plugins-workspace
 tauri-plugin-fs = "2.4.0"
 tauri-plugin-opener = "2.4.0"
-tauri-plugin-window-state = "2.3.0"
+tauri-plugin-window-state = "2.4.0"
 tokio = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
