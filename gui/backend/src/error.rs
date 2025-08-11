@@ -1,14 +1,10 @@
 //! errors of `This crate`
-use std::{io, path::PathBuf};
+use std::io;
 
 /// GUI Error
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    /// Failed to read file from
-    #[snafu(display("{source}: {}", path.display()))]
-    FailedReadFile { source: io::Error, path: PathBuf },
-
     /// Failed to get skyrim data dir: {source}
     NotFoundSkyrimDataDir { source: io::Error },
 
