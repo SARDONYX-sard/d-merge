@@ -295,6 +295,8 @@ impl<'de> Deserializer<'de> {
             if diff_start {
                 self.current.set_main_range_start(start_index)?;
             }
+
+            #[allow(unused)] // TODO: Support attack diff patch
             let attack_trigger = self.parse_next(
                 one_line
                     .verify(|s: &str| is_attack_starts(s))
@@ -315,6 +317,7 @@ impl<'de> Deserializer<'de> {
             let _clip_names_len = self.parse_next(
                 parse_one_line::<usize>.context(Expected(Description("clip_names_len: usize"))),
             )?;
+            #[cfg(feature = "tracing")]
             tracing::debug!(?attack_trigger, ?_is_contextual, ?_clip_names_len);
 
             let mut clip_names_start_index = 0;
@@ -340,6 +343,8 @@ impl<'de> Deserializer<'de> {
                 self.parse_opt_close_comment()?;
                 self.parse_next(multispace0)?;
                 clip_names_start_index += 1;
+
+                #[cfg(feature = "tracing")]
                 tracing::debug!(?clip_name);
             }
 
@@ -543,7 +548,6 @@ impl<'de> Deserializer<'de> {
                                 .one
                                 .insert(range.start, diff);
                         } else {
-                            // one_diff なのに Replace 以外ならエラーするなど検討もできる
                             return Err(Error::InvalidOpForOneField { op });
                         }
                     } else {
@@ -560,7 +564,7 @@ impl<'de> Deserializer<'de> {
                         self.output_patches.conditions_patches.seq.push(values);
                     }
                 }
-                ParserKind::Attacks => {} // TODO:
+                ParserKind::Attacks => {} // TODO: Support attack diff
                 ParserKind::AnimInfos => {
                     let one_diff = match self.current.one_field_patch.take() {
                         Some(FieldKind::AnimInfoAsciiExtension(ascii_extension)) => {
@@ -687,7 +691,7 @@ mod tests {
     // 19150068                       <- hashed_file_name[1]
     // 7891816                        <- ascii_extension[1]
 
-    #[quick_tracing::init]
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
     #[ignore = "Not complete yet"]
     #[test]
     fn test_replace_anim_block_diff_patch() {
