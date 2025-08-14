@@ -28,7 +28,7 @@ macro_rules! json_path {
     };
 
     // Match when one or more string literal arguments are provided.
-    ( $( $arg:literal ),* $(,)? ) => {
+    ( $( $arg:expr ),* $(,)? ) => {
         {
             std::vec![
                 $(

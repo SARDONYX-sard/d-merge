@@ -13,6 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bitflags = "2.9.1"
 dashmap = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
@@ -20,6 +21,8 @@ phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true, optional = true }
+havok_types = { workspace = true }
+havok_classes = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = [
   "extra_fmt",
