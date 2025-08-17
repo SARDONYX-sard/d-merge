@@ -17,7 +17,6 @@ fn main() {
         .on_window_event(prevent_close_window)
         .invoke_handler(tauri::generate_handler![
             crate::cmd::conversion::convert,
-            crate::cmd::conversion::is_supported_extra_fmt,
             crate::cmd::conversion::par_walk_dir::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,

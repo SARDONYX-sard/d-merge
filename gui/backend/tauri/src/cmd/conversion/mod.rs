@@ -10,19 +10,6 @@ use serde_hkx_features::OutFormat;
 use std::path::Path;
 use tauri::Window;
 
-/// Whether the converter supports json and yaml conversion as well?
-#[tauri::command]
-pub(crate) const fn is_supported_extra_fmt() -> bool {
-    #[cfg(feature = "extra_fmt")]
-    const RET: bool = true;
-    #[cfg(not(feature = "extra_fmt"))]
-    const RET: bool = false;
-
-    RET
-}
-
-// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Convert hkx <-> xml
 /// -
 #[tauri::command]

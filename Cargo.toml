@@ -18,8 +18,9 @@ members = [
   "core/node_expr",
   "core/skyrim_anim_parser",
   "core/skyrim_crc",
-  "gui/backend",
+  "ffi/javascript/node",
   "ffi/python",
+  "gui/backend/tauri",
 ]
 resolver = "2"
 

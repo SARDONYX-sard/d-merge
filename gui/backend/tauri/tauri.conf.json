@@ -1,5 +1,5 @@
 {
-  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "../../../node_modules/@tauri-apps/cli/config.schema.json",
   "app": {
     "security": {
       "csp": null,
@@ -29,7 +29,7 @@
     "beforeDevCommand": "npm run dev:front",
     "devUrl": "http://localhost:3000",
     "features": [],
-    "frontendDist": "../frontend/out"
+    "frontendDist": "../../frontend/out"
   },
   "bundle": {
     "active": true,
@@ -37,7 +37,7 @@
     "copyright": "SARDONYX-sard",
     "externalBin": [],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-    "licenseFile": "../../LICENSE",
+    "licenseFile": "../../../LICENSE",
     "longDescription": "",
     "macOS": {
       "entitlements": null,
@@ -60,5 +60,5 @@
   "identifier": "SARDONYX.d-merge",
   "plugins": {},
   "productName": "d_merge",
-  "version": "../../package.json"
+  "version": "../../../package.json"
 }

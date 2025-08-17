@@ -2,10 +2,7 @@ use super::bail;
 use node_expr::{build_dir_tree, DirEntry};
 use rayon::prelude::*;
 
-#[cfg(feature = "extra_fmt")]
-const FILTER: [&str; 4] = ["hkx", "xml", "json", "yaml"];
-#[cfg(not(feature = "extra_fmt"))]
-const FILTER: [&str; 2] = ["hkx", "xml"];
+const FILTER: [&str; 3] = ["hkx", "xml", "json"];
 
 /// Loads a directory structure from the specified path, filtering by allowed extensions.
 ///

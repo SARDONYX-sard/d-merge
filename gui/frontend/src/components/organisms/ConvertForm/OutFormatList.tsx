@@ -1,21 +1,12 @@
 import type { SelectChangeEvent } from '@mui/material';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { SelectWithLabel } from '@/components/molecules/SelectWithLabel';
-import { NOTIFY } from '@/lib/notify';
-import { isSupportedExtraFmt } from '@/services/api/serde_hkx';
 import { useConvertContext } from './ConvertProvider';
 
 export const OutFormatList = () => {
   const { fmt, setFmt } = useConvertContext();
-  const [isSupportedExtra, setIsSupportedExtra] = useState(false);
   const { t } = useTranslation();
-
-  useEffect(() => {
-    NOTIFY.asyncTry(async () => {
-      setIsSupportedExtra(await isSupportedExtraFmt());
-    });
-  }, []);
 
   const handleOnChange = useCallback(
     ({ target }: SelectChangeEvent) => {
@@ -35,12 +26,10 @@ export const OutFormatList = () => {
     [setFmt],
   );
 
-  const extra = isSupportedExtra
-    ? ([
-        { value: 'json', label: 'Json' },
-        // { value: 'yaml', label: 'Yaml' }, // NOTE: Do not use yaml because it cannot be reversed.
-      ] as const)
-    : ([] as const);
+  const extra = [
+    { value: 'json', label: 'Json' },
+    // { value: 'yaml', label: 'Yaml' }, // NOTE: Do not use yaml because it cannot be reversed.
+  ] as const;
 
   const menuItems = [
     { value: 'amd64', label: 'Amd64' },

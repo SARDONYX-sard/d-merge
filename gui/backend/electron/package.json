@@ -1,0 +1,73 @@
+{
+  "name": "@d-merge/electron_backend",
+  "version": "0.1.0",
+  "author": "SARDONYX",
+  "description": "hkx patcher",
+  "private": true,
+  "type": "commonjs",
+  "main": "out/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "vite build -c ./vite.electron.config.ts && electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "electron": "37.3.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2"
+  },
+  "build": {
+    "appId": "io.github.github.d-merge",
+    "productName": "d_merge",
+    "copyright": "Copyright (c) 2025 SARDONYX",
+    "files": [
+      "./out",
+      {
+        "from": "../../frontend/out",
+        "to": "frontend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "../../../resource/assets",
+        "to": "assets"
+      }
+    ],
+    "win": {
+      "target": [
+        "dir",
+        "portable",
+        "nsis",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
+      "icon": "../tauri/icons/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "signIgnore": null,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "icon": "../tauri/icons/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
+      "icon": "../tauri/icons/icon.png"
+    }
+  }
+}

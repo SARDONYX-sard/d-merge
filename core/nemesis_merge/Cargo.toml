@@ -68,4 +68,4 @@ serde = ["dep:serde", "json_patch/serde"]
 #   { "type": "Error", "message": "Something went wrong" }
 #
 # Disable this feature if you prefer the default Rust/Serde enum format.
-ts_serde = []
+ts_serde = ["serde"]

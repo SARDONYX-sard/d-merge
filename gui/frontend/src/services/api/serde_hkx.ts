@@ -15,15 +15,6 @@ export async function convert(inputs: string[], output: string, format: OutForma
   await invoke('convert', { inputs, output, format, roots });
 }
 
-/**
- * Whether the converter supports json and yaml conversion as well?
- *
- * @throws If the backend API (`invoke`) could not be called.
- */
-export async function isSupportedExtraFmt() {
-  return await invoke<boolean>('is_supported_extra_fmt');
-}
-
 export async function loadDirNode(dirs: string[]) {
   return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
 }

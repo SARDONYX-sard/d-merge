@@ -1,0 +1,26 @@
+[package]
+name = "d_merge_node"
+version.workspace = true
+description = "d-merge for Python3"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["skyrim", "node", "ffi"]
+license = "GPL-3.0"
+readme = "../../readme.md"
+repository.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "d_merge_node"
+crate-type = ["cdylib"]
+
+[dependencies]
+nemesis_merge = { workspace = true }
+napi = { version = "3.2.3", features = ["tokio_rt", "napi10"] }
+napi-derive = "3.2.3"
+
+[build-dependencies]
+napi-build = "2.2.3"
