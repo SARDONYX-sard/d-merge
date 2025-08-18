@@ -14,21 +14,24 @@ export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
  */
 export async function convert(inputs: string[], output: string, format: OutFormat, roots?: string[]) {
   if (isTauri()) {
-    await invoke('convert', { inputs, output, format, roots });
-  } else if (isElectron()) {
-    await electronApi.convert(inputs, output, format, roots);
-  } else {
-    throw new Error('Unsupported platform');
+    return await invoke('convert', { inputs, output, format, roots });
   }
-  await invoke('convert', { inputs, output, format, roots });
+
+  if (isElectron()) {
+    return await electronApi.convert(inputs, output, format, roots);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
 export async function loadDirNode(dirs: string[]) {
   if (isTauri()) {
     return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
-  } else if (isElectron()) {
-    return await electronApi.loadDirNode(dirs);
-  } else {
-    throw new Error('Unsupported platform');
   }
+
+  if (isElectron()) {
+    return await electronApi.loadDirNode(dirs);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }

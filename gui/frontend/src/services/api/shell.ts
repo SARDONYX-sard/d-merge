@@ -16,12 +16,14 @@ import { electronApi, isElectron } from './electron/setup';
 export async function openUrl(path: string) {
   await NOTIFY.asyncTry(async () => {
     if (isTauri()) {
-      await tauriOpenUrl(path);
-    } else if (isElectron()) {
-      await electronApi.openUrl(path);
-    } else {
-      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+      return await tauriOpenUrl(path);
     }
+
+    if (isElectron()) {
+      return await electronApi.openUrl(path);
+    }
+
+    throw new Error('Unsupported platform: Neither Tauri nor Electron');
   });
 }
 
