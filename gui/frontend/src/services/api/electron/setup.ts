@@ -1,12 +1,12 @@
-export const is_electron = () => {
+export const isElectron = () => {
   //@ts-ignore
-  return window.__ELECTRON__ !== undefined;
+  return (globalThis || window).__ELECTRON__ !== undefined;
 };
 
 // @ts-ignore
 export const electronApi = window.__ELECTRON__;
 
-if (is_electron()) {
+if (isElectron()) {
   window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     electronApi.showContextMenu();

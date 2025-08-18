@@ -8,6 +8,7 @@ import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
+import { isElectron } from '@/services/api/electron/setup';
 import { setVfsMode } from '@/services/api/patch';
 
 export const useBackup = () => {
@@ -15,13 +16,15 @@ export const useBackup = () => {
   useAutoExportBackup();
 };
 
+const isDesktopApp = () => isTauri() || isElectron();
+
 const useAutoImportBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
     const doImport = async () => {
-      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+      if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
@@ -59,7 +62,7 @@ const useAutoExportBackup = () => {
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+    if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
       setVfsMode(false);
       return;
     }

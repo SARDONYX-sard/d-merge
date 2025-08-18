@@ -1,7 +1,9 @@
+import { isTauri } from '@tauri-apps/api/core';
 import type { EventCallback, EventName } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import type { ReactNode } from 'react';
 import { NOTIFY } from '@/lib/notify';
+import { electronApi, isElectron } from './electron/setup';
 
 type ListenerProps = {
   setLoading: (b: boolean) => void;
@@ -89,7 +91,14 @@ export async function statusListener(
   };
 
   try {
-    unlisten = await listen<StatusPayload>(eventName, eventHandler);
+    if (isTauri()) {
+      unlisten = await listen<Status>(eventName, eventHandler);
+    } else if (isElectron()) {
+      unlisten = await electronApi.statusListener(eventName, eventHandler);
+    } else {
+      throw new Error('Unsupported platform for status listener: Neither Tauri nor Electron');
+    }
+
     await promiseFn();
     onSuccess?.();
   } catch (err) {

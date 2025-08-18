@@ -1,11 +1,11 @@
 import { app } from '@tauri-apps/api';
-import { invoke } from '@tauri-apps/api/core';
-import { appLogDir } from '@tauri-apps/api/path';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { appLogDir as tauriAppLogDir } from '@tauri-apps/api/path';
 import { z } from 'zod';
-
 import { STORAGE } from '@/lib/storage';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
+import { electronApi, isElectron } from '@/services/api/electron/setup';
 import { openPath } from '@/services/api/shell';
 
 const logList = ['trace', 'debug', 'info', 'warn', 'error'] as const;
@@ -19,14 +19,12 @@ const normalize = (logLevel?: string | null): LogLevel => {
 };
 
 export const LOG = {
-  default: DEFAULT,
-
   /**
    * Opens the log file.
    * @throws - if not found path
    */
   async openFile() {
-    const logFile = `${await appLogDir()}/${await app.getName()}.log`;
+    const logFile = `${await getLogDir()}/${await getAppName()}.log`;
     await openPath(logFile);
   },
 
@@ -35,7 +33,7 @@ export const LOG = {
    * @throws - if not found path
    */
   async openDir() {
-    await openPath(await appLogDir());
+    await openPath(await getLogDir());
   },
 
   /**
@@ -44,7 +42,13 @@ export const LOG = {
    * @returns A promise that resolves when the log level is changed.
    */
   async changeLevel(logLevel?: LogLevel) {
-    await invoke('change_log_level', { logLevel });
+    if (isTauri()) {
+      await invoke('change_log_level', { logLevel });
+    } else if (isElectron()) {
+      await electronApi.changeLogLevel(logLevel);
+    } else {
+      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+    }
   },
 
   normalize,
@@ -59,3 +63,21 @@ export const LOG = {
     STORAGE.set(PUB_CACHE_OBJ.logLevel, JSON.stringify(level));
   },
 } as const;
+
+async function getLogDir(): Promise<string> {
+  if (isTauri()) {
+    return await tauriAppLogDir();
+  } else if (isElectron()) {
+    return await electronApi.getAppLogDir();
+  }
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+}
+
+async function getAppName(): Promise<string> {
+  if (isTauri()) {
+    return await app.getName();
+  } else if (isElectron()) {
+    return await electronApi.getAppName();
+  }
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+}

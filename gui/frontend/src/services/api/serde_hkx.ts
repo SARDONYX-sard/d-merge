@@ -1,5 +1,6 @@
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { electronApi, isElectron } from './electron/setup';
 
 // NOTE: Do not use yaml because it cannot be reversed.
 export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
@@ -12,9 +13,22 @@ export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
  * @throws Error
  */
 export async function convert(inputs: string[], output: string, format: OutFormat, roots?: string[]) {
+  if (isTauri()) {
+    await invoke('convert', { inputs, output, format, roots });
+  } else if (isElectron()) {
+    await electronApi.convert(inputs, output, format, roots);
+  } else {
+    throw new Error('Unsupported platform');
+  }
   await invoke('convert', { inputs, output, format, roots });
 }
 
 export async function loadDirNode(dirs: string[]) {
-  return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
+  if (isTauri()) {
+    return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
+  } else if (isElectron()) {
+    return await electronApi.loadDirNode(dirs);
+  } else {
+    throw new Error('Unsupported platform');
+  }
 }

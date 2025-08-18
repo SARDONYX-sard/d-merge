@@ -1,6 +1,7 @@
-import { openPath as _openPath, openUrl as _openUrl } from '@tauri-apps/plugin-opener';
-
+import { isTauri } from '@tauri-apps/api/core';
+import { openPath as tauriOpenPath, openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 import { NOTIFY } from '@/lib/notify';
+import { electronApi, isElectron } from './electron/setup';
 
 /**
  * Wrapper tauri's `open` with `notify.error`
@@ -13,7 +14,15 @@ import { NOTIFY } from '@/lib/notify';
  * @param {string} [openWith]
  */
 export async function openUrl(path: string) {
-  await NOTIFY.asyncTry(async () => await _openUrl(path));
+  await NOTIFY.asyncTry(async () => {
+    if (isTauri()) {
+      await tauriOpenUrl(path);
+    } else if (isElectron()) {
+      await electronApi.openUrl(path);
+    } else {
+      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+    }
+  });
 }
 
 /**
@@ -27,5 +36,13 @@ export async function openUrl(path: string) {
  * @param {string} [openWith]
  */
 export async function openPath(path: string) {
-  await NOTIFY.asyncTry(async () => await _openPath(path));
+  await NOTIFY.asyncTry(async () => {
+    if (isTauri()) {
+      await tauriOpenPath(path);
+    } else if (isElectron()) {
+      await electronApi.openPath(path);
+    } else {
+      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+    }
+  });
 }

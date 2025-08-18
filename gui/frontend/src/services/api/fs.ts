@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { z } from 'zod';
 
@@ -6,6 +6,7 @@ import type { CacheKey } from '@/lib/storage';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 import { openPath } from './dialog';
+import { electronApi, isElectron } from './electron/setup';
 
 /**
  * Reads the entire contents of a file into a string.
@@ -27,7 +28,13 @@ export async function readFile(pathCacheKey: CacheKey, filterName: string, exten
   });
 
   if (typeof selectedPath === 'string') {
-    return await readTextFile(selectedPath);
+    if (isTauri()) {
+      return await readTextFile(selectedPath);
+    } else if (isElectron()) {
+      return await electronApi.readFile(selectedPath);
+    } else {
+      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+    }
   }
   return null;
 }
@@ -40,8 +47,14 @@ export async function readFile(pathCacheKey: CacheKey, filterName: string, exten
  * - The `writeTextFile` of tauri's api has a bug that the data order of some contents is unintentionally swapped.
  * @param path - path to write
  * @param content - string content
- * @throws Error
+ * @throws If failed to read content or if the platform is unsupported.
  */
 export async function writeFile(path: string, content: string) {
-  await invoke('write_file', { path, content });
+  if (isTauri()) {
+    return await invoke('write_file', { path, content });
+  } else if (isElectron()) {
+    return await electronApi.writeFile(path, content);
+  } else {
+    throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  }
 }
