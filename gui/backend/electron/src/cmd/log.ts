@@ -1,12 +1,13 @@
+import { changeLogLevel } from 'd_merge_node';
 import { app, ipcMain } from 'electron';
 
-ipcMain.handle('log:changeLevel', (_, level: string = 'error') => {
+ipcMain.handle('log:changeLevel', async (_, level: string = 'error') => {
   let isValid = false;
   if (['error', 'warn', 'info', 'debug', 'trace'].includes(level)) {
     isValid = true;
   }
 
-  // TODO: implement log level change logic in Electron(By Rust tracing ffi)
+  await changeLogLevel(level);
 });
 
 ipcMain.handle('app:getLogDir', () => app.getPath('logs'));

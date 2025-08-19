@@ -20,9 +20,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
-    "@tauri-apps/cli": "2.7.1",
+    "@tauri-apps/cli": "2.8.0",
     "@types/node": "24.3.0",
-    "@vitejs/plugin-react-swc": "4.0.0",
+    "@vitejs/plugin-react-swc": "4.0.1",
     "concurrently": "^9.2.0",
     "prettier": "3.6.2",
     "rimraf": "^6",
@@ -31,8 +31,9 @@
     "vitest": "3.2.4"
   },
   "workspaces": [
-    "gui/frontend",
-    "gui/backend/electron"
+    "ffi/javascript/node",
+    "gui/backend/electron",
+    "gui/frontend"
   ],
   "packageManager": "npm@10.8.3"
 }

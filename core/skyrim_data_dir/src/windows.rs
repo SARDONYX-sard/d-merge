@@ -3,9 +3,12 @@ use std::io;
 use std::os::windows::ffi::OsStringExt as _;
 use std::path::PathBuf;
 
-use crate::cmd::get_skyrim_dir::Runtime;
+use super::Runtime;
 
 /// Get the skyrim data directory.
+///
+/// # Errors
+/// Returns an error if the Skyrim directory cannot be found from registry.
 #[inline]
 pub fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     get_skyrim_dir(runtime).map(|mut path| {

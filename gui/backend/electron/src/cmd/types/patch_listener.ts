@@ -10,6 +10,7 @@ type ErrorPayload = string;
  * Backend status enum for merge operation (defined in Rust).
  *
  * The backend emits these status values using `window.emit(...)` during various stages.
+ * - Mirrors Rust enum with serde(tag="type", content="content").
  */
 export type Status =
   | { type: 'ReadingPatches'; content: StatusIndexing }

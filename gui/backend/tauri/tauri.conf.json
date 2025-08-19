@@ -47,7 +47,7 @@
       "signingIdentity": null
     },
     "resources": {
-      "../../resource/assets": "assets"
+      "../../../resource/assets": "assets"
     },
     "shortDescription": "",
     "targets": "all",

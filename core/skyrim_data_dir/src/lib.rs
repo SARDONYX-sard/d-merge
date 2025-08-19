@@ -7,7 +7,9 @@ mod unix {
     use std::io;
     use std::path::PathBuf;
 
-    /// # Note
+    /// Get the skyrim data directory.
+    ///
+    /// # Errors
     /// Unsupported `get_skyrim_data_dir` on Unix. windows only
     #[inline]
     #[allow(clippy::missing_const_for_fn)]
@@ -24,8 +26,9 @@ pub use unix::get_skyrim_data_dir;
 #[cfg(target_os = "windows")]
 pub use windows::get_skyrim_data_dir;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "UPPERCASE"))]
+#[derive(Debug, Clone, Copy)]
 pub enum Runtime {
     /// Skyrim Legendary Edition(32bit)
     Le,

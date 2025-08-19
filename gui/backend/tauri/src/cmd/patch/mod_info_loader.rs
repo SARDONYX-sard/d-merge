@@ -1,7 +1,7 @@
 use crate::cmd::bail;
-use crate::cmd::get_skyrim_dir::Runtime;
 use crate::error::NotFoundSkyrimDataDirSnafu;
 use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
+use skyrim_data_dir::Runtime;
 use snafu::ResultExt as _;
 use std::path::PathBuf;
 
@@ -22,8 +22,7 @@ pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
 /// e.g. `D:\\STEAM\\steamapps\\common\\Skyrim Special Edition\\Data`
 #[tauri::command]
 pub(crate) fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, String> {
-    match crate::cmd::get_skyrim_dir::get_skyrim_data_dir(runtime)
-        .with_context(|_| NotFoundSkyrimDataDirSnafu)
+    match skyrim_data_dir::get_skyrim_data_dir(runtime).with_context(|_| NotFoundSkyrimDataDirSnafu)
     {
         Ok(path) => Ok(path),
         Err(err) => bail!(err),

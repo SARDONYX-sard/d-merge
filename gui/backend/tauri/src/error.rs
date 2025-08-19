@@ -21,23 +21,10 @@ pub enum Error {
     NotFoundLogDir { source: tauri::Error },
 
     /// Failed to initialize logger.
-    FailedInitLog,
-
-    /// Uninitialized logger.
-    UninitLog,
-
-    /// Tracing log error
     #[snafu(transparent)]
-    FailedSetTracing {
-        source: tracing::subscriber::SetGlobalDefaultError,
+    FailedInitRotationLog {
+        source: tracing_rotation::error::Error,
     },
-
-    /// Tracing subscriber reload error
-    #[snafu(transparent)]
-    FailedReloadTracingSub {
-        source: tracing_subscriber::reload::Error,
-    },
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 /// `Result` for this crate.

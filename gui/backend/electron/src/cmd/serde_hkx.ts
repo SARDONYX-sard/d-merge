@@ -1,12 +1,11 @@
+import { convert, loadDirNode } from 'd_merge_node';
 import { ipcMain } from 'electron';
 
-ipcMain.handle('convert:convert', async (_, { inputs, output, format, roots }) => {
-  // TODO: Rust FFI
-  // await convert('convert', { inputs, output, format, roots });
+ipcMain.handle('serde_hkx:convert', async (_, { inputs, output, format, roots }) => {
+  await convert(inputs, output, format, roots);
 });
 
 // Load directory tree
-ipcMain.handle('convert:loadDirNode', async (_, { dirs }: { dirs: string[] }) => {
-  // TODO: Rust FFI
-  // return await invoke<TreeViewBaseItem[]>(dirs); // TODO: Return TreeViewBaseItem[]
+ipcMain.handle('serde_hkx:loadDirNode', async (_, { dirs }: { dirs: string[] }) => {
+  return await loadDirNode(dirs);
 });

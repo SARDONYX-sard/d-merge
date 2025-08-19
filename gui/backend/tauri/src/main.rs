@@ -3,7 +3,6 @@
 
 mod cmd;
 mod error;
-mod libs;
 mod log;
 
 // NOTE: For some reason, other tasks freeze after executing async cmd, so I don't use #[tokio::main].
@@ -17,7 +16,7 @@ fn main() {
         .on_window_event(prevent_close_window)
         .invoke_handler(tauri::generate_handler![
             crate::cmd::conversion::convert,
-            crate::cmd::conversion::par_walk_dir::load_dir_node,
+            crate::cmd::conversion::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::log::change_log_level,
             crate::cmd::patch::cancel_patch,

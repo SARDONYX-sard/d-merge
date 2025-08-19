@@ -2,6 +2,7 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 /// Generate an output path based on the roots_path and input_path.
+///
 /// If input_path starts with any of the roots_path entries, the relative path
 /// will be used. Otherwise, only the file stem will be appended.
 pub fn generate_output_path<P>(input: P, output_dir: &str, strip_roots: &[String]) -> PathBuf

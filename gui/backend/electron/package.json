@@ -23,7 +23,9 @@
     "productName": "d_merge",
     "copyright": "Copyright (c) 2025 SARDONYX",
     "files": [
+      "../../../ffi/javascript/node/build/index.node",
       "./out",
+      "node_modules/**/*",
       {
         "from": "../../frontend/out",
         "to": "frontend",

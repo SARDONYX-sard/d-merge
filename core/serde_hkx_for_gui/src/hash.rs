@@ -1,14 +1,17 @@
+/// Hash function for generating a consistent path ID.
+///
+/// This uses the DJB2 algorithm, producing a `u32` hash from a string.
+///
 /// # Why use this?
-/// The frontend selection can be deleted.
-/// Therefore, the conversion status shifts when using index.
-/// So, using hash from path solves this problem.
-/// The exact same hash function is implemented in frontend and tested.
+/// - Frontend selection items can be deleted, which can shift indexes.
+/// - Using the hash of the file path ensures that each task has a stable ID.
+/// - The same hash function is implemented in the frontend and tested for consistency.
 pub const fn hash_djb2(key: &str) -> u32 {
     let mut hash: u32 = 5381;
     let bytes = key.as_bytes();
     let mut i = 0;
 
-    // NOTE: For const, it is necessary to loop with while instead of using for loop(iter).
+    // NOTE: For const functions, we must use a `while` loop instead of iterators.
     while i < bytes.len() {
         hash = ((hash << 5).wrapping_add(hash)) ^ (bytes[i] as u32);
         i += 1;
