@@ -16,7 +16,6 @@ mod unix {
     pub fn get_skyrim_data_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
         let _ = runtime;
         const ERR_MSG: &str = "Unsupported `get_skyrim_data_dir` on Unix. windows only";
-        tracing::info!(ERR_MSG);
         Err(io::Error::new(io::ErrorKind::NotFound, ERR_MSG))
     }
 }
