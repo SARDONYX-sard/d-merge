@@ -12,10 +12,10 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
-    "electron": "37.3.0",
+    "electron": "37.3.1",
     "electron-builder": "^26.0.12",
     "typescript": "^5.9.2",
-    "vite": "^7.1.2"
+    "vite": "^7.1.3"
   },
   "build": {
     "appId": "io.github.d-merge",
