@@ -1,14 +1,13 @@
 import path from 'node:path';
 import { app, BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
-import tauriConfigJson from '../../tauri/tauri.conf.json';
 
 let win: BrowserWindow | null = null;
 
 const WINDOW_CONFIG = {
   title: 'D Merge',
   backgroundColor: 'transparent',
-  width: tauriConfigJson.app.windows[0].width,
-  height: tauriConfigJson.app.windows[0].height,
+  width: 825,
+  height: 920,
   show: false,
   webPreferences: {
     preload: path.join(__dirname, 'preload.js'),

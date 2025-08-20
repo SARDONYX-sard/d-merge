@@ -1,5 +1,5 @@
 {
-  "name": "@d-merge/electron_backend",
+  "name": "@sardonyx/d-merge_electron_backend",
   "version": "0.1.0",
   "author": "SARDONYX",
   "description": "Json based hkx patcher",
@@ -8,17 +8,20 @@
   "main": "out/main.js",
   "scripts": {
     "dev": "electron .",
-    "build": "vite build -c ./vite.electron.config.ts && electron-builder"
+    "dev:js": "node ./esbuild.config.cjs",
+    "build:js": "cross-env NODE_ENV=release node ./esbuild.config.cjs",
+    "build": "npm run dev:js && electron-builder"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
     "electron": "37.3.1",
     "electron-builder": "^26.0.12",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.3"
+    "esbuild": "^0.25.9",
+    "cross-env": "10.0.0",
+    "typescript": "^5.9.2"
   },
   "build": {
-    "appId": "io.github.d-merge",
+    "appId": "io.github.sardonyx.d-merge",
     "productName": "d_merge",
     "copyright": "Copyright (c) 2025 SARDONYX",
     "files": [
@@ -39,14 +42,10 @@
       "target": [
         "dir",
         "portable",
-        "nsis",
         "zip"
       ],
       "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
-      "icon": "../tauri/icons/icon.ico",
-      "extraFiles": [
-        "../../../ffi/javascript/node/d_merge_node.win32-x64-msvc.node"
-      ]
+      "icon": "../tauri/icons/icon.ico"
     },
     "mac": {
       "target": [
@@ -55,10 +54,7 @@
       ],
       "signIgnore": null,
       "artifactName": "${productName}-Setup-${version}.${ext}",
-      "icon": "../tauri/icons/icon.icns",
-      "extraFiles": [
-        "../../../ffi/javascript/node/d_merge_node.aarch64-apple-darwin.node"
-      ]
+      "icon": "../tauri/icons/icon.icns"
     },
     "linux": {
       "target": [
@@ -67,10 +63,7 @@
         "zip"
       ],
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
-      "icon": "../tauri/icons/icon.png",
-      "extraFiles": [
-        "../../../ffi/javascript/node/d_merge_node.x86_64-linux-gnu.node"
-      ]
+      "icon": "../tauri/icons/icon.png"
     }
   }
 }
