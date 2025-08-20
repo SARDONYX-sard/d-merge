@@ -36,5 +36,5 @@
     "gui/backend/electron",
     "gui/frontend"
   ],
-  "packageManager": "npm@10.8.3"
+  "packageManager": "npm@11.5.2"
 }

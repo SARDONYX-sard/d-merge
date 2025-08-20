@@ -6,13 +6,19 @@ import { menu } from './context_menu';
 import { handleAccessRequest } from './url_resolver';
 import { createWindow } from './window';
 import './cmd'; // load ipc handlers
+import { loggerInit } from 'd_merge_node';
+import { logDir, logFileName } from './cmd/log';
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // App event handlers
 
 app.on('ready', () => {
+  loggerInit(logDir, logFileName);
+
   createWindow();
-  session.defaultSession.webRequest.onBeforeRequest(handleAccessRequest);
+  if (app.isPackaged) {
+    session.defaultSession.webRequest.onBeforeRequest(handleAccessRequest);
+  }
 });
 
 app.on('window-all-closed', () => {

@@ -16,7 +16,7 @@ export default defineConfig({
       external: [
         'electron', // no need `electron` inclusion
         /^node:/,
-        // 'd_merge_node', // native module
+        'd_merge_node', // native module
       ],
       output: {
         entryFileNames: '[name].js',
