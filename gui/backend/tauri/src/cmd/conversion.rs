@@ -1,6 +1,6 @@
 use super::sender;
 use rayon::prelude::*;
-use serde_hkx_for_gui::par_walk_dir::DirEntry;
+use serde_hkx_for_gui::DirEntry;
 use tauri::Window;
 
 /// Convert hkx <-> xml
@@ -29,7 +29,7 @@ pub(crate) async fn convert(
 /// Returns an error message if the directory cannot be loaded or if there are issues reading the path.
 #[tauri::command]
 pub fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, String> {
-    serde_hkx_for_gui::par_walk_dir::load_dir_node(dirs).map_err(|errs| {
+    serde_hkx_for_gui::load_dir_node(dirs).map_err(|errs| {
         let err = errs
             .par_iter()
             .map(|e| e.to_string())

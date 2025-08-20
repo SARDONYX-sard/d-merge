@@ -2,7 +2,7 @@
   "name": "@d-merge/electron_backend",
   "version": "0.1.0",
   "author": "SARDONYX",
-  "description": "hkx patcher",
+  "description": "Json based hkx patcher",
   "private": true,
   "type": "commonjs",
   "main": "out/main.js",
@@ -10,7 +10,6 @@
     "dev": "electron .",
     "build": "vite build -c ./vite.electron.config.ts && electron-builder"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^24.3.0",
     "electron": "37.3.0",
@@ -19,24 +18,17 @@
     "vite": "^7.1.2"
   },
   "build": {
-    "appId": "io.github.github.d-merge",
+    "appId": "io.github.d-merge",
     "productName": "d_merge",
     "copyright": "Copyright (c) 2025 SARDONYX",
     "files": [
-      "../../../ffi/javascript/node/build/index.node",
       "./out",
       "node_modules/**/*",
       {
         "from": "../../frontend/out",
-        "to": "frontend",
-        "filter": [
-          "**/*"
-        ]
+        "to": "frontend"
       }
     ],
-    "directories": {
-      "output": "dist"
-    },
     "extraResources": [
       {
         "from": "../../../resource/assets",
@@ -51,7 +43,10 @@
         "zip"
       ],
       "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
-      "icon": "../tauri/icons/icon.ico"
+      "icon": "../tauri/icons/icon.ico",
+      "extraFiles": [
+        "../../../ffi/javascript/node/d_merge_node.win32-x64-msvc.node"
+      ]
     },
     "mac": {
       "target": [
@@ -60,7 +55,10 @@
       ],
       "signIgnore": null,
       "artifactName": "${productName}-Setup-${version}.${ext}",
-      "icon": "../tauri/icons/icon.icns"
+      "icon": "../tauri/icons/icon.icns",
+      "extraFiles": [
+        "../../../ffi/javascript/node/d_merge_node.aarch64-apple-darwin.node"
+      ]
     },
     "linux": {
       "target": [
@@ -69,7 +67,10 @@
         "zip"
       ],
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
-      "icon": "../tauri/icons/icon.png"
+      "icon": "../tauri/icons/icon.png",
+      "extraFiles": [
+        "../../../ffi/javascript/node/d_merge_node.x86_64-linux-gnu.node"
+      ]
     }
   }
 }

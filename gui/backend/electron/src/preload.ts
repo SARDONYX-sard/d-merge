@@ -1,7 +1,7 @@
+import { DirEntry, PatchStatus } from 'd_merge_node';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ModIds, ModInfo, PatchArguments, PatchOptions } from './cmd/types/patch';
-import type { Status } from './cmd/types/patch_listener';
-import type { OutputFormat, TreeViewBaseItem } from './cmd/types/serde_hkx';
+import type { OutputFormat } from './cmd/types/serde_hkx';
 
 // frontend <-> backend bridge functions
 // frontend: window.__ELECTRON__.showContextMenu()
@@ -52,8 +52,8 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
   },
 
   // --- Patch Status Listener ---
-  async statusListener(eventName: string, f: (status: Status) => void): Promise<() => void> {
-    const listener = (_event: Electron.IpcRendererEvent, status: Status) => f(status);
+  async statusListener(eventName: string, f: (status: PatchStatus) => void): Promise<() => void> {
+    const listener = (_event: Electron.IpcRendererEvent, status: PatchStatus) => f(status);
     event: ipcRenderer.on(eventName, listener);
     return () => {
       ipcRenderer.removeListener(eventName, listener);
@@ -65,7 +65,7 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
     return ipcRenderer.invoke('serde_hkx:convert', { inputs, output, format, roots });
   },
 
-  async loadDirNode(dirs: string[]): Promise<TreeViewBaseItem[]> {
+  async loadDirNode(dirs: string[]): Promise<DirEntry[]> {
     return ipcRenderer.invoke('serde_hkx:loadDirNode', { dirs });
   },
 

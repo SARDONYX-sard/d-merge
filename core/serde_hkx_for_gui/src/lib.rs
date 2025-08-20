@@ -1,7 +1,9 @@
 pub mod hash;
-pub mod par_walk_dir;
+mod par_walk_dir;
 pub mod path;
 pub mod status;
+
+pub use par_walk_dir::{load_dir_node, DirEntry};
 
 use self::status::{Payload, Status};
 use crate::{hash::hash_djb2, path::infer::generate_output_path};

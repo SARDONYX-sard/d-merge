@@ -1,9 +1,8 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
-import { behaviorGen, Config, cancelPatch, getSkyrimDataDir, loadModsInfo } from 'd_merge_node';
+import { behaviorGen, Config, getSkyrimDataDir, loadModsInfo, PatchStatus } from 'd_merge_node';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { ModInfo, PatchArguments } from './types/patch';
-import { Status } from './types/patch_listener';
 
 /**
  * Removes a file or directory at the given path if it exists.
@@ -59,7 +58,7 @@ ipcMain.handle('skyrim:getDataDir', async (_, runtime: 'SkyrimSE' | 'SkyrimLE') 
 
 // Mods info
 ipcMain.handle('patch:loadModsInfo', async (_, glob: string): Promise<ModInfo[]> => {
-  return await loadModsInfo(glob);
+  return loadModsInfo(glob);
 });
 
 // Patch operation
@@ -75,8 +74,8 @@ ipcMain.handle('patch:patch', async (_, { outputDir, ids, options }: PatchArgume
   if (!win) {
     throw new Error('The window you are focusing on cannot be found. Please keep the GUI app clicked.');
   }
-  const statusReporter = useProgressReporter
-    ? (status: Status) => {
+  const statusReporter: ((err: Error | null, status: PatchStatus) => void) | undefined = useProgressReporter
+    ? (err, status) => {
         win.webContents.send('d_merge://progress/patch', status);
       }
     : undefined;
@@ -84,17 +83,16 @@ ipcMain.handle('patch:patch', async (_, { outputDir, ids, options }: PatchArgume
   const config = {
     resourceDir: getAssetDir(),
     outputDir,
-    statusReport: statusReporter,
     debug,
     hackOptions,
     outputTarget,
   } as const satisfies Config;
 
-  return await behaviorGen(ids, config);
+  return await behaviorGen(ids, config, statusReporter);
 });
 
 ipcMain.handle('patch:cancel', async () => {
-  await cancelPatch();
+  // await cancelPatch();
 });
 
 ipcMain.handle('patch:setVfsMode', async (_, { enabled }) => {

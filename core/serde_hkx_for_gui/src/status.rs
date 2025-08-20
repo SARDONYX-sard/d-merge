@@ -18,7 +18,7 @@ pub enum Status {
     Error = 3,
 }
 
-/// # Payload for progress reporting
+/// Payload for progress reporting
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Payload {

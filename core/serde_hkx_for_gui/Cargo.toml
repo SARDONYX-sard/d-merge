@@ -15,10 +15,10 @@ rust-version.workspace = true
 [dependencies]
 futures = { workspace = true }
 rayon = { workspace = true }
-snafu = { workspace = true }
-serde =  { workspace = true }
+serde = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
-serde_repr =  { workspace = true }
+serde_repr = { workspace = true }
+snafu = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

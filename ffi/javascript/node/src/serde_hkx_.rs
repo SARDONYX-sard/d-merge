@@ -1,172 +1,125 @@
-use neon::prelude::*;
-use rayon::prelude::*;
-use serde_hkx_for_gui::convert;
-use serde_hkx_for_gui::par_walk_dir::{load_dir_node, DirEntry};
-use serde_hkx_for_gui::status::{Payload, Status};
 use std::sync::Arc;
 
-use crate::get_tokio_rt;
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use napi_derive::napi;
+use rayon::prelude::*;
+use serde_hkx_for_gui::status::{Payload as RustPayload, Status as RustStatus};
+use serde_hkx_for_gui::DirEntry as RustDirEntry;
 
-/// Module export
-pub fn register_api(cx: &mut ModuleContext) -> NeonResult<()> {
-    cx.export_function("loadDirNode", js_load_dir_node)?;
-    cx.export_function("convert", js_convert)?;
+/// Represents a node in the directory structure.
+#[napi_derive::napi(object)]
+pub struct DirEntry {
+    /// Relative or absolute path
+    pub id: String,
+    /// The name of the entry (file or directory).
+    pub label: String,
+    /// The sub-entries contained within this directory, if applicable.
+    /// This will be `None` if the entry is a file.
+    pub children: Option<Vec<DirEntry>>,
+}
+
+impl From<RustDirEntry> for DirEntry {
+    fn from(entry: RustDirEntry) -> Self {
+        DirEntry {
+            id: entry.path,
+            label: entry.name,
+            children: entry
+                .children
+                .map(|children| children.into_par_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[napi]
+pub async fn load_dir_node(dirs: Vec<String>) -> napi::Result<Vec<DirEntry>> {
+    let dir_entries = serde_hkx_for_gui::load_dir_node(dirs).map_err(|errs| {
+        let err = errs
+            .par_iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>()
+            .join("\n");
+        napi::Error::from_reason(err)
+    })?;
+
+    Ok(dir_entries.into_par_iter().map(Into::into).collect())
+}
+
+/// Converts between HKX and XML (or other supported formats) asynchronously.
+/// - `inputs`: input paths
+/// - `output`: output path
+/// - `format`: "amd64" | "win32" | "xml" | "json". otherwise error.
+/// - `roots`: inputs multiple
+/// - `progress`: status report function
+///
+/// # Errors
+/// - Failed to convert.
+/// - `FormatParse` - The provided output format string could not be parsed.
+#[napi(
+    ts_args_type = "inputs: string[], output: string, format: \"amd64\" | \"win32\" | \"xml\" | \"json\", roots: string[] | undefined, progress: (payload: Payload) => void"
+)]
+pub async fn convert(
+    inputs: Vec<String>,
+    output: Option<String>,
+    format: String,
+    roots: Option<Vec<String>>,
+    progress: ThreadsafeFunction<Payload>,
+) -> napi::Result<()> {
+    let progress = Arc::new(progress);
+
+    serde_hkx_for_gui::convert(inputs, output, &format, roots, move |payload| {
+        let _ = progress.call(Ok(payload.into()), ThreadsafeFunctionCallMode::NonBlocking);
+    })
+    .await
+    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+
     Ok(())
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Represents the progress status of a conversion task.
+///
+/// The numeric representation (`u8`) is serialized and deserialized directly,
+/// which is convenient for frontend communication.
+#[napi]
+pub enum SerdeHkxStatus {
+    /// Task is pending and has not started yet.: 0
+    Pending,
 
-fn js_load_dir_node(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let dirs_js = cx.argument::<JsArray>(0)?;
-    let mut dirs = Vec::new();
-    for i in 0..dirs_js.len(&mut cx) {
-        let s = dirs_js
-            .get::<JsString, _, _>(&mut cx, i)
-            .or_else(|_| cx.throw_type_error("dirs must be array of strings"))?;
-        dirs.push(s.value(&mut cx));
-    }
+    /// Task is currently being processed.: 1
+    Processing,
 
-    let channel = Arc::new(cx.channel());
-    let (deferred, promise) = cx.promise();
+    /// Task completed successfully.: 2
+    Done,
 
-    std::thread::spawn(move || {
-        let channel = channel.clone();
-        let res = load_dir_node(dirs);
-
-        deferred.settle_with(&channel, move |mut cx| match res {
-            Ok(items) => {
-                let js_array = JsArray::new(&mut cx, items.len());
-                for (i, item) in items.iter().enumerate() {
-                    let js_item = tree_item_to_js(&mut cx, item)?;
-                    js_array.set(&mut cx, i as u32, js_item)?;
-                }
-                Ok(js_array)
-            }
-            Err(errs) => {
-                let err = errs
-                    .par_iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n");
-
-                cx.throw_error(err)
-            }
-        });
-    });
-
-    Ok(promise)
+    /// Task encountered an error during processing.: 3
+    Error,
 }
 
-fn tree_item_to_js<'a, C: Context<'a>>(cx: &mut C, item: &DirEntry) -> JsResult<'a, JsObject> {
-    let id = cx.string(&item.name);
-    let label = cx.string(&item.path);
+/// Payload for progress reporting
+#[napi(object)]
+pub struct Payload {
+    /// Hashed identifier of the file path.
+    ///
+    /// Using a hash ensures that the frontend can track tasks reliably,
+    /// even if items are removed or reordered.
+    ///
+    /// - conversion input path to `djb2` hashed -> id
+    pub path_id: u32,
 
-    let js_obj = cx.empty_object();
-    js_obj.set(cx, "id", id)?;
-    js_obj.set(cx, "label", label)?;
+    /// Current progress status of this task.
+    pub status: SerdeHkxStatus,
+}
 
-    if let Some(children) = &item.children {
-        let js_children = JsArray::new(cx, children.len());
-        for (i, child) in children.iter().enumerate() {
-            let js_child = tree_item_to_js(cx, child)?;
-            js_children.set(cx, i as u32, js_child)?;
+// Rust Payload → JsPayload
+impl From<RustPayload> for Payload {
+    fn from(p: RustPayload) -> Self {
+        Payload {
+            path_id: p.path_id,
+            status: match p.status {
+                RustStatus::Pending => SerdeHkxStatus::Pending,
+                RustStatus::Processing => SerdeHkxStatus::Processing,
+                RustStatus::Done => SerdeHkxStatus::Done,
+                RustStatus::Error => SerdeHkxStatus::Error,
+            },
         }
-        js_obj.set(cx, "children", js_children)?;
     }
-
-    Ok(js_obj)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// ```ts
-/// function convert(inputs: string[], output: string, format: OutputFormat, roots?: string[]): Promise<void>;
-/// ```
-fn js_convert(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let inputs = cx.argument::<JsArray>(0)?;
-    let mut inputs_vec = Vec::new();
-    for i in 0..inputs.len(&mut cx) {
-        let js_str = inputs
-            .get::<JsString, _, _>(&mut cx, i)
-            .or_else(|_| cx.throw_type_error("inputs must be array of strings"))?;
-        inputs_vec.push(js_str.value(&mut cx));
-    }
-
-    // output
-    let output = match cx.argument_opt(1) {
-        Some(arg) => Some(
-            arg.downcast::<JsString, _>(&mut cx)
-                .or_else(|_| cx.throw_type_error("output must be a string"))?
-                .value(&mut cx),
-        ),
-        None => None,
-    };
-
-    // format
-    let format = cx.argument::<JsString>(2)?.value(&mut cx);
-
-    // roots (optional)
-    let roots = match cx.argument_opt(3) {
-        Some(arg) => {
-            let arr = arg
-                .downcast::<JsArray, _>(&mut cx)
-                .or_else(|_| cx.throw_type_error("roots must be array of strings"))?;
-            let mut vec = Vec::new();
-            for i in 0..arr.len(&mut cx) {
-                let js_str = arr
-                    .get::<JsString, _, _>(&mut cx, i)
-                    .or_else(|_| cx.throw_type_error("roots elements must be strings"))?;
-                vec.push(js_str.value(&mut cx));
-            }
-            Some(vec)
-        }
-        None => None,
-    };
-
-    // progress callback
-    let progress_fn = Arc::new(cx.argument::<JsFunction>(4)?.root(&mut cx));
-    let channel = cx.channel();
-    let (deferred, promise) = cx.promise();
-
-    get_tokio_rt(&mut cx)?.spawn(async move {
-        let cloned_channel = channel.clone();
-        let status_sender = move |payload: Payload| {
-            let progress_fn = progress_fn.clone();
-            cloned_channel.send(move |mut cx| {
-                let js_payload = payload_to_js(&mut cx, &payload)?;
-                progress_fn
-                    .to_inner(&mut cx)
-                    .bind(&mut cx)
-                    .arg(js_payload)?
-                    .call::<()>()?;
-                Ok(())
-            });
-        };
-
-        let res = convert(inputs_vec, output, &format, roots, status_sender).await;
-
-        deferred.settle_with(&channel, move |mut cx| match res {
-            Ok(_) => Ok(cx.undefined()),
-            Err(err) => cx.throw_error(format!("{:?}", err)),
-        });
-    });
-
-    Ok(promise)
-}
-
-/// Rust Status -> JsNumber
-fn status_to_js<'a, C: Context<'a>>(cx: &mut C, status: Status) -> JsResult<'a, JsNumber> {
-    Ok(cx.number(status as u8))
-}
-
-/// Rust Payload -> JsObject
-fn payload_to_js<'a, C: Context<'a>>(cx: &mut C, payload: &Payload) -> JsResult<'a, JsObject> {
-    let path_id = cx.number(payload.path_id as f64);
-    let status = status_to_js(cx, payload.status)?;
-
-    let js_obj = cx.empty_object();
-    js_obj.set(cx, "pathId", path_id)?;
-    js_obj.set(cx, "status", status)?;
-
-    Ok(js_obj)
 }

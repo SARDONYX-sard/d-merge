@@ -6,8 +6,7 @@ ipcMain.handle('log:changeLevel', async (_, level: string = 'error') => {
   if (['error', 'warn', 'info', 'debug', 'trace'].includes(level)) {
     isValid = true;
   }
-
-  await changeLogLevel(level);
+  changeLogLevel(level);
 });
 
 ipcMain.handle('app:getLogDir', () => app.getPath('logs'));
