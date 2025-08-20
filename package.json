@@ -16,7 +16,8 @@
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
     "lint": "biome lint ./ && cargo clippy --workspace",
     "lint:fix": "npm run fmt && biome check --write ./ && cargo clippy --workspace --fix --allow-staged --allow-dirty",
-    "tauri": "npm --workspace gui/frontend run tauri"
+    "tauri": "npm --workspace gui/frontend run tauri",
+    "test": "npm --workspace gui/frontend run test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
