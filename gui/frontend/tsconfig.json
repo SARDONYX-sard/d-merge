@@ -24,7 +24,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "../../vitest.config.ts",
+    "vitest.config.ts",
     "./out/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts"
