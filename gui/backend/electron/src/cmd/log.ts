@@ -1,8 +1,8 @@
 import { changeLogLevel } from 'd_merge_node';
 import { app, ipcMain } from 'electron';
 
-export const logDir = app.getPath('logs');
-export const logFileName = `d_merge.log`;
+export const LOG_DIR = app.getPath('logs');
+export const LOG_FILE_NAME = `d_merge.log`;
 
 ipcMain.handle('log:changeLevel', async (_, level: string = 'error') => {
   let isValid = false;
@@ -12,5 +12,5 @@ ipcMain.handle('log:changeLevel', async (_, level: string = 'error') => {
   changeLogLevel(level);
 });
 
-ipcMain.handle('app:getLogDir', () => logDir);
+ipcMain.handle('app:getLogDir', () => LOG_DIR);
 ipcMain.handle('app:getName', () => 'd_merge');

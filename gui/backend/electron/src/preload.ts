@@ -1,7 +1,8 @@
-import { DirEntry, PatchStatus } from 'd_merge_node';
+import { DirEntry } from 'd_merge_node';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ModIds, ModInfo, PatchArguments, PatchOptions } from './cmd/types/patch';
 import type { OutputFormat } from './cmd/types/serde_hkx';
+import type { ContextMenuParams } from './context_menu';
 
 // frontend <-> backend bridge functions
 // frontend: window.__ELECTRON__.showContextMenu()
@@ -81,6 +82,6 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
   },
 
   destroyWindow: () => ipcRenderer.invoke('window-destroy'),
-  showContextMenu: async () => await ipcRenderer.invoke('show-context-menu'),
+  showContextMenu: (params: ContextMenuParams) => ipcRenderer.invoke('show-context-menu', params),
   zoom: async (delta: number) => await ipcRenderer.invoke('zoom', { delta }),
 });

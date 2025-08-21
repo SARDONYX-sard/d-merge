@@ -9,17 +9,23 @@ export const electronApi = window.__ELECTRON__;
 if (isElectron()) {
   window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    electronApi.showContextMenu();
+
+    const selectionText = window.getSelection()?.toString() || '';
+
+    electronApi.showContextMenu({
+      x: e.x,
+      y: e.y,
+      selectionText,
+    });
   });
 
   window.addEventListener(
     'wheel',
     (e) => {
       if (e.ctrlKey) {
-        if (e.deltaY < 0) {
-          const delta = e.deltaY < 0 ? 0.1 : -0.1;
-          electronApi.zoom(delta);
-        }
+        // scroll up → zoom in, scroll down → zoom out
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        electronApi.zoom(delta);
       }
     },
     { passive: false },

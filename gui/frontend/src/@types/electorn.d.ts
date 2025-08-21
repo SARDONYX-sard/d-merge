@@ -77,7 +77,7 @@ export interface ElectronApi {
   /** Destroy the current window. */
   destroyWindow(): Promise<void>;
   /** Show a custom context menu defined in main process. */
-  showContextMenu(): Promise<void>;
+  showContextMenu({ x, y, selectionText }: { x: number; y: number; selectionText: string }): Promise<void>;
 
   /** Adjust the zoom factor of the current window. */
   zoom(delta: number): Promise<void>;

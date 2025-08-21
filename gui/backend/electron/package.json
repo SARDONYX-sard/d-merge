@@ -14,10 +14,11 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "archiver": "^7.0.1",
+    "cross-env": "10.0.0",
     "electron": "37.3.1",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.9",
-    "cross-env": "10.0.0",
     "typescript": "^5.9.2"
   },
   "build": {
@@ -38,30 +39,23 @@
         "to": "assets"
       }
     ],
+    "afterPack": "./tools/make_zip.js",
     "win": {
       "target": [
         "dir",
-        "portable",
-        "zip"
+        "portable"
       ],
       "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
       "icon": "../tauri/icons/icon.ico"
     },
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": [],
       "signIgnore": null,
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "icon": "../tauri/icons/icon.icns"
     },
     "linux": {
-      "target": [
-        "AppImage",
-        "deb",
-        "zip"
-      ],
+      "target": [],
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
       "icon": "../tauri/icons/icon.png"
     }

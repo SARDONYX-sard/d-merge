@@ -7,7 +7,7 @@
   "license": "GPL3.0",
   "scripts": {
     "build": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release-no-lto",
-    "build:electron": "npm run build:front && npm --workspace gui/backend/electron run build",
+    "build:electron": "npm -w ffi/javascript/node run build && npm run build:front && npm -w gui/backend/electron run build",
     "build:front": "npm --workspace gui/frontend run build:front",
     "build:icons": "npm run tauri icon ./gui/backend/tauri/icons/icon.svg",
     "dev": "tauri dev",
