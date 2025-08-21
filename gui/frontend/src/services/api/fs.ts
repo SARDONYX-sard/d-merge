@@ -1,5 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, exists as tauriExists } from '@tauri-apps/plugin-fs';
 import { z } from 'zod';
 
 import type { CacheKey } from '@/lib/storage';
@@ -19,24 +19,56 @@ import { electronApi, isElectron } from './electron/setup';
  *
  * @throws Throws an `Error` if there is an issue reading the file.
  */
-export async function readFile(pathCacheKey: CacheKey, filterName: string, extensions = ['json']) {
+export async function readFileWithDialog(pathCacheKey: CacheKey, filterName: string, extensions = ['json']) {
   const [path, setPath] = schemaStorage.use(pathCacheKey, z.string());
-  const selectedPath = await openPath(path ?? '', {
-    setPath,
-    filters: [{ name: filterName, extensions }],
-    multiple: false,
-  });
+  let selectedPath = null;
+  try {
+    selectedPath = await openPath(path ?? '', {
+      setPath,
+      filters: [{ name: filterName, extensions }],
+      multiple: false,
+    });
+  } catch (error) {
+    console.error('Failed to open file dialog:', error);
+  }
 
   if (typeof selectedPath === 'string') {
-    if (isTauri()) {
-      return await readTextFile(selectedPath);
-    } else if (isElectron()) {
-      return await electronApi.readFile(selectedPath);
-    } else {
-      throw new Error('Unsupported platform: Neither Tauri nor Electron');
-    }
+    return await readFile(selectedPath);
   }
   return null;
+}
+
+/**
+ *  Check if a path exists.
+ */
+export async function exists(filePath: string): Promise<boolean> {
+  if (isTauri()) {
+    return await tauriExists(filePath);
+  }
+
+  if (isElectron()) {
+    return await electronApi.exists(filePath);
+  }
+
+  return false;
+}
+
+/**
+ * Reads the entire contents of a file into a string (no dialog).
+ *
+ * @param filePath - Full path to the file.
+ * @returns File contents as string.
+ *
+ * @throws Error if reading fails or unsupported platform.
+ */
+export async function readFile(filePath: string): Promise<string> {
+  if (isTauri()) {
+    return await readTextFile(filePath);
+  } else if (isElectron()) {
+    return await electronApi.readFile(filePath);
+  } else {
+    throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  }
 }
 
 /**

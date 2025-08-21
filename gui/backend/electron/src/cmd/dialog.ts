@@ -36,9 +36,11 @@ const mapOpenOptions = (tauriOpts: Tauri.OpenDialogOptions): Electron.OpenDialog
   const properties: Electron.OpenDialogOptions['properties'] = [];
   if (canCreateDirectories) {
     properties.push('createDirectory'); // Support macOS only
-  } else if (multiple) {
+  }
+  if (multiple) {
     properties.push('multiSelections');
-  } else if (directory) {
+  }
+  if (directory) {
     properties.push('openDirectory');
   }
 

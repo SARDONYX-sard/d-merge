@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
   },
 
   // fs
+  async exists(path: string): Promise<boolean> {
+    return await ipcRenderer.invoke('fs-exists', path);
+  },
   async readFile(path: string): Promise<string> {
     return await ipcRenderer.invoke('fs:readFile', path);
   },
@@ -51,9 +54,9 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
     return ipcRenderer.invoke('patch:setVfsMode', value);
   },
 
-  // --- Patch Status Listener ---
-  async statusListener(eventName: string, f: (status: PatchStatus) => void): Promise<() => void> {
-    const listener = (_event: Electron.IpcRendererEvent, status: PatchStatus) => f(status);
+  // --- Convert/Patch Listener ---
+  async listen<T>(eventName: string, f: (payload: T) => void): Promise<() => void> {
+    const listener = (_event: Electron.IpcRendererEvent, payload: T) => f(payload);
     event: ipcRenderer.on(eventName, listener);
     return () => {
       ipcRenderer.removeListener(eventName, listener);
@@ -77,6 +80,7 @@ contextBridge.exposeInMainWorld('__ELECTRON__', {
     return await ipcRenderer.invoke('opener:openUrl', path);
   },
 
+  destroyWindow: () => ipcRenderer.invoke('window-destroy'),
   showContextMenu: async () => await ipcRenderer.invoke('show-context-menu'),
   zoom: async (delta: number) => await ipcRenderer.invoke('zoom', { delta }),
 });

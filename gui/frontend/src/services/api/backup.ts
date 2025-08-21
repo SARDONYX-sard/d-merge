@@ -1,17 +1,15 @@
-import { save } from '@tauri-apps/plugin-dialog';
-
 import { CACHE_KEYS, type Cache, STORAGE } from '@/lib/storage';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-
-import { readFile, writeFile } from './fs';
+import { save } from './dialog';
+import { readFileWithDialog, writeFile } from './fs';
 
 const SETTINGS_FILE_NAME = 'settings';
 
 export const BACKUP = {
   /** @throws Error | JsonParseError */
   async import(): Promise<Cache | undefined> {
-    const settings = await readFile(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
+    const settings = await readFileWithDialog(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
     return this.fromStr(settings);
   },
 

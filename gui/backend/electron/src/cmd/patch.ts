@@ -45,9 +45,9 @@ async function handleAutoRemoveMeshes(outputDir: string, autoRemoveMeshes: boole
  */
 function getAssetDir(): string {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'assets');
+    return path.join(process.resourcesPath, 'assets', 'templates');
   } else {
-    return path.join(__dirname, '../../../../../resource/assets');
+    return path.join(__dirname, '../../../../resource/assets/templates');
   }
 }
 
@@ -95,6 +95,7 @@ ipcMain.handle('patch:cancel', async () => {
   // await cancelPatch();
 });
 
-ipcMain.handle('patch:setVfsMode', async (_, { enabled }) => {
-  // setVfsMode(enabled);
+export let isVfsMode = false;
+ipcMain.handle('patch:setVfsMode', async (_, { enabled }: { enabled: boolean }) => {
+  isVfsMode = enabled;
 });

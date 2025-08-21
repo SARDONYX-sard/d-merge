@@ -1,9 +1,7 @@
-import { isTauri } from '@tauri-apps/api/core';
-import type { EventCallback, EventName } from '@tauri-apps/api/event';
-import { listen } from '@tauri-apps/api/event';
+import type { EventName } from '@tauri-apps/api/event';
 import type { ReactNode } from 'react';
 import { NOTIFY } from '@/lib/notify';
-import { electronApi, isElectron } from './electron/setup';
+import { listen } from './event';
 
 type ListenerProps = {
   setLoading: (b: boolean) => void;
@@ -33,8 +31,6 @@ export type Status =
   | { type: 'GeneratingHkxFiles'; content: StatusIndexing }
   | { type: 'Done' }
   | { type: 'Error'; content: ErrorPayload };
-
-type StatusPayload = Status;
 
 /**
  * Tauri status listener for backend merge progress.
@@ -86,18 +82,10 @@ export async function statusListener(
 
   let unlisten: (() => void) | null = null;
 
-  const eventHandler: EventCallback<StatusPayload> = (event) => {
-    onStatus(event.payload, unlisten);
-  };
-
   try {
-    if (isTauri()) {
-      unlisten = await listen<Status>(eventName, eventHandler);
-    } else if (isElectron()) {
-      unlisten = await electronApi.statusListener(eventName, eventHandler);
-    } else {
-      throw new Error('Unsupported platform for status listener: Neither Tauri nor Electron');
-    }
+    unlisten = await listen<Status>(eventName, (payload) => {
+      onStatus(payload, unlisten);
+    });
 
     await promiseFn();
     onSuccess?.();

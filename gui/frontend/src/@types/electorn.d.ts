@@ -24,6 +24,8 @@ export interface ElectronApi {
   open(options?: OpenDialogOptions): Promise<string | string[] | null>;
 
   // --- File System APIs ---
+  /** Checks if a file or directory exists. */
+  exists(path: string): Promise<boolean>;
   /** Read the contents of a file as string. */
   readFile(path: string): Promise<string>;
   /** Write string content to a file. */
@@ -63,7 +65,7 @@ export interface ElectronApi {
    * Returns a function to unsubscribe.
    * @category Event
    */
-  statusListener(eventName: string, listener: (status: Status) => void): Promise<() => void>;
+  listen<T>(eventName: string, listener: (payload: T) => void): Promise<() => void>;
 
   // --- serde_hkx APIs ---
   /** Convert files or directories to a different format (`hkx`/`xml`/`json`/`amd64`/`win32`). */
@@ -72,6 +74,8 @@ export interface ElectronApi {
   loadDirNode(dirs: string[]): Promise<TreeViewBaseItem[]>;
 
   // --- Misc / Window APIs ---
+  /** Destroy the current window. */
+  destroyWindow(): Promise<void>;
   /** Show a custom context menu defined in main process. */
   showContextMenu(): Promise<void>;
 

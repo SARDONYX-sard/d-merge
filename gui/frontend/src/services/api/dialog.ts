@@ -18,19 +18,21 @@ type OpenOptions = {
  * @throws
  */
 export async function openPath(path: string, options: OpenOptions = {}): Promise<string | string[] | null> {
+  const { setPath, ...dialogOptions } = options;
+
   const res = await (async () => {
     if (isTauri()) {
-      return await open({ defaultPath: path, ...options });
-    } else if (isElectron()) {
-      return await electronApi.open({ defaultPath: path, ...options });
-    } else {
-      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+      return await open({ defaultPath: path, ...dialogOptions });
     }
+
+    if (isElectron()) {
+      return await electronApi.open({ defaultPath: path, ...dialogOptions });
+    }
+
+    throw new Error('Unsupported platform: Neither Tauri nor Electron');
   })();
 
-  if (typeof res === 'string' && options.setPath) {
-    options.setPath(res);
-  }
+  typeof res === 'string' && setPath?.(res);
   return res;
 }
 
