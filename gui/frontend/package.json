@@ -15,7 +15,7 @@
     "lint": "biome lint ./ && cargo clippy --workspace",
     "lint:fix": "npm run fmt && biome check --write ./ && cargo clippy --workspace --fix --allow-staged --allow-dirty",
     "tauri": "tauri",
-    "test": "vitest run -c ./vitest.config.ts",
+    "test": "vitest run",
     "test:all": "npm test && npm run test:back",
     "test:back": " cargo test --workspace",
     "test:ui": "vitest --ui",
