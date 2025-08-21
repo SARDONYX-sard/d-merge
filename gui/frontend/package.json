@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "rimraf ../frontend/out && tauri build --features extra_fmt,debug --no-bundle -- --profile release-no-lto",
-    "build:front": "next build --turbopack",
+    "build:front": "next build",
     "build:icons": "tauri icon ../../../backend/icons/icon.svg",
     "dev": "tauri dev",
     "dev:front": "next ../frontend",
