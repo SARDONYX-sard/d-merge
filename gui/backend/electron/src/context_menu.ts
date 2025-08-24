@@ -22,30 +22,9 @@ export const DEFAULT_MENU = Menu.buildFromTemplate([
   },
   { label: 'Minimize', role: 'minimize' },
   { label: 'Zoom', role: 'zoom' },
+  // Unsupported these operations, ['Save as', 'Print', 'Share]
 
-  // Unsupported these operations
-  // {
-  //   label: 'Save As...',
-  //   click: (_item, focusedWindow) => {
-  //     focusedWindow instanceof BrowserWindow &&
-  //       focusedWindow.webContents.downloadURL(focusedWindow.webContents.getURL());
-  //   },
-  // },
-  // {
-  //   label: 'Print',
-  //   accelerator: 'Ctrl+P',
-  //   click: (_item, focusedWindow) => {
-  //     focusedWindow instanceof BrowserWindow && focusedWindow.webContents.print({});
-  //   },
-  // },
-  // {
-  //   label: 'Share',
-  //   click: (_item, focusedWindow) => {
-  //     focusedWindow instanceof BrowserWindow &&
-  //       shell.openExternal('mailto:?body=' + encodeURIComponent(focusedWindow.webContents.getURL()));
-  //   },
-  // },
-
+  { type: 'separator' },
   {
     label: 'Inspect with Developer Tools',
     accelerator: 'F12',
