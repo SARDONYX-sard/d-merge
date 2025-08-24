@@ -12,18 +12,24 @@ if (isElectron()) {
   });
 }
 
+// -   scroll up → zoom in
+// - scroll down → zoom out
+let currentZoom = 1.0; // initial magnification
 window.addEventListener(
   'wheel',
   async (e) => {
     if (e.ctrlKey) {
-      // -   scroll up → zoom in
-      // - scroll down → zoom out
-      const delta = e.deltaY < 0 ? 0.05 : -0.05;
-
       if (isTauri()) {
-        await getCurrentWebview().setZoom(delta);
-      } else if (isElectron()) {
-        await electronApi.zoom(delta);
+        currentZoom *= e.deltaY < 0 ? 1.05 : 0.95;
+        currentZoom = Math.min(Math.max(currentZoom, 0.1), 5); // limitation
+        console.log('currentZoom', currentZoom);
+        await getCurrentWebview().setZoom(currentZoom);
+        return;
+      }
+
+      if (isElectron()) {
+        await electronApi.zoom(e.deltaY < 0 ? 0.05 : -0.05);
+        return;
       }
     }
   },
