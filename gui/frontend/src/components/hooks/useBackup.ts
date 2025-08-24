@@ -4,7 +4,7 @@ import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
-import { isElectron } from '@/services/api/electron/setup';
+import { isElectron } from '@/services/api/electron';
 import { listen } from '@/services/api/event';
 import { exists, readFile } from '@/services/api/fs';
 import { setVfsMode } from '@/services/api/patch';

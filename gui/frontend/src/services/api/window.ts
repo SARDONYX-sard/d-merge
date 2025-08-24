@@ -1,6 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { electronApi, isElectron } from './electron/setup';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Since the window turns white while it is being prepared, this process is performed in the background,

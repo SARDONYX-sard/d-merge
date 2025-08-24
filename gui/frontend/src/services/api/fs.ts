@@ -6,7 +6,7 @@ import type { CacheKey } from '@/lib/storage';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 import { openPath } from './dialog';
-import { electronApi, isElectron } from './electron/setup';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Reads the entire contents of a file into a string.

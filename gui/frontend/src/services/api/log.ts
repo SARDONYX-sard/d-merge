@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { STORAGE } from '@/lib/storage';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-import { electronApi, isElectron } from '@/services/api/electron/setup';
+import { electronApi, isElectron } from '@/services/api/electron';
 import { openPath } from '@/services/api/shell';
 
 const logList = ['trace', 'debug', 'info', 'warn', 'error'] as const;

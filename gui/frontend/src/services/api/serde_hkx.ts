@@ -1,6 +1,6 @@
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { electronApi, isElectron } from './electron/setup';
+import { electronApi, isElectron } from './electron';
 
 // NOTE: Do not use yaml because it cannot be reversed.
 export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';

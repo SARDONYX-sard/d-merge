@@ -1,7 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { openPath as tauriOpenPath, openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 import { NOTIFY } from '@/lib/notify';
-import { electronApi, isElectron } from './electron/setup';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Wrapper tauri's `open` with `notify.error`

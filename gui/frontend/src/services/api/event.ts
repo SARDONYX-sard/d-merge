@@ -1,6 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { listen as tauriListen } from '@tauri-apps/api/event';
-import { electronApi, isElectron } from './electron/setup';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Cross-platform event listener for Tauri and Electron.

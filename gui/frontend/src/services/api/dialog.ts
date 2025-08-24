@@ -1,6 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { type OpenDialogOptions, open, SaveDialogOptions, save as tauriSave } from '@tauri-apps/plugin-dialog';
-import { electronApi, isElectron as isElectron } from './electron/setup';
+import { electronApi, isElectron as isElectron } from './electron';
 
 type OpenOptions = {
   /**
