@@ -139,7 +139,7 @@ export async function cancelPatch() {
  */
 export async function setVfsMode(isEnabled: boolean) {
   if (isTauri()) {
-    await invoke('set_vfs_mode', { value: isEnabled });
+    return await invoke('set_vfs_mode', { value: isEnabled });
   }
 
   if (isElectron()) {

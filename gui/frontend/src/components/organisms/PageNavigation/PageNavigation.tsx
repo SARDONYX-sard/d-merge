@@ -35,15 +35,15 @@ const getPageIndex = (pageName: LastPathName): 0 | 2 | 1 => {
  * This is a function that absorbs the difference between tauri and electron's `window.location.pathname`.
  *
  * For example, in the case of `/convert`
- * - tauri: ‘/convert’
+ * - tauri: ‘/convert/’
  * - electron: '[...]//app.asar/frontend/convert'
  */
 const pathnameToLastPathName = (path: string): LastPathName => {
-  if (path.endsWith('/convert')) {
+  if (path.endsWith('/convert/') || path.endsWith('/convert')) {
     return '/convert';
   }
 
-  if (path.endsWith('/settings')) {
+  if (path.endsWith('/settings/') || path.endsWith('/settings')) {
     return '/settings';
   }
 
