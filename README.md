@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://github.com/SARDONYX-sard/d-merge/releases">
-    <img src="./gui/backend/icons/icon.svg" alt="D Merge"/>
+    <img src="./gui/backend/tauri/icons/icon.svg" alt="D Merge"/>
   </a>
 
   <!-- Release Badges -->
