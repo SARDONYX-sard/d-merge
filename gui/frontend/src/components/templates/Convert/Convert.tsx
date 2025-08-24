@@ -1,8 +1,6 @@
 'use client'; // If this directive is not present on each page, a build error will occur.
 import { Box, Grid, type SxProps, type Theme } from '@mui/material';
-import { listen } from '@tauri-apps/api/event';
 import { type MouseEventHandler, useState } from 'react';
-
 import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { BottomActionBar } from '@/components/organisms/BottomActionBar';
 import { ConvertForm } from '@/components/organisms/ConvertForm';
@@ -13,6 +11,7 @@ import {
 } from '@/components/organisms/ConvertForm/ConvertProvider';
 import { getAllLeafItemIds } from '@/components/organisms/ConvertForm/PathTreeSelector';
 import { NOTIFY } from '@/lib/notify';
+import { listen } from '@/services/api/event';
 import { convert } from '@/services/api/serde_hkx';
 
 export const Convert = () => {
@@ -68,9 +67,9 @@ const useConvertExec = () => {
   })();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (_e) => {
-    const eventHandler = (event: { payload: ConvertStatusPayload }) => {
+    const eventHandler = (payload: ConvertStatusPayload) => {
       setConvertStatuses((prev) => {
-        const { pathId, status } = event.payload;
+        const { pathId, status } = payload;
         prev.set(pathId, status);
         // NOTE: As with Object, if the same reference is returned,
         // the value is not recognized as updated! So we need to call a new constructor sequentially.

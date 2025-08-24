@@ -1,0 +1,33 @@
+[package]
+name = "serde_hkx_for_gui"
+version = "0.1.0"
+description = "Common abstraction code layer for tauri & Electron desktop applications"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["tracing"]
+license = "GPL3.0"
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+futures = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
+serde_repr = { workspace = true }
+snafu = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# workspace members
+node_expr = { workspace = true }
+
+[dev-dependencies]
+temp-dir = "0.1.16"
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

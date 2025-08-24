@@ -1,0 +1,35 @@
+[package]
+name = "d_merge_node"
+version.workspace = true
+description = "d-merge for Node.js 20"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["skyrim", "node", "ffi"]
+license = "GPL-3.0"
+readme = "../../readme.md"
+repository.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
+[build-dependencies]
+napi-build = "2"
+
+[dependencies]
+napi = { version = "3.0.0", features = ["async"] } # Node.js FFI
+napi-derive = { version = "3.0.0" }                # Node.js FFI
+once_cell = { workspace = true }
+rayon = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# workspace members
+mod_info = { workspace = true }
+nemesis_merge = { workspace = true }
+serde_hkx_for_gui = { workspace = true }
+skyrim_data_dir = { workspace = true }
+tracing_rotation = { workspace = true }

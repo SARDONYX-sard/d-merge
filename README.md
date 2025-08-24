@@ -125,3 +125,7 @@ gui/backend (GPL-3.0)
 Other utility crates (e.g., `mod_info`, `node_expr`, `json_patch`, etc.) are licensed under **MIT OR Apache-2.0**, but the presence of GPL-licensed dependencies requires that the final binary (the GUI/backend) must be distributed under **GPL-3.0**.
 
 Please ensure that your usage and redistribution of this software complies with the [**GPL-3.0**](./LICENSE) license terms.
+
+### Deps NOTES
+
+need "zod": "^3.25.67"

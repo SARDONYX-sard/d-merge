@@ -1,19 +1,21 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
-
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
+import { isElectron } from '@/services/api/electron';
+import { listen } from '@/services/api/event';
+import { exists, readFile } from '@/services/api/fs';
 import { setVfsMode } from '@/services/api/patch';
+import { destroyCurrentWindow } from '@/services/api/window';
 
 export const useBackup = () => {
   useAutoImportBackup();
   useAutoExportBackup();
 };
+
+const isDesktopApp = () => isTauri() || isElectron();
 
 const useAutoImportBackup = () => {
   const { autoDetectEnabled, modInfoDir } = usePatchContext();
@@ -21,7 +23,7 @@ const useAutoImportBackup = () => {
 
   useEffect(() => {
     const doImport = async () => {
-      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+      if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
@@ -39,7 +41,7 @@ const useAutoImportBackup = () => {
       NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
 
       try {
-        const newSettings = await BACKUP.fromStr(await readTextFile(settingsPath));
+        const newSettings = await BACKUP.fromStr(await readFile(settingsPath));
         if (newSettings) {
           newSettings['last-path'] = '/';
           STORAGE.setAll(newSettings);
@@ -59,7 +61,7 @@ const useAutoExportBackup = () => {
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+    if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
       setVfsMode(false);
       return;
     }
@@ -76,7 +78,7 @@ const useAutoExportBackup = () => {
         } catch (e) {
           NOTIFY.error(`${e}`);
         } finally {
-          await getCurrentWindow().destroy();
+          destroyCurrentWindow();
         }
       });
 

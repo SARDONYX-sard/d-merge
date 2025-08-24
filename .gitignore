@@ -16,12 +16,14 @@ node_modules/
 .next/
 .swc
 out/
+build/
+dist/
 
 # /////////////////////////////////////////////////////
 # Backend
 
 # tauri build cache
-gui/backend/gen/
+**/gen/
 
 # Rust build cache
 **/target

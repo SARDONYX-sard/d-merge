@@ -67,7 +67,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        # platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, windows-latest] # Linux build unknown error
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4.2.2
@@ -98,3 +99,32 @@ jobs:
           include-hidden-files: true
           path: |
             ./build/
+
+  electron:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+      - name: Setup environment
+        uses: ./.github/actions/setup-deps
+        with:
+          platform: ${{ matrix.platform }}
+          build_profile: release
+          cache_key_suffix: 'electron'
+
+      - name: Build GUI
+        run: npm run build:electron
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ${{ env.APP_NAME }}-${{ runner.os }}-electron
+          # to include .keep file
+          include-hidden-files: true
+          path: |
+            ${{ github.workspace }}/gui/backend/electron/dist/*.zip

@@ -16,10 +16,14 @@ members = [
   "core/nemesis_merge",
   "core/nemesis_xml",
   "core/node_expr",
+  "core/serde_hkx_for_gui",
   "core/skyrim_anim_parser",
   "core/skyrim_crc",
-  "gui/backend",
+  "core/skyrim_data_dir",
+  "core/tracing_rotation",
+  "ffi/javascript/node",
   "ffi/python",
+  "gui/backend/tauri",
 ]
 resolver = "2"
 
@@ -29,6 +33,8 @@ educe = { version = "0.6.0" }
 futures = { version = "0.3.31" }
 indexmap = { version = "2.10.0", features = ["rayon"] }
 jwalk = { version = "0.8.1" }
+napi = { version = "3.0.0" } # Node.js FFI
+napi-derive = "3.0.0"
 once_cell = "1.21.3"
 phf = "0.12.1"
 rayon = "1.11.0"
@@ -53,13 +59,16 @@ pretty_assertions = "1.4.1"                                  # Color diff assert
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-skyrim_crc = { path = "./core/skyrim_crc" }
 json_patch = { path = "./core/json_patch" }
 mod_info = { path = "./core/mod_info" }
-nemesis_xml = { path = "./core/nemesis_xml" }
 nemesis_merge = { path = "./core/nemesis_merge" }
+nemesis_xml = { path = "./core/nemesis_xml" }
 node_expr = { path = "./core/node_expr" }
+serde_hkx_for_gui = { path= "./core/serde_hkx_for_gui" }
 skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
+skyrim_crc = { path = "./core/skyrim_crc" }
+skyrim_data_dir = { path = "./core/skyrim_data_dir" }
+tracing_rotation = { path= "./core/tracing_rotation" }
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.
 [profile.release]
