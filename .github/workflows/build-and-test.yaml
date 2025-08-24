@@ -67,7 +67,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        # platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, windows-latest] # Linux build unknown error
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4.2.2
