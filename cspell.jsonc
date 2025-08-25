@@ -18,6 +18,7 @@
     "clippy",
     "dashmap",
     "defaultmale",
+    "egui",
     "Filenaming",
     "firstperson",
     "havok",
