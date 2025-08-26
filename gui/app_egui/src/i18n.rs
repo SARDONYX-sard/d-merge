@@ -10,8 +10,8 @@ pub enum I18nKey {
     ClearButton,
     #[serde(rename = "column_name")]
     ColumnName,
-    #[serde(rename = "column_path")]
-    ColumnPath,
+    #[serde(rename = "column_id")]
+    ColumnId,
     #[serde(rename = "column_priority")]
     ColumnPriority,
     #[serde(rename = "column_site")]
@@ -63,7 +63,7 @@ impl I18nKey {
             Self::AutoRemoveMeshesHover => "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.",
             Self::ClearButton => "Clear",
             Self::ColumnName => "Name",
-            Self::ColumnPath => "Path",
+            Self::ColumnId => "ID",
             Self::ColumnPriority => "Priority",
             Self::ColumnSite => "Site",
             Self::DebugOutput => "Debug output",
@@ -99,7 +99,7 @@ impl I18nKey {
         map.insert(AutoRemoveMeshesHover, Cow::Borrowed(AutoRemoveMeshesHover.default_eng()));
         map.insert(ClearButton, Cow::Borrowed(ClearButton.default_eng()));
         map.insert(ColumnName, Cow::Borrowed(ColumnName.default_eng()));
-        map.insert(ColumnPath, Cow::Borrowed(ColumnPath.default_eng()));
+        map.insert(ColumnId, Cow::Borrowed(ColumnId.default_eng()));
         map.insert(ColumnPriority, Cow::Borrowed(ColumnPriority.default_eng()));
         map.insert(ColumnSite, Cow::Borrowed(ColumnSite.default_eng()));
         map.insert(DebugOutput, Cow::Borrowed(DebugOutput.default_eng()));

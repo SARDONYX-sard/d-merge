@@ -524,14 +524,13 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
-        let table_height = 600.0;
+        let table_height = ui.available_height() * 0.8;
 
         egui::ScrollArea::vertical()
             .max_height(table_height)
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
-                    // .resizable(true)
                     .column(egui_extras::Column::auto().resizable(true)) // checkbox
                     .column(egui_extras::Column::initial(200.0).resizable(true)) // id
                     .column(egui_extras::Column::initial(200.0).resizable(true)) // name
@@ -557,7 +556,7 @@ impl ModManagerApp {
 
     /// Render table header (column titles with sort toggles).
     fn render_table_header(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
-        let path_label = self.t(I18nKey::ColumnPath).to_string();
+        let path_label = self.t(I18nKey::ColumnId).to_string();
         let name_label = self.t(I18nKey::ColumnName).to_string();
         let site_label = self.t(I18nKey::ColumnSite).to_string();
         let priority_label = self.t(I18nKey::ColumnPriority).to_string();
