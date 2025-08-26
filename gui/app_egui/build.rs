@@ -6,12 +6,10 @@ fn main() {
         .map(|os| os != "windows")
         .unwrap_or(true);
 
-    // only build the resource for release builds as calling rc.exe might be slow
-    let is_release = env::var("PROFILE")
-        .map(|p| p.starts_with("release"))
-        .unwrap_or(false);
+    // Since the PROFILE environment variable becomes empty for builds other than "debug" or "release", use OPT_LEVEL instead.
+    let release_opt_level = env::var("OPT_LEVEL").unwrap_or_default() == "3";
 
-    if is_non_windows || !is_release {
+    if is_non_windows || !release_opt_level {
         return;
     }
 
@@ -27,6 +25,7 @@ fn embed_resources() -> Result<(), std::io::Error> {
         env!("CARGO_MANIFEST_DIR"),
         "/../backend/tauri/icons/icon.ico"
     );
+    let path = std::path::Path::new(ICO_PATH);
     let mut res = winres::WindowsResource::new();
 
     #[cfg(unix)]
@@ -40,7 +39,7 @@ fn embed_resources() -> Result<(), std::io::Error> {
         .set("CompanyName", env!("CARGO_PKG_AUTHORS"))
         .set("FileDescription", env!("CARGO_PKG_DESCRIPTION"))
         .set("LegalCopyright", env!("CARGO_PKG_AUTHORS"))
-        .set_icon(ICO_PATH)
+        .set_icon(&path.canonicalize()?.to_string_lossy())
         .set_language(0x0409);
 
     res.compile()?;

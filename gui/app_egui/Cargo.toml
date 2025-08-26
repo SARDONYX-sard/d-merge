@@ -1,7 +1,7 @@
 [package]
 name = "d_merge_egui"
 version = "0.1.0"
-description = "merge"
+description = "Diff & Merge hkx patcher"
 
 authors.workspace = true
 categories = ["development-tools"]
@@ -11,8 +11,9 @@ license = "GPL-3.0"
 readme = "../../README.md"
 repository.workspace = true
 rust-version.workspace = true
+build = "build.rs"
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
 
 [dependencies]

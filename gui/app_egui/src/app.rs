@@ -233,7 +233,10 @@ impl ModManagerApp {
                     .clicked()
                 {
                     let dialog = if !self.output_dir.is_empty() {
-                        rfd::FileDialog::new().set_directory(&self.output_dir)
+                        // NOTE: For some reason, we can't reach the path correctly without using canonicalize.
+                        let _ = std::fs::create_dir_all(&self.output_dir);
+                        let path = std::path::Path::new(&self.output_dir);
+                        rfd::FileDialog::new().set_directory(path.canonicalize().unwrap())
                     } else {
                         rfd::FileDialog::new()
                     };
