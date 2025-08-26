@@ -648,19 +648,16 @@ impl ModManagerApp {
             };
             let dir_str = dir.display().to_string();
 
+            if self.vfs_skyrim_data_dir.trim().is_empty() {
+                self.vfs_skyrim_data_dir = dir_str;
+            }
+
             let response = ui.add_sized(
                 [ui.available_width() * 0.9, 40.0],
-                egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir).hint_text(&dir_str),
+                egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
             );
 
-            let pattern = {
-                let search_dir = if dir_str.trim().is_empty() {
-                    &self.vfs_skyrim_data_dir
-                } else {
-                    &dir_str
-                };
-                format!("{search_dir}/Nemesis_Engine/mod/*/info.ini")
-            };
+            let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
 
             if self.is_first_render {
                 self.update_vfs_mod_list(&pattern);
@@ -816,8 +813,8 @@ impl ModManagerApp {
                 .map(|item| {
                     let mut path = PathBuf::new();
                     path.push(data_dir);
-                    path.push("Nemesis");
-                    path.push("mods");
+                    path.push("Nemesis_Engine");
+                    path.push("mod");
                     path.push(&item.id);
                     path
                 })
