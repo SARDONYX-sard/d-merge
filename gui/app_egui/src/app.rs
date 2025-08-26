@@ -82,6 +82,7 @@ pub struct ModManagerApp {
     pub log_lines: Arc<Mutex<Vec<String>>>,
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
+    pub is_first_render: bool,
 }
 
 impl Default for ModManagerApp {
@@ -118,6 +119,7 @@ impl Default for ModManagerApp {
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
             notification: Arc::new(Mutex::new(String::new())),
+            is_first_render: true,
         }
     }
 }
@@ -134,6 +136,8 @@ impl App for ModManagerApp {
         self.ui_notification(ctx);
         self.ui_bottom_panel(ctx);
         self.ui_log_window(ctx);
+
+        self.is_first_render = false;
     }
 
     // Called when the app is about to close
@@ -204,8 +208,8 @@ impl ModManagerApp {
 
                     if let Some(dir) = dialog.pick_folder() {
                         match self.mode {
-                            DataMode::Vfs => self.vfs_load_mods(&dir.display().to_string()),
-                            DataMode::Manual => self.load_mods(&dir.display().to_string()),
+                            DataMode::Vfs => self.update_vfs_mod_list(&dir.display().to_string()),
+                            DataMode::Manual => self.update_mod_list(&dir.display().to_string()),
                         };
                     }
                 }
@@ -541,7 +545,7 @@ impl ModManagerApp {
                 .clicked()
             {
                 let filtered_ids: Vec<String> = self
-                    .mod_list
+                    .mod_list()
                     .par_iter()
                     .filter(|m| {
                         self.filter_text.trim().is_empty()
@@ -644,18 +648,26 @@ impl ModManagerApp {
             };
             let dir_str = dir.display().to_string();
 
-            ui.add_sized(
+            let response = ui.add_sized(
                 [ui.available_width() * 0.9, 40.0],
                 egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir).hint_text(&dir_str),
             );
 
-            let search_dir = if dir_str.trim().is_empty() {
-                &self.vfs_skyrim_data_dir
-            } else {
-                &dir_str
+            let pattern = {
+                let search_dir = if dir_str.trim().is_empty() {
+                    &self.vfs_skyrim_data_dir
+                } else {
+                    &dir_str
+                };
+                format!("{search_dir}/Nemesis_Engine/mod/*/info.ini")
             };
-            if self.mod_list().is_empty() {
-                self.vfs_load_mods(&format!("{search_dir}/Nemesis_Engine/mod/*/info.ini"));
+
+            if self.is_first_render {
+                self.update_vfs_mod_list(&pattern);
+            }
+
+            if self.vfs_mod_list.is_empty() || response.changed() {
+                self.update_vfs_mod_list(&pattern);
             }
         } else {
             let response = ui.add_sized(
@@ -665,16 +677,35 @@ impl ModManagerApp {
             );
             if self.mod_list().is_empty() || response.changed() {
                 let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
-                self.load_mods(&pattern);
+                self.update_mod_list(&pattern);
             }
         }
     }
 
-    fn load_mods(&mut self, pattern: &str) {
+    fn update_mod_list(&mut self, pattern: &str) {
         use mod_info::GetModsInfo as _;
         match mod_info::ModsInfo::get_all(pattern) {
             Ok(mods) => {
-                let _ = core::mem::replace(self.mod_list_mut(), from_mod_infos(mods));
+                // Turn the IDs of previously enabled mods into a HashSet
+                let enabled_ids: std::collections::HashSet<&str> = self
+                    .mod_list
+                    .par_iter()
+                    .filter(|m| m.enabled)
+                    .map(|m| m.id.as_str())
+                    .collect();
+
+                // take over enabled for new mods
+                let new_mods: Vec<_> = from_mod_infos(mods)
+                    .into_par_iter()
+                    .map(|mut m| {
+                        if enabled_ids.contains(m.id.as_str()) {
+                            m.enabled = true;
+                        }
+                        m
+                    })
+                    .collect();
+
+                let _ = core::mem::replace(&mut self.mod_list, new_mods);
             }
             Err(err) => {
                 let err_msg = self.t(
@@ -686,18 +717,47 @@ impl ModManagerApp {
         }
     }
 
-    fn vfs_load_mods(&mut self, pattern: &str) {
+    /// # Note
+    /// The only difference between vfs and manual is the id.
+    /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
+    ///
+    /// This allows vfs mode to maintain the check state on a different PC.
+    fn update_vfs_mod_list(&mut self, pattern: &str) {
+        if let Some(mods) = self.get_vfs_mod_list(pattern) {
+            // Turn the IDs of previously enabled mods into a HashSet
+            let enabled_ids: std::collections::HashSet<&str> = self
+                .vfs_mod_list
+                .par_iter()
+                .filter(|m| m.enabled)
+                .map(|m| m.id.as_str())
+                .collect();
+
+            // take over enabled for new mods
+            let new_mods: Vec<_> = mods
+                .into_par_iter()
+                .map(|mut m| {
+                    if enabled_ids.contains(m.id.as_str()) {
+                        m.enabled = true;
+                    }
+                    m
+                })
+                .collect();
+
+            let _ = core::mem::replace(&mut self.vfs_mod_list, new_mods);
+        };
+    }
+
+    fn get_vfs_mod_list(&mut self, pattern: &str) -> Option<Vec<ModItem>> {
         use mod_info::GetModsInfo as _;
         match mod_info::ModsInfo::vfs_get_all(pattern) {
-            Ok(mods) => {
-                let _ = core::mem::replace(self.mod_list_mut(), from_mod_infos(mods));
-            }
+            Ok(mods) => Some(from_mod_infos(mods)),
             Err(err) => {
                 let err_msg = self.t(
                     "error_reading_mod_info",
                     &format!("Error: reading mod info: {err}"),
                 );
                 self.set_notification(err_msg);
+                None
             }
         }
     }
