@@ -53,7 +53,7 @@ impl Default for AppSettings {
             mode: crate::app::DataMode::Vfs,
             target_runtime: skyrim_data_dir::Runtime::Se,
 
-            template_dir: "./interface/templates".into(),
+            template_dir: "./assets/templates".into(),
             output_dir: String::new(),
             filter_text: String::new(),
             sort_column: SortColumn::Priority,
