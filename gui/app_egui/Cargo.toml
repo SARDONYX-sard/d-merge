@@ -24,7 +24,6 @@ egui_virtual_list = "0.8.0"
 ico = "0.4.0"
 notify = "8.2.0"
 open = { version = "5.3.2" }
-rfd = { version = "0.15.4", default-features = false }
 
 rayon = { workspace = true }
 serde = { workspace = true }
@@ -39,6 +38,12 @@ nemesis_merge = { workspace = true }
 # serde_hkx_for_gui = { workspace = true }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.15.4", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd = { version = "0.15.4", features = ["gtk3"] }
 
 [lints]
 workspace = true
