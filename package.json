@@ -7,11 +7,9 @@
   "license": "GPL3.0",
   "scripts": {
     "build": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release-no-lto",
-    "build:electron": "npm -w ffi/javascript/node run build && npm run build:front && npm -w gui/backend/electron run build",
     "build:front": "npm --workspace gui/frontend run build:front",
     "build:icons": "npm run tauri icon ./gui/backend/tauri/icons/icon.svg",
     "dev": "tauri dev",
-    "dev:electron": "concurrently -n \"NEXT,ELECTRON\" -c \"yellow,blue\" --kill-others \"npm run dev:front\" \"npm --workspace gui/backend/electron run dev\"",
     "dev:front": "npm --workspace gui/frontend run dev:front",
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
     "lint": "biome lint ./ && cargo clippy --workspace",
@@ -33,7 +31,6 @@
   },
   "workspaces": [
     "ffi/javascript/node",
-    "gui/backend/electron",
     "gui/frontend"
   ],
   "packageManager": "npm@11.5.2"
