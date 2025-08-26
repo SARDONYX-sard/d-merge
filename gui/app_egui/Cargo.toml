@@ -43,7 +43,7 @@ tracing_rotation = { workspace = true }
 rfd = { version = "0.15.4", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rfd = { version = "0.15.4", features = ["gtk3"] }
+rfd = { version = "0.15.4", features = ["xdg-portal"] }
 
 [lints]
 workspace = true
