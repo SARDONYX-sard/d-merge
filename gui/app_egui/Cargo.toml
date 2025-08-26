@@ -18,7 +18,7 @@ winres = "0.1.12"
 
 [dependencies]
 eframe = "0.32.1"
-egui = { version = "0.32.1" }
+egui = { version = "0.32.1", features = ["rayon"] }
 egui_dnd = "0.13.0"
 egui_extras = "0.32.1"
 egui_virtual_list = "0.8.0"

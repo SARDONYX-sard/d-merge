@@ -1,11 +1,13 @@
 use crate::{
     dnd::{check_only_table_body, dnd_table_body},
+    i18n::I18nKey,
     mod_item::{from_mod_infos, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
 use rayon::prelude::*;
 use std::{
+    borrow::Cow,
     path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
@@ -63,7 +65,7 @@ pub struct ModManagerApp {
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
-    pub i18n: std::collections::HashMap<String, String>,
+    pub i18n: std::collections::HashMap<I18nKey, Cow<'static, str>>,
     pub log_level: LogLevel,
     pub last_window_size: egui::Vec2,
     pub last_window_pos: egui::Pos2,
@@ -178,24 +180,28 @@ impl ModManagerApp {
     fn ui_execution_mode(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_execution_mode").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let vfs_mode_label = self.t("vfs_mode", "VFS mode");
-                let vfs_mode_hover= self.t("vfs_mode_hover", "When booting using MO2's vfs, etc.");
-                let manual_mode_label = self.t("manual_mode", "Manual mode");
-                let manual_mode_hover= self.t("manual_mode_hover", "When using it completely manually.");
+                let vfs_mode_label = self.t(I18nKey::VfsMode).to_string();
+                let vfs_mode_hover = self.t(I18nKey::VfsModeHover).to_string();
+                let manual_mode_label = self.t(I18nKey::ManualMode).to_string();
+                let manual_mode_hover = self.t(I18nKey::ManualModeHover).to_string();
 
-                ui.label(self.t("execution_mode_label", "Execution mode:"));
-                ui.radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label).on_hover_text(vfs_mode_hover);
-                ui.radio_value(&mut self.mode, DataMode::Manual, manual_mode_label).on_hover_text(manual_mode_hover);
+                ui.label(self.t(I18nKey::ExecutionModeLabel));
+                ui.radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label)
+                    .on_hover_text(vfs_mode_hover);
+                ui.radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
+                    .on_hover_text(manual_mode_hover);
 
                 ui.add(Separator::default().vertical());
 
-                let debug_output_label = self.t("debug_output", "Debug output");
-                let debug_output_hover = self.t("debug_output_hover", "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)");
-                ui.checkbox(&mut self.enable_debug_output, debug_output_label).on_hover_text(debug_output_hover);
+                let debug_output_label = self.t(I18nKey::DebugOutput).to_string();
+                let debug_output_hover = self.t(I18nKey::DebugOutputHover).to_string();
+                ui.checkbox(&mut self.enable_debug_output, debug_output_label)
+                    .on_hover_text(debug_output_hover);
 
-                let auto_remove_meshes_label = self.t("auto_remove_meshes", "Auto remove meshes");
-                let auto_remove_meshes_hover = self.t("auto_remove_meshes_hover", "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.");
-                ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label).on_hover_text(auto_remove_meshes_hover);
+                let auto_remove_meshes_label = self.t(I18nKey::AutoRemoveMeshes).to_string();
+                let auto_remove_meshes_hover = self.t(I18nKey::AutoRemoveMeshesHover).to_string();
+                ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label)
+                    .on_hover_text(auto_remove_meshes_hover);
             });
         });
     }
@@ -204,13 +210,13 @@ impl ModManagerApp {
     fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_data_dir").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t("skyrim_data_dir_label", "Skyrim Data dir:"));
+                ui.label(self.t(I18nKey::SkyrimDataDirLabel));
                 self.draw_skyrim_dir_ui(ui);
 
                 if ui
                     .add_sized(
                         [ui.available_width() * 0.06, 40.0],
-                        egui::Button::new(self.t("open_button", "Open")),
+                        egui::Button::new(self.t(I18nKey::OpenButton)),
                     )
                     .clicked()
                 {
@@ -239,7 +245,7 @@ impl ModManagerApp {
     fn ui_output_dir(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_output_dir").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let output_dir_label = self.t("output_dir_label", "Output dir:");
+                let output_dir_label = self.t(I18nKey::OutputDirLabel);
                 if ui.button(output_dir_label).clicked() {
                     let path = Path::new(&self.output_dir);
                     let _ = std::fs::create_dir_all(path);
@@ -257,7 +263,7 @@ impl ModManagerApp {
                 if ui
                     .add_sized(
                         [ui.available_width() * 0.06, 40.0],
-                        egui::Button::new(self.t("open_button", "Open")),
+                        egui::Button::new(self.t(I18nKey::OpenButton)),
                     )
                     .clicked()
                 {
@@ -282,10 +288,19 @@ impl ModManagerApp {
     fn ui_search_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t("search_label", "Search:"));
-                ui.add_sized([300.0, 40.0], egui::TextEdit::singleline(&mut self.filter_text));
+                ui.label(self.t(I18nKey::SearchLabel));
+                ui.add_sized(
+                    [300.0, 40.0],
+                    egui::TextEdit::singleline(&mut self.filter_text),
+                );
 
-                if ui.add_sized([60.0, 40.0], egui::Button::new(self.t("clear_button", "Clear"))).clicked() {
+                if ui
+                    .add_sized(
+                        [60.0, 40.0],
+                        egui::Button::new(self.t(I18nKey::ClearButton)),
+                    )
+                    .clicked()
+                {
                     self.filter_text.clear();
                 }
 
@@ -293,7 +308,7 @@ impl ModManagerApp {
                     ui.add_space(ui.available_width() - 60.0);
                     let lock_button_response = ui
                         .add_sized([60.0, 40.0], egui::Button::new("🔒"))
-                        .on_hover_text(self.t("lock_button_hover","Row reordering is locked unless sorting by Priority ascending.\nClick to unlock."));
+                        .on_hover_text(self.t(I18nKey::LockButtonHover));
                     if lock_button_response.clicked() {
                         self.unlock_readonly_table();
                     }
@@ -316,10 +331,7 @@ impl ModManagerApp {
                 self.ui_log_level_box(ui);
 
                 if ui
-                    .add_sized(
-                        [120.0, 40.0],
-                        egui::Button::new(self.t("log_dir", "Log Dir")),
-                    )
+                    .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogDir)))
                     .clicked()
                 {
                     let path = std::path::Path::new(crate::log::LOG_DIR);
@@ -329,10 +341,7 @@ impl ModManagerApp {
                     }
                 }
                 if ui
-                    .add_sized(
-                        [120.0, 40.0],
-                        egui::Button::new(self.t("log_button", "Log")),
-                    )
+                    .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogButton)))
                     .clicked()
                 {
                     self.show_log_window
@@ -342,7 +351,7 @@ impl ModManagerApp {
                 if ui
                     .add_sized(
                         [120.0, 40.0],
-                        egui::Button::new(self.t("notification_clear_button", "Clear Notify")),
+                        egui::Button::new(self.t(I18nKey::NotificationClearButton)),
                     )
                     .clicked()
                 {
@@ -352,7 +361,7 @@ impl ModManagerApp {
                 if ui
                     .add_sized(
                         [120.0, 40.0],
-                        egui::Button::new(self.t("patch_button", "Patch")),
+                        egui::Button::new(self.t(I18nKey::PatchButton)),
                     )
                     .clicked()
                 {
@@ -452,7 +461,7 @@ impl ModManagerApp {
     /// Central panel with mod list table.
     fn ui_mod_list(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading(self.t("mods_list_title", "Mods"));
+            ui.heading(self.t(I18nKey::ModsListTitle));
             ui.separator();
 
             // 1. Filter
@@ -548,10 +557,10 @@ impl ModManagerApp {
 
     /// Render table header (column titles with sort toggles).
     fn render_table_header(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
-        let path_label = self.t("column_path", "Path");
-        let name_label = self.t("column_name", "Name");
-        let site_label = self.t("column_site", "Site");
-        let priority_label = self.t("column_priority", "Priority");
+        let path_label = self.t(I18nKey::ColumnPath).to_string();
+        let name_label = self.t(I18nKey::ColumnName).to_string();
+        let site_label = self.t(I18nKey::ColumnSite).to_string();
+        let priority_label = self.t(I18nKey::ColumnPriority).to_string();
 
         self.checkbox_header_button(header);
         self.header_button(header, &path_label, SortColumn::Id);
@@ -728,11 +737,8 @@ impl ModManagerApp {
                 let _ = core::mem::replace(&mut self.mod_list, new_mods);
             }
             Err(err) => {
-                let err_msg = self.t(
-                    "error_reading_mod_info",
-                    &format!("Error: reading mod info: {err}"),
-                );
-                self.set_notification(err_msg);
+                let err_title = self.t(I18nKey::ErrorReadingModInfo);
+                self.set_notification(format!("{err_title} {err}"));
             }
         }
     }
@@ -767,16 +773,13 @@ impl ModManagerApp {
         };
     }
 
-    fn get_vfs_mod_list(&mut self, pattern: &str) -> Option<Vec<ModItem>> {
+    fn get_vfs_mod_list(&self, pattern: &str) -> Option<Vec<ModItem>> {
         use mod_info::GetModsInfo as _;
         match mod_info::ModsInfo::vfs_get_all(pattern) {
             Ok(mods) => Some(from_mod_infos(mods)),
             Err(err) => {
-                let err_msg = self.t(
-                    "error_reading_mod_info",
-                    &format!("Error: reading mod info: {err}"),
-                );
-                self.set_notification(err_msg);
+                let err_title = self.t(I18nKey::ErrorReadingModInfo);
+                self.set_notification(format!("{err_title} {err}"));
                 None
             }
         }
@@ -809,14 +812,12 @@ impl ModManagerApp {
 
 // i18n
 impl ModManagerApp {
-    /// Get i18n text by key, insert & fallback to default
-    fn t(&mut self, key: &str, default: &str) -> String {
-        if let Some(translation) = self.i18n.get(key) {
-            translation.clone()
-        } else {
-            self.i18n.insert(key.to_string(), default.to_string());
-            default.to_string()
-        }
+    /// Translate given key or fallback to default English.
+    #[inline]
+    fn t(&self, key: I18nKey) -> &str {
+        self.i18n
+            .get(&key)
+            .map_or_else(|| key.default_eng(), |s| s.as_ref())
     }
 }
 

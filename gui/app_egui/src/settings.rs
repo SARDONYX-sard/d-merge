@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Cow,
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
 
 use crate::{
     app::ModManagerApp,
+    i18n::I18nKey,
     mod_item::{ModItem, SortColumn},
 };
 
@@ -20,23 +23,22 @@ pub struct AppSettings {
     /// should be a subdirectory such as `assets/templates/meshes`.
     pub template_dir: String,
     pub output_dir: String,
-    /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
-    enable_debug_output: bool,
+
     /// Delete <output dir>/meshes immediately before running the patch.
     auto_remove_meshes: bool,
-
-    pub filter_text: String,
-    pub sort_column: SortColumn,
-    pub sort_asc: bool,
-    pub i18n: std::collections::HashMap<String, String>,
+    /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
+    enable_debug_output: bool,
     log_level: crate::app::LogLevel,
-
-    pub window_width: f32,
+    pub filter_text: String,
+    pub font_path: Option<PathBuf>,
+    pub i18n: std::collections::HashMap<I18nKey, Cow<'static, str>>,
+    pub sort_asc: bool,
+    pub sort_column: SortColumn,
     pub window_height: f32,
+    pub window_maximized: bool,
     pub window_pos_x: f32,
     pub window_pos_y: f32,
-    pub window_maximized: bool,
-    pub font_path: Option<PathBuf>,
+    pub window_width: f32,
 
     pub vfs_skyrim_data_dir: String,
     pub vfs_mod_list: Vec<ModItem>,
@@ -48,37 +50,40 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            vfs_skyrim_data_dir: String::new(),
-            vfs_mod_list: Vec::new(),
-
-            skyrim_data_dir: String::new(),
-            mod_list: Vec::new(),
-
-            mode: crate::app::DataMode::Vfs,
-            target_runtime: skyrim_data_dir::Runtime::Se,
-
-            template_dir: "./assets/templates".into(),
-            output_dir: String::new(),
-            filter_text: String::new(),
-            sort_column: SortColumn::Priority,
-            sort_asc: true,
-            i18n: std::collections::HashMap::new(),
-            log_level: crate::app::LogLevel::Debug,
-            enable_debug_output: false,
             auto_remove_meshes: true,
-
-            window_width: 900.0,
+            enable_debug_output: false,
+            filter_text: String::new(),
+            font_path: None,
+            i18n: HashMap::new(),
+            log_level: crate::app::LogLevel::Debug,
+            mode: crate::app::DataMode::Vfs,
+            output_dir: String::new(),
+            sort_asc: true,
+            sort_column: SortColumn::Priority,
+            target_runtime: skyrim_data_dir::Runtime::Se,
+            template_dir: "./assets/templates".into(),
             window_height: 900.0,
+            window_maximized: false,
             window_pos_x: 900.0,
             window_pos_y: 30.0,
-            window_maximized: false,
-            font_path: None,
+            window_width: 900.0,
+
+            vfs_skyrim_data_dir: String::new(),
+            vfs_mod_list: Vec::new(),
+            skyrim_data_dir: String::new(),
+            mod_list: Vec::new(),
         }
     }
 }
 
 impl From<ModManagerApp> for AppSettings {
     fn from(app: ModManagerApp) -> Self {
+        let i18n = if app.i18n.is_empty() {
+            I18nKey::default_map()
+        } else {
+            app.i18n
+        };
+
         Self {
             vfs_skyrim_data_dir: app.vfs_skyrim_data_dir,
             vfs_mod_list: app.vfs_mod_list,
@@ -86,23 +91,23 @@ impl From<ModManagerApp> for AppSettings {
             skyrim_data_dir: app.skyrim_data_dir,
             mod_list: app.mod_list,
 
-            mode: app.mode,
-            target_runtime: app.target_runtime,
-            log_level: app.log_level,
-            enable_debug_output: app.enable_debug_output,
             auto_remove_meshes: app.auto_remove_meshes,
-            template_dir: app.template_dir,
-            output_dir: app.output_dir,
+            enable_debug_output: app.enable_debug_output,
             filter_text: app.filter_text,
-            sort_column: app.sort_column,
+            font_path: app.font_path,
+            i18n,
+            log_level: app.log_level,
+            mode: app.mode,
+            output_dir: app.output_dir,
             sort_asc: app.sort_asc,
-            i18n: app.i18n,
-            window_width: app.last_window_size.x,
+            sort_column: app.sort_column,
+            target_runtime: app.target_runtime,
+            template_dir: app.template_dir,
             window_height: app.last_window_size.y,
+            window_maximized: app.last_window_maximized,
             window_pos_x: app.last_window_pos.x,
             window_pos_y: app.last_window_pos.y,
-            window_maximized: app.last_window_maximized,
-            font_path: app.font_path,
+            window_width: app.last_window_size.x,
         }
     }
 }

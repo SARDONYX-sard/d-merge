@@ -4,6 +4,7 @@
 mod app;
 mod dnd;
 mod fonts;
+mod i18n;
 mod log;
 mod mod_item;
 mod settings;
