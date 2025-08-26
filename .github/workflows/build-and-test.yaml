@@ -118,7 +118,7 @@ jobs:
           install_front_deps: false
 
       - name: Build GUI
-        run: cargo build -p d_merge_egui
+        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
 
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
