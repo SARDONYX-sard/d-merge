@@ -9,7 +9,8 @@ use crate::{
     mod_item::{ModItem, SortColumn},
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppSettings {
     mode: crate::app::DataMode,
     target_runtime: skyrim_data_dir::Runtime,
@@ -21,6 +22,9 @@ pub struct AppSettings {
     pub output_dir: String,
     /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
     enable_debug_output: bool,
+    /// Delete <output dir>/meshes immediately before running the patch.
+    auto_remove_meshes: bool,
+
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
@@ -61,6 +65,7 @@ impl Default for AppSettings {
             i18n: std::collections::HashMap::new(),
             log_level: crate::app::LogLevel::Debug,
             enable_debug_output: false,
+            auto_remove_meshes: true,
 
             window_width: 900.0,
             window_height: 900.0,
@@ -85,6 +90,7 @@ impl From<ModManagerApp> for AppSettings {
             target_runtime: app.target_runtime,
             log_level: app.log_level,
             enable_debug_output: app.enable_debug_output,
+            auto_remove_meshes: app.auto_remove_meshes,
             template_dir: app.template_dir,
             output_dir: app.output_dir,
             filter_text: app.filter_text,
@@ -114,6 +120,7 @@ impl From<AppSettings> for ModManagerApp {
             template_dir: settings.template_dir,
             output_dir: settings.output_dir,
             enable_debug_output: settings.enable_debug_output,
+            auto_remove_meshes: settings.auto_remove_meshes,
             filter_text: settings.filter_text,
             sort_column: settings.sort_column,
             sort_asc: settings.sort_asc,

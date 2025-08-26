@@ -6,7 +6,7 @@ use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
 use rayon::prelude::*;
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
@@ -59,6 +59,7 @@ pub struct ModManagerApp {
     pub output_dir: String,
     /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
     pub enable_debug_output: bool,
+    pub auto_remove_meshes: bool,
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
@@ -92,6 +93,7 @@ impl Default for ModManagerApp {
             mode: DataMode::Vfs,
             target_runtime: skyrim_data_dir::Runtime::Se,
             enable_debug_output: false,
+            auto_remove_meshes: true,
 
             vfs_skyrim_data_dir: String::new(),
             vfs_mod_list: vec![],
@@ -126,6 +128,7 @@ impl Default for ModManagerApp {
 
 impl App for ModManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        self.start_log_watcher(ctx);
         self.update_window_info(ctx);
 
         self.ui_execution_mode(ctx);
@@ -145,11 +148,22 @@ impl App for ModManagerApp {
     // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
-        settings.save(); // ← . /d_merge_settings.json Save to.
+        settings.save();
     }
 }
 
 impl ModManagerApp {
+    /// Start watcher for Log viewer.
+    fn start_log_watcher(&mut self, ctx: &egui::Context) {
+        if !self.log_watcher_started {
+            let log_lines = Arc::clone(&self.log_lines);
+            let ctx = ctx.clone();
+
+            crate::log::start_log_tail(log_lines, Some(ctx));
+            self.log_watcher_started = true;
+        }
+    }
+
     /// To save settings.
     fn update_window_info(&mut self, ctx: &egui::Context) {
         let rect = ctx.screen_rect();
@@ -176,8 +190,12 @@ impl ModManagerApp {
                 ui.add(Separator::default().vertical());
 
                 let debug_output_label = self.t("debug_output", "Debug output");
-                let debug_output_hover = self.t("debug_output_hover", "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/patches/.debug`)");
+                let debug_output_hover = self.t("debug_output_hover", "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)");
                 ui.checkbox(&mut self.enable_debug_output, debug_output_label).on_hover_text(debug_output_hover);
+
+                let auto_remove_meshes_label = self.t("auto_remove_meshes", "Auto remove meshes");
+                let auto_remove_meshes_hover = self.t("auto_remove_meshes_hover", "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.");
+                ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label).on_hover_text(auto_remove_meshes_hover);
             });
         });
     }
@@ -221,7 +239,16 @@ impl ModManagerApp {
     fn ui_output_dir(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_output_dir").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t("output_dir_label", "Output dir:"));
+                let output_dir_label = self.t("output_dir_label", "Output dir:");
+                if ui.button(output_dir_label).clicked() {
+                    let path = Path::new(&self.output_dir);
+                    let _ = std::fs::create_dir_all(path);
+                    if let Ok(abs_dir) = path.canonicalize() {
+                        if let Err(err) = open::that_detached(abs_dir) {
+                            self.set_notification(format!("Couldn't  open output dir: {err}"));
+                        };
+                    }
+                };
                 let _ = ui.add_sized(
                     [ui.available_width() * 0.9, 40.0],
                     egui::TextEdit::singleline(&mut self.output_dir),
@@ -309,15 +336,7 @@ impl ModManagerApp {
                     .clicked()
                 {
                     self.show_log_window
-                        .store(true, std::sync::atomic::Ordering::Relaxed);
-                    if !self.log_watcher_started {
-                        let log_lines = Arc::clone(&self.log_lines);
-                        let ctx = ctx.clone();
-
-                        crate::log::start_log_tail(log_lines, Some(ctx));
-
-                        self.log_watcher_started = true;
-                    }
+                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // toggle
                 }
 
                 if ui
@@ -408,6 +427,10 @@ impl ModManagerApp {
                     );
 
                     egui::CentralPanel::default().show(ctx, |ui| {
+                        if ui.button("Clear").clicked() {
+                            log_lines.lock().unwrap().clear();
+                        }
+
                         egui::ScrollArea::vertical()
                             .stick_to_bottom(true)
                             .show(ui, |ui| {
@@ -832,11 +855,23 @@ impl ModManagerApp {
         };
         let is_debug_mode = self.enable_debug_output;
 
+        if self.auto_remove_meshes {
+            let meshes_path = Path::new(&self.output_dir).join("meshes");
+            let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
+            rayon::join(
+                || {
+                    let _ = remove_if_exists(meshes_path);
+                },
+                || {
+                    let _ = remove_if_exists(debug_path);
+                },
+            );
+        }
+
         let notify = Arc::clone(&self.notification);
         self.async_rt.spawn(nemesis_merge::behavior_gen(
             nemesis_paths,
             nemesis_merge::Config {
-                // resource_dir: "./interface/templates".into(),
                 resource_dir: self.template_dir.clone().into(),
                 output_dir: self.output_dir.clone().into(),
                 output_target: match self.target_runtime {
@@ -860,4 +895,41 @@ impl ModManagerApp {
             },
         ));
     }
+}
+
+/// Removes a directory if it exists, with debug logging.
+///
+/// # Why need this?
+/// This is because the presence of a previous hkx may leave unintended changes behind.
+///
+/// # Reasons for not using `std::fs::remove_dir_all`
+/// For some reason, egui on MO2 throws an error saying the path doesn't exist when I try to use `std::remove_dir_all`,
+/// so I manually perform a recursive deletion starting from the end.
+fn remove_if_exists(path: impl AsRef<Path>) -> std::io::Result<()> {
+    use std::fs;
+
+    let path = path.as_ref();
+
+    if !path.exists() {
+        return Ok(());
+    }
+
+    // Get the contents
+    let entries: Vec<PathBuf> = fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .collect();
+
+    // directories recursively deleted in parallel, files deleted in parallel
+    entries.par_iter().for_each(|entry_path| {
+        if entry_path.is_dir() {
+            let _ = remove_if_exists(entry_path); // recursion
+        } else {
+            let _ = fs::remove_file(entry_path);
+        }
+    });
+
+    // remove itself after deleting the contents
+    fs::remove_dir(path)?;
+    Ok(())
 }

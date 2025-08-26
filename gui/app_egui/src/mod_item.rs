@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 
 /// Represents a single mod entry.
-#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ModItem {
     /// Whether the mod is enabled.
     pub enabled: bool,
@@ -17,7 +17,7 @@ pub struct ModItem {
 }
 
 /// Columns that can be used for sorting mods.
-#[derive(PartialEq, Eq, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortColumn {
     Id,
