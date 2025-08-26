@@ -7,10 +7,13 @@ authors.workspace = true
 categories = ["development-tools"]
 edition.workspace = true
 keywords = ["skyrim"]
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0"
 readme = "../../README.md"
 repository.workspace = true
 rust-version.workspace = true
+
+[build-dependencies]
+winres = "0.1.12"
 
 [dependencies]
 eframe = "0.32.1"
