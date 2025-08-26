@@ -1,6 +1,5 @@
 use crate::{
     dnd::{check_only_table_body, dnd_table_body},
-    log::start_log_watcher,
     mod_item::{from_mod_infos, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
@@ -150,9 +149,8 @@ impl ModManagerApp {
     /// To save settings.
     fn update_window_info(&mut self, ctx: &egui::Context) {
         let rect = ctx.screen_rect();
-        ctx.pointer_latest_pos();
         self.last_window_size = rect.size();
-        self.last_window_pos = rect.left_top();
+        // self.last_window_pos = rect.left_top(); // TODO: Get current window position.
 
         ctx.viewport(|state| {
             self.last_window_maximized = state.builder.maximized.unwrap_or_default();
@@ -310,7 +308,10 @@ impl ModManagerApp {
                         .store(true, std::sync::atomic::Ordering::Relaxed);
                     if !self.log_watcher_started {
                         let log_lines = Arc::clone(&self.log_lines);
-                        start_log_watcher(log_lines);
+                        let ctx = ctx.clone();
+
+                        crate::log::start_log_tail(log_lines, Some(ctx));
+
                         self.log_watcher_started = true;
                     }
                 }
@@ -390,9 +391,12 @@ impl ModManagerApp {
 
             ctx.show_viewport_deferred(
                 egui::ViewportId::from_hash_of("log_viewer"),
-                egui::ViewportBuilder::default()
-                    .with_title("Log viewer")
-                    .with_min_inner_size([800.0, 500.0]),
+                egui::ViewportBuilder {
+                    title: Some("Log viewer".to_string()),
+                    inner_size: Some(egui::Vec2::new(1300.0, 800.0)),
+                    resizable: Some(true),
+                    ..Default::default()
+                },
                 move |ctx, class| {
                     assert!(
                         class == egui::ViewportClass::Deferred,
@@ -403,9 +407,8 @@ impl ModManagerApp {
                         egui::ScrollArea::vertical()
                             .stick_to_bottom(true)
                             .show(ui, |ui| {
-                                for line in log_lines.lock().unwrap().iter() {
-                                    ui.label(line);
-                                }
+                                let text = log_lines.lock().unwrap().join("\n");
+                                ui.label(text);
                             });
                     });
 

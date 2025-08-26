@@ -25,6 +25,7 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
             title: Some("D Merge".to_string()),
+            app_id: Some("D Merge".to_string()),
             position: Some(egui::Pos2::new(
                 settings.window_pos_x,
                 settings.window_pos_y,
@@ -32,7 +33,6 @@ fn main() -> Result<(), eframe::Error> {
             maximized: Some(settings.window_maximized),
             inner_size: Some(egui::vec2(settings.window_width, settings.window_height)),
             resizable: Some(true),
-            transparent: Some(true),
             icon: Some(std::sync::Arc::new(egui::IconData {
                 rgba: icon_rgba,
                 width: icon_size[0],
