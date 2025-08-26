@@ -20,7 +20,7 @@
     "test": "npm --workspace gui/frontend run test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.0",
+    "@biomejs/biome": "2.2.2",
     "@tauri-apps/cli": "2.8.1",
     "@types/node": "24.3.0",
     "@vitejs/plugin-react-swc": "4.0.1",
