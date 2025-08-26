@@ -23,6 +23,7 @@ members = [
   "core/tracing_rotation",
   "ffi/javascript/node",
   "ffi/python",
+  "gui/app_egui",
   "gui/backend/tauri",
 ]
 resolver = "2"
@@ -151,7 +152,6 @@ macro_use_imports = "deny"
 manual_ok_or = "deny"
 map_flatten = "deny"
 map_unwrap_or = "deny"
-match_on_vec_items = "deny"
 match_same_arms = "deny"
 match_wild_err_arm = "deny"
 match_wildcard_for_single_variants = "deny"
