@@ -23,6 +23,7 @@ members = [
   "core/tracing_rotation",
   "ffi/javascript/node",
   "ffi/python",
+  "gui/app_egui",
   "gui/backend/tauri",
 ]
 resolver = "2"

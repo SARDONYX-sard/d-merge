@@ -18,6 +18,8 @@
     "clippy",
     "dashmap",
     "defaultmale",
+    "eframe",
+    "egui",
     "Filenaming",
     "firstperson",
     "havok",
@@ -32,6 +34,7 @@
     "multispace",
     "napi",
     "nextest",
+    "noninteractive",
     "notistack",
     "numelements",
     "onedark",
@@ -59,6 +62,7 @@
     "turbopack",
     "Uninit",
     "unlisten",
+    "viewports",
     "weapequip",
     "xorout"
   ]
