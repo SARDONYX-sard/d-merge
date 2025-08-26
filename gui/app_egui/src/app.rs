@@ -626,11 +626,11 @@ impl ModManagerApp {
         if self.mode == DataMode::Vfs {
             let dir = match skyrim_data_dir::get_skyrim_data_dir(self.target_runtime) {
                 Ok(dir) => dir,
-                Err(err) => {
+                Err(_err) => {
                     // NOTE: Unsupported Unix `get_skyrim_data_dir`
                     #[cfg(target_os = "windows")]
                     {
-                        let err_msg = format!("Error: Reading skyrim data dir: {err}");
+                        let err_msg = format!("Error: Reading skyrim data dir: {_err}");
                         self.set_notification(err_msg);
                     }
                     PathBuf::new()
