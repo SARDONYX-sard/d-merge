@@ -30,9 +30,9 @@ jobs:
           install_front_deps: false
 
       - name: Check format
-        run: cargo fmt --all -- --check --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python
+        run: cargo fmt --all --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python -- --check
       - name: Lint Check
-        run: cargo clippy --workspace -- -D warnings --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python
+        run: cargo clippy --workspace --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python -- -D warnings
 
   test:
     strategy:
