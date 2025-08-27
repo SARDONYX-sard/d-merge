@@ -50,6 +50,10 @@ pub enum I18nKey {
     SearchLabel,
     #[serde(rename = "skyrim_data_dir_label")]
     SkyrimDataDirLabel,
+    #[serde(rename = "transparent_button_label")]
+    Transparent,
+    #[serde(rename = "transparent_button_hover")]
+    TransparentHover,
     #[serde(rename = "vfs_mode")]
     VfsMode,
     #[serde(rename = "vfs_mode_hover")]
@@ -86,6 +90,8 @@ impl I18nKey {
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
             Self::SearchLabel => "Search:",
+            Self::Transparent => "Transparent",
+            Self::TransparentHover => "Toggle Transparent window",
             Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
             Self::VfsMode => "VFS mode",
             Self::VfsModeHover => "When booting using MO2's VFS, etc.",

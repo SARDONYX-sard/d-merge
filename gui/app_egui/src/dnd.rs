@@ -20,11 +20,12 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 5]
     let response =
         egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
             // Since body cannot be used, stripe must be implemented manually.
-            let bg_color = if state.index % 2 == 0 {
+            let mut bg_color = if state.index % 2 == 0 {
                 ui.style().visuals.widgets.active.bg_fill
             } else {
                 ui.visuals().widgets.noninteractive.bg_fill // gray
             };
+            bg_color = bg_color.gamma_multiply(0.7);
 
             let row_rect = ui
                 .allocate_rect(

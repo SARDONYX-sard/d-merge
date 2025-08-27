@@ -67,6 +67,7 @@ pub struct ModManagerApp {
     pub sort_asc: bool,
     pub i18n: std::collections::HashMap<I18nKey, Cow<'static, str>>,
     pub log_level: LogLevel,
+    pub transparent: bool,
     pub last_window_size: egui::Vec2,
     pub last_window_pos: egui::Pos2,
     pub last_window_maximized: bool,
@@ -110,6 +111,7 @@ impl Default for ModManagerApp {
             sort_asc: true,
             i18n: std::collections::HashMap::new(),
             log_level: LogLevel::Debug,
+            transparent: true,
             last_window_size: egui::Vec2::ZERO,
             last_window_pos: egui::Pos2::ZERO,
             last_window_maximized: false,
@@ -180,7 +182,12 @@ impl ModManagerApp {
     }
 
     fn ui_execution_mode(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_execution_mode").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::top("top_execution_mode");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let vfs_mode_label = self.t(I18nKey::VfsMode).to_string();
                 let vfs_mode_hover = self.t(I18nKey::VfsModeHover).to_string();
@@ -204,22 +211,31 @@ impl ModManagerApp {
                 let auto_remove_meshes_hover = self.t(I18nKey::AutoRemoveMeshesHover).to_string();
                 ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label)
                     .on_hover_text(auto_remove_meshes_hover);
+
+                ui.add_space(30.0);
+
+                let transparent_label = self.t(I18nKey::Transparent).to_string();
+                let transparent_hover = self.t(I18nKey::TransparentHover).to_string();
+                ui.checkbox(&mut self.transparent, transparent_label)
+                    .on_hover_text(transparent_hover);
             });
         });
     }
 
     /// Skyrim data directory selection panel.
     fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_data_dir").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::top("top_data_dir");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(self.t(I18nKey::SkyrimDataDirLabel));
                 self.draw_skyrim_dir_ui(ui);
 
                 if ui
-                    .add_sized(
-                        [ui.available_width() * 0.06, 40.0],
-                        egui::Button::new(self.t(I18nKey::OpenButton)),
-                    )
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
                     .clicked()
                 {
                     let dir = match self.mode {
@@ -234,8 +250,12 @@ impl ModManagerApp {
 
                     if let Some(dir) = dialog.pick_folder() {
                         match self.mode {
-                            DataMode::Vfs => self.update_vfs_mod_list(&dir.display().to_string()),
-                            DataMode::Manual => self.update_mod_list(&dir.display().to_string()),
+                            DataMode::Vfs => {
+                                self.update_vfs_mod_list(&dir.display().to_string());
+                            }
+                            DataMode::Manual => {
+                                self.update_mod_list(&dir.display().to_string());
+                            }
                         };
                     }
                 }
@@ -245,7 +265,12 @@ impl ModManagerApp {
 
     /// Output directory selection panel.
     fn ui_output_dir(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_output_dir").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::top("top_output_dir");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let output_dir_label = self.t(I18nKey::OutputDirLabel);
                 if ui.button(output_dir_label).clicked() {
@@ -263,10 +288,7 @@ impl ModManagerApp {
                 );
 
                 if ui
-                    .add_sized(
-                        [ui.available_width() * 0.06, 40.0],
-                        egui::Button::new(self.t(I18nKey::OpenButton)),
-                    )
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
                     .clicked()
                 {
                     let dialog = if !self.output_dir.is_empty() {
@@ -288,7 +310,12 @@ impl ModManagerApp {
 
     /// Search & lock panel.
     fn ui_search_panel(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::top("top_panel");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(self.t(I18nKey::SearchLabel));
                 ui.add_sized(
@@ -321,14 +348,24 @@ impl ModManagerApp {
 
     /// Notification bar at bottom.
     fn ui_notification(&self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("notification_panel").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::bottom("notification_panel");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.label(self.notification());
         });
     }
 
     /// Bottom panel with buttons (Log, Patch).
     fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+        let mut panel = egui::TopBottomPanel::bottom("bottom_panel");
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
@@ -347,7 +384,8 @@ impl ModManagerApp {
                     .clicked()
                 {
                     self.show_log_window
-                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // toggle
+                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed);
+                    // toggle
                 }
 
                 if ui
@@ -437,18 +475,20 @@ impl ModManagerApp {
                         "This egui backend doesn't support multiple viewports"
                     );
 
-                    egui::CentralPanel::default().show(ctx, |ui| {
-                        if ui.button("Clear").clicked() {
-                            log_lines.lock().unwrap().clear();
-                        }
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::new())
+                        .show(ctx, |ui| {
+                            if ui.button("Clear").clicked() {
+                                log_lines.lock().unwrap().clear();
+                            }
 
-                        egui::ScrollArea::vertical()
-                            .stick_to_bottom(true)
-                            .show(ui, |ui| {
-                                let text = log_lines.lock().unwrap().join("\n");
-                                ui.label(text);
-                            });
-                    });
+                            egui::ScrollArea::vertical()
+                                .stick_to_bottom(true)
+                                .show(ui, |ui| {
+                                    let text = log_lines.lock().unwrap().join("\n");
+                                    ui.label(text);
+                                });
+                        });
 
                     if ctx.input(|i| i.viewport().close_requested()) {
                         show_log_window.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -462,7 +502,12 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Central panel with mod list table.
     fn ui_mod_list(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let mut panel = egui::CentralPanel::default();
+        if self.transparent {
+            panel = panel.frame(egui::Frame::new());
+        }
+
+        panel.show(ctx, |ui| {
             ui.heading(self.t(I18nKey::ModsListTitle));
             ui.separator();
 
@@ -526,21 +571,23 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
-        let table_height = ui.available_height() * 0.8;
+        let table_max_height = ui.available_height() * 0.8;
+        let total_width = ui.available_width();
 
         egui::ScrollArea::vertical()
-            .max_height(table_height)
+            .max_height(table_max_height)
+            .max_width(total_width)
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
                     .column(egui_extras::Column::auto().resizable(true)) // checkbox
-                    .column(egui_extras::Column::initial(200.0).resizable(true)) // id
-                    .column(egui_extras::Column::initial(200.0).resizable(true)) // name
-                    .column(egui_extras::Column::initial(300.0).resizable(true)) // site
-                    .column(egui_extras::Column::initial(100.0).resizable(true)) // priority
+                    .column(egui_extras::Column::initial(total_width * 0.20).resizable(true)) // id
+                    .column(egui_extras::Column::initial(total_width * 0.30).resizable(true)) // name
+                    .column(egui_extras::Column::initial(total_width * 0.40).resizable(true)) // site
+                    .column(egui_extras::Column::remainder().resizable(true)) // priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
-                        let mut widths = [0.0; 5];
+                        let mut widths = [0.0; 5]; // 5 ==  column count
                         widths.clone_from_slice(body.widths());
 
                         match editable {

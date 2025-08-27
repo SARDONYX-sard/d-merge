@@ -37,6 +37,7 @@ fn main() -> Result<(), eframe::Error> {
                 settings.window_pos_x,
                 settings.window_pos_y,
             )),
+            transparent: Some(true),
             maximized: Some(settings.window_maximized),
             inner_size: Some(egui::vec2(settings.window_width, settings.window_height)),
             resizable: Some(true),
