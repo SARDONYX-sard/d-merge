@@ -1,9 +1,57 @@
-use crate::asdsf::{
-    alt::{alt_key::to_normal_txt_project_name, AltAsdsf, AltTxtProjects},
-    normal::ser::{write_anim_set, write_file_names},
+use rayon::prelude::*;
+
+use crate::{
+    asdsf::{
+        alt::{alt_key::to_normal_txt_project_name, AltAsdsf, AltTxtProjects},
+        normal::ser::{write_anim_set, write_file_names},
+    },
+    diff_line::DiffLines,
 };
 
 const NEW_LINE: &str = "\r\n";
+
+/// Converts an `AltAsdsf` struct back into the original `animationsetdatasinglefile.txt` text format with `\r\n` line endings.
+///
+/// # Errors
+/// Failed to apply patches.
+pub fn serialize_alt_asdsf_with_patches(
+    alt_asdsf: AltAsdsf<'_>,
+    patches: DiffLines,
+) -> Result<String, crate::diff_line::error::Error> {
+    let mut out = String::new();
+
+    let (mut txt_projects, anim_set_lists): (Vec<_>, Vec<_>) = alt_asdsf
+        .txt_projects
+        .0
+        .into_par_iter()
+        .map(|(k, v)| {
+            let mut out = String::new();
+            if to_normal_txt_project_name(&k, &mut out).is_none() {
+                // This should not occur as long as we are using vanilla's asdsf.
+                #[cfg(feature = "tracing")]
+                tracing::error!("Failed to convert path: {project_name}");
+            }
+            (k, v)
+        })
+        .unzip();
+    patches.into_apply(&mut txt_projects)?;
+
+    out.push_str(&txt_projects.len().to_string());
+    out.push_str(NEW_LINE);
+    for project_name in &txt_projects {
+        out.push_str(project_name);
+        out.push_str(NEW_LINE);
+    }
+
+    for anim_set_list in &anim_set_lists {
+        write_file_names(&mut out, anim_set_list);
+        for (_, anim_set) in &anim_set_list.0 {
+            write_anim_set(&mut out, anim_set);
+        }
+    }
+
+    Ok(out)
+}
 
 /// Converts an `AltAsdsf` struct back into the original `animationsetdatasinglefile.txt` text format with `\r\n` line endings.
 pub fn serialize_alt_asdsf(data: &AltAsdsf<'_>) -> String {

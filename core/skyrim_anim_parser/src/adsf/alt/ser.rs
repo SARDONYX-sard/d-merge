@@ -1,7 +1,46 @@
-use crate::adsf::{
-    alt::{to_adsf_key, AltAdsf, AltAnimData},
-    normal::ser::{serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block},
+use crate::{
+    adsf::{
+        alt::{to_adsf_key, AltAdsf, AltAnimData},
+        normal::ser::{
+            serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block,
+        },
+    },
+    diff_line::DiffLines,
 };
+use rayon::prelude::*;
+
+/// Serializes to `animationdatasinglefile.txt` string.
+///
+/// # Errors
+/// Returns an error if serialization fails.
+pub fn serialize_alt_adsf_with_patches(
+    alt_adsf: AltAdsf,
+    patches: DiffLines,
+) -> Result<String, crate::diff_line::error::Error> {
+    let mut output = String::new();
+
+    let (mut project_names, anim_list): (Vec<_>, Vec<_>) = alt_adsf
+        .0
+        .into_par_iter()
+        .map(|(k, v)| (to_adsf_key(k), v))
+        .unzip();
+    patches.into_apply(&mut project_names)?;
+
+    // Serialize project names
+    output.push_str(&format!("{}\r\n", project_names.len()));
+    for name in project_names {
+        let name = to_adsf_key(name.as_ref().into());
+        output.push_str(name.as_ref());
+        output.push_str("\r\n");
+    }
+
+    // Serialize animation data
+    for anim_data in &anim_list {
+        output.push_str(&serialize_anim_data(anim_data));
+    }
+
+    Ok(output)
+}
 
 /// Serializes to `animationdatasinglefile.txt` string.
 ///
@@ -137,6 +176,10 @@ mod tests {
             panic!("Failed to parse adsf:\n{err}");
         });
         let alt_adsf: AltAdsf = adsf.into();
+
+        if serialize_alt_adsf(&alt_adsf) == input {
+            panic!("alt_adsf != input");
+        }
 
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {

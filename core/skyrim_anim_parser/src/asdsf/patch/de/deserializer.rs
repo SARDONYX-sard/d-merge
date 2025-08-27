@@ -190,6 +190,7 @@ impl<'de> Deserializer<'de> {
             self.parse_opt_close_comment()?;
             self.parse_next(multispace0)?;
             start_index += 1;
+            self.current.increment_main_range();
         }
         Ok(())
     }

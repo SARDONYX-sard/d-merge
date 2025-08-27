@@ -7,6 +7,15 @@ use super::{AdsfPatch, PatchKind};
 /// target, id, and an associated clip or index.
 #[derive(Hash, Eq, PartialEq)]
 enum PatchKey<'a> {
+    ProjectNamesHeader {
+        target: &'a str,
+        id: &'a str,
+    },
+    AnimDataHeader {
+        target: &'a str,
+        id: &'a str,
+    },
+
     /// Edit an animation by its target, id, and clip name.
     EditAnim {
         target: &'a str,
@@ -63,6 +72,14 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
             HashMap::new,
             |mut map: HashMap<PatchKey<'_>, AdsfPatch<'a>>, (idx, patch)| {
                 let key = match &patch.patch {
+                    PatchKind::ProjectNamesHeader(_) => PatchKey::ProjectNamesHeader {
+                        target: patch.target,
+                        id: patch.id,
+                    },
+                    PatchKind::AnimDataHeader(_) => PatchKey::AnimDataHeader {
+                        target: patch.target,
+                        id: patch.id,
+                    },
                     PatchKind::EditAnim(edit) => PatchKey::EditAnim {
                         target: patch.target,
                         id: patch.id,
@@ -102,9 +119,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
                                 existing_edit.clip_id = new_edit.clip_id;
                                 existing_edit.priority = new_edit.priority;
                             }
-                            _ => {
-                                // Do nothing if the new patch has lower or equal priority.
-                            }
+                            _ => {} // Do nothing if the new patch has lower or equal priority.
                         }
                     }
                     std::collections::hash_map::Entry::Vacant(entry) => {
@@ -130,9 +145,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Ve
                             ) if new_edit.priority > existing_edit.priority => {
                                 entry.insert(patch2);
                             }
-                            _ => {
-                                // Do nothing for lower or equal priority.
-                            }
+                            _ => {} // Do nothing for lower or equal priority.
                         }
                     }
                     std::collections::hash_map::Entry::Vacant(entry) => {
