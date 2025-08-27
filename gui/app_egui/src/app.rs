@@ -161,7 +161,9 @@ impl ModManagerApp {
             let log_lines = Arc::clone(&self.log_lines);
             let ctx = ctx.clone();
 
-            crate::log::start_log_tail(log_lines, Some(ctx));
+            if let Err(err) = crate::log::start_log_tail(log_lines, Some(ctx)) {
+                tracing::error!("Couldn't start log watcher: {err}");
+            };
             self.log_watcher_started = true;
         }
     }
