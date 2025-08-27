@@ -67,8 +67,8 @@ impl Default for AppSettings {
             transparent: true,
             window_height: 900.0,
             window_maximized: false,
-            window_pos_x: 900.0,
-            window_pos_y: 30.0,
+            window_pos_x: 0.0,
+            window_pos_y: 0.0,
             window_width: 900.0,
 
             vfs_skyrim_data_dir: String::new(),
