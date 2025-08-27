@@ -177,10 +177,6 @@ mod tests {
         });
         let alt_adsf: AltAdsf = adsf.into();
 
-        if serialize_alt_adsf(&alt_adsf) == input {
-            panic!("alt_adsf != input");
-        }
-
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
             panic!("Failed to serialize adsf to JSON:\n{err}");
