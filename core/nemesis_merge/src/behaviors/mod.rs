@@ -19,7 +19,7 @@ use crate::behaviors::tasks::adsf::apply_adsf_patches;
 use crate::behaviors::tasks::asdsf::apply_asdsf_patches;
 use crate::behaviors::tasks::patches::types::OwnedPatches;
 use crate::config::{Config, Status};
-use crate::errors::{write_errors::write_errors, BehaviorGenerationError, Error, Result};
+use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
 use std::path::PathBuf;
 

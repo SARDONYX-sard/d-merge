@@ -24,3 +24,4 @@
 pub mod adsf;
 pub mod asdsf;
 pub(crate) mod common_parser;
+pub mod diff_line;
