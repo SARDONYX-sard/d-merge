@@ -20,7 +20,13 @@ fn main() -> Result<(), eframe::Error> {
     let _ = tracing_rotation::init(log::LOG_DIR, "d_merge.log");
     tracing_rotation::change_level("debug").unwrap();
 
-    let settings = settings::AppSettings::load();
+    let settings = match settings::AppSettings::load() {
+        Ok(settings) => settings,
+        Err(err) => {
+            tracing::error!("[Settings loader Error] {err}\nFallback to default");
+            settings::AppSettings::default()
+        }
+    };
     let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../backend/tauri/icons/icon.ico"));
 
     let options = eframe::NativeOptions {

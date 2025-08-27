@@ -54,6 +54,10 @@ pub enum I18nKey {
     VfsMode,
     #[serde(rename = "vfs_mode_hover")]
     VfsModeHover,
+
+    /// Invalid key come, then to this.
+    #[serde(other)]
+    Invalid,
 }
 
 impl I18nKey {
@@ -85,6 +89,8 @@ impl I18nKey {
             Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
             Self::VfsMode => "VFS mode",
             Self::VfsModeHover => "When booting using MO2's VFS, etc.",
+
+            Self::Invalid => "Invalid key. Please confirm i18n of settings json file",
         }
     }
 

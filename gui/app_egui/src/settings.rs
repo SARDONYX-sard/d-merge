@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt as _;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -144,12 +145,14 @@ impl AppSettings {
     const FILE: &'static str = "./.d_merge/d_merge_settings.json";
 
     /// Load settings from JSON file
-    pub fn load() -> Self {
+    pub fn load() -> Result<Self, SettingsError> {
         if Path::new(Self::FILE).exists() {
-            let text = fs::read_to_string(Self::FILE).unwrap_or_default();
-            serde_json::from_str(&text).unwrap_or_default()
+            let text = fs::read_to_string(Self::FILE).with_context(|_| IoSnafu {
+                path: Path::new(Self::FILE),
+            })?;
+            serde_json::from_str(&text).with_context(|_| JsonSnafu)
         } else {
-            Self::default()
+            Ok(Self::default())
         }
     }
 
@@ -162,4 +165,16 @@ impl AppSettings {
             tracing::info!("Settings saved to {}", Self::FILE);
         }
     }
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum SettingsError {
+    #[snafu(display("Failed to read file `{}`: {source}", path.display()))]
+    Io {
+        source: std::io::Error,
+        path: std::path::PathBuf,
+    },
+
+    #[snafu(display("Failed to parse JSON: {source}"))]
+    Json { source: serde_json::Error },
 }
