@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use std::{
     borrow::Cow,
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -56,7 +55,7 @@ impl Default for AppSettings {
             enable_debug_output: false,
             filter_text: String::new(),
             font_path: None,
-            i18n: HashMap::new(),
+            i18n: I18nKey::default_map(),
             log_level: crate::app::LogLevel::Debug,
             mode: crate::app::DataMode::Vfs,
             output_dir: String::new(),
