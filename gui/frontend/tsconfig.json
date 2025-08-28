@@ -21,13 +21,6 @@
     "paths": { "@/*": ["./src/*"] },
     "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "../../vitest.config.ts",
-    "./out/types/**/*.ts",
-    ".next/types/**/*.ts",
-    "next-env.d.ts"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "./out/types/**/*.ts", ".next/types/**/*.ts", "next-env.d.ts"],
   "exclude": ["node_modules"]
 }
