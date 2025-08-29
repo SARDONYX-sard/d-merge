@@ -87,6 +87,7 @@ pub struct ModManagerApp {
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
     pub is_first_render: bool,
+    pub prev_table_available_width: f32,
 }
 
 impl Default for ModManagerApp {
@@ -126,6 +127,7 @@ impl Default for ModManagerApp {
             show_log_window: Arc::new(AtomicBool::new(false)),
             notification: Arc::new(Mutex::new(String::new())),
             is_first_render: true,
+            prev_table_available_width: 0.0,
         }
     }
 }
@@ -152,6 +154,7 @@ impl App for ModManagerApp {
     // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         match x_win::get_active_window() {
+            // When maximized, neither position nor size is necessary.
             Ok(active_window) => {
                 let x_win::WindowPosition {
                     x,
@@ -588,6 +591,11 @@ impl ModManagerApp {
         let table_max_height = ui.available_height() * 0.8;
         let total_width = ui.available_width();
 
+        let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5; // ignore 0.5px diff
+        if changed_width {
+            self.prev_table_available_width = total_width;
+        }
+
         egui::ScrollArea::vertical()
             .max_height(table_max_height)
             .max_width(total_width)
@@ -595,9 +603,9 @@ impl ModManagerApp {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
                     .column(egui_extras::Column::auto().resizable(true)) // checkbox
-                    .column(egui_extras::Column::initial(total_width * 0.20).resizable(true)) // id
-                    .column(egui_extras::Column::initial(total_width * 0.30).resizable(true)) // name
-                    .column(egui_extras::Column::initial(total_width * 0.40).resizable(true)) // site
+                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // id
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // name
+                    .column(Self::resizable_column(total_width, 0.40, changed_width)) // site
                     .column(egui_extras::Column::remainder().resizable(true)) // priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
@@ -615,6 +623,22 @@ impl ModManagerApp {
                         }
                     });
             });
+    }
+
+    /// Create a resizable column that also auto-adjusts once when the table width changes.
+    ///
+    /// `egui_extras::Column` does not simultaneously support both automatic resizing based
+    /// on `available_width` and user-initiated resizing via `.resizable(true)`. This helper
+    /// implements a hack that enables this by making the width exact only momentarily during resizing.
+    fn resizable_column(total_width: f32, ratio: f32, changed_width: bool) -> egui_extras::Column {
+        let width = total_width * ratio;
+
+        if changed_width {
+            egui_extras::Column::exact(width)
+        } else {
+            egui_extras::Column::initial(width)
+        }
+        .resizable(true)
     }
 
     /// Render table header (column titles with sort toggles).
@@ -694,6 +718,8 @@ impl ModManagerApp {
 
 // mod info loader
 impl ModManagerApp {
+    /// - vfs -> vfs_mod_list
+    /// - others -> mod_list
     const fn mod_list(&self) -> &Vec<ModItem> {
         match self.mode {
             DataMode::Vfs => &self.vfs_mod_list,
@@ -701,6 +727,8 @@ impl ModManagerApp {
         }
     }
 
+    /// - vfs -> vfs_mod_list
+    /// - others -> mod_list
     const fn mod_list_mut(&mut self) -> &mut Vec<ModItem> {
         match self.mode {
             DataMode::Vfs => &mut self.vfs_mod_list,
