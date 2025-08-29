@@ -1,8 +1,7 @@
 import OutputIcon from '@mui/icons-material/Output';
 import { Checkbox, type SxProps, Tooltip } from '@mui/material';
-import { type ComponentPropsWithRef, useEffect } from 'react';
+import { type ComponentPropsWithRef, useCallback, useEffect } from 'react';
 
-import { useDebounce } from '@/components/hooks/useDebounce';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import type { InputField } from '@/components/molecules/InputField/InputField';
 import { usePatchContext } from '@/components/providers/PatchProvider';
@@ -16,50 +15,58 @@ const sx: SxProps = { color: 'action.active', mr: 1, my: 0.5, cursor: 'pointer' 
 
 export const usePatchInputs = () => {
   const {
-    cacheModInfoDir,
-    setCacheModInfoDir,
-    modInfoDir,
-    setModInfoDir,
-    autoDetectEnabled,
-    setAutoDetectEnabled,
     output,
     setOutput,
+
+    isVfsMode,
+    setIsVfsMode,
     patchOptions,
+
+    vfsSkyrimDataDir,
+    setVfsSkyrimDataDir,
+
+    skyrimDataDir,
+    setSkyrimDataDir,
   } = usePatchContext();
   const { t } = useTranslation();
 
-  const deferredAutoDetectEnabled = useDebounce(autoDetectEnabled, 450);
+  const dataDir = isVfsMode ? vfsSkyrimDataDir : skyrimDataDir;
+  const setDataDir = useCallback(
+    (path: string) => {
+      if (isVfsMode) {
+        setVfsSkyrimDataDir(path);
+      }
+      setSkyrimDataDir(path);
+    },
+    [setVfsSkyrimDataDir, setSkyrimDataDir],
+  );
 
-  // If a setState with a branch is not wrapped in useEffect, purity(Returns same value) is lost and an error occurs.
   useEffect(() => {
-    if (!deferredAutoDetectEnabled) {
-      setModInfoDir(cacheModInfoDir);
-    }
-  }, [cacheModInfoDir, deferredAutoDetectEnabled, setModInfoDir]);
-
-  useEffect(() => {
-    if (!deferredAutoDetectEnabled) {
+    if (!isVfsMode) {
       return;
     }
 
     const fetchDir = async () => {
       try {
         const dir = await getSkyrimDir(patchOptions.outputTarget);
-        setModInfoDir(dir);
+        setSkyrimDataDir(dir);
       } catch (_) {
         NOTIFY.error(t('patch.autoDetectSkyrimData_error_massage'));
       }
     };
 
     fetchDir();
-  }, [deferredAutoDetectEnabled, patchOptions.outputTarget, setModInfoDir, t]);
+  }, [isVfsMode, patchOptions.outputTarget, setSkyrimDataDir, t]);
 
   const inputHandlers = {
-    onClick: () =>
-      NOTIFY.asyncTry(async () => await openPath(stripGlob(modInfoDir), { setPath: setModInfoDir, directory: true })),
-    onIconClick: () => NOTIFY.asyncTry(async () => await open(stripGlob(modInfoDir))),
+    onClick: async () => {
+      return await NOTIFY.asyncTry(
+        async () => await openPath(stripGlob(dataDir), { setPath: setDataDir, directory: true }),
+      );
+    },
+    onIconClick: async () => await NOTIFY.asyncTry(async () => await open(stripGlob(dataDir))),
     onCheckboxToggle: () => {
-      setAutoDetectEnabled((prev) => !prev);
+      setIsVfsMode((prev) => !prev);
     },
   };
 
@@ -67,6 +74,10 @@ export const usePatchInputs = () => {
     onClick: () => NOTIFY.asyncTry(async () => await openPath(output, { setPath: setOutput, directory: true })),
     onIconClick: () => NOTIFY.asyncTry(async () => await open(output)),
   };
+
+  const placeholder = isVfsMode
+    ? 'D:/Steam/steamapps/common/Skyrim Special Edition/Data'
+    : 'D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*';
 
   return [
     {
@@ -77,20 +88,15 @@ export const usePatchInputs = () => {
       ),
       endIcon: (
         <Tooltip placement='top' title={t('patch.autoDetectSkyrimData_tooltip')}>
-          <Checkbox checked={autoDetectEnabled} onChange={inputHandlers.onCheckboxToggle} />
+          <Checkbox checked={isVfsMode} onChange={inputHandlers.onCheckboxToggle} />
         </Tooltip>
       ),
-      disabled: autoDetectEnabled,
+      disabled: isVfsMode,
       label: `${patchOptions.outputTarget} ${t('patch.input_directory')}`,
       onClick: inputHandlers.onClick,
-      path: modInfoDir,
-      placeholder: 'D:/Steam/steamapps/common/Skyrim Special Edition/Data',
-      setPath: (path) => {
-        if (!autoDetectEnabled) {
-          setCacheModInfoDir(path);
-        }
-        setModInfoDir(path);
-      },
+      path: dataDir,
+      placeholder,
+      setPath: setDataDir,
     },
     {
       icon: (
