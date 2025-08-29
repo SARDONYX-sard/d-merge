@@ -51,7 +51,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            auto_remove_meshes: true,
+            auto_remove_meshes: false, // If an incorrect output directory(e.g. skyrim data dir) is specified, it is dangerous, so false.
             enable_debug_output: false,
             filter_text: String::new(),
             font_path: None,
@@ -63,7 +63,7 @@ impl Default for AppSettings {
             sort_column: SortColumn::Priority,
             target_runtime: skyrim_data_dir::Runtime::Se,
             template_dir: "./assets/templates".into(),
-            transparent: true,
+            transparent: false, // For white there, visibility becomes poor, so the default is off.
             window_height: 900.0,
             window_maximized: false,
             window_pos_x: 0.0,
