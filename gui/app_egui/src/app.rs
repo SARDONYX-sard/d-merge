@@ -151,6 +151,23 @@ impl App for ModManagerApp {
     //
     // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        match x_win::get_active_window() {
+            Ok(active_window) => {
+                let x_win::WindowPosition {
+                    x,
+                    y,
+                    width,
+                    height,
+                    is_full_screen: _,
+                } = active_window.position;
+                self.last_window_size = egui::Vec2::new(width as f32, height as f32);
+                self.last_window_pos = egui::Pos2::new(x as f32, y as f32);
+            }
+            Err(err) => {
+                tracing::error!("error occurred while getting the active window: {err}");
+            }
+        }
+
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
     }
@@ -172,10 +189,7 @@ impl ModManagerApp {
 
     /// To save settings.
     fn update_window_info(&mut self, ctx: &egui::Context) {
-        let rect = ctx.screen_rect();
-        self.last_window_size = rect.size();
-        // self.last_window_pos = rect.left_top(); // TODO: Get current window position.
-
+        // self.last_window_size = rect.size(); // Get by on_exit(If couldn't then get here.)
         ctx.viewport(|state| {
             self.last_window_maximized = state.builder.maximized.unwrap_or_default();
         });
