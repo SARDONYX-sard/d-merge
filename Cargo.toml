@@ -47,7 +47,7 @@ simd-json = "0.15.1"
 snafu = "0.8.7"
 tokio = { version = "1.47.1", features = [ "fs", "rt-multi-thread" ] } # Async runtime
 tracing = { version = "0.1.41" } # logger
-tracing-subscriber = "0.3.19"
+tracing-subscriber = "0.3.20"
 winnow = { version = "0.7.13", features = ["simd"] }
 
 diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", tag = "0.8.6", default-features = false }
