@@ -29,6 +29,9 @@ export type ModInfo = {
   author: string;
   site: string;
   auto: string;
+
+  enabled: boolean;
+  priority: number;
 };
 
 export type ModIds = readonly string[];
@@ -107,7 +110,7 @@ export const patchOptionsSchema = z
  */
 export async function patch(output: string, ids: ModIds, options: PatchOptions) {
   if (isTauri()) {
-    await invoke('patch', { output, ids, options });
+    return await invoke('patch', { output, ids, options });
   }
 
   if (isElectron()) {
@@ -123,7 +126,7 @@ export async function patch(output: string, ids: ModIds, options: PatchOptions) 
  */
 export async function cancelPatch() {
   if (isTauri()) {
-    await invoke('cancel_patch');
+    return await invoke('cancel_patch');
   }
 
   if (isElectron()) {

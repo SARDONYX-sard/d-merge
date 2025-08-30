@@ -18,7 +18,7 @@ export const useBackup = () => {
 const isDesktopApp = () => isTauri() || isElectron();
 
 const useAutoImportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
+  const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const useAutoImportBackup = () => {
 };
 
 const useAutoExportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
+  const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {

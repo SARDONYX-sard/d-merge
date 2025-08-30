@@ -2,116 +2,115 @@
 
 import type { Dispatch, FC, ReactNode, SetStateAction } from 'react';
 import { createContext, useContext, useEffect, useMemo, useState, useTransition } from 'react';
+import z from 'zod';
 import { useDebounce } from '@/components/hooks/useDebounce';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { boolSchema, stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
+import { boolSchema, stringSchema } from '@/lib/zod/schema-utils';
 import { loadModsInfo, type ModInfo, type PatchOptions, patchOptionsSchema } from '@/services/api/patch';
 
 type ContextType = {
-  activateMods: string[];
-  setActivateMods: Dispatch<SetStateAction<string[]>>;
-
-  /** Loading info.ini for each Nemesis Mod? */
-  loading: boolean;
-
-  /** Data dir of Skyrim where each Nemesis Mod exists */
-  cacheModInfoDir: string;
-  setCacheModInfoDir: Dispatch<SetStateAction<string>>;
-
-  modInfoDir: string;
-  setModInfoDir: Dispatch<SetStateAction<string>>;
-
-  /** Auto detect skyrim data directory.(To get modInfoDir) */
-  autoDetectEnabled: boolean;
-  setAutoDetectEnabled: Dispatch<SetStateAction<boolean>>;
-
-  modInfoList: ModInfo[];
-  setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
-
   output: string;
   setOutput: Dispatch<SetStateAction<string>>;
-  /** priority ids */
-  priorities: string[];
-  setPriorities: Dispatch<SetStateAction<string[]>>;
+
+  isVfsMode: boolean;
+  setIsVfsMode: Dispatch<SetStateAction<boolean>>;
 
   patchOptions: PatchOptions;
   setPatchOptions: Dispatch<SetStateAction<PatchOptions>>;
+
+  /** For Vfs(MO2 etc.)mode */
+  vfsSkyrimDataDir: string;
+  setVfsSkyrimDataDir: Dispatch<SetStateAction<string>>;
+  vfsModList: ModItem[];
+  setVfsModList: Dispatch<SetStateAction<ModItem[]>>;
+
+  /** For Manual mode */
+  skyrimDataDir: string;
+  setSkyrimDataDir: Dispatch<SetStateAction<string>>;
+  modList: ModItem[];
+  setModList: Dispatch<SetStateAction<ModItem[]>>;
+
+  /////////////////////////////////////////////////////////////////////
+  // No cached
+
+  /** Loading info.ini for each Nemesis Mod? */
+  loading: boolean;
+  modInfoList: ModInfo[];
+  setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
 
+export type ModItem = z.infer<typeof ModItemSchema>;
+export const ModItemSchema = z.object({
+  enabled: z.boolean(),
+  /**
+   * - vfs: e.g. `aaaa`
+   * - manual: e.g. `path/to/aaaaa`
+   */
+  id: z.string(),
+  priority: z.number(),
+});
+export const ModListSchema = z.array(ModItemSchema).catch([]);
+
 export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [activateMods, setActivateMods] = useStorageState(PRIVATE_CACHE_OBJ.patchActivateIds, stringArraySchema);
-  const [cacheModInfoDir, setCacheModInfoDir] = useStorageState(PRIVATE_CACHE_OBJ.patchInput, stringSchema);
+  const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.patchOutput, stringSchema);
 
-  // ⚠ Do NOT use `cacheModInfoDir` as the initial value.
-  //
-  // Initial state: dir = cacheModInfoDir
-  // → Grid selection logic runs (If mod info length > 0)
-  // → No matching id found → selection becomes empty
-  // → useEffect triggers (autoDetect === true)
-  // → Directory switches to SkyrimDir
-  // → id is still empty → invalid or inconsistent state
-  const [modInfoDir, setModInfoDir] = useState('');
-
-  const [autoDetectEnabled, setAutoDetectEnabled] = useStorageState(PUB_CACHE_OBJ.autoDetectEnabled, boolSchema);
-
+  const [isVfsMode, setIsVfsMode] = useStorageState(PUB_CACHE_OBJ.isVfsMode, boolSchema);
   const [patchOptions, setPatchOptions] = useStorageState(PUB_CACHE_OBJ.patchOptions, patchOptionsSchema);
 
-  const [output, setOutput] = useStorageState(PRIVATE_CACHE_OBJ.patchOutput, stringSchema);
-  const [priorities, setPriorities] = useStorageState(PRIVATE_CACHE_OBJ.patchPriorityIds, stringArraySchema);
+  const [vfsSkyrimDataDir, setVfsSkyrimDataDir] = useStorageState(
+    PRIVATE_CACHE_OBJ.patchVfsSkyrimDataDir,
+    stringSchema,
+  );
+  const [vfsModList, setVfsModList] = useStorageState(PRIVATE_CACHE_OBJ.patchVfsModList, ModListSchema);
+
+  const [skyrimDataDir, setSkyrimDataDir] = useStorageState(PRIVATE_CACHE_OBJ.patchSkyrimDataDir, stringSchema);
+  const [modList, setModList] = useStorageState(PRIVATE_CACHE_OBJ.patchModList, ModListSchema);
 
   const [modInfoList, setModInfoList] = useState<ModInfo[]>([]);
   const [loading, startTransition] = useTransition();
 
   // NOTE: Use this instead of `useDeferredValue` to delay API calls.
-  const deferredModInfoDir = useDebounce(modInfoDir, 450);
+  const deferredModInfoDir = useDebounce(isVfsMode ? vfsSkyrimDataDir : skyrimDataDir, 450);
   useEffect(() => {
-    // fast skip
-    if (deferredModInfoDir === '') {
-      return;
-    }
+    if (!deferredModInfoDir) return;
 
     startTransition(() => {
-      NOTIFY.asyncTry(async () => {
-        const modsInfo = await loadModsInfo(deferredModInfoDir);
-        setModInfoList(modsInfo);
-      });
+      NOTIFY.asyncTry(async () => setModInfoList(await loadModsInfo(deferredModInfoDir)));
     });
-  }, [deferredModInfoDir]);
+  }, [deferredModInfoDir, isVfsMode]);
 
   // NOTE: Priority sorting in `useEffect` will cause a query to the backend each time, so separate it to prevent the query.
   const sortedModInfoList = useMemo(() => {
-    return modInfoList.toSorted((a, b) => priorities.indexOf(a.id) - priorities.indexOf(b.id));
-  }, [modInfoList, priorities]);
+    const activeModList = isVfsMode ? vfsModList : modList;
+    return sortModInfoList(modInfoList, activeModList);
+  }, [modInfoList, modList, vfsModList, isVfsMode]);
 
   const context = {
-    activateMods,
-    setActivateMods,
+    output,
+    setOutput,
 
-    cacheModInfoDir,
-    setCacheModInfoDir,
-
-    modInfoDir,
-    setModInfoDir,
-
-    autoDetectEnabled,
-    setAutoDetectEnabled,
+    isVfsMode,
+    setIsVfsMode,
 
     patchOptions,
     setPatchOptions,
 
-    output,
-    setOutput,
+    vfsSkyrimDataDir,
+    setVfsSkyrimDataDir,
+    vfsModList,
+    setVfsModList,
 
-    priorities,
-    setPriorities,
-
-    modInfoList: sortedModInfoList,
-    setModInfoList,
+    skyrimDataDir,
+    setSkyrimDataDir,
+    modList,
+    setModList,
 
     loading,
+    modInfoList: sortedModInfoList,
+    setModInfoList,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;
@@ -127,3 +126,38 @@ export const usePatchContext = () => {
   }
   return context;
 };
+
+/**
+ * Sorts the modInfoList by priority, referencing modList.
+ * Also updates each ModInfo.enabled to match modList.
+ */
+function sortModInfoList(modInfoList: ModInfo[], modList: ModItem[]): ModInfo[] {
+  if (!modList || modList.length === 0) return modInfoList;
+
+  // Create a map for quick lookup: id -> ModItem
+  const modMap = new Map(modList.map((m) => [m.id, m]));
+
+  return modInfoList
+    .map((modInfo) => {
+      const ref = modMap.get(modInfo.id);
+      return ref
+        ? {
+            ...modInfo,
+            enabled: ref.enabled,
+            priority: ref.priority,
+          }
+        : modInfo;
+    })
+    .toSorted((a, b) => {
+      const modA = modMap.get(a.id);
+      const modB = modMap.get(b.id);
+
+      // Fallback: if neither exists in modMap
+      if (!modA && !modB) return 0;
+      if (!modA) return 1;
+      if (!modB) return -1;
+
+      // Then sort by priority
+      return (modA.priority ?? 0) - (modB.priority ?? 0);
+    });
+}

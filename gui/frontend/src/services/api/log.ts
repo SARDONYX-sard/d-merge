@@ -10,7 +10,7 @@ import { openPath } from '@/services/api/shell';
 
 const logList = ['trace', 'debug', 'info', 'warn', 'error'] as const;
 const DEFAULT = 'error';
-const logLevelSchema = z.enum(logList).catch(DEFAULT);
+export const logLevelSchema = z.enum(logList).catch(DEFAULT);
 export type LogLevel = z.infer<typeof logLevelSchema>;
 
 /** @default `error` */
