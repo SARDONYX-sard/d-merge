@@ -13,22 +13,20 @@ use std::{
 
 /// Maximum number of log entries to retain (older entries are automatically discarded)
 const MAX_LOG_LINES: usize = 10_000;
-pub const LOG_DIR: &str = "./.d_merge/logs/";
+pub const LOG_FILENAME: &str = "d_merge.log";
 
 /// log file & Starts tail thread
 ///
 /// # Errors
 /// If fail to canonicalize log path.
 pub fn start_log_tail(
+    log_path: &Path,
     log_lines: Arc<Mutex<Vec<String>>>,
     ctx: Option<egui::Context>,
 ) -> Result<()> {
-    let mut log_path = Path::new(LOG_DIR).to_path_buf();
-    log_path.push("d_merge.log");
-
-    let log_path = log_path.canonicalize().context(CanonicalizeSnafu {
-        path: log_path.clone(),
-    })?;
+    let log_path = log_path
+        .canonicalize()
+        .context(CanonicalizeSnafu { path: log_path })?;
 
     thread::spawn(move || {
         if let Err(e) = tail_loop(log_path, log_lines, ctx) {

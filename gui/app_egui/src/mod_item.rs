@@ -32,7 +32,7 @@ pub fn from_mod_infos(mod_infos: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
         .into_par_iter()
         .enumerate()
         .map(|(i, mi)| ModItem {
-            enabled: false,
+            enabled: false, // NOTE: Always set it to false during the fetch phase, then later check the existing active list and set it to true.
             id: mi.id,
             name: mi.name,
             site: mi.site,

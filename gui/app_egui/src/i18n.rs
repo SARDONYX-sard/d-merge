@@ -6,6 +6,12 @@ pub enum I18nKey {
     AutoRemoveMeshes,
     #[serde(rename = "auto_remove_meshes_hover")]
     AutoRemoveMeshesHover,
+    #[serde(rename = "auto_remove_meshes_warning_body1")]
+    AutoRemoveMeshesWarningBody1,
+    #[serde(rename = "auto_remove_meshes_warning_body2")]
+    AutoRemoveMeshesWarningBody2,
+    #[serde(rename = "execute_button")]
+    CancelButton,
     #[serde(rename = "clear_button")]
     ClearButton,
     #[serde(rename = "column_name")]
@@ -21,6 +27,8 @@ pub enum I18nKey {
     #[serde(rename = "debug_output_hover")]
     DebugOutputHover,
     #[serde(rename = "execution_mode_label")]
+    ExecuteButton,
+    #[serde(rename = "cancel_button")]
     ExecutionModeLabel,
     #[serde(rename = "error_reading_mod_info")]
     ErrorReadingModInfo,
@@ -58,6 +66,8 @@ pub enum I18nKey {
     VfsMode,
     #[serde(rename = "vfs_mode_hover")]
     VfsModeHover,
+    #[serde(rename = "warning_title")]
+    WarningTitle,
 
     /// Invalid key come, then to this.
     #[serde(other)]
@@ -69,14 +79,18 @@ impl I18nKey {
         match self {
             Self::AutoRemoveMeshes => "Auto remove meshes",
             Self::AutoRemoveMeshesHover => "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.",
+            Self::AutoRemoveMeshesWarningBody1 => "Deleting the auto meshes directory in Skyrim Data Dir is dangerous.",
+            Self::AutoRemoveMeshesWarningBody2 => "It may remove files of other mods (like OAR). Are you sure?",
+            Self::CancelButton       => "Cancel",
             Self::ClearButton => "Clear",
-            Self::ColumnName => "Name",
             Self::ColumnId => "ID",
+            Self::ColumnName => "Name",
             Self::ColumnPriority => "Priority",
             Self::ColumnSite => "Site",
             Self::DebugOutput => "Debug output",
             Self::DebugOutputHover => "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)",
             Self::ErrorReadingModInfo => "Error: reading mod info",
+            Self::ExecuteButton      => "Execute",
             Self::ExecutionModeLabel => "Execution mode:",
             Self::LockButtonHover => "Row reordering is locked unless sorting by Priority ascending.\nClick to unlock.",
             Self::LogButton => "Log",
@@ -90,11 +104,12 @@ impl I18nKey {
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
             Self::SearchLabel => "Search:",
+            Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
             Self::Transparent => "Transparent",
             Self::TransparentHover => "Toggle Transparent window",
-            Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
             Self::VfsMode => "VFS mode",
             Self::VfsModeHover => "When booting using MO2's VFS, etc.",
+            Self::WarningTitle => "⚠ Warning",
 
             Self::Invalid => "Invalid key. Please confirm i18n of settings json file",
         }
@@ -109,19 +124,23 @@ impl I18nKey {
 
         map.insert(AutoRemoveMeshes, Cow::Borrowed(AutoRemoveMeshes.default_eng()));
         map.insert(AutoRemoveMeshesHover, Cow::Borrowed(AutoRemoveMeshesHover.default_eng()));
+        map.insert(AutoRemoveMeshesWarningBody1, Cow::Borrowed(AutoRemoveMeshesWarningBody1.default_eng()));
+        map.insert(AutoRemoveMeshesWarningBody2, Cow::Borrowed(AutoRemoveMeshesWarningBody2.default_eng()));
+        map.insert(CancelButton, Cow::Borrowed(CancelButton.default_eng()));
         map.insert(ClearButton, Cow::Borrowed(ClearButton.default_eng()));
-        map.insert(ColumnName, Cow::Borrowed(ColumnName.default_eng()));
         map.insert(ColumnId, Cow::Borrowed(ColumnId.default_eng()));
+        map.insert(ColumnName, Cow::Borrowed(ColumnName.default_eng()));
         map.insert(ColumnPriority, Cow::Borrowed(ColumnPriority.default_eng()));
         map.insert(ColumnSite, Cow::Borrowed(ColumnSite.default_eng()));
         map.insert(DebugOutput, Cow::Borrowed(DebugOutput.default_eng()));
         map.insert(DebugOutputHover, Cow::Borrowed(DebugOutputHover.default_eng()));
-        map.insert(ExecutionModeLabel, Cow::Borrowed(ExecutionModeLabel.default_eng()));
         map.insert(ErrorReadingModInfo, Cow::Borrowed(ErrorReadingModInfo.default_eng()));
+        map.insert(ExecuteButton, Cow::Borrowed(ExecuteButton.default_eng()));
+        map.insert(ExecutionModeLabel, Cow::Borrowed(ExecutionModeLabel.default_eng()));
+        map.insert(LockButtonHover, Cow::Borrowed(LockButtonHover.default_eng()));
         map.insert(LogButton, Cow::Borrowed(LogButton.default_eng()));
         map.insert(LogDir, Cow::Borrowed(LogDir.default_eng()));
         map.insert(LogLevelLabel, Cow::Borrowed(LogLevelLabel.default_eng()));
-        map.insert(LockButtonHover, Cow::Borrowed(LockButtonHover.default_eng()));
         map.insert(ManualMode, Cow::Borrowed(ManualMode.default_eng()));
         map.insert(ManualModeHover, Cow::Borrowed(ManualModeHover.default_eng()));
         map.insert(ModsListTitle, Cow::Borrowed(ModsListTitle.default_eng()));
@@ -130,8 +149,10 @@ impl I18nKey {
         map.insert(OutputDirLabel, Cow::Borrowed(OutputDirLabel.default_eng()));
         map.insert(PatchButton, Cow::Borrowed(PatchButton.default_eng()));
         map.insert(SearchLabel, Cow::Borrowed(SearchLabel.default_eng()));
+        map.insert(SkyrimDataDirLabel, Cow::Borrowed(SkyrimDataDirLabel.default_eng()));
         map.insert(VfsMode, Cow::Borrowed(VfsMode.default_eng()));
         map.insert(VfsModeHover, Cow::Borrowed(VfsModeHover.default_eng()));
+        map.insert(WarningTitle, Cow::Borrowed(WarningTitle.default_eng()));
 
         map
     }

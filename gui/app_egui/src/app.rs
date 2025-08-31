@@ -183,7 +183,8 @@ impl ModManagerApp {
             let log_lines = Arc::clone(&self.log_lines);
             let ctx = ctx.clone();
 
-            if let Err(err) = crate::log::start_log_tail(log_lines, Some(ctx)) {
+            let log_path = Path::new(&self.output_dir).join(crate::log::LOG_FILENAME);
+            if let Err(err) = crate::log::start_log_tail(&log_path, log_lines, Some(ctx)) {
                 tracing::error!("Couldn't start log watcher: {err}");
             };
             self.log_watcher_started = true;
@@ -390,7 +391,7 @@ impl ModManagerApp {
                     .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogDir)))
                     .clicked()
                 {
-                    let path = std::path::Path::new(crate::log::LOG_DIR);
+                    let path = std::path::Path::new(&self.output_dir);
                     let path = path.canonicalize().unwrap_or_default();
                     if let Err(err) = open::that_detached(path) {
                         self.set_notification(err.to_string());
@@ -422,7 +423,7 @@ impl ModManagerApp {
                     )
                     .clicked()
                 {
-                    self.patch();
+                    self.patch(ctx);
                 }
             });
         });
@@ -599,6 +600,7 @@ impl ModManagerApp {
         egui::ScrollArea::vertical()
             .max_height(table_max_height)
             .max_width(total_width)
+            .scroll_bar_rect(egui::Rect::everything_above(20.0)) // The scroll bar was too long, so I shortened it.
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
@@ -912,7 +914,7 @@ impl ModManagerApp {
 }
 
 impl ModManagerApp {
-    fn patch(&self) {
+    fn patch(&self, ctx: &egui::Context) {
         // mod Items to nemesis_path
         let data_dir = match self.mode {
             DataMode::Vfs => &self.vfs_skyrim_data_dir,
@@ -946,18 +948,7 @@ impl ModManagerApp {
         };
         let is_debug_mode = self.enable_debug_output;
 
-        if self.auto_remove_meshes {
-            let meshes_path = Path::new(&self.output_dir).join("meshes");
-            let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
-            rayon::join(
-                || {
-                    let _ = remove_if_exists(meshes_path);
-                },
-                || {
-                    let _ = remove_if_exists(debug_path);
-                },
-            );
-        }
+        self.auto_remove_meshes(ctx);
 
         let notify = Arc::clone(&self.notification);
         self.async_rt.spawn(nemesis_merge::behavior_gen(
@@ -985,6 +976,56 @@ impl ModManagerApp {
                 },
             },
         ));
+    }
+
+    /// Removes the auto meshes/debug directories with a safety warning if output_dir equals Skyrim data dir.
+    fn auto_remove_meshes(&self, ctx: &egui::Context) {
+        if self.auto_remove_meshes {
+            let skyrim_data_directory = match self.mode {
+                DataMode::Vfs => &self.vfs_skyrim_data_dir,
+                DataMode::Manual => &self.skyrim_data_dir,
+            };
+
+            let mut proceed = true;
+
+            if &self.output_dir == skyrim_data_directory {
+                let mut user_choice: Option<bool> = None;
+
+                egui::Window::new(self.t(I18nKey::WarningTitle))
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ctx, |ui| {
+                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody1));
+                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody2));
+
+                        ui.horizontal(|ui| {
+                            if ui.button(self.t(I18nKey::ExecuteButton)).clicked() {
+                                user_choice = Some(true);
+                            }
+                            if ui.button(self.t(I18nKey::CancelButton)).clicked() {
+                                user_choice = Some(false);
+                            }
+                        });
+                    });
+
+                if user_choice == Some(false) {
+                    proceed = false; // Skip deletion if user cancels
+                }
+            }
+
+            if proceed {
+                let meshes_path = Path::new(&self.output_dir).join("meshes");
+                let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
+                rayon::join(
+                    || {
+                        let _ = remove_if_exists(meshes_path);
+                    },
+                    || {
+                        let _ = remove_if_exists(debug_path);
+                    },
+                );
+            }
+        }
     }
 }
 

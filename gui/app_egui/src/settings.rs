@@ -58,7 +58,7 @@ impl Default for AppSettings {
             i18n: I18nKey::default_map(),
             log_level: crate::app::LogLevel::Debug,
             mode: crate::app::DataMode::Vfs,
-            output_dir: String::new(),
+            output_dir: "./d_merge_output".into(),
             sort_asc: true,
             sort_column: SortColumn::Priority,
             target_runtime: skyrim_data_dir::Runtime::Se,
@@ -145,6 +145,7 @@ impl From<AppSettings> for ModManagerApp {
 }
 
 impl AppSettings {
+    /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
     const FILE: &'static str = "./.d_merge/d_merge_settings.json";
 
     /// Load settings from JSON file

@@ -17,16 +17,16 @@ use app::ModManagerApp;
 /// # Errors
 /// Returns an error if the native GUI cannot be started.
 fn main() -> Result<(), eframe::Error> {
-    let _ = tracing_rotation::init(log::LOG_DIR, "d_merge.log");
-    tracing_rotation::change_level("debug").unwrap();
-
-    let settings = match settings::AppSettings::load() {
-        Ok(settings) => settings,
-        Err(err) => {
-            tracing::error!("[Settings loader Error] {err}\nFallback to default");
-            settings::AppSettings::default()
-        }
+    let (settings, err) = match settings::AppSettings::load() {
+        Ok(s) => (s, None),
+        Err(e) => (settings::AppSettings::default(), Some(e)),
     };
+
+    let _ = tracing_rotation::init(&settings.output_dir, log::LOG_FILENAME);
+    if let Some(err) = err {
+        tracing::error!("[Settings loader Error] {err}\nFallback to default");
+    }
+
     let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../backend/tauri/icons/icon.ico"));
 
     let options = eframe::NativeOptions {
