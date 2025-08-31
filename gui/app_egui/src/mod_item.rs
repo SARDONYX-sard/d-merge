@@ -32,7 +32,7 @@ pub fn from_mod_infos(mod_infos: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
         .into_par_iter()
         .enumerate()
         .map(|(i, mi)| ModItem {
-            enabled: true,
+            enabled: false,
             id: mi.id,
             name: mi.name,
             site: mi.site,

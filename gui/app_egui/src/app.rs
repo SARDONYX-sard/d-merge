@@ -839,7 +839,7 @@ impl ModManagerApp {
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
     fn update_vfs_mod_list(&mut self, pattern: &str) {
-        if let Some(mods) = self.get_vfs_mod_list(pattern) {
+        if let Some(mods) = self.fetch_vfs_mod_list(pattern) {
             // Turn the IDs of previously enabled mods into a HashSet
             let enabled_ids: std::collections::HashSet<&str> = self
                 .vfs_mod_list
@@ -863,7 +863,7 @@ impl ModManagerApp {
         };
     }
 
-    fn get_vfs_mod_list(&self, pattern: &str) -> Option<Vec<ModItem>> {
+    fn fetch_vfs_mod_list(&self, pattern: &str) -> Option<Vec<ModItem>> {
         use mod_info::GetModsInfo as _;
         match mod_info::ModsInfo::vfs_get_all(pattern) {
             Ok(mods) => Some(from_mod_infos(mods)),
