@@ -15,6 +15,13 @@ use std::{
 const MAX_LOG_LINES: usize = 10_000;
 pub const LOG_FILENAME: &str = "d_merge.log";
 
+pub fn get_log_dir<P>(output_dir: P) -> PathBuf
+where
+    P: AsRef<Path>,
+{
+    output_dir.as_ref().join(".d_merge/logs")
+}
+
 /// log file & Starts tail thread
 ///
 /// # Errors

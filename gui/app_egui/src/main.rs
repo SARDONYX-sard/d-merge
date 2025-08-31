@@ -22,7 +22,10 @@ fn main() -> Result<(), eframe::Error> {
         Err(e) => (settings::AppSettings::default(), Some(e)),
     };
 
-    let _ = tracing_rotation::init(&settings.output_dir, log::LOG_FILENAME);
+    let _ = tracing_rotation::init(
+        crate::log::get_log_dir(&settings.output_dir),
+        log::LOG_FILENAME,
+    );
     if let Some(err) = err {
         tracing::error!("[Settings loader Error] {err}\nFallback to default");
     }

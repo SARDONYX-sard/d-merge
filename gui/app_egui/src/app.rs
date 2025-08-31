@@ -182,7 +182,7 @@ impl ModManagerApp {
             let log_lines = Arc::clone(&self.log_lines);
             let ctx = ctx.clone();
 
-            let log_path = Path::new(&self.output_dir).join(crate::log::LOG_FILENAME);
+            let log_path = crate::log::get_log_dir(&self.output_dir).join(crate::log::LOG_FILENAME);
             if let Err(err) = crate::log::start_log_tail(&log_path, log_lines, Some(ctx)) {
                 tracing::error!("Couldn't start log watcher: {err}");
             };
@@ -291,13 +291,9 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 let output_dir_label = self.t(I18nKey::OutputDirLabel);
                 if ui.button(output_dir_label).clicked() {
-                    let path = Path::new(&self.output_dir);
-                    let _ = std::fs::create_dir_all(path);
-                    if let Ok(abs_dir) = path.canonicalize() {
-                        if let Err(err) = open::that_detached(abs_dir) {
-                            self.set_notification(format!("Couldn't  open output dir: {err}"));
-                        };
-                    }
+                    if let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir)) {
+                        self.set_notification(err);
+                    };
                 };
                 let _ = ui.add_sized(
                     [ui.available_width() * 0.9, 40.0],
@@ -390,10 +386,8 @@ impl ModManagerApp {
                     .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogDir)))
                     .clicked()
                 {
-                    let path = std::path::Path::new(&self.output_dir);
-                    let path = path.canonicalize().unwrap_or_default();
-                    if let Err(err) = open::that_detached(path) {
-                        self.set_notification(err.to_string());
+                    if let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir)) {
+                        self.set_notification(err);
                     }
                 }
                 if ui
@@ -1026,6 +1020,37 @@ impl ModManagerApp {
             }
         }
     }
+}
+
+/// Opens the given directory or the closest existing parent directory.
+///
+/// # Returns
+/// * `Ok(())` if a directory was successfully opened.
+/// * `Err(String)` if no existing directory could be opened.
+fn open_existing_dir_or_ancestor(dir: &Path) -> Result<(), String> {
+    // Start from the given path and walk up to the root
+    let mut current = dir;
+
+    while !current.exists() {
+        match current.parent() {
+            Some(parent) => current = parent,
+            None => {
+                return Err(format!(
+                    "No existing directory found in path hierarchy({})",
+                    dir.display()
+                ))
+            }
+        }
+    }
+
+    // Get absolute path
+    let abs_dir = current
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize path({}): {e}", dir.display()))?;
+
+    // Open the directory
+    open::that_detached(abs_dir)
+        .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
 }
 
 /// Removes a directory if it exists, with debug logging.
