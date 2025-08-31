@@ -3,7 +3,9 @@ use std::borrow::Cow;
 
 pub type I18nMap = IndexMap<I18nKey, Cow<'static, str>>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum I18nKey {
     #[serde(rename = "auto_remove_meshes")]
     AutoRemoveMeshes,
@@ -13,7 +15,7 @@ pub enum I18nKey {
     AutoRemoveMeshesWarningBody1,
     #[serde(rename = "auto_remove_meshes_warning_body2")]
     AutoRemoveMeshesWarningBody2,
-    #[serde(rename = "execute_button")]
+    #[serde(rename = "cancel_button")]
     CancelButton,
     #[serde(rename = "clear_button")]
     ClearButton,
@@ -31,7 +33,7 @@ pub enum I18nKey {
     DebugOutputHover,
     #[serde(rename = "execution_mode_label")]
     ExecuteButton,
-    #[serde(rename = "cancel_button")]
+    #[serde(rename = "execute_button")]
     ExecutionModeLabel,
     #[serde(rename = "error_reading_mod_info")]
     ErrorReadingModInfo,

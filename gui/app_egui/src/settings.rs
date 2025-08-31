@@ -78,10 +78,11 @@ impl Default for AppSettings {
 }
 
 impl From<ModManagerApp> for AppSettings {
-    fn from(app: ModManagerApp) -> Self {
+    fn from(mut app: ModManagerApp) -> Self {
         let i18n = if app.i18n.is_empty() {
             I18nKey::default_map()
         } else {
+            app.i18n.par_sort_unstable_keys();
             app.i18n
         };
 
