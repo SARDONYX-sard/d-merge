@@ -1,6 +1,7 @@
 use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
+    log::get_log_dir,
     mod_item::{from_mod_infos, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
@@ -386,7 +387,8 @@ impl ModManagerApp {
                     .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogDir)))
                     .clicked()
                 {
-                    if let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir)) {
+                    if let Err(err) = open_existing_dir_or_ancestor(&get_log_dir(&self.output_dir))
+                    {
                         self.set_notification(err);
                     }
                 }
