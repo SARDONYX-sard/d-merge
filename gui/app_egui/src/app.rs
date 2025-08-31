@@ -31,6 +31,18 @@ pub enum LogLevel {
     Trace,
 }
 
+impl LogLevel {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warn => "warn",
+            Self::Info => "info",
+            Self::Debug => "debug",
+            Self::Trace => "trace",
+        }
+    }
+}
+
 /// Main application state for Mod Manager.
 pub struct ModManagerApp {
     /// Execution mode. VFS or not

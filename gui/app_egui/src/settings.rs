@@ -27,7 +27,7 @@ pub struct AppSettings {
     auto_remove_meshes: bool,
     /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
     enable_debug_output: bool,
-    log_level: crate::app::LogLevel,
+    pub log_level: crate::app::LogLevel,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
     pub i18n: I18nMap,

@@ -26,6 +26,8 @@ fn main() -> Result<(), eframe::Error> {
         crate::log::get_log_dir(&settings.output_dir),
         log::LOG_FILENAME,
     );
+    tracing_rotation::change_level(settings.log_level.as_str()).unwrap();
+
     if let Some(err) = err {
         tracing::error!("[Settings loader Error] {err}\nFallback to default");
     }
