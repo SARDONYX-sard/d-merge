@@ -1377,6 +1377,7 @@ dependencies = [
  "egui_extras",
  "egui_virtual_list",
  "ico",
+ "indexmap 2.11.0",
  "mod_info",
  "nemesis_merge",
  "open",

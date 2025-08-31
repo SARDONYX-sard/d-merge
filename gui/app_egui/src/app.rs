@@ -1,13 +1,12 @@
 use crate::{
     dnd::{check_only_table_body, dnd_table_body},
-    i18n::I18nKey,
+    i18n::{I18nKey, I18nMap},
     mod_item::{from_mod_infos, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
 use rayon::prelude::*;
 use std::{
-    borrow::Cow,
     path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
@@ -65,7 +64,7 @@ pub struct ModManagerApp {
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
-    pub i18n: std::collections::HashMap<I18nKey, Cow<'static, str>>,
+    pub i18n: I18nMap,
     pub log_level: LogLevel,
     pub transparent: bool,
     pub last_window_size: egui::Vec2,
@@ -110,7 +109,7 @@ impl Default for ModManagerApp {
             filter_text: String::new(),
             sort_column: SortColumn::Priority,
             sort_asc: true,
-            i18n: std::collections::HashMap::new(),
+            i18n: I18nKey::default_map(),
             log_level: LogLevel::Debug,
             transparent: true,
             last_window_size: egui::Vec2::ZERO,

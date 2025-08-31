@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use std::{
-    borrow::Cow,
     fs,
     path::{Path, PathBuf},
 };
 
 use crate::{
     app::ModManagerApp,
-    i18n::I18nKey,
+    i18n::{I18nKey, I18nMap},
     mod_item::{ModItem, SortColumn},
 };
 
@@ -31,7 +30,7 @@ pub struct AppSettings {
     log_level: crate::app::LogLevel,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
-    pub i18n: std::collections::HashMap<I18nKey, Cow<'static, str>>,
+    pub i18n: I18nMap,
     pub sort_asc: bool,
     pub sort_column: SortColumn,
     pub transparent: bool,

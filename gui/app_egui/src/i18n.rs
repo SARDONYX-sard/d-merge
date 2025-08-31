@@ -1,4 +1,7 @@
-use std::{borrow::Cow, collections::HashMap};
+use indexmap::IndexMap;
+use std::borrow::Cow;
+
+pub type I18nMap = IndexMap<I18nKey, Cow<'static, str>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum I18nKey {
@@ -117,10 +120,11 @@ impl I18nKey {
 
     /// Generate all key-value pairs for translation.
     #[rustfmt::skip]
-    pub fn default_map() -> HashMap<Self, Cow<'static, str>> {
+    pub fn default_map() -> IndexMap<Self, Cow<'static, str>> {
         use I18nKey::*;
 
-        let mut map = HashMap::new();
+        // To preserve the order using serde, you have no choice but to use an index map.
+        let mut map = IndexMap::new();
 
         map.insert(AutoRemoveMeshes, Cow::Borrowed(AutoRemoveMeshes.default_eng()));
         map.insert(AutoRemoveMeshesHover, Cow::Borrowed(AutoRemoveMeshesHover.default_eng()));
