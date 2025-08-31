@@ -1,6 +1,7 @@
 // Forked: https://codesandbox.io/p/sandbox/mui-datagrid-dnd-kit-ctqzj8?file=%2Fsrc%2FApp.tsx%3A1%2C1-71%2C1&from-embed
 import { closestCorners, DndContext, MouseSensor, type UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core';
 import type { Props as DndCtxProps } from '@dnd-kit/core/dist/components/DndContext/DndContext';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DataGrid, type DataGridProps } from '@mui/x-data-grid';
 import { memo } from 'react';
@@ -42,12 +43,16 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
         collisionDetection={closestCorners}
         onDragEnd={onDragEnd}
         sensors={sensors}
+        // # Purpose
+        // - VerticalAxis: Prevents horizontal movement.
+        // - ParentElement: Prevents elements from extending beyond the grid.
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
       >
         <SortableContext items={rows} strategy={verticalListSortingStrategy}>
           <DataGrid
             checkboxSelection={true}
             disableRowSelectionOnClick={true}
-            rowBufferPx={4000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
+            rowBufferPx={5000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
             showCellVerticalBorder={true}
             slots={{ ...slots, row: DraggableGridRow }}

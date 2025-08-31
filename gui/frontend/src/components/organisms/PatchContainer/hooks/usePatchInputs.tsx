@@ -48,15 +48,14 @@ export const usePatchInputs = () => {
 
     const fetchDir = async () => {
       try {
-        const dir = await getSkyrimDir(patchOptions.outputTarget);
-        setSkyrimDataDir(dir);
+        setVfsSkyrimDataDir(await getSkyrimDir(patchOptions.outputTarget));
       } catch (_) {
         NOTIFY.error(t('patch.autoDetectSkyrimData_error_massage'));
       }
     };
 
     fetchDir();
-  }, [isVfsMode, patchOptions.outputTarget, setSkyrimDataDir, t]);
+  }, [isVfsMode, patchOptions.outputTarget, setVfsSkyrimDataDir, t]);
 
   const inputHandlers = {
     onClick: async () => {

@@ -23,6 +23,17 @@ export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
   throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
+export type FetchedModInfo = {
+  id: string;
+  name: string;
+  author: string;
+  site: string;
+  auto: string;
+
+  enabled?: boolean;
+  priority?: number;
+};
+
 export type ModInfo = {
   id: string;
   name: string;
@@ -42,7 +53,7 @@ export type ModIds = readonly string[];
  */
 export async function loadModsInfo(searchGlob: string) {
   if (isTauri()) {
-    return await invoke<ModInfo[]>('load_mods_info', { glob: searchGlob });
+    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: searchGlob });
   }
 
   if (isElectron()) {
@@ -137,10 +148,10 @@ export async function cancelPatch() {
 }
 
 /**
- * set vfs mode flag.(If enabled, close window manually.)
+ * If enabled, close window manually.
  * @throws Error
  */
-export async function setVfsMode(isEnabled: boolean) {
+export async function preventAutoCloseWindow(isEnabled: boolean) {
   if (isTauri()) {
     return await invoke('set_vfs_mode', { value: isEnabled });
   }

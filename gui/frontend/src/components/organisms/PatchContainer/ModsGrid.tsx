@@ -5,9 +5,9 @@ import type { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internal
 import type { ComponentPropsWithRef, FC } from 'react';
 import { memo, useCallback } from 'react';
 import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/DraggableDataGrid';
-import { ModItem, usePatchContext } from '@/components/providers/PatchProvider';
+import { usePatchContext } from '@/components/providers/PatchProvider';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { ModInfo } from '../../../services/api/patch';
+import { ModInfo } from '@/services/api/patch';
 import { CustomToolbar } from './GridToolbar';
 import { useColumns } from './hooks/useColumns';
 import { useGridStatePersistence } from './hooks/useGridStatePersistence';
@@ -18,45 +18,18 @@ type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModel
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
-  const {
-    isVfsMode,
-
-    modList,
-    setModList,
-
-    vfsModList,
-    setVfsModList,
-
-    modInfoList,
-    setModInfoList,
-    loading,
-  } = usePatchContext();
+  const { modInfoList, setModInfoList, loading } = usePatchContext();
   const columns = useColumns();
-
-  const activeModList = isVfsMode ? vfsModList : modList;
 
   const handleDragEnd = useCallback<DragEndHandler>(
     ({ active, over }) => {
       if (over) {
         const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
         const newIndex = modInfoList.findIndex((row) => row.id === over.id);
-
-        setModInfoList((prevRows) => {
-          // HACK: I don't know if it's a hidden specification, but drag-and-drop wouldn't work unless the drawn
-          // information and the derived information matched perfectly.
-          const newArray = reorderAndReindex(prevRows, oldIndex, newIndex);
-
-          if (isVfsMode) {
-            setVfsModList(toModList(newArray));
-          } else {
-            setModList(toModList(newArray));
-          }
-
-          return newArray;
-        });
+        setModInfoList((prevRows) => reorderAndReindex(prevRows, oldIndex, newIndex));
       }
     },
-    [modInfoList, setModInfoList, setVfsModList, setModList],
+    [modInfoList, setModInfoList],
   );
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
@@ -69,26 +42,20 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
 
       const selectedRowId = new Set(RowId.ids);
 
-      const modItemSetter = (prevModList: ModItem[]) => {
+      setModInfoList((prevModList: ModInfo[]) => {
         return prevModList.map((mod) => ({
           ...mod,
           enabled: selectedRowId.has(mod.id),
         }));
-      };
-
-      if (isVfsMode) {
-        setVfsModList(modItemSetter);
-      } else {
-        setModList(modItemSetter);
-      }
+      });
     },
-    [modInfoList, setVfsModList, setModList],
+    [modInfoList],
   );
 
   const apiRef = useGridApiRef();
   useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
 
-  const selectedIds = new Set(activeModList.filter((mod) => mod.enabled).map((mod) => mod.id));
+  const selectedIds = new Set(modInfoList.filter((mod) => mod.enabled).map((mod) => mod.id));
 
   return (
     <DraggableDataGrid
@@ -132,15 +99,4 @@ const reorderAndReindex = <T extends { id: string; priority: number }>(
     priority: idx + 1, // 1 based
   }));
   return newArray;
-};
-
-const toModList = (array: ModInfo[]): ModItem[] => {
-  return array.map(
-    (item) =>
-      ({
-        id: item.id,
-        enabled: item.enabled,
-        priority: item.priority,
-      }) as const satisfies ModItem,
-  );
 };

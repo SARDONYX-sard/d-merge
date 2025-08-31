@@ -1,8 +1,19 @@
 import { z } from 'zod';
-import { ModListSchema } from '@/components/providers/PatchProvider';
 import { OBJECT } from '@/lib/object-utils';
 import type { Cache } from '@/lib/storage';
 import { logLevelSchema } from '@/services/api/log';
+
+export type ModItem = z.infer<typeof ModItemSchema>;
+export const ModItemSchema = z.object({
+  enabled: z.boolean(),
+  /**
+   * - vfs: e.g. `aaaa`
+   * - manual: e.g. `path/to/aaaaa`
+   */
+  id: z.string(),
+  priority: z.number(),
+});
+export const ModListSchema = z.array(ModItemSchema);
 
 const EguiSettingsSchema = z.object({
   mode: z.enum(['vfs', 'manual']).optional(),
