@@ -7,7 +7,7 @@ import { BACKUP } from '@/services/api/backup';
 import { isElectron } from '@/services/api/electron';
 import { listen } from '@/services/api/event';
 import { exists, readFile } from '@/services/api/fs';
-import { setVfsMode } from '@/services/api/patch';
+import { preventAutoCloseWindow } from '@/services/api/patch';
 import { destroyCurrentWindow } from '@/services/api/window';
 
 export const useBackup = () => {
@@ -18,7 +18,7 @@ export const useBackup = () => {
 const isDesktopApp = () => isTauri() || isElectron();
 
 const useAutoImportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
+  const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
@@ -57,21 +57,20 @@ const useAutoImportBackup = () => {
 };
 
 const useAutoExportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
-  const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
+  const { isVfsMode, skyrimDataDir } = usePatchContext();
+  const settingsPath = `${skyrimDataDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
-      setVfsMode(false);
-      return;
-    }
-
-    setVfsMode(true);
-
     let unlisten: (() => void) | undefined;
 
     const registerCloseListener = async () => {
       const unlistenFn = await listen('tauri://close-requested', async () => {
+        if (!(isDesktopApp() && isVfsMode) || skyrimDataDir === '') {
+          preventAutoCloseWindow(false);
+          return;
+        }
+        preventAutoCloseWindow(true);
+
         try {
           NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
           await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
@@ -90,5 +89,5 @@ const useAutoExportBackup = () => {
     return () => {
       unlisten?.();
     };
-  }, [autoDetectEnabled, modInfoDir, settingsPath]);
+  }, [isVfsMode, skyrimDataDir, settingsPath]);
 };
