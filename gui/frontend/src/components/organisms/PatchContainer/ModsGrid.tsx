@@ -18,7 +18,7 @@ type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModel
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
-  const { modInfoList, setModInfoList, loading } = usePatchContext();
+  const { modInfoList, setModInfoList, loading, lockedDnd } = usePatchContext();
   const columns = useColumns();
 
   const handleDragEnd = useCallback<DragEndHandler>(
@@ -77,6 +77,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         ids: selectedIds,
         type: 'include',
       }}
+      draggable={!lockedDnd}
       rows={modInfoList}
       showToolbar={true}
       slots={{ toolbar: CustomToolbar }}

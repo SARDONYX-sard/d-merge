@@ -5,7 +5,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DataGrid, type DataGridProps } from '@mui/x-data-grid';
 import { memo } from 'react';
-import { DraggableGridRow } from './DraggableGridRow';
+import { createDraggableGridRow } from './DraggableGridRow';
 
 type Id =
   | UniqueIdentifier
@@ -13,11 +13,12 @@ type Id =
       id: UniqueIdentifier;
     };
 type Props = DataGridProps & {
+  draggable?: boolean;
   rows: Id[];
   onDragEnd: DndCtxProps['onDragEnd'];
 };
 
-export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, slots, ...props }: Props) {
+export const DraggableDataGrid = memo(function DraggableGrid({ draggable, rows, onDragEnd, slots, ...props }: Props) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -55,7 +56,7 @@ export const DraggableDataGrid = memo(function DraggableGrid({ rows, onDragEnd, 
             rowBufferPx={5000} // Without this, rows appear to disappear when auto-scroll is used to drag rows out of range.
             rows={rows}
             showCellVerticalBorder={true}
-            slots={{ ...slots, row: DraggableGridRow }}
+            slots={{ ...slots, row: createDraggableGridRow(draggable) }}
             {...props}
           />
         </SortableContext>

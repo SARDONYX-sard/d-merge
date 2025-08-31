@@ -1,7 +1,7 @@
 // NOTE: This state is not normally necessary globally, but it must be placed globally because it needs to be accessible to everything for automatic backup.
 
 import type { Dispatch, FC, ReactNode, SetStateAction } from 'react';
-import { createContext, useContext, useEffect, useTransition } from 'react';
+import { createContext, useContext, useEffect, useState, useTransition } from 'react';
 import { useDebounce } from '@/components/hooks/useDebounce';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { useModInfoState } from '@/components/organisms/PatchContainer/hooks/useModInfoState';
@@ -42,6 +42,10 @@ type ContextType = {
 
   /** Loading info.ini for each Nemesis Mod? */
   loading: boolean;
+
+  /** When sorting, locked drag & drop */
+  lockedDnd: boolean;
+  setLockedDnd: Dispatch<SetStateAction<boolean>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
 
@@ -58,8 +62,9 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const [skyrimDataDir, setSkyrimDataDir] = useStorageState(PRIVATE_CACHE_OBJ.patchSkyrimDataDir, stringSchema);
 
-  const [modInfoList, setModInfoList] = useModInfoState(isVfsMode);
+  const { modInfoList, setModInfoListActive: setModInfoList, setModInfoListRaw } = useModInfoState(isVfsMode);
   const [loading, startTransition] = useTransition();
+  const [lockedDnd, setLockedDnd] = useState(false);
 
   // NOTE: Use this instead of `useDeferredValue` to delay API calls.
   const deferredModInfoDir = useDebounce(isVfsMode ? vfsSkyrimDataDir : skyrimDataDir, 450);
@@ -68,9 +73,8 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
-        const modInfos = await loadModsInfo(deferredModInfoDir);
-        console.log('fetch mod infos');
-        setModInfoList(addDefaultsToModInfoList(modInfos));
+        console.log('fetching');
+        setModInfoListRaw(addDefaultsToModInfoList(await loadModsInfo(deferredModInfoDir)));
       });
     });
   }, [deferredModInfoDir, isVfsMode]);
@@ -95,6 +99,9 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setModInfoList,
 
     loading,
+
+    lockedDnd,
+    setLockedDnd,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;

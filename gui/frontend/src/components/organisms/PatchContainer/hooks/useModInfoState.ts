@@ -27,17 +27,16 @@ export const useModInfoState = (isVfsMode: boolean) => {
   const [activeModList, setActiveModList] = useState<ModItem[]>(() => schemaStorage.get(cacheKey, ModListSchema) ?? []);
 
   // Raw mod info list (fetched from API)
-  const [modInfoListRaw, _setModInfoList] = useState<ModInfo[]>([]);
+  const [modInfoListRaw, setModInfoListRaw] = useState<ModInfo[]>([]);
 
   /**
-   * Safe setter for modInfoList.
-   * - Updates React state
-   * - Synchronizes to schemaStorage
+   * Setter for local edits:
+   * - Updates React state AND schemaStorage
    * - Keeps activeModList in sync
    */
-  const setModInfoList = useCallback(
+  const setModInfoListActive = useCallback(
     (updater: React.SetStateAction<ModInfo[]>) => {
-      _setModInfoList((prev) => {
+      setModInfoListRaw((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
         const nextList = toModList(next);
 
@@ -55,11 +54,15 @@ export const useModInfoState = (isVfsMode: boolean) => {
    * - Matches enabled/priority with activeModList
    * - Sorted by priority
    */
-  const modInfoList = useMemo(() => {
-    return sortModInfoList(modInfoListRaw, activeModList);
-  }, [modInfoListRaw, activeModList]);
+  const modInfoList = useMemo(() => sortModInfoList(modInfoListRaw, activeModList), [modInfoListRaw, activeModList]);
 
-  return [modInfoList, setModInfoList] as const;
+  return {
+    modInfoList,
+    /** for initial fetch, does NOT update activeModList */
+    setModInfoListRaw,
+    /** for local edits, syncs with cache + activeModList */
+    setModInfoListActive,
+  } as const;
 };
 
 /**
