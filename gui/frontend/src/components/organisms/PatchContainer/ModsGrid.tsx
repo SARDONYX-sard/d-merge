@@ -40,7 +40,19 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         return;
       }
 
-      const selectedRowId = new Set(RowId.ids);
+      const selectedRowId = RowId.ids;
+
+      // HACK: For some reason, the check status becomes apparent one turn after checking, so it forces a “check all” at the zero stage.
+      if (selectedIds.size === 0 && _detail.reason === 'multipleRowsSelection') {
+        setModInfoList((prevModList: ModInfo[]) => {
+          return prevModList.map((mod) => ({
+            ...mod,
+            enabled: true,
+          }));
+        });
+
+        return;
+      }
 
       setModInfoList((prevModList: ModInfo[]) => {
         return prevModList.map((mod) => ({
@@ -56,7 +68,6 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
   useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
 
   const selectedIds = new Set(modInfoList.filter((mod) => mod.enabled).map((mod) => mod.id));
-
   return (
     <DraggableDataGrid
       apiRef={apiRef}

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useStorageState } from '@/components/hooks/useStorageState';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { schemaStorage } from '@/lib/storage/schemaStorage';
 import { type ModItem, ModListSchema } from '@/services/api/egui/backup';
 import type { ModInfo } from '@/services/api/patch';
 
@@ -24,7 +24,7 @@ export const useModInfoState = (isVfsMode: boolean) => {
   const cacheKey = isVfsMode ? PRIVATE_CACHE_OBJ.patchVfsModList : PRIVATE_CACHE_OBJ.patchModList;
 
   // Active mod list (truth source, synced with schemaStorage)
-  const [activeModList, setActiveModList] = useState<ModItem[]>(() => schemaStorage.get(cacheKey, ModListSchema) ?? []);
+  const [activeModList, setActiveModList] = useStorageState(cacheKey, ModListSchema.catch([]));
 
   // Raw mod info list (fetched from API)
   const [modInfoListRaw, setModInfoListRaw] = useState<ModInfo[]>([]);
@@ -41,7 +41,6 @@ export const useModInfoState = (isVfsMode: boolean) => {
         const nextList = toModList(next);
 
         setActiveModList(nextList);
-        schemaStorage.set(cacheKey, nextList);
 
         return next;
       });
