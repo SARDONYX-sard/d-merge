@@ -462,6 +462,7 @@ impl ModManagerApp {
         {
             let show_log_window = Arc::clone(&self.show_log_window);
             let log_lines = Arc::clone(&self.log_lines);
+            let clear_button_name = self.t(I18nKey::ClearButton).to_string();
 
             ctx.show_viewport_deferred(
                 egui::ViewportId::from_hash_of("log_viewer"),
@@ -481,7 +482,7 @@ impl ModManagerApp {
                         .frame(egui::Frame::new())
                         .show(ctx, |ui| {
                             ui.horizontal(|ui| {
-                                if ui.button("Clear").clicked() {
+                                if ui.button(clear_button_name.as_str()).clicked() {
                                     log_lines.lock().unwrap().clear();
                                 }
 
@@ -749,12 +750,23 @@ impl ModManagerApp {
             let dir = match skyrim_data_dir::get_skyrim_data_dir(self.target_runtime) {
                 Ok(dir) => dir,
                 Err(_err) => {
-                    // NOTE: Unsupported Unix `get_skyrim_data_dir`
                     #[cfg(target_os = "windows")]
-                    {
-                        let err_msg = format!("Error: Reading skyrim data dir: {_err}");
-                        self.set_notification(err_msg);
-                    }
+                    let exe_suffix = if self.target_runtime == skyrim_data_dir::Runtime::Se {
+                        "SE"
+                    } else {
+                        ""
+                    };
+
+                    #[cfg(target_os = "windows")]
+                    let err_msg = format!(
+                        "Error: Could not find Skyrim{exe_suffix}.exe path in the Windows registry: {_err}\n\
+                        If you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually."
+                    );
+
+                    #[cfg(not(target_os = "windows"))]
+                    let err_msg = "NOTE: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.".to_string();
+                    self.set_notification(err_msg);
+
                     PathBuf::new()
                 }
             };

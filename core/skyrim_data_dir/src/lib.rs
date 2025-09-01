@@ -27,7 +27,7 @@ pub use windows::get_skyrim_data_dir;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "UPPERCASE"))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Runtime {
     /// Skyrim Legendary Edition(32bit)
     Le,
