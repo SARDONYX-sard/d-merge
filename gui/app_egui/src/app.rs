@@ -100,6 +100,8 @@ pub struct ModManagerApp {
     pub show_log_window: Arc<AtomicBool>,
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
+    /// Even if no mod info can be retrieved, We want to maintain the check status and display it as empty.
+    pub fetch_is_empty: bool,
 }
 
 impl Default for ModManagerApp {
@@ -140,6 +142,7 @@ impl Default for ModManagerApp {
             notification: Arc::new(Mutex::new(String::new())),
             is_first_render: true,
             prev_table_available_width: 0.0,
+            fetch_is_empty: true,
         }
     }
 }
@@ -225,10 +228,23 @@ impl ModManagerApp {
                 let manual_mode_hover = self.t(I18nKey::ManualModeHover).to_string();
 
                 ui.label(self.t(I18nKey::ExecutionModeLabel));
-                ui.radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label)
-                    .on_hover_text(vfs_mode_hover);
-                ui.radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
-                    .on_hover_text(manual_mode_hover);
+                if ui
+                    .radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label)
+                    .on_hover_text(vfs_mode_hover)
+                    .clicked()
+                {
+                    let pattern =
+                        format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
+                    self.update_vfs_mod_list(&pattern);
+                };
+                if ui
+                    .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
+                    .on_hover_text(manual_mode_hover)
+                    .clicked()
+                {
+                    let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
+                    self.update_mod_list(&pattern);
+                };
 
                 ui.add(Separator::default().vertical());
 
@@ -605,7 +621,12 @@ impl ModManagerApp {
                     .body(|mut body| {
                         let mut widths = [0.0; 5]; // 5 ==  column count
                         widths.clone_from_slice(body.widths());
-                        let mod_list = self.mod_list_mut();
+
+                        let mod_list = if self.fetch_is_empty {
+                            &mut vec![] // Apply dummy to preserve check state.
+                        } else {
+                            self.mod_list_mut()
+                        };
 
                         if editable {
                             dnd_table_body(body.ui_mut(), mod_list, widths);
@@ -781,13 +802,8 @@ impl ModManagerApp {
                 egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
             );
 
-            let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
-
-            if self.is_first_render {
-                self.update_vfs_mod_list(&pattern);
-            }
-
-            if self.vfs_mod_list.is_empty() || response.changed() {
+            if self.is_first_render || response.changed() {
+                let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
                 self.update_vfs_mod_list(&pattern);
             }
         } else {
@@ -796,7 +812,8 @@ impl ModManagerApp {
                 egui::TextEdit::singleline(&mut self.skyrim_data_dir)
                     .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
             );
-            if self.mod_list().is_empty() || response.changed() {
+
+            if self.is_first_render || response.changed() {
                 let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
                 self.update_mod_list(&pattern);
             }
@@ -807,6 +824,12 @@ impl ModManagerApp {
         use mod_info::GetModsInfo as _;
         match mod_info::ModsInfo::get_all(pattern) {
             Ok(mods) => {
+                let is_empty = mods.is_empty();
+                self.fetch_is_empty = is_empty;
+                if is_empty {
+                    return; // To preserve check state even if empty
+                }
+
                 // Turn the IDs of previously enabled mods into a HashSet
                 let enabled_ids: std::collections::HashSet<&str> = self
                     .mod_list
@@ -842,6 +865,12 @@ impl ModManagerApp {
     /// This allows vfs mode to maintain the check state on a different PC.
     fn update_vfs_mod_list(&mut self, pattern: &str) {
         if let Some(mods) = self.fetch_vfs_mod_list(pattern) {
+            let is_empty = mods.is_empty();
+            self.fetch_is_empty = is_empty;
+            if is_empty {
+                return; // To preserve check state even if empty
+            }
+
             // Turn the IDs of previously enabled mods into a HashSet
             let enabled_ids: std::collections::HashSet<&str> = self
                 .vfs_mod_list

@@ -22,15 +22,14 @@ fn main() -> Result<(), eframe::Error> {
         Err(e) => (settings::AppSettings::default(), Some(e)),
     };
 
-    let _ = tracing_rotation::init(
-        crate::log::get_log_dir(&settings.output_dir),
-        log::LOG_FILENAME,
-    );
+    let _ = tracing_rotation::init(log::get_log_dir(&settings.output_dir), log::LOG_FILENAME);
     tracing_rotation::change_level(settings.log_level.as_str()).unwrap();
 
     if let Some(err) = err {
         tracing::error!("[Settings loader Error] {err}\nFallback to default");
-    }
+    } else {
+        tracing::info!("[Settings loader] Loaded settings.json");
+    };
 
     let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../backend/tauri/icons/icon.ico"));
 

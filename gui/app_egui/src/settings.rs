@@ -162,11 +162,16 @@ impl AppSettings {
 
     /// Save settings to JSON file
     pub fn save(&self) {
-        if let Ok(text) = serde_json::to_string_pretty(self) {
-            if let Err(err) = fs::write(Self::FILE, text) {
-                tracing::error!("Failed to save settings: {err}");
-            };
-            tracing::info!("Settings saved to {}", Self::FILE);
+        match serde_json::to_string_pretty(self) {
+            Ok(text) => {
+                if let Err(err) = fs::write(Self::FILE, text) {
+                    tracing::error!("Failed to save settings: {err}");
+                };
+                tracing::info!("Settings saved to {}", Self::FILE);
+            }
+            Err(err) => {
+                tracing::error!("Failed to parse settings as JSON: {err}");
+            }
         }
     }
 }

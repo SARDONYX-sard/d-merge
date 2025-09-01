@@ -42,8 +42,9 @@ pub enum I18nKey {
     VfsModeHover,
     WarningTitle,
 
+    // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
     /// Invalid key comes here when deserializing unknown strings.
-    #[serde(other, skip_serializing)]
+    #[serde(other)]
     Invalid,
 }
 
