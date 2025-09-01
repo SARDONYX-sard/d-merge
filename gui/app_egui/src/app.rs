@@ -395,45 +395,36 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
-                if ui
-                    .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogDir)))
-                    .clicked()
-                {
-                    if let Err(err) = open_existing_dir_or_ancestor(&get_log_dir(&self.output_dir))
-                    {
-                        self.set_notification(err);
+                self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
+                    if let Err(err) = open_existing_dir_or_ancestor(&get_log_dir(&s.output_dir)) {
+                        s.set_notification(err);
                     }
-                }
-                if ui
-                    .add_sized([120.0, 40.0], egui::Button::new(self.t(I18nKey::LogButton)))
-                    .clicked()
-                {
-                    self.show_log_window
-                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed);
-                    // toggle
-                }
-
-                if ui
-                    .add_sized(
-                        [120.0, 40.0],
-                        egui::Button::new(self.t(I18nKey::NotificationClearButton)),
-                    )
-                    .clicked()
-                {
-                    self.clear_notification();
-                }
-
-                if ui
-                    .add_sized(
-                        [120.0, 40.0],
-                        egui::Button::new(self.t(I18nKey::PatchButton)),
-                    )
-                    .clicked()
-                {
-                    self.patch(ctx);
-                }
+                });
+                self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
+                    s.show_log_window
+                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // Intended: toggle
+                });
+                self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
+                    s.clear_notification();
+                });
+                self.add_button(ui, ctx, I18nKey::PatchButton, |s, ctx| {
+                    s.patch(ctx);
+                });
             });
         });
+    }
+
+    /// Add bottom button
+    fn add_button<F>(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, key: I18nKey, f: F)
+    where
+        F: FnOnce(&mut Self, &egui::Context),
+    {
+        if ui
+            .add_sized([120.0, 40.0], egui::Button::new(self.t(key)))
+            .clicked()
+        {
+            f(self, ctx);
+        }
     }
 
     fn ui_log_level_box(&mut self, ui: &mut egui::Ui) {
@@ -441,37 +432,23 @@ impl ModManagerApp {
             ui.label("Log Level");
 
             egui::ComboBox::from_id_salt("log_level")
-                .selected_text(format!("{:?}", self.log_level))
+                .selected_text(self.log_level.as_str())
                 .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_value(&mut self.log_level, LogLevel::Error, "Error")
-                        .changed()
-                    {
-                        tracing_rotation::change_level("error").unwrap();
-                    }
-                    if ui
-                        .selectable_value(&mut self.log_level, LogLevel::Warn, "Warn")
-                        .changed()
-                    {
-                        tracing_rotation::change_level("warn").unwrap();
-                    }
-                    if ui
-                        .selectable_value(&mut self.log_level, LogLevel::Info, "Info")
-                        .changed()
-                    {
-                        tracing_rotation::change_level("info").unwrap();
-                    }
-                    if ui
-                        .selectable_value(&mut self.log_level, LogLevel::Debug, "Debug")
-                        .changed()
-                    {
-                        tracing_rotation::change_level("debug").unwrap();
-                    }
-                    if ui
-                        .selectable_value(&mut self.log_level, LogLevel::Trace, "Trace")
-                        .changed()
-                    {
-                        tracing_rotation::change_level("trace").unwrap();
+                    let levels: [(LogLevel, &'static str); 5] = [
+                        (LogLevel::Error, "Error"),
+                        (LogLevel::Warn, "Warn"),
+                        (LogLevel::Info, "Info"),
+                        (LogLevel::Debug, "Debug"),
+                        (LogLevel::Trace, "Trace"),
+                    ];
+
+                    for (level, label) in levels {
+                        if ui
+                            .selectable_value(&mut self.log_level, level, label)
+                            .changed()
+                        {
+                            tracing_rotation::change_level(level.as_str()).unwrap();
+                        }
                     }
                 });
         });
@@ -503,9 +480,16 @@ impl ModManagerApp {
                     egui::CentralPanel::default()
                         .frame(egui::Frame::new())
                         .show(ctx, |ui| {
-                            if ui.button("Clear").clicked() {
-                                log_lines.lock().unwrap().clear();
-                            }
+                            ui.horizontal(|ui| {
+                                if ui.button("Clear").clicked() {
+                                    log_lines.lock().unwrap().clear();
+                                }
+
+                                ui.button("Copy").clicked().then(|| {
+                                    let text = log_lines.lock().unwrap().join("\n");
+                                    ui.ctx().copy_text(text);
+                                });
+                            });
 
                             egui::ScrollArea::vertical()
                                 .stick_to_bottom(true)
@@ -611,24 +595,21 @@ impl ModManagerApp {
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
-                    .column(egui_extras::Column::auto().resizable(true)) // checkbox
-                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // id
-                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // name
-                    .column(Self::resizable_column(total_width, 0.40, changed_width)) // site
-                    .column(egui_extras::Column::remainder().resizable(true)) // priority
+                    .column(egui_extras::Column::auto().resizable(true)) // 1/5: checkbox
+                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // 2/5: id
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // 3/5: name
+                    .column(Self::resizable_column(total_width, 0.40, changed_width)) // 4/5: site
+                    .column(egui_extras::Column::remainder().resizable(true)) // 5/5: priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
                         let mut widths = [0.0; 5]; // 5 ==  column count
                         widths.clone_from_slice(body.widths());
+                        let mod_list = self.mod_list_mut();
 
-                        match editable {
-                            true => dnd_table_body(body.ui_mut(), self.mod_list_mut(), widths),
-                            false => check_only_table_body(
-                                &mut body,
-                                filtered_mods,
-                                self.mod_list_mut(),
-                                widths,
-                            ),
+                        if editable {
+                            dnd_table_body(body.ui_mut(), mod_list, widths);
+                        } else {
+                            check_only_table_body(&mut body, filtered_mods, mod_list, widths);
                         }
                     });
             });
@@ -713,8 +694,8 @@ impl ModManagerApp {
     ) {
         header.col(|ui| {
             let text = match self.sort_column {
-                _ if self.sort_column == column && self.sort_asc => format!("{} ▲", label),
-                _ if self.sort_column == column && !self.sort_asc => format!("{} ▼", label),
+                _ if self.sort_column == column && self.sort_asc => format!("{label} ▲"),
+                _ if self.sort_column == column && !self.sort_asc => format!("{label} ▼"),
                 _ => label.to_string(),
             };
 
