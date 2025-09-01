@@ -981,6 +981,11 @@ impl ModManagerApp {
     /// Removes the auto meshes/debug directories with a safety warning if output_dir equals Skyrim data dir.
     fn auto_remove_meshes(&self, ctx: &egui::Context) {
         if self.auto_remove_meshes {
+            self.set_notification(format!(
+                "Deleting `{}/meshes` directory...",
+                self.output_dir
+            ));
+
             let skyrim_data_directory = match self.mode {
                 DataMode::Vfs => &self.vfs_skyrim_data_dir,
                 DataMode::Manual => &self.skyrim_data_dir,
