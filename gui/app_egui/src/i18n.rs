@@ -6,76 +6,44 @@ pub type I18nMap = IndexMap<I18nKey, Cow<'static, str>>;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum I18nKey {
-    #[serde(rename = "auto_remove_meshes")]
     AutoRemoveMeshes,
-    #[serde(rename = "auto_remove_meshes_hover")]
     AutoRemoveMeshesHover,
-    #[serde(rename = "auto_remove_meshes_warning_body1")]
     AutoRemoveMeshesWarningBody1,
-    #[serde(rename = "auto_remove_meshes_warning_body2")]
     AutoRemoveMeshesWarningBody2,
-    #[serde(rename = "cancel_button")]
     CancelButton,
-    #[serde(rename = "clear_button")]
     ClearButton,
-    #[serde(rename = "column_name")]
-    ColumnName,
-    #[serde(rename = "column_id")]
     ColumnId,
-    #[serde(rename = "column_priority")]
+    ColumnName,
     ColumnPriority,
-    #[serde(rename = "column_site")]
     ColumnSite,
-    #[serde(rename = "debug_output")]
     DebugOutput,
-    #[serde(rename = "debug_output_hover")]
     DebugOutputHover,
-    #[serde(rename = "execution_mode_label")]
-    ExecuteButton,
-    #[serde(rename = "execute_button")]
-    ExecutionModeLabel,
-    #[serde(rename = "error_reading_mod_info")]
     ErrorReadingModInfo,
-    #[serde(rename = "log_button")]
-    LogButton,
-    #[serde(rename = "log_dir")]
-    LogDir,
-    #[serde(rename = "log_level_label")]
-    LogLevelLabel,
-    #[serde(rename = "lock_button_hover")]
+    ExecuteButton,
+    ExecutionModeLabel,
     LockButtonHover,
-    #[serde(rename = "manual_mode")]
+    LogButton,
+    LogDir,
+    LogLevelLabel,
     ManualMode,
-    #[serde(rename = "manual_mode_hover")]
     ManualModeHover,
-    #[serde(rename = "mods_list_title")]
     ModsListTitle,
-    #[serde(rename = "notification_clear_button")]
     NotificationClearButton,
-    #[serde(rename = "open_button")]
     OpenButton,
-    #[serde(rename = "output_dir_label")]
     OutputDirLabel,
-    #[serde(rename = "patch_button")]
     PatchButton,
-    #[serde(rename = "search_label")]
     SearchLabel,
-    #[serde(rename = "skyrim_data_dir_label")]
     SkyrimDataDirLabel,
-    #[serde(rename = "transparent_button_label")]
     Transparent,
-    #[serde(rename = "transparent_button_hover")]
     TransparentHover,
-    #[serde(rename = "vfs_mode")]
     VfsMode,
-    #[serde(rename = "vfs_mode_hover")]
     VfsModeHover,
-    #[serde(rename = "warning_title")]
     WarningTitle,
 
-    /// Invalid key come, then to this.
-    #[serde(other)]
+    /// Invalid key comes here when deserializing unknown strings.
+    #[serde(other, skip_serializing)]
     Invalid,
 }
 
@@ -122,11 +90,11 @@ impl I18nKey {
 
     /// Generate all key-value pairs for translation.
     #[rustfmt::skip]
-    pub fn default_map() -> IndexMap<Self, Cow<'static, str>> {
+    pub fn default_map() -> I18nMap {
         use I18nKey::*;
 
         // To preserve the order using serde, you have no choice but to use an index map.
-        let mut map = IndexMap::new();
+        let mut map = I18nMap::new();
 
         map.insert(AutoRemoveMeshes, Cow::Borrowed(AutoRemoveMeshes.default_eng()));
         map.insert(AutoRemoveMeshesHover, Cow::Borrowed(AutoRemoveMeshesHover.default_eng()));
@@ -156,6 +124,8 @@ impl I18nKey {
         map.insert(PatchButton, Cow::Borrowed(PatchButton.default_eng()));
         map.insert(SearchLabel, Cow::Borrowed(SearchLabel.default_eng()));
         map.insert(SkyrimDataDirLabel, Cow::Borrowed(SkyrimDataDirLabel.default_eng()));
+        map.insert(Transparent, Cow::Borrowed(SkyrimDataDirLabel.default_eng()));
+        map.insert(TransparentHover, Cow::Borrowed(SkyrimDataDirLabel.default_eng()));
         map.insert(VfsMode, Cow::Borrowed(VfsMode.default_eng()));
         map.insert(VfsModeHover, Cow::Borrowed(VfsModeHover.default_eng()));
         map.insert(WarningTitle, Cow::Borrowed(WarningTitle.default_eng()));
