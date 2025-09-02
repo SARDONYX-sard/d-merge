@@ -1,6 +1,8 @@
-// SPDX-FileCopyrightText: (C) Monitor221hz
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2023-2025 Pandora Behaviour Engine Contributors
+//
 // This is based on the logic of Pandora-Behaviour-Engine-Plus.
-// See Unabandon Public License(<repo_root>/resource/xml/templates/LICENSE.md)
+
 use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 

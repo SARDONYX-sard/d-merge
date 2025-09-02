@@ -1,6 +1,7 @@
-// SPDX-FileCopyrightText: (C) Monitor221hz
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2023-2025 Pandora Behaviour Engine Contributors
+//
 // This is based on the logic of Pandora-Behaviour-Engine-Plus.
-// See Unabandon Public License(<repo_root>/resource/xml/templates/LICENSE.md)
 //! This module defines FNIS animation types and flags.
 //!
 //! All animation type (`<AnimType>`) and option (`<option>`) definitions

@@ -4212,11 +4212,10 @@ dependencies = [
 name = "nemesis_merge"
 version = "0.1.0"
 dependencies = [
- "bitflags 2.9.1",
+ "bitflags 2.9.3",
  "dashmap",
  "havok_classes",
  "havok_types",
- "indexmap 2.10.0",
  "indexmap 2.11.0",
  "json_patch",
  "jwalk",
@@ -6468,9 +6467,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.142"
+version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "030fedb782600dcbd6f02d479bf0d817ac3bb40d644745b769d6a96bc3afc5a7"
+checksum = "d401abef1d108fbd9cbaebc3e46611f4b1021f714a0597a71f41ee463f5f4a5a"
 dependencies = [
  "itoa",
  "memchr",
