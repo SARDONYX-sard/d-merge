@@ -1,5 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Since the window turns white while it is being prepared, this process is performed in the background,
@@ -22,5 +23,23 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 export function showWindow() {
   if (typeof window !== 'undefined' && isTauri()) {
     getCurrentWindow().show();
+  }
+}
+
+/**
+ * Cross-platform window destroy helper.
+ *
+ * - On Tauri: calls `getCurrentWindow().destroy()`
+ * - On Electron: calls `electronApi.destroyWindow()`
+ *
+ * @throws Error if neither Tauri nor Electron is detected.
+ */
+export async function destroyCurrentWindow(): Promise<void> {
+  if (isTauri()) {
+    await getCurrentWindow().destroy();
+  } else if (isElectron()) {
+    await electronApi.destroyWindow();
+  } else {
+    throw new Error('Unsupported platform: neither Tauri nor Electron');
   }
 }

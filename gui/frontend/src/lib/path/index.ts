@@ -1,5 +1,3 @@
-// src/lib/path/index.ts (or use alias '@/lib/path/index.ts')
-
 const GLOB_REGEXP = /[*?[{\]]/;
 const PATH_SEP_REGEXP = /[\\/]+$/;
 
@@ -21,4 +19,30 @@ export function stripGlob(globPath: string): string {
   // Slice up to the first glob character and remove trailing path separators
   const basePath = globPath.slice(0, globCharIndex);
   return basePath.replace(PATH_SEP_REGEXP, ''); // remove trailing slashes or backslashes
+}
+
+/**
+ * Returns the last segment of a path (used as VFS id).
+ * Returns null if the path is empty, root, or ends with a slash/backslash.
+ *
+ * @param filePath - The file path
+ * @returns The last path segment or null
+ */
+export function getPathId(filePath: string): string | null {
+  if (!filePath) return null;
+
+  // normalize separators
+  const normalized = filePath.replace(/\\/g, '/');
+
+  // root check
+  if (normalized === '/') return null;
+  if (/^[a-zA-Z]:\/?$/.test(normalized)) return null; // windows root
+
+  // if ends with slash → invalid
+  if (normalized.endsWith('/')) return null;
+
+  // get last segment
+  const parts = normalized.split('/');
+  const last = parts[parts.length - 1];
+  return last || null;
 }

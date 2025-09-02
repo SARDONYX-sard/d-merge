@@ -1,0 +1,50 @@
+{
+  "name": "d_merge_node",
+  "description": "d_merge Node.js FFI",
+  "license": "GPL-3.0-only",
+  "main": "index.js",
+  "homepage": "https://github.com/SARDONYX-sard/d-merge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SARDONYX-sard/d-merge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SARDONYX-sard/d-merge/issues"
+  },
+  "keywords": [
+    "napi-rs",
+    "NAPI",
+    "N-API",
+    "Rust",
+    "node-addon",
+    "node-addon-api"
+  ],
+  "files": [
+    "index.d.ts",
+    "index.js"
+  ],
+  "napi": {
+    "binaryName": "d_merge_node",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin"
+    ]
+  },
+  "engines": {
+    "node": ">= 10"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "vitest",
+    "version": "napi version"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.1.5",
+    "npm-run-all2": "^8.0.4",
+    "typescript": "^5.8.3"
+  }
+}

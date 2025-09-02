@@ -24,14 +24,17 @@ const CONVERT_PRIVATE_CACHE_KEYS_OBJ = {
 const PATCH_PUB_CACHE_KEYS_OBJ = {
   patchOptions: 'patch-options',
   modsGridState: 'patch-mod-grid-state',
-  autoDetectEnabled: 'patch-auto-detect-enabled',
+  isVfsMode: 'patch-is-vfs-mode',
 } as const;
 
 const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
-  patchInput: 'patch-input',
   patchOutput: 'patch-output',
-  patchActivateIds: 'patch-activate-ids',
-  patchPriorityIds: 'patch-priority-ids',
+
+  patchVfsSkyrimDataDir: 'patch-vfs-skyrim-data-dir',
+  patchVfsModList: 'patch-vfs-mod-list',
+
+  patchSkyrimDataDir: 'patch-skyrim-data-dir',
+  patchModList: 'patch-mod-list',
 } as const;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

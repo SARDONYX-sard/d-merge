@@ -1,18 +1,38 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { z } from 'zod';
+import { electronApi, isElectron } from './electron';
 
 /**
  * Get skyrim directory
  * @throws Error
  */
 export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
-  switch (runtime) {
-    case 'SkyrimLE':
-      return await invoke<string>('get_skyrim_data_dir', { runtime: 'LE' });
-    default:
-      return await invoke<string>('get_skyrim_data_dir', { runtime: 'SE' });
+  if (isTauri()) {
+    switch (runtime) {
+      case 'SkyrimLE':
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'LE' });
+      default:
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'SE' });
+    }
   }
+
+  if (isElectron()) {
+    return await electronApi.getSkyrimDir(runtime);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
+
+export type FetchedModInfo = {
+  id: string;
+  name: string;
+  author: string;
+  site: string;
+  auto: string;
+
+  enabled?: boolean;
+  priority?: number;
+};
 
 export type ModInfo = {
   id: string;
@@ -20,6 +40,9 @@ export type ModInfo = {
   author: string;
   site: string;
   auto: string;
+
+  enabled: boolean;
+  priority: number;
 };
 
 export type ModIds = readonly string[];
@@ -29,7 +52,15 @@ export type ModIds = readonly string[];
  * @throws Error
  */
 export async function loadModsInfo(searchGlob: string) {
-  return await invoke<ModInfo[]>('load_mods_info', { glob: searchGlob });
+  if (isTauri()) {
+    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: searchGlob });
+  }
+
+  if (isElectron()) {
+    return await electronApi.loadModsInfo(searchGlob);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
 /** must be same as `GuiOption` serde */
@@ -89,7 +120,15 @@ export const patchOptionsSchema = z
  * @throws Error
  */
 export async function patch(output: string, ids: ModIds, options: PatchOptions) {
-  await invoke('patch', { output, ids, options });
+  if (isTauri()) {
+    return await invoke('patch', { output, ids, options });
+  }
+
+  if (isElectron()) {
+    return await electronApi.patch(output, ids, options);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
 /**
@@ -97,13 +136,29 @@ export async function patch(output: string, ids: ModIds, options: PatchOptions) 
  * @throws Error
  */
 export async function cancelPatch() {
-  await invoke('cancel_patch');
+  if (isTauri()) {
+    return await invoke('cancel_patch');
+  }
+
+  if (isElectron()) {
+    return await electronApi.cancelPatch();
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
 /**
- * set vfs mode flag.(If enabled, close window manually.)
+ * If enabled, close window manually.
  * @throws Error
  */
-export async function setVfsMode(value: boolean) {
-  await invoke('set_vfs_mode', { value });
+export async function preventAutoCloseWindow(isEnabled: boolean) {
+  if (isTauri()) {
+    return await invoke('set_vfs_mode', { value: isEnabled });
+  }
+
+  if (isElectron()) {
+    return await electronApi.setVfsMode(isEnabled);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }

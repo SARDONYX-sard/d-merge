@@ -52,7 +52,7 @@ pub type ModsInfo = Vec<ModInfo>;
 
 pub trait GetModsInfo {
     /// Get `info.ini` and store it in a [`IndexMap`] using `<id>` as the key.
-    /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
+    /// - Intended `<any path id>/info.ini` (any path id e.g.: `Nemesis_Engine/mods/aaaa`)
     ///
     /// # Errors
     /// If invalid glob pattern.
@@ -60,6 +60,16 @@ pub trait GetModsInfo {
     /// # Note
     /// Priority and `id` cannot be obtained at this stage.
     fn get_all(pattern: &str) -> Result<ModsInfo>;
+
+    /// Get `info.ini` and store it in a [`IndexMap`] using `<id>` as the key.
+    /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
+    ///
+    /// # Errors
+    /// If invalid glob pattern.
+    ///
+    /// # Note
+    /// Priority and `id` cannot be obtained at this stage.
+    fn vfs_get_all(pattern: &str) -> Result<ModsInfo>;
 }
 
 impl GetModsInfo for ModsInfo {
@@ -70,14 +80,36 @@ impl GetModsInfo for ModsInfo {
             .par_iter()
             .filter_map(|path| {
                 path.exists()
-                    .then(|| extract_id_from_path(path))
-                    .flatten()
-                    .and_then(|_id| {
+                    .then(|| {
                         fs::read_to_string(path)
                             .ok()
                             .and_then(|contents| serde_ini::from_str(&contents).ok())
                             .map(|mut mod_info: ModInfo| {
                                 mod_info.id = path.parent().unwrap_or(path).display().to_string();
+                                mod_info
+                            })
+                    })
+                    .flatten()
+            })
+            .collect::<Self>();
+        Ok(mod_info)
+    }
+
+    fn vfs_get_all(pattern: &str) -> Result<ModsInfo> {
+        let paths: Vec<PathBuf> = glob(pattern)?.filter_map(Result::ok).collect();
+
+        let mod_info = paths
+            .par_iter()
+            .filter_map(|path| {
+                path.exists()
+                    .then(|| extract_id_from_path(path))
+                    .flatten()
+                    .and_then(|id| {
+                        fs::read_to_string(path)
+                            .ok()
+                            .and_then(|contents| serde_ini::from_str(&contents).ok())
+                            .map(|mut mod_info: ModInfo| {
+                                mod_info.id = id.to_string();
                                 mod_info
                             })
                     })

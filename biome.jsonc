@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
   "extends": [],
   "files": {
     "includes": [
@@ -41,7 +41,7 @@
     }
   },
   "linter": {
-    "includes": ["gui/frontend/**/", "tools/version_up.js"],
+    "includes": ["ffi/javascript/__test__/**", "gui/backend/electron/**/", "gui/frontend/**/", "tools/version_up.js"],
     "rules": {
       "correctness": {
         "noUndeclaredDependencies": "off",

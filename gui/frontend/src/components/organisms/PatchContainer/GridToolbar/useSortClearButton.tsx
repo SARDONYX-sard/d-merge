@@ -1,26 +1,29 @@
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import Tooltip from '@mui/material/Tooltip';
 import { ToolbarButton, useGridApiContext } from '@mui/x-data-grid';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { usePatchContext } from '@/components/providers/PatchProvider';
 
+/**
+ * Returns a toolbar button to clear sorting.
+ * While sorted, dragging is locked (lock = true)
+ */
 export const useSortClearButton = () => {
   const { current: apiRefCurrent } = useGridApiContext();
-  const [isSorted, setIsSorted] = useState(false);
+  const { lockedDnd, setLockedDnd } = usePatchContext();
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (apiRefCurrent === null) {
-      return;
-    }
+    if (!apiRefCurrent) return;
 
     const updateSortState = () => {
       const sortModel = apiRefCurrent.getSortModel();
-      setIsSorted(sortModel.length > 0);
+      setLockedDnd(sortModel.length > 0);
     };
 
-    updateSortState(); // first
+    updateSortState(); // initialize
     const unsubscribe = apiRefCurrent.subscribeEvent('sortModelChange', updateSortState);
     return () => unsubscribe();
   }, [apiRefCurrent]);
@@ -29,7 +32,7 @@ export const useSortClearButton = () => {
     apiRefCurrent?.setSortModel([]);
   };
 
-  const SortClearButton = isSorted ? (
+  const SortClearButton = lockedDnd ? (
     <Tooltip title={t('patch.toolbar.locked_due_to_sorting_help')}>
       <ToolbarButton aria-label='Clear sorting to unlock' color='primary' onClick={handleClearSort}>
         <LockOpenIcon fontSize='small' />

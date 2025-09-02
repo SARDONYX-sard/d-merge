@@ -1,6 +1,6 @@
 import type { MouseEventHandler } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
-import { patch } from '@/services/api/patch';
+import { type ModInfo, patch } from '@/services/api/patch';
 import { type Status, statusListener } from '@/services/api/patch_listener';
 
 type Params = {
@@ -15,7 +15,7 @@ type Params = {
  * status updates, loading state, timer, and notifications.
  */
 export function usePatchHandler({ start, setLoading, onStatus, onError }: Params) {
-  const { output, activateMods, patchOptions } = usePatchContext();
+  const { output, isVfsMode, patchOptions, vfsSkyrimDataDir, modInfoList } = usePatchContext();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async () => {
     start();
@@ -23,15 +23,27 @@ export function usePatchHandler({ start, setLoading, onStatus, onError }: Params
     await statusListener(
       'd_merge://progress/patch', // event name emitted from Tauri backend
       async () => {
-        await patch(output, activateMods, patchOptions);
+        await patch(output, getCheckedPath(isVfsMode, vfsSkyrimDataDir, modInfoList), patchOptions);
       },
-      {
-        setLoading,
-        onStatus,
-        onError,
-      },
+      { setLoading, onStatus, onError },
     );
   };
 
   return { handleClick };
+}
+
+function getCheckedPath(isVfsMode: boolean, vfsSkyrimDataDir: string, modInfoList: ModInfo[]): string[] {
+  let res: string[] = [];
+
+  if (isVfsMode) {
+    for (const mod of modInfoList) {
+      res.push(`${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}`);
+    }
+    return res;
+  }
+
+  for (const mod of modInfoList) {
+    res.push(mod.id);
+  }
+  return res;
 }

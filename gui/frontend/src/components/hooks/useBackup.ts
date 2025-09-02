@@ -1,27 +1,29 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { useEffect } from 'react';
-
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
-import { setVfsMode } from '@/services/api/patch';
+import { isElectron } from '@/services/api/electron';
+import { listen } from '@/services/api/event';
+import { exists, readFile } from '@/services/api/fs';
+import { preventAutoCloseWindow } from '@/services/api/patch';
+import { destroyCurrentWindow } from '@/services/api/window';
 
 export const useBackup = () => {
   useAutoImportBackup();
   useAutoExportBackup();
 };
 
+const isDesktopApp = () => isTauri() || isElectron();
+
 const useAutoImportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
+  const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
     const doImport = async () => {
-      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+      if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
@@ -39,7 +41,7 @@ const useAutoImportBackup = () => {
       NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
 
       try {
-        const newSettings = await BACKUP.fromStr(await readTextFile(settingsPath));
+        const newSettings = await BACKUP.fromStr(await readFile(settingsPath));
         if (newSettings) {
           newSettings['last-path'] = '/';
           STORAGE.setAll(newSettings);
@@ -55,28 +57,27 @@ const useAutoImportBackup = () => {
 };
 
 const useAutoExportBackup = () => {
-  const { autoDetectEnabled, modInfoDir } = usePatchContext();
-  const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
+  const { isVfsMode, skyrimDataDir } = usePatchContext();
+  const settingsPath = `${skyrimDataDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
-      setVfsMode(false);
-      return;
-    }
-
-    setVfsMode(true);
-
     let unlisten: (() => void) | undefined;
 
     const registerCloseListener = async () => {
       const unlistenFn = await listen('tauri://close-requested', async () => {
+        if (!(isDesktopApp() && isVfsMode) || skyrimDataDir === '') {
+          preventAutoCloseWindow(false);
+          return;
+        }
+        preventAutoCloseWindow(true);
+
         try {
           NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
           await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
         } catch (e) {
           NOTIFY.error(`${e}`);
         } finally {
-          await getCurrentWindow().destroy();
+          destroyCurrentWindow();
         }
       });
 
@@ -88,5 +89,5 @@ const useAutoExportBackup = () => {
     return () => {
       unlisten?.();
     };
-  }, [autoDetectEnabled, modInfoDir, settingsPath]);
+  }, [isVfsMode, skyrimDataDir, settingsPath]);
 };

@@ -22,17 +22,12 @@ pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)>
                 is_txt_file(&path).then_some(path)?
             };
 
-            if is_nemesis_file(&txt_path) {
-                return Some((Category::Nemesis, txt_path));
-            }
-            if is_adsf_patch_file(&txt_path) {
-                return Some((Category::Adsf, txt_path));
-            }
-            if is_asdsf_patch_file(&txt_path) {
-                return Some((Category::Asdsf, txt_path));
-            }
-
-            None
+            Some(match txt_path {
+                _ if is_nemesis_file(&txt_path) => (Category::Nemesis, txt_path),
+                _ if is_adsf_patch_file(&txt_path) => (Category::Adsf, txt_path),
+                _ if is_asdsf_patch_file(&txt_path) => (Category::Asdsf, txt_path),
+                _ => return None,
+            })
         })
         .collect()
 }

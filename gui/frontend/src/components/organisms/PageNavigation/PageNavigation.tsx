@@ -10,21 +10,44 @@ import { z } from 'zod';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
-// NOTE: Note that the order of the arrays must be in the order of the `BottomNavigationAction` declarations,
-//       otherwise it will jump to the wrong place.
+/**
+ * # NOTE
+ * The order of the arrays must be in the order of the `BottomNavigationAction` declarations.
+ *
+ * Otherwise it will jump to the wrong place.
+ */
 const validPathNames = ['/convert', '/', '/settings'] as const;
 const lastPathSchema = z.enum(validPathNames);
-const getPageIndex = (path: string) => {
-  switch (path) {
+
+type LastPathName = (typeof validPathNames)[number];
+
+const getPageIndex = (pageName: LastPathName): 0 | 2 | 1 => {
+  switch (pageName) {
     case '/convert':
       return 0;
-    case '/':
-      return 1;
     case '/settings':
       return 2;
     default:
-      return 0;
+      return 1; // Default to patch page
   }
+};
+/**
+ * This is a function that absorbs the difference between tauri and electron's `window.location.pathname`.
+ *
+ * For example, in the case of `/convert`
+ * - tauri: ‘/convert/’
+ * - electron: '[...]//app.asar/frontend/convert'
+ */
+const pathnameToLastPathName = (path: string): LastPathName => {
+  if (path.endsWith('/convert/') || path.endsWith('/convert')) {
+    return '/convert';
+  }
+
+  if (path.endsWith('/settings/') || path.endsWith('/settings')) {
+    return '/settings';
+  }
+
+  return '/';
 };
 
 /** HACK: To prevents the conversion button from being hidden because the menu is fixed. */
@@ -35,12 +58,13 @@ export function PageNavigation() {
   const pathname = usePathname();
   const [selectedPage, setSelectedPage] = useState(0);
   const [lastPath, setLastPath] = schemaStorage.use(PUB_CACHE_OBJ.lastPath, lastPathSchema);
+  const lastPathName = pathnameToLastPathName(pathname);
 
   useEffect(() => {
     // Check if we've already redirected in this session
     const hasRedirected = sessionStorage.getItem('hasRedirected');
 
-    if (lastPath && lastPath !== pathname && !hasRedirected) {
+    if (lastPath && lastPath !== lastPathName && !hasRedirected) {
       sessionStorage.setItem('hasRedirected', 'true');
       // Since `/` is the initial coming path, there is no need to jump.
       // If you jump, you will have to jump twice when `/` is the LAST PATH.
@@ -52,13 +76,9 @@ export function PageNavigation() {
   }, [lastPath, pathname, router]);
 
   useEffect(() => {
-    const currentPage = getPageIndex(pathname);
+    const currentPage = getPageIndex(lastPathName);
     setSelectedPage(currentPage);
-
-    const result = lastPathSchema.safeParse(pathname);
-    if (result.success) {
-      setLastPath(result.data);
-    }
+    setLastPath(lastPathName);
   }, [pathname, setLastPath]);
 
   const handleNavigationChange = (pageIdx: number) => {

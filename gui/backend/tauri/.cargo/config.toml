@@ -1,0 +1,14 @@
+# ref: https://doc.rust-lang.org/rustc/codegen-options/index.html#target-feature
+# crt-static: Combines C runtime libraries, eliminating the need for separate installation, which we found to be cost-effective since it only adds 300KB.
+
+# For some reason, Linux cannot include the C runtime because of the following error.
+# ``txt
+# `cssparser-macros v0.6.1` as the target `x86_64-unknown-linux-gnu` does not support these crate types
+# failed to build app: failed to build app
+# ```
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "target-feature=+crt-static"]

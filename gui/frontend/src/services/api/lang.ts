@@ -1,4 +1,4 @@
-import { readFile } from './fs';
+import { readFileWithDialog } from './fs';
 
 /**
  * Read the entire contents of a file into a string.
@@ -7,5 +7,5 @@ import { readFile } from './fs';
  * @throws
  */
 export async function importLang() {
-  return await readFile('lang-file-path', 'Custom Language');
+  return await readFileWithDialog('lang-file-path', 'Custom Language');
 }

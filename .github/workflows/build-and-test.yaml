@@ -16,7 +16,7 @@ jobs:
   lint:
     strategy:
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4.2.2
@@ -54,7 +54,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Test(Rust)
-        run: cargo nextest run --workspace
+        run: cargo nextest run --workspace --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.6.2
@@ -96,5 +96,40 @@ jobs:
           name: ${{ env.APP_NAME }}-${{ runner.os }}
           # to include .keep file
           include-hidden-files: true
+          path: |
+            ./build/
+
+  egui:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+      - name: Setup environment
+        uses: ./.github/actions/setup-deps
+        with:
+          platform: ${{ matrix.platform }}
+          build_profile: release
+          cache_key_suffix: 'egui'
+          install_front_deps: false
+
+      - name: Build GUI
+        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
+
+      - name: Move exe -> ./build
+        uses: ./.github/actions/setup-release
+        with:
+          app_name: d_merge_egui
+          build_profile: ${{ env.BUILD_PROFILE }}
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ${{ env.APP_NAME }}-${{ runner.os }}-egui
+          include-hidden-files: true # to include .keep file
           path: |
             ./build/

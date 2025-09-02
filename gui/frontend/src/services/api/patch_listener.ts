@@ -1,7 +1,7 @@
-import type { EventCallback, EventName } from '@tauri-apps/api/event';
-import { listen } from '@tauri-apps/api/event';
+import type { EventName } from '@tauri-apps/api/event';
 import type { ReactNode } from 'react';
 import { NOTIFY } from '@/lib/notify';
+import { listen } from './event';
 
 type ListenerProps = {
   setLoading: (b: boolean) => void;
@@ -31,8 +31,6 @@ export type Status =
   | { type: 'GeneratingHkxFiles'; content: StatusIndexing }
   | { type: 'Done' }
   | { type: 'Error'; content: ErrorPayload };
-
-type StatusPayload = Status;
 
 /**
  * Tauri status listener for backend merge progress.
@@ -84,12 +82,11 @@ export async function statusListener(
 
   let unlisten: (() => void) | null = null;
 
-  const eventHandler: EventCallback<StatusPayload> = (event) => {
-    onStatus(event.payload, unlisten);
-  };
-
   try {
-    unlisten = await listen<StatusPayload>(eventName, eventHandler);
+    unlisten = await listen<Status>(eventName, (payload) => {
+      onStatus(payload, unlisten);
+    });
+
     await promiseFn();
     onSuccess?.();
   } catch (err) {

@@ -1,5 +1,6 @@
 import type { TreeViewBaseItem } from '@mui/x-tree-view';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { electronApi, isElectron } from './electron';
 
 // NOTE: Do not use yaml because it cannot be reversed.
 export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
@@ -12,18 +13,25 @@ export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
  * @throws Error
  */
 export async function convert(inputs: string[], output: string, format: OutFormat, roots?: string[]) {
-  await invoke('convert', { inputs, output, format, roots });
-}
+  if (isTauri()) {
+    return await invoke('convert', { inputs, output, format, roots });
+  }
 
-/**
- * Whether the converter supports json and yaml conversion as well?
- *
- * @throws If the backend API (`invoke`) could not be called.
- */
-export async function isSupportedExtraFmt() {
-  return await invoke<boolean>('is_supported_extra_fmt');
+  if (isElectron()) {
+    return await electronApi.convert(inputs, output, format, roots);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }
 
 export async function loadDirNode(dirs: string[]) {
-  return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
+  if (isTauri()) {
+    return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
+  }
+
+  if (isElectron()) {
+    return await electronApi.loadDirNode(dirs);
+  }
+
+  throw new Error('Unsupported platform: Neither Tauri nor Electron');
 }

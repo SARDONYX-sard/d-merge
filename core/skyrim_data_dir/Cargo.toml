@@ -1,0 +1,22 @@
+[package]
+name = "skyrim_data_dir"
+version = "0.1.0"
+description = "Get Skyrim data directory(For windows)"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[features]
+serde = ["dep:serde"]
+
+[lints]
+workspace = true
