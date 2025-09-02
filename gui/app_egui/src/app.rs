@@ -335,9 +335,15 @@ impl ModManagerApp {
                 {
                     let dialog = if !self.output_dir.is_empty() {
                         // NOTE: For some reason, we can't reach the path correctly without using canonicalize.
-                        let _ = std::fs::create_dir_all(&self.output_dir);
-                        let path = std::path::Path::new(&self.output_dir);
-                        rfd::FileDialog::new().set_directory(path.canonicalize().unwrap())
+                        match find_existing_dir_or_ancestor(&self.output_dir) {
+                            Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
+                            Err(err) => {
+                                self.set_notification(format!(
+                                    "Couldn't find output dir or ancestor: {err}"
+                                ));
+                                return;
+                            }
+                        }
                     } else {
                         rfd::FileDialog::new()
                     };
@@ -412,7 +418,7 @@ impl ModManagerApp {
                 self.ui_log_level_box(ui);
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
-                    if let Err(err) = open_existing_dir_or_ancestor(&get_log_dir(&s.output_dir)) {
+                    if let Err(err) = open_existing_dir_or_ancestor(get_log_dir(&s.output_dir)) {
                         s.set_notification(err);
                     }
                 });
@@ -1063,13 +1069,17 @@ impl ModManagerApp {
     }
 }
 
-/// Opens the given directory or the closest existing parent directory.
+/// Walks up the path hierarchy until an existing directory is found.
 ///
 /// # Returns
-/// * `Ok(())` if a directory was successfully opened.
-/// * `Err(String)` if no existing directory could be opened.
-fn open_existing_dir_or_ancestor(dir: &Path) -> Result<(), String> {
-    // Start from the given path and walk up to the root
+/// * `Ok(PathBuf)` with the existing directory path
+/// * `Err(String)` if no existing directory is found
+fn find_existing_dir_or_ancestor<P>(dir: P) -> Result<PathBuf, String>
+where
+    P: AsRef<Path>,
+{
+    let dir = dir.as_ref();
+
     let mut current = dir;
 
     while !current.exists() {
@@ -1084,12 +1094,23 @@ fn open_existing_dir_or_ancestor(dir: &Path) -> Result<(), String> {
         }
     }
 
-    // Get absolute path
-    let abs_dir = current
+    current
         .canonicalize()
-        .map_err(|e| format!("Failed to canonicalize path({}): {e}", dir.display()))?;
+        .map_err(|e| format!("Failed to canonicalize path({}): {e}", dir.display()))
+}
 
-    // Open the directory
+/// Opens the given directory or the closest existing parent directory.
+///
+/// # Returns
+/// * `Ok(())` if a directory was successfully opened.
+/// * `Err(String)` if no existing directory could be opened.
+fn open_existing_dir_or_ancestor<P>(dir: P) -> Result<(), String>
+where
+    P: AsRef<Path>,
+{
+    let dir = dir.as_ref();
+
+    let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir)
         .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
 }
