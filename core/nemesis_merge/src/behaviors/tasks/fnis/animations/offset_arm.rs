@@ -88,7 +88,7 @@ impl<'a> OffsetArmAnimation<'a> {
             priority,
         };
 
-        // Add inner class(Therefor, doesn't have name attribute(e.g. name = "#0000"))
+        // Add inner class(This means, doesn't have name attribute(e.g. <name = "#0000">))
         // hkbStateMachineStateInfo
         let state_info = json_typed!(borrowed, {
             "name": format!("{}_StateInfo", self.event_id),
