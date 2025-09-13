@@ -25,6 +25,10 @@ fn main() -> Result<(), eframe::Error> {
     let _ = tracing_rotation::init(log::get_log_dir(&settings.output_dir), log::LOG_FILENAME);
     tracing_rotation::change_level(settings.log_level.as_str()).unwrap();
 
+    std::panic::set_hook(Box::new(|info| {
+        tracing::error!(?info);
+    }));
+
     if let Some(err) = err {
         tracing::error!("[Settings loader Error] {err}\nFallback to default");
     } else {
