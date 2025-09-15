@@ -44,7 +44,7 @@
     "notistack": "3.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-i18next": "15.7.0",
+    "react-i18next": "15.7.3",
     "zod": "^3.25.67"
   },
   "devDependencies": {
