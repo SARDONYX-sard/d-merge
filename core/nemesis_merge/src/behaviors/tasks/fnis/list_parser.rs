@@ -101,9 +101,12 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
     let kind = parse_anim_preset
         .context(StrContext::Label("AnimPreset"))
         .context(StrContext::Expected(StrContextValue::Description(
-            "AnimType + optional flags, e.g. `s`, `fu-ac0`, `pa`",
+            "AnimType & Optional flags, e.g. `s -fu,ac0`, `pa`",
         )))
         .parse_next(input)?;
+    space0.parse_next(input)?;
+
+    dbg!(*input);
 
     let event = take_till(0.., (' ', '\t'))
         .context(StrContext::Label("AnimEvent"))
@@ -111,8 +114,7 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
             "Animation event name (string without spaces)",
         )))
         .parse_next(input)?;
-
-    space1.parse_next(input)?;
+    space0.parse_next(input)?;
 
     let file = terminated(take_until_ext(0.., Caseless(".hkx")), Caseless(".hkx"))
         .take()
@@ -203,13 +205,17 @@ fn parse_rd_data1(input: &mut &str) -> ModalResult<RotationData1> {
     .parse_next(input)
 }
 
-/// `RD <time> <quat_1> <quat_2> <quat_3> <quat_4>`
+/// `RD <time: float> <delta_z_angle: int>`
 fn parse_rd_data2(input: &mut &str) -> ModalResult<RotationData2> {
     seq!(RotationData2 {
         time: float,
         _: space1,
         delta_z_angle: dec_int,
     })
+    .context(StrContext::Label("RotationData2"))
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Format: RD <time: float> <delta_z_angle: int>",
+    )))
     .parse_next(input)
 }
 
@@ -256,15 +262,14 @@ fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
 /// ```
 fn parse_anim_preset(input: &mut &str) -> ModalResult<FNISAnimKind> {
     let anim_type = parse_anim_type.parse_next(input)?;
-    space0.parse_next(input)?;
+    space1.parse_next(input)?;
 
     // When `-` comes, parse the flag list.
     let anim_flags = if opt('-').parse_next(input)?.is_some() {
-        parse_anim_flag.parse_next(input)?
+        parse_anim_flags.parse_next(input)?
     } else {
         FNISAnimFlags::NONE
     };
-    space0.parse_next(input)?;
 
     Ok(FNISAnimKind::new(anim_type, anim_flags))
 }
@@ -296,31 +301,28 @@ fn parse_anim_flags(input: &mut &str) -> ModalResult<FNISAnimFlags> {
     let mut anim_flags = FNISAnimFlags::empty();
 
     loop {
-        space0.parse_next(input)?;
+        anim_flags |= parse_anim_flag.parse_next(input)?;
 
-        let mut flags = take_till(0.., ',').parse_next(input)?;
-        let flag = parse_anim_flag(&mut flags)?;
-        anim_flags |= flag;
-
-        // If the next token is a comma, consume it and continue loop
-        space0.parse_next(input)?;
         if opt(',').parse_next(input)?.is_some() {
+            space0.parse_next(input)?;
             continue;
         }
         break;
     }
-
-    space0.parse_next(input)?;
     Ok(anim_flags)
 }
 
 fn parse_anim_flag(input: &mut &str) -> ModalResult<FNISAnimFlags> {
     // NOTE: important match order
+    // `alt` is short-circuit evaluation, meaning if a character partially matches in the order of description,
+    // it does not check subsequent characters.
+    // Therefore, it tests characters in descending order of length.
     alt((
         "ac0".value(FNISAnimFlags::AnimatedCameraReset),
         "ac1".value(FNISAnimFlags::AnimatedCameraSet),
-        "ac".value(FNISAnimFlags::AnimatedCamera),
         "bsa".value(FNISAnimFlags::BSA),
+        //
+        "ac".value(FNISAnimFlags::AnimatedCamera),
         "md".value(FNISAnimFlags::MotionDriven),
         "st".value(FNISAnimFlags::Sticky),
         "Tn".value(FNISAnimFlags::TransitionNext),
@@ -457,13 +459,33 @@ mod tests {
     // ============================
 
     #[test]
+    fn test_parse_anim_preset() {
+        let input = r#"s -h,ac0"#;
+        let parsed = must_parse(parse_anim_preset, input);
+        assert_eq!(
+            parsed,
+            FNISAnimKind::new(
+                FNISAnimType::Sequenced,
+                FNISAnimFlags::AnimatedCameraReset | FNISAnimFlags::HeadTracking
+            )
+        );
+    }
+
+    #[test]
     fn test_parse_entry_valid() {
         let input = r#"
-s IdleStart IdleStart.hkx
+s -h,ac0 IdleStart IdleStart.hkx
 MD 1.0 0 0 0
 RD 1.0 0
 "#;
         let parsed = must_parse(parse_entry, input);
+        assert_eq!(
+            parsed.kind,
+            FNISAnimKind::new(
+                FNISAnimType::Sequenced,
+                FNISAnimFlags::AnimatedCameraReset | FNISAnimFlags::HeadTracking
+            )
+        );
         assert_eq!(parsed.event, "IdleStart");
         assert_eq!(parsed.file, "IdleStart.hkx");
     }
@@ -487,7 +509,7 @@ s IdleStart IdleStart.hkx
 MD 1.0 0 0 0
 RD 1.0 0
 
-fu SitDown SitDown.hkx
+fu -h,ac0 SitDown SitDown.hkx
 MD 2.0 0 -10 0
 RD 2.0 0 0 0 1
 "#;
@@ -516,7 +538,10 @@ RD 2.0 0 0 0 1
         assert_eq!(
             parsed.entries[1],
             Entry {
-                kind: FNISAnimKind::new(FNISAnimType::Furniture, FNISAnimFlags::empty()),
+                kind: FNISAnimKind::new(
+                    FNISAnimType::Furniture,
+                    FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimatedCameraReset
+                ),
                 event: "SitDown",
                 file: "SitDown.hkx",
                 md: MotionData {
@@ -537,6 +562,7 @@ RD 2.0 0 0 0 1
     }
 
     #[test]
+    #[ignore = "local test"]
     fn test_parse_real_file() {
         let input = std::fs::read_to_string(
             "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt"
