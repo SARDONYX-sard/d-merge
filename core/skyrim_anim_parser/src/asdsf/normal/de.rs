@@ -71,14 +71,15 @@ fn file_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
         .context(Expected(Description("file_names_len: usize"))))
     .parse_next(input)?;
 
-    let mut file_names = None;
-    if let Some(file_names_len) = file_names_len {
-        file_names = Some(
+    let file_names = if let Some(file_names_len) = file_names_len {
+        Some(
             lines(file_names_len)
                 .context(Expected(Description("file_names: Vec<Str>")))
                 .parse_next(input)?,
-        );
-    }
+        )
+    } else {
+        None
+    };
 
     Ok(file_names.unwrap_or_default())
 }
