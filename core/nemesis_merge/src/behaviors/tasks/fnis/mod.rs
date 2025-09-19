@@ -16,7 +16,7 @@ mod list_parser;
 /// Derived from FNIS animation definition syntax:
 /// - `<AnimType>` describes the core behavior (e.g., basic, sequenced, furniture, paired).
 /// - `<option>` describes modifiers (e.g., acyclic, animated camera, headtracking).
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FNISAnimKind {
     /// The main animation type (FNISAnimType).
     pub anim_type: FNISAnimType,
