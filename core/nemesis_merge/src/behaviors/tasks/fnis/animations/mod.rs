@@ -79,11 +79,11 @@ impl<'a> FNISFactory<'a> {
                 };
 
                 let prev_anim_flags = prev_anim.flags();
-                if prev_anim_flags.contains(FNISAnimFlags::Acyclic)
-                    && !prev_anim_flags.contains(FNISAnimFlags::SequenceFinish)
-                {
+                let prev_has_acyclic = prev_anim_flags.contains(FNISAnimFlags::Acyclic);
+
+                if prev_has_acyclic && !prev_anim_flags.contains(FNISAnimFlags::SequenceFinish) {
                     *prev_anim.flags_mut() |= FNISAnimFlags::SequenceStart;
-                } else if flags.contains(FNISAnimFlags::Acyclic) {
+                } else if prev_has_acyclic {
                     flags |= FNISAnimFlags::SequenceFinish;
                 };
 
@@ -96,7 +96,7 @@ impl<'a> FNISFactory<'a> {
                 );
 
                 if let Some(next_anim) = prev_anim.next_mut() {
-                    *next_anim = Box::new(animation.clone());
+                    *next_anim = Box::new(animation.clone()); // TODO: use Arc?
                 }
 
                 animation

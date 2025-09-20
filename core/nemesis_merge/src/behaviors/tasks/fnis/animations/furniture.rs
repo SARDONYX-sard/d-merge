@@ -74,15 +74,17 @@ impl<'a> FurnitureAnimation<'a> {
         };
 
         // Add root class
-        let clip_trigger_path = json_path!["", "hkbClipTrigger"];
-        let clip_trigger = ValueWithPriority {
+        let idle_furniture_exit_trigger_path = json_path!["", "hkbClipTrigger"];
+        let idle_furniture_exit_trigger = ValueWithPriority {
             patch: JsonPatch {
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
                     "localTime": -0.2,
                     "relativeToEndOfClip": true,
                     "mode": "MODE_LOOPING",
-                    "event": { // hkbEventProperty
+
+                    // hkbEventProperty
+                    "event": {
                         "__parent": { // hkbEventBase
                             "id": "20"
                         }

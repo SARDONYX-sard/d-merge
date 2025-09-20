@@ -123,7 +123,7 @@ bitflags::bitflags! {
 }
 
 impl FNISAnimFlags {
-    /// Checks whether this animation has runtime modifiers like HeadTracking or MotionDriven.
+    /// Checks whether this animation has runtime modifiers like `HeadTracking` or `MotionDriven`.
     #[inline]
     pub const fn has_modifier(&self) -> bool {
         self.contains(Self::HeadTracking) || self.contains(Self::MotionDriven)

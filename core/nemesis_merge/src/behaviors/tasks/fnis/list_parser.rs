@@ -17,7 +17,7 @@
 //! -  Alternate Animations: T <alternate_animation> <trigger1> <time1> <trigger2> <time2> ..
 //! ```
 use winnow::ascii::{
-    dec_int, digit1, float, multispace0, space0, space1, till_line_ending, Caseless,
+    dec_int, digit1, float, line_ending, multispace0, space0, space1, till_line_ending, Caseless,
 };
 use winnow::combinator::{alt, opt, preceded, repeat, seq, terminated};
 use winnow::error::{StrContext, StrContextValue};
@@ -47,6 +47,7 @@ struct Entry<'i> {
     pub event: &'i str,
     /// `.hkx` file name
     pub file: &'i str,
+    pub anim_objects: Vec<&'i str>,
     pub md: MotionData,
     pub rd: RotationData,
 }
@@ -106,8 +107,6 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
         .parse_next(input)?;
     space0.parse_next(input)?;
 
-    dbg!(*input);
-
     let event = take_till(0.., (' ', '\t'))
         .context(StrContext::Label("AnimEvent"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -123,13 +122,14 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
             "Filename ending with .hkx",
         )))
         .parse_next(input)?;
+    space0.parse_next(input)?;
 
+    let anim_objects = vec![];
     line_comments0.parse_next(input)?;
 
     let md = parse_md_data
         .context(StrContext::Label("MotionData"))
         .parse_next(input)?;
-
     line_comments0.parse_next(input)?;
 
     let rd = parse_rd_data
@@ -140,6 +140,7 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
         kind,
         event,
         file,
+        anim_objects,
         md,
         rd,
     })
@@ -237,17 +238,23 @@ fn line_comments0(input: &mut &str) -> ModalResult<()> {
 }
 
 /// ```ebnf
-/// version_line := 'Version' ' '    version
-/// version := digit '.' digit '.' digit string
+/// version_line := 'Version' ' ' version
+/// version := 'V'? digit '.' digit
 /// ```
 fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
     winnow::seq! {
         Version{
-            _: "Version",
+            _: Caseless("Version"),
             _: space0,
+            _: opt(Caseless("v")),
+            _: space0,
+
             major: digit1.parse_to(),
+            _: space0,
             minor: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)),
-            _: multispace0,
+
+            _: space0,
+            _: line_ending,
         }
     }
     .parse_next(input)
@@ -523,6 +530,7 @@ RD 2.0 0 0 0 1
                 kind: FNISAnimKind::new(FNISAnimType::Sequenced, FNISAnimFlags::empty()),
                 event: "IdleStart",
                 file: "IdleStart.hkx",
+                anim_objects: vec![],
                 md: MotionData {
                     time: 1.0,
                     delta_x: 0,
@@ -544,6 +552,7 @@ RD 2.0 0 0 0 1
                 ),
                 event: "SitDown",
                 file: "SitDown.hkx",
+                anim_objects: vec![],
                 md: MotionData {
                     time: 2.0,
                     delta_x: 0,
