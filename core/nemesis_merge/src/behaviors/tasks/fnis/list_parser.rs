@@ -19,7 +19,7 @@
 use winnow::ascii::{
     dec_int, digit1, float, line_ending, multispace0, space0, space1, till_line_ending, Caseless,
 };
-use winnow::combinator::{alt, opt, preceded, repeat, seq, terminated};
+use winnow::combinator::{alt, opt, preceded, repeat, separated, seq, terminated};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser as _};
@@ -107,7 +107,7 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
         .parse_next(input)?;
     space0.parse_next(input)?;
 
-    let event = take_till(0.., (' ', '\t'))
+    let event = take_till(1.., (' ', '\t'))
         .context(StrContext::Label("AnimEvent"))
         .context(StrContext::Expected(StrContextValue::Description(
             "Animation event name (string without spaces)",
@@ -115,7 +115,7 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
         .parse_next(input)?;
     space0.parse_next(input)?;
 
-    let file = terminated(take_until_ext(0.., Caseless(".hkx")), Caseless(".hkx"))
+    let file = terminated(take_until_ext(1.., Caseless(".hkx")), Caseless(".hkx"))
         .take()
         .context(StrContext::Label("AnimFile"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -124,7 +124,10 @@ fn parse_entry<'i>(input: &mut &'i str) -> ModalResult<Entry<'i>> {
         .parse_next(input)?;
     space0.parse_next(input)?;
 
-    let anim_objects = vec![];
+    let anim_objects =
+        separated(0.., take_until_ext(1.., (" ", "\t", "\r\n", "\n")), space1).parse_next(input)?;
+    line_ending.parse_next(input)?;
+
     line_comments0.parse_next(input)?;
 
     let md = parse_md_data
@@ -261,7 +264,7 @@ fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
 }
 
 /// ```ebnf
-/// <anim_preset> := anim_type flags event? file
+/// <anim_preset> := anim_type flags
 /// <flags> : = '-' flags *
 /// <flag> := flags ','
 /// <event> := string
@@ -339,6 +342,7 @@ fn parse_anim_flag(input: &mut &str) -> ModalResult<FNISAnimFlags> {
         "k".value(FNISAnimFlags::Known),
         "o".value(FNISAnimFlags::AnimObjects),
     ))
+    .context(StrContext::Label("FNISAnimFlags"))
     .context(StrContext::Expected(StrContextValue::Description(
         "One of: ac0, ac1, ac, bsa, md, st, Tn, a, h, k, o",
     )))

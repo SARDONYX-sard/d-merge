@@ -16,7 +16,7 @@ mod list_parser;
 /// Derived from FNIS animation definition syntax:
 /// - `<AnimType>` describes the core behavior (e.g., basic, sequenced, furniture, paired).
 /// - `<option>` describes modifiers (e.g., acyclic, animated camera, headtracking).
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Hash)]
 pub struct FNISAnimKind {
     /// The main animation type (FNISAnimType).
     pub anim_type: FNISAnimType,
@@ -36,7 +36,7 @@ impl FNISAnimKind {
 }
 
 /// Core FNIS animation types from `<AnimType>` syntax.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum FNISAnimType {
     /// **b** – Basic: simple idle animation with one animation file.
     Basic,
@@ -83,7 +83,7 @@ impl FNISAnimType {
 
 bitflags::bitflags! {
     /// FNIS animation modifier flags from `<option>` syntax.
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub struct FNISAnimFlags: u32 {
         /// No special options.
         const NONE = 0;

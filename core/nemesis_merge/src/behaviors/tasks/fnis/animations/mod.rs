@@ -7,7 +7,7 @@ use self::furniture::FurnitureAnimation;
 use self::offset_arm::OffsetArmAnimation;
 use crate::behaviors::tasks::fnis::{FNISAnimFlags, FNISAnimType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum FNISAnimation<'a> {
     Basic(BasicAnimation<'a>),
     Furniture(FurnitureAnimation<'a>),

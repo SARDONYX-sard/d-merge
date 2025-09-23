@@ -10,9 +10,9 @@ use crate::behaviors::tasks::patches::types::{OnePatchMap, SeqPatchMap};
 
 /// - `push_target_index`: `hkbStateMachine` root class name attr. (e.g. `#0010`)
 ///
-/// - `generator_id`: unique name attribute. (e.g. `$fnis_3`)
+/// - `generator_id`: unique name attribute. (`$FNIS_{mod_code}${index}`)
 /// - `generator_file_stem`: `hkbBehaviorReferenceGenerator`.`name`. (e.g. `dummy`)
-/// - `inner_path`: `hkbBehaviorReferenceGenerator`.`behavior_name`. (e.g. `Animation\FNIS_Mod\dummy.hkx`)
+/// - `inner_path`: `hkbBehaviorReferenceGenerator`.`behavior_name`. (e.g. `behaviors\\behavior.hkx`)
 fn inject_graph_reference<'a>(
     push_target_index: &'a str,
     patches: &mut (OnePatchMap<'a>, SeqPatchMap<'a>),
@@ -24,48 +24,48 @@ fn inject_graph_reference<'a>(
 ) {
     let (one, seq) = patches;
 
-    {
-        // hkbBehaviorReferenceGenerator (Push as root class)
-        let generator = ValueWithPriority {
+    // hkbBehaviorReferenceGenerator (Push as root class)
+    one.insert(
+        json_path![generator_id, "hkbBehaviorReferenceGenerator"],
+        ValueWithPriority {
             patch: JsonPatch {
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
                     "__ptr": generator_id,
+                    "variableBindingSet": "#0000",
+                    "userData": 0,
                     "name": generator_file_stem, // StringPtr
                     "behaviorName": inner_path, // StringPtr
                 }),
             },
             priority,
-        };
-
-        let generator_path = json_path![generator_id, "hkbBehaviorReferenceGenerator"];
-        one.insert(generator_path, generator);
-    }
+        },
+    );
 
     {
         let hashed_inner_path_id = {
             use std::hash::{DefaultHasher, Hash as _, Hasher as _};
             let mut hasher = DefaultHasher::new();
             inner_path.hash(&mut hasher);
-            (hasher.finish() as i32).to_string()
+            hasher.finish() as i32
         };
 
         // hkbStateMachineStateInfo
-        let state_info = ValueWithPriority {
-            patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
-                value: json_typed!(borrowed, {
-                    "name": "PN_StateInfo", // StringPtr
-                    "generator": generator_id, // ptr
-                    "stateId": hashed_inner_path_id, // I32<'a>
-                    "probability": 1.0, // f32
-                    "enable": true,
-                }),
+        seq.insert(
+            json_path![push_target_index, "hkbStateMachine", "states"],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    op: OpRangeKind::Pure(Op::Add),
+                    value: json_typed!(borrowed, {
+                        "name": "PN_StateInfo", // StringPtr
+                        "generator": generator_id, // ptr
+                        "stateId": hashed_inner_path_id, // I32<'a>
+                        "probability": 1.0, // f32
+                        "enable": true,
+                    }),
+                },
+                priority,
             },
-            priority,
-        };
-
-        let state_info_path = json_path![push_target_index, "hkbStateMachine", "states"];
-        seq.insert(state_info_path, state_info);
+        );
     }
 }
