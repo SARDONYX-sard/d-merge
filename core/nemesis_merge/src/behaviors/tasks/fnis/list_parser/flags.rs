@@ -92,6 +92,8 @@ pub fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<
             ParsedFlag::Simple(flag) => set.flags |= flag,
             ParsedFlag::Param(param) => set.params.push(param),
         }
+        space0.parse_next(input)?; // Intended `md ,`
+
         if opt(',').parse_next(input)?.is_some() {
             space0.parse_next(input)?;
             continue;
@@ -253,7 +255,7 @@ mod tests {
         assert!(matches!(
             parsed.params[3],
             FNISAnimFlagParam::AnimVar {
-                name: "Var",
+                name: "bar",
                 inverse: true,
             }
         ));

@@ -1,7 +1,7 @@
 //! Motion Data parsing: `MD <time> <dx> <dy> <dz>`
 
-use winnow::ascii::{dec_int, float, space1};
-use winnow::combinator::{opt, preceded, seq};
+use winnow::ascii::{dec_int, float, line_ending, space0, space1};
+use winnow::combinator::{preceded, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
@@ -29,7 +29,8 @@ pub fn parse_md_data(input: &mut &str) -> ModalResult<MotionData> {
             delta_y: dec_int.context(StrContext::Label("delta_y")),
             _: space1,
             delta_z: dec_int.context(StrContext::Label("delta_z")),
-            _: (opt("\r"), "\n")
+            _: space0,
+            _: line_ending,
         }),
     )
     .context(StrContext::Label("MotionData"))
@@ -46,13 +47,13 @@ mod tests {
 
     #[test]
     fn test_parse_md_data_valid() {
-        let parsed = must_parse(parse_md_data, "MD 2.5 0 0 30\n");
+        let parsed = must_parse(parse_md_data, "MD 2.5 0 0 30");
         assert!((parsed.time - 2.5).abs() < 1e-6);
         assert_eq!(parsed.delta_z, 30);
     }
 
     #[test]
     fn test_parse_md_data_invalid() {
-        must_fail(parse_md_data, "MD abc 0 0 30\n");
+        must_fail(parse_md_data, "MD abc 0 0 30   \n");
     }
 }
