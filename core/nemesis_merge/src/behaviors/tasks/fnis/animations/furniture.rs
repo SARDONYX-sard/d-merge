@@ -6,7 +6,9 @@
 use json_patch::{json_path, JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::{animations::FNISAnimation, FNISAnimFlags, FNISAnimType};
+use crate::behaviors::tasks::fnis::{
+    animations::FNISAnimation, list_parser::flags::FNISAnimFlags, FNISAnimType,
+};
 use crate::behaviors::tasks::patches::types::{OnePatchMap, SeqPatchMap};
 
 #[derive(Debug, Clone, Hash)]

@@ -5,7 +5,7 @@ mod offset_arm;
 use self::basic::BasicAnimation;
 use self::furniture::FurnitureAnimation;
 use self::offset_arm::OffsetArmAnimation;
-use crate::behaviors::tasks::fnis::{FNISAnimFlags, FNISAnimType};
+use crate::behaviors::tasks::fnis::{list_parser::flags::FNISAnimFlags, FNISAnimType};
 
 #[derive(Debug, Clone, Hash)]
 pub enum FNISAnimation<'a> {

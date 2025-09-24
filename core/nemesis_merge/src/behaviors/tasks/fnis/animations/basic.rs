@@ -9,7 +9,7 @@ use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::{
-    fnis::{animations::FNISAnimation, FNISAnimFlags, FNISAnimType},
+    fnis::{animations::FNISAnimation, list_parser::flags::FNISAnimFlags, FNISAnimType},
     patches::types::{OnePatchMap, SeqPatchMap},
 };
 
