@@ -7,7 +7,9 @@ use tauri::path::BaseDirectory;
 
 use crate::cmd::{bail, time};
 use crate::error::NotFoundResourceDirSnafu;
-use nemesis_merge::{behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, Status};
+use nemesis_merge::{
+    behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
+};
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
@@ -37,12 +39,11 @@ pub(crate) struct GuiPatchOptions {
     use_progress_reporter: bool,
 }
 
-/// - ids: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 #[tauri::command]
 pub(crate) async fn patch(
     window: Window,
     output: PathBuf,
-    ids: Vec<PathBuf>,
+    patches: PatchMaps,
     options: GuiPatchOptions,
 ) -> Result<(), String> {
     cancel_patch_inner().await?; // Abort previous task if exists
@@ -77,7 +78,7 @@ pub(crate) async fn patch(
                 output_target: options.output_target,
             };
 
-            let _ = time!("[patch]", behavior_gen(ids, config).await);
+            let _ = time!("[patch]", behavior_gen(patches, config).await);
         }
     });
 

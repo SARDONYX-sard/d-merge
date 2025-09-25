@@ -1,4 +1,4 @@
-from typing import List, Optional, Awaitable, Callable
+from typing import Dict, Optional, Awaitable, Callable
 from enum import Enum
 
 class OutPutTarget(Enum):
@@ -207,8 +207,32 @@ class Config:
         log_level: Optional[LogLevel] = None,
     ) -> None: ...
 
+class PatchMaps:
+    """
+    Holds patch maps for Nemesis and FNIS.
+
+    Attributes:
+        nemesis_entries (Dict[str, int]):
+            Nemesis patch path map.
+            - key: path until mod_code (例: `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+            - value: priority (u32)
+
+        fnis_entries (Dict[str, int]):
+            FNIS patch path map.
+            - key: path until namespace (例: `<skyrim_data_dir>/meshes/actors/character/animations/FNISFlyer`)
+            - value: priority (u32)
+    """
+
+    nemesis_entries: Dict[str, int]
+    fnis_entries: Dict[str, int]
+
+    def __init__(
+        self, nemesis_entries: Dict[str, int], fnis_entries: Dict[str, int]
+    ) -> None: ...
+    def __repr__(self) -> str: ...
+
 def behavior_gen(
-    nemesis_paths: List[str],
+    patches: PatchMaps,
     config: Config,
     status_report: Optional[Callable[[Status], None]] = None,
 ) -> Awaitable[None]:
@@ -293,7 +317,7 @@ def behavior_gen(
 
         async def run():
             # IMPORTANT: Don't forget to await this!
-            await behavior_gen(nemesis_paths, config, status_report=on_status)
+            await behavior_gen(patches, config, status_report=on_status)
 
         asyncio.run(run())
         ```

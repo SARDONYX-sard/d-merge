@@ -1,12 +1,15 @@
-use rayon::prelude::*;
+use mod_info::ModType;
+use nemesis_merge::PatchMaps;
+use rayon::{iter::Either, prelude::*};
 
 /// Represents a single mod entry.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)] // Need hash to dnd
 pub struct ModItem {
     /// Whether the mod is enabled.
     pub enabled: bool,
-    /// - vfs mode => id. e.g. `aaaa`
-    /// - others => `/path/to/mod/<id>`
+    /// - Nemesis/FNIS(vfs): e.g. `aaaa`
+    /// - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+    /// - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
     pub id: String,
     /// Display name of the mod.
     pub name: String,
@@ -14,6 +17,10 @@ pub struct ModItem {
     pub site: String,
     /// Load priority.
     pub priority: usize,
+
+    /// Mod type. Nemesis, FNIS
+    #[serde(default)]
+    pub mod_type: ModType,
 }
 
 /// Columns that can be used for sorting mods.
@@ -37,6 +44,50 @@ pub fn from_mod_infos(mod_infos: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
             name: mi.name,
             site: mi.site,
             priority: i,
+            mod_type: mi.mod_type,
         })
         .collect()
+}
+
+/// Convert `ModItem` into `PatchMaps`.
+pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
+    // - Nemesis/FNIS(vfs): e.g. `aaaa`
+    // - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+    // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
+    let (nemesis_entries, fnis_entries) = mod_infos
+        .par_iter()
+        .filter(|item| item.enabled)
+        .partition_map(
+            |ModItem {
+                 id,
+                 priority,
+                 mod_type,
+                 ..
+             }| {
+                let priority = *priority;
+
+                match mod_type {
+                    ModType::Nemesis => {
+                        let id = if is_vfs {
+                            format!("{skyrim_data_dir}/Nemesis_Engine/mod/{id}")
+                        } else {
+                            id.clone()
+                        };
+                        Either::Right((id, priority))
+                    }
+                    ModType::Fnis => {
+                        let id = if is_vfs {
+                            format!("{skyrim_data_dir}/meshes/actors/character/animations/{id}")
+                        } else {
+                            id.clone()
+                        };
+                        Either::Left((id, priority))
+                    }
+                }
+            },
+        );
+    PatchMaps {
+        nemesis_entries,
+        fnis_entries,
+    }
 }

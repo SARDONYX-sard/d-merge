@@ -110,8 +110,6 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, Error> {
     .collect())
 }
 
-// format!("{animations fnis mod dir}/FNIS_*_List.txt");
-
 /// FNIS: `<skyrim_data_dir>/meshes/actors/character/animations/*/FNIS_*_List.txt`
 ///
 /// # Errors
@@ -126,15 +124,16 @@ fn get_all_fnis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Err
             if !path.exists() {
                 return None;
             }
+            // <skyrim_data_dir>/meshes/actors/character/animations/<vfs_id>
             let parent_dir = path.parent()?;
 
-            // get `<vfs_id>` from animations/<vfs_id>/FNIS_*_List.txt
+            // get `<vfs_id>`
             let name = parent_dir.file_name()?.display().to_string();
 
             let id = if is_vfs {
                 name.clone()
             } else {
-                parent_dir.display().to_string()
+                parent_dir.display().to_string() //
             };
 
             let mod_info = ModInfo {
@@ -156,6 +155,9 @@ fn get_all_fnis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Err
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModInfo {
     /// Mod-specific dir name.
+    /// - Nemesis/FNIS(vfs): e.g. `aaaa`
+    /// - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+    /// - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
     #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub id: String,
 
@@ -175,14 +177,14 @@ pub struct ModInfo {
     #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub auto: String,
 
-    /// For FNIS mods, the path to the list is entered in this field.
-    ///
-    /// This enables FNIS mod detection for this mod from this path.
+    /// Mod type. Nemesis, FNIS
     #[serde(default)]
     pub mod_type: ModType,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
@@ -190,7 +192,7 @@ pub enum ModType {
     #[default]
     Nemesis,
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
-    /// - `<skyrim data dir>/meshes/.../animations/aaaa`
+    /// - `<skyrim data dir>/meshes/actors/character/animations/aaaa`
     Fnis,
 }
 

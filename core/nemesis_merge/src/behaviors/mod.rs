@@ -2,39 +2,57 @@
 mod priority_ids;
 mod tasks;
 
-pub(crate) use tasks::adsf::path_parser::ParseError as AsdfPathParseError;
-pub(crate) use tasks::asdsf::path_parser::ParseError as AsdsfPathParseError;
+pub use crate::behaviors::priority_ids::types::PriorityMap;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
 
-use self::priority_ids::paths_to_priority_map;
-use self::tasks::{
-    hkx::generate::generate_hkx_files,
-    patches::{
-        apply::apply_patches,
-        collect::{collect_borrowed_patches, collect_owned_patches},
-        types::{BorrowedPatches, OwnedPatchMap},
-    },
-};
+pub(crate) use tasks::adsf::path_parser::ParseError as AsdfPathParseError;
+pub(crate) use tasks::asdsf::path_parser::ParseError as AsdsfPathParseError;
+
 use crate::behaviors::tasks::adsf::apply_adsf_patches;
 use crate::behaviors::tasks::asdsf::apply_asdsf_patches;
+use crate::behaviors::tasks::hkx::generate::generate_hkx_files;
 use crate::behaviors::tasks::patches::types::OwnedPatches;
+use crate::behaviors::tasks::patches::{
+    apply::apply_patches,
+    collect::{collect_borrowed_patches, collect_owned_patches},
+    types::{BorrowedPatches, OwnedPatchMap},
+};
 use crate::config::{Config, Status};
 use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
-use std::path::PathBuf;
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct PatchMaps {
+    /// Nemesis patch path
+    /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+    /// - value: priority
+    pub nemesis_entries: PriorityMap,
+    /// FNIS patch path
+    /// - key: path until namespace(e.g. `<skyrim_data_dir>/path/Meshes/actors/character/animations/FNISFlyer`)
+    /// - value: priority
+    pub fnis_entries: PriorityMap,
+}
 
 /// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
 ///
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
-pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result<()> {
-    let id_order = paths_to_priority_map(&nemesis_paths);
+pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
+    let PatchMaps {
+        nemesis_entries,
+        fnis_entries,
+    } = patches;
+
     #[cfg(feature = "tracing")]
     {
-        let mut sorted: Vec<_> = id_order.par_iter().collect();
+        let mut sorted: Vec<_> = nemesis_entries.par_iter().collect();
         sorted.par_sort_by_key(|&(_, v)| *v);
-        tracing::trace!("id_order_by_priority = {sorted:#?}");
+        tracing::trace!("nemesis_entries = {sorted:#?}");
+
+        let mut sorted: Vec<_> = fnis_entries.par_iter().collect();
+        sorted.par_sort_by_key(|&(_, v)| *v);
+        tracing::trace!("fnis_entries = {sorted:#?}");
     }
 
     // Collect all patches file.
@@ -43,15 +61,19 @@ pub async fn behavior_gen(nemesis_paths: Vec<PathBuf>, config: Config) -> Result
         adsf_patches: owned_adsf_patches,
         asdsf_patches: owned_asdsf_patches,
         errors: owned_file_errors,
-    } = collect_owned_patches(&nemesis_paths, &id_order, &config).await;
+    } = collect_owned_patches(&nemesis_entries, &config).await;
 
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
     let mut patched_hkx_errors = None;
 
     rayon::scope(|s| {
-        s.spawn(|_| adsf_errors = apply_adsf_patches(owned_adsf_patches, &id_order, &config));
-        s.spawn(|_| asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &id_order, &config));
+        s.spawn(|_| {
+            adsf_errors = apply_adsf_patches(owned_adsf_patches, &nemesis_entries, &config);
+        });
+        s.spawn(|_| {
+            asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &nemesis_entries, &config);
+        });
         s.spawn(|_| patched_hkx_errors = Some(apply_and_gen_patched_hkx(&owned_patches, &config)));
     });
 

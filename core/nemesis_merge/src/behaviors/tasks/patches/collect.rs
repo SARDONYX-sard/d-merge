@@ -42,21 +42,19 @@ struct OwnedPath {
 ///
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
-pub async fn collect_owned_patches(
-    nemesis_paths: &[PathBuf],
-    id_order: &PriorityMap<'_>,
-    config: &Config,
-) -> OwnedPatches {
+pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Config) -> OwnedPatches {
     let mut handles = vec![];
 
-    fn get_priority_by_path_id(path: &Path, ids: &PriorityMap<'_>) -> Option<usize> {
+    fn get_priority_by_path_id(path: &Path, ids: &PriorityMap) -> Option<usize> {
         let id_str = get_nemesis_id(path.to_str()?).ok()?;
         ids.get(id_str).copied()
     }
 
-    let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
+    let paths = nemesis_entries
+        .iter()
+        .flat_map(|(path, _)| collect_nemesis_paths(path));
     for (category, path) in paths {
-        let priority = get_priority_by_path_id(&path, id_order).unwrap_or(usize::MAX); // todo error handling
+        let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or(usize::MAX); // todo error handling
 
         handles.push(tokio::spawn(async move {
             let content = fs::read_to_string(&path)

@@ -22,7 +22,6 @@ rayon = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true, optional = true }
 havok_types = { workspace = true }
-havok_classes = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = [
   "extra_fmt",

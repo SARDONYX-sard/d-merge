@@ -2,7 +2,7 @@ use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
-    mod_item::{from_mod_infos, ModItem, SortColumn},
+    mod_item::{from_mod_infos, to_patches, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
@@ -950,44 +950,19 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     fn patch(&self, ctx: &egui::Context) {
-        // mod Items to nemesis_path
-        let data_dir = match self.mode {
-            DataMode::Vfs => &self.vfs_skyrim_data_dir,
-            DataMode::Manual => &self.skyrim_data_dir,
-        };
-
-        let nemesis_paths = match self.mode {
-            DataMode::Vfs => self
-                .vfs_mod_list
-                .par_iter()
-                .filter(|item| item.enabled)
-                .map(|item| {
-                    let mut path = PathBuf::new();
-                    path.push(data_dir);
-                    path.push("Nemesis_Engine");
-                    path.push("mod");
-                    path.push(&item.id);
-                    path
-                })
-                .collect(),
-            DataMode::Manual => self
-                .mod_list
-                .par_iter()
-                .filter(|item| item.enabled)
-                .map(|item| {
-                    let mut path = PathBuf::new();
-                    path.push(&item.id);
-                    path
-                })
-                .collect(),
+        let patches = match self.mode {
+            DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
+            DataMode::Manual => to_patches(&self.skyrim_data_dir, false, &self.mod_list),
         };
         let is_debug_mode = self.enable_debug_output;
 
-        self.auto_remove_meshes(ctx);
+        if self.auto_remove_meshes {
+            self.remove_meshes_dir_all(ctx);
+        }
 
         let notify = Arc::clone(&self.notification);
         self.async_rt.spawn(nemesis_merge::behavior_gen(
-            nemesis_paths,
+            patches,
             nemesis_merge::Config {
                 resource_dir: self.template_dir.clone().into(),
                 output_dir: self.output_dir.clone().into(),
@@ -1013,58 +988,56 @@ impl ModManagerApp {
         ));
     }
 
-    /// Removes the auto meshes/debug directories with a safety warning if output_dir equals Skyrim data dir.
-    fn auto_remove_meshes(&self, ctx: &egui::Context) {
-        if self.auto_remove_meshes {
-            self.set_notification(format!(
-                "Deleting `{}/meshes` directory...",
-                self.output_dir
-            ));
+    /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
+    fn remove_meshes_dir_all(&self, ctx: &egui::Context) {
+        self.set_notification(format!(
+            "Deleting `{}/meshes` directory...",
+            self.output_dir
+        ));
 
-            let skyrim_data_directory = match self.mode {
-                DataMode::Vfs => &self.vfs_skyrim_data_dir,
-                DataMode::Manual => &self.skyrim_data_dir,
-            };
+        let skyrim_data_directory = match self.mode {
+            DataMode::Vfs => &self.vfs_skyrim_data_dir,
+            DataMode::Manual => &self.skyrim_data_dir,
+        };
 
-            let mut proceed = true;
+        let mut proceed = true;
 
-            if &self.output_dir == skyrim_data_directory {
-                let mut user_choice: Option<bool> = None;
+        if &self.output_dir == skyrim_data_directory {
+            let mut user_choice: Option<bool> = None;
 
-                egui::Window::new(self.t(I18nKey::WarningTitle))
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, |ui| {
-                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody1));
-                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody2));
+            egui::Window::new(self.t(I18nKey::WarningTitle))
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody1));
+                    ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody2));
 
-                        ui.horizontal(|ui| {
-                            if ui.button(self.t(I18nKey::ExecuteButton)).clicked() {
-                                user_choice = Some(true);
-                            }
-                            if ui.button(self.t(I18nKey::CancelButton)).clicked() {
-                                user_choice = Some(false);
-                            }
-                        });
+                    ui.horizontal(|ui| {
+                        if ui.button(self.t(I18nKey::ExecuteButton)).clicked() {
+                            user_choice = Some(true);
+                        }
+                        if ui.button(self.t(I18nKey::CancelButton)).clicked() {
+                            user_choice = Some(false);
+                        }
                     });
+                });
 
-                if user_choice == Some(false) {
-                    proceed = false; // Skip deletion if user cancels
-                }
+            if user_choice == Some(false) {
+                proceed = false; // Skip deletion if user cancels
             }
+        }
 
-            if proceed {
-                let meshes_path = Path::new(&self.output_dir).join("meshes");
-                let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
-                rayon::join(
-                    || {
-                        let _ = remove_if_exists(meshes_path);
-                    },
-                    || {
-                        let _ = remove_if_exists(debug_path);
-                    },
-                );
-            }
+        if proceed {
+            let meshes_path = Path::new(&self.output_dir).join("meshes");
+            let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
+            rayon::join(
+                || {
+                    let _ = remove_if_exists(meshes_path);
+                },
+                || {
+                    let _ = remove_if_exists(debug_path);
+                },
+            );
         }
     }
 }

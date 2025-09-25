@@ -24,7 +24,7 @@ use std::{
 use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
 
 use crate::behaviors::{
-    priority_ids::take_until_ext, tasks::fnis::paths::parse::find_fnis_namespace,
+    priority_ids::take_until_ext, tasks::fnis::paths::parse::get_fnis_namespace,
 };
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
@@ -33,6 +33,9 @@ pub struct OwnedFnisInjection {
     /// The value must be unique.
     /// - `<namespace>` under `meshes\actors\character\animations\<namespace>\`.
     pub namespace: String,
+
+    /// The index of the `paths` in the `nemesis_merge::behavior_gen` passed from the GUI is the priority, and that is passed.
+    pub priority: usize,
 
     /// The contents of the FNIS list.txt file in this namespace.
     pub list_content: String,
@@ -118,7 +121,10 @@ impl OwnedFnisInjection {
 /// - The animation directory is empty (`MissingNameSpace`)
 /// - The List file is missing (`ListMissing`)
 /// - The Behavior file is missing (`BehaviorMissing`)
-pub fn collect_fnis_injection<P>(animations_mod_dir: P) -> Result<OwnedFnisInjection, FnisError>
+pub fn collect_fnis_injection<P>(
+    animations_mod_dir: P,
+    priority: usize,
+) -> Result<OwnedFnisInjection, FnisError>
 where
     P: AsRef<Path>,
 {
@@ -132,7 +138,7 @@ where
             path: animations_mod_dir.to_path_buf(),
         });
     } else {
-        find_fnis_namespace(&animation_paths[0])?
+        get_fnis_namespace(&animation_paths[0])?
     };
 
     // Case-insensitive List file lookup
@@ -175,6 +181,7 @@ where
 
     Ok(OwnedFnisInjection {
         namespace: namespace.to_string(),
+        priority,
         list_content,
         animation_paths,
         behavior_path,
@@ -335,7 +342,7 @@ mod tests {
     #[test]
     fn test_collect_fnis_injection() {
         let input = "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
-        let res = collect_fnis_injection(input).unwrap_or_else(|e| panic!("{e}"));
+        let res = collect_fnis_injection(input, 0).unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);
     }
 }

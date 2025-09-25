@@ -1,6 +1,6 @@
 import type { MouseEventHandler } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
-import { type ModInfo, patch } from '@/services/api/patch';
+import { type ModInfo, type PatchMaps, patch } from '@/services/api/patch';
 import { type Status, statusListener } from '@/services/api/patch_listener';
 
 type Params = {
@@ -23,7 +23,7 @@ export function usePatchHandler({ start, setLoading, onStatus, onError }: Params
     await statusListener(
       'd_merge://progress/patch', // event name emitted from Tauri backend
       async () => {
-        await patch(output, getCheckedPath(isVfsMode, vfsSkyrimDataDir, modInfoList), patchOptions);
+        await patch(output, toPatches(vfsSkyrimDataDir, isVfsMode, modInfoList), patchOptions);
       },
       { setLoading, onStatus, onError },
     );
@@ -32,18 +32,22 @@ export function usePatchHandler({ start, setLoading, onStatus, onError }: Params
   return { handleClick };
 }
 
-function getCheckedPath(isVfsMode: boolean, vfsSkyrimDataDir: string, modInfoList: ModInfo[]): string[] {
-  let res: string[] = [];
-
-  if (isVfsMode) {
-    for (const mod of modInfoList) {
-      res.push(`${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}`);
-    }
-    return res;
-  }
+function toPatches(vfsSkyrimDataDir: string, isVfsMode: boolean, modInfoList: ModInfo[]): PatchMaps {
+  const nemesis_entries: Record<string, number> = {};
+  const fnis_entries: Record<string, number> = {};
 
   for (const mod of modInfoList) {
-    res.push(mod.id);
+    if (!mod.enabled) continue;
+
+    let path: string;
+    if (mod.modType === 'nemesis') {
+      path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}` : mod.id;
+      nemesis_entries[path] = mod.priority;
+    } else if (mod.modType === 'fnis') {
+      path = isVfsMode ? `${vfsSkyrimDataDir}/meshes/actors/character/animations/${mod.id}` : mod.id;
+      fnis_entries[path] = mod.priority;
+    }
   }
-  return res;
+
+  return { nemesisEntries: nemesis_entries, fnisEntries: fnis_entries };
 }

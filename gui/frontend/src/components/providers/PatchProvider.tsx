@@ -74,7 +74,7 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
         console.log('fetching');
-        setModInfoListRaw(addDefaultsToModInfoList(await loadModsInfo(deferredModInfoDir)));
+        setModInfoListRaw(intoModInfoList(await loadModsInfo(deferredModInfoDir)));
       });
     });
   }, [deferredModInfoDir, isVfsMode]);
@@ -119,21 +119,20 @@ export const usePatchContext = () => {
 };
 
 /**
- * Ensures each modInfo in modInfoList has enabled and priority.
+ * Convert FetchedModInfo[] to ModInfo(add default `enabled` & `priority`)
  * Existing fields are preserved. New fields are added only if missing.
  */
-const addDefaultsToModInfoList = (modInfoList: FetchedModInfo[]): ModInfo[] => {
-  for (let i = 0; i < modInfoList.length; i++) {
-    const mod = modInfoList[i];
-
-    if (mod.enabled === undefined) {
-      mod.enabled = false;
-    }
-
-    if (mod.priority === undefined) {
-      mod.priority = i + 1; // 1based
-    }
-  }
-
-  return modInfoList as ModInfo[];
+const intoModInfoList = (modInfoList: FetchedModInfo[]): ModInfo[] => {
+  return modInfoList.map(({ id, name, author, site, auto, modType: mod_type }, index) => {
+    return {
+      id,
+      name,
+      author,
+      site,
+      auto,
+      modType: mod_type,
+      enabled: false,
+      priority: index + 1,
+    } as const satisfies ModInfo;
+  });
 };

@@ -11,9 +11,6 @@
 //! - Friendly, readable error reporting via `ReadableError`
 pub mod types;
 
-use std::path::PathBuf;
-
-use rayon::prelude::*;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::ascii::Caseless;
 use winnow::combinator::repeat;
@@ -21,30 +18,6 @@ use winnow::error::StrContext::*;
 use winnow::error::StrContextValue::*;
 use winnow::token::any;
 use winnow::{combinator::alt, prelude::*, seq, token::take_while};
-
-use self::types::PriorityMap;
-
-/// Converts a slice of `PathBuf`s into a [`PriorityMap`] by extracting
-/// mod identifiers from each path.
-///
-/// The mod identifier is determined by parsing the path to locate the
-/// segment that follows the structure:
-/// `.../Nemesis_Engine/mod/<mod_code>/...`
-///
-/// Paths that do not match the expected format will be skipped.
-/// # Returns
-/// A `PriorityMap` where keys are the extracted mod codes and values are their index.
-pub fn paths_to_priority_map(paths: &[PathBuf]) -> PriorityMap<'_> {
-    paths
-        .par_iter()
-        .enumerate()
-        .filter_map(|(index, path)| {
-            get_nemesis_id(path.to_str()?)
-                .map(|mod_code| (mod_code, index))
-                .ok()
-        })
-        .collect()
-}
 
 /// Parses a string path to extract the mod ID in the format:
 /// `.../Nemesis_Engine/mod/<mod_code>/...`

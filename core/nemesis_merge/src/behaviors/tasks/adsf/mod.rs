@@ -388,7 +388,10 @@ mod tests {
 
         sort_patches_by_priority(
             &mut patches,
-            &ids.iter().enumerate().map(|(i, &p)| (p, i)).collect(),
+            &ids.iter()
+                .enumerate()
+                .map(|(priority, &id)| (id.to_string(), priority))
+                .collect(),
         );
 
         let sorted_ids: Vec<&str> = patches.iter().map(|p| p.id).collect();

@@ -5,11 +5,11 @@ use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResu
 
 use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::paths::collect::FnisError};
 
-/// Parse FNIS path to extract mod_code (directory after `animations`)
+/// Parse FNIS path to extract mod_code (directory after `meshes/character/animations`)
 ///
 /// # Note
 /// Must be unique name
-pub fn find_fnis_namespace(input: &str) -> Result<&str, FnisError> {
+pub fn get_fnis_namespace(input: &str) -> Result<&str, FnisError> {
     parse_components
         .parse(input)
         .map_err(|e| FnisError::FailedParseFnisPatchPath {
@@ -20,7 +20,13 @@ pub fn find_fnis_namespace(input: &str) -> Result<&str, FnisError> {
 /// Find `animations` then grab the next path component
 fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let (namespace,) = seq! {
-        _: take_until_ext(0.., Caseless("animations")),
+        _: take_until_ext(0.., Caseless("meshes")),
+        _: Caseless("meshes"),
+        _: alt(('/', '\\')),
+        _: Caseless("actors"),
+        _: alt(('/', '\\')),
+        _: Caseless("character"),
+        _: alt(('/', '\\')),
         _: Caseless("animations"),
         _: alt(('/', '\\')),
         take_until_ext(1.., alt(('/' ,'\\'))),
@@ -36,7 +42,7 @@ mod tests {
     use super::*;
 
     fn test_parse_fnis(path: &str) -> &str {
-        find_fnis_namespace(path).unwrap_or_else(|e| panic!("{e}"))
+        get_fnis_namespace(path).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
@@ -59,6 +65,6 @@ mod tests {
     fn parse_fnis_invalid() {
         // Missing "animations"
         let input_path = "/Meshes/actors/character/behaviors/FNIS_FNISFlyer_Behavior.hkx";
-        assert!(find_fnis_namespace(input_path).is_err());
+        assert!(get_fnis_namespace(input_path).is_err());
     }
 }

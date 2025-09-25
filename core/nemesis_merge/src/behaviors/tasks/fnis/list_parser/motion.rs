@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn test_parse_md_data_valid() {
         let parsed = must_parse(parse_md_data, "MD 2.5 0 0 30");
-        assert!((parsed.time - 2.5).abs() < 1e-6);
+        assert_eq!(parsed.time.to_le_bytes(), 2.5_f32.to_le_bytes());
         assert_eq!(parsed.delta_z, 30);
     }
 
