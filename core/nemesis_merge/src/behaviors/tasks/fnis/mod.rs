@@ -11,6 +11,9 @@ mod animations;
 mod inject;
 mod list_parser;
 
+mod paths;
+mod types;
+
 use crate::behaviors::tasks::fnis::list_parser::{
     anim_types::FNISAnimType, flags::FNISAnimFlagSet,
 };

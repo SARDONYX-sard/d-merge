@@ -12,24 +12,24 @@ use crate::behaviors::tasks::fnis::{
 use crate::behaviors::tasks::patches::types::{OnePatchMap, SeqPatchMap};
 
 #[derive(Debug, Clone, Hash)]
-pub struct FurnitureAnimation<'a> {
+pub struct FurnitureAnimation<'a, 'b> {
     pub(crate) template_type: FNISAnimType,
     pub(crate) flags: FNISAnimFlags,
 
     event_id: &'a str,
     animation_file_path: &'a str,
 
-    anim_object_names: &'a [String],
-    pub(crate) next_animation: Option<Box<FNISAnimation<'a>>>,
+    anim_object_names: &'b [&'a str],
+    pub(crate) next_animation: Option<Box<FNISAnimation<'a, 'b>>>,
 }
 
-impl<'a> FurnitureAnimation<'a> {
+impl<'a, 'b> FurnitureAnimation<'a, 'b> {
     pub const fn new(
         template_type: FNISAnimType,
         flags: FNISAnimFlags,
         event_id: &'a str,
         animation_file_path: &'a str,
-        anim_object_names: &'a [String],
+        anim_object_names: &'b [&'a str],
     ) -> Self {
         Self {
             template_type,

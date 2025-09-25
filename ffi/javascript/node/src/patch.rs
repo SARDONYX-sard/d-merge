@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use mod_info::{GetModsInfo as _, ModInfo as RustModInfo, ModsInfo};
+use mod_info::ModInfo as RustModInfo;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 use nemesis_merge::{
@@ -300,8 +300,8 @@ pub fn get_skyrim_data_dir(runtime: String) -> napi::Result<String> {
 ///
 /// Returns `napi::Error` if loading fails.
 #[napi]
-pub fn load_mods_info(glob: String) -> napi::Result<Vec<ModInfo>> {
-    let pattern = format!("{glob}/Nemesis_Engine/mod/*/info.ini");
-    let infos = ModsInfo::get_all(&pattern).map_err(|e| napi::Error::from_reason(e.to_string()))?;
+pub fn load_mods_info(glob: String, is_vfs: bool) -> napi::Result<Vec<ModInfo>> {
+    let infos =
+        mod_info::get_all(&glob, is_vfs).map_err(|e| napi::Error::from_reason(e.to_string()))?;
     Ok(infos.into_par_iter().map(Into::into).collect())
 }

@@ -233,17 +233,14 @@ impl ModManagerApp {
                     .on_hover_text(vfs_mode_hover)
                     .clicked()
                 {
-                    let pattern =
-                        format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
-                    self.update_vfs_mod_list(&pattern);
+                    self.update_vfs_mod_list();
                 };
                 if ui
                     .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
                     .on_hover_text(manual_mode_hover)
                     .clicked()
                 {
-                    let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
-                    self.update_mod_list(&pattern);
+                    self.update_mod_list();
                 };
 
                 ui.add(Separator::default().vertical());
@@ -284,23 +281,30 @@ impl ModManagerApp {
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
                     .clicked()
                 {
-                    let dir = match self.mode {
-                        DataMode::Vfs => &self.vfs_skyrim_data_dir,
-                        DataMode::Manual => &self.skyrim_data_dir,
-                    };
-                    let dialog = if !dir.is_empty() {
-                        rfd::FileDialog::new().set_directory(dir)
-                    } else {
-                        rfd::FileDialog::new()
+                    let dialog = {
+                        let default_dir = {
+                            let default_dir = match self.mode {
+                                DataMode::Vfs => &self.vfs_skyrim_data_dir,
+                                DataMode::Manual => &self.skyrim_data_dir,
+                            };
+                            let path = Path::new(default_dir);
+                            path.canonicalize().ok()
+                        };
+                        match default_dir {
+                            Some(default_dir) => rfd::FileDialog::new().set_directory(default_dir),
+                            None => rfd::FileDialog::new(),
+                        }
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
                         match self.mode {
                             DataMode::Vfs => {
-                                self.update_vfs_mod_list(&dir.display().to_string());
+                                self.vfs_skyrim_data_dir = dir.display().to_string();
+                                self.update_vfs_mod_list();
                             }
                             DataMode::Manual => {
-                                self.update_mod_list(&dir.display().to_string());
+                                self.skyrim_data_dir = dir.display().to_string();
+                                self.update_mod_list();
                             }
                         };
                     }
@@ -809,8 +813,7 @@ impl ModManagerApp {
             );
 
             if self.is_first_render || response.changed() {
-                let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
-                self.update_vfs_mod_list(&pattern);
+                self.update_vfs_mod_list();
             }
         } else {
             let response = ui.add_sized(
@@ -820,15 +823,13 @@ impl ModManagerApp {
             );
 
             if self.is_first_render || response.changed() {
-                let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
-                self.update_mod_list(&pattern);
+                self.update_mod_list();
             }
         }
     }
 
-    fn update_mod_list(&mut self, pattern: &str) {
-        use mod_info::GetModsInfo as _;
-        match mod_info::ModsInfo::get_all(pattern) {
+    fn update_mod_list(&mut self) {
+        match mod_info::get_all(&self.skyrim_data_dir, false) {
             Ok(mods) => {
                 let is_empty = mods.is_empty();
                 self.fetch_is_empty = is_empty;
@@ -869,8 +870,8 @@ impl ModManagerApp {
     /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
-    fn update_vfs_mod_list(&mut self, pattern: &str) {
-        if let Some(mods) = self.fetch_vfs_mod_list(pattern) {
+    fn update_vfs_mod_list(&mut self) {
+        if let Some(mods) = self.fetch_vfs_mod_list() {
             let is_empty = mods.is_empty();
             self.fetch_is_empty = is_empty;
             if is_empty {
@@ -900,9 +901,8 @@ impl ModManagerApp {
         };
     }
 
-    fn fetch_vfs_mod_list(&self, pattern: &str) -> Option<Vec<ModItem>> {
-        use mod_info::GetModsInfo as _;
-        match mod_info::ModsInfo::vfs_get_all(pattern) {
+    fn fetch_vfs_mod_list(&self) -> Option<Vec<ModItem>> {
+        match mod_info::get_all(&self.vfs_skyrim_data_dir, true) {
             Ok(mods) => Some(from_mod_infos(mods)),
             Err(err) => {
                 let err_title = self.t(I18nKey::ErrorReadingModInfo);

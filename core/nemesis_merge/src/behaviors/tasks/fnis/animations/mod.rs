@@ -8,13 +8,13 @@ use self::offset_arm::OffsetArmAnimation;
 use crate::behaviors::tasks::fnis::{list_parser::flags::FNISAnimFlags, FNISAnimType};
 
 #[derive(Debug, Clone, Hash)]
-pub enum FNISAnimation<'a> {
-    Basic(BasicAnimation<'a>),
-    Furniture(FurnitureAnimation<'a>),
-    OffsetArm(OffsetArmAnimation<'a>),
+pub enum FNISAnimation<'a, 'b> {
+    Basic(BasicAnimation<'a, 'b>),
+    Furniture(FurnitureAnimation<'a, 'b>),
+    OffsetArm(OffsetArmAnimation<'a, 'b>),
 }
 
-impl<'a> FNISAnimation<'a> {
+impl<'a, 'b> FNISAnimation<'a, 'b> {
     #[inline]
     const fn next_mut(&mut self) -> Option<&mut Box<Self>> {
         match self {
@@ -52,20 +52,20 @@ impl<'a> FNISAnimation<'a> {
     }
 }
 
-pub struct FNISFactory<'a>(Vec<FNISAnimation<'a>>);
+pub struct FNISFactory<'a, 'b>(Vec<FNISAnimation<'a, 'b>>);
 
-impl<'a> FNISFactory<'a> {
+impl<'a, 'b> FNISFactory<'a, 'b> {
     pub fn create(
         &mut self,
         template_type: FNISAnimType,
         mut flags: FNISAnimFlags,
         event: &'a str,
         anim_path: &'a str,
-        anim_names: &'a [String],
-    ) -> FNISAnimation<'a> {
+        anim_object_names: &'b [&'a str],
+    ) -> FNISAnimation<'a, 'b> {
         match template_type {
             FNISAnimType::Furniture | FNISAnimType::FurnitureOptimized => FNISAnimation::Furniture(
-                FurnitureAnimation::new(template_type, flags, event, anim_path, anim_names),
+                FurnitureAnimation::new(template_type, flags, event, anim_path, anim_object_names),
             ),
             FNISAnimType::SequencedContinued => {
                 let Some(mut prev_anim) = self.0.pop() else {
@@ -74,7 +74,7 @@ impl<'a> FNISFactory<'a> {
                         flags,
                         event,
                         anim_path,
-                        anim_names,
+                        anim_object_names,
                     ));
                 };
 
@@ -92,7 +92,7 @@ impl<'a> FNISFactory<'a> {
                     flags,
                     event,
                     anim_path,
-                    anim_names,
+                    anim_object_names,
                 );
 
                 if let Some(next_anim) = prev_anim.next_mut() {
@@ -106,7 +106,7 @@ impl<'a> FNISFactory<'a> {
                 flags,
                 event,
                 anim_path,
-                anim_names,
+                anim_object_names,
             )),
 
             FNISAnimType::Basic
@@ -120,7 +120,7 @@ impl<'a> FNISFactory<'a> {
                 flags,
                 event,
                 anim_path,
-                anim_names,
+                anim_object_names,
             )),
         }
     }

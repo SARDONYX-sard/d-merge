@@ -14,26 +14,26 @@ use crate::behaviors::tasks::{
 };
 
 #[derive(Debug, Clone, Hash)]
-pub struct BasicAnimation<'a> {
+pub struct BasicAnimation<'a, 'b> {
     pub(crate) template_type: FNISAnimType,
     pub(crate) flags: FNISAnimFlags,
 
     event_id: &'a str,
     animation_file_path: &'a str,
 
-    anim_object_names: &'a [String],
-    pub(crate) next_animation: Option<Box<FNISAnimation<'a>>>,
+    anim_object_names: &'b [&'a str],
+    pub(crate) next_animation: Option<Box<FNISAnimation<'a, 'b>>>,
 }
 
 type Patches<'a> = (OnePatchMap<'a>, SeqPatchMap<'a>);
 
-impl<'a> BasicAnimation<'a> {
+impl<'a, 'b> BasicAnimation<'a, 'b> {
     pub const fn new(
         template_type: FNISAnimType,
         flags: FNISAnimFlags,
         event: &'a str,
         animation_file_path: &'a str,
-        anim_object_names: &'a [String],
+        anim_object_names: &'b [&'a str],
     ) -> Self {
         Self {
             template_type,
@@ -266,7 +266,7 @@ impl<'a: 'b, 'b> PatchContext<'a, 'b> {
     }
 }
 
-impl core::fmt::Display for BasicAnimation<'_> {
+impl core::fmt::Display for BasicAnimation<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ty = self.template_type.as_str();
         write!(f, "PN_{ty}_{}", self.event_id)

@@ -48,13 +48,13 @@ pub async fn collect_owned_patches(
     config: &Config,
 ) -> OwnedPatches {
     let mut handles = vec![];
-    let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
 
     fn get_priority_by_path_id(path: &Path, ids: &PriorityMap<'_>) -> Option<usize> {
         let id_str = get_nemesis_id(path.to_str()?).ok()?;
         ids.get(id_str).copied()
     }
 
+    let paths = nemesis_paths.iter().flat_map(collect_nemesis_paths);
     for (category, path) in paths {
         let priority = get_priority_by_path_id(&path, id_order).unwrap_or(usize::MAX); // todo error handling
 
