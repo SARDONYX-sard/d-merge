@@ -24,13 +24,13 @@ use std::{
 use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
 
 use crate::behaviors::{
-    priority_ids::take_until_ext, tasks::fnis::paths::parse::get_fnis_namespace,
+    priority_ids::take_until_ext, tasks::fnis::collect::parse::get_fnis_namespace,
 };
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
-    /// The value must be unique.
+    /// Primarily used for generating havok class IDs(XML name attribute). e.g. `#namespace$1` (The value must be unique.)
     /// - `<namespace>` under `meshes\actors\character\animations\<namespace>\`.
     pub namespace: String,
 

@@ -3,7 +3,7 @@
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
 
-use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::paths::collect::FnisError};
+use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::collect::owned::FnisError};
 
 /// Parse FNIS path to extract mod_code (directory after `meshes/character/animations`)
 ///

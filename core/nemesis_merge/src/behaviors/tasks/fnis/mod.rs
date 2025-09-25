@@ -8,11 +8,9 @@
 //! are **based on and quoted from** _Fore's_ **"FNIS for Modders_V6.2.pdf"(© Fore)**,
 //! which is part of the FNIS (Fores New Idles in Skyrim) modding documentation.
 mod animations;
+pub mod collect;
 mod inject;
 mod list_parser;
-
-pub mod paths;
-pub mod types;
 
 use crate::behaviors::tasks::fnis::list_parser::{
     anim_types::FNISAnimType, flags::FNISAnimFlagSet,

@@ -63,6 +63,8 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         errors: owned_file_errors,
     } = collect_owned_patches(&nemesis_entries, &config).await;
 
+    // TODO: OwnedFnis here.(all injection context struct).
+
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
     let mut patched_hkx_errors = None;
