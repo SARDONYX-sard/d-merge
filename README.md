@@ -64,16 +64,16 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic frontend(patch, convert, settings)
   - [x] Support MO2 mode/Virtual file system mode(auto read settings file) when use auto detect(Current: windows only)
   - [ ] hkx json/patch editor
-  - [ ] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
+  - [x] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
 
 - AnimData(`animationdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - [ ] txt project header patch
+  - [x] txt project header patch
   - [ ] anim header patch
   - [x] Add Operation
   - [x] Replace/Remove Operation
-  - [ ] Conflict resolver
+  - [x] Conflict resolver
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
   - [x] Serialization
@@ -101,14 +101,16 @@ This project includes multiple crates with different licenses. The overall licen
 ### License Tree
 
 ```txt
-gui/backend (GPL-3.0)
+gui (GPL-3.0)
 ├── nemesis_merge (GPL-3.0)
-│   ├── skyrim_anim_parser (GPL-3.0)
+│   ├── json_patch (MIT OR Apache-2.0)
 │   ├── nemesis_xml (MIT OR Apache-2.0)
-│   ├── skyrim_crc (MIT OR Apache-2.0)
-│   └── json_patch (MIT OR Apache-2.0)
+│   ├── skyrim_anim_parser (GPL-3.0)
+│   └── skyrim_crc (MIT OR Apache-2.0)
+├── node_expr (MIT OR Apache-2.0)
 ├── mod_info (MIT OR Apache-2.0)
-└── node_expr (MIT OR Apache-2.0)
+├── serde_hkx_for_gui (MIT OR Apache-2.0)
+└── tracing_rotation (MIT OR Apache-2.0)
 ```
 
 #### License Propagation
