@@ -36,3 +36,14 @@ pub enum Runtime {
     /// Skyrim VR(64bit)
     Vr,
 }
+
+impl Runtime {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Le => "SkyrimLE",
+            Self::Se => "SkyrimSE",
+            Self::Vr => "SkyrimVR",
+        }
+    }
+}

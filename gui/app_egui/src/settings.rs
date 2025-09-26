@@ -7,7 +7,6 @@ use std::{
 
 use crate::{
     app::ModManagerApp,
-    i18n::{I18nKey, I18nMap},
     mod_item::{ModItem, SortColumn},
 };
 
@@ -30,7 +29,6 @@ pub struct AppSettings {
     pub log_level: crate::app::LogLevel,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
-    pub i18n: I18nMap,
     pub sort_asc: bool,
     pub sort_column: SortColumn,
     pub transparent: bool,
@@ -54,7 +52,6 @@ impl Default for AppSettings {
             enable_debug_output: false,
             filter_text: String::new(),
             font_path: None,
-            i18n: I18nKey::default_map(),
             log_level: crate::app::LogLevel::Debug,
             mode: crate::app::DataMode::Vfs,
             output_dir: "./d_merge_output".into(),
@@ -78,14 +75,7 @@ impl Default for AppSettings {
 }
 
 impl From<ModManagerApp> for AppSettings {
-    fn from(mut app: ModManagerApp) -> Self {
-        let i18n = if app.i18n.is_empty() {
-            I18nKey::default_map()
-        } else {
-            app.i18n.par_sort_unstable_keys();
-            app.i18n
-        };
-
+    fn from(app: ModManagerApp) -> Self {
         Self {
             vfs_skyrim_data_dir: app.vfs_skyrim_data_dir,
             vfs_mod_list: app.vfs_mod_list,
@@ -97,7 +87,6 @@ impl From<ModManagerApp> for AppSettings {
             enable_debug_output: app.enable_debug_output,
             filter_text: app.filter_text,
             font_path: app.font_path,
-            i18n,
             log_level: app.log_level,
             mode: app.mode,
             output_dir: app.output_dir,
@@ -132,7 +121,6 @@ impl From<AppSettings> for ModManagerApp {
             filter_text: settings.filter_text,
             sort_column: settings.sort_column,
             sort_asc: settings.sort_asc,
-            i18n: settings.i18n,
             log_level: settings.log_level,
             transparent: settings.transparent,
             last_window_size: egui::vec2(settings.window_width, settings.window_height),

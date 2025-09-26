@@ -124,7 +124,7 @@ impl Default for ModManagerApp {
             filter_text: String::new(),
             sort_column: SortColumn::Priority,
             sort_asc: true,
-            i18n: I18nKey::default_map(),
+            i18n: I18nMap::load_translation(),
             log_level: LogLevel::Debug,
             transparent: true,
             last_window_size: egui::Vec2::ZERO,
@@ -188,6 +188,7 @@ impl App for ModManagerApp {
 
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
+        crate::i18n::I18nMap::save_translation();
     }
 }
 
@@ -245,6 +246,8 @@ impl ModManagerApp {
 
                 ui.add(Separator::default().vertical());
 
+                self.ui_target_runtime_box(ui);
+
                 let debug_output_label = self.t(I18nKey::DebugOutput).to_string();
                 let debug_output_hover = self.t(I18nKey::DebugOutputHover).to_string();
                 ui.checkbox(&mut self.enable_debug_output, debug_output_label)
@@ -265,6 +268,37 @@ impl ModManagerApp {
         });
     }
 
+    fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(self.t(I18nKey::RuntimeTargetLabel))
+                .on_hover_text(self.t(I18nKey::RuntimeTargetHover));
+
+            egui::ComboBox::from_id_salt("skyrim_runtime_target")
+                .selected_text(self.target_runtime.as_str())
+                .show_ui(ui, |ui| {
+                    let runtimes = [
+                        (skyrim_data_dir::Runtime::Le, "SkyrimLE"),
+                        (skyrim_data_dir::Runtime::Se, "SkyrimSE"),
+                        (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
+                    ];
+
+                    for (runtime, label) in runtimes {
+                        if ui
+                            .selectable_value(&mut self.target_runtime, runtime, label)
+                            .changed()
+                            && self.mode == DataMode::Vfs
+                        {
+                            if let Ok(data_dir) =
+                                skyrim_data_dir::get_skyrim_data_dir(self.target_runtime)
+                            {
+                                self.skyrim_data_dir = data_dir.display().to_string();
+                            };
+                        }
+                    }
+                });
+        });
+    }
+
     /// Skyrim data directory selection panel.
     fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_data_dir");
@@ -274,20 +308,25 @@ impl ModManagerApp {
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t(I18nKey::SkyrimDataDirLabel));
+                if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked() {
+                    if let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
+                    {
+                        self.set_notification(err);
+                    };
+                };
+
                 self.draw_skyrim_dir_ui(ui);
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
+                    .add_sized(
+                        [60.0, 40.0],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
                     let dialog = {
                         let default_dir = {
-                            let default_dir = match self.mode {
-                                DataMode::Vfs => &self.vfs_skyrim_data_dir,
-                                DataMode::Manual => &self.skyrim_data_dir,
-                            };
-                            let path = Path::new(default_dir);
+                            let path = Path::new(self.current_skyrim_data_dir());
                             path.canonicalize().ok()
                         };
                         match default_dir {
@@ -334,7 +373,10 @@ impl ModManagerApp {
                 );
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
+                    .add_sized(
+                        [60.0, 40.0],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
                     let dialog = if !self.output_dir.is_empty() {
@@ -386,9 +428,8 @@ impl ModManagerApp {
                 }
 
                 if self.is_locked {
-                    ui.add_space(ui.available_width() - 60.0);
                     let lock_button_response = ui
-                        .add_sized([60.0, 40.0], egui::Button::new("🔒"))
+                        .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::LockButton)))
                         .on_hover_text(self.t(I18nKey::LockButtonHover));
                     if lock_button_response.clicked() {
                         self.unlock_readonly_table();
@@ -433,8 +474,8 @@ impl ModManagerApp {
                 self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
-                self.add_button(ui, ctx, I18nKey::PatchButton, |s, ctx| {
-                    s.patch(ctx);
+                self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
+                    s.patch();
                 });
             });
         });
@@ -740,6 +781,15 @@ impl ModManagerApp {
 
 // mod info loader
 impl ModManagerApp {
+    /// - vfs -> self.vfs_skyrim_data_dir
+    /// - others -> self.skyrim_data_dir
+    const fn current_skyrim_data_dir(&self) -> &str {
+        match self.mode {
+            DataMode::Vfs => self.vfs_skyrim_data_dir.as_str(),
+            DataMode::Manual => self.skyrim_data_dir.as_str(),
+        }
+    }
+
     /// - vfs -> vfs_mod_list
     /// - others -> mod_list
     const fn mod_list(&self) -> &Vec<ModItem> {
@@ -917,7 +967,9 @@ impl ModManagerApp {
     /// Set message to notification
     pub fn set_notification<S: Into<String>>(&self, msg: S) {
         if let Ok(mut guard) = self.notification.lock() {
-            *guard = msg.into();
+            let msg = msg.into();
+            tracing::info!("{msg}");
+            *guard = msg;
         }
     }
 
@@ -942,14 +994,12 @@ impl ModManagerApp {
     /// Translate given key or fallback to default English.
     #[inline]
     fn t(&self, key: I18nKey) -> &str {
-        self.i18n
-            .get(&key)
-            .map_or_else(|| key.default_eng(), |s| s.as_ref())
+        self.i18n.t(key)
     }
 }
 
 impl ModManagerApp {
-    fn patch(&self, ctx: &egui::Context) {
+    fn patch(&self) {
         let patches = match self.mode {
             DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
             DataMode::Manual => to_patches(&self.skyrim_data_dir, false, &self.mod_list),
@@ -957,7 +1007,7 @@ impl ModManagerApp {
         let is_debug_mode = self.enable_debug_output;
 
         if self.auto_remove_meshes {
-            self.remove_meshes_dir_all(ctx);
+            self.remove_meshes_dir_all();
         }
 
         let notify = Arc::clone(&self.notification);
@@ -989,55 +1039,23 @@ impl ModManagerApp {
     }
 
     /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
-    fn remove_meshes_dir_all(&self, ctx: &egui::Context) {
-        self.set_notification(format!(
-            "Deleting `{}/meshes` directory...",
-            self.output_dir
-        ));
+    fn remove_meshes_dir_all(&self) {
+        let output_dir = &self.output_dir;
+        let skyrim_data_directory = self.current_skyrim_data_dir();
 
-        let skyrim_data_directory = match self.mode {
-            DataMode::Vfs => &self.vfs_skyrim_data_dir,
-            DataMode::Manual => &self.skyrim_data_dir,
-        };
+        let is_dangerous_remove = Path::new(output_dir)
+            .canonicalize()
+            .unwrap_or_else(|_| Path::new(output_dir).to_path_buf())
+            == Path::new(skyrim_data_directory)
+                .canonicalize()
+                .unwrap_or_else(|_| Path::new(skyrim_data_directory).to_path_buf());
 
-        let mut proceed = true;
-
-        if &self.output_dir == skyrim_data_directory {
-            let mut user_choice: Option<bool> = None;
-
-            egui::Window::new(self.t(I18nKey::WarningTitle))
-                .collapsible(false)
-                .resizable(false)
-                .show(ctx, |ui| {
-                    ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody1));
-                    ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody2));
-
-                    ui.horizontal(|ui| {
-                        if ui.button(self.t(I18nKey::ExecuteButton)).clicked() {
-                            user_choice = Some(true);
-                        }
-                        if ui.button(self.t(I18nKey::CancelButton)).clicked() {
-                            user_choice = Some(false);
-                        }
-                    });
-                });
-
-            if user_choice == Some(false) {
-                proceed = false; // Skip deletion if user cancels
-            }
-        }
-
-        if proceed {
-            let meshes_path = Path::new(&self.output_dir).join("meshes");
-            let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
-            rayon::join(
-                || {
-                    let _ = remove_if_exists(meshes_path);
-                },
-                || {
-                    let _ = remove_if_exists(debug_path);
-                },
-            );
+        if is_dangerous_remove {
+            let warn = "0/5: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.";
+            tracing::warn!("{warn}");
+        } else {
+            self.set_notification(format!("0/5:  Removing `{output_dir}/meshes` directory..."));
+            crate::cache_remover::remove_meshes_dir_all(output_dir);
         }
     }
 }
@@ -1086,41 +1104,4 @@ where
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir)
         .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
-}
-
-/// Removes a directory if it exists, with debug logging.
-///
-/// # Why need this?
-/// This is because the presence of a previous hkx may leave unintended changes behind.
-///
-/// # Reasons for not using `std::fs::remove_dir_all`
-/// For some reason, egui on MO2 throws an error saying the path doesn't exist when I try to use `std::remove_dir_all`,
-/// so I manually perform a recursive deletion starting from the end.
-fn remove_if_exists(path: impl AsRef<Path>) -> std::io::Result<()> {
-    use std::fs;
-
-    let path = path.as_ref();
-
-    if !path.exists() {
-        return Ok(());
-    }
-
-    // Get the contents
-    let entries: Vec<PathBuf> = fs::read_dir(path)?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .collect();
-
-    // directories recursively deleted in parallel, files deleted in parallel
-    entries.par_iter().for_each(|entry_path| {
-        if entry_path.is_dir() {
-            let _ = remove_if_exists(entry_path); // recursion
-        } else {
-            let _ = fs::remove_file(entry_path);
-        }
-    });
-
-    // remove itself after deleting the contents
-    fs::remove_dir(path)?;
-    Ok(())
 }
