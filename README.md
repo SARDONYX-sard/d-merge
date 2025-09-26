@@ -54,6 +54,25 @@
 
 - [Click assets](https://github.com/SARDONYX-sard/d-merge/releases)
 
+## Intended Use of Automatic Settings File Loading
+
+The load order configuration file is automatically loaded each time the application runs.
+
+It is written to <skyrim data dir>/.d_merge/d_merge_settings.json immediately before the application closes.
+
+By utilizing this behavior as follows, settings will be automatically loaded and updated whenever you switch profiles.
+
+```txt
+D:/MO2/mods/
+├── male_profile_dir/
+│   └── .d_merge/
+│       └── d_merge_settings.json <- output_dir: D:/MO2/mods/male_profile_dir
+│
+└── female_profile_dir/
+    └── .d_merge/
+        └── d_merge_settings.json <- output_dir: D:/MO2/mods/female_profile_dir
+```
+
 ## Patch Page Progress
 
 This currently works to some extent(Sliding, Paraglider, MCO, DMCO-Dodge, ...), but there seems to be a conflict where the patch changes every time the button is pressed.

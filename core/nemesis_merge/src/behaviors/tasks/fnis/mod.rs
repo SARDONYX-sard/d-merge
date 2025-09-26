@@ -12,7 +12,7 @@ pub mod collect;
 mod inject;
 mod list_parser;
 
-use crate::behaviors::tasks::fnis::list_parser::{
+use crate::behaviors::tasks::fnis::list_parser::combinator::{
     anim_types::FNISAnimType, flags::FNISAnimFlagSet,
 };
 
