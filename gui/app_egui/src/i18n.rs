@@ -75,7 +75,7 @@ impl I18nKey {
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
             Self::RuntimeTargetLabel => "Output format",
-            Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64",
+            Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry. (Windows only)",
             Self::SearchLabel => "Search:",
             Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
             Self::Transparent => "Transparent",
