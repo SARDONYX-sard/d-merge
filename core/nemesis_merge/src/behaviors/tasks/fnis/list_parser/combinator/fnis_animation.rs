@@ -1,7 +1,7 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::ascii::{line_ending, space0, space1};
-use winnow::combinator::{opt, preceded, repeat, seq};
+use winnow::combinator::{opt, repeat, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};

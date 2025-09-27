@@ -1,11 +1,10 @@
 //! Line comments parsing (`' comment`)
 
-use winnow::ascii::{line_ending, till_line_ending};
-use winnow::combinator::{preceded, repeat, terminated};
+use winnow::ascii::{line_ending, space0, till_line_ending};
+use winnow::combinator::{alt, preceded, repeat, terminated};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-/// Parse zero or more comment lines starting with `'`
 pub fn comment_line0(input: &mut &str) -> ModalResult<()> {
     let _: () = repeat(0.., comment_line).parse_next(input)?;
     Ok(())
@@ -18,4 +17,10 @@ fn comment_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
             "e.g. `' Any String`",
         )))
         .parse_next(input)
+}
+
+/// space 0 or more, opt(comment) line ending
+pub fn comment_line_ending<'a>(input: &mut &'a str) -> ModalResult<()> {
+    (space0, alt((comment_line, line_ending))).parse_next(input)?;
+    Ok(())
 }

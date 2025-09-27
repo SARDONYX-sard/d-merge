@@ -1,0 +1,118 @@
+//! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
+
+use winnow::ascii::{line_ending, space0, space1};
+use winnow::combinator::{opt, repeat, seq};
+use winnow::error::{StrContext, StrContextValue};
+use winnow::token::take_till;
+use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::comments::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::parse_fnis_animation;
+use crate::behaviors::tasks::fnis::list_parser::combinator::{
+    flags::FNISAnimFlags, fnis_animation::FNISAnimation,
+};
+
+#[derive(Debug, PartialEq)]
+pub struct FNISChairAnimation<'a> {
+    /// start chair animation
+    pub start: FNISAnimation<'a>,
+    /// base, var1, var2
+    pub sequenced: Vec<SequencedChairAnimation<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SequencedChairAnimation<'a> {
+    event: &'a str,
+    file: &'a str,
+}
+
+pub fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISChairAnimation<'a>> {
+    seq!(FNISChairAnimation{
+            _: space0,
+            start: parse_fnis_animation.verify(|anim| {
+                let flags = anim.flag_set.flags;
+                flags == FNISAnimFlags::AnimObjects || flags.is_empty()
+            }).context(StrContext::Label("chair start animation: only -o or no options are allowed")),
+            sequenced: parse_sequenced_animation,
+    })
+    .context(StrContext::Label("FNIS Chair Animation"))
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Format: ch [-o] <AnimEvent_1> <AnimFile1> [<AnimObject> …]
+        + <Unused_AnimEvent_dummy2> <AnimFile2>
+        + <Unused_AnimEvent_dummy3> <AnimFile3>
+        + <Unused_AnimEvent_dummy4> <AnimFile4>",
+    )))
+    .parse_next(input)
+}
+
+fn parse_sequenced_animation<'a>(
+    input: &mut &'a str,
+) -> ModalResult<Vec<SequencedChairAnimation<'a>>> {
+    repeat(
+        3..,
+        seq! {SequencedChairAnimation {
+                _: space0,
+                _: "+".context(StrContext::Expected(StrContextValue::StringLiteral("+"))),
+                _: space1,
+                event: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_event: str")),
+                _: space1,
+                file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
+                _: space0,
+                _: opt(comment_line_ending),
+        }},
+    )
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Chair animation requires at least 4 consecutive animations."
+    )))
+    .parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::behaviors::tasks::fnis::list_parser::{
+        combinator::{anim_types::FNISAnimType, flags::FNISAnimFlagSet},
+        test_helpers::must_parse,
+    };
+
+    #[test]
+    fn test_parse_fnis_animation_valid() {
+        let parsed = must_parse(
+            parse_fnis_chair_animation,
+            r"ch -o PlayFluteSitting PlayFluteSittingStart.hkx AnimObjectFlute
++ PlayFluteSitting_2 PlayFluteSittingIdlebase.hkx
++ PlayFluteSitting_3 PlayFluteSittingIdlevar1.hkx
++ PlayFluteSitting_4 PlayFluteSittingIdlevar2.hkx",
+        );
+
+        assert_eq!(
+            parsed,
+            FNISChairAnimation {
+                start: FNISAnimation {
+                    anim_type: FNISAnimType::Chair,
+                    anim_event: "PlayFluteSitting",
+                    anim_file: "PlayFluteSittingStart.hkx",
+                    anim_objects: vec!["AnimObjectFlute"],
+                    flag_set: FNISAnimFlagSet {
+                        flags: FNISAnimFlags::AnimObjects,
+                        ..Default::default()
+                    },
+                },
+                sequenced: vec![
+                    SequencedChairAnimation {
+                        event: "PlayFluteSitting_2",
+                        file: "PlayFluteSittingIdlebase.hkx"
+                    },
+                    SequencedChairAnimation {
+                        event: "PlayFluteSitting_3",
+                        file: "PlayFluteSittingIdlevar1.hkx"
+                    },
+                    SequencedChairAnimation {
+                        event: "PlayFluteSitting_4",
+                        file: "PlayFluteSittingIdlevar2.hkx"
+                    },
+                ]
+            }
+        );
+    }
+}
