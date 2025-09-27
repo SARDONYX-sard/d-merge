@@ -1,6 +1,6 @@
 //! Motion Data parsing: `MD <time> <dx> <dy> <dz>`
 
-use winnow::ascii::{dec_int, float, line_ending, space0, space1};
+use winnow::ascii::{dec_int, float, line_ending, space0, space1, Caseless};
 use winnow::combinator::{preceded, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
@@ -14,25 +14,23 @@ pub struct MotionData {
 }
 
 pub fn parse_md_data(input: &mut &str) -> ModalResult<MotionData> {
-    preceded(
-        "MD",
-        seq!(MotionData {
-            _: space1,
-            time: float
-                .context(StrContext::Label("Motion time"))
-                .context(StrContext::Expected(StrContextValue::Description(
-                    "Float value (e.g. 1.5, 2.9333)"
-                ))),
-            _: space1,
-            delta_x: dec_int.context(StrContext::Label("delta_x")),
-            _: space1,
-            delta_y: dec_int.context(StrContext::Label("delta_y")),
-            _: space1,
-            delta_z: dec_int.context(StrContext::Label("delta_z")),
-            _: space0,
-            _: line_ending,
-        }),
-    )
+    seq!(MotionData {
+        _: Caseless("MD"),
+        _: space1,
+        time: float
+            .context(StrContext::Label("Motion time"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                "Float value (e.g. 1.5, 2.9333)"
+            ))),
+        _: space1,
+        delta_x: dec_int.context(StrContext::Label("delta_x")),
+        _: space1,
+        delta_y: dec_int.context(StrContext::Label("delta_y")),
+        _: space1,
+        delta_z: dec_int.context(StrContext::Label("delta_z")),
+        _: space0,
+        _: line_ending,
+    })
     .context(StrContext::Label("MotionData"))
     .context(StrContext::Expected(StrContextValue::Description(
         "Format: MD <time: float> <dx: int> <dy: int> <dz: int>",

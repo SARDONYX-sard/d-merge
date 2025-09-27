@@ -27,8 +27,7 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
             _: space0,
             anim_type: parse_anim_type,
             _: space1,
-            flag_set: opt(preceded("-", parse_anim_flags))
-                .map(|opt_flags| opt_flags.unwrap_or_default()),
+            flag_set: parse_anim_flags,
             _: space1,
             anim_event: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_event: str")),
             _: space1,
@@ -49,12 +48,8 @@ fn parse_anim_objects<'a>(
 ) -> impl FnMut(&mut &'a str) -> ModalResult<Vec<&'a str>> {
     move |input: &mut &'a str| {
         repeat(0.., take_till(1.., [' ', '\t', '\r', '\n']))
-            .verify(|objs: &Vec<&str>| {
-                if flags.contains(FNISAnimFlags::AnimObjects) {
-                    !objs.is_empty()
-                } else {
-                    objs.is_empty()
-                }
+            .verify(|anim_objects: &Vec<&str>| {
+                flags.contains(FNISAnimFlags::AnimObjects) && !anim_objects.is_empty()
             })
             .context(StrContext::Label("anim_objects: Vec<str>"))
             .context(StrContext::Expected(StrContextValue::Description(
