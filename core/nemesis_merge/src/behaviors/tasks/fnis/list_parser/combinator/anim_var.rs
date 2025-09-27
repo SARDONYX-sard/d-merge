@@ -6,7 +6,7 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ValueType {
@@ -41,7 +41,7 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
             _: space1,
             default_value: parse_default_value(value_type),
             _: space0,
-            _: comment_line_ending,
+            _: parse_opt_comment_line,
         }
     }
     .context(StrContext::Label("AnimVar"))

@@ -11,7 +11,7 @@ use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
 
 /// Rotation data for an animation with a common `time` and specific format data.
 #[derive(Debug, PartialEq)]
@@ -47,7 +47,7 @@ pub fn parse_rd_data(input: &mut &str) -> ModalResult<RotationData> {
         _: space1,
         alt((parse_rd_data1, parse_rd_data2)),
         _: space0,
-        _: comment_line_ending,
+        _: parse_opt_comment_line,
     }
     .map(|(time, format)| RotationData { time, format })
     .context(StrContext::Label("Rotation"))

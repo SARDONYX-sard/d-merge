@@ -5,7 +5,7 @@ use winnow::combinator::seq;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
 
 #[derive(Debug, PartialEq)]
 pub struct MotionData {
@@ -31,7 +31,7 @@ pub fn parse_md_data(input: &mut &str) -> ModalResult<MotionData> {
         _: space1,
         delta_z: dec_int.context(StrContext::Label("delta_z")),
         _: space0,
-        _: comment_line_ending,
+        _: parse_opt_comment_line,
     })
     .context(StrContext::Label("MotionData"))
     .context(StrContext::Expected(StrContextValue::Description(

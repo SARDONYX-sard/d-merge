@@ -9,7 +9,7 @@ use winnow::{ModalResult, Parser};
 use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::{
     parse_anim_type, FNISAnimType,
 };
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
     parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags,
 };
@@ -35,7 +35,7 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
             anim_file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
             anim_objects: parse_anim_objects(flag_set.flags).context(StrContext::Label("anim_objects: str")),
             _: space0,
-            _: opt(comment_line_ending), // At the end of the file, there is no \n.
+            _: opt(parse_opt_comment_line), // At the end of the file, there is no \n.
     })
     .context(StrContext::Label("FNIS Animation"))
     .context(StrContext::Expected(StrContextValue::Description(
