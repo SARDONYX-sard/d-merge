@@ -1,6 +1,6 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
-use winnow::ascii::{line_ending, space0, space1};
+use winnow::ascii::{space0, space1};
 use winnow::combinator::{opt, repeat, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
@@ -16,14 +16,10 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::{
 pub struct FNISChairAnimation<'a> {
     /// start chair animation
     pub start: FNISAnimation<'a>,
+    /// files
+    ///
     /// base, var1, var2
-    pub sequenced: Vec<SequencedChairAnimation<'a>>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct SequencedChairAnimation<'a> {
-    event: &'a str,
-    file: &'a str,
+    pub sequenced: Vec<&'a str>,
 }
 
 pub fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISChairAnimation<'a>> {
@@ -45,26 +41,27 @@ pub fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISCh
     .parse_next(input)
 }
 
-fn parse_sequenced_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<Vec<SequencedChairAnimation<'a>>> {
-    repeat(
-        3..,
-        seq! {SequencedChairAnimation {
-                _: space0,
-                _: "+".context(StrContext::Expected(StrContextValue::StringLiteral("+"))),
-                _: space1,
-                event: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_event: str")),
-                _: space1,
-                file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
-                _: space0,
-                _: opt(comment_line_ending),
-        }},
-    )
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Chair animation requires at least 4 consecutive animations."
-    )))
-    .parse_next(input)
+fn parse_sequenced_animation<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
+    repeat(3.., parse_file)
+        .context(StrContext::Expected(StrContextValue::Description(
+            "Chair animation requires at least 4 consecutive animations.",
+        )))
+        .parse_next(input)
+}
+
+fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    let (file,) = seq! {
+        _: space0,
+        _: "+".context(StrContext::Expected(StrContextValue::StringLiteral("+"))),
+        _: space1,
+        _: take_till(1.., [' ' , '\t']).context(StrContext::Label("dummy_event: str")),
+        _: space1,
+        take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
+        _: space0,
+        _: opt(comment_line_ending),
+    }
+    .parse_next(input)?;
+    Ok(file)
 }
 
 #[cfg(test)]
@@ -99,18 +96,9 @@ mod tests {
                     },
                 },
                 sequenced: vec![
-                    SequencedChairAnimation {
-                        event: "PlayFluteSitting_2",
-                        file: "PlayFluteSittingIdlebase.hkx"
-                    },
-                    SequencedChairAnimation {
-                        event: "PlayFluteSitting_3",
-                        file: "PlayFluteSittingIdlevar1.hkx"
-                    },
-                    SequencedChairAnimation {
-                        event: "PlayFluteSitting_4",
-                        file: "PlayFluteSittingIdlevar2.hkx"
-                    },
+                    "PlayFluteSittingIdlebase.hkx",
+                    "PlayFluteSittingIdlevar1.hkx",
+                    "PlayFluteSittingIdlevar2.hkx"
                 ]
             }
         );
