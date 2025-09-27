@@ -20,7 +20,7 @@ fn comment_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 }
 
 /// space 0 or more, opt(comment) line ending
-pub fn comment_line_ending<'a>(input: &mut &'a str) -> ModalResult<()> {
+pub fn comment_line_ending(input: &mut &str) -> ModalResult<()> {
     (space0, alt((comment_line, line_ending))).parse_next(input)?;
     Ok(())
 }

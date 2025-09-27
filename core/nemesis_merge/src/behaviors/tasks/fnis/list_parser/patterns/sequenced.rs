@@ -30,6 +30,11 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<
     let mut animations = vec![anim];
     animations.par_extend(parse_sequenced_animations.parse_next(input)?);
 
+    // TODO: Once I understand it, I should perform verification here.
+    // It seems seq anims must always have acyclic(`-a`) appended at the end.
+    // However, the sample has `-a` at the beginning.
+    // I don't quite understand this.
+
     Ok(SeqAnimation { animations })
 }
 
