@@ -6,7 +6,7 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::take_till_line_or_eof;
 use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::flags::{
     parse_anim_flags, FNISPairAndKillMoveAnimFlagSet,
 };
@@ -60,7 +60,7 @@ pub fn parse_paired_animation<'a>(
         anim_file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
         _: space0,
         anim_objects: repeat(0.., parse_anim_object_numbered),
-        _: opt(parse_opt_comment_line),
+        _: opt(take_till_line_or_eof),
     })
     .context(StrContext::Label("FNIS Paired/KillMove Animation"))
     .context(StrContext::Expected(StrContextValue::Description(

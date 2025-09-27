@@ -1,12 +1,12 @@
 //! -     Behavior Variable: AnimVar <AnimVar> [ BOOL | INT32 | REAL ] <numeric_value>
 
-use winnow::ascii::{float, line_ending, space0, space1, Caseless};
+use winnow::ascii::{float, space1, Caseless};
 use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::parse_opt_comment_line;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::take_till_line_or_eof;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ValueType {
@@ -40,8 +40,7 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
             .context(StrContext::Expected(StrContextValue::StringLiteral("REAL"))) ,
             _: space1,
             default_value: parse_default_value(value_type),
-            _: space0,
-            _: parse_opt_comment_line,
+            _: take_till_line_or_eof,
         }
     }
     .context(StrContext::Label("AnimVar"))

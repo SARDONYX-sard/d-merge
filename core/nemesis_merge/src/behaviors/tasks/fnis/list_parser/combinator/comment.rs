@@ -1,19 +1,24 @@
 //! Line comments parsing (`' comment`)
 
 use winnow::ascii::{line_ending, space0, till_line_ending};
-use winnow::combinator::{alt, eof, opt, preceded};
+use winnow::combinator::{alt, eof, opt, preceded, seq};
 use winnow::{ModalResult, Parser};
 
 /// Parses an optional line comment and consumes the trailing newline or end-of-input.
 ///
 /// # Examples of accepted input
-/// - `"   ' hello world\n"`
 /// - `"   ' hello world\r\n"`
 /// - `"   ' hello world"`
 /// - `"   "`
-pub fn parse_opt_comment_line(input: &mut &str) -> ModalResult<()> {
-    (space0, opt(comment_line), alt((line_ending, eof))).parse_next(input)?;
-    Ok(())
+/// - `""`
+pub fn take_till_line_or_eof<'a>(input: &mut &'a str) -> ModalResult<Option<&'a str>> {
+    let (comment,) = seq! {
+        _: space0,
+        opt(comment_line),
+        _: alt((line_ending, eof))
+    }
+    .parse_next(input)?;
+    Ok(comment)
 }
 
 /// Parses a single comment line until line ending.
@@ -36,28 +41,28 @@ mod tests {
     #[test]
     fn test_parse_opt_comment_line_with_comment_and_newline() {
         let mut input = "   ' hello world\n";
-        assert!(parse_opt_comment_line(&mut input).is_ok());
+        assert!(take_till_line_or_eof(&mut input).is_ok());
         assert_eq!(input, "");
     }
 
     #[test]
     fn test_parse_opt_comment_line_with_comment_and_eof() {
         let mut input = "   ' hello world";
-        assert!(parse_opt_comment_line(&mut input).is_ok());
+        assert!(take_till_line_or_eof(&mut input).is_ok());
         assert_eq!(input, "");
     }
 
     #[test]
     fn test_parse_opt_comment_line_with_only_whitespace() {
         let mut input = "   ";
-        assert!(parse_opt_comment_line(&mut input).is_ok());
+        assert!(take_till_line_or_eof(&mut input).is_ok());
         assert_eq!(input, "");
     }
 
     #[test]
     fn test_parse_opt_comment_line_with_only_newline() {
         let mut input = "\n";
-        assert!(parse_opt_comment_line(&mut input).is_ok());
+        assert!(take_till_line_or_eof(&mut input).is_ok());
         assert_eq!(input, "");
     }
 }
