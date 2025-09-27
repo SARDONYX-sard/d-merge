@@ -24,9 +24,9 @@ pub struct FNISPairedAndKillAnimation<'a> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FNISPairedType {
     /// paired animation
-    Pa,
+    Paired,
     /// kill move
-    Km,
+    KilMove,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -50,7 +50,7 @@ pub fn parse_paired_animation<'a>(
 ) -> ModalResult<FNISPairedAndKillAnimation<'a>> {
     seq!(FNISPairedAndKillAnimation {
         _: space0,
-        kind: alt((Caseless("pa").value(FNISPairedType::Pa), Caseless("km").value(FNISPairedType::Km))),
+        kind: alt((Caseless("pa").value(FNISPairedType::Paired), Caseless("km").value(FNISPairedType::KilMove))),
         _: space1,
         flag_set: parse_anim_flags,
         _: space1,
@@ -101,7 +101,7 @@ mod tests {
         );
 
         let expected = FNISPairedAndKillAnimation {
-            kind: FNISPairedType::Pa,
+            kind: FNISPairedType::Paired,
             flag_set: FNISPairAndKillMoveAnimFlagSet {
                 flags: FNISAnimFlags::AnimObjects,
                 duration: 3.466667,

@@ -6,6 +6,7 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
+use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType;
 use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
 use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::parse_fnis_animation;
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
@@ -26,9 +27,11 @@ pub fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISCh
     seq!(FNISChairAnimation{
             _: space0,
             start: parse_fnis_animation.verify(|anim| {
+                let is_chair = anim.anim_type == FNISAnimType::Chair;
                 let flags = anim.flag_set.flags;
-                flags == FNISAnimFlags::AnimObjects || flags.is_empty()
-            }).context(StrContext::Label("chair start animation: only -o or no options are allowed")),
+                let has_none_or_anim_obj_only = flags == FNISAnimFlags::AnimObjects || flags.is_empty();
+                is_chair && has_none_or_anim_obj_only
+            }).context(StrContext::Label("Chair start animation: only -o or no options are allowed")),
             sequenced: parse_sequenced_animation,
     })
     .context(StrContext::Label("FNIS Chair Animation"))

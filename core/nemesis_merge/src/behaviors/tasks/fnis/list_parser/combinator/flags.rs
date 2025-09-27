@@ -14,7 +14,7 @@ pub struct FNISAnimFlagSet<'a> {
     /// Collection of simple on/off flags.
     pub flags: FNISAnimFlags,
     /// Blend time in seconds (e.g. `B1.5`).
-    pub blend_time: f32,
+    pub blend_time: Option<f32>,
 
     /// Trigger event at given time (e.g. `TJump/2.0`).
     pub triggers: Vec<Trigger<'a>>,
@@ -107,7 +107,7 @@ fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a
     loop {
         match parse_anim_flag.parse_next(input)? {
             ParsedFlag::Simple(flag) => set.flags |= flag,
-            ParsedFlag::BlendTime(time) => set.blend_time = time,
+            ParsedFlag::BlendTime(time) => set.blend_time = Some(time), // FIXME?: overwrite is_err?
             ParsedFlag::Trigger(trigger) => set.triggers.push(trigger),
             ParsedFlag::AnimVar(anim_var) => set.anim_vars.push(anim_var),
         }
@@ -252,7 +252,7 @@ mod tests {
         let actual = must_parse(parse_anim_flags, "-a,ac0,B1.5,TJump/2.0,AVfoo,AVIbar");
         let expected = FNISAnimFlagSet {
             flags: FNISAnimFlags::Acyclic | FNISAnimFlags::AnimatedCameraReset,
-            blend_time: 1.5,
+            blend_time: Some(1.5),
             triggers: vec![Trigger {
                 event: "Jump",
                 time: 2.0,
@@ -278,7 +278,7 @@ mod tests {
 
         let expected = FNISAnimFlagSet {
             flags: FNISAnimFlags::TransitionNext | FNISAnimFlags::MotionDriven,
-            blend_time: 1.0,
+            blend_time: Some(1.0),
             triggers: vec![Trigger {
                 event: "Run",
                 time: 3.0,
