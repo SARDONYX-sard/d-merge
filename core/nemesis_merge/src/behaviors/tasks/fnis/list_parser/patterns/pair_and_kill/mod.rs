@@ -6,7 +6,7 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comments::comment_line_ending;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
 use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::flags::{
     parse_anim_flags, FNISPairAndKillMoveAnimFlagSet,
 };

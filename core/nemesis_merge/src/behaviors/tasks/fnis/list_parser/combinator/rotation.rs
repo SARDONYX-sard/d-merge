@@ -6,10 +6,12 @@
 //! - `RD <time: f32> <quat_1: f32> <quat_2: f32> <quat_3: f32> <quat_4: f32>`
 //! - `RD <time: f32> <delta_z_angle: f32>`
 
-use winnow::ascii::{float, line_ending, space0, space1, Caseless};
+use winnow::ascii::{float, space0, space1, Caseless};
 use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
 
 /// Rotation data for an animation with a common `time` and specific format data.
 #[derive(Debug, PartialEq)]
@@ -45,7 +47,7 @@ pub fn parse_rd_data(input: &mut &str) -> ModalResult<RotationData> {
         _: space1,
         alt((parse_rd_data1, parse_rd_data2)),
         _: space0,
-        _: line_ending,
+        _: comment_line_ending,
     }
     .map(|(time, format)| RotationData { time, format })
     .context(StrContext::Label("Rotation"))

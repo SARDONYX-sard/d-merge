@@ -1,9 +1,11 @@
 //! Motion Data parsing: `MD <time> <dx> <dy> <dz>`
 
-use winnow::ascii::{dec_int, float, line_ending, space0, space1, Caseless};
-use winnow::combinator::{preceded, seq};
+use winnow::ascii::{dec_int, float, space0, space1, Caseless};
+use winnow::combinator::seq;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::comment_line_ending;
 
 #[derive(Debug, PartialEq)]
 pub struct MotionData {
@@ -29,7 +31,7 @@ pub fn parse_md_data(input: &mut &str) -> ModalResult<MotionData> {
         _: space1,
         delta_z: dec_int.context(StrContext::Label("delta_z")),
         _: space0,
-        _: line_ending,
+        _: comment_line_ending,
     })
     .context(StrContext::Label("MotionData"))
     .context(StrContext::Expected(StrContextValue::Description(

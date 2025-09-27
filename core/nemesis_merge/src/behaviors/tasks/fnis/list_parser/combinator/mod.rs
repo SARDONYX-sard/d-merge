@@ -21,7 +21,7 @@
 pub mod alt_anim;
 pub mod anim_types;
 pub mod anim_var;
-pub mod comments;
+pub mod comment;
 pub mod flags;
 pub mod fnis_animation;
 pub mod motion;
