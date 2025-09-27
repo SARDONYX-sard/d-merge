@@ -24,7 +24,7 @@ pub enum AltAnimLine<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trigger<'a> {
     pub event: &'a str,
-    pub time: &'a str,
+    pub time: f32,
 }
 
 /// Parse `AAprefix <3_character_mod_abbreviation>`
@@ -73,7 +73,7 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
             Trigger {
                 event: take_till(0.., [' ', '\t']).verify(|s: &str| s.parse::<f32>().is_err()).context(StrContext::Label("Trigger.event: str")),
                 _: space1,
-                time: take_till(0.., [' ', '\t', '\r', '\n']).verify(|s: &str| s.parse::<f32>().is_ok()).context(StrContext::Label("Trigger.time: f32")),
+                time: take_till(0.., [' ', '\t', '\r', '\n']).verify_map(|s: &str| s.parse::<f32>().ok()).context(StrContext::Label("Trigger.time: f32")),
                 _: space0,
             }
         }
@@ -148,11 +148,11 @@ mod tests {
                 triggers: vec![
                     Trigger {
                         event: "start",
-                        time: "0.0"
+                        time: 0.0
                     },
                     Trigger {
                         event: "end",
-                        time: "1.5"
+                        time: 1.5
                     },
                 ],
             }
@@ -169,11 +169,11 @@ mod tests {
                 triggers: vec![
                     Trigger {
                         event: "trigger1",
-                        time: "0.2"
+                        time: 0.2
                     },
                     Trigger {
                         event: "trigger2",
-                        time: "3.5"
+                        time: 3.5
                     },
                 ],
             }

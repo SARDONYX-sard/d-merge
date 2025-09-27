@@ -1,7 +1,7 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::ascii::{line_ending, space0, space1};
-use winnow::combinator::{opt, repeat, seq};
+use winnow::combinator::{opt, preceded, repeat, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
@@ -10,13 +10,13 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::{
     parse_anim_type, FNISAnimType,
 };
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
-    parse_anim_flags, FNISAnimFlagSet,
+    parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags,
 };
 
 #[derive(Debug, PartialEq)]
 pub struct FNISAnimation<'a> {
     pub anim_type: FNISAnimType,
-    pub flags: FNISAnimFlagSet<'a>,
+    pub flag_set: FNISAnimFlagSet<'a>,
     pub anim_event: &'a str,
     pub anim_file: &'a str,
     pub anim_objects: Vec<&'a str>,
@@ -27,14 +27,14 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
             _: space0,
             anim_type: parse_anim_type,
             _: space1,
-            _: "-", // <- flags start
-            flags: parse_anim_flags,
+            flag_set: opt(preceded("-", parse_anim_flags))
+                .map(|opt_flags| opt_flags.unwrap_or_default()),
             _: space1,
             anim_event: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_event: str")),
             _: space1,
             anim_file: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_file: str")),
             _: space0,
-            anim_objects: repeat(0.., take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_objects: Vec<str>"))),
+            anim_objects: parse_anim_objects(flag_set.flags),
             _: opt(line_ending), // At the end of the file, there is no \n.
     })
     .context(StrContext::Label("FNIS Animation"))
@@ -42,6 +42,28 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
         "Format: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]",
     )))
     .parse_next(input)
+}
+
+fn parse_anim_objects<'a>(
+    flags: FNISAnimFlags,
+) -> impl FnMut(&mut &'a str) -> ModalResult<Vec<&'a str>> {
+    move |input: &mut &'a str| {
+        repeat(0.., take_till(1.., [' ', '\t', '\r', '\n']))
+            .verify(|objs: &Vec<&str>| {
+                if flags.contains(FNISAnimFlags::AnimObjects) {
+                    !objs.is_empty()
+                } else {
+                    objs.is_empty()
+                }
+            })
+            .context(StrContext::Label("anim_objects: Vec<str>"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                "When setting anim_objects, you must use the -o flag. \
+                    If -o is used, at least one anim_object is required. \
+                    Otherwise, no anim_objects are allowed.",
+            )))
+            .parse_next(input)
+    }
 }
 
 #[cfg(test)]
@@ -62,9 +84,9 @@ mod tests {
             parsed,
             FNISAnimation {
                 anim_type: FNISAnimType::SequencedContinued,
-                flags: FNISAnimFlagSet {
+                flag_set: FNISAnimFlagSet {
                     flags: FNISAnimFlags::AnimObjects | FNISAnimFlags::Known,
-                    params: vec![]
+                    ..Default::default()
                 },
                 anim_event: "MyCheerSA3",
                 anim_file: "MyCheerAnim2.hkx",

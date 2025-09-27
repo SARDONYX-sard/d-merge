@@ -27,6 +27,10 @@ pub enum FNISAnimType {
     FurnitureOptimized,
     /// **+** – Second-to-last animation of a s/so/fu/fuo or ch definition.
     SequencedContinued,
+
+    /// o - AnimObject: basic animation with one or more AnimObjects
+    AnimObject,
+
     /// **ofa** – Offset Arm Animation: modifies arm position while other animations play.
     OffsetArm,
     /// **pa** – Paired Animation: contains animation data for two actors in one animation file.
@@ -51,6 +55,7 @@ impl FNISAnimType {
             Self::FurnitureOptimized => "fuo",
             Self::SequencedContinued => "+",
             Self::OffsetArm => "ofa",
+            Self::AnimObject => "o",
             Self::Paired => "pa",
             Self::KillMove => "km",
             Self::Alternate => "aa",
@@ -61,18 +66,20 @@ impl FNISAnimType {
 
 pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
     alt((
-        "b".value(FNISAnimType::Basic),
-        "s".value(FNISAnimType::Sequenced),
-        "so".value(FNISAnimType::SequencedOptimized),
-        "fu".value(FNISAnimType::Furniture),
         "fuo".value(FNISAnimType::FurnitureOptimized),
-        "+".value(FNISAnimType::SequencedContinued),
         "ofa".value(FNISAnimType::OffsetArm),
-        "o".value(FNISAnimType::Basic),
-        "pa".value(FNISAnimType::Paired),
-        "km".value(FNISAnimType::KillMove),
+        // 2 char
         "aa".value(FNISAnimType::Alternate),
         "ch".value(FNISAnimType::Chair),
+        "fu".value(FNISAnimType::Furniture),
+        "km".value(FNISAnimType::KillMove),
+        "pa".value(FNISAnimType::Paired),
+        "so".value(FNISAnimType::SequencedOptimized),
+        // 1 char
+        "+".value(FNISAnimType::SequencedContinued),
+        "b".value(FNISAnimType::Basic),
+        "o".value(FNISAnimType::AnimObject),
+        "s".value(FNISAnimType::Sequenced),
     ))
     .context(StrContext::Label("AnimType"))
     .context(StrContext::Expected(StrContextValue::Description(

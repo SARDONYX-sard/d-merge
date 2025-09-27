@@ -1,17 +1,31 @@
 //! Animation flags parsing: simple flags and parameterized flags
 
-use winnow::ascii::{alphanumeric1, float, space0};
-use winnow::combinator::{alt, opt, preceded};
+use winnow::ascii::{alphanumeric1, float, space0, Caseless};
+use winnow::combinator::{alt, opt, preceded, seq};
 use winnow::error::{StrContext, StrContextValue};
+use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::alt_anim::Trigger;
 
 /// Combination of simple bitflags and parameterized flags.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FNISAnimFlagSet<'a> {
     /// Collection of simple on/off flags.
     pub flags: FNISAnimFlags,
-    /// Collection of parameterized flags with values.
-    pub params: Vec<FNISAnimFlagParam<'a>>,
+    /// Blend time in seconds (e.g. `B1.5`).
+    pub blend_time: f32,
+
+    /// Trigger event at given time (e.g. `TJump/2.0`).
+    pub triggers: Vec<Trigger<'a>>,
+    /// Animation variable set/inverse (e.g. `AVfoo`, `AVIbar`).
+    pub anim_vars: Vec<AnimVar<'a>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AnimVar<'a> {
+    name: &'a str,
+    inverse: bool,
 }
 
 bitflags::bitflags! {
@@ -66,31 +80,36 @@ impl FNISAnimFlags {
     }
 }
 
-/// Parameterized animation flags (flags with extra values).
-#[derive(Debug, Clone, PartialEq)]
-pub enum FNISAnimFlagParam<'a> {
-    /// Blend time in seconds (e.g. `B1.5`).
-    BlendTime(f32),
-    /// Trigger event at given time (e.g. `TJump/2.0`).
-    Trigger { event: &'a str, time: f32 },
-    /// Animation variable set/inverse (e.g. `AVfoo`, `AVIbar`).
-    AnimVar { name: &'a str, inverse: bool },
-}
-
 // Internal representation for parser results:
 // either a simple bitflags or a parameterized flag.
+#[derive(Debug, PartialEq)]
 enum ParsedFlag<'a> {
     Simple(FNISAnimFlags),
-    Param(FNISAnimFlagParam<'a>),
+
+    BlendTime(f32),
+    Trigger(Trigger<'a>),
+    AnimVar(AnimVar<'a>),
 }
 
 /// Parse a list of animation flags separated by commas.
 pub fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a>> {
+    preceded("-", __parse_anim_flags)
+    .context(StrContext::Label("FNISAnimFlags"))
+    .context(StrContext::Expected(StrContextValue::Description(
+        "One of: ac0, ac1, ac, bsa, md, st, Tn, a, h, k, o, B<n>.<m> (e.g. `B1.5`), T<trigger>/<time> (e.g. `TJump/2.0`), AV<Var name>(e.g. `AVfoo`), AVI<Var name>",
+    )))
+    .parse_next(input)
+}
+
+/// Parse a list of animation flags separated by commas.
+fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a>> {
     let mut set = FNISAnimFlagSet::default();
     loop {
         match parse_anim_flag.parse_next(input)? {
             ParsedFlag::Simple(flag) => set.flags |= flag,
-            ParsedFlag::Param(param) => set.params.push(param),
+            ParsedFlag::BlendTime(time) => set.blend_time = time,
+            ParsedFlag::Trigger(trigger) => set.triggers.push(trigger),
+            ParsedFlag::AnimVar(anim_var) => set.anim_vars.push(anim_var),
         }
 
         // Intended `md ,`
@@ -102,16 +121,13 @@ pub fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<
     }
     Ok(set)
 }
+
 /// Parse a single animation flag (simple or parameterized).
 fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     alt((
         parse_anim_flag_simple.map(ParsedFlag::Simple),
-        parse_anim_flag_param.map(ParsedFlag::Param),
+        parse_anim_flag_param,
     ))
-    .context(StrContext::Label("FNISAnimFlags"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "One of: ac0, ac1, ac, bsa, md, st, Tn, a, h, k, o, B<n>.<m> (e.g. `B1.5`), T<trigger>/<time> (e.g. `TJump/2.0`), AV<Var name>(e.g. `AVfoo`), AVI<Var name>",
-    )))
     .parse_next(input)
 }
 
@@ -132,20 +148,30 @@ fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
     .parse_next(input)
 }
 
-fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagParam<'a>> {
+fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     alt((
-        preceded("B", float).map(FNISAnimFlagParam::BlendTime),
-        //
-        preceded("T", (alphanumeric1, "/", float))
-            .map(|(event, _, time)| FNISAnimFlagParam::Trigger { event, time }),
-        //
-        preceded("AV", (opt("I"), alphanumeric1)).map(|(inverse, name)| {
-            FNISAnimFlagParam::AnimVar {
-                name,
-                inverse: inverse.is_some(),
-            }
-        }),
+        seq! {AnimVar{
+            _: Caseless("AV"),
+            inverse: opt(Caseless("I")).map(|inverse| inverse.is_some()),
+            name: alphanumeric1
+        }}
+        .map(ParsedFlag::AnimVar),
+        seq! {ParsedFlag::BlendTime(
+            _: Caseless("B"),
+            float
+        )},
+        parse_trigger_options.map(ParsedFlag::Trigger),
     ))
+    .parse_next(input)
+}
+
+pub fn parse_trigger_options<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
+    seq! {Trigger {
+        _: Caseless("T"),
+        event: take_till(1.., '/'),
+        _: "/",
+        time: float,
+    }}
     .parse_next(input)
 }
 
@@ -182,38 +208,33 @@ mod tests {
 
     #[test]
     fn parse_parameterized_flags() {
-        // BlendTime
-        match must_parse(parse_anim_flag_param, "B2.5") {
-            FNISAnimFlagParam::BlendTime(t) => assert!((t - 2.5).abs() < 1e-6),
-            _ => panic!("Expected BlendTime"),
-        }
+        assert_eq!(
+            must_parse(parse_anim_flag_param, "B2.5"),
+            ParsedFlag::BlendTime(2.5)
+        );
 
-        // Trigger
-        match must_parse(parse_anim_flag_param, "TJump/1.0") {
-            FNISAnimFlagParam::Trigger { event, time } => {
-                assert_eq!(event, "Jump");
-                assert!((time - 1.0).abs() < 1e-6);
-            }
-            _ => panic!("Expected Trigger"),
-        }
+        assert_eq!(
+            must_parse(parse_anim_flag_param, "TJump/1.0"),
+            ParsedFlag::Trigger(Trigger {
+                event: "Jump",
+                time: 1.0
+            })
+        );
 
-        // AnimVar normal
-        match must_parse(parse_anim_flag_param, "AVfoo") {
-            FNISAnimFlagParam::AnimVar { name, inverse } => {
-                assert_eq!(name, "foo");
-                assert!(!inverse);
-            }
-            _ => panic!("Expected AnimVar"),
-        }
-
-        // AnimVar inverse
-        match must_parse(parse_anim_flag_param, "AVIbar") {
-            FNISAnimFlagParam::AnimVar { name, inverse } => {
-                assert_eq!(name, "bar");
-                assert!(inverse);
-            }
-            _ => panic!("Expected AnimVar inverse"),
-        }
+        assert_eq!(
+            must_parse(parse_anim_flag_param, "AVfoo"),
+            ParsedFlag::AnimVar(AnimVar {
+                name: "foo",
+                inverse: false
+            })
+        );
+        assert_eq!(
+            must_parse(parse_anim_flag_param, "AVbar"),
+            ParsedFlag::AnimVar(AnimVar {
+                name: "bar",
+                inverse: true,
+            })
+        );
     }
 
     #[test]
@@ -228,72 +249,52 @@ mod tests {
     // -----------------------------
     #[test]
     fn parse_multiple_flags() {
-        let parsed = must_parse(parse_anim_flags, "a,ac0,B1.5,TJump/2.0,AVfoo,AVIbar");
-        assert!(parsed.flags.contains(FNISAnimFlags::Acyclic));
-        assert!(parsed.flags.contains(FNISAnimFlags::AnimatedCameraReset));
-        assert_eq!(parsed.params.len(), 4);
-
-        // Check parameter types
-        assert!(matches!(
-            parsed.params[0],
-            FNISAnimFlagParam::BlendTime(1.5)
-        ));
-        assert!(matches!(
-            parsed.params[1],
-            FNISAnimFlagParam::Trigger {
+        let actual = must_parse(parse_anim_flags, "-a,ac0,B1.5,TJump/2.0,AVfoo,AVIbar");
+        let expected = FNISAnimFlagSet {
+            flags: FNISAnimFlags::Acyclic | FNISAnimFlags::AnimatedCameraReset,
+            blend_time: 1.5,
+            triggers: vec![Trigger {
                 event: "Jump",
-                time: 2.0
-            }
-        ));
-        assert!(matches!(
-            parsed.params[2],
-            FNISAnimFlagParam::AnimVar {
-                name: "foo",
-                inverse: false
-            }
-        ));
-        assert!(matches!(
-            parsed.params[3],
-            FNISAnimFlagParam::AnimVar {
-                name: "bar",
-                inverse: true,
-            }
-        ));
+                time: 2.0,
+            }],
+            anim_vars: vec![
+                AnimVar {
+                    name: "foo",
+                    inverse: false,
+                },
+                AnimVar {
+                    name: "bar",
+                    inverse: true,
+                },
+            ],
+        };
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
     fn parse_multiple_flags_with_spaces() {
-        let parsed = must_parse(parse_anim_flags, "Tn , md , B1.0 , TRun/3.0 , AVx , AVIy");
-        assert!(parsed.flags.contains(FNISAnimFlags::TransitionNext));
-        assert!(parsed.flags.contains(FNISAnimFlags::MotionDriven));
+        let actual = must_parse(parse_anim_flags, "-Tn , md , B1.0 , TRun/3.0 , AVx , AVIy");
 
-        assert_eq!(parsed.params.len(), 4);
-
-        // Check parameter types
-        assert!(matches!(
-            parsed.params[0],
-            FNISAnimFlagParam::BlendTime(1.0)
-        ));
-        assert!(matches!(
-            parsed.params[1],
-            FNISAnimFlagParam::Trigger {
+        let expected = FNISAnimFlagSet {
+            flags: FNISAnimFlags::TransitionNext | FNISAnimFlags::MotionDriven,
+            blend_time: 1.0,
+            triggers: vec![Trigger {
                 event: "Run",
-                time: 3.0
-            }
-        ));
-        assert!(matches!(
-            parsed.params[2],
-            FNISAnimFlagParam::AnimVar {
-                name: "x",
-                inverse: false
-            }
-        ));
-        assert!(matches!(
-            parsed.params[3],
-            FNISAnimFlagParam::AnimVar {
-                name: "y",
-                inverse: true,
-            }
-        ));
+                time: 3.0,
+            }],
+            anim_vars: vec![
+                AnimVar {
+                    name: "x",
+                    inverse: false,
+                },
+                AnimVar {
+                    name: "y",
+                    inverse: true,
+                },
+            ],
+        };
+
+        assert_eq!(actual, expected);
     }
 }

@@ -110,6 +110,7 @@ impl<'a, 'b> FNISFactory<'a, 'b> {
             )),
 
             FNISAnimType::Basic
+            | FNISAnimType::AnimObject
             | FNISAnimType::Sequenced
             | FNISAnimType::SequencedOptimized
             | FNISAnimType::Paired
