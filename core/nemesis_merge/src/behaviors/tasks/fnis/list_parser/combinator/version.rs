@@ -1,9 +1,11 @@
 //! Version line parsing: `Version V<n>.<m>`
 
-use winnow::ascii::{digit1, line_ending, space0, Caseless};
+use winnow::ascii::{digit1, space0, Caseless};
 use winnow::combinator::{opt, preceded, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
@@ -22,8 +24,7 @@ pub fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
             major: digit1.parse_to(),
             _: space0,
             minor: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)),
-            _: space0,
-            _: line_ending,
+            _: skip_ws_and_comments,
         }
     }
     .context(StrContext::Label("Version"))

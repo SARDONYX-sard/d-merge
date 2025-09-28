@@ -64,11 +64,6 @@ bitflags::bitflags! {
         const Sticky = 1 << 9;
         /// **Tn** — Character keeps position after `-a` animation (no IdleForceDefaultState).
         const TransitionNext = 1 << 10;
-
-        /// Special runtime-added flag: sequence start marker (not parsed from text).
-        const SequenceStart = 1 << 11;
-        /// Special runtime-added flag: sequence end marker (not parsed from text).
-        const SequenceFinish = 1 << 12;
     }
 }
 

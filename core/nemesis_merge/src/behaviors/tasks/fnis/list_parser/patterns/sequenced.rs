@@ -18,6 +18,8 @@ pub struct SeqAnimation<'a> {
 }
 
 pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<'a>> {
+    // TODO: By first checking the type with peek, you can prevent the parser from splitting.;
+
     let anim = parse_fnis_animation
         .verify(|anim| {
             matches!(
@@ -28,7 +30,7 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<
         .parse_next(input)?;
 
     let mut animations = vec![anim];
-    animations.par_extend(parse_sequenced_animations.parse_next(input)?);
+    animations.par_extend(parse_seq_remains.parse_next(input)?);
 
     // TODO: Once I understand it, I should perform verification here.
     // It seems seq anims must always have acyclic(`-a`) appended at the end.
@@ -38,7 +40,7 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<
     Ok(SeqAnimation { animations })
 }
 
-fn parse_sequenced_animations<'a>(input: &mut &'a str) -> ModalResult<Vec<FNISAnimation<'a>>> {
+fn parse_seq_remains<'a>(input: &mut &'a str) -> ModalResult<Vec<FNISAnimation<'a>>> {
     repeat(
         1..,
         parse_fnis_animation
@@ -80,6 +82,8 @@ mod tests {
                     anim_event: "MyCheerSA1",
                     anim_file: "..\\idlewave.hkx",
                     anim_objects: vec![],
+                    motions: vec![],
+                    rotations: vec![],
                 },
                 FNISAnimation {
                     anim_type: FNISAnimType::SequencedContinued,
@@ -92,6 +96,8 @@ mod tests {
                     anim_event: "MyCheerSA2",
                     anim_file: "MyCheerAnim1.hkx",
                     anim_objects: vec!["AnimObjectIronSword"],
+                    motions: vec![],
+                    rotations: vec![],
                 },
                 FNISAnimation {
                     anim_type: FNISAnimType::SequencedContinued,
@@ -104,10 +110,29 @@ mod tests {
                     anim_event: "MyCheerSA3",
                     anim_file: "MyCheerAnim2.hkx",
                     anim_objects: vec!["AnimObjectIronSword"],
+                    motions: vec![],
+                    rotations: vec![],
                 },
             ],
         };
 
         assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_list() {
+        use crate::behaviors::tasks::fnis::list_parser::combinator::version::parse_version_line;
+
+        let list = std::fs::read_to_string("../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt").unwrap();
+        let ret = must_parse(
+            (
+                parse_version_line,
+                parse_seq_animation,
+                parse_fnis_animation,
+            ),
+            &list,
+        );
+        std::fs::write("./debug.log", format!("{ret:#?}")).unwrap();
     }
 }

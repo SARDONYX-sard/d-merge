@@ -11,7 +11,7 @@ use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::take_till_line_or_eof;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 
 /// Rotation data for an animation with a common `time` and specific format data.
 #[derive(Debug, PartialEq)]
@@ -27,10 +27,10 @@ pub struct RotationData {
 pub enum RotationFormat {
     /// Quaternion-based rotation
     Quaternion {
-        quat_1: f32,
-        quat_2: f32,
-        quat_3: f32,
-        quat_4: f32,
+        quat_x: f32,
+        quat_y: f32,
+        quat_z: f32,
+        quat_w: f32,
     },
     /// Single-axis Z rotation
     DeltaZAngle { delta_z_angle: f32 },
@@ -46,27 +46,27 @@ pub fn parse_rd_data(input: &mut &str) -> ModalResult<RotationData> {
         float.context(StrContext::Label("Rotation time")),
         _: space1,
         alt((parse_rd_data1, parse_rd_data2)),
-        _: take_till_line_or_eof,
+        _: skip_ws_and_comments,
     }
     .map(|(time, format)| RotationData { time, format })
     .context(StrContext::Label("Rotation"))
     .context(StrContext::Expected(StrContextValue::Description(
-        "Format: `RD <time: f32> <quat_1: f32> <quat_2: f32> <quat_3: f32> <quat_4: f32>` or `RD <time: f32> <delta_z_angle: f32>`",
+        "Format: `RD <time: f32> <quat_x: f32> <quat_y: f32> <quat_z: f32> <quat_w: f32>` or `RD <time: f32> <delta_z_angle: f32>`",
     )))
     .parse_next(input)
 }
 
-/// Parse quaternion-based rotation: RD <time> <quat_1> <quat_2> <quat_3> <quat_4>
+/// Parse quaternion-based rotation: RD <time> <quat_x> <quat_y> <quat_z> <quat_w>
 fn parse_rd_data1(input: &mut &str) -> ModalResult<RotationFormat> {
     seq! {
         RotationFormat::Quaternion {
-            quat_1: float,
+            quat_x: float,
             _: space1,
-            quat_2: float,
+            quat_y: float,
             _: space1,
-            quat_3: float,
+            quat_z: float,
             _: space1,
-            quat_4: float,
+            quat_w: float,
         }
     }
     .parse_next(input)
@@ -93,10 +93,10 @@ mod tests {
         let expected = RotationData {
             time: 1.5,
             format: RotationFormat::Quaternion {
-                quat_1: 0.0,
-                quat_2: 0.0,
-                quat_3: 0.0,
-                quat_4: 1.0,
+                quat_x: 0.0,
+                quat_y: 0.0,
+                quat_z: 0.0,
+                quat_w: 1.0,
             },
         };
         let parsed = must_parse(parse_rd_data, input);
@@ -128,10 +128,10 @@ mod tests {
         let expected1 = RotationData {
             time: 1.5,
             format: RotationFormat::Quaternion {
-                quat_1: 0.0,
-                quat_2: 0.0,
-                quat_3: 0.0,
-                quat_4: 1.0,
+                quat_x: 0.0,
+                quat_y: 0.0,
+                quat_z: 0.0,
+                quat_w: 1.0,
             },
         };
         let parsed1 = must_parse(parse_rd_data, input1);

@@ -11,31 +11,3 @@ mod animations;
 pub mod collect;
 mod inject;
 mod list_parser;
-
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
-    anim_types::FNISAnimType, flags::FNISAnimFlagSet,
-};
-
-/// Represents a FNIS animation kind, consisting of a base animation type and optional flags.
-///
-/// Derived from FNIS animation definition syntax:
-/// - `<AnimType>` describes the core behavior (e.g., basic, sequenced, furniture, paired).
-/// - `<option>` describes modifiers (e.g., acyclic, animated camera, headtracking).
-#[derive(Debug, PartialEq)]
-pub struct FNISAnimKind<'a> {
-    /// The main animation type (FNISAnimType).
-    pub anim_type: FNISAnimType,
-    /// Bitflags representing animation modifiers (FNISAnimFlags).
-    pub flags: FNISAnimFlagSet<'a>,
-}
-
-impl<'a> FNISAnimKind<'a> {
-    /// Creates a new FNISAnimKind with the given animation type and flags.
-    #[inline]
-    pub const fn new(animation_type: FNISAnimType, flags: FNISAnimFlagSet<'a>) -> Self {
-        Self {
-            anim_type: animation_type,
-            flags,
-        }
-    }
-}

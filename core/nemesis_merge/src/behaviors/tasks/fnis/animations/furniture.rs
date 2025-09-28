@@ -6,9 +6,8 @@
 use json_patch::{json_path, JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::{
-    animations::FNISAnimation, list_parser::combinator::flags::FNISAnimFlags, FNISAnimType,
-};
+use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType;
+use crate::behaviors::tasks::fnis::list_parser::combinator::flags::FNISAnimFlags;
 use crate::behaviors::tasks::patches::types::{OnePatchMap, SeqPatchMap};
 
 #[derive(Debug, Clone, Hash)]
@@ -20,7 +19,7 @@ pub struct FurnitureAnimation<'a, 'b> {
     animation_file_path: &'a str,
 
     anim_object_names: &'b [&'a str],
-    pub(crate) next_animation: Option<Box<FNISAnimation<'a, 'b>>>,
+    pub(crate) next_animation: Option<Box<FurnitureAnimation<'a, 'b>>>,
 }
 
 impl<'a, 'b> FurnitureAnimation<'a, 'b> {
@@ -44,7 +43,6 @@ impl<'a, 'b> FurnitureAnimation<'a, 'b> {
     // - `state_info_id`: hkbStateMachineStateInfo root class name att r
     // - `clip_id`: `hkbClipGenerator.triggers`(Pointer). It's `hkbClipTriggerArray`
     fn build_flags(
-        &self,
         patches: &(OnePatchMap<'a>, SeqPatchMap<'a>),
         priority: usize,
         mod_code: &'a str,
@@ -54,9 +52,10 @@ impl<'a, 'b> FurnitureAnimation<'a, 'b> {
 
         let (_, seq) = patches;
 
-        if self.flags.contains(FNISAnimFlags::SequenceFinish) {
-            return;
-        }
+        // if self.flags.contains(FNISAnimFlags::SequenceFinish) {
+        //     return;
+        // }
+
         // Push headtracking event to `event(hkbStateMachineEventPropertyArray)`.
         seq.insert(
             json_path![
@@ -194,7 +193,9 @@ impl<'a, 'b> FurnitureAnimation<'a, 'b> {
             },
         );
 
-        let transitions = if self.flags.contains(FNISAnimFlags::SequenceStart) {
+        // TODO: self.flags.contains(FNISAnimFlags::SequenceStart)
+        let is_seq_start = false;
+        let transitions = if is_seq_start {
             let mut last_anim = None;
             while let Some(next_anim) = &self.next_animation {
                 last_anim = Some(next_anim);

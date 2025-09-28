@@ -1,7 +1,7 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::ascii::{space0, space1};
-use winnow::combinator::{repeat, seq};
+use winnow::combinator::{opt, repeat, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
@@ -9,9 +9,13 @@ use winnow::{ModalResult, Parser};
 use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::{
     parse_anim_type, FNISAnimType,
 };
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::take_till_line_or_eof;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
     parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags,
+};
+use crate::behaviors::tasks::fnis::list_parser::combinator::motion::{parse_md_data, MotionData};
+use crate::behaviors::tasks::fnis::list_parser::combinator::rotation::{
+    parse_rd_data, RotationData,
 };
 
 #[derive(Debug, PartialEq)]
@@ -21,20 +25,29 @@ pub struct FNISAnimation<'a> {
     pub anim_event: &'a str,
     pub anim_file: &'a str,
     pub anim_objects: Vec<&'a str>,
+    pub motions: Vec<MotionData>,
+    pub rotations: Vec<RotationData>,
 }
 
 pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimation<'a>> {
     seq!(FNISAnimation {
             _: space0,
             anim_type: parse_anim_type,
+            flag_set: opt(|input: &mut &'a str| {
+                let (flags,) = seq! {
+                    _: space1,
+                    parse_anim_flags
+                }.parse_next(input)?;
+                Ok(flags)
+            }).map(|set| set.unwrap_or_default()),
             _: space1,
-            flag_set: parse_anim_flags,
+            anim_event: take_till(1.., [' ', '\t']).context(StrContext::Label("anim_event: str")),
             _: space1,
-            anim_event: take_till(1.., [' ' , '\t']).context(StrContext::Label("anim_event: str")),
-            _: space1,
-            anim_file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
+            anim_file: take_till(1.., [' ', '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
             anim_objects: parse_anim_objects(flag_set.flags).context(StrContext::Label("anim_objects: str")),
-            _: take_till_line_or_eof,
+            _: skip_ws_and_comments,
+            motions: repeat(0.., parse_md_data),
+            rotations: repeat(0.., parse_rd_data),
     })
     .context(StrContext::Label("FNIS Animation"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -88,7 +101,9 @@ mod tests {
                 },
                 anim_event: "MyCheerSA3",
                 anim_file: "MyCheerAnim2.hkx",
-                anim_objects: vec!["AnimObjectIronSword"]
+                anim_objects: vec!["AnimObjectIronSword"],
+                motions: vec![],
+                rotations: vec![],
             }
         );
     }

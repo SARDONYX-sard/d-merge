@@ -7,7 +7,7 @@ use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
 use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType;
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::take_till_line_or_eof;
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::parse_fnis_animation;
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
     flags::FNISAnimFlags, fnis_animation::FNISAnimation,
@@ -60,7 +60,7 @@ fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
         _: take_till(1.., [' ' , '\t']).context(StrContext::Label("dummy_event: str")),
         _: space1,
         take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
-        _: take_till_line_or_eof,
+        _: skip_ws_and_comments,
     }
     .parse_next(input)?;
     Ok(file)
@@ -96,6 +96,8 @@ mod tests {
                         flags: FNISAnimFlags::AnimObjects,
                         ..Default::default()
                     },
+                    motions: vec![],
+                    rotations: vec![],
                 },
                 sequenced: vec![
                     "PlayFluteSittingIdlebase.hkx",

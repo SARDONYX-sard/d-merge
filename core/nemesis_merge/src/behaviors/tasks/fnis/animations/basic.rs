@@ -9,268 +9,207 @@ use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::{
-    fnis::{
-        animations::FNISAnimation, list_parser::combinator::flags::FNISAnimFlags, FNISAnimType,
-    },
+    fnis::list_parser::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation},
     patches::types::{OnePatchMap, SeqPatchMap},
 };
 
-#[derive(Debug, Clone, Hash)]
-pub struct BasicAnimation<'a, 'b> {
-    pub(crate) template_type: FNISAnimType,
-    pub(crate) flags: FNISAnimFlags,
+/// Context for patch building.
+pub struct PatchContext<'a, 'b> {
+    pub one: &'b OnePatchMap<'a>,
+    pub seq: &'b SeqPatchMap<'a>,
+    pub priority: usize,
 
-    event_id: &'a str,
-    animation_file_path: &'a str,
+    /// `hkbStateMachineStateInfo` index e.g. `#0000`
+    pub index: &'a str,
+    /// Replace target(`hkbClipTriggerArray`) index
+    pub clip_id: &'a str,
 
-    anim_object_names: &'b [&'a str],
-    pub(crate) next_animation: Option<Box<FNISAnimation<'a, 'b>>>,
+    pub trigger_pushed: bool,
+    /// creation index. e.g. `#{mod_code}${index}`
+    pub new_clip_gen_id: &'a str,
 }
 
-type Patches<'a> = (OnePatchMap<'a>, SeqPatchMap<'a>);
-
-impl<'a, 'b> BasicAnimation<'a, 'b> {
-    pub const fn new(
-        template_type: FNISAnimType,
-        flags: FNISAnimFlags,
-        event: &'a str,
-        animation_file_path: &'a str,
-        anim_object_names: &'b [&'a str],
-    ) -> Self {
-        Self {
-            template_type,
-            flags,
-            event_id: event,
-            animation_file_path,
-            anim_object_names,
-            next_animation: None,
-        }
-    }
-
-    // - `state_info_id`: hkbStateMachineStateInfo root class name att r
-    fn build_flags(
-        &self,
-        patches: &Patches<'a>,
-        priority: usize,
-        state_info_id: &'a str,
-        clip_id: &'a str,
-    ) {
-        let mut ctx = PatchContext::new(patches, priority, clip_id);
-
-        if self.flags.has_modifier() {
-            // TODO:
-        }
-
-        // `mode` to Acyclic or Looping
-        {
-            let mode = if self.flags.contains(FNISAnimFlags::Acyclic) {
-                "MODE_SINGLE_PLAY"
-            } else {
-                "MODE_LOOPING"
-            };
-            ctx.one.insert(
-                json_path![ctx.clip_id, "hkbClipGenerator", "mode"],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        op: OpRangeKind::Pure(Op::Replace),
-                        value: json_typed!(borrowed, mode),
-                    },
-                    priority,
-                },
-            );
-        }
-
-        if self.flags.contains(FNISAnimFlags::AnimObjects) {
-            for name in self.anim_object_names {
-                // hkbStringEventPayload
-                let payload = json_typed!(borrowed, { "data": name });
-
-                // enter events (id 393, 394)
-                ctx.push_notify_event(
-                    state_info_id,
-                    NotifyEvent::Enter,
-                    393,
-                    Some(payload.clone()),
-                );
-                ctx.push_notify_event(state_info_id, NotifyEvent::Enter, 394, Some(payload));
-
-                // Sticky exit to 165
-                if !self.flags.contains(FNISAnimFlags::Sticky) {
-                    ctx.push_notify_event(state_info_id, NotifyEvent::Exit, 165, None);
-                }
-            }
-        }
-
-        // SequenceStart
-        if self.flags.contains(FNISAnimFlags::SequenceStart) {
-            if let Some(FNISAnimation::Basic(next)) = self.next_animation.as_deref() {
-                // use Nemesis variable.
-                let start_event_var = Cow::Owned(format!("$eventID[{}]", next.event_id));
-                ctx.push_event_name(&start_event_var);
-                ctx.push_trigger(-0.3, &start_event_var);
-            }
-        }
-
-        // SequenceFinish
-        if self.flags.contains(FNISAnimFlags::SequenceFinish) {
-            // use Nemesis variable.
-            // During hkx conversion, if `hkbBehaviorGraphStringData.eventNames` contains identical strings, they are automatically replaced with the corresponding index.
-            // Otherwise, an error occurs.
-            {
-                let done_event_var = Cow::Owned(format!("$eventID[{}_DONE]", self.event_id));
-                ctx.push_event_name(&done_event_var);
-                ctx.push_trigger(-0.2, &done_event_var);
-            }
-
-            let idle_event_var = Cow::Borrowed("$eventID[IdleForceDefaultState]$"); // `mt_behavior` has this eventName.
-            ctx.push_trigger(-0.05, &idle_event_var);
-        }
-
-        ctx.finish();
-    }
-}
-
+/// Notify event type for state machine transitions.
 enum NotifyEvent {
     Enter,
     Exit,
 }
+impl NotifyEvent {
+    /// to C++ field name
+    const fn to_field_name(&self) -> &'static str {
+        match self {
+            Self::Enter => "enterNotifyEvents",
+            Self::Exit => "exitNotifyEvents",
+        }
+    }
+}
 
-/// PatchContext groups OnePatchMap and SeqPatchMap together
-/// and manages insertion priority for patches.
+/// Build all patches for a sequence of FNIS animations.
 ///
-/// - Provides helper methods for inserting notify events, event names,
-///   and triggers.
-/// - If `push_trigger` is called at least once, `finish()` must be called
-///   to inject a `clip_index` entry into `hkbClipTriggerArray.triggers`.
-struct PatchContext<'a: 'b, 'b> {
-    one: &'b OnePatchMap<'a>,
-    seq: &'b SeqPatchMap<'a>,
-    priority: usize,
-    clip_id: &'a str,
-    trigger_pushed: bool,
-}
+/// - Inserts clip mode (`MODE_SINGLE_PLAY` or `MODE_LOOPING`)
+/// - Adds animation object notify events (393, 394, 165)
+/// - Handles sequence start (first animation) and finish (last animation)
+///
+/// # Parameters
+/// - `anims`: slice of FNIS animations forming a sequence
+/// - `ctx`: patch context for inserting patches
+pub fn build_animation_sequence<'a>(anims: &[FNISAnimation<'a>], ctx: &mut PatchContext<'a, '_>) {
+    if anims.is_empty() {
+        return;
+    }
+    let last_index = anims.len() - 1;
 
-impl<'a: 'b, 'b> PatchContext<'a, 'b> {
-    /// Create a new PatchContext.
-    const fn new(patches: &'b Patches<'a>, priority: usize, clip_id: &'a str) -> Self {
-        let (one, seq) = patches;
-        Self {
-            one,
-            seq,
-            priority,
-            clip_id,
-            trigger_pushed: false,
+    for (i, anim) in anims.iter().enumerate() {
+        // Common patch generation for every animation
+        build_animation_common(anim, ctx);
+
+        // Sequence start → first animation
+        if i == 0 {
+            if let Some(next) = anims.get(1) {
+                let start_event_var = Cow::Owned(format!("$eventID[{}]", next.anim_event));
+                push_event_name(ctx, &start_event_var);
+                push_trigger(ctx, -0.3, &start_event_var);
+            }
+        }
+
+        // Sequence finish → last animation
+        if i == last_index {
+            {
+                let done_event_var = format!("$eventID[{}_DONE]", anim.anim_event);
+                push_event_name(ctx, &done_event_var);
+                push_trigger(ctx, -0.2, &done_event_var);
+            }
+
+            push_trigger(ctx, -0.05, "$eventID[IdleForceDefaultState]$");
         }
     }
 
-    /// Push seq patch to `hkbStateMachineStateInfo.events`.
-    ///
-    /// - `kind`: "enterNotifyEvents" or "exitNotifyEvents"
-    /// - `id`: event ID
-    /// - `payload`: optional payload value
-    pub fn push_notify_event(
-        &self,
-        state_info_id: &'a str,
-        event_kind: NotifyEvent,
-        id: impl serde::Serialize,
-        payload: Option<simd_json::BorrowedValue<'a>>,
-    ) {
-        let kind = match event_kind {
-            NotifyEvent::Enter => "enterNotifyEvents",
-            NotifyEvent::Exit => "exitNotifyEvents",
-        };
+    finish(ctx);
+}
 
-        self.seq.insert(
-            json_path![state_info_id, "hkbStateMachineStateInfo", kind, "events"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    op: OpRangeKind::Seq(json_patch::OpRange {
-                        op: Op::Add,
-                        range: 9999..9999, // FIXME?: intended push to the last.
-                    }),
-                    // hkbEventProperty
-                    value: json_typed!(borrowed, {
-                        "parent": { // hkbEventBase
-                            "id": id,
-                            "payload": payload
-                        }
-                    }),
-                },
-                priority: self.priority,
-            },
-        );
-    }
+/// Build common patches for a single FNIS animation.
+///
+/// - Inserts clip mode (`MODE_SINGLE_PLAY` or `MODE_LOOPING`)
+/// - Adds animation object notify events (393, 394, 165)
+fn build_animation_common<'a>(anim: &FNISAnimation<'a>, ctx: &PatchContext<'a, '_>) {
+    replace_mode(ctx, anim.flag_set.flags);
 
-    /// Push seq patch to `hkbBehaviorGraphStringData.eventNames`.
-    pub fn push_event_name(&self, event_name: &str) {
-        let id = "#0000"; // TODO: resolve index dynamically
+    if anim.flag_set.flags.contains(FNISAnimFlags::AnimObjects) {
+        for name in &anim.anim_objects {
+            let payload = json_typed!(borrowed, { "data": name }); // hkbStringEventPayload
 
-        self.seq.insert(
-            json_path![id, "hkbBehaviorGraphStringData", "eventNames"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    op: OpRangeKind::Seq(json_patch::OpRange {
-                        op: Op::Add,
-                        range: 9999..9999, // FIXME?: intended push to the last.
-                    }),
-                    value: json_typed!(borrowed, event_name),
-                },
-                priority: self.priority,
-            },
-        );
-    }
+            push_notify_event(ctx, NotifyEvent::Enter, 393, Some(&payload));
+            push_notify_event(ctx, NotifyEvent::Enter, 394, Some(&payload));
 
-    /// Push seq patch to `hkbClipTriggerArray.triggers`.
-    pub fn push_trigger(&mut self, local_time: f32, event_id: &str) {
-        self.seq.insert(
-            json_path![self.clip_id, "hkbClipTriggerArray", "triggers"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    op: OpRangeKind::Seq(json_patch::OpRange {
-                        op: Op::Add,
-                        range: 9999..9999, // FIXME?: intended push to the last.
-                    }),
-                    value: json_typed!(borrowed, {
-                        "localTime": local_time,
-                        "relativeToEndOfClip": true,
-                        // hkbEventProperty
-                        "event": {
-                            "parent": { // hkbEventBase
-                                "id": event_id // I32<'a>
-                            }
-                        },
-                    }),
-                },
-                priority: self.priority,
-            },
-        );
-        self.trigger_pushed = true;
-    }
-
-    /// Finalize the patch set.
-    /// If at least one trigger was pushed, insert a `clip_id` to `triggers` entry.
-    pub fn finish(self) {
-        if !self.trigger_pushed {
-            return;
+            if !anim.flag_set.flags.contains(FNISAnimFlags::Sticky) {
+                push_notify_event(ctx, NotifyEvent::Exit, 165, None);
+            }
         }
-
-        // TODO: Find push target!
-        self.one.insert(
-            json_path!["#0000", "hkbClipGenerator", "triggers"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Replace), // FIXME: If the name attribute is $mod_Id$, then generate hkbClipGenerator all.
-                    value: json_typed!(borrowed, self.clip_id),
-                },
-                priority: self.priority,
-            },
-        );
     }
 }
 
-impl core::fmt::Display for BasicAnimation<'_, '_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ty = self.template_type.as_str();
-        write!(f, "PN_{ty}_{}", self.event_id)
+/// Insert or replace the clip mode in `hkbClipGenerator`.
+fn replace_mode(ctx: &PatchContext<'_, '_>, flags: FNISAnimFlags) {
+    let mode = if flags.contains(FNISAnimFlags::Acyclic) {
+        "MODE_SINGLE_PLAY"
+    } else {
+        "MODE_LOOPING"
+    };
+
+    ctx.one.insert(
+        json_path![ctx.clip_id, "hkbClipGenerator", "mode"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Replace),
+                value: json_typed!(borrowed, mode),
+            },
+            priority: ctx.priority,
+        },
+    );
+}
+
+const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
+    op: Op::Add,
+    range: 9998..9999,
+});
+
+/// Push a notify event into `hkbStateMachineStateInfo`.
+fn push_notify_event<'a>(
+    ctx: &PatchContext<'a, '_>,
+    event: NotifyEvent,
+    id: impl serde::Serialize,
+    payload: Option<&simd_json::BorrowedValue<'a>>,
+) {
+    let json_path = json_path![
+        ctx.index,
+        "hkbStateMachineStateInfo",
+        event.to_field_name(),
+        "events"
+    ];
+    ctx.seq.insert(
+        json_path,
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, {
+                    "id": id,
+                    "payload": payload
+                }),
+            },
+            priority: ctx.priority,
+        },
+    );
+}
+
+/// Push to `eventNames` in `mt_behavior.xml(from hkxcmd).hkbBehaviorGraphStringData(#0083)`.
+fn push_event_name(ctx: &PatchContext<'_, '_>, event_name: &str) {
+    ctx.seq.insert(
+        json_path!["#0083", "hkbBehaviorGraphStringData", "eventNames"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, event_name),
+            },
+            priority: ctx.priority,
+        },
+    );
+}
+
+/// Push a trigger into `hkbClipTriggerArray.triggers`.
+fn push_trigger(ctx: &mut PatchContext<'_, '_>, local_time: f32, event_id: &str) {
+    ctx.seq.insert(
+        json_path![ctx.clip_id, "hkbClipTriggerArray", "triggers"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, {
+                    "localTime": local_time,
+                    "relativeToEndOfClip": true,
+                    "event": {
+                        "id": event_id
+                    }
+                }),
+            },
+            priority: ctx.priority,
+        },
+    );
+    ctx.trigger_pushed = true;
+}
+
+/// Finalize the patch set.
+/// If at least one trigger was pushed, a `clip_id` entry is inserted.
+fn finish(ctx: &PatchContext<'_, '_>) {
+    if !ctx.trigger_pushed {
+        return;
     }
+    ctx.one.insert(
+        json_path![ctx.new_clip_gen_id, "hkbClipGenerator", "triggers"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Replace),
+                value: json_typed!(borrowed, ctx.clip_id), // hkbClipTriggerArray Pointer
+            },
+            priority: ctx.priority,
+        },
+    );
 }
