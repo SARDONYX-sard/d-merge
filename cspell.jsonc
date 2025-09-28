@@ -19,6 +19,7 @@
     "chrono",
     "clippy",
     "dashmap",
+    "defaultfemale",
     "defaultmale",
     "eframe",
     "egui",

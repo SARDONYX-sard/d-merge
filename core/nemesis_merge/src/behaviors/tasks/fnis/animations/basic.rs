@@ -213,3 +213,20 @@ fn finish(ctx: &PatchContext<'_, '_>) {
         },
     );
 }
+
+/// e.g. `["Animations\sample.hkx", "Animations\sample1.hkx"]`
+fn push_animations<'a>(animations: &[&'a str], priority: usize) -> ValueWithPriority<'a> {
+    // Push targets: same json path
+    // - `meshes/actors/character/_1stperson/firstperson.xml`
+    // - `meshes/actors/character/default_female/defaultfemale.xml`
+    // - `meshes/actors/character/defaultmale/defaultmale.xml`
+    let path = json_path!["#0029", "hkbCharacterStringData", "animationNames"];
+
+    ValueWithPriority {
+        patch: JsonPatch {
+            op: PUSH_OP,
+            value: json_typed!(borrowed, animations),
+        },
+        priority,
+    }
+}

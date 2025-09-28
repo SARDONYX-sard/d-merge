@@ -17,7 +17,8 @@ pub enum ValueType {
 
 #[derive(Debug, PartialEq)]
 pub struct AnimVar<'a> {
-    pub anim_var: &'a str,
+    /// variable name
+    pub name: &'a str,
     pub value_type: ValueType,
     pub default_value: f32,
 }
@@ -27,7 +28,7 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
         AnimVar {
             _: Caseless("AnimVar"),
             _: space1,
-            anim_var: take_till(1.., [' ' , '\t']).context(StrContext::Label("Anim var name: str")),
+            name: take_till(1.., [' ' , '\t']).context(StrContext::Label("name: str")),
             _: space1,
             value_type: alt((
                 Caseless("BOOL").value(ValueType::Bool),
@@ -78,7 +79,7 @@ mod tests {
         assert_eq!(
             parsed,
             AnimVar {
-                anim_var: "MyFlag",
+                name: "MyFlag",
                 value_type: ValueType::Bool,
                 default_value: 0.0,
             }
@@ -91,7 +92,7 @@ mod tests {
         assert_eq!(
             parsed,
             AnimVar {
-                anim_var: "Enabled",
+                name: "Enabled",
                 value_type: ValueType::Bool,
                 default_value: 1.0,
             }
@@ -111,7 +112,7 @@ mod tests {
         assert_eq!(
             parsed,
             AnimVar {
-                anim_var: "Counter",
+                name: "Counter",
                 value_type: ValueType::Int32,
                 default_value: 42.0,
             }
@@ -124,7 +125,7 @@ mod tests {
         assert_eq!(
             parsed,
             AnimVar {
-                anim_var: "Speed",
+                name: "Speed",
                 value_type: ValueType::Real,
                 default_value: 2.5,
             }
@@ -137,7 +138,7 @@ mod tests {
         assert_eq!(
             parsed,
             AnimVar {
-                anim_var: "Accel",
+                name: "Accel",
                 value_type: ValueType::Real,
                 default_value: 0.123,
             }
