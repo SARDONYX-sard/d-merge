@@ -1,13 +1,11 @@
 //! - FNIS Sequenced Animation: s|so [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
-use rayon::prelude::*;
-use winnow::combinator::repeat;
+use winnow::combinator::fail;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
-    anim_types::FNISAnimType,
-    fnis_animation::{parse_fnis_animation, FNISAnimation},
+use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::{
+    parse_fnis_animation, FNISAnimation,
 };
 
 /// sequenced animations
@@ -18,20 +16,35 @@ pub struct SeqAnimation<'a> {
 }
 
 pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<'a>> {
-    // TODO: By first checking the type with peek, you can prevent the parser from splitting.;
+    use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType::{
+        Sequenced, SequencedContinued, SequencedOptimized,
+    };
 
-    let anim = parse_fnis_animation
-        .verify(|anim| {
-            matches!(
-                anim.anim_type,
-                FNISAnimType::Sequenced | FNISAnimType::SequencedOptimized
-            )
-        })
+    let seq_start_anim = parse_fnis_animation
+        .verify(|anim| matches!(anim.anim_type, Sequenced | SequencedOptimized))
         .parse_next(input)?;
 
-    let mut animations = vec![anim];
-    animations.par_extend(parse_seq_remains.parse_next(input)?);
+    let mut animations = vec![seq_start_anim];
 
+    // NOTE: To avoid intermediate allocations of `Vec` caused by using `repeat`, manually perform the loop.
+    loop {
+        match parse_fnis_animation
+            .verify(|anim| matches!(anim.anim_type, SequencedContinued))
+            .parse_next(input)
+        {
+            Ok(anim) => animations.push(anim),
+            Err(winnow::error::ErrMode::Backtrack(_)) => break, // End if no further action.
+            Err(e) => return Err(e),
+        }
+    }
+
+    if animations.len() < 2 {
+        return fail
+            .context(StrContext::Expected(StrContextValue::Description(
+                "Sequenced Animation requires at least 2 consecutive animations.",
+            )))
+            .parse_next(input)?;
+    }
     // TODO: Once I understand it, I should perform verification here.
     // It seems seq anims must always have acyclic(`-a`) appended at the end.
     // However, the sample has `-a` at the beginning.
@@ -40,23 +53,14 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<
     Ok(SeqAnimation { animations })
 }
 
-fn parse_seq_remains<'a>(input: &mut &'a str) -> ModalResult<Vec<FNISAnimation<'a>>> {
-    repeat(
-        1..,
-        parse_fnis_animation
-            .verify(|anim| matches!(anim.anim_type, FNISAnimType::SequencedContinued)),
-    )
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Sequenced Animation requires at least 2 consecutive animations.",
-    )))
-    .parse_next(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::behaviors::tasks::fnis::list_parser::{
-        combinator::flags::{FNISAnimFlagSet, FNISAnimFlags},
+        combinator::{
+            anim_types::FNISAnimType,
+            flags::{FNISAnimFlagSet, FNISAnimFlags},
+        },
         test_helpers::must_parse,
     };
 
