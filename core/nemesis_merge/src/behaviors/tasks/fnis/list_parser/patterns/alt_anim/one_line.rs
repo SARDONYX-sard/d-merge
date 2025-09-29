@@ -1,7 +1,7 @@
 //! Alternate animations parsing (AAprefix, AAset, T)
 
-use winnow::ascii::{dec_uint, space0, space1, till_line_ending, Caseless};
-use winnow::combinator::{repeat_till, seq};
+use winnow::ascii::{dec_uint, space0, space1, Caseless};
+use winnow::combinator::{repeat, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
@@ -11,29 +11,31 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::{
     take_till_fnis_ignores, take_till_space, Trigger,
 };
 
-/// Represents a single line of an alternate animation definition.
+/// AlterativeAnimation set
+///
+/// `AAset <animation_group> <number>`
 #[derive(Debug, Clone, PartialEq)]
-pub enum AltAnimLine<'a> {
-    /// `AAprefix <3_character_mod_abbreviation>`
-    Prefix(&'a str),
-    /// `AAset <animation_group> <number>`
-    Set { group: &'a str, slots: u64 },
-    /// `T <alternate_animation> <trigger1> <time1> ...`
-    Trigger {
-        /// animation name
-        anim: &'a str,
-        /// Trigger event, time
-        triggers: Vec<Trigger<'a>>,
-    },
+pub struct AASet<'a> {
+    pub group: &'a str,
+    pub slots: u64,
+}
+
+/// `T <alternate_animation> <trigger1> <time1> ...`
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnimTrigger<'a> {
+    /// animation name
+    pub anim_name: &'a str,
+    /// Trigger event, time
+    pub triggers: Vec<Trigger<'a>>,
 }
 
 /// Parse `AAprefix <3_character_mod_abbreviation>`
-pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine<'a>> {
+pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let (prefix,) = seq! {
         _: space0,
         _: Caseless("AAprefix"),
         _: space1,
-        till_line_ending.verify(|s: &str| !s.is_empty()),
+        take_till_fnis_ignores,
         _: skip_ws_and_comments,
     }
     .context(StrContext::Label("Alternate Animations"))
@@ -41,11 +43,11 @@ pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<AltAni
         "Expected Syntax: `AAprefix <3_character_mod_abbreviation: str>` (e.g. `AAprefix fsm`)",
     )))
     .parse_next(input)?;
-    Ok(AltAnimLine::Prefix(prefix.trim()))
+    Ok(prefix)
 }
 
 /// Parse `AAset <animation_group> <number>`
-pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine<'a>> {
+pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AASet<'a>> {
     let (anim_group, slots_count) = seq! {
         _: space0,
         _: Caseless("AAset"),
@@ -60,14 +62,14 @@ pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLi
         "Expected Syntax: `AAset <animation_group: str> <number: u64>`",
     )))
     .parse_next(input)?;
-    Ok(AltAnimLine::Set {
+    Ok(AASet {
         group: anim_group,
         slots: slots_count,
     })
 }
 
 /// Parse `T <alternate_animation> <trigger1> <time1> ...`
-pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine<'a>> {
+pub fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResult<AnimTrigger<'a>> {
     fn parse_trigger<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
         seq! {
             Trigger {
@@ -80,13 +82,13 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
         .parse_next(input)
     }
 
-    let (anim_name, (triggers, _)) = seq! {
+    let (anim_name, triggers) = seq! {
         _: space0,
         _: Caseless("T"),
         _: space1,
         take_till_space.context(StrContext::Label("anim_name: str")),
         _: space0,
-        repeat_till(0.., parse_trigger, winnow::combinator::alt(('\'', '\r', '\n'))).context(StrContext::Label("triggers: Vec<Trigger>")),
+        repeat(0.., parse_trigger).context(StrContext::Label("triggers: Vec<Trigger>")),
         _: skip_ws_and_comments,
     }
     .context(StrContext::Label("Alternate Animations"))
@@ -94,8 +96,8 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
         "Expected Syntax: `T <alternate_animation: str> <trigger1: str> <time1: f32> ...`",
     )))
     .parse_next(input)?;
-    Ok(AltAnimLine::Trigger {
-        anim: anim_name,
+    Ok(AnimTrigger {
+        anim_name,
         triggers,
     })
 }
@@ -111,10 +113,10 @@ mod tests {
     #[test]
     fn test_parse_alt_anim_prefix_line() {
         let res = must_parse(parse_alt_anim_prefix_line, "AAprefix fsm\n");
-        assert_eq!(res, AltAnimLine::Prefix("fsm"));
+        assert_eq!(res, "fsm");
 
         let res2 = must_parse(parse_alt_anim_prefix_line, "   AAprefix xyz\n");
-        assert_eq!(res2, AltAnimLine::Prefix("xyz"));
+        assert_eq!(res2, "xyz");
 
         must_fail(parse_alt_anim_prefix_line, "AAprefix\n"); // missing code
     }
@@ -124,7 +126,7 @@ mod tests {
         let res = must_parse(parse_alt_anim_set_line, "AAset _mt 9\n");
         assert_eq!(
             res,
-            AltAnimLine::Set {
+            AASet {
                 group: "_mt",
                 slots: 9
             }
@@ -133,7 +135,7 @@ mod tests {
         let res2 = must_parse(parse_alt_anim_set_line, "  AAset _run 42\n");
         assert_eq!(
             res2,
-            AltAnimLine::Set {
+            AASet {
                 group: "_run",
                 slots: 42
             }
@@ -144,11 +146,11 @@ mod tests {
 
     #[test]
     fn test_parse_alt_anim_t_line() {
-        let res = must_parse(parse_alt_anim_t_line, "T _run start 0.0 end 1.5\n");
+        let res = must_parse(parse_alt_anim_trigger_line, "T _run start 0.0 end 1.5\n");
         assert_eq!(
             res,
-            AltAnimLine::Trigger {
-                anim: "_run",
+            AnimTrigger {
+                anim_name: "_run",
                 triggers: vec![
                     Trigger {
                         event: "start",
@@ -163,13 +165,13 @@ mod tests {
         );
 
         let res2 = must_parse(
-            parse_alt_anim_t_line,
+            parse_alt_anim_trigger_line,
             "  T _walk trigger1 0.2 trigger2 3.5\n",
         );
         assert_eq!(
             res2,
-            AltAnimLine::Trigger {
-                anim: "_walk",
+            AnimTrigger {
+                anim_name: "_walk",
                 triggers: vec![
                     Trigger {
                         event: "trigger1",
@@ -183,6 +185,6 @@ mod tests {
             }
         );
 
-        must_fail(parse_alt_anim_t_line, "T _anim trig not_a_float\n");
+        must_fail(parse_alt_anim_trigger_line, "T _anim trig not_a_float\n");
     }
 }

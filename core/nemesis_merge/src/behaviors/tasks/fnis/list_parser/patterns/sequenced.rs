@@ -10,12 +10,12 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::{
 
 /// sequenced animations
 #[derive(Debug, PartialEq)]
-pub struct SeqAnimation<'a> {
+pub struct SequencedAnimation<'a> {
     /// sequenced animations
     pub animations: Vec<FNISAnimation<'a>>,
 }
 
-pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<'a>> {
+pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SequencedAnimation<'a>> {
     use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType::{
         Sequenced, SequencedContinued, SequencedOptimized,
     };
@@ -50,7 +50,7 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SeqAnimation<
     // However, the sample has `-a` at the beginning.
     // I don't quite understand this.
 
-    Ok(SeqAnimation { animations })
+    Ok(SequencedAnimation { animations })
 }
 
 #[cfg(test)]
@@ -73,7 +73,7 @@ mod tests {
 + -o,k MyCheerSA3 MyCheerAnim2.hkx AnimObjectIronSword",
         );
 
-        let expected = SeqAnimation {
+        let expected = SequencedAnimation {
             animations: vec![
                 FNISAnimation {
                     anim_type: FNISAnimType::Sequenced,

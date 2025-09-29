@@ -8,14 +8,14 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::{
     parse_fnis_animation, FNISAnimation,
 };
 
-/// sequenced animations
+/// Furniture animation
 #[derive(Debug, PartialEq)]
 pub struct FurnitureAnimation<'a> {
     /// furniture animations
     pub animations: Vec<FNISAnimation<'a>>,
 }
 
-pub fn parse_furniture_animations<'a>(input: &mut &'a str) -> ModalResult<FurnitureAnimation<'a>> {
+pub fn parse_furniture_animation<'a>(input: &mut &'a str) -> ModalResult<FurnitureAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Furniture Animation"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -98,14 +98,12 @@ mod tests {
     #[test]
     fn test_parse_fnis_animation_valid() {
         let parsed = must_parse(
-            parse_furniture_animations,
+            parse_furniture_animation,
             r"fu -a Kneel_Enter Kneel_Enter.hkx
 + -o,B1.2 Kneel_Loop1 Kneel_Loop1.hkx myAnimObject1 myAnimObject2
 + -o Kneel_Loop2 Kneel_Loop2.hkx myAnimObject1 myAnimObject2
 + -a,o Kneel_Exit Kneel_Exit.hkx myAnimObject1 myAnimObject2",
         );
-
-        std::fs::write("./debug_fu.log", format!("{parsed:?}")).unwrap();
 
         let expected = FurnitureAnimation {
             animations: vec![
