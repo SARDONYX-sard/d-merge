@@ -5,10 +5,10 @@ use winnow::combinator::{alt, fail, opt, preceded};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::alt_anim::Trigger;
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
     parse_trigger_options, FNISAnimFlags,
 };
+use crate::behaviors::tasks::fnis::list_parser::combinator::Trigger;
 
 /// Combination of simple bitflags and parameterized flags.
 #[derive(Debug, Clone, Default, PartialEq)]

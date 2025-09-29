@@ -1,10 +1,15 @@
 //! Alternate animations parsing (AAprefix, AAset, T)
 
-use winnow::ascii::{line_ending, space0, space1, till_line_ending, Caseless};
+use winnow::ascii::{dec_uint, space0, space1, till_line_ending, Caseless};
 use winnow::combinator::{repeat_till, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
+
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
+use crate::behaviors::tasks::fnis::list_parser::combinator::{
+    take_till_fnis_ignores, take_till_space, Trigger,
+};
 
 /// Represents a single line of an alternate animation definition.
 #[derive(Debug, Clone, PartialEq)]
@@ -15,16 +20,11 @@ pub enum AltAnimLine<'a> {
     Set { group: &'a str, slots: u64 },
     /// `T <alternate_animation> <trigger1> <time1> ...`
     Trigger {
+        /// animation name
         anim: &'a str,
         /// Trigger event, time
         triggers: Vec<Trigger<'a>>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Trigger<'a> {
-    pub event: &'a str,
-    pub time: f32,
 }
 
 /// Parse `AAprefix <3_character_mod_abbreviation>`
@@ -32,9 +32,9 @@ pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<AltAni
     let (prefix,) = seq! {
         _: space0,
         _: Caseless("AAprefix"),
-        _: space0,
+        _: space1,
         till_line_ending.verify(|s: &str| !s.is_empty()),
-        _: line_ending,
+        _: skip_ws_and_comments,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -52,8 +52,8 @@ pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLi
         _: space1,
         take_till(0.., [' ', '\t']),
         _: space1,
-        till_line_ending.verify_map(|s: &str| s.parse::<u64>().ok()),
-        _: line_ending,
+        dec_uint,
+        _: skip_ws_and_comments,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -71,22 +71,23 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
     fn parse_trigger<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
         seq! {
             Trigger {
-                event: take_till(0.., [' ', '\t']).verify(|s: &str| s.parse::<f32>().is_err()).context(StrContext::Label("Trigger.event: str")),
+                event: take_till_space.verify(|s: &str| s.parse::<f32>().is_err()).context(StrContext::Label("Trigger.event: str")),
                 _: space1,
-                time: take_till(0.., [' ', '\t', '\r', '\n']).verify_map(|s: &str| s.parse::<f32>().ok()).context(StrContext::Label("Trigger.time: f32")),
+                time: take_till_fnis_ignores.verify_map(|s: &str| s.parse::<f32>().ok()).context(StrContext::Label("Trigger.time: f32")),
                 _: space0,
             }
         }
         .parse_next(input)
     }
 
-    let (anim_anim, (triggers, _)) = seq! {
+    let (anim_name, (triggers, _)) = seq! {
         _: space0,
         _: Caseless("T"),
         _: space1,
-        take_till(0.., [' ', '\t']),
-        _: space1,
-        repeat_till(0.., parse_trigger, line_ending),
+        take_till_space.context(StrContext::Label("anim_name: str")),
+        _: space0,
+        repeat_till(0.., parse_trigger, winnow::combinator::alt(('\'', '\r', '\n'))).context(StrContext::Label("triggers: Vec<Trigger>")),
+        _: skip_ws_and_comments,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -94,7 +95,7 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
     )))
     .parse_next(input)?;
     Ok(AltAnimLine::Trigger {
-        anim: anim_anim,
+        anim: anim_name,
         triggers,
     })
 }
@@ -102,7 +103,10 @@ pub fn parse_alt_anim_t_line<'a>(input: &mut &'a str) -> ModalResult<AltAnimLine
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::behaviors::tasks::fnis::list_parser::{
+        combinator::Trigger,
+        test_helpers::{must_fail, must_parse},
+    };
 
     #[test]
     fn test_parse_alt_anim_prefix_line() {

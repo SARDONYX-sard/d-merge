@@ -3,10 +3,10 @@
 use winnow::ascii::{float, space1, Caseless};
 use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
-use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
 use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
+use crate::behaviors::tasks::fnis::list_parser::combinator::take_till_space;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ValueType {
@@ -28,7 +28,7 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
         AnimVar {
             _: Caseless("AnimVar"),
             _: space1,
-            name: take_till(1.., [' ' , '\t']).context(StrContext::Label("name: str")),
+            name: take_till_space.context(StrContext::Label("name: str")),
             _: space1,
             value_type: alt((
                 Caseless("BOOL").value(ValueType::Bool),

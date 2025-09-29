@@ -1,9 +1,8 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::ascii::{space0, space1};
-use winnow::combinator::{opt, repeat, seq};
+use winnow::combinator::{opt, repeat, separated, seq};
 use winnow::error::{StrContext, StrContextValue};
-use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
 use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::{
@@ -16,6 +15,9 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
 use crate::behaviors::tasks::fnis::list_parser::combinator::motion::{parse_md_data, MotionData};
 use crate::behaviors::tasks::fnis::list_parser::combinator::rotation::{
     parse_rd_data, RotationData,
+};
+use crate::behaviors::tasks::fnis::list_parser::combinator::{
+    take_till_fnis_ignores, take_till_space,
 };
 
 #[derive(Debug, PartialEq)]
@@ -31,6 +33,7 @@ pub struct FNISAnimation<'a> {
 
 pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimation<'a>> {
     seq!(FNISAnimation {
+            // 1 line
             _: space0,
             anim_type: parse_anim_type,
             flag_set: opt(|input: &mut &'a str| {
@@ -41,13 +44,14 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
                 Ok(flags)
             }).map(|set| set.unwrap_or_default()),
             _: space1,
-            anim_event: take_till(1.., [' ', '\t']).context(StrContext::Label("anim_event: str")),
+            anim_event: take_till_space.context(StrContext::Label("anim_event: str")),
             _: space1,
-            anim_file: take_till(1.., [' ', '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
+            anim_file: take_till_fnis_ignores.context(StrContext::Label("anim_file: str")),
             anim_objects: parse_anim_objects(flag_set.flags).context(StrContext::Label("anim_objects: str")),
             _: skip_ws_and_comments,
-            motions: repeat(0.., parse_md_data),
-            rotations: repeat(0.., parse_rd_data),
+
+            motions: repeat(0.., parse_md_data), // n time lines
+            rotations: repeat(0.., parse_rd_data), // n time lines
     })
     .context(StrContext::Label("FNIS Animation"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -66,7 +70,7 @@ fn parse_anim_objects<'a>(
         }
 
         space1.parse_next(input)?;
-        repeat(1.., take_till(1.., [' ', '\t', '\r', '\n']))
+        separated(1.., take_till_fnis_ignores, space1)
             .context(StrContext::Label("anim_objects: Vec<str>"))
             .context(StrContext::Expected(StrContextValue::Description(
                 "When setting anim_objects, you must use the -o flag. \

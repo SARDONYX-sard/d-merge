@@ -18,7 +18,6 @@
 //! -  Alternate Animations: AAset <animation_group> <number>
 //! -  Alternate Animations: T <alternate_animation> <trigger1> <time1> <trigger2> <time2> ..
 //! ```
-pub mod alt_anim;
 pub mod anim_types;
 pub mod anim_var;
 pub mod comment;
@@ -27,3 +26,21 @@ pub mod fnis_animation;
 pub mod motion;
 pub mod rotation;
 pub mod version;
+
+use winnow::{token::take_till, ModalResult, Parser as _};
+
+/// take till space, tab
+pub fn take_till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    take_till(1.., [' ', '\t']).parse_next(input)
+}
+
+/// take till comment start(`'`), space, tab, or line_ending
+pub fn take_till_fnis_ignores<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    take_till(1.., [' ', '\t', '\r', '\n', '\'']).parse_next(input)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Trigger<'a> {
+    pub event: &'a str,
+    pub time: f32,
+}

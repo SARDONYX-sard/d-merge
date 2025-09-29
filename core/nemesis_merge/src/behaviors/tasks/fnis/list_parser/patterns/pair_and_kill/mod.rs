@@ -89,7 +89,7 @@ fn parse_anim_object_numbered<'a>(input: &mut &'a str) -> ModalResult<AnimObject
 mod tests {
     use super::*;
     use crate::behaviors::tasks::fnis::list_parser::{
-        combinator::{alt_anim::Trigger, flags::FNISAnimFlags},
+        combinator::{flags::FNISAnimFlags, Trigger},
         test_helpers::must_parse,
     };
 
