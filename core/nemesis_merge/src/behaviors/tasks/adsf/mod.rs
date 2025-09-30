@@ -32,7 +32,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-pub struct AdsfPatch<'a> {
+pub(crate) struct AdsfPatch<'a> {
     /// e.g. `DefaultMale`, `DefaultFemale`
     pub target: &'a str,
     /// e.g. `/some/Nemesis_Engine/mod/slide`
@@ -41,7 +41,7 @@ pub struct AdsfPatch<'a> {
 }
 
 #[derive(serde::Serialize, Debug, Clone, PartialEq)]
-enum PatchKind<'a> {
+pub(crate) enum PatchKind<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     ProjectNamesHeader(DiffLines<'a>),
     #[allow(unused)]
@@ -57,7 +57,7 @@ enum PatchKind<'a> {
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-struct EditAnim<'a> {
+pub(crate) struct EditAnim<'a> {
     patch: ClipAnimDiffPatch<'a>,
     priority: usize,
     /// `<Name>~<clip_id>`
@@ -69,7 +69,7 @@ struct EditAnim<'a> {
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-struct EditMotion<'a> {
+pub(crate) struct EditMotion<'a> {
     patch: ClipMotionDiffPatch<'a>,
     priority: usize,
     clip_id: &'a str,

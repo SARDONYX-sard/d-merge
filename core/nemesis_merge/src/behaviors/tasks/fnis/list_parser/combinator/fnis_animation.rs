@@ -1,5 +1,6 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
+use skyrim_anim_parser::adsf::normal::Translation;
 use winnow::ascii::{space0, space1};
 use winnow::combinator::{opt, repeat, separated, seq};
 use winnow::error::{StrContext, StrContextValue};
@@ -12,7 +13,7 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
     parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags,
 };
-use crate::behaviors::tasks::fnis::list_parser::combinator::motion::{parse_md_data, MotionData};
+use crate::behaviors::tasks::fnis::list_parser::combinator::motion::parse_md_data;
 use crate::behaviors::tasks::fnis::list_parser::combinator::rotation::{
     parse_rd_data, RotationData,
 };
@@ -27,8 +28,8 @@ pub struct FNISAnimation<'a> {
     pub anim_event: &'a str,
     pub anim_file: &'a str,
     pub anim_objects: Vec<&'a str>,
-    pub motions: Vec<MotionData>,
-    pub rotations: Vec<RotationData>,
+    pub motions: Vec<Translation<'a>>,
+    pub rotations: Vec<RotationData<'a>>,
 }
 
 pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimation<'a>> {

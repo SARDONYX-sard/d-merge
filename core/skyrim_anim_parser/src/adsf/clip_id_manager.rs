@@ -10,6 +10,7 @@ pub struct ClipIdManager {
 }
 
 impl ClipIdManager {
+    /// i16::MAX
     pub const MAX_ID: usize = 32767;
 
     pub fn new() -> Self {

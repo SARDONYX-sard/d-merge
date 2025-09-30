@@ -4,7 +4,7 @@ use dashmap::{DashMap, DashSet};
 use indexmap::IndexMap;
 use std::path::PathBuf;
 
-pub use self::patch_map::{OnePatchMap, SeqPatchMap};
+pub use self::patch_map::{HkxPatches, OnePatchMap, SeqPatchMap};
 use crate::behaviors::tasks::{
     adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::types::TemplateKey,
 };

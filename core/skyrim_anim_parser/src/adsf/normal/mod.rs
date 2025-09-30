@@ -134,6 +134,10 @@ pub struct ClipAnimDataBlock<'a> {
     pub name: Str<'a>,
 
     /// An identifier for the animation clip.
+    ///
+    /// # NOTE
+    /// In the case of mods, variables (e.g., `slide$0`) are used.
+    /// These must be assigned a unique index across the entire animationdatasinglefile.txt file during serialization.
     pub clip_id: Str<'a>,
 
     /// The playback speed of the animation.

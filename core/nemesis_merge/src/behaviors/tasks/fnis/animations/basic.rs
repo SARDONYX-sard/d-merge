@@ -9,7 +9,10 @@ use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::{
-    fnis::list_parser::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation},
+    fnis::{
+        animations::PUSH_OP,
+        list_parser::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation},
+    },
     patches::types::{OnePatchMap, SeqPatchMap},
 };
 
@@ -128,11 +131,6 @@ fn replace_mode(ctx: &PatchContext<'_, '_>, flags: FNISAnimFlags) {
     );
 }
 
-const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
-    op: Op::Add,
-    range: 9998..9999,
-});
-
 /// Push a notify event into `hkbStateMachineStateInfo`.
 fn push_notify_event<'a>(
     ctx: &PatchContext<'a, '_>,
@@ -212,21 +210,4 @@ fn finish(ctx: &PatchContext<'_, '_>) {
             priority: ctx.priority,
         },
     );
-}
-
-/// e.g. `["Animations\sample.hkx", "Animations\sample1.hkx"]`
-fn push_animations<'a>(animations: &[&'a str], priority: usize) -> ValueWithPriority<'a> {
-    // Push targets: same json path
-    // - `meshes/actors/character/_1stperson/firstperson.xml`
-    // - `meshes/actors/character/default_female/defaultfemale.xml`
-    // - `meshes/actors/character/defaultmale/defaultmale.xml`
-    let path = json_path!["#0029", "hkbCharacterStringData", "animationNames"];
-
-    ValueWithPriority {
-        patch: JsonPatch {
-            op: PUSH_OP,
-            value: json_typed!(borrowed, animations),
-        },
-        priority,
-    }
 }

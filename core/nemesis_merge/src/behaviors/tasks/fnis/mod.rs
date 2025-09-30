@@ -9,5 +9,4 @@
 //! which is part of the FNIS (Fores New Idles in Skyrim) modding documentation.
 mod animations;
 pub mod collect;
-mod inject;
 mod list_parser;

@@ -5,7 +5,7 @@ mod tasks;
 pub use crate::behaviors::priority_ids::types::PriorityMap;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
 
-pub(crate) use tasks::adsf::path_parser::ParseError as AsdfPathParseError;
+pub(crate) use tasks::adsf::{path_parser::ParseError as AsdfPathParseError, PatchKind};
 pub(crate) use tasks::asdsf::path_parser::ParseError as AsdsfPathParseError;
 
 use crate::behaviors::tasks::adsf::apply_adsf_patches;

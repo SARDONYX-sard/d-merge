@@ -13,6 +13,8 @@ use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 
+pub type HkxPatches<'a> = (OnePatchMap<'a>, SeqPatchMap<'a>);
+
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default)]
