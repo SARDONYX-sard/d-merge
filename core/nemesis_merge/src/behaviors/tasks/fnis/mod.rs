@@ -7,6 +7,6 @@
 //! All animation type (`<AnimType>`) and option (`<option>`) definitions
 //! are **based on and quoted from** _Fore's_ **"FNIS for Modders_V6.2.pdf"(© Fore)**,
 //! which is part of the FNIS (Fores New Idles in Skyrim) modding documentation.
-mod animations;
 pub mod collect;
 mod list_parser;
+mod patch_gen;

@@ -5,8 +5,10 @@ mod tasks;
 pub use crate::behaviors::priority_ids::types::PriorityMap;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
 
-pub(crate) use tasks::adsf::{path_parser::ParseError as AsdfPathParseError, PatchKind};
-pub(crate) use tasks::asdsf::path_parser::ParseError as AsdsfPathParseError;
+pub(crate) use tasks::{
+    adsf::path_parser::ParseError as AsdfPathParseError,
+    asdsf::path_parser::ParseError as AsdsfPathParseError,
+};
 
 use crate::behaviors::tasks::adsf::apply_adsf_patches;
 use crate::behaviors::tasks::asdsf::apply_asdsf_patches;
@@ -21,6 +23,7 @@ use crate::config::{Config, Status};
 use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
 
+/// Nemesis & FNIS patch path
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct PatchMaps {
     /// Nemesis patch path
@@ -28,12 +31,11 @@ pub struct PatchMaps {
     /// - value: priority
     pub nemesis_entries: PriorityMap,
     /// FNIS patch path
-    /// - key: path until namespace(e.g. `<skyrim_data_dir>/path/Meshes/actors/character/animations/FNISFlyer`)
+    /// - key: path until namespace(e.g. `<skyrim_data_dir>/meshes/actors/character/animations/FNISFlyer`)
     /// - value: priority
     pub fnis_entries: PriorityMap,
 }
 
-/// - nemesis_paths: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
 ///
 /// # Errors

@@ -4,10 +4,18 @@
 //! <skyrim data dir>/
 //! └── meshes/
 //!     └── actors/
-//!         └── character/
+//!         ├── character/                                      <- defaultmale, defaultfemale humanoid animations
+//!         │   ├── animations/
+//!         │   │   └── <fnis_mod_namespace>/                   <- this is `animations_mod_dir`
+//!         │   │       ├── *.hkx                               <- HKX animation files collected by `animation_paths`
+//!         │   │       └── FNIS_<fnis_mod_namespace>_List.txt  <- List file read into `list_content`
+//!         │   └── behaviors/
+//!         │       └── FNIS_<fnis_mod_namespace>_Behavior.hkx  <- Behavior file path returned as `behavior_path`
+//!         │
+//!         └── cow/                                            <- any Creature
 //!             ├── animations/
-//!             │   └── <fnis_mod_namespace>/           <- this is `animations_mod_dir`
-//!             │       ├── *.hkx                 <- HKX animation files collected by `animation_paths`
+//!             │   └── <fnis_mod_namespace>/                   <- this is `animations_mod_dir`
+//!             │       ├── *.hkx                               <- HKX animation files collected by `animation_paths`
 //!             │       └── FNIS_<fnis_mod_namespace>_List.txt  <- List file read into `list_content`
 //!             └── behaviors/
 //!                 └── FNIS_<fnis_mod_namespace>_Behavior.hkx  <- Behavior file path returned as `behavior_path`
@@ -15,12 +23,14 @@
 //!
 //! # Note
 //! - Linux path is case sensitive: https://learn.microsoft.com/windows/wsl/case-sensitivity
-use rayon::prelude::*;
-use snafu::ResultExt as _;
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
 };
+
+use rayon::prelude::*;
+use snafu::ResultExt as _;
 use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
 
 use crate::behaviors::{
@@ -31,6 +41,8 @@ use crate::behaviors::{
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
     /// Primarily used for generating havok class IDs(XML name attribute). e.g. `#namespace$1` (The value must be unique.)
+    ///
+    /// In Nemesis, it is called `mod_code`.
     /// - `<namespace>` under `meshes\actors\character\animations\<namespace>\`.
     pub namespace: String,
 
@@ -47,9 +59,9 @@ pub struct OwnedFnisInjection {
     ///
     /// # Expected sample
     ///
-    /// ```txt
+    /// ```log
     /// [
-    ///   "Animations\FNISFlyer\FNISfl_Back_ac.hkx"
+    ///   "Animations\FNISFlyer\FNISfl_Back_ac.hkx",
     ///   "Animations\FNISFlyer\FNISfl_Back_fm.hkx"
     /// ]
     /// ```
@@ -73,9 +85,55 @@ pub struct OwnedFnisInjection {
     /// 3. Push the state info index into `hkbStateMachine.states` so that
     ///    vanilla HKX recognizes the behavior.
     pub behavior_path: String,
+
+    /// Every time an XML C++ root class is added, a sequential number must be generated.
+    ///
+    /// However, `d_merge_serde_hkx` has been extended to allow direct use of Nemesis variables
+    /// (which use 1-based indexing and have the format `#<mod_code>$<index>`) as indices.
+    ///
+    /// Therefore, a counter is established per mod to prevent ID duplication.
+    ///
+    /// # Intended additional pattern
+    /// Note that the actual code uses XML that has been further converted to JSON.
+    /// ```xml
+    /// <!-- Add new class (current_class_index:1) -->
+    /// <hkobject name="#FNIS_Flyer$1" class="hkbStateMachine" signature="0x816c1dcb">...</hkobject>
+    ///
+    /// <!-- increment index & Add new class again (current_class_index:2) -->
+    /// <hkobject name="#FNIS_Flyer$2" class="hkbStateMachine" signature="0x816c1dcb">...</hkobject>
+    /// ```
+    current_class_index: AtomicUsize,
 }
 
 impl OwnedFnisInjection {
+    /// Increments the index and returns the full `name` attribute
+    /// string in Nemesis format: `#<mod_code>$<index>`.
+    ///
+    /// # Example
+    /// ```
+    /// let inj = OwnedFnisInjection { current_class_index: AtomicUsize::new(0), mod_code: "FNIS_Flyer".into() };
+    /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$1");
+    /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$2");
+    /// ```
+    pub fn next_class_name_attribute(&self) -> String {
+        let idx = self.next_class_index();
+        format!("#{}${}", self.namespace, idx)
+    }
+
+    /// Increments the `current_class_index` counter and returns the **next available index**.
+    ///
+    /// This is used when registering a new XML C++ root class, ensuring
+    /// that the Nemesis-style index (`#<mod_code>$<index>`) remains unique.
+    ///
+    /// # Ordering
+    /// - Uses [`Ordering::Acquire`] to ensure correct memory synchronization across threads.
+    ///
+    /// # Returns
+    /// The incremented class index (1-based).
+    pub fn next_class_index(&self) -> usize {
+        self.current_class_index.fetch_add(1, Ordering::Acquire) + 1
+    }
+
     /// Returns the behavior file name without the `Behaviors\` prefix and `.hkx` extension.
     ///
     /// e.g., for `Behaviors\FNIS_FNISFlyer_Behavior.hkx` this returns
@@ -185,6 +243,7 @@ where
         list_content,
         animation_paths,
         behavior_path,
+        current_class_index: AtomicUsize::new(0),
     })
 }
 

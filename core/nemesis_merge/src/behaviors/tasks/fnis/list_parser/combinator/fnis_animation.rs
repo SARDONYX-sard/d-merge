@@ -6,18 +6,12 @@ use winnow::combinator::{opt, repeat, separated, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::{
-    parse_anim_type, FNISAnimType,
-};
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
-    parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags,
-};
-use crate::behaviors::tasks::fnis::list_parser::combinator::motion::parse_md_data;
-use crate::behaviors::tasks::fnis::list_parser::combinator::rotation::{
-    parse_rd_data, RotationData,
-};
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
+    anim_types::{parse_anim_type, FNISAnimType},
+    comment::skip_ws_and_comments,
+    flags::{parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags},
+    motion::parse_md_data,
+    rotation::{parse_rd_data, RotationData},
     take_till_fnis_ignores, take_till_space,
 };
 

@@ -10,7 +10,7 @@ use simd_json::json_typed;
 
 use crate::behaviors::tasks::{
     fnis::{
-        animations::PUSH_OP,
+        patch_gen::PUSH_OP,
         list_parser::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation},
     },
     patches::types::{OnePatchMap, SeqPatchMap},

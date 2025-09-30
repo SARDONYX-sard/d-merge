@@ -33,11 +33,18 @@ use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub(crate) struct AdsfPatch<'a> {
-    /// e.g. `DefaultMale`, `DefaultFemale`
+    /// When multiple entries share the same `project_name`, the `~n` suffix,
+    /// where `n` is 1-based and indicates the nth occurrence (with `1` meaning the first).
+    ///
+    /// e.g. `DefaultMale~1`, `DefaultFemale~1`
     pub target: &'a str,
-    /// e.g. `/some/Nemesis_Engine/mod/slide`
+
+    /// Ordering priority id.
+    /// # Example
+    /// - Vfs => `slide`
+    /// - Manual => `/some/Nemesis_Engine/mod/slide`
     pub id: &'a str,
-    patch: PatchKind<'a>,
+    pub(crate) patch: PatchKind<'a>,
 }
 
 #[derive(serde::Serialize, Debug, Clone, PartialEq)]
