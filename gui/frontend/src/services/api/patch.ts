@@ -95,6 +95,12 @@ export type PatchOptions = {
   autoRemoveMeshes: boolean;
   /** Report progress status +2s */
   useProgressReporter: boolean;
+  /** Skyrim data directories glob (required **only when using FNIS**).
+   *
+   * This must include all directories containing `animations/<namespace>`, otherwise FNIS
+   * entries will not be detected and the process will fail.
+   **/
+  skyrimDataDirGlob?: string;
 };
 
 export const patchOptionsSchema = z
@@ -110,6 +116,7 @@ export const patchOptionsSchema = z
     outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
     autoRemoveMeshes: z.boolean(),
     useProgressReporter: z.boolean(),
+    skyrimDataDirGlob: z.optional(z.string()),
   })
   .catch({
     hackOptions: {

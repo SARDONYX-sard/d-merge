@@ -1034,6 +1034,7 @@ impl ModManagerApp {
                     output_merged_json: is_debug_mode,
                     output_merged_xml: false,
                 },
+                skyrim_data_dir_glob: Some(self.current_skyrim_data_dir().to_string()),
             },
         ));
     }

@@ -92,6 +92,12 @@ pub struct Config {
 
     /// Options controlling the output of debug artifacts.
     pub debug: DebugOptions,
+
+    /// Skyrim data directories glob (required **only when using FNIS**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
 impl Config {
@@ -126,6 +132,7 @@ impl Config {
                 output_merged_xml: self.debug.output_merged_xml,
             },
             status_report,
+            skyrim_data_dir_glob: self.skyrim_data_dir_glob,
         })
     }
 }
@@ -337,8 +344,7 @@ pub fn get_skyrim_data_dir(runtime: String) -> napi::Result<String> {
 /// # FNIS
 /// | is_vfs | glob pattern                                                         | id extracted as                   |
 /// |--------|----------------------------------------------------------------------|-----------------------------------|
-/// | true   | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
-/// | false  | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | full parent path (e.g. `MO2/mods/mod_name/.../animations/aaaa`) |
+/// |  any   | `{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
 ///
 /// - `is_vfs`:
 ///   Whether the lookup is done in the virtualized `Data` directory (true) or

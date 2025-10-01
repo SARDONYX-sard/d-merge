@@ -55,6 +55,7 @@ pub(crate) fn fastest_config() -> Config {
             output_merged_xml: false,
         },
         output_target: OutPutTarget::SkyrimSe,
+        skyrim_data_dir_glob: None,
     }
 }
 
@@ -72,5 +73,6 @@ pub(crate) fn slow_debug_config() -> Config {
             output_merged_xml: false,
         },
         output_target: OutPutTarget::SkyrimSe,
+        skyrim_data_dir_glob: None,
     }
 }

@@ -40,10 +40,7 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::behaviors::{
-    priority_ids::take_until_ext,
-    tasks::fnis::collect::{owned_::collect_paths, parse::get_fnis_namespace},
-};
+use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::collect::collect_paths};
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
 #[derive(Debug)]
@@ -189,6 +186,7 @@ impl OwnedFnisInjection {
 /// - The Behavior file is missing (`BehaviorMissing`)
 pub fn collect_fnis_injection<P>(
     animations_mod_dir: P,
+    namespace: &str,
     priority: usize,
 ) -> Result<OwnedFnisInjection, FnisError>
 where
@@ -204,9 +202,6 @@ where
         });
     }
 
-    let binding = animations_mod_dir.to_string_lossy();
-    let namespace = get_fnis_namespace(binding.as_ref())?;
-
     let list_contents = load_all_fnis_list_files(animations_mod_dir, namespace)?;
     let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
 
@@ -218,39 +213,6 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
     })
-}
-
-/// Performs a case-insensitive file or directory search on Linux.
-///
-/// On Linux, filesystem paths are case-sensitive. To ensure that FNIS
-/// mod files can be found regardless of capitalization, this function
-/// searches a directory for a file or folder matching `name` case-insensitively.
-///
-/// On Windows and other case-insensitive filesystems, this function
-/// simply returns `base.join(name)` with **zero overhead**.
-///
-/// # Errors
-/// - Not found target name.
-/// - If dir is empty.
-#[cfg(target_os = "linux")]
-fn find_case_insensitive(base: &Path, name: &str) -> std::io::Result<PathBuf> {
-    let name_lower = name.to_lowercase();
-    for entry in fs::read_dir(base)? {
-        let entry = entry?;
-        if entry.file_name().to_string_lossy().to_lowercase() == name_lower {
-            return Ok(entry.path());
-        }
-    }
-
-    Err(std::io::Error::new(
-        std::io::ErrorKind::DirectoryNotEmpty,
-        "Dir is empty.",
-    ))
-}
-
-#[cfg(not(target_os = "linux"))]
-fn find_case_insensitive(base: &Path, name: &str) -> std::io::Result<PathBuf> {
-    Ok(base.join(name))
 }
 
 fn collect_hkx_entries(root: &Path) -> Vec<String> {
@@ -374,64 +336,90 @@ fn load_all_fnis_list_files(
 /// - `FNIS_<namespace>_<suffix>_Behavior.hkx`
 ///
 /// Returns the relative path to the behavior file (with `\` separators)
-/// or an error if not found.
+///
+/// # Errors
+/// An error if not found.
 fn find_behavior_file(animations_mod_dir: &Path, namespace: &str) -> Result<String, FnisError> {
-    let char_dir = animations_mod_dir
+    let parent_dir = animations_mod_dir
         .parent()
         .and_then(|p| p.parent())
-        .ok_or_else(|| FnisError::BehaviorMissing {
-            expected: format!("Behaviors\\FNIS_{}_Behavior.hkx", namespace),
+        .ok_or_else(|| FnisError::BehaviorParentMissing {
+            animations_mod_dir: animations_mod_dir.to_path_buf(),
         })?;
 
-    let behaviors_dir =
-        find_case_insensitive(char_dir, "behaviors").map_err(|_| FnisError::BehaviorMissing {
-            expected: namespace.to_string(),
+    let mut behaviors_file = parent_dir.join("behaviors");
+    behaviors_file.push(format!("FNIS_{namespace}*_Behavior.hkx"));
+    let pattern = behaviors_file.to_string_lossy().to_string();
+
+    let matches =
+        collect_paths(&pattern).map_err(|source| FnisError::BehaviorInvalidGlobPatten {
+            pattern: pattern.clone(),
+            source,
         })?;
 
-    // Build a glob pattern for suffix support
-    let pattern = behaviors_dir
-        .join(format!("FNIS_{}*_Behavior.hkx", namespace))
-        .to_string_lossy()
-        .to_string();
-
-    let mut matches = collect_paths(&pattern).map_err(|_| FnisError::BehaviorMissing {
-        expected: pattern.clone(),
-    })?;
-
-    // No match -> error
-    let path = matches.pop().ok_or_else(|| FnisError::BehaviorMissing {
-        expected: pattern.clone(),
-    })?;
-
-    // Convert to relative path with backslashes
-    let rel_path = path
-        .strip_prefix(char_dir)
-        .unwrap_or(&path)
-        .components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("\\");
-
-    Ok(rel_path)
+    match matches.len() {
+        0 => Err(FnisError::BehaviorNotFound { pattern }),
+        1 => {
+            let path = &matches[0];
+            let rel_path = path
+                .strip_prefix(parent_dir)
+                .map_err(|_| FnisError::BehaviorRelativePathError {
+                    full_path: path.clone(),
+                    base: parent_dir.to_path_buf(),
+                })?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("\\");
+            Ok(rel_path)
+        }
+        _ => {
+            let files: Vec<String> = matches
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            Err(FnisError::MultipleBehaviorFiles { files })
+        }
+    }
 }
 
 #[derive(Debug, snafu::Snafu)]
 pub enum FnisError {
-    /// One or more hkx files were expected below(`{animations_mod_dir}`), but none were found.
-    #[snafu(display("One or more hkx files were expected below(`{}`), but none were found.", animations_mod_dir.display()))]
+    /// One or more HKX files were expected below the given directory, but none were found.
+    #[snafu(display(
+        "One or more hkx files were expected below(`{animations_mod_dir:?}`), but none were found."
+    ))]
     EmptyAnimPaths { animations_mod_dir: PathBuf },
 
-    /// Failed to parse path as fnis path
-    #[snafu(display("Failed to parse namespace(e.g. `FNISZoo`) from this path:\n{source}"))]
-    FailedToGetFnisNamespace {
-        source: serde_hkx::errors::readable::ReadableError,
-    },
-
-    /// Expected list file at {expected}, but not found such a path.
+    /// Expected list file at `{expected}`, but the file was not found.
+    #[snafu(display("Expected list file at {expected}, but not found such a path."))]
     ListMissing { expected: String, source: io::Error },
 
-    /// Expected behavior file at `Behaviors\\FNIS_{expected}[_<suffix>]_Behavior.hkx`(e.g. FNIS_FNISZoo_tail_Behavior.txt), but not found such a path.
-    BehaviorMissing { expected: String },
+    /// Failed to get the parent directory of the animations mod directory.
+    /// This indicates that the provided `animations_mod_dir` is too shallow in the filesystem hierarchy.
+    #[snafu(display("Failed to get parent directory for `{animations_mod_dir:?}`"))]
+    BehaviorParentMissing { animations_mod_dir: PathBuf },
+
+    /// I/O error occurred while searching for behavior files matching the given pattern.
+    #[snafu(display("Failed to search for behaviors with pattern `{pattern}`: {source}"))]
+    BehaviorInvalidGlobPatten {
+        pattern: String,
+        source: glob::PatternError,
+    },
+
+    /// No behavior files found matching the expected pattern.
+    /// For example: `FNIS_<namespace>_Behavior.hkx` or `FNIS_<namespace>_<suffix>_Behavior.hkx`.
+    #[snafu(display("No behavior file found matching pattern `{pattern}`"))]
+    BehaviorNotFound { pattern: String },
+
+    /// Multiple behavior files were found matching the pattern.
+    /// This is ambiguous, as FNIS expects exactly one behavior file per namespace.
+    #[snafu(display("Multiple behavior files found: {files:?}"))]
+    MultipleBehaviorFiles { files: Vec<String> },
+
+    /// Failed to convert the absolute path to a relative path from the parent directory.
+    #[snafu(display("Failed to convert `{full_path:?}` to relative path from `{base:?}`"))]
+    BehaviorRelativePathError { full_path: PathBuf, base: PathBuf },
 }
 
 #[cfg(test)]
@@ -479,7 +467,7 @@ mod tests {
     #[test]
     fn test_collect_fnis_injection() {
         let input = "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
-        let res = collect_fnis_injection(input, 0).unwrap_or_else(|e| panic!("{e}"));
+        let res = collect_fnis_injection(input, "FNISFlyer", 0).unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);
     }
 }

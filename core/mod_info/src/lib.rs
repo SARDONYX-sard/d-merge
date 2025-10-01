@@ -16,8 +16,7 @@ use std::path::{Path, PathBuf};
 /// # FNIS
 /// | is_vfs | glob pattern                                                         | id extracted as                   |
 /// |--------|----------------------------------------------------------------------|-----------------------------------|
-/// | true   | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
-/// | false  | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | full parent path (e.g. `MO2/mods/mod_name/.../animations/aaaa`) |
+/// |  any   | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
 ///
 /// - `is_vfs`:
 ///   Whether the lookup is done in the virtualized `Data` directory (true) or
@@ -39,7 +38,7 @@ use std::path::{Path, PathBuf};
 pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let mut mods = Vec::new();
     mods.par_extend(get_all_nemesis(skyrim_data_dir, is_vfs)?);
-    mods.par_extend(get_all_fnis(skyrim_data_dir, is_vfs)?);
+    mods.par_extend(get_all_fnis(skyrim_data_dir)?);
     Ok(mods)
 }
 
@@ -114,37 +113,46 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, Error> {
 ///
 /// # Errors
 /// If invalid glob pattern.
-fn get_all_fnis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
-    let fnis_pattern =
-        format!("{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt");
+fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
+    use std::collections::HashSet;
 
-    let mods = collect_paths(&fnis_pattern)?
-        .par_iter()
-        .filter_map(|path| {
-            if !path.exists() {
-                return None;
-            }
-            // <skyrim_data_dir>/meshes/actors/character/animations/<vfs_id>
-            let parent_dir = path.parent()?;
+    fn inner(fnis_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
+        let mods = collect_paths(fnis_pattern)?
+            .par_iter()
+            .filter_map(|path| {
+                if !path.exists() {
+                    return None;
+                }
+                // <skyrim_data_dir>/meshes/**/animations/<vfs_id>
+                let parent_dir = path.parent()?;
 
-            // get `<vfs_id>`
-            let name = parent_dir.file_name()?.display().to_string();
+                // get `<vfs_id>`
+                let name = parent_dir.file_name()?.display().to_string();
+                let id = name.clone();
 
-            let id = if is_vfs {
-                name.clone()
-            } else {
-                parent_dir.display().to_string() //
-            };
+                let mod_info = ModInfo {
+                    id,
+                    name,
+                    mod_type: ModType::Fnis,
+                    ..Default::default()
+                };
+                Some(mod_info)
+            })
+            .collect();
 
-            let mod_info = ModInfo {
-                id,
-                name,
-                mod_type: ModType::Fnis,
-                ..Default::default()
-            };
-            Some(mod_info)
-        })
-        .collect();
+        Ok(mods)
+    }
+
+    let fnis_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
+    let mut mods = inner(&fnis_pattern)?;
+
+    // TkDodgeSE lacks FNIS_*_List.txt and consists solely of animations, making acquisition difficult.
+    // To avoid false positives with other standard animation searches, it requires special handling.
+    let fnis_tk_dodge = format!("{skyrim_data_dir}/meshes/actors/character/animations/TkDodge");
+    mods.par_extend(inner(&fnis_tk_dodge)?);
+
+    let mut mods: Vec<_> = mods.into_par_iter().collect();
+    mods.sort_unstable_by(|a, b| a.name.cmp(&b.name));
 
     Ok(mods)
 }
@@ -152,7 +160,7 @@ fn get_all_fnis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Err
 /// # Note
 /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
 /// - `priority`: As with MO2, lower numbers indicate lower priority, higher numbers indicate higher priority.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ModInfo {
     /// Mod-specific dir name.
     /// - Nemesis/FNIS(vfs): e.g. `aaaa`

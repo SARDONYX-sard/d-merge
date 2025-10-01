@@ -37,6 +37,12 @@ pub(crate) struct GuiPatchOptions {
     output_target: OutPutTarget,
     auto_remove_meshes: bool,
     use_progress_reporter: bool,
+
+    /// Skyrim data directories glob (required **only when using FNIS**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
 #[tauri::command]
@@ -76,6 +82,7 @@ pub(crate) async fn patch(
                 hack_options: options.hack_options,
                 debug: options.debug,
                 output_target: options.output_target,
+                skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             };
 
             let _ = time!("[patch]", behavior_gen(patches, config).await);
