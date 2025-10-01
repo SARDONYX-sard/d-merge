@@ -14,20 +14,21 @@ use crate::behaviors::tasks::fnis::{
     },
     patch_gen::PUSH_OP,
 };
-use crate::behaviors::tasks::patches::types::{HkxPatches, OnePatchMap, SeqPatchMap};
+use crate::behaviors::tasks::patches::types::{HkxPatchMaps, OnePatchMap, SeqPatchMap};
 
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
-) -> (HkxPatches<'a>, Vec<AdsfPatch<'a>>) {
+) -> (HkxPatchMaps<'a>, Vec<AdsfPatch<'a>>) {
     let namespace = owned_data.namespace.as_str();
     let priority = owned_data.priority;
 
-    let hkx_patches = (OnePatchMap::new(), SeqPatchMap::new());
+    let one = OnePatchMap::new();
+    let seq = SeqPatchMap::new();
     {
         let animations = &owned_data.animation_paths;
         let (json_path, patch) = new_add_anim_seq_patch(animations, priority);
-        hkx_patches.1.insert(json_path, patch);
+        seq.insert(json_path, patch);
     }
 
     // push_mod_root_behavior(&hkx_patches, owned_data);
@@ -86,7 +87,7 @@ pub fn generate_patch<'a>(
         };
     }
 
-    (hkx_patches, adsf_patches)
+    (HkxPatchMaps { one, seq }, adsf_patches)
 }
 
 fn push_new_adsf_patch<'a>(

@@ -9,7 +9,7 @@
 //! From here, we need to determine and load the xml to which the patch will be applied, so we use a table to load this.
 //! Note that the dir paths above `mesh` can be optionally specified and concatenated as resource paths later.
 use serde_hkx::errors::readable::ReadableError;
-use snafu::{prelude::*, OptionExt};
+use snafu::prelude::*;
 use std::path::Path;
 use winnow::{
     ascii::Caseless,
@@ -19,26 +19,11 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::behaviors::priority_ids::take_until_ext;
-use crate::behaviors::tasks::templates::types::TemplateKey;
+use crate::behaviors::{priority_ids::take_until_ext, tasks::templates::key::TemplateKey};
 
 /// Return (hashmap key, inner path starting from `meshes`)
-pub(super) fn template_name_and_inner_path(
-    path: &Path,
-) -> Result<(TemplateKey<'_>, &str), TemplateError> {
-    let file_stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .context(MissingFileStemSnafu)?;
-
-    let is_1stperson = path
-        .components()
-        .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
-
-    let key = TemplateKey::new(file_stem, is_1stperson);
-    let inner_path = parse_template_path(path)?;
-
-    Ok((key, inner_path))
+pub(crate) fn template_name_and_inner_path(path: &Path) -> Result<TemplateKey<'_>, TemplateError> {
+    Ok(unsafe { TemplateKey::new_unchecked(parse_template_path(path)?) })
 }
 
 pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {
@@ -76,24 +61,21 @@ pub enum TemplateError {
 mod tests {
     use super::*;
 
-    fn assert_template(path: &str, expected_key: (&str, bool), expected_inner: &str) {
+    fn assert_template(path: &str, expected_inner: &str) {
         let path = Path::new(path);
         let result = template_name_and_inner_path(path).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(result.0, TemplateKey::new(expected_key.0, expected_key.1));
-        assert_eq!(result.1, expected_inner);
+        assert_eq!(result.as_str(), expected_inner);
     }
 
     #[test]
     fn test_regular_path() {
         assert_template(
             r"../../resource/assets/templates/meshes/actors/character/defaultmale_Project.bin",
-            ("defaultmale_Project", false),
             r"meshes/actors/character/defaultmale_Project.bin",
         );
 
         assert_template(
             "data/meshes/actors/character/behaviors/weapequip.xml",
-            ("weapequip", false),
             "meshes/actors/character/behaviors/weapequip.xml",
         );
     }
@@ -102,7 +84,6 @@ mod tests {
     fn test_with_backslashes_and_1stperson() {
         assert_template(
             r"data/meshes/actors/character/character assets/_1stperson/skeleton.nif",
-            ("skeleton", true),
             r"meshes/actors/character/character assets/_1stperson/skeleton.nif",
         );
     }
@@ -111,7 +92,6 @@ mod tests {
     fn test_with_slashes_and_1stperson() {
         assert_template(
             "Data/Meshes/_1stPerson/something.nif",
-            ("something", true),
             "Meshes/_1stPerson/something.nif",
         );
     }
@@ -121,13 +101,11 @@ mod tests {
     fn windows_long_path() {
         assert_template(
             r"D:release-no-lto\assets\templates\meshes\actors\character\_1stperson\characters\firstperson.bin",
-            ("firstperson", true),
             r"meshes\actors\character\_1stperson\characters\firstperson.bin",
         );
         let path = r"\\?\D:\rust\d-merge\target\release-no-lto\assets\templates\meshes\actors\character\_1stperson\behaviors\blockbehavior.bin";
         assert_template(
             path,
-            ("blockbehavior", true),
             r"meshes\actors\character\_1stperson\behaviors\blockbehavior.bin",
         );
     }
@@ -136,32 +114,5 @@ mod tests {
     fn test_missing_meshes_dir() {
         let path = Path::new("data/not_meshes_dir/character/skeleton.nif");
         assert!(template_name_and_inner_path(path).is_err());
-    }
-
-    #[ignore = "local only checker"]
-    #[test]
-    fn test_overwrite_path() {
-        let path = "../../resource/assets";
-
-        let mut map = indexmap::IndexMap::new();
-        let mut overwrite = vec![];
-        for result in jwalk::WalkDir::new(path) {
-            let path = result.unwrap().path();
-
-            if !path.is_file() {
-                continue;
-            }
-
-            let Ok((key, inner_path)) = template_name_and_inner_path(&path) else {
-                continue;
-            };
-
-            if let Some(prev) = map.insert(key.to_string(), inner_path.to_string()) {
-                overwrite.push((inner_path.to_string(), prev));
-            };
-        }
-
-        dbg!(&overwrite);
-        dbg!(overwrite.len());
     }
 }

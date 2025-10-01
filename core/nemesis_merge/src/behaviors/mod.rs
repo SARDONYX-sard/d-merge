@@ -1,6 +1,6 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 mod priority_ids;
-mod tasks;
+pub(crate) mod tasks;
 
 pub use crate::behaviors::priority_ids::types::PriorityMap;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
@@ -133,7 +133,7 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     // 1/3: Parse nemesis patches
     let (
         BorrowedPatches {
-            template_names,
+            template_keys: template_names,
             borrowed_patches,
             behavior_string_data_map: variable_class_map,
         },

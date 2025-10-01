@@ -4,9 +4,9 @@ use dashmap::{DashMap, DashSet};
 use indexmap::IndexMap;
 use std::path::PathBuf;
 
-pub use self::patch_map::{HkxPatches, OnePatchMap, SeqPatchMap};
+pub use self::patch_map::{HkxPatchMaps, OnePatchMap, SeqPatchMap};
 use crate::behaviors::tasks::{
-    adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::types::TemplateKey,
+    adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::key::TemplateKey,
 };
 
 pub struct OwnedPatches {
@@ -36,9 +36,8 @@ pub type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
 pub struct BorrowedPatches<'a> {
     /// Name of the template that needs to be read.
     ///
-    /// - format: template_name, is_1st_person
-    /// - e.g. (`0_master`, false)
-    pub template_names: DashSet<TemplateKey<'a>>,
+    /// - e.g. (`meshes/actors/character/_1stperson/behaviors/0_master.bin`)
+    pub template_keys: DashSet<TemplateKey<'a>>,
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
     pub borrowed_patches: RawBorrowedPatches<'a>,
@@ -66,9 +65,7 @@ pub struct BorrowedPatches<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub(crate) struct RawBorrowedPatches<'a>(
-    pub DashMap<TemplateKey<'a>, (OnePatchMap<'a>, SeqPatchMap<'a>)>,
-);
+pub(crate) struct RawBorrowedPatches<'a>(pub DashMap<TemplateKey<'a>, HkxPatchMaps<'a>>);
 
 impl RawBorrowedPatches<'_> {
     pub(crate) fn len(&self) -> usize {
@@ -76,7 +73,7 @@ impl RawBorrowedPatches<'_> {
         self.0
             .par_iter()
             .map(|pair| {
-                let (one, seq) = pair.value();
+                let HkxPatchMaps { one, seq } = pair.value();
                 one.0.len() + seq.0.len()
             })
             .sum()

@@ -16,6 +16,9 @@ use crate::{
 };
 
 /// Parse nemesis patch path.
+///
+/// # Return
+/// e.g. `0_master`, is_1st_person
 pub fn parse_nemesis_path(path: &Path) -> Result<(&str, bool), Error> {
     let input = path.to_str().with_context(|| NonUtf8PathSnafu { path })?;
 

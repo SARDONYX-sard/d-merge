@@ -1,7 +1,13 @@
 use rayon::prelude::*;
+use snafu::ResultExt as _;
 use std::{collections::HashSet, path::Path};
 
-use crate::behaviors::tasks::templates::types::{OwnedTemplateMap, TemplateKey};
+use crate::{
+    behaviors::tasks::templates::{
+        collect::path::template_name_and_inner_path, key::TemplateKey, types::OwnedTemplateMap,
+    },
+    errors::FailedToGetInnerPathFromTemplateSnafu,
+};
 
 /// Return HashMap<template key, `meshes` inner path>
 pub fn collect_templates(
@@ -23,10 +29,17 @@ pub fn collect_templates(
                 return None;
             }
 
-            let is_1st_person = path
-                .components()
-                .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
-            template_names.get(&TemplateKey::new(file_stem.to_str()?, is_1st_person))?;
+            let inner_path = match template_name_and_inner_path(&path)
+                .with_context(|_| FailedToGetInnerPathFromTemplateSnafu { path: path.clone() })
+            {
+                Ok(inner_path) => inner_path,
+                Err(e) => {
+                    tracing::error!(%e);
+                    return None;
+                }
+            };
+
+            template_names.get(&inner_path)?;
 
             let bytes = std::fs::read(&path).ok()?;
             Some((path, bytes))

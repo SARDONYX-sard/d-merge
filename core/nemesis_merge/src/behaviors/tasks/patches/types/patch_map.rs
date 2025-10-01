@@ -13,7 +13,33 @@ use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 
-pub type HkxPatches<'a> = (OnePatchMap<'a>, SeqPatchMap<'a>);
+/// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
+///
+/// This is useful when you want to manage both *single-value patches*
+/// and *multi-value patches* in the same context.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HkxPatchMaps<'a> {
+    /// Stores one value per path (highest priority wins).
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
+    )]
+    pub one: OnePatchMap<'a>,
+    /// Stores multiple values per path.
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))
+    )]
+    pub seq: SeqPatchMap<'a>,
+}
+
+impl HkxPatchMaps<'_> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.one.0.len() + self.seq.0.len()
+    }
+}
 
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.

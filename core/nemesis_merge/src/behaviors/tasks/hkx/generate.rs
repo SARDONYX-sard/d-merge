@@ -33,8 +33,9 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
 
     let results = templates
         .into_par_iter()
-        .map(|(key, (inner_path, template_json))| {
+        .map(|(key, template_json)| {
             reporter.increment();
+            let inner_path = key.as_meshes_inner_path();
             let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
@@ -107,7 +108,7 @@ pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
     filter_results(results)
 }
 
-fn debug_file_path(output_dir: &Path, inner_path: &str) -> PathBuf {
+fn debug_file_path(output_dir: &Path, inner_path: &Path) -> PathBuf {
     output_dir.join(".d_merge").join(".debug").join(inner_path)
 }
 

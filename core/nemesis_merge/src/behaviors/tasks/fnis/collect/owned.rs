@@ -26,13 +26,11 @@
 //! # Note
 //! - Linux path is case sensitive: https://learn.microsoft.com/windows/wsl/case-sensitivity
 use std::{
-    fs, io,
+    io,
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use rayon::prelude::*;
-use snafu::ResultExt as _;
 use winnow::{
     ascii::Caseless,
     combinator::alt,

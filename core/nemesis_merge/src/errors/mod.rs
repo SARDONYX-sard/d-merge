@@ -127,6 +127,10 @@ pub enum Error {
     #[snafu(display("Failed to parse path as nemesis path:\n{source}"))]
     FailedParseNemesisPatchPath { source: ReadableError },
 
+    /// Failed to parse path as nemesis path
+    #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
+    FailedParseNemesisPatchPath2 { path: PathBuf },
+
     #[snafu(transparent)]
     ParsedAdsfPathError {
         source: crate::behaviors::AsdfPathParseError,

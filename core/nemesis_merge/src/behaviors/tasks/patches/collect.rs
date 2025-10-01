@@ -12,11 +12,11 @@ use crate::{
                 BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, OwnedPatches,
                 RawBorrowedPatches,
             },
-            templates::types::TemplateKey,
+            templates::key::TemplateKey,
         },
     },
     config::{ReportType, StatusReportCounter},
-    errors::{Error, FailedIoSnafu, NemesisXmlErrSnafu, Result},
+    errors::{Error, FailedIoSnafu, FailedParseNemesisPatchPath2Snafu, NemesisXmlErrSnafu, Result},
     results::filter_results,
     Config,
 };
@@ -24,7 +24,7 @@ use dashmap::DashSet;
 use json_patch::ValueWithPriority;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
-use snafu::ResultExt as _;
+use snafu::{OptionExt as _, ResultExt as _};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -128,7 +128,7 @@ pub fn collect_borrowed_patches<'a>(
     config: &Config,
 ) -> (BorrowedPatches<'a>, Vec<Error>) {
     let raw_borrowed_patches = RawBorrowedPatches::default();
-    let template_names = DashSet::new();
+    let template_keys = DashSet::new();
     let variable_class_map = BehaviorStringDataMap::new();
 
     let reporter = StatusReportCounter::new(
@@ -149,10 +149,11 @@ pub fn collect_borrowed_patches<'a>(
                     parse_nemesis_patch(xml, config.hack_options.map(Into::into))
                         .with_context(|_| NemesisXmlErrSnafu { path })?;
 
-                let (template_name, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
-                let key = TemplateKey::new(template_name, is_1st_person);
+                let (template_file_stem, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
+                let key = TemplateKey::from_nemesis_file(template_file_stem, is_1st_person)
+                    .with_context(|| FailedParseNemesisPatchPath2Snafu { path })?;
 
-                template_names.insert(key.clone());
+                template_keys.insert(key.clone());
                 if let Some(class_index) = variable_class_index {
                     variable_class_map
                         .0
@@ -169,11 +170,11 @@ pub fn collect_borrowed_patches<'a>(
                         // Pure: no add and remove because of single value
                         json_patch::OpRangeKind::Pure(_) => {
                             let value = ValueWithPriority::new(value, priority);
-                            entry.value().0.insert(json_path, value);
+                            entry.value().one.insert(json_path, value);
                         }
                         json_patch::OpRangeKind::Seq(_) => {
                             let value = ValueWithPriority::new(value, priority);
-                            entry.value().1.insert(json_path, value);
+                            entry.value().seq.insert(json_path, value);
                         }
                         json_patch::OpRangeKind::Discrete(range_vec) => {
                             let json_patch::JsonPatch { value, .. } = value;
@@ -199,7 +200,7 @@ pub fn collect_borrowed_patches<'a>(
                                     value
                                 },
                             );
-                            entry.value().1.extend(json_path, iter);
+                            entry.value().seq.extend(json_path, iter);
                         }
                     }
                 });
@@ -215,7 +216,7 @@ pub fn collect_borrowed_patches<'a>(
 
     (
         BorrowedPatches {
-            template_names,
+            template_keys,
             borrowed_patches: raw_borrowed_patches,
             behavior_string_data_map: variable_class_map,
         },
