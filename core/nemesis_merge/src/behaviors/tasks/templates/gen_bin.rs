@@ -113,4 +113,13 @@ mod tests {
         let output_dir = Path::new("../../dummy/templates/bins");
         create_bin_templates(paths.iter(), output_dir);
     }
+
+    #[test]
+    fn test_gen_behaviors() {
+        let paths = crate::behaviors::tasks::fnis::collect::collect_paths(
+            "../../dummy/templates/bins/**/behaviors/*.bin",
+        )
+        .unwrap();
+        std::fs::write("./behaviors.log", format!("{paths:#?}")).unwrap();
+    }
 }

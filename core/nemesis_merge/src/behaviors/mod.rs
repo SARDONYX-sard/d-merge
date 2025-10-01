@@ -2,7 +2,8 @@
 mod priority_ids;
 pub(crate) mod tasks;
 
-pub use crate::behaviors::priority_ids::types::PriorityMap;
+pub use crate::behaviors::priority_ids::types::{PatchMaps, PriorityMap};
+use crate::behaviors::tasks::fnis::collect::collect_all_fnis_injections;
 pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
 
 pub(crate) use tasks::{
@@ -22,31 +23,6 @@ use crate::behaviors::tasks::patches::{
 use crate::config::{Config, Status};
 use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
 use rayon::prelude::*;
-
-/// Nemesis & FNIS patch path
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct PatchMaps {
-    /// Nemesis patch path
-    /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
-    /// - value: priority
-    pub nemesis_entries: PriorityMap,
-    /// FNIS patch path
-    /// - key: namespace (e.g. `FNISFlyer`)
-    /// - value: priority
-    ///
-    /// # Important notes when using FNIS entries:
-    /// 1. FNIS collects all files under `animations/<namespace>` across all mods.
-    ///    If running in manual mode (outside of VFS) and multiple versions of the same mod exist,
-    ///    they share the same namespace, which can lead to unintended conflicts such as
-    ///    duplicate animation registrations and other bugs.
-    /// 2. When using FNIS entries, ensure that `config.skyrim_data_dir_glob` includes
-    ///    all relevant Skyrim data directories, e.g.:
-    ///    - `"MO2/mods/*"`
-    ///    - `"steamapps/Skyrim Special Edition/Data"`
-    ///
-    ///    Otherwise, the code may fail with errors.
-    pub fnis_entries: PriorityMap,
-}
 
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
 ///
@@ -69,6 +45,16 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         tracing::trace!("fnis_entries = {sorted:#?}");
     }
 
+    let owned_fnis_patches = if !fnis_entries.is_empty() {
+        let skyrim_data_dir_glob = config
+            .skyrim_data_dir_glob
+            .as_ref()
+            .ok_or(Error::MissingSkyrimDataDirGlob)?;
+        collect_all_fnis_injections(skyrim_data_dir_glob, &fnis_entries)
+    } else {
+        vec![]
+    };
+
     // Collect all patches file.
     let OwnedPatches {
         owned_patches,
@@ -76,8 +62,6 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         asdsf_patches: owned_asdsf_patches,
         errors: owned_file_errors,
     } = collect_owned_patches(&nemesis_entries, &config).await;
-
-    // TODO: OwnedFnis here.(all injection context struct).
 
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
@@ -159,11 +143,16 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
     #[cfg(feature = "tracing")]
     tracing::debug!("needed template_names = {template_names:#?}");
 
+    let mut template_error_len;
     let owned_templates = {
         use self::tasks::templates::collect::owned;
         let template_dir = &config.resource_dir;
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        owned::collect_templates(template_dir, template_names.into_par_iter().collect())
+        let (owned_templates, errors) =
+            owned::collect_templates(template_dir, template_names.into_par_iter().collect());
+        template_error_len = errors.len();
+        all_errors.par_extend(errors);
+        owned_templates
     };
 
     {
@@ -172,11 +161,10 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         let variable_class_map = variable_class_map;
         let borrowed_patches = borrowed_patches;
 
-        let template_error_len;
         let mut templates = {
             use self::tasks::templates::collect::borrowed;
             let (templates, errors) = borrowed::collect_templates(&owned_templates);
-            template_error_len = errors.len();
+            template_error_len += errors.len();
             all_errors.par_extend(errors);
             templates
         };

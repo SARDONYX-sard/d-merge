@@ -11,6 +11,16 @@ pub enum Error {
     /// {msg}
     Custom { msg: String },
 
+    /// Applying the FNIS mod patch requires input for config.skyrim_data_dir_glob, but it is not provided.
+    MissingSkyrimDataDirGlob,
+
+    /// Failed to parse FNIS_*_List.txt file.
+    #[snafu(display("[FNIS_*_List.txt file Parse Error]{}:\n{source}", path.display()))]
+    FailedParseFnisModList {
+        source: ReadableError,
+        path: PathBuf,
+    },
+
     /// Failed to read file from {path}
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },

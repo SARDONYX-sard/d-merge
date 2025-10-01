@@ -10,6 +10,9 @@ pub(crate) struct StatusReportCounter<'a> {
 }
 
 pub(crate) enum ReportType {
+    /// Status when generating FNIS patches.
+    GeneratingFnisPatches,
+
     /// Status when reading patches.
     ReadingPatches,
 
@@ -47,6 +50,12 @@ impl<'a> StatusReportCounter<'a> {
             + 1;
         if let Some(status_reporter) = self.status_reporter {
             match self.kind {
+                ReportType::GeneratingFnisPatches => {
+                    (status_reporter)(Status::GeneratingFnisPatches {
+                        index: done,
+                        total: self.total,
+                    });
+                }
                 ReportType::ReadingPatches => (status_reporter)(Status::ReadingPatches {
                     index: done,
                     total: self.total,

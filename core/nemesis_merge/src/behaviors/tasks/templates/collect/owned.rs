@@ -1,50 +1,36 @@
-use rayon::prelude::*;
-use snafu::ResultExt as _;
+use rayon::{iter::Either, prelude::*};
 use std::{collections::HashSet, path::Path};
 
 use crate::{
-    behaviors::tasks::templates::{
-        collect::path::template_name_and_inner_path, key::TemplateKey, types::OwnedTemplateMap,
-    },
-    errors::FailedToGetInnerPathFromTemplateSnafu,
+    behaviors::tasks::templates::{key::TemplateKey, types::OwnedTemplateMap},
+    errors::Error,
 };
 
-/// Return HashMap<template key, `meshes` inner path>
+/// Collect templates path & content map.
+///
+/// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
 pub fn collect_templates(
-    path: &Path,
+    template_root: &Path,
     template_names: HashSet<TemplateKey<'_>>,
-) -> OwnedTemplateMap {
-    let map: OwnedTemplateMap = jwalk::WalkDir::new(path)
-        .into_iter()
-        .par_bridge()
+) -> (OwnedTemplateMap, Vec<Error>) {
+    template_names
         .into_par_iter()
-        .flat_map(|entry| {
-            let path = entry.ok()?.path();
-            if !path.is_file() {
-                return None;
+        .map(|template_key| {
+            // Intended sample: `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.bin`
+            let template_path = template_root.join(template_key.as_meshes_inner_path());
+
+            if !template_path.exists() || !template_path.is_file() {
+                return Either::Right(Error::NotFoundTemplate {
+                    template_name: template_path.display().to_string(),
+                });
             }
 
-            let file_stem = path.file_stem()?;
-            if file_stem.eq_ignore_ascii_case("animationdatasinglefile") {
-                return None;
+            match std::fs::read(&template_path) {
+                Ok(bytes) => Either::Left((template_path, bytes)),
+                Err(_err) => Either::Right(Error::NotFoundTemplate {
+                    template_name: template_path.display().to_string(),
+                }),
             }
-
-            let inner_path = match template_name_and_inner_path(&path)
-                .with_context(|_| FailedToGetInnerPathFromTemplateSnafu { path: path.clone() })
-            {
-                Ok(inner_path) => inner_path,
-                Err(e) => {
-                    tracing::error!(%e);
-                    return None;
-                }
-            };
-
-            template_names.get(&inner_path)?;
-
-            let bytes = std::fs::read(&path).ok()?;
-            Some((path, bytes))
         })
-        .collect();
-
-    map
+        .partition_map(|either| either)
 }

@@ -10,6 +10,13 @@ use pyo3::prelude::*;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub enum Status {
+    /// Status when generating FNIS patches.
+    GeneratingFnisPatches {
+        /// 0 based index
+        index: usize,
+        total: usize,
+    },
+
     /// Indicates the system is reading patches and templates.
     ReadingPatches {
         /// The index of the currently processed file (0-based).
@@ -38,6 +45,9 @@ impl From<RustStatus> for Status {
     #[inline]
     fn from(status: RustStatus) -> Self {
         match status {
+            RustStatus::GeneratingFnisPatches { index, total } => {
+                Status::GeneratingFnisPatches { index, total }
+            }
             RustStatus::ReadingPatches { index, total } => Status::ReadingPatches { index, total },
             RustStatus::ParsingPatches { index, total } => Status::ParsingPatches { index, total },
             RustStatus::ApplyingPatches { index, total } => {
@@ -55,19 +65,22 @@ impl From<RustStatus> for Status {
 impl core::fmt::Display for Status {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::GeneratingFnisPatches { index, total } => {
+                write!(f, "[1/6] Generating FNIS patches...({index}/{total})")
+            }
             Self::ReadingPatches { index, total } => {
-                write!(f, "[1/5] Reading templates and patches...({index}/{total})")
+                write!(f, "[2/6] Reading templates and patches...({index}/{total})")
             }
             Self::ParsingPatches { index, total } => {
-                write!(f, "[2/5] Parsing patches...({index}/{total})")
+                write!(f, "[3/6] Parsing patches...({index}/{total})")
             }
             Self::ApplyingPatches { index, total } => {
-                write!(f, "[3/5] Applying patches...({index}/{total})")
+                write!(f, "[4/6] Applying patches...({index}/{total})")
             }
             Self::GeneratingHkxFiles { index, total } => {
-                write!(f, "[4/5] Generating .hkx files...({index}/{total})")
+                write!(f, "[5/6] Generating .hkx files...({index}/{total})")
             }
-            Self::Done() => write!(f, "[5/5] Done."),
+            Self::Done() => write!(f, "[6/6] Done."),
             Self::Error(msg) => write!(f, "[Error] {msg}"),
         }
     }

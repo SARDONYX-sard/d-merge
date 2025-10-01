@@ -20,7 +20,7 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
                 print!("{CLEAR_LINE}{CYAN}{status}{RESET}");
                 stdout().flush().ok();
             }
-            Status::ParsingPatches { .. } => {
+            Status::GeneratingFnisPatches { .. } | Status::ParsingPatches { .. } => {
                 print!("{CLEAR_LINE}{MAGENTA}{status}{RESET}");
                 stdout().flush().ok();
             }

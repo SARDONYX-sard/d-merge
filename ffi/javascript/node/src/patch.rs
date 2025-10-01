@@ -159,6 +159,13 @@ pub struct ProgressContent {
 /// - Mirrors Rust enum with serde(tag="type", content="content").
 #[napi]
 pub enum PatchStatus {
+    /// Status when generating FNIS patches.
+    GeneratingFnisPatches {
+        /// 0 based index
+        index: u32,
+        total: u32,
+    },
+
     /// Status when reading patches.
     ReadingPatches {
         /// 0 based index
@@ -197,6 +204,12 @@ pub enum PatchStatus {
 impl From<RustStatus> for PatchStatus {
     fn from(s: RustStatus) -> Self {
         match s {
+            RustStatus::GeneratingFnisPatches { index, total } => {
+                PatchStatus::GeneratingFnisPatches {
+                    index: index as u32,
+                    total: total as u32,
+                }
+            }
             RustStatus::ReadingPatches { index, total } => PatchStatus::ReadingPatches {
                 index: index as u32,
                 total: total as u32,

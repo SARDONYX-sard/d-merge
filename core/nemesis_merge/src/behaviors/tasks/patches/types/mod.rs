@@ -49,18 +49,18 @@ pub struct BorrowedPatches<'a> {
     pub behavior_string_data_map: BehaviorStringDataMap<'a>,
 }
 
-/// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
+/// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)
 /// - value: `Map<jsonPath, { patch, priority }>`
 ///
-/// # Intended
+/// # Intended image
 /// ```json
-/// "0_master": {
+/// "meshes/.../0_master.bin": {
 ///     ["#0001", "hkbProjectData", "variable"]: OneField { op, patch, priority },
 ///     ["#0001", "hkbProjectData", "variableNames"]: Seq {
 ///         [{ op, patch, priority }, { op, patch, priority }]
 ///     }
 /// },
-/// "_1stperson/0_master": {
+/// "meshes/.../_1stperson/0_master.bin": {
 ///     ["#0001", "hkbProjectData", "variable"]: { op, patch, priority }
 /// }
 /// ```
