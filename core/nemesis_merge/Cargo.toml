@@ -15,6 +15,7 @@ rust-version.workspace = true
 [dependencies]
 bitflags = "2.9.1"
 dashmap = { workspace = true }
+glob = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }

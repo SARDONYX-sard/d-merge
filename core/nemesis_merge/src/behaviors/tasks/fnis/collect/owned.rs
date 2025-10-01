@@ -1,5 +1,7 @@
 //! # FNIS Path collector
 //!
+//! - [_<suffix>] is optional. e.g. `animations/FNISZoo/FNIS_FNISZoo_tail_List.txt`
+//!
 //! ```txt
 //! <skyrim data dir>/
 //! └── meshes/
@@ -8,7 +10,7 @@
 //!         │   ├── animations/
 //!         │   │   └── <fnis_mod_namespace>/                   <- this is `animations_mod_dir`
 //!         │   │       ├── *.hkx                               <- HKX animation files collected by `animation_paths`
-//!         │   │       └── FNIS_<fnis_mod_namespace>_List.txt  <- List file read into `list_content`
+//!         │   │       └── FNIS_<fnis_mod_namespace>[_<suffix>]_List.txt  <- List file read into `list_content`
 //!         │   └── behaviors/
 //!         │       └── FNIS_<fnis_mod_namespace>_Behavior.hkx  <- Behavior file path returned as `behavior_path`
 //!         │
@@ -16,7 +18,7 @@
 //!             ├── animations/
 //!             │   └── <fnis_mod_namespace>/                   <- this is `animations_mod_dir`
 //!             │       ├── *.hkx                               <- HKX animation files collected by `animation_paths`
-//!             │       └── FNIS_<fnis_mod_namespace>_List.txt  <- List file read into `list_content`
+//!             │       └── FNIS_<fnis_mod_namespace>[_<suffix>]_List.txt  <- List file read into `list_content`
 //!             └── behaviors/
 //!                 └── FNIS_<fnis_mod_namespace>_Behavior.hkx  <- Behavior file path returned as `behavior_path`
 //! ```
@@ -31,10 +33,18 @@ use std::{
 
 use rayon::prelude::*;
 use snafu::ResultExt as _;
-use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
+use winnow::{
+    ascii::Caseless,
+    combinator::alt,
+    error::{StrContext, StrContextValue},
+    seq,
+    token::take_while,
+    ModalResult, Parser,
+};
 
 use crate::behaviors::{
-    priority_ids::take_until_ext, tasks::fnis::collect::parse::get_fnis_namespace,
+    priority_ids::take_until_ext,
+    tasks::fnis::collect::{owned_::collect_paths, parse::get_fnis_namespace},
 };
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
@@ -49,8 +59,8 @@ pub struct OwnedFnisInjection {
     /// The index of the `paths` in the `nemesis_merge::behavior_gen` passed from the GUI is the priority, and that is passed.
     pub priority: usize,
 
-    /// The contents of the FNIS list.txt file in this namespace.
-    pub list_content: String,
+    /// The contents of the FNIS list.txt files in this namespace.
+    pub list_contents: Vec<String>,
 
     /// All `.hkx` files under `Meshes\actors\character\animations\<namespace>\`
     ///
@@ -190,57 +200,22 @@ where
 
     // Collect hkx entries
     let animation_paths = collect_hkx_entries(animations_mod_dir);
-
-    let namespace = if animation_paths.is_empty() {
-        return Err(FnisError::MissingNameSpace {
-            path: animations_mod_dir.to_path_buf(),
+    if animation_paths.is_empty() {
+        return Err(FnisError::EmptyAnimPaths {
+            animations_mod_dir: animations_mod_dir.to_path_buf(),
         });
-    } else {
-        get_fnis_namespace(&animation_paths[0])?
-    };
+    }
 
-    // Case-insensitive List file lookup
-    let list_file_name = format!("FNIS_{namespace}_List.txt");
-    let list_path = find_case_insensitive(animations_mod_dir, &list_file_name).map_err(|e| {
-        FnisError::ListMissing {
-            expected: animations_mod_dir
-                .join(&list_file_name)
-                .to_string_lossy()
-                .to_string(),
-            source: e,
-        }
-    })?;
-    let list_content = fs::read_to_string(&list_path).with_context(|_| ListMissingSnafu {
-        expected: list_path.to_string_lossy().to_string(),
-    })?;
+    let binding = animations_mod_dir.to_string_lossy();
+    let namespace = get_fnis_namespace(binding.as_ref())?;
 
-    // Behavior file
-    let behavior_path = {
-        fn get_behavior_path(animations_mod_dir: &Path, unique_namespace: &str) -> Option<String> {
-            let char_dir = animations_mod_dir.parent()?.parent()?;
-            let behaviors_dir = find_case_insensitive(char_dir, "behaviors").ok()?;
-            let file_name = format!("FNIS_{unique_namespace}_Behavior.hkx");
-            let behavior_file = find_case_insensitive(&behaviors_dir, &file_name).ok()?;
-
-            if behavior_file.exists() {
-                // To ensure Skyrim reads the game, use `\` regardless of the OS.
-                Some(format!("Behaviors\\FNIS_{unique_namespace}_Behavior.hkx"))
-            } else {
-                None
-            }
-        }
-
-        get_behavior_path(animations_mod_dir, namespace).ok_or_else(|| {
-            FnisError::BehaviorMissing {
-                expected: format!("Behaviors\\FNIS_{namespace}_Behavior.hkx"),
-            }
-        })?
-    };
+    let list_contents = load_all_fnis_list_files(animations_mod_dir, namespace)?;
+    let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
 
     Ok(OwnedFnisInjection {
         namespace: namespace.to_string(),
         priority,
-        list_content,
+        list_contents,
         animation_paths,
         behavior_path,
         current_class_index: AtomicUsize::new(0),
@@ -283,11 +258,15 @@ fn find_case_insensitive(base: &Path, name: &str) -> std::io::Result<PathBuf> {
 fn collect_hkx_entries(root: &Path) -> Vec<String> {
     let mut paths: Vec<String> = jwalk::WalkDir::new(root)
         .into_iter()
-        .par_bridge()
-        .into_par_iter()
         .filter_map(|entry| {
-            let e = entry.ok()?;
-            let path: PathBuf = e.path();
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    tracing::error!(%e);
+                    return None;
+                }
+            };
+            let path: PathBuf = entry.path();
 
             if path.extension()?.eq_ignore_ascii_case("hkx") {
                 normalize_hkx_path(&path)
@@ -305,15 +284,25 @@ fn collect_hkx_entries(root: &Path) -> Vec<String> {
 ///
 /// NOTE: To ensure Skyrim reads the game, use `\` regardless of the OS.
 fn normalize_hkx_path(path: &Path) -> Option<String> {
-    let s = path.to_str()?;
-    let rel = trim_till_animations.parse(s).ok()?;
+    let Some(s) = path.to_str() else {
+        tracing::info!("unsupported non utf8 hkx file path: {}", path.display());
+        return None;
+    };
+    // intended: `meshes\actors\character\animations\FNISZoo\sample.hkx` -> hkx_path `FNISZoo\sample.hkx`
+    let hkx_path = match trim_till_animations.parse(s) {
+        Ok(hkx_path) => hkx_path,
+        Err(e) => {
+            tracing::error!(%e);
+            return None;
+        }
+    };
 
     // Heap alloc optimization. avoid `replace & format!`
     // Convert to a single String and replace the entire string with backslashes.
-    let mut normalized = String::with_capacity(rel.len() + 11); // Leave a little extra space for “Animations\”
+    let mut normalized = String::with_capacity(hkx_path.len() + 11); // Leave a little extra space for “Animations\”
     normalized.push_str("Animations\\");
 
-    for c in rel.chars() {
+    for c in hkx_path.chars() {
         if matches!(c, '\\' | '/') {
             normalized.push('\\');
         } else {
@@ -327,36 +316,123 @@ fn normalize_hkx_path(path: &Path) -> Option<String> {
 /// Return the substring relative to `meshes\actors\character\animations\`
 fn trim_till_animations<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let (rel,) = seq! {
-        _: take_until_ext(0.., Caseless("meshes")),
-        _: Caseless("meshes"),
-        _: alt(('/', '\\')),
-        _: Caseless("actors"),
-        _: alt(('/', '\\')),
-        _: Caseless("character"),
-        _: alt(('/', '\\')),
-        _: Caseless("animations"),
-        _: alt(('/', '\\')),
+        _: take_until_ext(0.., Caseless("animations")).context(StrContext::Expected(StrContextValue::Description("animations"))),
+        _: Caseless("animations").context(StrContext::Expected(StrContextValue::Description("animations"))),
+        _: alt(('/', '\\')).context(StrContext::Expected(StrContextValue::Description("path separator: /"))),
         take_while(1.., |_| true),
     }
     .parse_next(input)?;
     Ok(rel)
 }
 
+/// Load all FNIS list files for a given namespace using glob.
+///
+/// Supports:
+/// - `FNIS_<namespace>_List.txt`
+/// - `FNIS_<namespace>_<suffix>_List.txt`
+///
+/// Returns a vector of the contents of all matched list files.
+///
+/// # Errors
+/// Returns an error if no file is found.
+fn load_all_fnis_list_files(
+    animations_mod_dir: &Path,
+    namespace: &str,
+) -> Result<Vec<String>, FnisError> {
+    let pattern = animations_mod_dir
+        .join(format!("FNIS_{namespace}*_List.txt"))
+        .to_string_lossy()
+        .to_string();
+
+    let paths = collect_paths(&pattern).map_err(|e| FnisError::ListMissing {
+        expected: pattern.clone(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()),
+    })?;
+
+    if paths.is_empty() {
+        return Err(FnisError::ListMissing {
+            expected: pattern,
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "FNIS list not found"),
+        });
+    }
+
+    // Read all matched list files
+    let mut contents = Vec::with_capacity(paths.len());
+    for path in paths {
+        let content = std::fs::read_to_string(&path).map_err(|e| FnisError::ListMissing {
+            expected: path.to_string_lossy().to_string(),
+            source: e,
+        })?;
+        contents.push(content);
+    }
+
+    Ok(contents)
+}
+
+/// Find a FNIS behavior file for a given namespace, supporting optional suffix.
+///
+/// Looks for:
+/// - `FNIS_<namespace>_Behavior.hkx`
+/// - `FNIS_<namespace>_<suffix>_Behavior.hkx`
+///
+/// Returns the relative path to the behavior file (with `\` separators)
+/// or an error if not found.
+fn find_behavior_file(animations_mod_dir: &Path, namespace: &str) -> Result<String, FnisError> {
+    let char_dir = animations_mod_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| FnisError::BehaviorMissing {
+            expected: format!("Behaviors\\FNIS_{}_Behavior.hkx", namespace),
+        })?;
+
+    let behaviors_dir =
+        find_case_insensitive(char_dir, "behaviors").map_err(|_| FnisError::BehaviorMissing {
+            expected: namespace.to_string(),
+        })?;
+
+    // Build a glob pattern for suffix support
+    let pattern = behaviors_dir
+        .join(format!("FNIS_{}*_Behavior.hkx", namespace))
+        .to_string_lossy()
+        .to_string();
+
+    let mut matches = collect_paths(&pattern).map_err(|_| FnisError::BehaviorMissing {
+        expected: pattern.clone(),
+    })?;
+
+    // No match -> error
+    let path = matches.pop().ok_or_else(|| FnisError::BehaviorMissing {
+        expected: pattern.clone(),
+    })?;
+
+    // Convert to relative path with backslashes
+    let rel_path = path
+        .strip_prefix(char_dir)
+        .unwrap_or(&path)
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("\\");
+
+    Ok(rel_path)
+}
+
 #[derive(Debug, snafu::Snafu)]
 pub enum FnisError {
+    /// One or more hkx files were expected below(`{animations_mod_dir}`), but none were found.
+    #[snafu(display("One or more hkx files were expected below(`{}`), but none were found.", animations_mod_dir.display()))]
+    EmptyAnimPaths { animations_mod_dir: PathBuf },
+
     /// Failed to parse path as fnis path
-    #[snafu(display("Failed to parse path as fnis path:\n{source}"))]
-    FailedParseFnisPatchPath {
+    #[snafu(display("Failed to parse namespace(e.g. `FNISZoo`) from this path:\n{source}"))]
+    FailedToGetFnisNamespace {
         source: serde_hkx::errors::readable::ReadableError,
     },
 
-    #[snafu(display("Expected list file at {expected}, but not found such a path."))]
+    /// Expected list file at {expected}, but not found such a path.
     ListMissing { expected: String, source: io::Error },
 
-    #[snafu(display("The fnis mod was specified, but the namespace `meshes/character/actors/animations/<mod_namespace>` was not found within this path.: {}", path.display()))]
-    MissingNameSpace { path: PathBuf },
-
-    #[snafu(display("Expected behavior file at {expected}, but not found such a path."))]
+    /// Expected behavior file at `Behaviors\\FNIS_{expected}[_<suffix>]_Behavior.hkx`(e.g. FNIS_FNISZoo_tail_Behavior.txt), but not found such a path.
     BehaviorMissing { expected: String },
 }
 
@@ -375,6 +451,10 @@ mod tests {
         let s = "/mnt/data/Meshes/actors/character/animations/FNISTest/Foo.hkx";
         let rel = trim_till_animations.parse(s).unwrap();
         assert_eq!(rel, "FNISTest/Foo.hkx");
+
+        let s = "Animations\\FNISTest\\Foo.hkx";
+        let rel = trim_till_animations.parse(s).unwrap();
+        assert_eq!(rel, "FNISTest\\Foo.hkx");
     }
 
     #[test]

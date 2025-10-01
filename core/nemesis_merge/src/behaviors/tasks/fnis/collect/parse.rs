@@ -1,7 +1,14 @@
 //! FNIS namespace parser
 
 use serde_hkx::errors::readable::ReadableError;
-use winnow::{ascii::Caseless, combinator::alt, seq, token::take_while, ModalResult, Parser};
+use winnow::{
+    ascii::Caseless,
+    combinator::alt,
+    error::{StrContext, StrContextValue},
+    seq,
+    token::take_while,
+    ModalResult, Parser,
+};
 
 use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::collect::owned::FnisError};
 
@@ -10,27 +17,21 @@ use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::collect::owned
 /// # Note
 /// Must be unique name
 pub fn get_fnis_namespace(input: &str) -> Result<&str, FnisError> {
-    parse_components
+    parse_fnis_namespace
         .parse(input)
-        .map_err(|e| FnisError::FailedParseFnisPatchPath {
+        .map_err(|e| FnisError::FailedToGetFnisNamespace {
             source: ReadableError::from_parse(e),
         })
 }
 
 /// Find `animations` then grab the next path component
-fn parse_components<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub fn parse_fnis_namespace<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let (namespace,) = seq! {
-        _: take_until_ext(0.., Caseless("meshes")),
-        _: Caseless("meshes"),
-        _: alt(('/', '\\')),
-        _: Caseless("actors"),
-        _: alt(('/', '\\')),
-        _: Caseless("character"),
-        _: alt(('/', '\\')),
-        _: Caseless("animations"),
-        _: alt(('/', '\\')),
+        _: take_until_ext(0.., Caseless("animations")).context(StrContext::Expected(StrContextValue::Description("animations"))),
+        _: Caseless("animations").context(StrContext::Expected(StrContextValue::Description("animations"))),
+        _: alt(('/', '\\')).context(StrContext::Expected(StrContextValue::Description("path separator: /"))),
         take_until_ext(1.., alt(('/' ,'\\'))),
-        _: take_while(1.., |_| true),
+        _: take_while(0.., |_| true), // skip else
     }
     .parse_next(input)?;
 

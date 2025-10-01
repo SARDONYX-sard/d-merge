@@ -54,7 +54,7 @@ fn is_nemesis_file(path: &Path) -> bool {
     is_sharp_prefix
 }
 
-/// Check `<name>~<anim_data_clip_id>.txt` or `<anim_data_clip_id>.txt` format.
+/// Has `animationdatasinglefile` dir?
 ///
 /// # Assumption.
 /// - The file is a file with a txt extension.
@@ -76,7 +76,7 @@ fn is_adsf_patch_file(txt_path: &Path) -> bool {
     txt_path.file_stem().is_some_and(|s| !s.is_empty()) // Allow either `<clip>~<anim_data_id>` or just `<anim_data_id>`
 }
 
-// Check if any parent directory in the last 3 components is "animationsetdatasinglefile"
+/// Check if any parent directory in the last 3 components is `animationsetdatasinglefile`
 ///
 /// # Assumption.
 /// - The file is a file with a txt extension.
