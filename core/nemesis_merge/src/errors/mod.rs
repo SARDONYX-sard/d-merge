@@ -58,13 +58,6 @@ pub enum Error {
         source: nemesis_xml::error::Error,
     },
 
-    /// Failed to get `meshes` path from this template path.
-    #[snafu(display("Failed to get `meshes` path from this template path -> {source}: {}", path.display()))]
-    FailedToGetInnerPathFromTemplate {
-        path: PathBuf,
-        source: crate::behaviors::TemplateError,
-    },
-
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfTemplate {

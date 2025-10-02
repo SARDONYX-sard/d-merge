@@ -8,10 +8,7 @@ use crate::{
         tasks::{
             adsf::types::OwnedAdsfPatchMap,
             asdsf::types::OwnedAsdsfPatchMap,
-            patches::types::{
-                BehaviorStringDataMap, BorrowedPatches, OwnedPatchMap, OwnedPatches,
-                RawBorrowedPatches,
-            },
+            patches::types::{BorrowedPatches, OwnedPatchMap, OwnedPatches},
             templates::key::TemplateKey,
         },
     },
@@ -20,7 +17,6 @@ use crate::{
     results::filter_results,
     Config,
 };
-use dashmap::DashSet;
 use json_patch::ValueWithPriority;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
@@ -126,10 +122,13 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
 pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
+    fnis_patches: BorrowedPatches<'a>,
 ) -> (BorrowedPatches<'a>, Vec<Error>) {
-    let raw_borrowed_patches = RawBorrowedPatches::default();
-    let template_keys = DashSet::new();
-    let variable_class_map = BehaviorStringDataMap::new();
+    let BorrowedPatches {
+        template_keys,
+        borrowed_patches: raw_borrowed_patches,
+        behavior_string_data_map: variable_class_map,
+    } = fnis_patches;
 
     let reporter = StatusReportCounter::new(
         &config.status_report,

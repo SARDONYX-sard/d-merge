@@ -20,10 +20,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(crate) fn generate_hkx_files<'a: 'b, 'b>(
+pub(crate) fn generate_hkx_files(
     config: &Config,
-    templates: BorrowedTemplateMap<'a>,
-    variable_class_map: BehaviorStringDataMap<'b>,
+    templates: BorrowedTemplateMap<'_>,
+    variable_class_map: BehaviorStringDataMap<'_>,
 ) -> Result<(), Vec<Error>> {
     let reporter = StatusReportCounter::new(
         &config.status_report,

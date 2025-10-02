@@ -2,7 +2,6 @@ mod patch_map;
 
 use dashmap::{DashMap, DashSet};
 use indexmap::IndexMap;
-use rayon::iter::ParallelExtend;
 use std::path::PathBuf;
 
 pub use self::patch_map::HkxPatchMaps;
@@ -50,23 +49,6 @@ pub struct BorrowedPatches<'a> {
     pub behavior_string_data_map: BehaviorStringDataMap<'a>,
 }
 
-impl<'a> BorrowedPatches<'a> {
-    /// Merge another `BorrowedPatches` into this one.
-    pub fn merge(&mut self, other: BorrowedPatches<'a>) {
-        self.template_keys.par_extend(other.template_keys);
-        self.behavior_string_data_map
-            .0
-            .par_extend(other.behavior_string_data_map.0);
-
-        for (k, v) in other.borrowed_patches.0 {
-            let mut map = self.borrowed_patches.0.entry(k).or_default();
-
-            map.one.0.par_extend(v.one.0);
-            map.seq.0.par_extend(v.seq.0);
-        }
-    }
-}
-
 /// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)
 /// - value: `Map<jsonPath, { patch, priority }>`
 ///
@@ -83,7 +65,7 @@ impl<'a> BorrowedPatches<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub(crate) struct RawBorrowedPatches<'a>(pub DashMap<TemplateKey<'a>, HkxPatchMaps<'a>>);
+pub(crate) struct RawBorrowedPatches<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
 impl RawBorrowedPatches<'_> {
     pub(crate) fn len(&self) -> usize {

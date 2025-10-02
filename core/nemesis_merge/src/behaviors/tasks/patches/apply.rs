@@ -22,9 +22,9 @@ use std::path::Path;
 /// shrinking the lifetime of the patch by the higher-level function.
 ///
 /// Therefore, this seemingly strange lifetime annotation is intentional.
-pub fn apply_patches<'a, 'b: 'a>(
-    templates: &mut BorrowedTemplateMap<'a>,
-    borrowed_patches: RawBorrowedPatches<'b>,
+pub fn apply_patches<'t, 'p: 't>(
+    templates: &mut BorrowedTemplateMap<'t>,
+    borrowed_patches: RawBorrowedPatches<'p>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
     let status_report = &config.status_report;

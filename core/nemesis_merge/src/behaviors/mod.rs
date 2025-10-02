@@ -4,7 +4,7 @@ pub(crate) mod tasks;
 
 pub use crate::behaviors::priority_ids::types::{PatchMaps, PriorityMap};
 use crate::behaviors::tasks::fnis::collect::collect_all_fnis_injections;
-pub use tasks::templates::{gen_bin::create_bin_templates, TemplateError};
+pub use tasks::templates::gen_bin::create_bin_templates;
 
 pub(crate) use tasks::{
     adsf::path_parser::ParseError as AsdfPathParseError,
@@ -145,10 +145,10 @@ struct Errors {
     hkx_errors: Vec<Error>,
 }
 
-fn apply_and_gen_patched_hkx(
-    owned_patches: &OwnedPatchMap,
+fn apply_and_gen_patched_hkx<'a>(
+    owned_patches: &'a OwnedPatchMap,
     config: &Config,
-    fnis_patches: BorrowedPatches<'_>,
+    fnis_patches: BorrowedPatches<'a>,
 ) -> Errors {
     let mut all_errors = vec![];
 
@@ -161,8 +161,8 @@ fn apply_and_gen_patched_hkx(
         },
         patch_errors_len,
     ) = {
-        let (borrowed_patches, errors) = collect_borrowed_patches(owned_patches, config);
-        // borrowed_patches.merge(fnis_patches);
+        let (borrowed_patches, errors) =
+            collect_borrowed_patches(owned_patches, config, fnis_patches);
 
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);

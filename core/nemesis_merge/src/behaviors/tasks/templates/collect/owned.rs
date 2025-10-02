@@ -11,7 +11,7 @@ use crate::{
 /// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
 pub fn collect_templates(
     template_root: &Path,
-    template_names: HashSet<TemplateKey<'_>>,
+    template_names: HashSet<TemplateKey<'static>>,
 ) -> (OwnedTemplateMap, Vec<Error>) {
     template_names
         .into_par_iter()
@@ -26,7 +26,7 @@ pub fn collect_templates(
             }
 
             match std::fs::read(&template_path) {
-                Ok(bytes) => Either::Left((template_path, bytes)),
+                Ok(bytes) => Either::Left((template_key, bytes)),
                 Err(_err) => Either::Right(Error::NotFoundTemplate {
                     template_name: template_path.display().to_string(),
                 }),
