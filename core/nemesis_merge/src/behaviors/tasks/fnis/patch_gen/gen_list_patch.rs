@@ -13,6 +13,7 @@ use crate::behaviors::tasks::fnis::{
     },
 };
 
+/// Generate from one list file.
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,

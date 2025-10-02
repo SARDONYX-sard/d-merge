@@ -96,6 +96,7 @@ mod tests {
                         flags: FNISAnimFlags::AnimObjects,
                         ..Default::default()
                     },
+                    anim_vars: vec![],
                     motions: vec![],
                     rotations: vec![],
                 },

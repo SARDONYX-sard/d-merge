@@ -2,9 +2,10 @@ mod patch_map;
 
 use dashmap::{DashMap, DashSet};
 use indexmap::IndexMap;
+use rayon::iter::ParallelExtend;
 use std::path::PathBuf;
 
-pub use self::patch_map::{HkxPatchMaps, OnePatchMap, SeqPatchMap};
+pub use self::patch_map::HkxPatchMaps;
 use crate::behaviors::tasks::{
     adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::key::TemplateKey,
 };
@@ -37,7 +38,7 @@ pub struct BorrowedPatches<'a> {
     /// Name of the template that needs to be read.
     ///
     /// - e.g. (`meshes/actors/character/_1stperson/behaviors/0_master.bin`)
-    pub template_keys: DashSet<TemplateKey<'a>>,
+    pub template_keys: DashSet<TemplateKey<'static>>,
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
     pub borrowed_patches: RawBorrowedPatches<'a>,
@@ -47,6 +48,23 @@ pub struct BorrowedPatches<'a> {
     /// This information exists because it is needed to replace variables
     /// such as the Nemesis variable `$variableID[]$`, `$eventID[]$`.
     pub behavior_string_data_map: BehaviorStringDataMap<'a>,
+}
+
+impl<'a> BorrowedPatches<'a> {
+    /// Merge another `BorrowedPatches` into this one.
+    pub fn merge(&mut self, other: BorrowedPatches<'a>) {
+        self.template_keys.par_extend(other.template_keys);
+        self.behavior_string_data_map
+            .0
+            .par_extend(other.behavior_string_data_map.0);
+
+        for (k, v) in other.borrowed_patches.0 {
+            let mut map = self.borrowed_patches.0.entry(k).or_default();
+
+            map.one.0.par_extend(v.one.0);
+            map.seq.0.par_extend(v.seq.0);
+        }
+    }
 }
 
 /// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)

@@ -97,6 +97,7 @@ pub(crate) fn apply_adsf_patches(
     owned_anim_data_patches: OwnedAdsfPatchMap,
     id_order: &PriorityMap,
     config: &Config,
+    fnis_adsf_patches: Vec<AdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse adsf patch (1 loop with par_iter)
     let results: Vec<Result<AdsfPatch, Error>> = owned_anim_data_patches
@@ -106,6 +107,7 @@ pub(crate) fn apply_adsf_patches(
         .collect(); // back iter
 
     let (mut borrowed_patches, mut errors) = partition_results(results);
+    borrowed_patches.par_extend(fnis_adsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
     sort_patches_by_priority(&mut borrowed_patches, id_order);

@@ -1,8 +1,5 @@
-mod add;
-mod basic;
-mod furniture;
+mod gen_list_patch;
 pub mod generated_behaviors;
-mod offset_arm;
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -17,7 +14,7 @@ use winnow::Parser;
 use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
-use crate::behaviors::tasks::fnis::patch_gen::add::generate_patch;
+use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::generate_patch;
 use crate::behaviors::tasks::patches::types::{
     BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
 };

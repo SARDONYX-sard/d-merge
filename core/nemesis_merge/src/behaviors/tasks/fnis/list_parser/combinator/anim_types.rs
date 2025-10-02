@@ -43,27 +43,6 @@ pub enum FNISAnimType {
     Chair,
 }
 
-impl FNISAnimType {
-    /// To FNIS options.
-    #[inline]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Basic => "b",
-            Self::Sequenced => "s",
-            Self::SequencedOptimized => "so",
-            Self::Furniture => "fu",
-            Self::FurnitureOptimized => "fuo",
-            Self::SequencedContinued => "+",
-            Self::OffsetArm => "ofa",
-            Self::AnimObject => "o",
-            Self::Paired => "pa",
-            Self::KillMove => "km",
-            Self::Alternate => "aa",
-            Self::Chair => "ch",
-        }
-    }
-}
-
 pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
     alt((
         "fuo".value(FNISAnimType::FurnitureOptimized),

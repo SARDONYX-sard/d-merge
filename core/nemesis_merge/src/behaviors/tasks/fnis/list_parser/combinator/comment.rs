@@ -11,7 +11,7 @@ use winnow::{ModalResult, Parser};
 /// - `"   foo"` → leaves `"foo"`
 /// - `"' comment\nfoo"` → leaves `"foo"`
 /// - `"   ' comment\n   ' another\nfoo"` → leaves `"foo"`
-pub fn skip_ws_and_comments<'a>(input: &mut &'a str) -> ModalResult<()> {
+pub fn skip_ws_and_comments(input: &mut &str) -> ModalResult<()> {
     repeat::<_, _, (), _, _>(0.., alt((space1, line_ending, comment_line))).parse_next(input)?;
     Ok(())
 }

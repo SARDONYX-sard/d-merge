@@ -20,7 +20,7 @@ impl<'a> TemplateKey<'a> {
     }
 
     /// From nemesis file stem. e.g. `0_master` -> `meshes/actors/character/behaviors/0_master.bin`
-    pub fn from_nemesis_file(template_file_stem: &'a str, is_1st_person: bool) -> Option<Self> {
+    pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
         let template_name = match is_1st_person {
             true => NEMESIS_1ST_PERSON_MAP.get(template_file_stem)?,
             false => NEMESIS_3RD_PERSON_MAP.get(template_file_stem)?,

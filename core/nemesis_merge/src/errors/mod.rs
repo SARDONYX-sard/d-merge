@@ -211,6 +211,7 @@ impl AnimPatchErrSubKind {
 
 #[derive(Debug, Clone)]
 pub struct BehaviorGenerationError {
+    pub fnis_errors_errors_len: usize,
     pub owned_file_errors_len: usize,
     pub adsf_errors_len: usize,
     pub asdsf_errors_len: usize,
@@ -222,6 +223,7 @@ pub struct BehaviorGenerationError {
 impl core::fmt::Display for BehaviorGenerationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self {
+            fnis_errors_errors_len,
             owned_file_errors_len,
             adsf_errors_len,
             asdsf_errors_len,
@@ -231,6 +233,7 @@ impl core::fmt::Display for BehaviorGenerationError {
         } = *self;
 
         if adsf_errors_len == 0
+            && fnis_errors_errors_len == 0
             && asdsf_errors_len == 0
             && owned_file_errors_len == 0
             && patch_errors_len == 0
@@ -241,6 +244,12 @@ impl core::fmt::Display for BehaviorGenerationError {
         }
 
         writeln!(f, "Behavior generation failed with the following errors:")?;
+        if owned_file_errors_len > 0 {
+            writeln!(
+                f,
+                "-    Generating FNIS patch Error count: {fnis_errors_errors_len}",
+            )?;
+        }
         if owned_file_errors_len > 0 {
             writeln!(f, "-    Reading file Error count: {owned_file_errors_len}",)?;
         }

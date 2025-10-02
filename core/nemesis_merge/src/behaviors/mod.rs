@@ -54,7 +54,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     } else {
         vec![]
     };
-    let (borrowed_fnis_patches, adsf_patches, fnis_errors) =
+    let (fnis_hkx_patches, fnis_adsf_patches, fnis_errors) =
         tasks::fnis::patch_gen::collect_borrowed_patches(
             &owned_fnis_patches,
             &config.status_report,
@@ -74,47 +74,64 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            adsf_errors = apply_adsf_patches(owned_adsf_patches, &nemesis_entries, &config);
+            adsf_errors = apply_adsf_patches(
+                owned_adsf_patches,
+                &nemesis_entries,
+                &config,
+                fnis_adsf_patches,
+            );
         });
         s.spawn(|_| {
             asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &nemesis_entries, &config);
         });
-        s.spawn(|_| patched_hkx_errors = Some(apply_and_gen_patched_hkx(&owned_patches, &config)));
+        s.spawn(|_| {
+            patched_hkx_errors = Some(apply_and_gen_patched_hkx(
+                &owned_patches,
+                &config,
+                fnis_hkx_patches,
+            ));
+        });
     });
 
-    let Errors {
-        patch_errors_len,
-        apply_errors_len,
-        hkx_errors_len,
-        hkx_errors,
-    } = patched_hkx_errors.unwrap_or_default();
-    let owned_file_errors_len = owned_file_errors.len();
-    let adsf_errors_len = adsf_errors.len();
-    let asdsf_errors_len = asdsf_errors.len();
-
-    let all_errors = {
-        let mut all_errors = vec![];
-        all_errors.par_extend(owned_file_errors);
-        all_errors.par_extend(adsf_errors);
-        all_errors.par_extend(asdsf_errors);
-        all_errors.par_extend(hkx_errors);
-        all_errors
-    };
-
-    if !all_errors.is_empty() {
-        let err = BehaviorGenerationError {
-            owned_file_errors_len,
-            adsf_errors_len,
-            asdsf_errors_len,
+    // Error process
+    {
+        let Errors {
             patch_errors_len,
             apply_errors_len,
             hkx_errors_len,
-        };
-        config.on_report_status(Status::Error(err.to_string()));
+            hkx_errors,
+        } = patched_hkx_errors.unwrap_or_default();
+        let fnis_errors_errors_len = fnis_errors.len();
+        let owned_file_errors_len = owned_file_errors.len();
+        let adsf_errors_len = adsf_errors.len();
+        let asdsf_errors_len = asdsf_errors.len();
 
-        write_errors(&config, &all_errors).await?;
-        return Err(Error::FailedToGenerateBehaviors { source: err });
-    };
+        let all_errors = {
+            let mut all_errors = vec![];
+            all_errors.par_extend(fnis_errors);
+            all_errors.par_extend(owned_file_errors);
+            all_errors.par_extend(adsf_errors);
+            all_errors.par_extend(asdsf_errors);
+            all_errors.par_extend(hkx_errors);
+            all_errors
+        };
+
+        if !all_errors.is_empty() {
+            let err = BehaviorGenerationError {
+                fnis_errors_errors_len,
+                owned_file_errors_len,
+                adsf_errors_len,
+                asdsf_errors_len,
+                patch_errors_len,
+                apply_errors_len,
+                hkx_errors_len,
+            };
+            config.on_report_status(Status::Error(err.to_string()));
+
+            write_errors(&config, &all_errors).await?;
+            return Err(Error::FailedToGenerateBehaviors { source: err });
+        };
+    }
 
     config.on_report_status(Status::Done);
     Ok(())
@@ -128,7 +145,11 @@ struct Errors {
     hkx_errors: Vec<Error>,
 }
 
-fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> Errors {
+fn apply_and_gen_patched_hkx(
+    owned_patches: &OwnedPatchMap,
+    config: &Config,
+    fnis_patches: BorrowedPatches<'_>,
+) -> Errors {
     let mut all_errors = vec![];
 
     // 1/3: Parse nemesis patches
@@ -140,10 +161,14 @@ fn apply_and_gen_patched_hkx(owned_patches: &OwnedPatchMap, config: &Config) -> 
         },
         patch_errors_len,
     ) = {
-        let (patch_result, errors) = collect_borrowed_patches(owned_patches, config);
+        let (borrowed_patches, errors) = collect_borrowed_patches(owned_patches, config);
+        // borrowed_patches.merge(fnis_patches);
+
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
-        (patch_result, patch_errors_len)
+
+        // borrowed_patches
+        (borrowed_patches, patch_errors_len)
     };
     #[cfg(feature = "tracing")]
     tracing::debug!("needed template_names = {template_names:#?}");

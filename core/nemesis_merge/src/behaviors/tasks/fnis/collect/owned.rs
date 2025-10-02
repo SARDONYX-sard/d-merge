@@ -31,18 +31,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use winnow::{
-    ascii::Caseless,
-    combinator::alt,
-    error::{StrContext, StrContextValue},
-    seq,
-    token::take_while,
-    ModalResult, Parser,
-};
-
-use crate::behaviors::{
-    priority_ids::take_until_ext,
-    tasks::fnis::{collect::collect_paths, patch_gen::generated_behaviors::BehaviorEntry},
+use crate::behaviors::tasks::fnis::{
+    collect::collect_paths, patch_gen::generated_behaviors::BehaviorEntry,
 };
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
@@ -62,21 +52,6 @@ pub struct OwnedFnisInjection {
 
     /// The contents of the FNIS list.txt files in this namespace.
     pub list_contents: Vec<String>,
-
-    /// All `.hkx` files under `Meshes\actors\character\animations\<namespace>\`
-    ///
-    /// To register them within hkx as paths readable by the game engine,
-    /// they are adjusted to always start with `Animations` and use `\` as the path separator.
-    ///
-    /// # Expected sample
-    ///
-    /// ```log
-    /// [
-    ///   "Animations\FNISFlyer\FNISfl_Back_ac.hkx",
-    ///   "Animations\FNISFlyer\FNISfl_Back_fm.hkx"
-    /// ]
-    /// ```
-    pub animation_paths: Vec<String>,
 
     /// Relative path to the behavior file.
     ///
@@ -144,18 +119,6 @@ impl OwnedFnisInjection {
     pub fn next_class_index(&self) -> usize {
         self.current_class_index.fetch_add(1, Ordering::Acquire) + 1
     }
-
-    /// Returns the behavior file name without the `Behaviors\` prefix and `.hkx` extension.
-    ///
-    /// e.g., for `Behaviors\FNIS_FNISFlyer_Behavior.hkx` this returns
-    /// `"FNIS_FNISFlyer_Behavior"`.
-    ///
-    /// Used as input for `hkbBehaviorReferenceGenerator.name` during patch generation.
-    pub fn behavior_name(&self) -> &str {
-        let path = &self.behavior_path;
-        let file_name = path.rsplit('\\').next().unwrap_or(path);
-        file_name.strip_suffix(".hkx").unwrap_or(file_name)
-    }
 }
 
 /// Collects FNIS injection data from a Skyrim FNIS mod directory.
@@ -201,14 +164,6 @@ where
 {
     let animations_mod_dir = animations_mod_dir.as_ref();
 
-    // Collect hkx entries
-    let animation_paths = collect_hkx_entries(animations_mod_dir);
-    if animation_paths.is_empty() {
-        return Err(FnisError::EmptyAnimPaths {
-            animations_mod_dir: animations_mod_dir.to_path_buf(),
-        });
-    }
-
     let list_contents = load_all_fnis_list_files(animations_mod_dir, namespace)?;
     let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
 
@@ -217,80 +172,9 @@ where
         namespace: namespace.to_string(),
         priority,
         list_contents,
-        animation_paths,
         behavior_path,
         current_class_index: AtomicUsize::new(0),
     })
-}
-
-fn collect_hkx_entries(root: &Path) -> Vec<String> {
-    let mut paths: Vec<String> = jwalk::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|entry| {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(e) => {
-                    tracing::error!(%e);
-                    return None;
-                }
-            };
-            let path: PathBuf = entry.path();
-
-            if path.extension()?.eq_ignore_ascii_case("hkx") {
-                normalize_hkx_path(&path)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    paths.sort_unstable(); // `par_bridge` is unordered. So we need sort.
-    paths
-}
-
-/// To `Animations\<inner_path>\*.hkx`
-///
-/// NOTE: To ensure Skyrim reads the game, use `\` regardless of the OS.
-fn normalize_hkx_path(path: &Path) -> Option<String> {
-    let Some(s) = path.to_str() else {
-        tracing::info!("unsupported non utf8 hkx file path: {}", path.display());
-        return None;
-    };
-    // intended: `meshes\actors\character\animations\FNISZoo\sample.hkx` -> hkx_path `FNISZoo\sample.hkx`
-    let hkx_path = match trim_till_animations.parse(s) {
-        Ok(hkx_path) => hkx_path,
-        Err(e) => {
-            tracing::error!(%e);
-            return None;
-        }
-    };
-
-    // Heap alloc optimization. avoid `replace & format!`
-    // Convert to a single String and replace the entire string with backslashes.
-    let mut normalized = String::with_capacity(hkx_path.len() + 11); // Leave a little extra space for “Animations\”
-    normalized.push_str("Animations\\");
-
-    for c in hkx_path.chars() {
-        if matches!(c, '\\' | '/') {
-            normalized.push('\\');
-        } else {
-            normalized.push(c);
-        }
-    }
-
-    Some(normalized)
-}
-
-/// Return the substring relative to `meshes\actors\character\animations\`
-fn trim_till_animations<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    let (rel,) = seq! {
-        _: take_until_ext(0.., Caseless("animations")).context(StrContext::Expected(StrContextValue::Description("animations"))),
-        _: Caseless("animations").context(StrContext::Expected(StrContextValue::Description("animations"))),
-        _: alt(('/', '\\')).context(StrContext::Expected(StrContextValue::Description("path separator: /"))),
-        take_while(1.., |_| true),
-    }
-    .parse_next(input)?;
-    Ok(rel)
 }
 
 /// Load all FNIS list files for a given namespace using glob.
@@ -432,46 +316,7 @@ pub enum FnisError {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-
-    #[test]
-    fn test_parse_relative_path() {
-        // windows
-        let s = r"D:\Game\Data\Meshes\actors\character\animations\FNISTest\Foo.hkx";
-        let rel = trim_till_animations.parse(s).unwrap();
-        assert_eq!(rel, r"FNISTest\Foo.hkx");
-
-        // unix
-        let s = "/mnt/data/Meshes/actors/character/animations/FNISTest/Foo.hkx";
-        let rel = trim_till_animations.parse(s).unwrap();
-        assert_eq!(rel, "FNISTest/Foo.hkx");
-
-        let s = "Animations\\FNISTest\\Foo.hkx";
-        let rel = trim_till_animations.parse(s).unwrap();
-        assert_eq!(rel, "FNISTest\\Foo.hkx");
-    }
-
-    #[test]
-    fn test_normalize_hkx_path() {
-        // windows
-        let path =
-            Path::new(r"D:\Game\Data\Meshes\actors\character\animations\FNISFlyer\FNISfl_Back.hkx");
-        let normalized = normalize_hkx_path(path).unwrap();
-        assert_eq!(normalized, r"Animations\FNISFlyer\FNISfl_Back.hkx");
-
-        // unix
-        let path =
-            Path::new("/mnt/data/Meshes/actors/character/animations/FNISFlyer/FNISfl_Back.hkx");
-        let normalized = normalize_hkx_path(path).unwrap();
-        assert_eq!(normalized, r"Animations\FNISFlyer\FNISfl_Back.hkx");
-
-        // mix
-        let path =
-            Path::new("/mnt/data\\Meshes/actors/character/animations/FNISFlyer\\FNISfl_Back.hkx");
-        let normalized = normalize_hkx_path(path).unwrap();
-        assert_eq!(normalized, r"Animations\FNISFlyer\FNISfl_Back.hkx");
-    }
 
     #[test]
     fn test_collect_fnis_injection() {

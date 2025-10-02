@@ -6,6 +6,9 @@ use winnow::combinator::{opt, repeat, separated, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
+use crate::behaviors::tasks::fnis::list_parser::combinator::anim_var::{
+    parse_anim_var_line, AnimVar,
+};
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},
     comment::skip_ws_and_comments,
@@ -22,6 +25,14 @@ pub struct FNISAnimation<'a> {
     pub anim_event: &'a str,
     pub anim_file: &'a str,
     pub anim_objects: Vec<&'a str>,
+    /// This variable likely needs to be registered below.
+    /// - hkbBehaviorGraphStringData.variableNames
+    /// - hkbVariableValueSet.wordVariableValues
+    /// - hkbBehaviorGraphData.variableInfos
+    ///
+    /// TODO: It's unclear whether this is per animation file or per mod list.
+    ///       This needs to be determined.
+    pub anim_vars: Vec<AnimVar<'a>>,
     pub motions: Vec<Translation<'a>>,
     pub rotations: Vec<RotationData<'a>>,
 }
@@ -45,6 +56,7 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
             anim_objects: parse_anim_objects(flag_set.flags).context(StrContext::Label("anim_objects: str")),
             _: skip_ws_and_comments,
 
+            anim_vars: repeat(0.., parse_anim_var_line), // n time lines
             motions: repeat(0.., parse_md_data), // n time lines
             rotations: repeat(0.., parse_rd_data), // n time lines
     })
@@ -101,6 +113,7 @@ mod tests {
                 anim_event: "MyCheerSA3",
                 anim_file: "MyCheerAnim2.hkx",
                 anim_objects: vec!["AnimObjectIronSword"],
+                anim_vars: vec![],
                 motions: vec![],
                 rotations: vec![],
             }
