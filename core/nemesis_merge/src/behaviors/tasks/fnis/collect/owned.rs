@@ -319,6 +319,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "local only"]
     fn test_collect_fnis_injection() {
         use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::HUMANOID;
 

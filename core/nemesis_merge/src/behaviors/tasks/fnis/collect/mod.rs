@@ -92,6 +92,7 @@ mod tests {
     use rayon::prelude::*;
 
     #[test]
+    #[ignore = "local only"]
     fn test_parse_relative_path() {
         crate::global_logger::global_logger("./test.log", tracing::Level::TRACE).unwrap();
 

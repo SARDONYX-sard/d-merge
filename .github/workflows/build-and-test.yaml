@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
   pull_request:
-    branches: ['*']
+    branches: ["*"]
   workflow_dispatch:
 
 env:
@@ -30,9 +30,9 @@ jobs:
           install_front_deps: false
 
       - name: Check format
-        run: cargo fmt --all -- --check
+        run: rustup component add rustfmt;cargo fmt --all -- --check
       - name: Lint Check
-        run: cargo clippy --workspace -- -D warnings
+        run: rustup component add clippy;cargo clippy --workspace -- -D warnings
 
   test:
     strategy:
@@ -114,7 +114,7 @@ jobs:
         with:
           platform: ${{ matrix.platform }}
           build_profile: release
-          cache_key_suffix: 'egui'
+          cache_key_suffix: "egui"
           install_front_deps: false
 
       - name: Build GUI
