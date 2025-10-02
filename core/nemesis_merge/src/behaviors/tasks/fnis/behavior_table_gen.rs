@@ -92,7 +92,7 @@ pub struct BehaviorEntry {
     /// Animation path registered target template path (e.g. `character/firstperson.bin`)
     ///
     /// # Note
-    /// When writing, don't forget to use `set_extension(“hkx”)`.
+    /// When writing, don't forget to use `set_extension("hkx")`.
     pub default_behavior: &'static str,
     /// Animation path registered target(`hkbCharacterStringData`) XML index e.g. `#0029`
     pub default_behavior_index: &'static str,
@@ -100,7 +100,7 @@ pub struct BehaviorEntry {
     /// Mod root behavior registered target template path (e.g. `behaviors/0_master.bin`)
     ///
     /// # Note
-    /// When writing, don't forget to use `set_extension(“hkx”)`.
+    /// When writing, don't forget to use `set_extension("hkx")`.
     pub master_behavior: &'static str,
     /// Mod root behavior registered target(`hkbStateMachine`) XML index e.g. `#1831`
     pub master_behavior_index: &'static str,
@@ -160,7 +160,6 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
 /// # Usage
 /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
 /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
-/// This is the condition check for that purpose.
 pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     behavior_object: "character",
     base_dir: "actors/character",
