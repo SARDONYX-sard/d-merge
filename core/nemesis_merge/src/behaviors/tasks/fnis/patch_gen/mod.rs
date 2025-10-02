@@ -15,9 +15,12 @@ use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
 use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::generate_patch;
+use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry;
+use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::DEFAULT_FEMALE;
 use crate::behaviors::tasks::patches::types::{
     BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
 };
+use crate::behaviors::tasks::templates::key::TemplateKey;
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
@@ -107,27 +110,25 @@ pub fn collect_borrowed_patches<'a>(
                 .collect();
 
             // Push One Mod animations
-            {
-                let behavior_key = owed_ref_one_mod
-                    .behavior_entry
-                    .to_default_behavior_template_key();
-                template_keys.insert(behavior_key.clone());
-
-                let (json_path, patch) = new_add_anim_seq_patch(
-                    owed_ref_one_mod.behavior_entry.default_behavior_index,
+            if !animations.is_empty() {
+                insert_anim_seq_patch(
                     &animations,
+                    owed_ref_one_mod.behavior_entry,
                     owed_ref_one_mod.priority,
+                    &raw_borrowed_patches,
+                    &template_keys,
                 );
-                #[cfg(feature = "tracing")]
-                tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
 
-                raw_borrowed_patches
-                    .0
-                    .entry(behavior_key)
-                    .or_default()
-                    .seq
-                    .insert(json_path, patch);
-            }
+                if owed_ref_one_mod.behavior_entry.is_humanoid() {
+                    insert_anim_seq_patch(
+                        &animations,
+                        &DEFAULT_FEMALE,
+                        owed_ref_one_mod.priority,
+                        &raw_borrowed_patches,
+                        &template_keys,
+                    );
+                }
+            };
 
             (adsf_patches, errors)
         })
@@ -196,6 +197,32 @@ fn new_injectable_mod_root_behavior<'a>(
     );
 
     (one, seq)
+}
+
+/// Insert a new animation sequence patch into the borrowed patches map.
+fn insert_anim_seq_patch<'a>(
+    animations: &[&'a str],
+    behavior_entry: &BehaviorEntry,
+    priority: usize,
+    raw_borrowed_patches: &RawBorrowedPatches<'a>,
+    template_keys: &DashSet<TemplateKey<'static>>,
+) {
+    let behavior_key = behavior_entry.to_default_behavior_template_key();
+
+    template_keys.insert(behavior_key.clone());
+
+    let (json_path, patch) =
+        new_add_anim_seq_patch(behavior_entry.default_behavior_index, animations, priority);
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
+
+    raw_borrowed_patches
+        .0
+        .entry(behavior_key)
+        .or_default()
+        .seq
+        .insert(json_path, patch);
 }
 
 /// Create an additional patch for the animations for one of the following template files.

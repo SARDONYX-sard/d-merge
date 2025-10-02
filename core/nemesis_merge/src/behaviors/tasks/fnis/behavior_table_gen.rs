@@ -128,6 +128,11 @@ impl BehaviorEntry {
     }
 
     /// Is humanoid patch.
+    ///
+    /// # Usage
+    /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
+    /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
+    /// This is the condition check for that purpose.
     pub fn is_humanoid(&self) -> bool {
         HUMANOID.contains_key(self.behavior_object)
     }
@@ -150,6 +155,19 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_behavior: "behaviors/0_master.bin",
         master_behavior_index: "#2521",
     },
+};
+
+/// # Usage
+/// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
+/// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
+/// This is the condition check for that purpose.
+pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
+    behavior_object: "character",
+    base_dir: "actors/character",
+    default_behavior: "characters female/defaultfemale.bin",
+    default_behavior_index: "#0029", // defaultmale.xml & defaultfemale.xml same index
+    master_behavior: "behaviors/0_master.bin",
+    master_behavior_index: "#2521",
 };
 "###
         .to_string();
