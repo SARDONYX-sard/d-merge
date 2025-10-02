@@ -115,6 +115,7 @@ mod tests {
         create_bin_templates(paths.iter(), output_dir);
     }
 
+    #[ignore = "local only"]
     #[test]
     fn test_gen_behaviors() {
         let paths = crate::behaviors::tasks::fnis::collect::collect_paths(
@@ -124,6 +125,7 @@ mod tests {
         std::fs::write("./behaviors.log", format!("{paths:#?}")).unwrap();
     }
 
+    #[ignore = "local only"]
     #[test]
     fn test_gen_behaviors_table() {
         use havok_classes::Classes;
