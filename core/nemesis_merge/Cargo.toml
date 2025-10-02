@@ -22,7 +22,6 @@ phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true, optional = true }
-havok_types = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = [
   "extra_fmt",
@@ -41,6 +40,7 @@ nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
 [dev-dependencies]
+havok_classes = { workspace = true }
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
 tokio = { workspace = true, features = [

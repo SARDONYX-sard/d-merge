@@ -4216,7 +4216,7 @@ dependencies = [
  "bitflags 2.9.3",
  "dashmap",
  "glob",
- "havok_types",
+ "havok_classes",
  "indexmap 2.11.4",
  "json_patch",
  "jwalk",

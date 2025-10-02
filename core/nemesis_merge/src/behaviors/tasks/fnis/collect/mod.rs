@@ -1,83 +1,72 @@
 pub mod owned;
 
 use crate::{
-    behaviors::tasks::fnis::collect::owned::{collect_fnis_injection, OwnedFnisInjection},
+    behaviors::tasks::fnis::{
+        collect::owned::{collect_fnis_injection, OwnedFnisInjection},
+        patch_gen::generated_behaviors::{
+            BehaviorEntry, AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
+        },
+    },
     PriorityMap,
 };
-use rayon::prelude::*;
 use std::path::PathBuf;
 
 /// Collect FNIS injections by scanning specific directories under `<skyrim_data_dir>/meshes`.
 ///
-/// It searches for `animations/<namespace>/FNIS_*_List.txt` under:
-/// - `meshes/actors/*/`
-/// - `meshes/actors/ambient/chicken/`
-/// - `meshes/actors/character/_1stperson/`
-/// - `meshes/auxbones/tail/`
-/// - `meshes/dlc01/plants/caveworm/`
-/// - `meshes/dlc01/plants/cavewormgroup/`
-/// - `meshes/dlc01/plants/cavewormsmall/`
+/// It searches for `meshes/**/animations/<namespace>/FNIS_*_List.txt` under:
 pub fn collect_all_fnis_injections(
     skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
 ) -> Vec<OwnedFnisInjection> {
-    const TARGET_PATTERNS: &[&str] = &[
-        "meshes/actors/*",
-        "meshes/actors/ambient/chicken",
-        "meshes/actors/character/_1stperson",
-        "meshes/auxbones/tail",
-        "meshes/dlc01/plants/caveworm",
-        "meshes/dlc01/plants/cavewormgroup",
-        "meshes/dlc01/plants/cavewormsmall",
+    use std::sync::atomic::Ordering;
+
+    const ALL_MAPS: &[&phf::Map<&str, BehaviorEntry>] = &[
+        &HUMANOID,
+        &CREATURES,
+        &SKELETONS,
+        &AUXBONES,
+        &PLANTS_ACTIVATORS,
     ];
 
-    // Resolve data directories (single path or glob)
-    let mut data_dirs: Vec<PathBuf> = Vec::new();
-    if skyrim_data_dir.contains(['*', '?', '[']) {
-        match collect_paths(skyrim_data_dir) {
-            Ok(paths) => data_dirs.par_extend(paths),
-            Err(e) => {
-                tracing::warn!(
-                    "Invalid glob pattern for skyrim_data_dir: {skyrim_data_dir}, error={e}"
-                );
-                return vec![];
-            }
-        }
-    } else {
-        data_dirs.push(PathBuf::from(skyrim_data_dir));
-    }
+    // Flag to ensure "draugr" from CREATURES is only processed once
+    let draugr_skipped = std::sync::atomic::AtomicBool::new(false);
 
-    data_dirs
+    ALL_MAPS
         .iter()
-        .flat_map(|data_dir| {
-            TARGET_PATTERNS
-                .iter()
-                .flat_map(|pattern| {
-                    let search_root = data_dir.join(pattern);
-                    let glob_pat = format!("{}/animations/*", search_root.display());
+        .flat_map(|map| {
+            map.values().flat_map(|entry| {
+                // Special case: skip CREATURES' draugr if it was already processed by SKELETONS
+                let skip =
+                    entry.behavior_object == "draugr" && draugr_skipped.load(Ordering::Relaxed);
+                if !skip && entry.behavior_object == "draugr" {
+                    draugr_skipped.store(true, Ordering::Relaxed);
+                }
 
-                    collect_paths(&glob_pat)
-                        .unwrap_or_else(|e| {
-                            tracing::warn!("Glob error at {glob_pat}: {e}");
-                            vec![]
-                        })
-                        .into_iter()
-                        .filter(|ns_path| ns_path.is_dir())
-                        .filter_map(|ns_path| {
-                            let namespace = ns_path.file_name()?.to_string_lossy();
-                            let priority = fnis_entries.get(namespace.as_ref()).copied()?;
+                // Mark draugr as processed if we encounter it in SKELETONS
+                if entry.behavior_object == "draugr" {
+                    draugr_skipped.store(true, Ordering::Relaxed);
+                }
 
-                            match collect_fnis_injection(&ns_path, &namespace,priority) {
-                                Ok(injection) => Some(injection),
-                                Err(e) => {
-                                    tracing::warn!(namespace=%namespace, error=%e, "Failed to collect FNIS injection");
-                                    None
-                                }
-                            }
-                        })
-                })
+                let base_dir = entry.base_dir;
+                let glob_pat = format!("{skyrim_data_dir}/meshes/{base_dir}/animations/*");
+
+                collect_paths(&glob_pat)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|ns_path| ns_path.is_dir())
+                    .filter_map(move |ns_path| {
+                        if skip {
+                            return None; // skip draugr from CREATURES
+                        }
+
+                        let namespace = ns_path.file_name()?.to_string_lossy();
+                        let priority = fnis_entries.get(namespace.as_ref()).copied()?;
+
+                        collect_fnis_injection(&ns_path, entry, &namespace, priority).ok()
+                    })
+            })
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 /// Collect case-insensitive paths using glob.
@@ -100,6 +89,7 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, glob::PatternError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rayon::prelude::*;
 
     #[test]
     fn test_parse_relative_path() {

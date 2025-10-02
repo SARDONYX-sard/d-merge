@@ -54,6 +54,11 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     } else {
         vec![]
     };
+    let (borrowed_fnis_patches, adsf_patches, fnis_errors) =
+        tasks::fnis::patch_gen::collect_borrowed_patches(
+            &owned_fnis_patches,
+            &config.status_report,
+        );
 
     // Collect all patches file.
     let OwnedPatches {

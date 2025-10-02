@@ -1,6 +1,7 @@
 mod add;
 mod basic;
 mod furniture;
+pub mod generated_behaviors;
 mod offset_arm;
 
 use std::borrow::Cow;
@@ -13,16 +14,15 @@ use simd_json::json_typed;
 use snafu::ResultExt;
 use winnow::Parser;
 
+use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
 use crate::behaviors::tasks::fnis::patch_gen::add::generate_patch;
 use crate::behaviors::tasks::patches::types::{
     BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
 };
-use crate::behaviors::tasks::templates::key::THIRD_PERSON_0_MASTER;
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
-use crate::errors::{Error, FailedParseFnisModListSnafu, Result};
-use crate::results::filter_results;
+use crate::errors::{Error, FailedParseFnisModListSnafu};
 
 /// For Seq patch
 pub(crate) const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
@@ -30,12 +30,109 @@ pub(crate) const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
     range: 9998..9999,
 });
 
+pub fn collect_borrowed_patches<'a>(
+    mods_patches: &'a [OwnedFnisInjection],
+    status_reporter: &'a StatusReporterFn,
+) -> (BorrowedPatches<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
+    let raw_borrowed_patches = RawBorrowedPatches::default();
+    let template_keys = DashSet::new();
+    let variable_class_map = BehaviorStringDataMap::new();
+
+    let reporter = StatusReportCounter::new(
+        status_reporter,
+        ReportType::GeneratingFnisPatches,
+        mods_patches.len(),
+    );
+
+    let (adsf_patches, errors): (Vec<_>, Vec<_>) = mods_patches
+        .par_iter()
+        .flat_map(|owed_ref_one_mod| {
+            reporter.increment();
+
+            // Push Mod Root behavior to master xml
+            {
+                let master_template_key = owed_ref_one_mod
+                    .behavior_entry
+                    .to_master_behavior_template_key();
+
+                template_keys.insert(master_template_key.clone());
+
+                let (one, seq) = new_injectable_mod_root_behavior(owed_ref_one_mod);
+                let entry = raw_borrowed_patches
+                    .0
+                    .entry(master_template_key)
+                    .or_default();
+                entry.one.insert(one.0, one.1);
+                entry.seq.insert(seq.0, seq.1);
+            }
+
+            let (lists, errors): (Vec<_>, Vec<_>) = owed_ref_one_mod
+                .list_contents
+                .par_iter()
+                .partition_map(|list| {
+                    let result = parse_fnis_list
+                        .parse(list)
+                        .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
+                        .with_context(|_| FailedParseFnisModListSnafu {
+                            path: Path::new(&format!(
+                                "meshes/{}/animations/{}/FNIS_*_List.txt",
+                                owed_ref_one_mod.behavior_entry.base_dir,
+                                owed_ref_one_mod.namespace
+                            ))
+                            .to_path_buf(),
+                        });
+                    match result {
+                        Ok(list) => rayon::iter::Either::Left(list),
+                        Err(err) => rayon::iter::Either::Right(err),
+                    }
+                });
+
+            let (animations, adsf_patches): (Vec<_>, Vec<_>) = lists
+                .into_par_iter()
+                .flat_map(|list| generate_patch(owed_ref_one_mod, list))
+                .collect();
+
+            // Push One Mod animations
+            {
+                let behavior_key = owed_ref_one_mod
+                    .behavior_entry
+                    .to_default_behavior_template_key();
+                template_keys.insert(behavior_key.clone());
+
+                let (json_path, patch) = new_add_anim_seq_patch(
+                    owed_ref_one_mod.behavior_entry.default_behavior_index,
+                    &animations,
+                    owed_ref_one_mod.priority,
+                );
+                raw_borrowed_patches
+                    .0
+                    .entry(behavior_key)
+                    .or_default()
+                    .seq
+                    .insert(json_path, patch);
+            }
+
+            (adsf_patches, errors)
+        })
+        .unzip();
+
+    (
+        BorrowedPatches {
+            template_keys,
+            borrowed_patches: raw_borrowed_patches,
+            behavior_string_data_map: variable_class_map,
+        },
+        adsf_patches,
+        errors,
+    )
+}
+
 /// Register a mod's root behavior (`behaviors\FNIS_<namespace>_Behavior.hkx`)
 /// into `meshes\actors\character\behaviors\0_master.xml`.
 ///
 /// - `behavior_id`: Unique identifier for the behavior (e.g., `#<namespace>${index}`).
 /// - `behavior_path`: Path to the behavior file used in `hkbBehaviorReferenceGenerator.behavior_name`.
-pub fn push_mod_root_behavior<'a>(
+fn new_injectable_mod_root_behavior<'a>(
     owned_data: &'a OwnedFnisInjection,
 ) -> (
     (JsonPath<'a>, ValueWithPriority<'a>),
@@ -45,6 +142,7 @@ pub fn push_mod_root_behavior<'a>(
     let priority = owned_data.priority;
     let behavior_path = owned_data.behavior_path.as_str();
     let new_root_behavior_index = owned_data.next_class_name_attribute();
+    let master_index = owned_data.behavior_entry.master_behavior_index;
 
     let one = (
         vec![
@@ -70,7 +168,7 @@ pub fn push_mod_root_behavior<'a>(
     );
 
     let seq = (
-        json_path!["#0340", "hkbStateMachine", "states"],
+        json_path![master_index, "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,
@@ -83,101 +181,35 @@ pub fn push_mod_root_behavior<'a>(
     (one, seq)
 }
 
-pub fn collect_borrowed_patches<'a>(
-    owned_patches: &'a [OwnedFnisInjection],
-    status_reporter: &'a StatusReporterFn,
-) -> (BorrowedPatches<'a>, Vec<Error>) {
-    let raw_borrowed_patches = RawBorrowedPatches::default();
-    let template_keys = DashSet::new();
-    let variable_class_map = BehaviorStringDataMap::new();
-
-    let reporter = StatusReportCounter::new(
-        status_reporter,
-        ReportType::GeneratingFnisPatches,
-        owned_patches.len(),
-    );
-
-    let results: Vec<Result<()>> = owned_patches
-        .par_iter()
-        .map(|owed_ref_one_mod| {
-            reporter.increment();
-
-            let priority = owed_ref_one_mod.priority;
-            let (lists, errors): (Vec<_>, Vec<_>) = owed_ref_one_mod
-                .list_contents
-                .par_iter()
-                .partition_map(|list| {
-                    let result = parse_fnis_list
-                        .parse(list)
-                        .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
-                        .with_context(|_| FailedParseFnisModListSnafu {
-                            path: Path::new("TODO: Need list path").to_path_buf(),
-                        });
-                    match result {
-                        Ok(list) => rayon::iter::Either::Left(list),
-                        Err(err) => rayon::iter::Either::Right(err),
-                    }
-                });
-
-            // TODO:
-            // let (json_patches, _): (nemesis_xml::patch::PatchesMap, Vec<_>) = lists
-            //     .into_par_iter()
-            //     .flat_map(|list| generate_patch(owed_ref_one_mod, list))
-            //     .collect();
-
-            // template_keys.insert(key.clone());
-            // if let Some(class_index) = variable_class_index {
-            //     variable_class_map
-            //         .0
-            //         .entry(key.clone())
-            //         .or_insert(class_index);
-            // }
-
-            // Mod Root register to actors/character/behaviors/0_master.xml
-            {
-                let entry = raw_borrowed_patches
-                    .0
-                    .entry(THIRD_PERSON_0_MASTER)
-                    .or_default();
-                let (one, seq) = push_mod_root_behavior(owed_ref_one_mod);
-                entry.one.insert(one.0, one.1);
-                entry.seq.insert(seq.0, seq.1);
-            }
-
-            // json_patches.into_par_iter().for_each(|(json_path, value)| {
-            //     // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-            //     let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
-
-            //     match &value.op {
-            //         // Overwrite to match patch structure
-            //         // Pure: no add and remove because of single value
-            //         json_patch::OpRangeKind::Pure(_) => {
-            //             let value = ValueWithPriority::new(value, priority);
-            //             entry.value().one.insert(json_path, value);
-            //         }
-            //         json_patch::OpRangeKind::Seq(_) => {
-            //             let value = ValueWithPriority::new(value, priority);
-            //             entry.value().seq.insert(json_path, value);
-            //         }
-            //         json_patch::OpRangeKind::Discrete(range_vec) => {} // never used. old API.
-            //     }
-            // });
-
-            Ok(())
-        })
-        .collect();
-
-    let errors = match filter_results(results) {
-        Ok(()) => vec![],
-        Err(errors) => errors,
-    };
-
+/// Create an additional patch for the animations for one of the following template files.
+/// - `#0029`
+///    - `meshes/actors/character/_1stperson/firstperson.xml`
+///    - `meshes/actors/character/default_female/defaultfemale.xml`
+///    - `meshes/actors/character/defaultmale/defaultmale.xml`
+///
+/// # Note
+/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
+///
+/// - sample animations
+/// ```txt
+/// [
+///     "Animations\<FNIS one mod namespace>\sample.hkx",
+///     "Animations\<FNIS one mod namespace>\sample1.hkx"
+/// ]
+/// ```
+fn new_add_anim_seq_patch<'a>(
+    index: &'static str,
+    animations: &[&'a str],
+    priority: usize,
+) -> (json_path::JsonPath<'static>, ValueWithPriority<'a>) {
     (
-        BorrowedPatches {
-            template_keys,
-            borrowed_patches: raw_borrowed_patches,
-            behavior_string_data_map: variable_class_map,
+        json_path![index, "hkbCharacterStringData", "animationNames"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, animations),
+            },
+            priority,
         },
-        errors,
     )
 }

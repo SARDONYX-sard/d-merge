@@ -1,39 +1,27 @@
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, ValueWithPriority};
 use rayon::prelude::*;
-use simd_json::json_typed;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
+use crate::behaviors::tasks::fnis::list_parser::patterns::sequenced::SequencedAnimation;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     list_parser::{
         combinator::{fnis_animation::FNISAnimation, rotation::RotationData},
         FNISList, SyntaxPattern,
     },
-    patch_gen::PUSH_OP,
 };
-use crate::behaviors::tasks::patches::types::{HkxPatchMaps, OnePatchMap, SeqPatchMap};
 
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
-) -> (HkxPatchMaps<'a>, Vec<AdsfPatch<'a>>) {
+) -> (Vec<&'a str>, Vec<AdsfPatch<'a>>) {
     let namespace = owned_data.namespace.as_str();
-    let priority = owned_data.priority;
 
-    let one = OnePatchMap::new();
-    let seq = SeqPatchMap::new();
-    {
-        let animations = &owned_data.animation_paths;
-        let (json_path, patch) = new_add_anim_seq_patch(animations, priority);
-        seq.insert(json_path, patch);
-    }
+    let mut all_adsf_patches = vec![];
+    let mut all_anim_files = vec![];
 
-    // push_mod_root_behavior(&hkx_patches, owned_data);
-
-    let mut adsf_patches = vec![];
     for (index, pattern) in list.patterns.into_iter().enumerate() {
         match pattern {
             SyntaxPattern::AltAnim(_alt_animation) => {
@@ -49,55 +37,88 @@ pub fn generate_patch<'a>(
                 tracing::error!("Unsupported Furniture Animation yet.");
             }
             SyntaxPattern::Sequenced(sequenced_animation) => {
-                for fnis_animation in sequenced_animation.animations {
-                    let FNISAnimation {
-                        anim_event,
-                        motions,
-                        rotations,
-                        ..
-                    } = fnis_animation;
+                fn collect_seq_patch<'a>(
+                    namespace: &'a str,
+                    index: usize,
+                    sequenced_animation: SequencedAnimation<'a>,
+                ) -> (Vec<&'a str>, Vec<[AdsfPatch<'a>; 4]>) {
+                    sequenced_animation
+                        .animations
+                        .into_par_iter()
+                        .map(|fnis_animation| {
+                            let FNISAnimation {
+                                anim_event,
+                                anim_file,
+                                motions,
+                                rotations,
+                                ..
+                            } = fnis_animation;
 
-                    push_new_adsf_patch(
-                        &mut adsf_patches,
-                        namespace,
-                        index,
-                        anim_event,
-                        motions,
-                        rotations,
-                    );
+                            let adsf_patches =
+                                new_adsf_patch(namespace, index, anim_event, motions, rotations);
+                            (anim_file, adsf_patches)
+                        })
+                        .collect()
                 }
+                fn collect_seq_creature_patch<'a>(
+                    sequenced_animation: SequencedAnimation<'a>,
+                ) -> Vec<&'a str> {
+                    sequenced_animation
+                        .animations
+                        .into_par_iter()
+                        .map(|fnis_animation| {
+                            let FNISAnimation {
+                                anim_file,
+                                rotations,
+                                ..
+                            } = fnis_animation;
+                            if rotations.is_empty() {
+                                tracing::error!(
+                                    "Unsupported animationdatasinglefile.txt for Creature yet."
+                                );
+                            }
+
+                            anim_file
+                        })
+                        .collect()
+                }
+
+                let (anim_files, adsf_patches): (Vec<_>, Vec<_>) =
+                    if owned_data.behavior_entry.is_humanoid() {
+                        collect_seq_patch(namespace, index, sequenced_animation)
+                    } else {
+                        // TODO: Support creature adsf
+                        (collect_seq_creature_patch(sequenced_animation), vec![])
+                    };
+                all_anim_files.par_extend(anim_files);
+                all_adsf_patches.par_extend(adsf_patches.into_par_iter().flat_map(|patch| patch));
             }
             SyntaxPattern::Basic(fnis_animation) => {
                 let FNISAnimation {
                     anim_event,
+                    anim_file,
                     motions,
                     rotations,
                     ..
                 } = fnis_animation;
 
-                push_new_adsf_patch(
-                    &mut adsf_patches,
-                    namespace,
-                    index,
-                    anim_event,
-                    motions,
-                    rotations,
-                );
+                let adsf_patches = new_adsf_patch(namespace, index, anim_event, motions, rotations);
+                all_anim_files.push(anim_file);
+                all_adsf_patches.par_extend(adsf_patches);
             }
         };
     }
 
-    (HkxPatchMaps { one, seq }, adsf_patches)
+    (all_anim_files, all_adsf_patches)
 }
 
-fn push_new_adsf_patch<'a>(
-    patches: &mut Vec<AdsfPatch<'a>>,
+fn new_adsf_patch<'a>(
     namespace: &'a str,
     index: usize,
     anim_event: &'a str,
     motions: Vec<Translation<'a>>,
     rotations: Vec<RotationData<'a>>,
-) {
+) -> [AdsfPatch<'a>; 4] {
     // To link them, translation and rotation must always use the same ID.
     let clip_id: Cow<'a, str> = Cow::Owned(format!("FNIS_{namespace}${index}")); // use Nemesis variable
 
@@ -135,61 +156,29 @@ fn push_new_adsf_patch<'a>(
         })
     };
 
+    // TODO: separate Creature adsf
     // Movement and rotation patches for humans (`meshes/actors/character`) are equivalent to patches
     // for both DefaultMale and DefaultFemale (since there's only one, the index is 1).
-    // TODO: separate Creature adsf
-    patches.push(AdsfPatch {
-        target: "DefaultMale~1",
-        id: namespace,
-        patch: anim_block.clone(),
-    });
-    patches.push(AdsfPatch {
-        target: "DefaultMale~1",
-        id: namespace,
-        patch: motion_block.clone(),
-    });
-
-    patches.push(AdsfPatch {
-        target: "DefaultFemale~1",
-        id: namespace,
-        patch: anim_block,
-    });
-    patches.push(AdsfPatch {
-        target: "DefaultFemale~1",
-        id: namespace,
-        patch: motion_block,
-    });
-}
-
-/// Create an additional patch for the animations for one of the following template files.
-/// - `meshes/actors/character/_1stperson/firstperson.xml`
-/// - `meshes/actors/character/default_female/defaultfemale.xml`
-/// - `meshes/actors/character/defaultmale/defaultmale.xml`
-///
-/// # Note
-/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
-///
-/// - sample animations
-/// ```txt
-/// [
-///     "Animations\<FNIS one mod namespace>\sample.hkx",
-///     "Animations\<FNIS one mod namespace>\sample1.hkx"
-/// ]
-/// ```
-pub fn new_add_anim_seq_patch<'a>(
-    animations: &[String],
-    priority: usize,
-) -> (json_path::JsonPath<'static>, ValueWithPriority<'a>) {
-    (
-        // INFO: The destination for additions to the target template file is either coincidental or unknown,
-        //       but all three share the exact same hkxcmd path.
-        json_path!["#0029", "hkbCharacterStringData", "animationNames"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: json_typed!(borrowed, animations),
-            },
-            priority,
+    [
+        AdsfPatch {
+            target: "DefaultMale~1",
+            id: namespace,
+            patch: anim_block.clone(),
         },
-    )
+        AdsfPatch {
+            target: "DefaultMale~1",
+            id: namespace,
+            patch: motion_block.clone(),
+        },
+        AdsfPatch {
+            target: "DefaultFemale~1",
+            id: namespace,
+            patch: anim_block,
+        },
+        AdsfPatch {
+            target: "DefaultFemale~1",
+            id: namespace,
+            patch: motion_block,
+        },
+    ]
 }

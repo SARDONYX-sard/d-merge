@@ -178,6 +178,13 @@ mod tests {
         let alt_adsf: AltAdsf = adsf.into();
 
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
+
+        std::fs::write(
+            "../../dummy/debug/animationdatasinglefile_keys.log",
+            format!("{:#?}", alt_adsf.0.keys()),
+        )
+        .unwrap();
+
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
             panic!("Failed to serialize adsf to JSON:\n{err}");
         });

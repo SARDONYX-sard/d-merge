@@ -23,7 +23,9 @@ use crate::behaviors::{priority_ids::take_until_ext, tasks::templates::key::Temp
 
 /// Return (hashmap key, inner path starting from `meshes`)
 pub(crate) fn template_name_and_inner_path(path: &Path) -> Result<TemplateKey<'_>, TemplateError> {
-    Ok(unsafe { TemplateKey::new_unchecked(parse_template_path(path)?) })
+    Ok(unsafe {
+        TemplateKey::new_unchecked(std::borrow::Cow::Borrowed(parse_template_path(path)?))
+    })
 }
 
 pub fn parse_template_path(path: &Path) -> Result<&str, TemplateError> {

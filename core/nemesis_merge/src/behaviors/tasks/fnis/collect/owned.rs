@@ -40,11 +40,17 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::behaviors::{priority_ids::take_until_ext, tasks::fnis::collect::collect_paths};
+use crate::behaviors::{
+    priority_ids::take_until_ext,
+    tasks::fnis::{collect::collect_paths, patch_gen::generated_behaviors::BehaviorEntry},
+};
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
+    /// Actor name. (e.g. `character`, `dragon`, `dog`)
+    pub behavior_entry: &'static BehaviorEntry,
+
     /// Primarily used for generating havok class IDs(XML name attribute). e.g. `#namespace$1` (The value must be unique.)
     ///
     /// In Nemesis, it is called `mod_code`.
@@ -186,6 +192,7 @@ impl OwnedFnisInjection {
 /// - The Behavior file is missing (`BehaviorMissing`)
 pub fn collect_fnis_injection<P>(
     animations_mod_dir: P,
+    behavior_entry: &'static BehaviorEntry,
     namespace: &str,
     priority: usize,
 ) -> Result<OwnedFnisInjection, FnisError>
@@ -206,6 +213,7 @@ where
     let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
 
     Ok(OwnedFnisInjection {
+        behavior_entry,
         namespace: namespace.to_string(),
         priority,
         list_contents,
@@ -424,6 +432,7 @@ pub enum FnisError {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
@@ -466,8 +475,12 @@ mod tests {
 
     #[test]
     fn test_collect_fnis_injection() {
+        use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::HUMANOID;
+
         let input = "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
-        let res = collect_fnis_injection(input, "FNISFlyer", 0).unwrap_or_else(|e| panic!("{e}"));
+        let behavior_entry = HUMANOID.get("character").unwrap();
+        let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0)
+            .unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);
     }
 }
