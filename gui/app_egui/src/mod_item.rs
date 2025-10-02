@@ -73,11 +73,11 @@ pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) ->
                         } else {
                             id.clone()
                         };
-                        Either::Right((id, priority))
+                        Either::Left((id, priority))
                     }
                     ModType::Fnis => {
                         let id = id.clone();
-                        Either::Left((id, priority))
+                        Either::Right((id, priority))
                     }
                 }
             },
