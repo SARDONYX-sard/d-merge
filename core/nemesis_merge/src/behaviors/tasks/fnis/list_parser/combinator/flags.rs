@@ -219,7 +219,7 @@ mod tests {
             must_parse(parse_anim_flag_param, "AVbar"),
             ParsedFlag::AnimVar(AnimVar {
                 name: "bar",
-                inverse: true,
+                inverse: false,
             })
         );
     }

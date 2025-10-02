@@ -30,7 +30,7 @@ runs:
   using: 'composite'
   steps:
     - name: Install dependencies (ubuntu only)
-      if: ${{ inputs.platform == 'ubuntu-latest' }}
+      if: ${{ inputs.platform == 'ubuntu-latest' }} && ${{ inputs.install_front_deps == 'true' }}
       shell: bash
       run: |
         sudo apt-get update

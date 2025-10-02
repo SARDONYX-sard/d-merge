@@ -55,6 +55,11 @@ pub fn collect_borrowed_patches<'a>(
                 template_keys.insert(master_template_key.clone());
 
                 let (one, seq) = new_injectable_mod_root_behavior(owed_ref_one_mod);
+                #[cfg(feature = "tracing")]
+                tracing::debug!(
+                    "FNIS Generated for root mod behavior injection:\none = {one:#?}\nseq = {seq:#?}"
+                );
+
                 let entry = raw_borrowed_patches
                     .0
                     .entry(master_template_key)
@@ -79,7 +84,19 @@ pub fn collect_borrowed_patches<'a>(
                             .to_path_buf(),
                         });
                     match result {
-                        Ok(list) => rayon::iter::Either::Left(list),
+                        Ok(list) => {
+                            #[cfg(feature = "tracing")]
+                            {
+                                let list_path = format!(
+                                    "meshes/{}/animations/{}/FNIS_*_List.txt",
+                                    owed_ref_one_mod.behavior_entry.base_dir,
+                                    owed_ref_one_mod.namespace
+                                );
+                                tracing::debug!("{list_path}: {list:#?}");
+                            }
+
+                            rayon::iter::Either::Left(list)
+                        }
                         Err(err) => rayon::iter::Either::Right(err),
                     }
                 });
@@ -101,6 +118,9 @@ pub fn collect_borrowed_patches<'a>(
                     &animations,
                     owed_ref_one_mod.priority,
                 );
+                #[cfg(feature = "tracing")]
+                tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
+
                 raw_borrowed_patches
                     .0
                     .entry(behavior_key)
@@ -169,7 +189,7 @@ fn new_injectable_mod_root_behavior<'a>(
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,
-                value: json_typed!(borrowed, new_root_behavior_index),
+                value: json_typed!(borrowed, [new_root_behavior_index]),
             },
             priority,
         },

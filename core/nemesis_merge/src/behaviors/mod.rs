@@ -38,11 +38,11 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     {
         let mut sorted: Vec<_> = nemesis_entries.par_iter().collect();
         sorted.par_sort_by_key(|&(_, v)| *v);
-        tracing::trace!("nemesis_entries = {sorted:#?}");
+        tracing::debug!("nemesis_entries = {sorted:#?}");
 
         let mut sorted: Vec<_> = fnis_entries.par_iter().collect();
         sorted.par_sort_by_key(|&(_, v)| *v);
-        tracing::trace!("fnis_entries = {sorted:#?}");
+        tracing::debug!("fnis_entries = {sorted:#?}");
     }
 
     let owned_fnis_patches = if !fnis_entries.is_empty() {

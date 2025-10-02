@@ -140,15 +140,15 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         default_behavior: "characters/firstperson.bin",
         default_behavior_index: "#0029",
         master_behavior: "behaviors/0_master.bin",
-        master_behavior_index: "#1831",
+        master_behavior_index: "#1995",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
         base_dir: "actors/character",
         default_behavior: "characters/defaultmale.bin", // & characters female/defaultfemale.bin"
-        default_behavior_index: "#0029",
+        default_behavior_index: "#0029", // defaultmale.xml & defaultfemale.xml same index
         master_behavior: "behaviors/0_master.bin",
-        master_behavior_index: "#1831",
+        master_behavior_index: "#2521",
     },
 };
 "###

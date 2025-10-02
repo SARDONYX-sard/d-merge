@@ -11,7 +11,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
 
     global_logger("../../dummy/merge_test.log", tracing::Level::TRACE)?;
 
-    let mods = {
+    let patches = {
         use crate::behaviors::PriorityMap;
 
         let string = std::fs::read_to_string("../../dummy/ids.txt")?;
@@ -21,22 +21,27 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
             .map(str::trim)
             .filter(|line| !line.is_empty() && !line.starts_with("//"))
             .collect();
+        let nemesis_mods_count = lines.len();
 
-        lines
+        let nemesis_entries = lines
             .into_par_iter()
             .enumerate()
             .map(|(idx, line)| (line.to_string(), idx))
-            .collect::<PriorityMap>()
+            .collect::<PriorityMap>();
+
+        let fnis_entries = ["FNISFlyer", "FNISZoo", "XPMSE"]
+            .into_par_iter()
+            .enumerate()
+            .map(|(idx, namespace)| (namespace.to_string(), nemesis_mods_count + idx))
+            .collect();
+
+        PatchMaps {
+            nemesis_entries,
+            fnis_entries,
+        }
     };
 
-    behavior_gen(
-        PatchMaps {
-            nemesis_entries: mods,
-            ..Default::default()
-        },
-        slow_debug_config(),
-    )
-    .await?;
+    behavior_gen(patches, slow_debug_config()).await?;
     // behavior_gen(mods, fastest_config()).await?;
     Ok(())
 }

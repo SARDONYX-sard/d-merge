@@ -110,6 +110,7 @@ mod tests {
     fn test_create_bin_templates() {
         // let paths = std::fs::read_to_string("../../dummy/templates_paths.txt").unwrap();
         let paths = ["../../resource/xml"];
+        // let paths = ["../../dummy/overwrited_xml"];
         let output_dir = Path::new("../../dummy/templates/bins");
         create_bin_templates(paths.iter(), output_dir);
     }
@@ -126,7 +127,12 @@ mod tests {
     #[test]
     fn test_gen_behaviors_table() {
         use havok_classes::Classes;
+        use rayon::prelude::*;
+        use std::{fs, path::Path};
 
+        // -------------------------------
+        // Input structures (from json)
+        // -------------------------------
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
         pub struct Root {
             pub version: String,
@@ -167,12 +173,9 @@ mod tests {
             pub bo_anims: String,
         }
 
-        let parsed: Root = {
-            let mut data =
-                std::fs::read_to_string("../../dummy/debug/FNIS_output/fnis_table.json").unwrap();
-            simd_json::from_slice(unsafe { data.as_bytes_mut() }).unwrap()
-        };
-
+        // -------------------------------
+        // Output structures
+        // -------------------------------
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
         pub struct NewRoot {
             pub creatures: Vec<NewEntry>,
@@ -188,12 +191,10 @@ mod tests {
             pub behavior_object: String,
             /// "base_folder": "actors\\dlc02\\riekling",
             pub base_folder: String,
-
             /// "default_behavior": "characters\\rieklingcharacter.hkx",
             pub default_behavior: String,
             /// #0200
             pub default_behavior_index: String,
-
             /// "master_behavior": "behaviors\\rieklingbehavior.hkx",
             pub master_behavior: String,
             /// #0100
@@ -204,75 +205,65 @@ mod tests {
             fn from_indexes(entry: &Entry, indexes: (String, String)) -> Self {
                 Self {
                     behavior_object: entry.behavior_object.clone(),
-                    base_folder: entry.base_folder.clone(),
-                    default_behavior: entry.default_behavior.clone(),
+                    base_folder: entry.base_folder.replace("\\", "/"),
+                    default_behavior: entry.default_behavior.replace("\\", "/"),
                     default_behavior_index: indexes.1,
-                    master_behavior: entry.master_behavior.clone(),
+                    master_behavior: entry.master_behavior.replace("\\", "/"),
                     master_behavior_index: indexes.0,
                 }
             }
         }
 
-        let root_dir = r"../dummy/hkxcmd_xml/meshes";
+        // -------------------------------
+        // Common processor for all groups
+        // -------------------------------
+        fn process_entries(
+            entries: &[Entry],
+            root_dir: &Path,
+            errors: &mut Vec<String>,
+        ) -> Vec<NewEntry> {
+            entries
+                .par_iter()
+                .map(|entry| match get_behavior(root_dir, entry) {
+                    Ok(indexes) => Ok(NewEntry::from_indexes(entry, indexes)),
+                    Err(e) => Err(format!("{}: {}", entry.behavior_object, e)),
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .filter_map(|res| match res {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        errors.push(e);
+                        None
+                    }
+                })
+                .collect()
+        }
 
-        let new_root = NewRoot {
-            creatures: parsed
-                .creatures
-                .par_iter()
-                .map(|entry| NewEntry::from_indexes(entry, get_behavior(root_dir, entry)))
-                .collect(),
-            skeletons: parsed
-                .skeletons
-                .par_iter()
-                .map(|entry| NewEntry::from_indexes(entry, get_behavior(root_dir, entry)))
-                .collect(),
-            auxbones: parsed
-                .auxbones
-                .par_iter()
-                .map(|entry| NewEntry::from_indexes(entry, get_behavior(root_dir, entry)))
-                .collect(),
-            plants_activators: parsed
-                .plants_activators
-                .par_iter()
-                .map(|entry| NewEntry::from_indexes(entry, get_behavior(root_dir, entry)))
-                .collect(),
-        };
-
-        fn get_behavior(root_dir: impl AsRef<Path>, entry: &Entry) -> (String, String) {
-            let root_dir = root_dir.as_ref();
-
-            // hkbStateMachine
-            let mut master = Path::new(root_dir)
+        // -------------------------------
+        // Behavior analyzers
+        // -------------------------------
+        fn get_behavior(root_dir: &Path, entry: &Entry) -> Result<(String, String), String> {
+            let mut master = root_dir
                 .join(&entry.base_folder)
                 .join(&entry.master_behavior);
             master.set_extension("xml");
-
-            // find hkbCharacterStringData
-            let mut default = Path::new(root_dir)
+            let mut default = root_dir
                 .join(&entry.base_folder)
                 .join(&entry.default_behavior);
             default.set_extension("xml");
 
-            if let (Some(master), Some(default)) = (
-                get_master_root_behavior(&master),
-                get_default_root_state(&default),
-            ) {
-                return (master, default);
-            };
+            let master_res = get_master_root_behavior(&master)
+                .ok_or_else(|| format!("master not found: {}", master.display()))?;
+            let default_res = get_default_root_state(&default)
+                .ok_or_else(|| format!("default not found: {}", default.display()))?;
 
-            panic!(
-                "Not found: master={}, default={}",
-                master.display(),
-                default.display()
-            );
+            Ok((master_res, default_res))
         }
 
         fn get_default_root_state(default: &Path) -> Option<String> {
-            let string = std::fs::read_to_string(default).unwrap();
-            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string)
-                .unwrap_or_else(|e| {
-                    panic!("serde_hkx de error:{}\n {e}", default.display());
-                });
+            let string = std::fs::read_to_string(default).ok()?;
+            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
 
             let class: Vec<_> = class_map
                 .par_iter()
@@ -281,50 +272,65 @@ mod tests {
                     _ => None,
                 })
                 .collect();
+
             if class.is_empty() || class.len() > 2 {
-                panic!("hkbCharacterStringData len {}", class.len());
-            };
+                return None;
+            }
 
             class[0].__ptr.as_ref().map(|ptr| ptr.to_string())
         }
 
         fn get_master_root_behavior(master: &Path) -> Option<String> {
-            // - master finder
-            //   hkRootLevelContainer
-            //   -> namedVariants[0]: ptr
-            //   -> variant: ptr -> (map[ptr])
-            //   -> hkbBehaviorGraph.rootGenerator
-            let string = std::fs::read_to_string(master).unwrap();
-            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string)
-                .unwrap_or_else(|e| {
-                    panic!("serde_hkx de error:{}\n {e}", master.display());
-                });
+            let string = std::fs::read_to_string(master).ok()?;
+            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
 
             let (_, root) = class_map
                 .par_iter()
-                .find_first(|(_, class)| matches!(class, Classes::hkRootLevelContainer(_)))
-                .unwrap_or_else(|| {
-                    panic!("Not found hkRootLevelContainer from {}", master.display())
-                });
+                .find_first(|(_, class)| matches!(class, Classes::hkRootLevelContainer(_)))?;
 
             if let Classes::hkRootLevelContainer(container) = root {
-                // namedVariants[0].variant が BehaviorGraph を指す
                 if let Some(variant) = container.m_namedVariants.first() {
                     let ptr = &variant.m_variant;
-
-                    let behavior_graph = class_map.get(ptr.get()).unwrap();
-                    if let Classes::hkbBehaviorGraph(graph) = behavior_graph {
-                        // rootGenerator を取る
+                    if let Some(Classes::hkbBehaviorGraph(graph)) = class_map.get(ptr.get()) {
                         return Some(graph.m_rootGenerator.to_string());
                     }
                 }
             }
-
             None
         }
 
-        let json = simd_json::to_string_pretty(&new_root)
-            .unwrap_or_else(|_| panic!("simd_json ser error"));
-        std::fs::write("./behaviors_table.json", json).unwrap();
+        // let root_dir = Path::new("../../resource/xml/templates/meshes");
+        let root_dir = Path::new("../../dummy/overwrited_xml/meshes");
+        let mut errors: Vec<String> = Vec::new();
+
+        // -------------------------------
+        // Load source json
+        // -------------------------------
+        let parsed: Root = {
+            let mut data =
+                std::fs::read_to_string("../../dummy/debug/FNIS_output/fnis_table.json").unwrap();
+            simd_json::from_slice(unsafe { data.as_bytes_mut() }).unwrap()
+        };
+
+        // -------------------------------
+        // Build output
+        // -------------------------------
+        let new_root = NewRoot {
+            creatures: process_entries(&parsed.creatures, root_dir, &mut errors),
+            skeletons: process_entries(&parsed.skeletons, root_dir, &mut errors),
+            auxbones: process_entries(&parsed.auxbones, root_dir, &mut errors),
+            plants_activators: process_entries(&parsed.plants_activators, root_dir, &mut errors),
+        };
+
+        // -------------------------------
+        // Write outputs
+        // -------------------------------
+        let json = simd_json::to_string_pretty(&new_root).unwrap();
+        fs::write("../../dummy/fnis/table/behaviors_table.json", json).unwrap();
+
+        if !errors.is_empty() {
+            let joined = errors.join("\n");
+            fs::write("../../dummy/fnis/table/errors_list.log", joined).unwrap();
+        }
     }
 }

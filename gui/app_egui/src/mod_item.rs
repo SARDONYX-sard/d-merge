@@ -76,11 +76,7 @@ pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) ->
                         Either::Right((id, priority))
                     }
                     ModType::Fnis => {
-                        let id = if is_vfs {
-                            format!("{skyrim_data_dir}/meshes/actors/character/animations/{id}")
-                        } else {
-                            id.clone()
-                        };
+                        let id = id.clone();
                         Either::Left((id, priority))
                     }
                 }

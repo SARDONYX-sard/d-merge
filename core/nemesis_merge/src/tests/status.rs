@@ -45,7 +45,8 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
 #[allow(unused)]
 pub(crate) fn fastest_config() -> Config {
     Config {
-        resource_dir: "../../resource/assets/templates".into(),
+        // resource_dir: "../../resource/assets/templates".into(),
+        resource_dir: "../../dummy/templates/bins".into(),
         output_dir: "../../dummy/behavior_gen/output".into(),
         status_report: None,
         hack_options: Some(HackOptions::enable_all()),
@@ -55,14 +56,15 @@ pub(crate) fn fastest_config() -> Config {
             output_merged_xml: false,
         },
         output_target: OutPutTarget::SkyrimSe,
-        skyrim_data_dir_glob: None,
+        skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
     }
 }
 
 #[allow(unused)]
 pub(crate) fn slow_debug_config() -> Config {
     Config {
-        resource_dir: "../../resource/assets/templates".into(),
+        // resource_dir: "../../resource/assets/templates".into(),
+        resource_dir: "../../dummy/templates/bins".into(),
         output_dir: "../../dummy/behavior_gen/output".into(),
         status_report: Some(new_color_status_reporter()), // +2s
         // status_report: None,
@@ -73,6 +75,6 @@ pub(crate) fn slow_debug_config() -> Config {
             output_merged_xml: false,
         },
         output_target: OutPutTarget::SkyrimSe,
-        skyrim_data_dir_glob: None,
+        skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
     }
 }
