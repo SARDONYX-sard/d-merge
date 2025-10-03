@@ -89,6 +89,8 @@ pub struct OwnedFnisInjection {
     /// <hkobject name="#FNIS_Flyer$2" class="hkbStateMachine" signature="0x816c1dcb">...</hkobject>
     /// ```
     current_class_index: AtomicUsize,
+
+    current_adsf_index: AtomicUsize,
 }
 
 impl OwnedFnisInjection {
@@ -102,22 +104,14 @@ impl OwnedFnisInjection {
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$2");
     /// ```
     pub fn next_class_name_attribute(&self) -> String {
-        let idx = self.next_class_index();
-        format!("#{}${}", self.namespace, idx)
+        let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire) + 1;
+        format!("#{}${idx}", self.namespace)
     }
 
-    /// Increments the `current_class_index` counter and returns the **next available index**.
-    ///
-    /// This is used when registering a new XML C++ root class, ensuring
-    /// that the Nemesis-style index (`#<mod_code>$<index>`) remains unique.
-    ///
-    /// # Ordering
-    /// - Uses [`Ordering::Acquire`] to ensure correct memory synchronization across threads.
-    ///
-    /// # Returns
-    /// The incremented class index (1-based).
-    pub fn next_class_index(&self) -> usize {
-        self.current_class_index.fetch_add(1, Ordering::Acquire) + 1
+    /// `#FNIS_{namespace}${idx}`
+    pub fn next_adsf_id(&self) -> String {
+        let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire) + 1;
+        format!("#FNIS_{}${idx}", self.namespace)
     }
 }
 
@@ -174,6 +168,7 @@ where
         list_contents,
         behavior_path,
         current_class_index: AtomicUsize::new(0),
+        current_adsf_index: AtomicUsize::new(0),
     })
 }
 

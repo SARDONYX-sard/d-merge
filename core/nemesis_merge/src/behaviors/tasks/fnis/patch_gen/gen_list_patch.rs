@@ -23,7 +23,7 @@ pub fn generate_patch<'a>(
     let mut all_adsf_patches = vec![];
     let mut all_anim_files = vec![];
 
-    for (index, pattern) in list.patterns.into_iter().enumerate() {
+    for pattern in list.patterns {
         match pattern {
             SyntaxPattern::AltAnim(_alt_animation) => {
                 tracing::error!("Unsupported Alternative Animation yet.");
@@ -40,7 +40,7 @@ pub fn generate_patch<'a>(
             SyntaxPattern::Sequenced(sequenced_animation) => {
                 fn collect_seq_patch<'a>(
                     namespace: &'a str,
-                    index: usize,
+                    owned_data: &'a OwnedFnisInjection,
                     sequenced_animation: SequencedAnimation<'a>,
                 ) -> (Vec<String>, Vec<[AdsfPatch<'a>; 4]>) {
                     sequenced_animation
@@ -55,8 +55,13 @@ pub fn generate_patch<'a>(
                                 ..
                             } = fnis_animation;
 
-                            let adsf_patches =
-                                new_adsf_patch(namespace, index, anim_event, motions, rotations);
+                            let adsf_patches = new_adsf_patch(
+                                namespace,
+                                owned_data.next_adsf_id(),
+                                anim_event,
+                                motions,
+                                rotations,
+                            );
                             (
                                 format!("Animations\\{namespace}\\{anim_file}"),
                                 adsf_patches,
@@ -90,7 +95,7 @@ pub fn generate_patch<'a>(
 
                 let (anim_files, adsf_patches): (Vec<_>, Vec<_>) =
                     if owned_data.behavior_entry.is_humanoid() {
-                        collect_seq_patch(namespace, index, sequenced_animation)
+                        collect_seq_patch(namespace, owned_data, sequenced_animation)
                     } else {
                         // TODO: Support creature adsf
                         (
@@ -110,7 +115,13 @@ pub fn generate_patch<'a>(
                     ..
                 } = fnis_animation;
 
-                let adsf_patches = new_adsf_patch(namespace, index, anim_event, motions, rotations);
+                let adsf_patches = new_adsf_patch(
+                    namespace,
+                    owned_data.next_adsf_id(),
+                    anim_event,
+                    motions,
+                    rotations,
+                );
                 all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
                 all_adsf_patches.par_extend(adsf_patches);
             }
@@ -122,13 +133,13 @@ pub fn generate_patch<'a>(
 
 fn new_adsf_patch<'a>(
     namespace: &'a str,
-    index: usize,
+    index: String,
     anim_event: &'a str,
     motions: Vec<Translation<'a>>,
     rotations: Vec<RotationData<'a>>,
 ) -> [AdsfPatch<'a>; 4] {
     // To link them, translation and rotation must always use the same ID.
-    let clip_id: Cow<'a, str> = Cow::Owned(format!("FNIS_{namespace}${index}")); // use Nemesis variable
+    let clip_id: Cow<'a, str> = Cow::Owned(index); // use Nemesis variable
 
     let anim_block = PatchKind::AddAnim(ClipAnimDataBlock {
         name: Cow::Borrowed(anim_event),
