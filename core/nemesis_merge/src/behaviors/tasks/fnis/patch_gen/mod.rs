@@ -200,31 +200,7 @@ fn new_injectable_mod_root_behavior<'a>(
 }
 
 /// Insert a new animation sequence patch into the borrowed patches map.
-fn insert_anim_seq_patch<'a>(
-    animations: &[&'a str],
-    behavior_entry: &BehaviorEntry,
-    priority: usize,
-    raw_borrowed_patches: &RawBorrowedPatches<'a>,
-    template_keys: &DashSet<TemplateKey<'static>>,
-) {
-    let behavior_key = behavior_entry.to_default_behavior_template_key();
-
-    template_keys.insert(behavior_key.clone());
-
-    let (json_path, patch) =
-        new_add_anim_seq_patch(behavior_entry.default_behavior_index, animations, priority);
-
-    #[cfg(feature = "tracing")]
-    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
-
-    raw_borrowed_patches
-        .0
-        .entry(behavior_key)
-        .or_default()
-        .seq
-        .insert(json_path, patch);
-}
-
+///
 /// Create an additional patch for the animations for one of the following template files.
 /// - `#0029`
 ///    - `meshes/actors/character/_1stperson/firstperson.xml`
@@ -241,19 +217,38 @@ fn insert_anim_seq_patch<'a>(
 ///     "Animations\<FNIS one mod namespace>\sample1.hkx"
 /// ]
 /// ```
-fn new_add_anim_seq_patch<'a>(
-    index: &'static str,
-    animations: &[&'a str],
+fn insert_anim_seq_patch<'a>(
+    animations: &[String],
+    behavior_entry: &BehaviorEntry,
     priority: usize,
-) -> (json_path::JsonPath<'static>, ValueWithPriority<'a>) {
-    (
-        json_path![index, "hkbCharacterStringData", "animationNames"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: json_typed!(borrowed, animations),
+    raw_borrowed_patches: &RawBorrowedPatches<'a>,
+    template_keys: &DashSet<TemplateKey<'static>>,
+) {
+    let behavior_key = behavior_entry.to_default_behavior_template_key();
+
+    template_keys.insert(behavior_key.clone());
+
+    let (json_path, patch) = {
+        let index = behavior_entry.default_behavior_index;
+        (
+            json_path![index, "hkbCharacterStringData", "animationNames"],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    op: PUSH_OP,
+                    value: json_typed!(borrowed, animations),
+                },
+                priority,
             },
-            priority,
-        },
-    )
+        )
+    };
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
+
+    raw_borrowed_patches
+        .0
+        .entry(behavior_key)
+        .or_default()
+        .seq
+        .insert(json_path, patch);
 }

@@ -17,7 +17,7 @@ use crate::behaviors::tasks::fnis::{
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
-) -> (Vec<&'a str>, Vec<AdsfPatch<'a>>) {
+) -> (Vec<String>, Vec<AdsfPatch<'a>>) {
     let namespace = owned_data.namespace.as_str();
 
     let mut all_adsf_patches = vec![];
@@ -42,7 +42,7 @@ pub fn generate_patch<'a>(
                     namespace: &'a str,
                     index: usize,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<&'a str>, Vec<[AdsfPatch<'a>; 4]>) {
+                ) -> (Vec<String>, Vec<[AdsfPatch<'a>; 4]>) {
                     sequenced_animation
                         .animations
                         .into_par_iter()
@@ -57,13 +57,17 @@ pub fn generate_patch<'a>(
 
                             let adsf_patches =
                                 new_adsf_patch(namespace, index, anim_event, motions, rotations);
-                            (anim_file, adsf_patches)
+                            (
+                                format!("Animations\\{namespace}\\{anim_file}"),
+                                adsf_patches,
+                            )
                         })
                         .collect()
                 }
                 fn collect_seq_creature_patch<'a>(
+                    namespace: &str,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> Vec<&'a str> {
+                ) -> Vec<String> {
                     sequenced_animation
                         .animations
                         .into_par_iter()
@@ -79,7 +83,7 @@ pub fn generate_patch<'a>(
                                 );
                             }
 
-                            anim_file
+                            format!("Animations\\{namespace}\\{anim_file}")
                         })
                         .collect()
                 }
@@ -89,7 +93,10 @@ pub fn generate_patch<'a>(
                         collect_seq_patch(namespace, index, sequenced_animation)
                     } else {
                         // TODO: Support creature adsf
-                        (collect_seq_creature_patch(sequenced_animation), vec![])
+                        (
+                            collect_seq_creature_patch(namespace, sequenced_animation),
+                            vec![],
+                        )
                     };
                 all_anim_files.par_extend(anim_files);
                 all_adsf_patches.par_extend(adsf_patches.into_par_iter().flat_map(|patch| patch));
@@ -104,7 +111,7 @@ pub fn generate_patch<'a>(
                 } = fnis_animation;
 
                 let adsf_patches = new_adsf_patch(namespace, index, anim_event, motions, rotations);
-                all_anim_files.push(anim_file);
+                all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
                 all_adsf_patches.par_extend(adsf_patches);
             }
         };
