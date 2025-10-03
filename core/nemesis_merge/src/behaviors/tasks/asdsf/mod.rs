@@ -225,10 +225,14 @@ fn write_alt_asdsf_file(
 }
 
 /// Outputs debug JSON files for each patch in the provided slice.
-fn output_debug_patch_json(borrowed_patches: &[AsdsfPatch], config: &Config) {
-    let mut debug_path = config.output_dir.join(".d_merge");
-    debug_path.push(".debug/patches/animationsetdatasinglefile/patches.json");
-    if let Err(_err) = write_patched_json(&debug_path, borrowed_patches) {
+fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
+    let mut dest_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join(ASDSF_INNER_PATH);
+    dest_path.set_extension("json");
+    if let Err(_err) = write_patched_json(&dest_path, patches) {
         #[cfg(feature = "tracing")]
         tracing::error!("{_err}");
     };

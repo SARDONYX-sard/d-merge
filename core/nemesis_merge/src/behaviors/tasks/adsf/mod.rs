@@ -28,7 +28,6 @@ pub use skyrim_anim_parser::adsf::patch::de::others::{
 };
 use skyrim_anim_parser::diff_line::{deserializer::parse_lines_diff_patch, DiffLines};
 use snafu::ResultExt as _;
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -303,60 +302,17 @@ fn write_alt_adsf_file(
 }
 
 /// Outputs debug JSON files for each patch in the provided slice.
-///
-/// Each file is written to a subdirectory under `.d_merge/.debug/` and is
-/// categorized by patch type and target. The filenames are structured to support
-/// easy sorting and searching, using a shared patch identifier (`patchXX`) across
-/// both `Add` and `Edit` variants.
-///
-/// ### Filename Format
-///
-/// | Field         | Description                                                                 | Example                       |
-/// |---------------|-----------------------------------------------------------------------------|-------------------------------|
-/// | `clip_anim`   | Category of the patch (`clip_anim` or `clip_motion`)                        | `clip_anim`                   |
-/// | `edit`/`add`  | Indicates whether the patch modifies existing data or adds new content      | `edit`, `add`                 |
-/// | `_idxNNN`     | Only included for `Edit` patches; shows the index of the edited entry       | `_idx044`                     |
-/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
-///
-/// ### Full Filename Examples
-///
-/// - `clip_anim_add_patch07.json`
-/// - `clip_anim_edit_idx044_patch07.json`
-/// - `clip_motion_edit_idx005_patch12.json`
-///
-/// This naming convention helps ensure:
-///
-/// - Easy grouping and lookup by `patchXX`
-/// - Clear distinction between `add` and `edit` actions
-/// - Fine-grained identification of edits via index
-fn output_debug_patch_json(borrowed_patches: &[AdsfPatch], config: &Config) {
-    for (patch_id, patch) in borrowed_patches.iter().enumerate() {
-        let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
-        let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
-            PatchKind::ProjectNamesHeader(_) => ("txt_project_header", "".into()),
-            PatchKind::AnimDataHeader(_) => ("anim_header", "".into()),
-            PatchKind::AddAnim(_) => ("clip_anim", "".into()),
-            PatchKind::AddMotion(_) => ("clip_motion", "".into()),
-            PatchKind::EditAnim(edit) => ("clip_anim", format!("_id{}", edit.name_clip).into()),
-            PatchKind::EditMotion(edit) => ("clip_motion", format!("_id{}", edit.clip_id).into()),
-        };
-
-        let action = match &patch.patch {
-            PatchKind::ProjectNamesHeader(_) | PatchKind::AnimDataHeader(_) => "patch",
-            PatchKind::AddAnim(_) | PatchKind::AddMotion(_) => "add",
-            PatchKind::EditAnim(_) | PatchKind::EditMotion(_) => "edit",
-        };
-
-        let target = patch.target;
-        let inner_path = format!(
-            "patches/animationdatasinglefile/{target}/{kind}_{action}{index_str}_{patch_id:04}.json",
-        );
-        debug_path.push(inner_path);
-        if let Err(_err) = write_patched_json(&debug_path, patch) {
-            #[cfg(feature = "tracing")]
-            tracing::error!("{_err}");
-        };
-    }
+fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
+    let mut adsf_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join(ADSF_INNER_PATH);
+    adsf_path.set_extension("json");
+    if let Err(_err) = write_patched_json(&adsf_path, patches) {
+        #[cfg(feature = "tracing")]
+        tracing::error!("{_err}");
+    };
 }
 
 fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
