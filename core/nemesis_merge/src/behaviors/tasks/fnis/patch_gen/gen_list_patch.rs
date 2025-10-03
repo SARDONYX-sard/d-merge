@@ -75,10 +75,11 @@ pub fn generate_patch<'a>(
                         .map(|fnis_animation| {
                             let FNISAnimation {
                                 anim_file,
+                                motions,
                                 rotations,
                                 ..
                             } = fnis_animation;
-                            if rotations.is_empty() {
+                            if !motions.is_empty() || !rotations.is_empty() {
                                 tracing::error!(
                                     "Unsupported animationdatasinglefile.txt for Creature yet."
                                 );

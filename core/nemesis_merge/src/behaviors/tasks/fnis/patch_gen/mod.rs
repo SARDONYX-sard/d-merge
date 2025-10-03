@@ -2,6 +2,7 @@ mod gen_list_patch;
 pub mod generated_behaviors;
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::path::Path;
 
 use dashmap::DashSet;
@@ -106,6 +107,10 @@ pub fn collect_borrowed_patches<'a>(
                 .into_par_iter()
                 .flat_map(|list| generate_patch(owed_ref_one_mod, list))
                 .collect();
+            // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
+            let animations: HashSet<_> = animations.into_iter().collect();
+            let mut animations: Vec<_> = animations.into_iter().collect();
+            animations.par_sort_unstable();
 
             // Push One Mod animations
             if !animations.is_empty() {
@@ -121,6 +126,26 @@ pub fn collect_borrowed_patches<'a>(
                     insert_anim_seq_patch(
                         &animations,
                         &DEFAULT_FEMALE,
+                        owed_ref_one_mod.priority,
+                        &raw_borrowed_patches,
+                        &template_keys,
+                    );
+                } else if owed_ref_one_mod.behavior_entry.behavior_object == "draugr" {
+                    // # Why need this?
+                    // It seems draugr must have the animations path added to both draugr.xml and
+                    // draugr_skeleton.xml (information from the FNIS Creature pack's behavior object).
+                    const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
+                        behavior_object: "draugr",
+                        base_dir: "actors/draugr",
+                        default_behavior: "characterskeleton/draugr_skeleton.bin",
+                        default_behavior_index: "#0024",
+                        master_behavior: "behaviors/draugrbehavior.bin",
+                        master_behavior_index: "#2026",
+                    };
+
+                    insert_anim_seq_patch(
+                        &animations,
+                        &DRAUGR_SKELETON,
                         owed_ref_one_mod.priority,
                         &raw_borrowed_patches,
                         &template_keys,
