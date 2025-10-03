@@ -32,11 +32,11 @@ pub struct AppSettings {
     pub sort_asc: bool,
     pub sort_column: SortColumn,
     pub transparent: bool,
+    pub window_width: f32,
     pub window_height: f32,
-    pub window_maximized: bool,
     pub window_pos_x: f32,
     pub window_pos_y: f32,
-    pub window_width: f32,
+    pub window_maximized: bool,
 
     pub vfs_skyrim_data_dir: String,
     pub vfs_mod_list: Vec<ModItem>,
@@ -60,11 +60,11 @@ impl Default for AppSettings {
             target_runtime: skyrim_data_dir::Runtime::Se,
             template_dir: "./assets/templates".into(),
             transparent: false, // For white there, visibility becomes poor, so the default is off.
+            window_width: 900.0,
             window_height: 900.0,
-            window_maximized: false,
             window_pos_x: 0.0,
             window_pos_y: 0.0,
-            window_width: 900.0,
+            window_maximized: false,
 
             vfs_skyrim_data_dir: String::new(),
             vfs_mod_list: Vec::new(),
@@ -95,11 +95,11 @@ impl From<ModManagerApp> for AppSettings {
             target_runtime: app.target_runtime,
             template_dir: app.template_dir,
             transparent: app.transparent,
+            window_width: app.last_window_size.x,
             window_height: app.last_window_size.y,
-            window_maximized: app.last_window_maximized,
             window_pos_x: app.last_window_pos.x,
             window_pos_y: app.last_window_pos.y,
-            window_width: app.last_window_size.x,
+            window_maximized: app.last_window_maximized,
         }
     }
 }

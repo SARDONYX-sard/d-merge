@@ -653,7 +653,7 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
-        let table_max_height = ui.available_height() * 0.8;
+        let table_max_height = ui.available_height() * 0.9;
         let total_width = ui.available_width();
 
         let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5; // ignore 0.5px diff
