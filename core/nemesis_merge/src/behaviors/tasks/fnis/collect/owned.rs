@@ -51,7 +51,12 @@ pub struct OwnedFnisInjection {
     pub priority: usize,
 
     /// The contents of the FNIS list.txt files in this namespace.
-    pub list_contents: Vec<String>,
+    ///
+    /// # About duplicated list
+    /// When animations for dog and wolf exist simultaneously in the same path, multiple List.txt files may exist at the same level,
+    /// but they should be processed separately.
+    /// - e.g. `FNIS Zoo 5.0.1/Meshes/actors/canine/animations/FNISZoo/FNIS_FNISZoo_{dog|wolf}_List.txt`
+    pub list_content: String,
 
     /// Relative path to the behavior file.
     ///
@@ -158,14 +163,14 @@ where
 {
     let animations_mod_dir = animations_mod_dir.as_ref();
 
-    let list_contents = load_all_fnis_list_files(animations_mod_dir, namespace)?;
+    let list_content = load_fnis_list_file(animations_mod_dir, behavior_entry, namespace)?;
     let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
 
     Ok(OwnedFnisInjection {
         behavior_entry,
         namespace: namespace.to_string(),
         priority,
-        list_contents,
+        list_content,
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
@@ -182,38 +187,29 @@ where
 ///
 /// # Errors
 /// Returns an error if no file is found.
-fn load_all_fnis_list_files(
+fn load_fnis_list_file(
     animations_mod_dir: &Path,
+    behavior_entry: &'static BehaviorEntry,
     namespace: &str,
-) -> Result<Vec<String>, FnisError> {
-    let pattern = animations_mod_dir
-        .join(format!("FNIS_{namespace}*_List.txt"))
-        .to_string_lossy()
-        .to_string();
+) -> Result<String, FnisError> {
+    let list_path_string = if behavior_entry.is_humanoid() {
+        format!("{}/FNIS_{namespace}_List.txt", animations_mod_dir.display())
+    } else {
+        let creature_object_name = behavior_entry.behavior_object;
+        format!(
+            "{}/FNIS_{namespace}_{creature_object_name}_List.txt",
+            animations_mod_dir.display()
+        )
+    };
 
-    let paths = collect_paths(&pattern).map_err(|e| FnisError::ListMissing {
-        expected: pattern.clone(),
-        source: std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()),
+    let list_path = Path::new(&list_path_string);
+
+    let content = std::fs::read_to_string(list_path).map_err(|e| FnisError::ListMissing {
+        expected: list_path_string,
+        source: e,
     })?;
 
-    if paths.is_empty() {
-        return Err(FnisError::ListMissing {
-            expected: pattern,
-            source: std::io::Error::new(std::io::ErrorKind::NotFound, "FNIS list not found"),
-        });
-    }
-
-    // Read all matched list files
-    let mut contents = Vec::with_capacity(paths.len());
-    for path in paths {
-        let content = std::fs::read_to_string(&path).map_err(|e| FnisError::ListMissing {
-            expected: path.to_string_lossy().to_string(),
-            source: e,
-        })?;
-        contents.push(content);
-    }
-
-    Ok(contents)
+    Ok(content)
 }
 
 /// Find a FNIS behavior file for a given namespace, supporting optional suffix.

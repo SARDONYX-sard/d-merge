@@ -7,6 +7,7 @@ use std::path::Path;
 
 use dashmap::DashSet;
 use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
+use rayon::iter::Either;
 use rayon::prelude::*;
 use simd_json::json_typed;
 use snafu::ResultExt;
@@ -70,43 +71,30 @@ pub fn collect_borrowed_patches<'a>(
                 entry.seq.insert(seq_state.0, seq_state.1);
             }
 
-            let (lists, errors): (Vec<_>, Vec<_>) = owed_ref_one_mod
-                .list_contents
-                .par_iter()
-                .partition_map(|list| {
-                    let result = parse_fnis_list
-                        .parse(list)
-                        .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
-                        .with_context(|_| FailedParseFnisModListSnafu {
-                            path: Path::new(&format!(
-                                "meshes/{}/animations/{}/FNIS_*_List.txt",
-                                owed_ref_one_mod.behavior_entry.base_dir,
-                                owed_ref_one_mod.namespace
-                            ))
-                            .to_path_buf(),
-                        });
-                    match result {
-                        Ok(list) => {
-                            #[cfg(feature = "tracing")]
-                            {
-                                let list_path = format!(
-                                    "meshes/{}/animations/{}/FNIS_*_List.txt",
-                                    owed_ref_one_mod.behavior_entry.base_dir,
-                                    owed_ref_one_mod.namespace
-                                );
-                                tracing::debug!("{list_path}: {list:#?}");
-                            }
+            let list = match parse_fnis_list
+                .parse(&owed_ref_one_mod.list_content)
+                .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
+                .with_context(|_| FailedParseFnisModListSnafu {
+                    path: Path::new(&format!(
+                        "meshes/{}/animations/{}/FNIS_*_List.txt",
+                        owed_ref_one_mod.behavior_entry.base_dir, owed_ref_one_mod.namespace
+                    ))
+                    .to_path_buf(),
+                }) {
+                Ok(list) => list,
+                Err(err) => return Either::Right(err),
+            };
 
-                            rayon::iter::Either::Left(list)
-                        }
-                        Err(err) => rayon::iter::Either::Right(err),
-                    }
-                });
+            #[cfg(feature = "tracing")]
+            {
+                let base_dir = owed_ref_one_mod.behavior_entry.base_dir;
+                let namespace = &owed_ref_one_mod.namespace;
+                tracing::debug!(
+                    "meshes/{base_dir}/animations/{namespace}/FNIS_*_List.txt: \n{list:#?}"
+                );
+            }
 
-            let (animations, adsf_patches): (Vec<_>, Vec<_>) = lists
-                .into_par_iter()
-                .flat_map(|list| generate_patch(owed_ref_one_mod, list))
-                .collect();
+            let (animations, adsf_patches) = generate_patch(owed_ref_one_mod, list);
             // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
             let animations: HashSet<_> = animations.into_iter().collect();
             let mut animations: Vec<_> = animations.into_iter().collect();
@@ -153,13 +141,11 @@ pub fn collect_borrowed_patches<'a>(
                 }
             };
 
-            #[cfg(feature = "tracing")]
-            tracing::debug!("flat_map inner: adsf_patches = {adsf_patches:#?}");
-            (adsf_patches, errors)
+            Either::Left(adsf_patches)
         })
         .collect();
+
     let adsf_patches: Vec<_> = adsf_patches.into_par_iter().flatten().collect();
-    let errors: Vec<_> = errors.into_par_iter().flatten().collect();
 
     (
         BorrowedPatches {
