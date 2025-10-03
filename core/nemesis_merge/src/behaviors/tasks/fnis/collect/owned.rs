@@ -31,9 +31,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::behaviors::tasks::fnis::{
-    collect::collect_paths, patch_gen::generated_behaviors::BehaviorEntry,
-};
+use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry;
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
 #[derive(Debug)]
@@ -164,7 +162,7 @@ where
     let animations_mod_dir = animations_mod_dir.as_ref();
 
     let list_content = load_fnis_list_file(animations_mod_dir, behavior_entry, namespace)?;
-    let behavior_path = find_behavior_file(animations_mod_dir, namespace)?;
+    let behavior_path = find_behavior_file(animations_mod_dir, behavior_entry, namespace)?;
 
     Ok(OwnedFnisInjection {
         behavior_entry,
@@ -222,7 +220,12 @@ fn load_fnis_list_file(
 ///
 /// # Errors
 /// An error if not found.
-fn find_behavior_file(animations_mod_dir: &Path, namespace: &str) -> Result<String, FnisError> {
+fn find_behavior_file(
+    animations_mod_dir: &Path,
+    behavior_entry: &'static BehaviorEntry,
+    namespace: &str,
+) -> Result<String, FnisError> {
+    // e.g. ../meshes/actors/canine
     let parent_dir = animations_mod_dir
         .parent()
         .and_then(|p| p.parent())
@@ -230,40 +233,38 @@ fn find_behavior_file(animations_mod_dir: &Path, namespace: &str) -> Result<Stri
             animations_mod_dir: animations_mod_dir.to_path_buf(),
         })?;
 
-    let mut behaviors_file = parent_dir.join("behaviors");
-    behaviors_file.push(format!("FNIS_{namespace}*_Behavior.hkx"));
-    let pattern = behaviors_file.to_string_lossy().to_string();
+    let master_path = Path::new(behavior_entry.master_behavior);
 
-    let matches =
-        collect_paths(&pattern).map_err(|source| FnisError::BehaviorInvalidGlobPatten {
-            pattern: pattern.clone(),
-            source,
+    // e.g. `behaviors wolf`
+    let master_behavior_dir = master_path
+        .parent()
+        .and_then(|p| p.file_name())
+        .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
+            sub_dir: master_path.to_path_buf(),
         })?;
 
-    match matches.len() {
-        0 => Err(FnisError::BehaviorNotFound { pattern }),
-        1 => {
-            let path = &matches[0];
-            let rel_path = path
-                .strip_prefix(parent_dir)
-                .map_err(|_| FnisError::BehaviorRelativePathError {
-                    full_path: path.clone(),
-                    base: parent_dir.to_path_buf(),
-                })?
-                .components()
-                .map(|c| c.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("\\");
-            Ok(rel_path)
-        }
-        _ => {
-            let files: Vec<String> = matches
-                .iter()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect();
-            Err(FnisError::MultipleBehaviorFiles { files })
-        }
-    }
+    let file_name = if behavior_entry.is_humanoid() {
+        format!("FNIS_{namespace}_Behavior.hkx")
+    } else {
+        // e.g. wolf
+        let creature_object_name = behavior_entry.behavior_object;
+        format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
+    };
+    let mut behaviors_file = parent_dir.join(master_behavior_dir);
+    behaviors_file.push(&file_name);
+
+    // e.g. `behaviors wolf\\FNIS_FNISZoo_wolf_Behavior.hkx`
+    let behavior_relative_path = format!(
+        "{}\\{file_name}",
+        master_behavior_dir.display().to_string().replace("/", "\\")
+    );
+    if behaviors_file.exists() {
+        return Ok(behavior_relative_path);
+    };
+
+    Err(FnisError::BehaviorNotFound {
+        path: behaviors_file,
+    })
 }
 
 #[derive(Debug, snafu::Snafu)]
@@ -283,26 +284,14 @@ pub enum FnisError {
     #[snafu(display("Failed to get parent directory for `{animations_mod_dir:?}`"))]
     BehaviorParentMissing { animations_mod_dir: PathBuf },
 
-    /// I/O error occurred while searching for behavior files matching the given pattern.
-    #[snafu(display("Failed to search for behaviors with pattern `{pattern}`: {source}"))]
-    BehaviorInvalidGlobPatten {
-        pattern: String,
-        source: glob::PatternError,
-    },
+    /// Not found Parent of Mod root behavior registered target template path (e.g. behaviors/0_master.bin)
+    #[snafu(display("Not found this sub dir parent: {}", sub_dir.display()))]
+    BehaviorNotFoundSubDirParent { sub_dir: PathBuf },
 
-    /// No behavior files found matching the expected pattern.
+    /// No behavior files found.
     /// For example: `FNIS_<namespace>_Behavior.hkx` or `FNIS_<namespace>_<suffix>_Behavior.hkx`.
-    #[snafu(display("No behavior file found matching pattern `{pattern}`"))]
-    BehaviorNotFound { pattern: String },
-
-    /// Multiple behavior files were found matching the pattern.
-    /// This is ambiguous, as FNIS expects exactly one behavior file per namespace.
-    #[snafu(display("Multiple behavior files found: {files:?}"))]
-    MultipleBehaviorFiles { files: Vec<String> },
-
-    /// Failed to convert the absolute path to a relative path from the parent directory.
-    #[snafu(display("Failed to convert `{full_path:?}` to relative path from `{base:?}`"))]
-    BehaviorRelativePathError { full_path: PathBuf, base: PathBuf },
+    #[snafu(display("No behavior file found: `{}`", path.display()))]
+    BehaviorNotFound { path: PathBuf },
 }
 
 #[cfg(test)]

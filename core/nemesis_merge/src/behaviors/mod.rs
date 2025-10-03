@@ -45,20 +45,26 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         tracing::debug!("fnis_entries = {sorted:#?}");
     }
 
-    let owned_fnis_patches = if !fnis_entries.is_empty() {
+    let (owned_fnis_patches, mut fnis_errors) = if !fnis_entries.is_empty() {
         let skyrim_data_dir_glob = config
             .skyrim_data_dir_glob
             .as_ref()
             .ok_or(Error::MissingSkyrimDataDirGlob)?;
         collect_all_fnis_injections(skyrim_data_dir_glob, &fnis_entries)
     } else {
-        vec![]
+        (vec![], vec![])
     };
-    let (fnis_hkx_patches, fnis_adsf_patches, fnis_errors) =
-        tasks::fnis::patch_gen::collect_borrowed_patches(
-            &owned_fnis_patches,
-            &config.status_report,
-        );
+
+    let (fnis_hkx_patches, fnis_adsf_patches) = {
+        let (fnis_hkx_patches, fnis_adsf_patches, errors) =
+            tasks::fnis::patch_gen::collect_borrowed_patches(
+                &owned_fnis_patches,
+                &config.status_report,
+            );
+        fnis_errors.par_extend(errors);
+
+        (fnis_hkx_patches, fnis_adsf_patches)
+    };
 
     // Collect all patches file.
     let OwnedPatches {

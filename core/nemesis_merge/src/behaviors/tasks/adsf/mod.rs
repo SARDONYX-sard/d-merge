@@ -323,7 +323,6 @@ fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Err
         .output_dir
         .join(".d_merge")
         .join(".debug")
-        .join("patches")
         .join(ADSF_INNER_PATH);
     dest_path.set_extension("json");
     write_patched_json(&dest_path, alt_adsf)

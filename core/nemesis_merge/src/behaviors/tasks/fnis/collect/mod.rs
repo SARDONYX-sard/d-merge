@@ -7,6 +7,7 @@ use crate::{
             BehaviorEntry, AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
         },
     },
+    errors::Error,
     PriorityMap,
 };
 use std::path::PathBuf;
@@ -17,7 +18,7 @@ use std::path::PathBuf;
 pub fn collect_all_fnis_injections(
     skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
-) -> Vec<OwnedFnisInjection> {
+) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
     use std::sync::atomic::Ordering;
 
     const ALL_MAPS: &[&phf::Map<&str, BehaviorEntry>] = &[
@@ -31,7 +32,7 @@ pub fn collect_all_fnis_injections(
     // Flag to ensure "draugr" from CREATURES is only processed once
     let draugr_skipped = std::sync::atomic::AtomicBool::new(false);
 
-    ALL_MAPS
+    let results: Vec<_> = ALL_MAPS
         .iter()
         .flat_map(|map| {
             map.values().flat_map(|entry| {
@@ -53,20 +54,25 @@ pub fn collect_all_fnis_injections(
                 collect_paths(&glob_pat)
                     .unwrap_or_default()
                     .into_iter()
-                    .filter(|ns_path| ns_path.is_dir())
-                    .filter_map(move |ns_path| {
-                        if skip {
-                            return None; // skip draugr from CREATURES
-                        }
-
-                        let namespace = ns_path.file_name()?.to_string_lossy();
-                        let priority = fnis_entries.get(namespace.as_ref()).copied()?;
-
-                        collect_fnis_injection(&ns_path, entry, &namespace, priority).ok()
+                    .filter(move |ns_path| ns_path.is_dir() && !skip) // skip draugr from CREATURES
+                    .filter_map(|ns_path| {
+                        let namespace = ns_path.file_name()?.to_string_lossy().to_string();
+                        let priority = fnis_entries.get(namespace.as_str()).copied()?;
+                        Some((ns_path, namespace, priority))
+                    })
+                    .map(|(ns_path, namespace, priority)| {
+                        Ok(collect_fnis_injection(
+                            &ns_path, entry, &namespace, priority,
+                        )?)
                     })
             })
         })
-        .collect()
+        .collect();
+    let (oks, errs): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+    let oks = oks.into_iter().map(Result::unwrap).collect();
+    let errs = errs.into_iter().map(Result::unwrap_err).collect();
+
+    (oks, errs)
 }
 
 /// Collect case-insensitive paths using glob.
