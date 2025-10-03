@@ -67,6 +67,15 @@ pub enum Error {
 
     /// Failed to diff line patch error
     #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
+    FailedSerialize {
+        source: skyrim_anim_parser::adsf::alt::ser::SerializeError,
+        kind: AnimPatchErrKind,
+        sub_kind: AnimPatchErrSubKind,
+        path: PathBuf,
+    },
+
+    /// Failed to diff line patch error
+    #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
     FailedDiffLinesPatch {
         source: skyrim_anim_parser::diff_line::error::Error,
         kind: AnimPatchErrKind,
@@ -216,7 +225,7 @@ pub struct BehaviorGenerationError {
 impl core::fmt::Display for BehaviorGenerationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self {
-            fnis_errors_errors_len,
+            fnis_errors_errors_len: fnis_errors_len,
             owned_file_errors_len,
             adsf_errors_len,
             asdsf_errors_len,
@@ -226,7 +235,7 @@ impl core::fmt::Display for BehaviorGenerationError {
         } = *self;
 
         if adsf_errors_len == 0
-            && fnis_errors_errors_len == 0
+            && fnis_errors_len == 0
             && asdsf_errors_len == 0
             && owned_file_errors_len == 0
             && patch_errors_len == 0
@@ -237,10 +246,10 @@ impl core::fmt::Display for BehaviorGenerationError {
         }
 
         writeln!(f, "Behavior generation failed with the following errors:")?;
-        if owned_file_errors_len > 0 {
+        if fnis_errors_len > 0 {
             writeln!(
                 f,
-                "-    Generating FNIS patch Error count: {fnis_errors_errors_len}",
+                "-    Generating FNIS patch Error count: {fnis_errors_len}",
             )?;
         }
         if owned_file_errors_len > 0 {

@@ -53,7 +53,7 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
             anim_event: take_till_space.context(StrContext::Label("anim_event: str")),
             _: space1,
             anim_file: take_till_fnis_ignores.context(StrContext::Label("anim_file: str")),
-            anim_objects: parse_anim_objects(flag_set.flags).context(StrContext::Label("anim_objects: str")),
+            anim_objects: parse_anim_objects(anim_type, flag_set.flags).context(StrContext::Label("anim_objects: str")),
             _: skip_ws_and_comments,
 
             anim_vars: repeat(0.., parse_anim_var_line), // n time lines
@@ -68,23 +68,26 @@ pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimatio
 }
 
 fn parse_anim_objects<'a>(
+    anim_type: FNISAnimType,
     flags: FNISAnimFlags,
 ) -> impl FnMut(&mut &'a str) -> ModalResult<Vec<&'a str>> {
     move |input: &mut &'a str| {
+        let is_anim_object_type = matches!(anim_type, FNISAnimType::AnimObject);
         let has_anim_object = flags.contains(FNISAnimFlags::AnimObjects);
-        if !has_anim_object {
-            return Ok(vec![]);
-        }
 
-        space1.parse_next(input)?;
-        separated(1.., take_till_fnis_ignores, space1)
-            .context(StrContext::Label("anim_objects: Vec<str>"))
-            .context(StrContext::Expected(StrContextValue::Description(
-                "When setting anim_objects, you must use the -o flag. \
+        if is_anim_object_type || has_anim_object {
+            space1.parse_next(input)?;
+            return separated(1.., take_till_fnis_ignores, space1)
+                .context(StrContext::Label("anim_objects: Vec<str>"))
+                .context(StrContext::Expected(StrContextValue::Description(
+                    "When setting anim_objects, you must use `o` anim type or the `-o` flag. \
                     If -o is used, at least one anim_object is required. \
                     Otherwise, no anim_objects are allowed.",
-            )))
-            .parse_next(input)
+                )))
+                .parse_next(input);
+        }
+
+        Ok(vec![])
     }
 }
 

@@ -46,7 +46,7 @@ pub fn collect_borrowed_patches<'a>(
 
     let (adsf_patches, errors): (Vec<_>, Vec<_>) = mods_patches
         .par_iter()
-        .flat_map(|owed_ref_one_mod| {
+        .map(|owed_ref_one_mod| {
             reporter.increment();
 
             // Push Mod Root behavior to master xml
@@ -128,9 +128,13 @@ pub fn collect_borrowed_patches<'a>(
                 }
             };
 
+            #[cfg(feature = "tracing")]
+            tracing::debug!("flat_map inner: adsf_patches = {adsf_patches:#?}");
             (adsf_patches, errors)
         })
-        .unzip();
+        .collect();
+    let adsf_patches: Vec<_> = adsf_patches.into_par_iter().flatten().collect();
+    let errors: Vec<_> = errors.into_par_iter().flatten().collect();
 
     (
         BorrowedPatches {

@@ -56,11 +56,7 @@ pub fn generate_patch<'a>(
                             } = fnis_animation;
 
                             let adsf_patches = new_adsf_patch(
-                                namespace,
-                                owned_data.next_adsf_id(),
-                                anim_event,
-                                motions,
-                                rotations,
+                                namespace, owned_data, anim_event, motions, rotations,
                             );
                             (
                                 format!("Animations\\{namespace}\\{anim_file}"),
@@ -115,13 +111,8 @@ pub fn generate_patch<'a>(
                     ..
                 } = fnis_animation;
 
-                let adsf_patches = new_adsf_patch(
-                    namespace,
-                    owned_data.next_adsf_id(),
-                    anim_event,
-                    motions,
-                    rotations,
-                );
+                let adsf_patches =
+                    new_adsf_patch(namespace, owned_data, anim_event, motions, rotations);
                 all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
                 all_adsf_patches.par_extend(adsf_patches);
             }
@@ -133,13 +124,14 @@ pub fn generate_patch<'a>(
 
 fn new_adsf_patch<'a>(
     namespace: &'a str,
-    index: String,
+    owned_data: &'a OwnedFnisInjection,
     anim_event: &'a str,
     motions: Vec<Translation<'a>>,
     rotations: Vec<RotationData<'a>>,
 ) -> [AdsfPatch<'a>; 4] {
     // To link them, translation and rotation must always use the same ID.
-    let clip_id: Cow<'a, str> = Cow::Owned(index); // use Nemesis variable
+    // use Nemesis variable
+    let clip_id: Cow<'a, str> = Cow::Owned(owned_data.next_adsf_id());
 
     let anim_block = PatchKind::AddAnim(ClipAnimDataBlock {
         name: Cow::Borrowed(anim_event),

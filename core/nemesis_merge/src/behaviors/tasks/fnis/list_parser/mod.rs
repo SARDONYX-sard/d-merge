@@ -6,10 +6,12 @@ pub(crate) mod patterns;
 #[cfg(test)]
 mod test_helpers;
 
-use winnow::combinator::fail;
+use winnow::ascii::Caseless;
+use winnow::combinator::{alt, fail, opt};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
+use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},
     fnis_animation::{parse_fnis_animation, FNISAnimation},
@@ -37,18 +39,24 @@ pub(crate) enum SyntaxPattern<'a> {
 #[derive(Debug, PartialEq)]
 pub(crate) struct FNISList<'a> {
     /// Mod version
-    pub version: Version,
+    pub version: Option<Version>,
 
     /// sequenced animations
     pub(crate) patterns: Vec<SyntaxPattern<'a>>,
 }
 
 pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
-    let version = parse_version_line.parse_next(input)?;
+    let version = opt(parse_version_line).parse_next(input)?;
+    skip_ws_and_comments.parse_next(input)?;
 
     let mut patterns = vec![];
 
-    while let Ok((_, anim_type)) = parse_anim_type.parse_peek(input) {
+    while let Ok((_, anim_type)) = alt((
+        parse_anim_type,
+        Caseless("AAprefix").value(FNISAnimType::Alternate),
+    ))
+    .parse_peek(input)
+    {
         // FIXME: Need validate OffsetArm
         let pattern = match anim_type {
             FNISAnimType::Basic | FNISAnimType::AnimObject | FNISAnimType::OffsetArm => {
@@ -102,7 +110,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_list() {
-        let list = std::fs::read_to_string("../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt").unwrap();
+        let list = std::fs::read_to_string("../../dummy/fnis_test_mods/FNIS Zoo 5.0.1/Meshes/actors/dlc02/riekling/animations/FNISZoo/FNIS_FNISZoo_riekling_List.txt").unwrap();
         let ret = must_parse(parse_fnis_list, &list);
         std::fs::write("./debug.log", format!("{ret:#?}")).unwrap();
     }

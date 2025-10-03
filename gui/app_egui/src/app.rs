@@ -168,24 +168,6 @@ impl App for ModManagerApp {
     //
     // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        match x_win::get_active_window() {
-            // When maximized, neither position nor size is necessary.
-            Ok(active_window) => {
-                let x_win::WindowPosition {
-                    x,
-                    y,
-                    width,
-                    height,
-                    is_full_screen: _,
-                } = active_window.position;
-                self.last_window_size = egui::Vec2::new(width as f32, height as f32);
-                self.last_window_pos = egui::Pos2::new(x as f32, y as f32);
-            }
-            Err(err) => {
-                tracing::error!("error occurred while getting the active window: {err}");
-            }
-        }
-
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
         crate::i18n::I18nMap::save_translation();
@@ -209,10 +191,33 @@ impl ModManagerApp {
 
     /// To save settings.
     fn update_window_info(&mut self, ctx: &egui::Context) {
-        // self.last_window_size = rect.size(); // Get by on_exit(If couldn't then get here.)
-        ctx.viewport(|state| {
-            self.last_window_maximized = state.builder.maximized.unwrap_or_default();
+        let (pos, size, maximized) = ctx.input(|i| {
+            // NOTE: Accessing self internally causes deadlock
+            // Do not write directly to self within the closure
+            let mut temp_pos = None;
+            let mut temp_size = None;
+            let mut temp_maximized = None;
+
+            if let Some(view_info) = i.raw.viewports.get(&egui::ViewportId::ROOT) {
+                temp_maximized = Some(view_info.maximized.unwrap_or(false));
+                if let Some(outer_rect) = view_info.outer_rect {
+                    temp_size = Some(outer_rect.size());
+                    temp_pos = Some(outer_rect.min);
+                }
+            }
+
+            (temp_pos, temp_size, temp_maximized)
         });
+
+        if let Some(pos) = pos {
+            self.last_window_pos = pos;
+        }
+        if let Some(size) = size {
+            self.last_window_size = size;
+        }
+        if let Some(max) = maximized {
+            self.last_window_maximized = max;
+        }
     }
 
     fn ui_execution_mode(&mut self, ctx: &egui::Context) {

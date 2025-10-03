@@ -10,6 +10,7 @@ use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
     FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu,
+    FailedSerializeSnafu,
 };
 use crate::results::partition_results;
 use crate::Config;
@@ -284,14 +285,14 @@ fn write_alt_adsf_file(
     let serialized = if patches.is_empty() {
         serialize_alt_adsf(&alt_adsf)
     } else {
-        serialize_alt_adsf_with_patches(alt_adsf, patches).with_context(|_| {
-            FailedDiffLinesPatchSnafu {
-                kind: AnimPatchErrKind::Adsf,
-                sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
-                path,
-            }
-        })?
-    };
+        serialize_alt_adsf_with_patches(alt_adsf, patches)
+    }
+    .with_context(|_| FailedSerializeSnafu {
+        kind: AnimPatchErrKind::Adsf,
+        sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
+        path,
+    })?;
+
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);
     }
