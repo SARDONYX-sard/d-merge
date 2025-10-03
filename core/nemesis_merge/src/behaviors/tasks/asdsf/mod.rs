@@ -230,6 +230,7 @@ fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
         .output_dir
         .join(".d_merge")
         .join(".debug")
+        .join("patches")
         .join(ASDSF_INNER_PATH);
     dest_path.set_extension("json");
     if let Err(_err) = write_patched_json(&dest_path, patches) {
@@ -239,10 +240,11 @@ fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
 }
 
 fn output_merged_alt_adsf(alt_adsf: &AltAsdsf, config: &Config) -> Result<(), Error> {
-    let adsf_path = config
+    let dest_path = config
         .output_dir
         .join(".d_merge")
         .join(".debug")
+        .join("patches")
         .join(ASDSF_INNER_PATH);
-    write_patched_json(&adsf_path, alt_adsf)
+    write_patched_json(&dest_path, alt_adsf)
 }
