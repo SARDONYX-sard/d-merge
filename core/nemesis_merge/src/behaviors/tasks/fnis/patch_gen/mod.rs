@@ -57,18 +57,16 @@ pub fn collect_borrowed_patches<'a>(
 
                 template_keys.insert(master_template_key.clone());
 
-                let (one, seq) = new_injectable_mod_root_behavior(owed_ref_one_mod);
-                #[cfg(feature = "tracing")]
-                tracing::debug!(
-                    "FNIS Generated for root mod behavior injection:\none = {one:#?}\nseq = {seq:#?}"
-                );
+                let (one_gen, one_state_info, seq_state) =
+                    new_injectable_mod_root_behavior(owed_ref_one_mod);
 
                 let entry = raw_borrowed_patches
                     .0
                     .entry(master_template_key)
                     .or_default();
-                entry.one.insert(one.0, one.1);
-                entry.seq.insert(seq.0, seq.1);
+                entry.one.insert(one_gen.0, one_gen.1);
+                entry.one.insert(one_state_info.0, one_state_info.1);
+                entry.seq.insert(seq_state.0, seq_state.1);
             }
 
             let (lists, errors): (Vec<_>, Vec<_>) = owed_ref_one_mod
@@ -155,23 +153,52 @@ fn new_injectable_mod_root_behavior<'a>(
 ) -> (
     (JsonPath<'a>, ValueWithPriority<'a>),
     (JsonPath<'a>, ValueWithPriority<'a>),
+    (JsonPath<'a>, ValueWithPriority<'a>),
 ) {
+    // NOTE: To learn the additional method, I enabled only one FNIS mod and ran it, then read the XML in tools/*/`temporary_logs`.
     let namespace = owned_data.namespace.as_str();
     let priority = owned_data.priority;
     let behavior_path = owned_data.behavior_path.as_str();
-    let new_root_behavior_index = owned_data.next_class_name_attribute();
+    let new_generator_index = owned_data.next_class_name_attribute();
+    let new_root_state_info_index = owned_data.next_class_name_attribute();
     let master_index = owned_data.behavior_entry.master_behavior_index;
 
-    let one = (
+    let one_state_info = (
         vec![
-            Cow::Owned(new_root_behavior_index.clone()),
+            Cow::Owned(new_root_state_info_index.clone()),
+            Cow::Borrowed("hkbStateMachineStateInfo"),
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Add),
+                value: json_typed!(borrowed, {
+                        "__ptr": new_root_state_info_index,
+                        "variableBindingSet": "#0000",
+                        "listeners": [],
+                        "enterNotifyEvents": "#0000",
+                        "exitNotifyEvents": "#0000",
+                        "transitions": "#0000",
+                        "generator": new_generator_index,
+                        "name": format!("FNIS_State{priority}"),
+                        "stateId": 1000 + priority, // FIXME?
+                        "probability": 1.0,
+                        "enable": true
+                }),
+            },
+            priority,
+        },
+    );
+
+    let one_gen = (
+        vec![
+            Cow::Owned(new_generator_index.clone()),
             Cow::Borrowed("hkbBehaviorReferenceGenerator"),
         ],
         ValueWithPriority {
             patch: JsonPatch {
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
-                    "__ptr": new_root_behavior_index,
+                    "__ptr": new_generator_index,
                     "variableBindingSet": "#0000", // null
                     "userData": 0,
 
@@ -185,18 +212,18 @@ fn new_injectable_mod_root_behavior<'a>(
         },
     );
 
-    let seq = (
+    let seq_state = (
         json_path![master_index, "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,
-                value: json_typed!(borrowed, [new_root_behavior_index]),
+                value: json_typed!(borrowed, [new_root_state_info_index]),
             },
             priority,
         },
     );
 
-    (one, seq)
+    (one_gen, one_state_info, seq_state)
 }
 
 /// Insert a new animation sequence patch into the borrowed patches map.

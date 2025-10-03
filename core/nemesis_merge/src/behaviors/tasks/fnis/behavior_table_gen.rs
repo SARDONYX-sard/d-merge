@@ -102,7 +102,7 @@ pub struct BehaviorEntry {
     /// # Note
     /// When writing, don't forget to use `set_extension("hkx")`.
     pub master_behavior: &'static str,
-    /// Mod root behavior registered target(`hkbStateMachine`) XML index e.g. `#1831`
+    /// Mod root behavior registered target(`hkbStateMachine`) XML index e.g. `#0340`
     pub master_behavior_index: &'static str,
 }
 
@@ -145,7 +145,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         default_behavior: "characters/firstperson.bin",
         default_behavior_index: "#0029",
         master_behavior: "behaviors/0_master.bin",
-        master_behavior_index: "#1995",
+        master_behavior_index: "#0167",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -153,7 +153,9 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         default_behavior: "characters/defaultmale.bin", // & characters female/defaultfemale.bin"
         default_behavior_index: "#0029", // defaultmale.xml & defaultfemale.xml same index
         master_behavior: "behaviors/0_master.bin",
-        master_behavior_index: "#2521",
+        // Basically, hkRootLevelContainer.m_namedVariants[0] -> hkbBehaviorGraph.m_rootGenerator
+        // However, for some reason, only the humanoid 0_master seems to push to a different index.
+        master_behavior_index: "#0340",
     },
 };
 
