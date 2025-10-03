@@ -310,15 +310,22 @@ fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
         .join(".debug")
         .join("patches")
         .join(ADSF_INNER_PATH);
-    adsf_path.set_extension("json");
+    adsf_path.set_extension("patch.json");
     if let Err(_err) = write_patched_json(&adsf_path, patches) {
         #[cfg(feature = "tracing")]
         tracing::error!("{_err}");
     };
 }
 
+/// Debug merged json.
 fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
-    let dest_path = config.output_dir.join(ADSF_INNER_PATH);
+    let mut dest_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join("patches")
+        .join(ADSF_INNER_PATH);
+    dest_path.set_extension("json");
     write_patched_json(&dest_path, alt_adsf)
 }
 
