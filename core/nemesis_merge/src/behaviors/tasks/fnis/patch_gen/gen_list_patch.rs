@@ -4,10 +4,11 @@ use rayon::prelude::*;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
-use crate::behaviors::tasks::fnis::list_parser::patterns::sequenced::SequencedAnimation;
-use crate::behaviors::tasks::fnis::{
-    collect::owned::OwnedFnisInjection,
-    list_parser::{combinator::fnis_animation::FNISAnimation, FNISList, SyntaxPattern},
+use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
+use crate::behaviors::tasks::fnis::list_parser::{
+    combinator::{fnis_animation::FNISAnimation, Trigger},
+    patterns::sequenced::SequencedAnimation,
+    FNISList, SyntaxPattern,
 };
 
 /// Generate from one list file.
@@ -110,7 +111,7 @@ fn new_adsf_patch<'a>(
     fnis_animation: FNISAnimation<'a>,
 ) -> Vec<AdsfPatch<'a>> {
     let FNISAnimation {
-        // flag_set,
+        flag_set,
         anim_event,
         motions,
         rotations,
@@ -133,16 +134,12 @@ fn new_adsf_patch<'a>(
         play_back_speed: Cow::Borrowed("1"),
         crop_start_local_time: Cow::Borrowed("0"),
         crop_end_local_time: Cow::Borrowed("0"),
-        trigger_names_len: 0,
-        trigger_names: vec![],
-        //
-        // FIXME: Correct?
-        // trigger_names_len: flag_set.triggers.len(),
-        // trigger_names: flag_set
-        //     .triggers
-        //     .into_iter()
-        //     .map(|trigger| Cow::Borrowed(trigger.event))
-        //     .collect(),
+        trigger_names_len: flag_set.triggers.len(),
+        trigger_names: flag_set
+            .triggers
+            .into_par_iter()
+            .map(|Trigger { event, time }| Cow::Owned(format!("{event}:{time}")))
+            .collect(),
     });
 
     let motion_block = {

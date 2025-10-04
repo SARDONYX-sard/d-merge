@@ -156,6 +156,19 @@ pub struct ClipAnimDataBlock<'a> {
     pub trigger_names_len: usize,
 
     /// A list of names that trigger the animation.
+    ///
+    /// In practice, it consists of `{event:str}:{time:f32 with 6 decimal places}`,
+    /// but for memory efficiency, it is treated as a single contiguous string.
+    ///
+    /// # Example values
+    /// In animationdatasinglefile.txt
+    /// ```txt
+    /// arrowRelease:0.133333
+    /// SoundPlay:0.2
+    /// SoundPlay:0.2
+    /// arrowAttach:0.666667
+    /// reloadStop:2.47167
+    /// ```
     pub trigger_names: Vec<Str<'a>>,
 }
 
