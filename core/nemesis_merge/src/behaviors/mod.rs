@@ -36,13 +36,16 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
 
     #[cfg(feature = "tracing")]
     {
-        let mut sorted: Vec<_> = nemesis_entries.par_iter().collect();
-        sorted.par_sort_by_key(|&(_, v)| *v);
-        tracing::debug!("nemesis_entries = {sorted:#?}");
-
-        let mut sorted: Vec<_> = fnis_entries.par_iter().collect();
-        sorted.par_sort_by_key(|&(_, v)| *v);
-        tracing::debug!("fnis_entries = {sorted:#?}");
+        tracing::debug!("nemesis_entries = {:#?}", {
+            let mut sorted: Vec<_> = nemesis_entries.par_iter().collect();
+            sorted.par_sort_by_key(|&(_, v)| *v);
+            sorted
+        });
+        tracing::debug!("fnis_entries = {:#?}", {
+            let mut sorted: Vec<_> = fnis_entries.par_iter().collect();
+            sorted.par_sort_by_key(|&(_, v)| *v);
+            sorted
+        });
     }
 
     let (owned_fnis_patches, mut fnis_errors) = if !fnis_entries.is_empty() {
@@ -202,14 +205,10 @@ fn apply_and_gen_patched_hkx<'a>(
         };
 
         #[cfg(feature = "tracing")]
-        {
-            tracing::debug!("owned_templates_keys = {:#?}", owned_templates.keys());
-            tracing::debug!("borrowed_templates_keys = {:#?}", {
-                let borrowed_keys: Vec<String> =
-                    templates.par_iter().map(|r| r.key().to_string()).collect();
-                borrowed_keys
-            });
-        }
+        tracing::debug!(
+            "owned_templates_keys(Things that actually exist) = {:#?}",
+            owned_templates.keys()
+        );
 
         // 2/3: Apply patches & Replace variables to indexes
         let mut apply_errors_len = template_error_len;

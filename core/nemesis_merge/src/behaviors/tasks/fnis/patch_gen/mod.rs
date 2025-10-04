@@ -38,7 +38,7 @@ pub fn collect_borrowed_patches<'a>(
 ) -> (BorrowedPatches<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
     let raw_borrowed_patches = RawBorrowedPatches::default();
     let template_keys = DashSet::new();
-    let variable_class_map = BehaviorStringDataMap::new();
+    let variable_class_map = BehaviorStringDataMap::new(); // TODO: Change to compile time phf map.
 
     let reporter = StatusReportCounter::new(
         status_reporter,
