@@ -51,6 +51,8 @@ impl<'a> RotationData<'a> {
                         x: Cow::Borrowed("0"),
                         y: Cow::Borrowed("0"),
                         z: Cow::Borrowed("0.000000"),
+                        // NOTE: After setting the w element to 0.0, for some reason the
+                        //       character's sliding and other movements stopped working.
                         w: Cow::Borrowed("1.000000"),
                     };
                 }

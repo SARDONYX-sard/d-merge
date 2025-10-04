@@ -5,7 +5,6 @@ pub mod types;
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
 use self::sort::dedup_patches_by_priority_parallel;
 use self::types::OwnedAdsfPatchMap;
-use crate::behaviors::priority_ids::types::PriorityMap;
 use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
@@ -13,7 +12,7 @@ use crate::errors::{
     FailedSerializeSnafu,
 };
 use crate::results::partition_results;
-use crate::Config;
+use crate::{Config, PatchMaps};
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::alt::{
     ser::{serialize_alt_adsf, serialize_alt_adsf_with_patches},
@@ -93,9 +92,12 @@ const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.bin";
 
 // "dmco", "slide"
 /// Patch to `animationdatasinglefile.txt`
+///
+/// # Note
+/// - `entries`: (nemesis, fnis)
 pub(crate) fn apply_adsf_patches(
     owned_anim_data_patches: OwnedAdsfPatchMap,
-    id_order: &PriorityMap,
+    entries: &PatchMaps,
     config: &Config,
     fnis_adsf_patches: Vec<AdsfPatch<'_>>,
 ) -> Vec<Error> {
@@ -110,7 +112,7 @@ pub(crate) fn apply_adsf_patches(
     borrowed_patches.par_extend(fnis_adsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
-    sort_patches_by_priority(&mut borrowed_patches, id_order);
+    sort_patches_by_priority(&mut borrowed_patches, entries);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
     if config.debug.output_patch_json {
@@ -261,8 +263,18 @@ fn parse_anim_data_patch<'a>(
 }
 
 /// Sorts AdsfPatch list based on the given ID priority list.
-fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_order: &PriorityMap) {
-    patches.par_sort_by_key(|patch| id_order.get(patch.id).copied().unwrap_or(usize::MAX));
+fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_orders: &PatchMaps) {
+    patches.par_sort_by_key(|patch| {
+        let priority = id_orders.nemesis_entries.get(patch.id).copied();
+        match priority {
+            Some(priority) => priority,
+            None => id_orders
+                .fnis_entries
+                .get(patch.id)
+                .copied()
+                .unwrap_or(usize::MAX), // FIXME: MAX
+        }
+    });
 }
 
 /// Read the ADSF file from the resource directory
@@ -357,10 +369,14 @@ mod tests {
 
         sort_patches_by_priority(
             &mut patches,
-            &ids.iter()
-                .enumerate()
-                .map(|(priority, &id)| (id.to_string(), priority))
-                .collect(),
+            &PatchMaps {
+                nemesis_entries: ids
+                    .iter()
+                    .enumerate()
+                    .map(|(priority, &id)| (id.to_string(), priority))
+                    .collect(),
+                ..Default::default()
+            },
         );
 
         let sorted_ids: Vec<&str> = patches.iter().map(|p| p.id).collect();

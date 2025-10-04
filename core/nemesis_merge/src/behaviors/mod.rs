@@ -32,7 +32,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let PatchMaps {
         nemesis_entries,
         fnis_entries,
-    } = patches;
+    } = &patches;
 
     #[cfg(feature = "tracing")]
     {
@@ -50,7 +50,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
             .skyrim_data_dir_glob
             .as_ref()
             .ok_or(Error::MissingSkyrimDataDirGlob)?;
-        collect_all_fnis_injections(skyrim_data_dir_glob, &fnis_entries)
+        collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries)
     } else {
         (vec![], vec![])
     };
@@ -72,7 +72,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         adsf_patches: owned_adsf_patches,
         asdsf_patches: owned_asdsf_patches,
         errors: owned_file_errors,
-    } = collect_owned_patches(&nemesis_entries, &config).await;
+    } = collect_owned_patches(nemesis_entries, &config).await;
 
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
@@ -80,15 +80,11 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            adsf_errors = apply_adsf_patches(
-                owned_adsf_patches,
-                &nemesis_entries,
-                &config,
-                fnis_adsf_patches,
-            );
+            adsf_errors =
+                apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
         });
         s.spawn(|_| {
-            asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &nemesis_entries, &config);
+            asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, nemesis_entries, &config);
         });
         s.spawn(|_| {
             patched_hkx_errors = Some(apply_and_gen_patched_hkx(
