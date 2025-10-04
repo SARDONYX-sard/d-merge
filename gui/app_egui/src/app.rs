@@ -240,7 +240,7 @@ impl ModManagerApp {
                     .on_hover_text(vfs_mode_hover)
                     .clicked()
                 {
-                    self.update_vfs_mod_list();
+                    self.update_mod_list();
                 };
                 if ui
                     .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
@@ -345,7 +345,7 @@ impl ModManagerApp {
                         match self.mode {
                             DataMode::Vfs => {
                                 self.vfs_skyrim_data_dir = dir.display().to_string();
-                                self.update_vfs_mod_list();
+                                self.update_mod_list();
                             }
                             DataMode::Manual => {
                                 self.skyrim_data_dir = dir.display().to_string();
@@ -869,7 +869,7 @@ impl ModManagerApp {
             );
 
             if self.is_first_render || response.changed() {
-                self.update_vfs_mod_list();
+                self.update_mod_list();
             }
         } else {
             let response = ui.add_sized(
@@ -884,8 +884,15 @@ impl ModManagerApp {
         }
     }
 
+    /// Update mod info based on file search according to the current mode (vfs or manual).
+    ///
+    /// # Note
+    /// The only difference between vfs and manual is the id.
+    /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
+    ///
+    /// This allows vfs mode to maintain the check state on a different PC.
     fn update_mod_list(&mut self) {
-        match mod_info::get_all(&self.skyrim_data_dir, false) {
+        match mod_info::get_all(self.current_skyrim_data_dir(), self.mode == DataMode::Vfs) {
             Ok(new_mods) => {
                 let is_empty = new_mods.is_empty();
                 self.fetch_is_empty = is_empty;
@@ -893,41 +900,14 @@ impl ModManagerApp {
                     return; // To preserve check state even if empty
                 }
 
-                let new_mods = inherit_reorder_cast(&self.mod_list, new_mods);
-                let _ = core::mem::replace(&mut self.mod_list, new_mods);
+                let new_mods = inherit_reorder_cast(self.mod_list(), new_mods);
+                let _ = core::mem::replace(self.mod_list_mut(), new_mods);
             }
             Err(err) => {
                 let err_title = self.t(I18nKey::ErrorReadingModInfo);
                 self.set_notification(format!("{err_title} {err}"));
             }
         }
-    }
-
-    /// # Note
-    /// The only difference between vfs and manual is the id.
-    /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
-    ///
-    /// This allows vfs mode to maintain the check state on a different PC.
-    fn update_vfs_mod_list(&mut self) {
-        if let Some(new_mods) = {
-            match mod_info::get_all(&self.vfs_skyrim_data_dir, true) {
-                Ok(mods) => Some(mods),
-                Err(err) => {
-                    let err_title = self.t(I18nKey::ErrorReadingModInfo);
-                    self.set_notification(format!("{err_title} {err}"));
-                    None
-                }
-            }
-        } {
-            let is_empty = new_mods.is_empty();
-            self.fetch_is_empty = is_empty;
-            if is_empty {
-                return; // To preserve check state even if empty
-            }
-
-            let new_mods = inherit_reorder_cast(&self.vfs_mod_list, new_mods);
-            let _ = core::mem::replace(&mut self.vfs_mod_list, new_mods);
-        };
     }
 }
 
