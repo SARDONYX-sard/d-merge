@@ -1,16 +1,13 @@
 use std::borrow::Cow;
 
 use rayon::prelude::*;
-use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
+use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
 use crate::behaviors::tasks::fnis::list_parser::patterns::sequenced::SequencedAnimation;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
-    list_parser::{
-        combinator::{fnis_animation::FNISAnimation, rotation::RotationData},
-        FNISList, SyntaxPattern,
-    },
+    list_parser::{combinator::fnis_animation::FNISAnimation, FNISList, SyntaxPattern},
 };
 
 /// Generate from one list file.
@@ -42,25 +39,16 @@ pub fn generate_patch<'a>(
                     namespace: &'a str,
                     owned_data: &'a OwnedFnisInjection,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<[AdsfPatch<'a>; 4]>) {
+                ) -> (Vec<String>, Vec<Vec<AdsfPatch<'a>>>) {
                     sequenced_animation
                         .animations
                         .into_par_iter()
                         .map(|fnis_animation| {
-                            let FNISAnimation {
-                                anim_event,
-                                anim_file,
-                                motions,
-                                rotations,
-                                ..
-                            } = fnis_animation;
+                            let FNISAnimation { anim_file, .. } = &fnis_animation;
 
-                            let adsf_patches = new_adsf_patch(
-                                namespace, owned_data, anim_event, motions, rotations,
-                            );
                             (
                                 format!("Animations\\{namespace}\\{anim_file}"),
-                                adsf_patches,
+                                new_adsf_patch(owned_data, namespace, fnis_animation),
                             )
                         })
                         .collect()
@@ -101,20 +89,13 @@ pub fn generate_patch<'a>(
                         )
                     };
                 all_anim_files.par_extend(anim_files);
-                all_adsf_patches.par_extend(adsf_patches.into_par_iter().flat_map(|patch| patch));
+                all_adsf_patches.par_extend(adsf_patches.into_par_iter().flatten());
             }
             SyntaxPattern::Basic(fnis_animation) => {
-                let FNISAnimation {
-                    anim_event,
-                    anim_file,
-                    motions,
-                    rotations,
-                    ..
-                } = fnis_animation;
-
-                let adsf_patches =
-                    new_adsf_patch(namespace, owned_data, anim_event, motions, rotations);
+                let FNISAnimation { anim_file, .. } = &fnis_animation;
                 all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
+
+                let adsf_patches = new_adsf_patch(owned_data, namespace, fnis_animation);
                 all_adsf_patches.par_extend(adsf_patches);
             }
         };
@@ -124,12 +105,24 @@ pub fn generate_patch<'a>(
 }
 
 fn new_adsf_patch<'a>(
-    namespace: &'a str,
     owned_data: &'a OwnedFnisInjection,
-    anim_event: &'a str,
-    motions: Vec<Translation<'a>>,
-    rotations: Vec<RotationData<'a>>,
-) -> [AdsfPatch<'a>; 4] {
+    namespace: &'a str,
+    fnis_animation: FNISAnimation<'a>,
+) -> Vec<AdsfPatch<'a>> {
+    let FNISAnimation {
+        // flag_set,
+        anim_event,
+        motions,
+        rotations,
+        ..
+    } = fnis_animation;
+
+    // Since there is no need to output adsf if there are no rotation (RD) or motion (MD) syntaxes,
+    // skip it.
+    if motions.is_empty() && rotations.is_empty() {
+        return vec![];
+    };
+
     // To link them, translation and rotation must always use the same ID.
     // use Nemesis variable
     let clip_id: Cow<'a, str> = Cow::Owned(owned_data.next_adsf_id());
@@ -142,6 +135,14 @@ fn new_adsf_patch<'a>(
         crop_end_local_time: Cow::Borrowed("0"),
         trigger_names_len: 0,
         trigger_names: vec![],
+        //
+        // FIXME: Correct?
+        // trigger_names_len: flag_set.triggers.len(),
+        // trigger_names: flag_set
+        //     .triggers
+        //     .into_iter()
+        //     .map(|trigger| Cow::Borrowed(trigger.event))
+        //     .collect(),
     });
 
     let motion_block = {
@@ -150,12 +151,10 @@ fn new_adsf_patch<'a>(
             .map(|rotation| rotation.into_rotation())
             .collect();
 
-        let duration = match (motions.is_empty(), rotations.is_empty()) {
-            (true, true) => Cow::Borrowed("0.0"),
-            (true, false) => motions[0].time.clone(),
-            (false, true) => rotations[0].time.clone(),
-            (false, false) if motions[0].time == rotations[0].time => motions[0].time.clone(),
-            (false, false) => Cow::Borrowed("1.5"), // FIXME: Correct?
+        let duration = match (motions.last(), rotations.last()) {
+            (None, None) => Cow::Borrowed("0.000000"), // FIXME: Correct?
+            (None | Some(_), Some(rd)) => rd.time.clone(),
+            (Some(md), None) => md.time.clone(),
         };
 
         PatchKind::AddMotion(ClipMotionBlock {
@@ -171,7 +170,7 @@ fn new_adsf_patch<'a>(
     // TODO: separate Creature adsf
     // Movement and rotation patches for humans (`meshes/actors/character`) are equivalent to patches
     // for both DefaultMale and DefaultFemale (since there's only one, the index is 1).
-    [
+    vec![
         AdsfPatch {
             target: "DefaultMale~1",
             id: namespace,

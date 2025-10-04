@@ -50,8 +50,8 @@ impl<'a> RotationData<'a> {
                         time,
                         x: Cow::Borrowed("0"),
                         y: Cow::Borrowed("0"),
-                        z: Cow::Borrowed("0"),
-                        w: Cow::Borrowed("0"),
+                        z: Cow::Borrowed("0.000000"),
+                        w: Cow::Borrowed("1.000000"),
                     };
                 }
 

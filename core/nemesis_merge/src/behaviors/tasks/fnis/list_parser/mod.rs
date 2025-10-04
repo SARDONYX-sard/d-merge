@@ -46,7 +46,10 @@ pub(crate) struct FNISList<'a> {
 }
 
 pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
+    skip_ws_and_comments.parse_next(input)?;
+
     let version = opt(parse_version_line).parse_next(input)?;
+
     skip_ws_and_comments.parse_next(input)?;
 
     let mut patterns = vec![];
