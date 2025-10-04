@@ -33,18 +33,69 @@ pub enum SortColumn {
     Priority,
 }
 
+/// Inherit `priority` & `enabled` from old list & Convert `ModInfo` into `ModItem`.
+pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
+    use std::collections::HashMap;
+
+    if old.is_empty() {
+        return from_mod_infos_with_incremented_priority(new);
+    };
+
+    let priority_map: HashMap<&str, (bool, usize)> = old
+        .par_iter()
+        .map(|item| (item.id.as_str(), (item.enabled, item.priority)))
+        .collect();
+
+    // NOTE: This relies on the fact that the priority is equal to the 1-based index of len.
+    // Example
+    // When len is 5 -> The last priority is 5.
+    // start 5 + 1 = 6
+    // The return value of fetch_add is the previous value, which is 6.
+    let current_new_priority = std::sync::atomic::AtomicUsize::new(old.len() + 1);
+
+    // Inherit priorities from old list
+    let mut new: Vec<ModItem> = new
+        .into_par_iter()
+        .map(|item| {
+            if let Some(&(enabled, priority)) = priority_map.get(item.id.as_str()) {
+                ModItem {
+                    enabled, // NOTE: Always set it to false during the fetch phase, then later check the existing active list and set it to true.
+                    id: item.id,
+                    name: item.name,
+                    site: item.site,
+                    priority,
+                    mod_type: item.mod_type,
+                }
+            } else {
+                ModItem {
+                    enabled: false, // To prevent malfunctions, new mods are not enabled by default.
+                    id: item.id,
+                    name: item.name,
+                    site: item.site,
+                    priority: current_new_priority
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                    mod_type: item.mod_type,
+                }
+            }
+        })
+        .collect();
+
+    new.par_sort_unstable_by(|a, b| a.priority.cmp(&b.priority));
+    new
+}
+
 /// Convert `ModInfo` into `ModItem`.
-pub fn from_mod_infos(mod_infos: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
+fn from_mod_infos_with_incremented_priority(mod_infos: Vec<mod_info::ModInfo>) -> Vec<ModItem> {
     mod_infos
         .into_par_iter()
         .enumerate()
-        .map(|(i, mi)| ModItem {
+        .map(|(i, item)| ModItem {
             enabled: false, // NOTE: Always set it to false during the fetch phase, then later check the existing active list and set it to true.
-            id: mi.id,
-            name: mi.name,
-            site: mi.site,
+            id: item.id,
+            name: item.name,
+            site: item.site,
             priority: i,
-            mod_type: mi.mod_type,
+            mod_type: item.mod_type,
         })
         .collect()
 }

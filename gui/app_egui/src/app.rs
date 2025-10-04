@@ -2,7 +2,7 @@ use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
-    mod_item::{from_mod_infos, to_patches, ModItem, SortColumn},
+    mod_item::{inherit_reorder_cast, to_patches, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
@@ -98,6 +98,7 @@ pub struct ModManagerApp {
     pub log_lines: Arc<Mutex<Vec<String>>>,
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
+    /// It exists because mod_info must be loaded automatically only on the first run.
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
     /// Even if no mod info can be retrieved, We want to maintain the check status and display it as empty.
@@ -885,32 +886,14 @@ impl ModManagerApp {
 
     fn update_mod_list(&mut self) {
         match mod_info::get_all(&self.skyrim_data_dir, false) {
-            Ok(mods) => {
-                let is_empty = mods.is_empty();
+            Ok(new_mods) => {
+                let is_empty = new_mods.is_empty();
                 self.fetch_is_empty = is_empty;
                 if is_empty {
                     return; // To preserve check state even if empty
                 }
 
-                // Turn the IDs of previously enabled mods into a HashSet
-                let enabled_ids: std::collections::HashSet<&str> = self
-                    .mod_list
-                    .par_iter()
-                    .filter(|m| m.enabled)
-                    .map(|m| m.id.as_str())
-                    .collect();
-
-                // take over enabled for new mods
-                let new_mods: Vec<_> = from_mod_infos(mods)
-                    .into_par_iter()
-                    .map(|mut m| {
-                        if enabled_ids.contains(m.id.as_str()) {
-                            m.enabled = true;
-                        }
-                        m
-                    })
-                    .collect();
-
+                let new_mods = inherit_reorder_cast(&self.mod_list, new_mods);
                 let _ = core::mem::replace(&mut self.mod_list, new_mods);
             }
             Err(err) => {
@@ -926,45 +909,25 @@ impl ModManagerApp {
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
     fn update_vfs_mod_list(&mut self) {
-        if let Some(mods) = self.fetch_vfs_mod_list() {
-            let is_empty = mods.is_empty();
+        if let Some(new_mods) = {
+            match mod_info::get_all(&self.vfs_skyrim_data_dir, true) {
+                Ok(mods) => Some(mods),
+                Err(err) => {
+                    let err_title = self.t(I18nKey::ErrorReadingModInfo);
+                    self.set_notification(format!("{err_title} {err}"));
+                    None
+                }
+            }
+        } {
+            let is_empty = new_mods.is_empty();
             self.fetch_is_empty = is_empty;
             if is_empty {
                 return; // To preserve check state even if empty
             }
 
-            // Turn the IDs of previously enabled mods into a HashSet
-            let enabled_ids: std::collections::HashSet<&str> = self
-                .vfs_mod_list
-                .par_iter()
-                .filter(|m| m.enabled)
-                .map(|m| m.id.as_str())
-                .collect();
-
-            // take over enabled for new mods
-            let new_mods: Vec<_> = mods
-                .into_par_iter()
-                .map(|mut m| {
-                    if enabled_ids.contains(m.id.as_str()) {
-                        m.enabled = true;
-                    }
-                    m
-                })
-                .collect();
-
+            let new_mods = inherit_reorder_cast(&self.vfs_mod_list, new_mods);
             let _ = core::mem::replace(&mut self.vfs_mod_list, new_mods);
         };
-    }
-
-    fn fetch_vfs_mod_list(&self) -> Option<Vec<ModItem>> {
-        match mod_info::get_all(&self.vfs_skyrim_data_dir, true) {
-            Ok(mods) => Some(from_mod_infos(mods)),
-            Err(err) => {
-                let err_title = self.t(I18nKey::ErrorReadingModInfo);
-                self.set_notification(format!("{err_title} {err}"));
-                None
-            }
-        }
     }
 }
 
