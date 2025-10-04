@@ -77,7 +77,7 @@ pub struct ModManagerApp {
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
-    pub i18n: I18nMap,
+    pub i18n: Arc<I18nMap>,
     pub log_level: LogLevel,
     pub transparent: bool,
     pub last_window_size: egui::Vec2,
@@ -125,7 +125,7 @@ impl Default for ModManagerApp {
             filter_text: String::new(),
             sort_column: SortColumn::Priority,
             sort_asc: true,
-            i18n: I18nMap::load_translation(),
+            i18n: Arc::new(I18nMap::load_translation()),
             log_level: LogLevel::Debug,
             transparent: true,
             last_window_size: egui::Vec2::ZERO,
@@ -502,7 +502,7 @@ impl ModManagerApp {
 
     fn ui_log_level_box(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            ui.label("Log Level");
+            ui.label(self.t(I18nKey::LogLevelLabel));
 
             egui::ComboBox::from_id_salt("log_level")
                 .selected_text(self.log_level.as_str())
@@ -948,6 +948,8 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     fn patch(&self) {
+        let start_time = std::time::Instant::now();
+
         let patches = match self.mode {
             DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
             DataMode::Manual => to_patches(&self.skyrim_data_dir, false, &self.mod_list),
@@ -959,6 +961,8 @@ impl ModManagerApp {
         }
 
         let notify = Arc::clone(&self.notification);
+        let i18n = Arc::clone(&self.i18n);
+
         self.async_rt.spawn(nemesis_merge::behavior_gen(
             patches,
             nemesis_merge::Config {
@@ -972,7 +976,7 @@ impl ModManagerApp {
                 },
                 status_report: Some(Box::new(move |status| {
                     let mut n = notify.lock().unwrap();
-                    *n = status.to_string();
+                    *n = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {
                     cast_ragdoll_event: true,
@@ -1000,10 +1004,12 @@ impl ModManagerApp {
                 .unwrap_or_else(|_| Path::new(skyrim_data_directory).to_path_buf());
 
         if is_dangerous_remove {
-            let warn = "0/5: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.";
+            let warn = "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.";
             tracing::warn!("{warn}");
         } else {
-            self.set_notification(format!("0/5:  Removing `{output_dir}/meshes` directory..."));
+            let removing_msg = self.t(I18nKey::RemovingMeshesMessage);
+            self.set_notification(format!("0/6: {removing_msg} `{output_dir}/meshes`"));
+
             crate::cache_remover::remove_meshes_dir_all(output_dir);
         }
     }

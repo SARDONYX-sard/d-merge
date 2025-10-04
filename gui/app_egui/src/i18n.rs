@@ -30,11 +30,19 @@ pub enum I18nKey {
     NotificationClearButton,
     OutputDirLabel,
     PatchButton,
+    RemovingMeshesMessage,
     RuntimeTargetHover,
     RuntimeTargetLabel,
     SearchLabel,
     SelectButton,
     SkyrimDataDirLabel,
+    StatusGeneratingFnisPatches,
+    StatusReadingPatches,
+    StatusParsingPatches,
+    StatusApplyingPatches,
+    StatusGeneratingHkxFiles,
+    StatusDone,
+    StatusError,
     Transparent,
     TransparentHover,
     VfsMode,
@@ -49,7 +57,7 @@ pub enum I18nKey {
 impl I18nKey {
     pub const fn default_eng(&self) -> &'static str {
         match self {
-            Self::AutoRemoveMeshes => "Auto remove meshes",
+            Self::AutoRemoveMeshes => "Auto remove `meshes`",
             Self::AutoRemoveMeshesHover => "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.\nNote: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods.",
             Self::CancelButton       => "Cancel",
             Self::ClearButton => "Clear",
@@ -68,16 +76,24 @@ impl I18nKey {
             Self::LogDir => "Log Dir",
             Self::LogLevelLabel => "Log Level",
             Self::ManualMode => "Manual mode",
-            Self::ManualModeHover => "When using it completely manually.",
+            Self::ManualModeHover => "When using it completely manually.\n(The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)",
             Self::ModsListTitle => "Mods",
             Self::NotificationClearButton => "Clear Notify",
             Self::SelectButton => "Select",
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
+            Self::RemovingMeshesMessage => "Removing the `<output_dir>/meshes` directory...",
             Self::RuntimeTargetLabel => "Output format",
-            Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry. (Windows only)",
+            Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.",
             Self::SearchLabel => "Search:",
             Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
+            Self::StatusGeneratingFnisPatches => "[1/6] Generating FNIS patches...",
+            Self::StatusReadingPatches => "[2/6] Reading templates and patches...",
+            Self::StatusParsingPatches => "[3/6] Parsing patches...",
+            Self::StatusApplyingPatches => "[4/6] Applying patches...",
+            Self::StatusGeneratingHkxFiles => "[5/6] Generating .hkx files...",
+            Self::StatusDone => "[6/6] Done.",
+            Self::StatusError => "[Error]: Recommend checking debug and log files.",
             Self::Transparent => "Transparent",
             Self::TransparentHover => "Toggle Transparent window",
             Self::VfsMode => "VFS mode",
@@ -143,6 +159,13 @@ impl I18nMap {
         map.0.insert(SearchLabel, Cow::Borrowed(SearchLabel.default_eng()));
         map.0.insert(SelectButton, Cow::Borrowed(SelectButton.default_eng()));
         map.0.insert(SkyrimDataDirLabel, Cow::Borrowed(SkyrimDataDirLabel.default_eng()));
+        map.0.insert(StatusGeneratingFnisPatches, Cow::Borrowed(StatusGeneratingFnisPatches.default_eng()));
+        map.0.insert(StatusReadingPatches, Cow::Borrowed(StatusReadingPatches.default_eng()));
+        map.0.insert(StatusParsingPatches, Cow::Borrowed(StatusParsingPatches.default_eng()));
+        map.0.insert(StatusApplyingPatches, Cow::Borrowed(StatusApplyingPatches.default_eng()));
+        map.0.insert(StatusGeneratingHkxFiles, Cow::Borrowed(StatusGeneratingHkxFiles.default_eng()));
+        map.0.insert(StatusDone, Cow::Borrowed(StatusDone.default_eng()));
+        map.0.insert(StatusError, Cow::Borrowed(StatusError.default_eng()));
         map.0.insert(Transparent, Cow::Borrowed(Transparent.default_eng()));
         map.0.insert(TransparentHover, Cow::Borrowed(TransparentHover.default_eng()));
         map.0.insert(VfsMode, Cow::Borrowed(VfsMode.default_eng()));
@@ -205,5 +228,45 @@ impl I18nMap {
                 }
             }
         };
+    }
+}
+
+pub fn status_to_text(
+    status: nemesis_merge::Status,
+    i18n: &I18nMap,
+    start_time: std::time::Instant,
+) -> String {
+    match status {
+        nemesis_merge::Status::GeneratingFnisPatches { index, total } => format!(
+            "[1/6] {} ({index}/{total})",
+            i18n.t(I18nKey::StatusGeneratingFnisPatches),
+        ),
+        nemesis_merge::Status::ReadingPatches { index, total } => format!(
+            "[2/6] {} ({index}/{total})",
+            i18n.t(I18nKey::StatusReadingPatches),
+        ),
+        nemesis_merge::Status::ParsingPatches { index, total } => format!(
+            "[3/6] {} ({index}/{total})",
+            i18n.t(I18nKey::StatusParsingPatches),
+        ),
+        nemesis_merge::Status::ApplyingPatches { index, total } => format!(
+            "[4/6] {} ({index}/{total})",
+            i18n.t(I18nKey::StatusApplyingPatches),
+        ),
+        nemesis_merge::Status::GeneratingHkxFiles { index, total } => format!(
+            "[5/6] {} ({index}/{total})",
+            i18n.t(I18nKey::StatusGeneratingHkxFiles),
+        ),
+        nemesis_merge::Status::Done => {
+            let elapsed = start_time.elapsed();
+            format!(
+                "[6/6] {} (took {:.2?})",
+                i18n.t(I18nKey::StatusDone),
+                elapsed
+            )
+        }
+        nemesis_merge::Status::Error(msg) => {
+            format!("[Error] {}: {}", i18n.t(I18nKey::StatusError), msg)
+        }
     }
 }
