@@ -5,7 +5,7 @@ mod pair;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::PathBuf;
 
 use dashmap::DashSet;
 use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
@@ -55,37 +55,30 @@ pub fn collect_borrowed_patches<'a>(
 
     let (adsf_patches, errors): (Vec<_>, Vec<_>) = mods_patches
         .par_iter()
-        .map(|owed_ref_one_mod| {
+        .map(|owned_data| {
             reporter.increment();
 
             let list = match parse_fnis_list
-                .parse(&owed_ref_one_mod.list_content)
+                .parse(&owned_data.list_content)
                 .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
                 .with_context(|_| FailedParseFnisModListSnafu {
-                    path: Path::new(&format!(
-                        "meshes/{}/animations/{}/FNIS_*_List.txt",
-                        owed_ref_one_mod.behavior_entry.base_dir, owed_ref_one_mod.namespace
-                    ))
-                    .to_path_buf(),
+                    path: PathBuf::from(owned_data.to_list_path()),
                 }) {
                 Ok(list) => list,
                 Err(err) => return Either::Right(err),
             };
             #[cfg(feature = "tracing")]
-            {
-                let base_dir = owed_ref_one_mod.behavior_entry.base_dir;
-                let namespace = &owed_ref_one_mod.namespace;
-                tracing::debug!(
-                    "meshes/{base_dir}/animations/{namespace}/FNIS_*_List.txt: \n{list:#?}"
-                );
-            }
+            tracing::debug!(
+                "{list_path}: \n{list:#?}",
+                list_path = owned_data.to_list_path(),
+            );
 
             let OneListPatch {
                 animation_paths: animations,
                 adsf_patches,
                 one_master_patches,
                 seq_master_patches,
-            } = match generate_patch(owed_ref_one_mod, list) {
+            } = match generate_patch(owned_data, list) {
                 Ok(patches) => patches,
                 Err(err) => return Either::Right(Error::from(err)),
             };
@@ -96,11 +89,19 @@ pub fn collect_borrowed_patches<'a>(
 
             // Add patches to master.xml
             {
-                let master_template_key = owed_ref_one_mod
-                    .behavior_entry
-                    .to_master_behavior_template_key();
+                let master_template_key =
+                    owned_data.behavior_entry.to_master_behavior_template_key();
 
-                template_keys.insert(master_template_key.clone());
+                // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
+                if template_keys.contains(&master_template_key) {
+                    template_keys.insert(master_template_key.clone());
+                };
+                if !variable_class_map.0.contains_key(&master_template_key) {
+                    variable_class_map.0.insert(
+                        master_template_key.clone(),
+                        owned_data.behavior_entry.master_string_data_index,
+                    );
+                }
 
                 // Push Mod Root behavior to master xml
                 let entry = raw_borrowed_patches
@@ -109,14 +110,13 @@ pub fn collect_borrowed_patches<'a>(
                     .or_default();
                 {
                     let (one_gen, one_state_info, seq_state) =
-                        new_injectable_mod_root_behavior(owed_ref_one_mod);
+                        new_injectable_mod_root_behavior(owned_data);
                     entry.one.insert(one_gen.0, one_gen.1);
                     entry.one.insert(one_state_info.0, one_state_info.1);
                     entry.seq.insert(seq_state.0, seq_state.1);
                 }
 
                 // Insert patches for FNIS_*_List.txt
-
                 // TODO: Once the FNIS patch generation code is complete, the following must be verified:
                 // - Does this pattern cause deadlock?
                 // - Does it only generate classes without overwriting any existing ones?
@@ -134,28 +134,35 @@ pub fn collect_borrowed_patches<'a>(
             if !animations.is_empty() {
                 insert_anim_seq_patch(
                     &animations,
-                    owed_ref_one_mod.behavior_entry,
-                    owed_ref_one_mod.priority,
+                    owned_data.behavior_entry,
+                    owned_data.priority,
                     &raw_borrowed_patches,
                     &template_keys,
                 );
 
-                if owed_ref_one_mod.behavior_entry.is_humanoid() {
-                    insert_anim_seq_patch(
-                        &animations,
-                        &DEFAULT_FEMALE,
-                        owed_ref_one_mod.priority,
-                        &raw_borrowed_patches,
-                        &template_keys,
-                    );
-                } else if owed_ref_one_mod.behavior_entry.behavior_object == "draugr" {
-                    insert_anim_seq_patch(
-                        &animations,
-                        &DRAUGR_SKELETON,
-                        owed_ref_one_mod.priority,
-                        &raw_borrowed_patches,
-                        &template_keys,
-                    );
+                match owned_data.behavior_entry.behavior_object {
+                    // NOTE: The sync between `defaultmale` and `defaultfemale` must be performed.
+                    "character" => {
+                        insert_anim_seq_patch(
+                            &animations,
+                            &DEFAULT_FEMALE,
+                            owned_data.priority,
+                            &raw_borrowed_patches,
+                            &template_keys,
+                        );
+                    }
+                    // NOTE: Adding animation only to `draugr` will cause `dragurskeleton` to assume the A pose.
+                    //       Therefore, you must add it in the same manner.
+                    "draugr" => {
+                        insert_anim_seq_patch(
+                            &animations,
+                            &DRAUGR_SKELETON,
+                            owned_data.priority,
+                            &raw_borrowed_patches,
+                            &template_keys,
+                        );
+                    }
+                    _ => {}
                 }
             };
 

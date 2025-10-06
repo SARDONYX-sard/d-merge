@@ -10,6 +10,7 @@ mod tests {
         pub default_behavior_index: String,
         pub master_behavior: String,
         pub master_behavior_index: String,
+        pub master_string_data_index: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -35,6 +36,7 @@ mod tests {
         default_behavior_index: "{dbi}",
         master_behavior: "{mb}",
         master_behavior_index: "{mbi}",
+        master_string_data_index: "{msi}",
     }},
 "###,
                 bo = entry.behavior_object,
@@ -43,6 +45,7 @@ mod tests {
                 dbi = entry.default_behavior_index,
                 mb = entry.master_behavior,
                 mbi = entry.master_behavior_index,
+                msi = entry.master_string_data_index,
             ));
         }
 
@@ -63,8 +66,7 @@ pub static {name}: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {{
         use std::io::Write as _;
         use std::path::Path;
 
-        let mut data =
-            std::fs::read_to_string("../../dummy/debug/FNIS_output/behaviors_table.json")?;
+        let mut data = std::fs::read_to_string("../../dummy/debug/behaviors_table.json")?;
         let root: Root = simd_json::from_slice(unsafe { data.as_bytes_mut() })?;
 
         let rs_code = r###"// This is an automatically generated template. Do not edit it.
@@ -104,6 +106,8 @@ pub struct BehaviorEntry {
     pub master_behavior: &'static str,
     /// Mod root behavior registered target(`hkbStateMachine`) XML index e.g. `#0340`
     pub master_behavior_index: &'static str,
+    /// `hkbBehaviorGraphStringData` XML index. e.g. `#0106`, _1stperson `#0095`
+    pub master_string_data_index: &'static str,
 }
 
 impl BehaviorEntry {
@@ -146,6 +150,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         default_behavior_index: "#0029",
         master_behavior: "behaviors/0_master.bin",
         master_behavior_index: "#0167",
+        master_string_data_index: "#0095",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -156,6 +161,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         // Basically, hkRootLevelContainer.m_namedVariants[0] -> hkbBehaviorGraph.m_rootGenerator
         // However, for some reason, only the humanoid 0_master seems to push to a different index.
         master_behavior_index: "#0340",
+        master_string_data_index: "#0106",
     },
 };
 
@@ -169,6 +175,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     default_behavior_index: "#0029", // defaultmale.xml & defaultfemale.xml same index
     master_behavior: "behaviors/0_master.bin",
     master_behavior_index: "#2521",
+    master_string_data_index: "#0106",
 };
 
 /// # Why need this?
@@ -181,6 +188,7 @@ pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     default_behavior_index: "#0024",
     master_behavior: "behaviors/draugrbehavior.bin",
     master_behavior_index: "#2026",
+    master_string_data_index: "#0092",
 };
 "###
         .to_string();

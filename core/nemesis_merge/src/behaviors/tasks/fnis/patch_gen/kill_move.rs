@@ -32,11 +32,25 @@ pub fn new_kill_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.push((
-        json_path!["#0106", "hkbBehaviorGraphStringData", "eventNames"],
+        json_path![
+            owned_data.behavior_entry.master_string_data_index,
+            "hkbBehaviorGraphStringData",
+            "eventNames",
+        ],
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,
                 value: simd_json::json_typed!(borrowed, [paired_and_kill_animation.anim_event]),
+            },
+            priority,
+        },
+    ));
+    seq_patches.push((
+        json_path!["#0788", "hkbStateMachine", "states"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, class_indexes),
             },
             priority,
         },
@@ -685,17 +699,6 @@ pub fn new_kill_patches<'a>(
         )
     });
 
-    one_patches.push((
-        json_path!["#0788", "hkbStateMachine", "states"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: json_typed!(borrowed, class_indexes),
-            },
-            priority,
-        },
-    ));
-
     (one_patches, seq_patches)
 }
 
@@ -844,7 +847,7 @@ pub fn new_synchronized_clip_generator<'a>(
                     "userData": 0,
                     "name": format!("pa_{namespace}"),
                     "pClipGenerator": generator_index,
-                    "SyncAnimPrefix": "`", // <- XML(&#9216;) to unicode
+                    "SyncAnimPrefix": "\u{2400}", // <- XML(&#9216;) to unicode
                     "bSyncClipIgnoreMarkPlacement": false,
                     "fGetToMarkTime": 0.0,
                     "fMarkErrorThreshold": 0.1,

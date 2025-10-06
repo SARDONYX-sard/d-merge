@@ -29,11 +29,32 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
             .map(|(idx, line)| (line.to_string(), idx))
             .collect::<PriorityMap>();
 
-        let fnis_entries = ["FNISFlyer", "FNISZoo", "XPMSE"]
-            .into_par_iter()
-            .enumerate()
-            .map(|(idx, namespace)| (namespace.to_string(), nemesis_mods_count + idx))
-            .collect();
+        let fnis_entries = [
+            "FNISBase",
+            "FNISCreatureVersion",
+            "FNISZoo",
+            "P1FlyingRing",
+            "XPMSE",
+            "backgrab",
+            "backgrabnosneak",
+            "backstabnosneak",
+            "cbbackcutandkick",
+            "cbbackcutandkicknosneak",
+            "cbbackstompsneak",
+            "cbbackuppercutandslash",
+            "Fightcb4kickandkill",
+            "cbstabback",
+            "cbstompback1",
+            "fightcbsitkick",
+            "Slidekill",
+            "fightcbstamp",
+            "frontgrab",
+            "newfightcb1",
+        ]
+        .into_par_iter()
+        .enumerate()
+        .map(|(idx, namespace)| (namespace.to_string(), nemesis_mods_count + idx))
+        .collect();
 
         PatchMaps {
             nemesis_entries,

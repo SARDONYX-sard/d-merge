@@ -201,17 +201,20 @@ mod tests {
             pub master_behavior: String,
             /// #0100
             pub master_behavior_index: String,
+            /// `hkbBehaviorGraphStringData` index. e.g. `#0106`, _1stperson `#0095`
+            pub master_string_data_index: String,
         }
 
         impl NewEntry {
-            fn from_indexes(entry: &Entry, indexes: (String, String)) -> Self {
+            fn from_indexes(entry: &Entry, indexes: (String, String, String)) -> Self {
                 Self {
                     behavior_object: entry.behavior_object.clone(),
                     base_folder: entry.base_folder.replace("\\", "/"),
                     default_behavior: entry.default_behavior.replace("\\", "/"),
-                    default_behavior_index: indexes.1,
+                    default_behavior_index: indexes.2,
                     master_behavior: entry.master_behavior.replace("\\", "/"),
                     master_behavior_index: indexes.0,
+                    master_string_data_index: indexes.1,
                 }
             }
         }
@@ -245,7 +248,10 @@ mod tests {
         // -------------------------------
         // Behavior analyzers
         // -------------------------------
-        fn get_behavior(root_dir: &Path, entry: &Entry) -> Result<(String, String), String> {
+        fn get_behavior(
+            root_dir: &Path,
+            entry: &Entry,
+        ) -> Result<(String, String, String), String> {
             let mut master = root_dir
                 .join(&entry.base_folder)
                 .join(&entry.master_behavior);
@@ -257,10 +263,12 @@ mod tests {
 
             let master_res = get_master_root_behavior(&master)
                 .ok_or_else(|| format!("master not found: {}", master.display()))?;
+            let master_string_data_res = get_master_string_data(&master)
+                .ok_or_else(|| format!("master_var not found: {}", master.display()))?;
             let default_res = get_default_root_state(&default)
                 .ok_or_else(|| format!("default not found: {}", default.display()))?;
 
-            Ok((master_res, default_res))
+            Ok((master_res, master_string_data_res, default_res))
         }
 
         fn get_default_root_state(default: &Path) -> Option<String> {
@@ -298,7 +306,39 @@ mod tests {
                     }
                 }
             }
+
+            let class: Vec<_> = class_map
+                .par_iter()
+                .filter_map(|(_, class)| match class {
+                    Classes::hkbBehaviorGraphStringData(class) => Some(class),
+                    _ => None,
+                })
+                .collect();
+
+            if class.is_empty() || class.len() > 2 {
+                return None;
+            }
+            class[0].__ptr.as_ref().map(|ptr| ptr.to_string());
+
             None
+        }
+
+        fn get_master_string_data(master: &Path) -> Option<String> {
+            let string = std::fs::read_to_string(master).ok()?;
+            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
+
+            let class: Vec<_> = class_map
+                .par_iter()
+                .filter_map(|(_, class)| match class {
+                    Classes::hkbBehaviorGraphStringData(class) => Some(class),
+                    _ => None,
+                })
+                .collect();
+
+            if class.is_empty() || class.len() > 2 {
+                return None;
+            }
+            class[0].__ptr.as_ref().map(|ptr| ptr.to_string())
         }
 
         // let root_dir = Path::new("../../resource/xml/templates/meshes");
@@ -328,7 +368,7 @@ mod tests {
         // Write outputs
         // -------------------------------
         let json = simd_json::to_string_pretty(&new_root).unwrap();
-        fs::write("../../dummy/fnis/table/behaviors_table.json", json).unwrap();
+        fs::write("../../dummy/behaviors_table.json", json).unwrap();
 
         if !errors.is_empty() {
             let joined = errors.join("\n");

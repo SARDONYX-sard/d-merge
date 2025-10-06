@@ -47,6 +47,16 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
+    seq_patches.push((
+        json_path!["#0788", "hkbStateMachine", "states"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, class_indexes),
+            },
+            priority,
+        },
+    ));
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)

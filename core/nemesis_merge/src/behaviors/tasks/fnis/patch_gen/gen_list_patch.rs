@@ -62,10 +62,7 @@ pub fn generate_patch<'a>(
                 if !owned_data.behavior_entry.is_humanoid() {
                     return Err(
                         FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
-                            path: PathBuf::from(&format!(
-                                "meshes/{}/animations/{}/FNIS_*_List.txt",
-                                owned_data.behavior_entry.base_dir, owned_data.namespace
-                            )),
+                            path: PathBuf::from(&owned_data.to_list_path()),
                         },
                     );
                 }

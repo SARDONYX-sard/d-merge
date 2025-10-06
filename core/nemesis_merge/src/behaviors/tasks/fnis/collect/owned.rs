@@ -97,6 +97,18 @@ pub struct OwnedFnisInjection {
 }
 
 impl OwnedFnisInjection {
+    /// Returns `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}[_{behavior_object}]_List.txt`
+    pub fn to_list_path(&self) -> String {
+        let base_dir = self.behavior_entry.base_dir;
+        let namespace = &self.namespace;
+        if self.behavior_entry.is_humanoid() {
+            format!("meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_List.txt")
+        } else {
+            let behavior_object = self.behavior_entry.behavior_object;
+            format!("meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt")
+        }
+    }
+
     /// Increments the index and returns the full `name` attribute
     /// string in Nemesis format: `#<mod_code>$<index>`.
     ///
