@@ -1,26 +1,52 @@
 use std::borrow::Cow;
+use std::path::PathBuf;
 
+use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::FNISPairedAndKillAnimation;
+use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::{
+    FNISPairedAndKillAnimation, FNISPairedType,
+};
 use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{fnis_animation::FNISAnimation, Trigger},
     patterns::sequenced::SequencedAnimation,
     FNISList, SyntaxPattern,
 };
+use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_kill_patches;
+use crate::behaviors::tasks::fnis::patch_gen::pair::new_pair_patches;
+
+#[derive(Debug)]
+pub struct OneListPatch<'a> {
+    /// `vec!["Animations\\<namespace>\\anim_file.hkx"]`
+    pub animation_paths: Vec<String>,
+    pub adsf_patches: Vec<AdsfPatch<'a>>,
+
+    /// replace one field, Add one class patches to `0_master.xml`(or each creature master xml)
+    pub one_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+    pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum FnisPatchGenerationError {
+    /// The addition of pairs and kill moves animation applies only to humanoids; creatures are not supported.
+    #[snafu(display(""))]
+    UnsupportedPairAndKillMoveForCreature { path: PathBuf },
+}
 
 /// Generate from one list file.
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
-) -> (Vec<String>, Vec<AdsfPatch<'a>>) {
+) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     let namespace = owned_data.namespace.as_str();
 
     let mut all_adsf_patches = vec![];
     let mut all_anim_files = vec![];
+    let mut one_master_patches = vec![];
+    let mut seq_master_patches = vec![];
 
     for pattern in list.patterns {
         match pattern {
@@ -28,10 +54,32 @@ pub fn generate_patch<'a>(
                 tracing::error!("Unsupported Alternative Animation yet.");
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_animation) => {
-                let FNISPairedAndKillAnimation { anim_file, .. } = &paired_and_kill_animation;
+                let FNISPairedAndKillAnimation {
+                    kind, anim_file, ..
+                } = &paired_and_kill_animation;
                 all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
 
-                tracing::error!("Unsupported PairAndKillMove Animation yet.");
+                if owned_data.behavior_entry.is_humanoid() {
+                    return Err(
+                        FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
+                            path: PathBuf::from(&format!(
+                                "meshes/{}/animations/{}/FNIS_*_List.txt",
+                                owned_data.behavior_entry.base_dir, owned_data.namespace
+                            )),
+                        },
+                    );
+                }
+
+                let (one, seq) = match kind {
+                    FNISPairedType::KilMove => {
+                        new_kill_patches(paired_and_kill_animation, owned_data)
+                    }
+                    FNISPairedType::Paired => {
+                        new_pair_patches(paired_and_kill_animation, owned_data)
+                    }
+                };
+                one_master_patches.par_extend(one);
+                seq_master_patches.par_extend(seq);
             }
             SyntaxPattern::Chair(_chair_animation) => {
                 tracing::error!("Unsupported Chair Animation yet.");
@@ -106,7 +154,12 @@ pub fn generate_patch<'a>(
         };
     }
 
-    (all_anim_files, all_adsf_patches)
+    Ok(OneListPatch {
+        animation_paths: all_anim_files,
+        adsf_patches: all_adsf_patches,
+        one_master_patches,
+        seq_master_patches,
+    })
 }
 
 fn new_adsf_patch<'a>(

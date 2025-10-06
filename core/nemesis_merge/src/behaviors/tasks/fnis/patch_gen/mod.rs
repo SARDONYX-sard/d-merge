@@ -18,9 +18,10 @@ use winnow::Parser;
 use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
-use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::generate_patch;
-use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry;
-use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::DEFAULT_FEMALE;
+use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::{generate_patch, OneListPatch};
+use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
+    BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
+};
 use crate::behaviors::tasks::patches::types::{
     BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
 };
@@ -28,11 +29,15 @@ use crate::behaviors::tasks::templates::key::TemplateKey;
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
+pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
+
 /// For Seq patch
 pub(crate) const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
     op: Op::Add,
     range: 9998..9999,
 });
+
+pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
@@ -53,26 +58,6 @@ pub fn collect_borrowed_patches<'a>(
         .map(|owed_ref_one_mod| {
             reporter.increment();
 
-            // Push Mod Root behavior to master xml
-            {
-                let master_template_key = owed_ref_one_mod
-                    .behavior_entry
-                    .to_master_behavior_template_key();
-
-                template_keys.insert(master_template_key.clone());
-
-                let (one_gen, one_state_info, seq_state) =
-                    new_injectable_mod_root_behavior(owed_ref_one_mod);
-
-                let entry = raw_borrowed_patches
-                    .0
-                    .entry(master_template_key)
-                    .or_default();
-                entry.one.insert(one_gen.0, one_gen.1);
-                entry.one.insert(one_state_info.0, one_state_info.1);
-                entry.seq.insert(seq_state.0, seq_state.1);
-            }
-
             let list = match parse_fnis_list
                 .parse(&owed_ref_one_mod.list_content)
                 .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
@@ -86,7 +71,6 @@ pub fn collect_borrowed_patches<'a>(
                 Ok(list) => list,
                 Err(err) => return Either::Right(err),
             };
-
             #[cfg(feature = "tracing")]
             {
                 let base_dir = owed_ref_one_mod.behavior_entry.base_dir;
@@ -96,11 +80,55 @@ pub fn collect_borrowed_patches<'a>(
                 );
             }
 
-            let (animations, adsf_patches) = generate_patch(owed_ref_one_mod, list);
+            let OneListPatch {
+                animation_paths: animations,
+                adsf_patches,
+                one_master_patches,
+                seq_master_patches,
+            } = match generate_patch(owed_ref_one_mod, list) {
+                Ok(patches) => patches,
+                Err(err) => return Either::Right(Error::from(err)),
+            };
             // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
             let animations: HashSet<_> = animations.into_iter().collect();
             let mut animations: Vec<_> = animations.into_iter().collect();
             animations.par_sort_unstable();
+
+            // Add patches to master.xml
+            {
+                let master_template_key = owed_ref_one_mod
+                    .behavior_entry
+                    .to_master_behavior_template_key();
+
+                template_keys.insert(master_template_key.clone());
+
+                // Push Mod Root behavior to master xml
+                let entry = raw_borrowed_patches
+                    .0
+                    .entry(master_template_key)
+                    .or_default();
+                {
+                    let (one_gen, one_state_info, seq_state) =
+                        new_injectable_mod_root_behavior(owed_ref_one_mod);
+                    entry.one.insert(one_gen.0, one_gen.1);
+                    entry.one.insert(one_state_info.0, one_state_info.1);
+                    entry.seq.insert(seq_state.0, seq_state.1);
+                }
+
+                // Insert patches for FNIS_*_List.txt
+
+                // TODO: Once the FNIS patch generation code is complete, the following must be verified:
+                // - Does this pattern cause deadlock?
+                // - Does it only generate classes without overwriting any existing ones?
+                // entry.one.par_extend(one_master_patches);
+                for (path, patch) in one_master_patches {
+                    entry.one.insert(path, patch);
+                }
+
+                for (path, patch) in seq_master_patches {
+                    entry.seq.insert(path, patch);
+                }
+            }
 
             // Push One Mod animations
             if !animations.is_empty() {
@@ -121,18 +149,6 @@ pub fn collect_borrowed_patches<'a>(
                         &template_keys,
                     );
                 } else if owed_ref_one_mod.behavior_entry.behavior_object == "draugr" {
-                    // # Why need this?
-                    // It seems draugr must have the animations path added to both draugr.xml and
-                    // draugr_skeleton.xml (information from the FNIS Creature pack's behavior object).
-                    const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
-                        behavior_object: "draugr",
-                        base_dir: "actors/draugr",
-                        default_behavior: "characterskeleton/draugr_skeleton.bin",
-                        default_behavior_index: "#0024",
-                        master_behavior: "behaviors/draugrbehavior.bin",
-                        master_behavior_index: "#2026",
-                    };
-
                     insert_anim_seq_patch(
                         &animations,
                         &DRAUGR_SKELETON,

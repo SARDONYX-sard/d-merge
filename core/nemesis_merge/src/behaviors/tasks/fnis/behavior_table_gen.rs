@@ -170,6 +170,18 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     master_behavior: "behaviors/0_master.bin",
     master_behavior_index: "#2521",
 };
+
+/// # Why need this?
+/// It seems draugr must have the animations path added to both draugr.xml and
+/// draugr_skeleton.xml (information from the FNIS Creature pack's behavior object).
+pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
+    behavior_object: "draugr",
+    base_dir: "actors/draugr",
+    default_behavior: "characterskeleton/draugr_skeleton.bin",
+    default_behavior_index: "#0024",
+    master_behavior: "behaviors/draugrbehavior.bin",
+    master_behavior_index: "#2026",
+};
 "###
         .to_string();
 

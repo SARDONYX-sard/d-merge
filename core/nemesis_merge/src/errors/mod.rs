@@ -26,6 +26,11 @@ pub enum Error {
         path: PathBuf,
     },
 
+    #[snafu(transparent)]
+    FnisPatchGenerationError {
+        source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,
+    },
+
     /// Failed to read file from {path}
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },

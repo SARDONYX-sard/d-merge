@@ -1,30 +1,28 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt"
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::{
-    collect::owned::OwnedFnisInjection,
-    list_parser::{
-        combinator::{flags::FNISAnimFlags, Trigger},
-        patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
+use crate::behaviors::tasks::fnis::list_parser::{
+    combinator::{flags::FNISAnimFlags, Trigger},
+    patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+};
+use crate::behaviors::tasks::fnis::patch_gen::{
+    kill_move::{
+        calculate_hash, get_anim_object_index, make_state_info_patch, make_state_info_patch2,
+        new_event_property_array, new_synchronized_clip_generator,
     },
-    patch_gen::{
-        kill_move::{
-            calculate_hash, get_anim_object_index, make_state_info_patch, make_state_info_patch2,
-            new_event_property_array, new_synchronized_clip_generator,
-        },
-        PUSH_OP,
-    },
+    JsonPatchPairs, PUSH_OP,
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_pair_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
-) -> Vec<(JsonPath<'a>, ValueWithPriority<'a>)> {
+) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
     let class_indexes: [String; 23] =
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
     let namespace = &owned_data.namespace;
@@ -36,9 +34,10 @@ pub fn new_pair_patches<'a>(
         paired_and_kill_animation.anim_file
     ); // Animations\\$Fkm$
 
-    let mut patches = vec![];
+    let mut one_patches = vec![];
+    let mut seq_patches = vec![];
 
-    patches.push((
+    seq_patches.push((
         json_path!["#0106", "hkbBehaviorGraphStringData", "eventNames"],
         ValueWithPriority {
             patch: JsonPatch {
@@ -52,7 +51,7 @@ pub fn new_pair_patches<'a>(
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();
-    patches.par_extend(
+    one_patches.par_extend(
         paired_and_kill_animation
             .anim_objects
             .par_iter()
@@ -82,7 +81,7 @@ pub fn new_pair_patches<'a>(
     );
 
     // $RI
-    patches.push({
+    one_patches.push({
         let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
             true => "#2530",
             false => "#0000",
@@ -120,7 +119,7 @@ pub fn new_pair_patches<'a>(
     });
 
     // RI+1
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[1].clone()),
             Cow::Borrowed("hkbStateMachine"),
@@ -157,7 +156,7 @@ pub fn new_pair_patches<'a>(
     ));
 
     // #$RI+2$  hkbVariableBindingSet
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[2].clone()),
             Cow::Borrowed("hkbVariableBindingSet"),
@@ -181,7 +180,7 @@ pub fn new_pair_patches<'a>(
     ));
 
     // #$RI+3$  hkbStateMachineStateInfo
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[3].clone()),
             Cow::Borrowed("hkbStateMachineStateInfo"),
@@ -208,7 +207,7 @@ pub fn new_pair_patches<'a>(
     ));
 
     // #$RI+4$  hkbStateMachine
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[4].clone()),
             Cow::Borrowed("hkbStateMachine"),
@@ -244,7 +243,7 @@ pub fn new_pair_patches<'a>(
         },
     ));
     // #$RI+5$  hkbVariableBindingSet
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[5].clone()),
             Cow::Borrowed("hkbVariableBindingSet"),
@@ -268,7 +267,7 @@ pub fn new_pair_patches<'a>(
     ));
 
     // #$RI+6$  hkbStateMachineStateInfo
-    patches.push({
+    one_patches.push({
         // $-o|#%RI+7%|h|null|#2526$
         let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
             class_indexes[7].as_str()
@@ -317,7 +316,7 @@ pub fn new_pair_patches<'a>(
     });
 
     // #$RI+7$  hkbStateMachineEventPropertyArray
-    patches.push({
+    one_patches.push({
         let first_anim_object_index = class_index_to_anim_object_map
             .get(&0)
             .map_or("#0000", |p| **p.value());
@@ -328,7 +327,7 @@ pub fn new_pair_patches<'a>(
     new_synchronized_clip_generator(&class_indexes[8], namespace, &class_indexes[9], priority);
 
     // #$RI+9$  hkbClipGenerator
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[9].clone()),
             Cow::Borrowed("hkbClipGenerator"),
@@ -358,7 +357,7 @@ pub fn new_pair_patches<'a>(
         },
     ));
 
-    patches.push({
+    one_patches.push({
         let mut triggers: Vec<_> = paired_and_kill_animation
             .flag_set
             .triggers
@@ -411,14 +410,14 @@ pub fn new_pair_patches<'a>(
         )
     });
 
-    patches.push(make_state_info_patch(
+    one_patches.push(make_state_info_patch(
         &class_indexes[11],
         &class_indexes[12],
         flags,
         priority,
         format!("NPC_FNISpa{priority}"),
     ));
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[12].clone()),
             Cow::Borrowed("hkbStateMachine"),
@@ -453,7 +452,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[13].clone()),
             Cow::Borrowed("hkbVariableBindingSet"),
@@ -478,7 +477,7 @@ pub fn new_pair_patches<'a>(
         },
     ));
 
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[14].clone()),
             Cow::Borrowed("hkbStateMachineStateInfo"),
@@ -503,7 +502,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[15].clone()),
             Cow::Borrowed("hkbStateMachine"),
@@ -538,7 +537,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[16].clone()),
             Cow::Borrowed("hkbVariableBindingSet"),
@@ -570,12 +569,12 @@ pub fn new_pair_patches<'a>(
         priority,
         format!("FNISpa_{namespace}"), // FNISpa_$1/1$
     );
-    patches.push({
+    one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
         new_event_property_array(maybe_2nd_anim_object_index, &class_indexes[18], priority)
     });
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[19].clone()),
             Cow::Borrowed("BSSynchronizedClipGenerator"),
@@ -602,7 +601,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    patches.push((
+    one_patches.push((
         vec![
             Cow::Owned(class_indexes[20].clone()),
             Cow::Borrowed("hkbClipGenerator"),
@@ -632,7 +631,7 @@ pub fn new_pair_patches<'a>(
         },
     ));
 
-    patches.push({
+    one_patches.push({
         let triggers: Vec<_> = paired_and_kill_animation
             .flag_set
             .triggers
@@ -669,5 +668,5 @@ pub fn new_pair_patches<'a>(
         )
     });
 
-    patches
+    (one_patches, seq_patches)
 }
