@@ -32,7 +32,7 @@ pub struct OneListPatch<'a> {
 #[derive(Debug, snafu::Snafu)]
 pub enum FnisPatchGenerationError {
     /// The addition of pairs and kill moves animation applies only to humanoids; creatures are not supported.
-    #[snafu(display(""))]
+    #[snafu(display("The addition of pairs and kill moves animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 }
 
@@ -59,7 +59,7 @@ pub fn generate_patch<'a>(
                 } = &paired_and_kill_animation;
                 all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
 
-                if owned_data.behavior_entry.is_humanoid() {
+                if !owned_data.behavior_entry.is_humanoid() {
                     return Err(
                         FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
                             path: PathBuf::from(&format!(
