@@ -5,6 +5,7 @@ use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotat
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
+use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::FNISPairedAndKillAnimation;
 use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{fnis_animation::FNISAnimation, Trigger},
     patterns::sequenced::SequencedAnimation,
@@ -26,7 +27,10 @@ pub fn generate_patch<'a>(
             SyntaxPattern::AltAnim(_alt_animation) => {
                 tracing::error!("Unsupported Alternative Animation yet.");
             }
-            SyntaxPattern::PairAndKillMove(_paired_and_kill_animation) => {
+            SyntaxPattern::PairAndKillMove(paired_and_kill_animation) => {
+                let FNISPairedAndKillAnimation { anim_file, .. } = &paired_and_kill_animation;
+                all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
+
                 tracing::error!("Unsupported PairAndKillMove Animation yet.");
             }
             SyntaxPattern::Chair(_chair_animation) => {

@@ -32,8 +32,8 @@ pub enum FNISPairedType {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimObject<'a> {
     /// e.g. `AnimObjectSword`
-    name: &'a str,
-    role: ActorRole,
+    pub name: &'a str,
+    pub role: ActorRole,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

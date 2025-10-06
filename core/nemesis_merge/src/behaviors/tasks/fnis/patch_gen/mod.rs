@@ -1,5 +1,7 @@
 mod gen_list_patch;
 pub mod generated_behaviors;
+mod kill_move;
+mod pair;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
