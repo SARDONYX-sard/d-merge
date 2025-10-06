@@ -4,7 +4,6 @@ mod kill_move;
 mod pair;
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 use dashmap::DashSet;
@@ -75,6 +74,7 @@ pub fn collect_borrowed_patches<'a>(
 
             let OneListPatch {
                 animation_paths: animations,
+                events,
                 adsf_patches,
                 one_master_patches,
                 seq_master_patches,
@@ -82,10 +82,6 @@ pub fn collect_borrowed_patches<'a>(
                 Ok(patches) => patches,
                 Err(err) => return Either::Right(Error::from(err)),
             };
-            // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
-            let animations: HashSet<_> = animations.into_iter().collect();
-            let mut animations: Vec<_> = animations.into_iter().collect();
-            animations.par_sort_unstable();
 
             // Add patches to master.xml
             {
@@ -117,22 +113,35 @@ pub fn collect_borrowed_patches<'a>(
                 }
 
                 // Insert patches for FNIS_*_List.txt
-                // TODO: Once the FNIS patch generation code is complete, the following must be verified:
-                // - Does this pattern cause deadlock?
-                // - Does it only generate classes without overwriting any existing ones?
+                // TODO: If it's strictly for additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
                 // entry.one.par_extend(one_master_patches);
                 for (path, patch) in one_master_patches {
                     entry.one.insert(path, patch);
                 }
-
                 for (path, patch) in seq_master_patches {
+                    entry.seq.insert(path, patch);
+                }
+
+                // TODO: Existing events must avoid duplicate additions. To achieve this, a table must be created. - FNIS_base, 0_master, mt_behavior
+                // However, creating a table for each creature is impractical; in reality, it would likely be limited to pairAndKillMoves(character).
+                if !events.is_empty() {
+                    let mut events: Vec<_> = events.into_iter().collect(); // We'll probably end up using `.filter` and `phf_set!` to check here.
+                    events.par_sort_unstable();
+                    let (path, patch) = new_push_events_seq_patch(
+                        &events,
+                        owned_data.behavior_entry,
+                        owned_data.priority,
+                    );
                     entry.seq.insert(path, patch);
                 }
             }
 
             // Push One Mod animations
             if !animations.is_empty() {
-                insert_anim_seq_patch(
+                let mut animations: Vec<_> = animations.into_iter().collect();
+                animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
+
+                new_push_anim_seq_patch(
                     &animations,
                     owned_data.behavior_entry,
                     owned_data.priority,
@@ -143,7 +152,7 @@ pub fn collect_borrowed_patches<'a>(
                 match owned_data.behavior_entry.behavior_object {
                     // NOTE: The sync between `defaultmale` and `defaultfemale` must be performed.
                     "character" => {
-                        insert_anim_seq_patch(
+                        new_push_anim_seq_patch(
                             &animations,
                             &DEFAULT_FEMALE,
                             owned_data.priority,
@@ -152,9 +161,9 @@ pub fn collect_borrowed_patches<'a>(
                         );
                     }
                     // NOTE: Adding animation only to `draugr` will cause `dragurskeleton` to assume the A pose.
-                    //       Therefore, you must add it in the same manner.
+                    //       Therefore, we must add it in the same manner.
                     "draugr" => {
-                        insert_anim_seq_patch(
+                        new_push_anim_seq_patch(
                             &animations,
                             &DRAUGR_SKELETON,
                             owned_data.priority,
@@ -284,7 +293,7 @@ fn new_injectable_mod_root_behavior<'a>(
 ///     "Animations\<FNIS one mod namespace>\sample1.hkx"
 /// ]
 /// ```
-fn insert_anim_seq_patch<'a>(
+fn new_push_anim_seq_patch<'a>(
     animations: &[String],
     behavior_entry: &BehaviorEntry,
     priority: usize,
@@ -318,4 +327,25 @@ fn insert_anim_seq_patch<'a>(
         .or_default()
         .seq
         .insert(json_path, patch);
+}
+
+fn new_push_events_seq_patch<'a>(
+    events: &[&'a str],
+    behavior_entry: &BehaviorEntry,
+    priority: usize,
+) -> (JsonPath<'a>, ValueWithPriority<'a>) {
+    (
+        json_path![
+            behavior_entry.master_string_data_index,
+            "hkbBehaviorGraphStringData",
+            "eventNames",
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: simd_json::json_typed!(borrowed, events),
+            },
+            priority,
+        },
+    )
 }

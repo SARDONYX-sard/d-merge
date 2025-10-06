@@ -38,16 +38,6 @@ pub fn new_pair_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.push((
-        json_path!["#0106", "hkbBehaviorGraphStringData", "eventNames"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: simd_json::json_typed!(borrowed, [paired_and_kill_animation.anim_event]),
-            },
-            priority,
-        },
-    ));
-    seq_patches.push((
         json_path!["#0788", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
@@ -334,7 +324,12 @@ pub fn new_pair_patches<'a>(
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
-    new_synchronized_clip_generator(&class_indexes[8], namespace, &class_indexes[9], priority);
+    one_patches.push(new_synchronized_clip_generator(
+        &class_indexes[8],
+        namespace,
+        &class_indexes[9],
+        priority,
+    ));
 
     // #$RI+9$  hkbClipGenerator
     one_patches.push((
@@ -571,14 +566,14 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    make_state_info_patch2(
+    one_patches.push(make_state_info_patch2(
         &class_indexes[17],
         flags,
         &class_indexes[18],
         &class_indexes[19],
         priority,
         format!("FNISpa_{namespace}"), // FNISpa_$1/1$
-    );
+    ));
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);

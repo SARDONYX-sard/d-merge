@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use json_patch::{JsonPath, ValueWithPriority};
@@ -21,7 +22,8 @@ use crate::behaviors::tasks::fnis::patch_gen::pair::new_pair_patches;
 #[derive(Debug)]
 pub struct OneListPatch<'a> {
     /// `vec!["Animations\\<namespace>\\anim_file.hkx"]`
-    pub animation_paths: Vec<String>,
+    pub animation_paths: HashSet<String>,
+    pub events: HashSet<&'a str>,
     pub adsf_patches: Vec<AdsfPatch<'a>>,
 
     /// replace one field, Add one class patches to `0_master.xml`(or each creature master xml)
@@ -31,8 +33,8 @@ pub struct OneListPatch<'a> {
 
 #[derive(Debug, snafu::Snafu)]
 pub enum FnisPatchGenerationError {
-    /// The addition of pairs and kill moves animation applies only to humanoids; creatures are not supported.
-    #[snafu(display("The addition of pairs and kill moves animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
+    /// The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.
+    #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 }
 
@@ -44,7 +46,8 @@ pub fn generate_patch<'a>(
     let namespace = owned_data.namespace.as_str();
 
     let mut all_adsf_patches = vec![];
-    let mut all_anim_files = vec![];
+    let mut all_anim_files = HashSet::new();
+    let mut all_events = HashSet::new();
     let mut one_master_patches = vec![];
     let mut seq_master_patches = vec![];
 
@@ -55,11 +58,18 @@ pub fn generate_patch<'a>(
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_animation) => {
                 let FNISPairedAndKillAnimation {
-                    kind, anim_file, ..
+                    kind,
+                    flag_set,
+                    anim_file,
+                    anim_event,
+                    ..
                 } = &paired_and_kill_animation;
-                all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
+                all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                all_events.insert(*anim_event);
+                all_events.par_extend(flag_set.triggers.par_iter().map(|trigger| trigger.event));
 
-                if !owned_data.behavior_entry.is_humanoid() {
+                // TODO: It seems FNIS doesn't support `_1stperson` kill moves.
+                if owned_data.behavior_entry.behavior_object != "character" {
                     return Err(
                         FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
                             path: PathBuf::from(&owned_data.to_list_path()),
@@ -89,15 +99,20 @@ pub fn generate_patch<'a>(
                     namespace: &'a str,
                     owned_data: &'a OwnedFnisInjection,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<Vec<AdsfPatch<'a>>>) {
+                ) -> (Vec<String>, Vec<&'a str>, Vec<Vec<AdsfPatch<'a>>>) {
                     sequenced_animation
                         .animations
-                        .into_par_iter()
+                        .into_iter()
                         .map(|fnis_animation| {
-                            let FNISAnimation { anim_file, .. } = &fnis_animation;
+                            let FNISAnimation {
+                                anim_file,
+                                anim_event,
+                                ..
+                            } = &fnis_animation;
 
                             (
                                 format!("Animations\\{namespace}\\{anim_file}"),
+                                *anim_event,
                                 new_adsf_patch(owned_data, namespace, fnis_animation),
                             )
                         })
@@ -106,13 +121,14 @@ pub fn generate_patch<'a>(
                 fn collect_seq_creature_patch<'a>(
                     namespace: &str,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> Vec<String> {
+                ) -> (Vec<String>, Vec<&'a str>) {
                     sequenced_animation
                         .animations
                         .into_par_iter()
                         .map(|fnis_animation| {
                             let FNISAnimation {
                                 anim_file,
+                                anim_event,
                                 motions,
                                 rotations,
                                 ..
@@ -123,27 +139,27 @@ pub fn generate_patch<'a>(
                                 );
                             }
 
-                            format!("Animations\\{namespace}\\{anim_file}")
+                            (format!("Animations\\{namespace}\\{anim_file}"), anim_event)
                         })
                         .collect()
                 }
 
-                let (anim_files, adsf_patches): (Vec<_>, Vec<_>) =
+                let (anim_files, events, adsf_patches): (Vec<_>, Vec<_>, Vec<_>) =
                     if owned_data.behavior_entry.is_humanoid() {
                         collect_seq_patch(namespace, owned_data, sequenced_animation)
                     } else {
                         // TODO: Support creature adsf
-                        (
-                            collect_seq_creature_patch(namespace, sequenced_animation),
-                            vec![],
-                        )
+                        let (anims, events) =
+                            collect_seq_creature_patch(namespace, sequenced_animation);
+                        (anims, events, vec![])
                     };
                 all_anim_files.par_extend(anim_files);
+                all_events.par_extend(events);
                 all_adsf_patches.par_extend(adsf_patches.into_par_iter().flatten());
             }
             SyntaxPattern::Basic(fnis_animation) => {
                 let FNISAnimation { anim_file, .. } = &fnis_animation;
-                all_anim_files.push(format!("Animations\\{namespace}\\{anim_file}"));
+                all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
 
                 let adsf_patches = new_adsf_patch(owned_data, namespace, fnis_animation);
                 all_adsf_patches.par_extend(adsf_patches);
@@ -153,6 +169,7 @@ pub fn generate_patch<'a>(
 
     Ok(OneListPatch {
         animation_paths: all_anim_files,
+        events: all_events,
         adsf_patches: all_adsf_patches,
         one_master_patches,
         seq_master_patches,

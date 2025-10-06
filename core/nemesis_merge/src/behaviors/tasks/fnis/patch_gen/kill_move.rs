@@ -32,20 +32,6 @@ pub fn new_kill_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.push((
-        json_path![
-            owned_data.behavior_entry.master_string_data_index,
-            "hkbBehaviorGraphStringData",
-            "eventNames",
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: simd_json::json_typed!(borrowed, [paired_and_kill_animation.anim_event]),
-            },
-            priority,
-        },
-    ));
-    seq_patches.push((
         json_path!["#0788", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
@@ -259,14 +245,14 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
-    make_state_info_patch2(
+    one_patches.push(make_state_info_patch2(
         &class_indexes[7],
         flags,
         &class_indexes[8],
         &class_indexes[9],
         priority,
         format!("pa_{namespace}"), // pa_$Ekm$
-    );
+    ));
 
     one_patches.push({
         let first_anim_object_index = class_index_to_anim_object_map
@@ -274,7 +260,12 @@ pub fn new_kill_patches<'a>(
             .map_or("#0000", |p| **p.value());
         new_event_property_array(first_anim_object_index, &class_indexes[8], priority)
     });
-    new_synchronized_clip_generator(&class_indexes[9], namespace, &class_indexes[10], priority);
+    one_patches.push(new_synchronized_clip_generator(
+        &class_indexes[9],
+        namespace,
+        &class_indexes[10],
+        priority,
+    ));
 
     one_patches.push((
         vec![
@@ -482,6 +473,30 @@ pub fn new_kill_patches<'a>(
                     "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
                     "states": [&class_indexes[18]],
                     "wildcardTransitions": "#0000"
+                }),
+            },
+            priority,
+        },
+    ));
+    one_patches.push((
+        vec![
+            Cow::Owned(class_indexes[17].clone()),
+            Cow::Borrowed("hkbVariableBindingSet"),
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Add),
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": class_indexes[17],
+                    "bindings": [
+                        {
+                            "memberPath": "bIsActive0",
+                            "variableIndex": 51,
+                            "bitIndex": -1,
+                            "bindingType": "BINDING_TYPE_VARIABLE"
+                        }
+                    ],
+                    "indexOfBindingToEnable": -1
                 }),
             },
             priority,
@@ -708,6 +723,7 @@ pub fn new_kill_patches<'a>(
 /// # Returns
 ///
 /// A `Cow<str>` representing the first found value, or `"#0000"` if none exist.
+#[must_use]
 pub fn get_anim_object_index<'a>(
     map: &dashmap::DashMap<usize, &&'a str>,
     start_index: usize,
@@ -725,6 +741,7 @@ pub fn get_anim_object_index<'a>(
 /// # Note
 /// - `enter_notify_events`: #2530 or null
 /// - `exit_notify_events`: #2532 or null
+#[must_use]
 pub fn make_state_info_patch<'a>(
     class_index: &str,
     generator_index: &str,
@@ -773,6 +790,7 @@ pub fn make_state_info_patch<'a>(
 /// # Note
 /// - `enter_notify_events`: index or null or #2526
 /// - `exit_notify_events`: `$-h,o|#2528|h|null|o|#2529|#2527$`
+#[must_use]
 pub fn make_state_info_patch2<'a>(
     class_index: &str,
     flags: FNISAnimFlags,
@@ -827,10 +845,11 @@ pub fn make_state_info_patch2<'a>(
     )
 }
 
+#[must_use]
 pub fn new_synchronized_clip_generator<'a>(
     class_index: &String,
     namespace: &'a str,
-    generator_index: &'a str,
+    generator_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     (
@@ -862,6 +881,7 @@ pub fn new_synchronized_clip_generator<'a>(
     )
 }
 
+#[must_use]
 pub fn new_event_property_array<'a>(
     anim_object_index: &'a str,
     class_index: &str,
@@ -898,6 +918,7 @@ pub fn new_event_property_array<'a>(
     )
 }
 
+#[must_use]
 fn new_values_from_triggers<'a>(
     event_id: u64,
     triggers: &[Trigger<'a>],
@@ -931,6 +952,7 @@ fn new_values_from_triggers<'a>(
 }
 
 /// stateID generator?
+#[must_use]
 pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> u64 {
     let mut hasher = std::hash::DefaultHasher::new();
     t.hash(&mut hasher);
