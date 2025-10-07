@@ -10,7 +10,12 @@ use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
-use crate::behaviors::tasks::fnis::patch_gen::{JsonPatchPairs, PUSH_OP};
+use crate::behaviors::tasks::fnis::patch_gen::{
+    JsonPatchPairs, FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
+    FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530,
+    FNIS_AA_GLOBAL_AUTO_GEN_2532, FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
+    PUSH_OP,
+};
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_kill_patches<'a>(
@@ -51,9 +56,9 @@ pub fn new_kill_patches<'a>(
             .par_iter()
             .enumerate()
             .map(|(index, AnimObject { name, role: _ })| {
-                class_index_to_anim_object_map.insert(index, name);
-
                 let new_anim_object_index = owned_data.next_class_name_attribute();
+                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+
                 let one_anim_obj = (
                     vec![
                         Cow::Owned(new_anim_object_index.clone()),
@@ -257,8 +262,8 @@ pub fn new_kill_patches<'a>(
     one_patches.push({
         let first_anim_object_index = class_index_to_anim_object_map
             .get(&0)
-            .map_or("#0000", |p| **p.value());
-        new_event_property_array(first_anim_object_index, &class_indexes[8], priority)
+            .map_or(Cow::Borrowed("#0000"), |p| Cow::Owned(p.value().clone()));
+        new_event_property_array(&first_anim_object_index, &class_indexes[8], priority)
     });
     one_patches.push(new_synchronized_clip_generator(
         &class_indexes[9],
@@ -336,11 +341,11 @@ pub fn new_kill_patches<'a>(
     });
     one_patches.push({
         let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-            true => "#2534",
-            false => "#2533",
+            true => FNIS_AA_GLOBAL_AUTO_GEN_2534,
+            false => FNIS_AA_GLOBAL_AUTO_GEN_2533,
         };
         let exit_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-            true => "#2532",
+            true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
             false => "#0000",
         };
 
@@ -592,18 +597,18 @@ pub fn new_kill_patches<'a>(
         } else if flags.contains(FNISAnimFlags::HeadTracking) {
             "#0000"
         } else {
-            "#2526"
+            FNIS_AA_GLOBAL_AUTO_GEN_2526
         };
         // $-h,o|#2528|h|null|o|#2529|#2527$
         let exit_notify_events =
             if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-                "#2528"
+                FNIS_AA_GLOBAL_AUTO_GEN_2528
             } else if flags.contains(FNISAnimFlags::HeadTracking) {
                 "#0000"
             } else if flags.contains(FNISAnimFlags::AnimObjects) {
-                "#2529"
+                FNIS_AA_GLOBAL_AUTO_GEN_2529
             } else {
-                "#2527"
+                FNIS_AA_GLOBAL_AUTO_GEN_2527
             };
 
         (
@@ -635,7 +640,7 @@ pub fn new_kill_patches<'a>(
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
-        new_event_property_array(maybe_2nd_anim_object_index, &class_indexes[22], priority)
+        new_event_property_array(&maybe_2nd_anim_object_index, &class_indexes[22], priority)
     });
     one_patches.push((
         vec![
@@ -724,16 +729,16 @@ pub fn new_kill_patches<'a>(
 ///
 /// A `Cow<str>` representing the first found value, or `"#0000"` if none exist.
 #[must_use]
-pub fn get_anim_object_index<'a>(
-    map: &dashmap::DashMap<usize, &&'a str>,
+pub fn get_anim_object_index(
+    map: &dashmap::DashMap<usize, String>,
     start_index: usize,
-) -> &'a str {
+) -> Cow<'static, str> {
     for idx in (0..=start_index).rev() {
         if let Some(val) = map.get(&idx) {
-            return val.value();
+            return Cow::Owned(val.value().clone());
         }
     }
-    "#0000"
+    Cow::Borrowed("#0000")
 }
 
 /// - `state_name`:  e.g. `FNIS_State{priority}`, `Player_FNISpa$1/1$`
@@ -750,11 +755,11 @@ pub fn make_state_info_patch<'a>(
     state_name: String,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-        true => "#2530",
+        true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
         false => "#0000",
     };
     let exit_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-        true => "#2532",
+        true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
         false => "#0000",
     };
 
@@ -804,18 +809,18 @@ pub fn make_state_info_patch2<'a>(
     } else if flags.contains(FNISAnimFlags::HeadTracking) {
         "#0000"
     } else {
-        "#2526"
+        FNIS_AA_GLOBAL_AUTO_GEN_2526
     };
     // $-h,o|#2528|h|null|o|#2529|#2527$
     let exit_notify_events =
         if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-            "#2528"
+            FNIS_AA_GLOBAL_AUTO_GEN_2528
         } else if flags.contains(FNISAnimFlags::HeadTracking) {
             "#0000"
         } else if flags.contains(FNISAnimFlags::AnimObjects) {
-            "#2529"
+            FNIS_AA_GLOBAL_AUTO_GEN_2529
         } else {
-            "#2527"
+            FNIS_AA_GLOBAL_AUTO_GEN_2527
         };
 
     (
@@ -883,7 +888,7 @@ pub fn new_synchronized_clip_generator<'a>(
 
 #[must_use]
 pub fn new_event_property_array<'a>(
-    anim_object_index: &'a str,
+    anim_object_index: &str,
     class_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {

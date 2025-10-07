@@ -120,6 +120,12 @@ impl<'a> core::hash::Hash for TemplateKey<'a> {
     }
 }
 
+pub const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
+    TemplateKey::new_unchecked(Cow::Borrowed(
+        "meshes/actors/character/behaviors/0_master.bin",
+    ))
+};
+
 /// Nemesis 1st person to meshes rel template .bin path
 #[rustfmt::skip]
 static NEMESIS_1ST_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {

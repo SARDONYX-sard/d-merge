@@ -24,7 +24,7 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
 use crate::behaviors::tasks::patches::types::{
     BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
 };
-use crate::behaviors::tasks::templates::key::TemplateKey;
+use crate::behaviors::tasks::templates::key::{TemplateKey, THREAD_PERSON_0_MASTER_KEY};
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
@@ -89,7 +89,7 @@ pub fn collect_borrowed_patches<'a>(
                     owned_data.behavior_entry.to_master_behavior_template_key();
 
                 // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
-                if template_keys.contains(&master_template_key) {
+                if !template_keys.contains(&master_template_key) {
                     template_keys.insert(master_template_key.clone());
                 };
                 if !variable_class_map.0.contains_key(&master_template_key) {
@@ -180,6 +180,18 @@ pub fn collect_borrowed_patches<'a>(
         .collect();
 
     let adsf_patches: Vec<_> = adsf_patches.into_par_iter().flatten().collect();
+
+    // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
+    if template_keys.contains(&THREAD_PERSON_0_MASTER_KEY) {
+        raw_borrowed_patches
+            .0
+            .entry(THREAD_PERSON_0_MASTER_KEY)
+            .or_default()
+            .one
+            .0
+            // Safety: This only adds a private global index and does not conflict with the class_name index.
+            .par_extend(new_global_alt_flags(0));
+    };
 
     (
         BorrowedPatches {
@@ -348,4 +360,135 @@ fn new_push_events_seq_patch<'a>(
             priority,
         },
     )
+}
+
+/// FNIS XML(name="#2526") - `HeadTrackingOff`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2526: &str = "FNIS_aa_global_auto_gen2526";
+
+/// FNIS XML(name="#2527") - `HeadTrackingOn`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2527: &str = "FNIS_aa_global_auto_gen2527";
+
+/// FNIS XML(name="#2528") - `AnimObjectUnequip`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2528: &str = "FNIS_aa_global_auto_gen2528";
+
+/// FNIS XML(name="#2529") - `Multi (HeadTrackingOn + AnimObjectUnequip)`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2529: &str = "FNIS_aa_global_auto_gen2529";
+
+/// FNIS XML(name="#2530") - `StartAnimatedCamera`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2530: &str = "FNIS_aa_global_auto_gen2530";
+
+/// FNIS XML(name="#2531") - `StringEventPayload (Camera3rd [Cam3])`
+pub(crate) const FNIS_AA_STRING_PAYLOAD_2531: &str = "FNIS_aa_global_auto_gen2531";
+
+/// FNIS XML(name="#2532") - `EndAnimatedCamera`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2532: &str = "FNIS_aa_global_auto_gen2532";
+
+/// FNIS XML(name="#2533") - `PairedKillTarget`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2533: &str = "FNIS_aa_global_auto_gen2533";
+
+/// FNIS XML(name="#2534") - `Multi (StartAnimatedCamera + PairedKillTarget)`
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "FNIS_aa_global_auto_gen2534";
+
+/// Generate the Havok class corresponding to the options flags in FNIS_*_List.txt.
+///
+/// # Note
+/// The classes generated here are used in `character/behaviors/0_master.xml`
+/// and are generated for alternative animations(FNIS_aa).
+///
+/// However, they are actually also reused in PairedAndKillMoves, so they must be generated.
+///
+/// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt`
+fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
+    // single event (#2526, #2527, #2528, #2530, #2532, #2533)
+    let single_events: [(&'static str, i32, Option<&'static str>); 6] = [
+        (FNIS_AA_GLOBAL_AUTO_GEN_2526, 366, None), // HeadTrackingOff
+        (FNIS_AA_GLOBAL_AUTO_GEN_2527, 367, None), // HeadTrackingOn
+        (FNIS_AA_GLOBAL_AUTO_GEN_2528, 543, None), // AnimObjectUnequip
+        (FNIS_AA_GLOBAL_AUTO_GEN_2530, 1061, Some("#2531")), // StartAnimatedCamera
+        (FNIS_AA_GLOBAL_AUTO_GEN_2532, 1062, None), // EndAnimatedCamera
+        (FNIS_AA_GLOBAL_AUTO_GEN_2533, 915, None), // PairedKillTarget
+    ];
+
+    let mut patches: JsonPatchPairs<'a> = single_events
+        .par_iter()
+        .map(|&(class_index, id, payload)| {
+            (
+                json_path![class_index, "hkbStateMachineEventPropertyArray"],
+                ValueWithPriority {
+                    patch: JsonPatch {
+                        op: OpRangeKind::Pure(Op::Add),
+                        value: simd_json::json_typed!(borrowed, {
+                            "__ptr": class_index,
+                            "events": [
+                                {
+                                    "id": id,
+                                    "payload": payload.unwrap_or("null"),
+                                }
+                            ]
+                        }),
+                    },
+                    priority,
+                },
+            )
+        })
+        .collect();
+
+    // multi events #2529
+    patches.push((
+        json_path![
+            FNIS_AA_GLOBAL_AUTO_GEN_2529,
+            "hkbStateMachineEventPropertyArray"
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Add),
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2529,
+                    "events": [
+                        { "id": 367, "payload": "null" }, // HeadTrackingOn
+                        { "id": 543, "payload": "null" }, // AnimObjectUnequip
+                    ]
+                }),
+            },
+            priority,
+        },
+    ));
+
+    // multi events #2534
+    patches.push((
+        json_path![
+            FNIS_AA_GLOBAL_AUTO_GEN_2534,
+            "hkbStateMachineEventPropertyArray"
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Add),
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2534,
+                    "events": [
+                        { "id": 1061, "payload": FNIS_AA_STRING_PAYLOAD_2531 }, // StartAnimatedCamera
+                        { "id": 915,  "payload": "null"   }, // PairedKillTarget
+                    ]
+                }),
+            },
+            priority,
+        },
+    ));
+
+    // StringEventPayload #2531
+    patches.push((
+        json_path![FNIS_AA_STRING_PAYLOAD_2531, "hkbStringEventPayload"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: OpRangeKind::Pure(Op::Add),
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": FNIS_AA_STRING_PAYLOAD_2531,
+                    "data": "Camera3rd [Cam3]"
+                }),
+            },
+            priority,
+        },
+    ));
+
+    patches
 }

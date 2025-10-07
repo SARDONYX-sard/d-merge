@@ -17,6 +17,10 @@ use crate::behaviors::tasks::fnis::patch_gen::{
     },
     JsonPatchPairs, PUSH_OP,
 };
+use crate::behaviors::tasks::fnis::patch_gen::{
+    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
+    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+};
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_pair_patches<'a>(
@@ -57,9 +61,8 @@ pub fn new_pair_patches<'a>(
             .par_iter()
             .enumerate()
             .map(|(index, AnimObject { name, role: _ })| {
-                class_index_to_anim_object_map.insert(index, name);
-
                 let new_anim_object_index = owned_data.next_class_name_attribute();
+                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
                 let one_anim_obj = (
                     vec![
                         Cow::Owned(new_anim_object_index.clone()),
@@ -83,11 +86,11 @@ pub fn new_pair_patches<'a>(
     // $RI
     one_patches.push({
         let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-            true => "#2530",
+            true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
             false => "#0000",
         };
         let exit_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-            true => "#2532",
+            true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
             false => "#0000",
         };
 
@@ -274,18 +277,18 @@ pub fn new_pair_patches<'a>(
         } else if flags.contains(FNISAnimFlags::HeadTracking) {
             "#0000"
         } else {
-            "#2526"
+            FNIS_AA_GLOBAL_AUTO_GEN_2526
         };
         // $-h,o|#2528|h|null|o|#2529|#2527$
         let exit_notify_events =
             if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-                "#2528"
+                FNIS_AA_GLOBAL_AUTO_GEN_2528
             } else if flags.contains(FNISAnimFlags::HeadTracking) {
                 "#0000"
             } else if flags.contains(FNISAnimFlags::AnimObjects) {
-                "#2529"
+                FNIS_AA_GLOBAL_AUTO_GEN_2529
             } else {
-                "#2527"
+                FNIS_AA_GLOBAL_AUTO_GEN_2527
             };
 
         (
@@ -319,8 +322,8 @@ pub fn new_pair_patches<'a>(
     one_patches.push({
         let first_anim_object_index = class_index_to_anim_object_map
             .get(&0)
-            .map_or("#0000", |p| **p.value());
-        new_event_property_array(first_anim_object_index, &class_indexes[7], priority)
+            .map_or(Cow::Borrowed("#0000"), |p| Cow::Owned(p.value().clone()));
+        new_event_property_array(&first_anim_object_index, &class_indexes[7], priority)
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
@@ -577,7 +580,7 @@ pub fn new_pair_patches<'a>(
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
-        new_event_property_array(maybe_2nd_anim_object_index, &class_indexes[18], priority)
+        new_event_property_array(&maybe_2nd_anim_object_index, &class_indexes[18], priority)
     });
     one_patches.push((
         vec![
