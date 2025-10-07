@@ -378,7 +378,7 @@ fn new_push_events_seq_patch<'a>(
                             .par_iter()
                             .map(|_| {
                                 simd_json::json_typed!(borrowed, {
-                                    "flags": 0
+                                    "flags": "0"
                                 })
                             })
                             .collect::<Vec<_>>()
