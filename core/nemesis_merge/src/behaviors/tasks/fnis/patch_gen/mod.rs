@@ -366,7 +366,7 @@ fn new_push_events_seq_patch<'a>(
         (
             json_path![
                 behavior_entry.master_behavior_graph_index,
-                "hkbBehaviorGraphStringData",
+                "hkbBehaviorGraphData",
                 "eventInfos",
             ],
             ValueWithPriority {
