@@ -27,7 +27,7 @@ pub fn new_pair_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 23] =
+    let class_indexes: [String; 22] =
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
