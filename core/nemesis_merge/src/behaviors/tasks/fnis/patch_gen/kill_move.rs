@@ -47,6 +47,18 @@ pub fn new_kill_patches<'a>(
         },
     ));
 
+    // TODO: It seems necessary to register the eventID and stateID of kill_move's event_names to existing transitions.
+    // seq_patches.push((
+    //     json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
+    //     ValueWithPriority {
+    //         patch: JsonPatch {
+    //             op: PUSH_OP,
+    //             value: json_typed!(borrowed, transitions),
+    //         },
+    //         priority,
+    //     },
+    // ));
+
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();

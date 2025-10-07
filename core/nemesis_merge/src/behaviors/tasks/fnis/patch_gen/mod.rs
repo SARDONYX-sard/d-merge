@@ -450,7 +450,7 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
                             "events": [
                                 {
                                     "id": id,
-                                    "payload": payload.unwrap_or("null"),
+                                    "payload": payload.unwrap_or("#0000"),
                                 }
                             ]
                         }),
@@ -473,8 +473,8 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2529,
                     "events": [
-                        { "id": 367, "payload": "null" }, // HeadTrackingOn
-                        { "id": 543, "payload": "null" }, // AnimObjectUnequip
+                        { "id": 367, "payload": "#0000" }, // HeadTrackingOn
+                        { "id": 543, "payload": "#0000" }, // AnimObjectUnequip
                     ]
                 }),
             },
@@ -495,7 +495,7 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2534,
                     "events": [
                         { "id": 1061, "payload": FNIS_AA_STRING_PAYLOAD_2531 }, // StartAnimatedCamera
-                        { "id": 915,  "payload": "null"   }, // PairedKillTarget
+                        { "id": 915,  "payload": "#0000"   }, // PairedKillTarget
                     ]
                 }),
             },
