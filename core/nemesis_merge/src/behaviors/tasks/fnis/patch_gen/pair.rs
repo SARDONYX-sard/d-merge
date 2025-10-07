@@ -323,7 +323,7 @@ pub fn new_pair_patches<'a>(
         let first_anim_object_index = class_index_to_anim_object_map
             .get(&0)
             .map_or(Cow::Borrowed("#0000"), |p| Cow::Owned(p.value().clone()));
-        new_event_property_array(&first_anim_object_index, &class_indexes[7], priority)
+        new_event_property_array(flags, &first_anim_object_index, &class_indexes[7], priority)
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
@@ -580,7 +580,12 @@ pub fn new_pair_patches<'a>(
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
-        new_event_property_array(&maybe_2nd_anim_object_index, &class_indexes[18], priority)
+        new_event_property_array(
+            flags,
+            &maybe_2nd_anim_object_index,
+            &class_indexes[18],
+            priority,
+        )
     });
     one_patches.push((
         vec![

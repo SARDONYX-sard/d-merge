@@ -347,7 +347,7 @@ fn new_push_events_seq_patch<'a>(
     events: &[&'a str],
     behavior_entry: &BehaviorEntry,
     priority: usize,
-) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
+) -> [(JsonPath<'a>, ValueWithPriority<'a>); 3] {
     [
         (
             json_path![
@@ -387,6 +387,51 @@ fn new_push_events_seq_patch<'a>(
                 priority,
             },
         ),
+        {
+            // It seems necessary to register the eventID and stateID of kill_move's event_names to existing transitions.
+            let transitions: Vec<_> = events
+            .par_iter()
+            // Register events other than sound.(Alt Determination Method: `!event[0..10].eq_ascii_ignore("SoundPlay.")`)
+            .filter(|event| !event.starts_with("SoundPlay."))
+            .map(|event| {
+                let to_state_id = kill_move::calculate_hash(event); // FIXME: Is this correct?
+
+                json_typed!(borrowed, {
+                    "triggerInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0
+                    },
+                    "initiateInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0
+                    },
+                    "transition": "#0111",
+                    "condition": "#0000",
+                    "eventId": format!("$eventID[{event}]$"), // use Nemesis variable
+                    "toStateId": to_state_id,
+                    "fromNestedStateId": 0,
+                    "toNestedStateId": 0,
+                    "priority": 0,
+                    "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
+                })
+            })
+            .collect();
+
+            (
+                json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
+                ValueWithPriority {
+                    patch: JsonPatch {
+                        op: PUSH_OP,
+                        value: json_typed!(borrowed, transitions),
+                    },
+                    priority,
+                },
+            )
+        },
     ]
 }
 

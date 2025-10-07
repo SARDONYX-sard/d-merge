@@ -47,18 +47,6 @@ pub fn new_kill_patches<'a>(
         },
     ));
 
-    // TODO: It seems necessary to register the eventID and stateID of kill_move's event_names to existing transitions.
-    // seq_patches.push((
-    //     json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
-    //     ValueWithPriority {
-    //         patch: JsonPatch {
-    //             op: PUSH_OP,
-    //             value: json_typed!(borrowed, transitions),
-    //         },
-    //         priority,
-    //     },
-    // ));
-
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();
@@ -275,7 +263,7 @@ pub fn new_kill_patches<'a>(
         let first_anim_object_index = class_index_to_anim_object_map
             .get(&0)
             .map_or(Cow::Borrowed("#0000"), |p| Cow::Owned(p.value().clone()));
-        new_event_property_array(&first_anim_object_index, &class_indexes[8], priority)
+        new_event_property_array(flags, &first_anim_object_index, &class_indexes[8], priority)
     });
     one_patches.push(new_synchronized_clip_generator(
         &class_indexes[9],
@@ -654,7 +642,12 @@ pub fn new_kill_patches<'a>(
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$" (fallback to first)
         let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
-        new_event_property_array(&maybe_2nd_anim_object_index, &class_indexes[22], priority)
+        new_event_property_array(
+            flags,
+            &maybe_2nd_anim_object_index,
+            &class_indexes[22],
+            priority,
+        )
     });
     one_patches.push((
         vec![
@@ -885,7 +878,8 @@ pub fn new_synchronized_clip_generator<'a>(
                     "userData": 0,
                     "name": format!("pa_{namespace}"),
                     "pClipGenerator": generator_index,
-                    "SyncAnimPrefix": "\u{2400}", // <- XML(&#9216;) to unicode
+                    // See: https://github.com/SARDONYX-sard/serde-hkx/blob/main/crates/havok_types/src/string_ptr.rs#L181
+                    "SyncAnimPrefix": null, // <- XML(&#9216;) null symbol to json
                     "bSyncClipIgnoreMarkPlacement": false,
                     "fGetToMarkTime": 0.0,
                     "fMarkErrorThreshold": 0.1,
@@ -902,10 +896,39 @@ pub fn new_synchronized_clip_generator<'a>(
 
 #[must_use]
 pub fn new_event_property_array<'a>(
+    flags: FNISAnimFlags,
     anim_object_index: &str,
     class_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
+    let events = if flags.contains(FNISAnimFlags::HeadTracking) {
+        json_typed!(borrowed,[
+            {
+                "id": 937, // AnimObjLoad
+                "payload": anim_object_index
+            },
+            {
+                "id": 936, // AnimObjDraw
+                "payload": anim_object_index
+            }
+        ])
+    } else {
+        json_typed!(borrowed,[
+            {
+                "id": 366, // HeadTrackingOff
+                "payload": "#0000"
+            },
+            {
+                "id": 937, // AnimObjLoad
+                "payload": anim_object_index
+            },
+            {
+                "id": 936, // AnimObjDraw
+                "payload": anim_object_index
+            }
+        ])
+    };
+
     (
         vec![
             Cow::Owned(class_index.to_string()),
@@ -916,20 +939,7 @@ pub fn new_event_property_array<'a>(
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
                     "__ptr": class_index,
-                    "events": [
-                        {
-                            "id": 366, // HeadTrackingOff
-                            "payload": "#0000"
-                        },
-                        {
-                            "id": 937, // AnimObjLoad
-                            "payload": anim_object_index
-                        },
-                        {
-                            "id": 936, // AnimObjDraw
-                            "payload": anim_object_index
-                        }
-                    ]
+                    "events": events
                 }),
             },
             priority,
