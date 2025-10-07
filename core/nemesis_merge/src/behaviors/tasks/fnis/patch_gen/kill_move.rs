@@ -117,7 +117,7 @@ pub fn new_kill_patches<'a>(
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[2],
-                    "variableBindingSet": class_indexes[2],
+                    "variableBindingSet": class_indexes[3],
                     "userData": 0,
                     "name": format!("Player_FNISkm{priority}$_Behavior"), // FIXME? $1/1$
                     "eventToSendWhenStateOrTransitionChanges": {
@@ -145,7 +145,7 @@ pub fn new_kill_patches<'a>(
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[3].clone()),
-            Cow::Borrowed("hkbStateMachine"),
+            Cow::Borrowed("hkbVariableBindingSet"),
         ],
         ValueWithPriority {
             patch: JsonPatch {
@@ -256,7 +256,7 @@ pub fn new_kill_patches<'a>(
         &class_indexes[8],
         &class_indexes[9],
         priority,
-        format!("pa_{namespace}"), // pa_$Ekm$
+        format!("pa_{}", paired_and_kill_animation.anim_event), // pa_$Ekm$
     ));
 
     one_patches.push({
@@ -349,6 +349,8 @@ pub fn new_kill_patches<'a>(
             false => "#0000",
         };
 
+        let state_name = format!("NPC_FNISkm{priority}");
+
         (
             vec![
                 Cow::Owned(class_indexes[12].clone()),
@@ -365,8 +367,8 @@ pub fn new_kill_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": "#0000",
                         "generator": &class_indexes[13],
-                        "name": format!("NPC_FNISkm{namespace}"),
-                        "stateId": calculate_hash(&class_indexes[12]),
+                        "name": state_name,
+                        "stateId": calculate_hash(&state_name),
                         "probability": 1.0,
                         "enable": true
                     }),
@@ -387,7 +389,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[13],
                     "variableBindingSet": "#0000",
                     "userData": 1,
-                    "name": format!("NPC_FNISkm{namespace}_ModGen"),
+                    "name": format!("NPC_FNISkm{priority}_ModGen"),
                     "modifier": &class_indexes[14],
                     "generator": &class_indexes[16]
                 }),
@@ -780,7 +782,7 @@ pub fn make_state_info_patch<'a>(
                     "transitions": "#0000",
                     "generator": generator_index,
                     "name": state_name,
-                    "stateId": calculate_hash(class_index),
+                    "stateId": calculate_hash(&state_name),
                     "probability": 1.0,
                     "enable": true
                 }),
