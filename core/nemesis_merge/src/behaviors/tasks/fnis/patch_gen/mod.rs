@@ -127,12 +127,14 @@ pub fn collect_borrowed_patches<'a>(
                 if !events.is_empty() {
                     let mut events: Vec<_> = events.into_iter().collect(); // We'll probably end up using `.filter` and `phf_set!` to check here.
                     events.par_sort_unstable();
-                    let (path, patch) = new_push_events_seq_patch(
+                    let patches = new_push_events_seq_patch(
                         &events,
                         owned_data.behavior_entry,
                         owned_data.priority,
                     );
-                    entry.seq.insert(path, patch);
+                    for (path, patch) in patches {
+                        entry.seq.insert(path, patch);
+                    }
                 }
             }
 
@@ -345,21 +347,47 @@ fn new_push_events_seq_patch<'a>(
     events: &[&'a str],
     behavior_entry: &BehaviorEntry,
     priority: usize,
-) -> (JsonPath<'a>, ValueWithPriority<'a>) {
-    (
-        json_path![
-            behavior_entry.master_string_data_index,
-            "hkbBehaviorGraphStringData",
-            "eventNames",
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: simd_json::json_typed!(borrowed, events),
+) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
+    [
+        (
+            json_path![
+                behavior_entry.master_string_data_index,
+                "hkbBehaviorGraphStringData",
+                "eventNames",
+            ],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    op: PUSH_OP,
+                    value: simd_json::json_typed!(borrowed, events),
+                },
+                priority,
             },
-            priority,
-        },
-    )
+        ),
+        (
+            json_path![
+                behavior_entry.master_behavior_graph_index,
+                "hkbBehaviorGraphStringData",
+                "eventInfos",
+            ],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    op: PUSH_OP,
+                    value: simd_json::json_typed!(
+                        borrowed,
+                        events
+                            .par_iter()
+                            .map(|_| {
+                                simd_json::json_typed!(borrowed, {
+                                    "flags": 0
+                                })
+                            })
+                            .collect::<Vec<_>>()
+                    ),
+                },
+                priority,
+            },
+        ),
+    ]
 }
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`

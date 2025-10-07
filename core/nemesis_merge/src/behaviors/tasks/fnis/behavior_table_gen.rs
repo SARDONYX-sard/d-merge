@@ -11,6 +11,8 @@ mod tests {
         pub master_behavior: String,
         pub master_behavior_index: String,
         pub master_string_data_index: String,
+        /// `hkbBehaviorGraphData` index. e.g. `#0108`
+        pub master_behavior_graph_index: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -37,6 +39,7 @@ mod tests {
         master_behavior: "{mb}",
         master_behavior_index: "{mbi}",
         master_string_data_index: "{msi}",
+        master_behavior_graph_index: "{mb_g_i}",
     }},
 "###,
                 bo = entry.behavior_object,
@@ -46,6 +49,7 @@ mod tests {
                 mb = entry.master_behavior,
                 mbi = entry.master_behavior_index,
                 msi = entry.master_string_data_index,
+                mb_g_i = entry.master_behavior_graph_index,
             ));
         }
 
@@ -107,7 +111,11 @@ pub struct BehaviorEntry {
     /// Mod root behavior registered target(`hkbStateMachine`) XML index e.g. `#0340`
     pub master_behavior_index: &'static str,
     /// `hkbBehaviorGraphStringData` XML index. e.g. `#0106`, _1stperson `#0095`
+    /// Used for pushing to eventNames.
     pub master_string_data_index: &'static str,
+    /// `hkbBehaviorGraphData` index. e.g. `#0108`
+    /// Used for pushing to eventInfos.
+    pub master_behavior_graph_index: &'static str,
 }
 
 impl BehaviorEntry {
@@ -151,6 +159,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_behavior: "behaviors/0_master.bin",
         master_behavior_index: "#0167",
         master_string_data_index: "#0095",
+        master_behavior_graph_index: "#0097",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -162,6 +171,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         // However, for some reason, only the humanoid 0_master seems to push to a different index.
         master_behavior_index: "#0340",
         master_string_data_index: "#0106",
+        master_behavior_graph_index: "#0108",
     },
 };
 
@@ -176,6 +186,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     master_behavior: "behaviors/0_master.bin",
     master_behavior_index: "#2521",
     master_string_data_index: "#0106",
+    master_behavior_graph_index: "#0108",
 };
 
 /// # Why need this?
@@ -189,6 +200,7 @@ pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     master_behavior: "behaviors/draugrbehavior.bin",
     master_behavior_index: "#2026",
     master_string_data_index: "#0092",
+    master_behavior_graph_index: "#0094",
 };
 "###
         .to_string();
