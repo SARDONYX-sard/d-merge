@@ -10,9 +10,10 @@ use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
+use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::{
-        calculate_hash, make_player_root_state_info_patch, make_state_info_patch2,
+        calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
         new_event_property_array, new_synchronized_clip_generator,
     },
     JsonPatchPairs, PUSH_OP,
@@ -32,6 +33,8 @@ pub fn new_pair_patches<'a>(
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
+    let player_event = paired_and_kill_animation.anim_event;
+    let npc_event = format!("FNISpa_{priority}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{namespace}\\{}",
@@ -40,6 +43,14 @@ pub fn new_pair_patches<'a>(
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
+
+    let player_root_state_name = format!("Player_FNISpa{priority}");
+    let npc_root_state_name = format!("NPC_FNISpa{priority}");
+    seq_patches.push(new_push_transitions_seq_patch(
+        [player_event, npc_event.as_str()],
+        [&player_root_state_name, &npc_root_state_name],
+        priority,
+    ));
 
     // Push and register the Root `hkbStateMachineStateInfo` for both Player and NPC.
     seq_patches.push((
@@ -111,8 +122,8 @@ pub fn new_pair_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": "#0000",
                         "generator": &class_indexes[1],
-                        "name": format!("Player_FNISpa{priority}"),
-                        "stateId": calculate_hash(&class_indexes[0]),
+                        "name": player_root_state_name,
+                        "stateId": calculate_hash(&player_root_state_name),
                         "probability": 1.0,
                         "enable": true
                     }),
@@ -308,7 +319,7 @@ pub fn new_pair_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": "#0000",
                         "generator": &class_indexes[8],
-                        "name": format!("pa_FNISpa{priority}"),
+                        "name": npc_event,
                         "stateId": 0,
                         "probability": 1.0,
                         "enable": true
@@ -422,7 +433,7 @@ pub fn new_pair_patches<'a>(
         &class_indexes[12],
         flags,
         priority,
-        format!("NPC_FNISpa{priority}"),
+        npc_root_state_name,
     ));
     one_patches.push((
         vec![
@@ -569,13 +580,13 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
-    one_patches.push(make_state_info_patch2(
+    one_patches.push(make_event_state_info_patch(
         &class_indexes[17],
         flags,
         &class_indexes[18],
         &class_indexes[19],
         priority,
-        format!("FNISpa_{namespace}"), // FNISpa_$1/1$
+        &npc_event, // FNISpa_$1/1$
     ));
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
@@ -594,7 +605,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[19],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": paired_and_kill_animation.anim_event,
+                    "name": player_event, // $Epa$
                     "pClipGenerator": &class_indexes[20],
                     "SyncAnimPrefix": "2_",
                     "bSyncClipIgnoreMarkPlacement": false,
@@ -621,8 +632,8 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[20],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("NPC_Paired_FNISpa{priority}"), // FIXME?: priority <- $1/1$
-                    "animationName": anim_file, // Animations\\$Fkm$
+                    "name": format!("NPC_Paired_FNISpa{priority}"),
+                    "animationName": anim_file,
                     "triggers": &class_indexes[21],
                     "cropStartAmountLocalTime": 0.0,
                     "cropEndAmountLocalTime": 0.0,

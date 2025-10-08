@@ -1,3 +1,4 @@
+mod event_table;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod kill_move;
@@ -126,7 +127,13 @@ pub fn collect_borrowed_patches<'a>(
                 // FIXME: Existing events must avoid duplicate additions. To achieve this, a table must be created. - FNIS_base, 0_master, mt_behavior
                 // However, creating a table for each creature is impractical; in reality, it would likely be limited to pairAndKillMoves(character).
                 if !events.is_empty() {
-                    let mut events: Vec<_> = events.into_iter().collect(); // We'll probably end up using `.filter` and `phf_set!` to check here.
+                    let mut events: Vec<_> = match is_3rd_person_master_patch {
+                        true => events
+                            .into_iter()
+                            .filter(|event| !event_table::TABLE_0_MASTER.contains(event))
+                            .collect(),
+                        false => events.into_iter().collect(),
+                    };
                     events.par_sort_unstable();
                     let patches = new_push_events_seq_patch(
                         &events,
@@ -134,12 +141,6 @@ pub fn collect_borrowed_patches<'a>(
                         owned_data.priority,
                     );
                     for (path, patch) in patches {
-                        entry.seq.insert(path, patch);
-                    }
-
-                    if is_3rd_person_master_patch {
-                        let (path, patch) =
-                            new_push_transitions_seq_patch(&events, owned_data.priority);
                         entry.seq.insert(path, patch);
                     }
                 }
@@ -395,55 +396,6 @@ fn new_push_events_seq_patch<'a>(
             },
         ),
     ]
-}
-
-/// This is a PairedAndKillMove and specific to `character/behaviors/0_master.xml`,
-///
-/// FIXME: and should prevent duplicate registrations of existing events by filtering via table references.
-fn new_push_transitions_seq_patch<'a>(
-    events: &[Cow<'a, str>],
-    priority: usize,
-) -> (JsonPath<'a>, ValueWithPriority<'a>) {
-    let transitions: Vec<_> = events
-        .par_iter()
-        // Register events other than sound.(Alt Determination Method: `!event[0..10].eq_ascii_ignore("SoundPlay.")`)
-        .filter(|event| !event.starts_with("SoundPlay."))
-        .map(|event| {
-            json_typed!(borrowed, {
-                "triggerInterval": {
-                    "enterEventId": -1,
-                    "exitEventId": -1,
-                    "enterTime": 0.0,
-                    "exitTime": 0.0
-                },
-                "initiateInterval": {
-                    "enterEventId": -1,
-                    "exitEventId": -1,
-                    "enterTime": 0.0,
-                    "exitTime": 0.0
-                },
-                "transition": "#0111",
-                "condition": "#0000",
-                "eventId": format!("$eventID[{event}]$"), // use Nemesis variable
-                "toStateId": kill_move::calculate_hash(event), // FIXME: Is this correct?
-                "fromNestedStateId": 0,
-                "toNestedStateId": 0,
-                "priority": 0,
-                "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
-            })
-        })
-        .collect();
-
-    (
-        json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                op: PUSH_OP,
-                value: json_typed!(borrowed, transitions),
-            },
-            priority,
-        },
-    )
 }
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`

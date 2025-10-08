@@ -22,20 +22,30 @@ pub fn new_kill_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
+    // new C++ Havok class XML name attributes
     let class_indexes: [String; 26] =
-        std::array::from_fn(|_| owned_data.next_class_name_attribute());
-    let namespace = &owned_data.namespace;
+        core::array::from_fn(|_| owned_data.next_class_name_attribute());
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
+    let player_event = paired_and_kill_animation.anim_event;
+    let npc_event = format!("pa_{player_event}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
-        "Animations\\{namespace}\\{}",
-        paired_and_kill_animation.anim_file
+        "Animations\\{}\\{}",
+        &owned_data.namespace, paired_and_kill_animation.anim_file
     ); // Animations\\$Fkm$
+
+    let player_root_state_name = format!("Player_FNISkm{priority}"); // NOTE: must be unique in 0_master.xml
+    let npc_root_state_name = format!("NPC_FNISkm{priority}"); // NOTE: must be unique in 0_master.xml
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
+    seq_patches.push(new_push_transitions_seq_patch(
+        [player_event, npc_event.as_str()],
+        [&player_root_state_name, &npc_root_state_name],
+        priority,
+    ));
     // Push and register the Root `hkbStateMachineStateInfo` for both Player and NPC.
     seq_patches.push((
         json_path!["#0788", "hkbStateMachine", "states"],
@@ -85,7 +95,7 @@ pub fn new_kill_patches<'a>(
         &class_indexes[1],
         flags,
         priority,
-        format!("Player_FNISkm{priority}"),
+        player_root_state_name,
     ));
 
     one_patches.push((
@@ -251,13 +261,13 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
-    one_patches.push(make_state_info_patch2(
+    one_patches.push(make_event_state_info_patch(
         &class_indexes[7],
         flags,
         &class_indexes[8],
         &class_indexes[9],
         priority,
-        format!("pa_{}", paired_and_kill_animation.anim_event), // pa_$Ekm$
+        &npc_event, // pa_$Ekm$
     ));
 
     one_patches.push({
@@ -267,7 +277,7 @@ pub fn new_kill_patches<'a>(
     });
     one_patches.push(new_synchronized_clip_generator(
         &class_indexes[9],
-        paired_and_kill_animation.anim_event,
+        npc_event.as_str(),
         &class_indexes[10],
         priority,
     ));
@@ -344,7 +354,7 @@ pub fn new_kill_patches<'a>(
         &class_indexes[13],
         flags,
         priority,
-        format!("NPC_FNISkm{priority}"),
+        npc_root_state_name,
     ));
     one_patches.push((
         vec![
@@ -598,7 +608,7 @@ pub fn new_kill_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": "#0000",
                         "generator": &class_indexes[23],
-                        "name": paired_and_kill_animation.anim_event,
+                        "name": player_event,
                         "stateId": 0,
                         "probability": 1.0,
                         "enable": true
@@ -625,7 +635,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[23],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": paired_and_kill_animation.anim_event,
+                    "name": player_event,
                     "pClipGenerator": &class_indexes[24],
                     "SyncAnimPrefix": "2_",
                     "bSyncClipIgnoreMarkPlacement": false,
@@ -763,19 +773,19 @@ pub fn make_player_root_state_info_patch<'a>(
     )
 }
 
-/// - `state_name`:  e.g. `FNIS_State{priority}`, `Player_FNISpa$1/1$`
+/// - `state_name`:  e.g. `pa_{event_name}`, `pa_$Ekm` -> `pa_back`
 ///
 /// # Note
 /// - `enter_notify_events`: index or null or #2526
 /// - `exit_notify_events`: `$-h,o|#2528|h|null|o|#2529|#2527$`
 #[must_use]
-pub fn make_state_info_patch2<'a>(
+pub fn make_event_state_info_patch<'a>(
     class_index: &str,
     flags: FNISAnimFlags,
     enter_notify_events_index: &str,
     generator_index: &str,
     priority: usize,
-    state_name: String,
+    state_name: &str,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
         enter_notify_events_index
@@ -813,7 +823,7 @@ pub fn make_state_info_patch2<'a>(
                     "transitions": "#0000",
                     "generator": generator_index,
                     "name": state_name,
-                    "stateId": calculate_hash(class_index),
+                    "stateId": 0,
                     "probability": 1.0,
                     "enable": true
                 }),
@@ -873,7 +883,7 @@ pub fn make_npc_root_state_info_patch<'a>(
 #[must_use]
 pub fn new_synchronized_clip_generator<'a>(
     class_index: &String,
-    event: &'a str,
+    event: &str,
     generator_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
@@ -889,7 +899,7 @@ pub fn new_synchronized_clip_generator<'a>(
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("pa_{event}"),
+                    "name": event,
                     "pClipGenerator": generator_index,
                     // See: https://github.com/SARDONYX-sard/serde-hkx/blob/main/crates/havok_types/src/string_ptr.rs#L181
                     "SyncAnimPrefix": null, // <- XML(&#9216;) null symbol to json
@@ -988,10 +998,96 @@ fn new_values_from_triggers<'a>(
     values
 }
 
-/// stateID generator?
+/// stateID(i32) generator?
 #[must_use]
-pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> u64 {
+pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
     let mut hasher = std::hash::DefaultHasher::new();
     t.hash(&mut hasher);
-    std::hash::Hasher::finish(&hasher)
+    (std::hash::Hasher::finish(&hasher) & (i32::MAX as u64)) as i32
+}
+
+/// This is a PairedAndKillMove and specific to `character/behaviors/0_master.xml`,
+///
+/// - `events`: the actual event names
+///   - e.g. `["back_grab", "pa_back_grab"]`
+/// - `root_events`:
+///   - e.g. `["Player_FNISkm{}", "NPC_FNISkm{}"]`
+///
+/// # Why is this needed?
+/// The array `hkbStateMachineTransitionInfoArray.transitions` links
+/// an **animation event (`eventId`)** to the **root state (`toStateId`)**
+/// of the state machine.
+///
+/// This makes it possible to trigger a transition when a kill move event fires.
+///
+/// ## Mapping
+/// | Role   | Example `eventId`       | Example `toStateId` (root state) |
+/// |--------|-------------------------|----------------------------------|
+/// | Player | `back_grab`             | `Player_FNISkm{}`                |
+/// | NPC    | `pa_back_grab`          | `NPC_FNISkm{}`                   |
+///
+/// ## Flow
+/// ```text
+/// anim_event (kill move)
+///        │
+///        ▼
+///   eventId (index of hkbSBehaviorStringData.eventNames)
+///        │
+///        ▼
+///   toStateId (root hkbStateMachineInfo.stateId)
+///        │
+///        ▼
+///   Transition executes → state machine moves to correct root state
+/// ```
+///
+/// ## Crash Warning
+/// If `eventId` and `toStateId` do not correctly match the root
+/// `hkbStateMachineInfo`, the game will **crash instantly**
+/// at the moment the animation is played.
+pub fn new_push_transitions_seq_patch<'a>(
+    events: [&str; 2],
+    root_state_names: [&String; 2],
+    priority: usize,
+) -> (json_path::JsonPath<'a>, ValueWithPriority<'a>) {
+    let transitions: Vec<_> = events
+        .iter()
+        .zip(root_state_names.iter())
+        .map(|(event_name, root_state_name)| {
+            json_typed!(borrowed, {
+                "triggerInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0
+                },
+                "initiateInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0
+                },
+                "transition": "#0111",
+                "condition": "#0000",
+                // eventId is Nemesis variable, derived from `events`
+                "eventId": format!("$eventID[{event_name}]$"),
+                // toStateId must match root_event (NOT the event)
+                "toStateId": calculate_hash(root_state_name),
+                "fromNestedStateId": 0,
+                "toNestedStateId": 0,
+                "priority": 0,
+                "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
+            })
+        })
+        .collect();
+
+    (
+        json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, transitions),
+            },
+            priority,
+        },
+    )
 }
