@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn parse_trigger_flag_t2() {
-        let input = "-D2.0,T2_2_killactor/3.333";
+        let input = "-D2.0,T2_killactor/3.333";
         let parsed = must_parse(parse_anim_flags, input);
 
         assert_eq!(
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn parse_full_flagset() {
-        let input = "-bsa,D1.0,TJump/1.0,T2_2_killactor/3.333";
+        let input = "-bsa,D1.0,TJump/1.0,T2_killactor/3.333";
         let parsed = must_parse(parse_anim_flags, input);
 
         assert_eq!(
