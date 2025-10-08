@@ -75,6 +75,12 @@ pub fn generate_patch<'a>(
                         .par_iter()
                         .map(|trigger| Cow::Borrowed(trigger.event)),
                 );
+                all_events.par_extend(
+                    flag_set
+                        .triggers2
+                        .par_iter()
+                        .map(|trigger| Cow::Borrowed(trigger.event)),
+                );
 
                 // TODO: It seems FNIS doesn't support `_1stperson` kill moves.
                 if owned_data.behavior_entry.behavior_object != "character" {

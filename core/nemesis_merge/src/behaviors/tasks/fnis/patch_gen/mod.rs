@@ -409,8 +409,6 @@ fn new_push_transitions_seq_patch<'a>(
         // Register events other than sound.(Alt Determination Method: `!event[0..10].eq_ascii_ignore("SoundPlay.")`)
         .filter(|event| !event.starts_with("SoundPlay."))
         .map(|event| {
-            let to_state_id = kill_move::calculate_hash(event); // FIXME: Is this correct?
-
             json_typed!(borrowed, {
                 "triggerInterval": {
                     "enterEventId": -1,
@@ -427,7 +425,7 @@ fn new_push_transitions_seq_patch<'a>(
                 "transition": "#0111",
                 "condition": "#0000",
                 "eventId": format!("$eventID[{event}]$"), // use Nemesis variable
-                "toStateId": to_state_id,
+                "toStateId": kill_move::calculate_hash(event), // FIXME: Is this correct?
                 "fromNestedStateId": 0,
                 "toNestedStateId": 0,
                 "priority": 0,
