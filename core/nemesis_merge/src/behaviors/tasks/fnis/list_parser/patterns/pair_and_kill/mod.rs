@@ -105,16 +105,14 @@ mod tests {
             flag_set: FNISPairAndKillMoveAnimFlagSet {
                 flags: FNISAnimFlags::AnimObjects,
                 duration: 3.466667,
-                triggers: vec![
-                    Trigger {
-                        event: "npcsoundplay.npckillchop",
-                        time: 2.555,
-                    },
-                    Trigger {
-                        event: "2_killactor",
-                        time: 3.333,
-                    },
-                ],
+                triggers: vec![Trigger {
+                    event: "npcsoundplay.npckillchop",
+                    time: 2.555,
+                }],
+                triggers2: vec![Trigger {
+                    event: "2_killactor",
+                    time: 3.333,
+                }],
             },
             anim_event: "HugB",
             anim_file: "paired_hugb.hkx",

@@ -23,7 +23,7 @@ use crate::behaviors::tasks::fnis::patch_gen::pair::new_pair_patches;
 pub struct OneListPatch<'a> {
     /// `vec!["Animations\\<namespace>\\anim_file.hkx"]`
     pub animation_paths: HashSet<String>,
-    pub events: HashSet<&'a str>,
+    pub events: HashSet<Cow<'a, str>>,
     pub adsf_patches: Vec<AdsfPatch<'a>>,
 
     /// replace one field, Add one class patches to `0_master.xml`(or each creature master xml)
@@ -65,8 +65,16 @@ pub fn generate_patch<'a>(
                     ..
                 } = &paired_and_kill_animation;
                 all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
-                all_events.insert(*anim_event);
-                all_events.par_extend(flag_set.triggers.par_iter().map(|trigger| trigger.event));
+                all_events.extend([
+                    Cow::Borrowed(*anim_event),
+                    Cow::Owned(format!("pa_{anim_event}")),
+                ]);
+                all_events.par_extend(
+                    flag_set
+                        .triggers
+                        .par_iter()
+                        .map(|trigger| Cow::Borrowed(trigger.event)),
+                );
 
                 // TODO: It seems FNIS doesn't support `_1stperson` kill moves.
                 if owned_data.behavior_entry.behavior_object != "character" {
@@ -99,7 +107,7 @@ pub fn generate_patch<'a>(
                     namespace: &'a str,
                     owned_data: &'a OwnedFnisInjection,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<&'a str>, Vec<Vec<AdsfPatch<'a>>>) {
+                ) -> (Vec<String>, Vec<Cow<'a, str>>, Vec<Vec<AdsfPatch<'a>>>) {
                     sequenced_animation
                         .animations
                         .into_iter()
@@ -112,7 +120,7 @@ pub fn generate_patch<'a>(
 
                             (
                                 format!("Animations\\{namespace}\\{anim_file}"),
-                                *anim_event,
+                                Cow::Borrowed(*anim_event),
                                 new_adsf_patch(owned_data, namespace, fnis_animation),
                             )
                         })
@@ -121,7 +129,7 @@ pub fn generate_patch<'a>(
                 fn collect_seq_creature_patch<'a>(
                     namespace: &str,
                     sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<&'a str>) {
+                ) -> (Vec<String>, Vec<Cow<'a, str>>) {
                     sequenced_animation
                         .animations
                         .into_par_iter()
@@ -139,7 +147,10 @@ pub fn generate_patch<'a>(
                                 );
                             }
 
-                            (format!("Animations\\{namespace}\\{anim_file}"), anim_event)
+                            (
+                                format!("Animations\\{namespace}\\{anim_file}"),
+                                Cow::Borrowed(anim_event),
+                            )
                         })
                         .collect()
                 }

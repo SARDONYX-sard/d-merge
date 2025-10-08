@@ -1,4 +1,11 @@
-//! Pair and killMoves Animation flags parsing.
+//! Pair and KillMove animation flags parsing.
+//!
+//! Supported flags:
+//! - Simple flags: `bsa`, `h`, `k`, `o`
+//! - Duration: `D<time>` (mandatory, e.g. `D1.5`)
+//! - Triggers:
+//!   - `T<event>/<time>` → stored in `triggers`
+//!   - `T2_<event>/<time>` → stored in `triggers2` (event string keeps the `2_` prefix)
 
 use winnow::ascii::{float, space0, Caseless};
 use winnow::combinator::{alt, fail, opt, preceded};
@@ -19,34 +26,43 @@ pub struct FNISPairAndKillMoveAnimFlagSet<'a> {
     /// Animation duration (e.g. `D1.5`).
     pub duration: f32,
 
-    /// Triggers event at given time (e.g. `TJump/2.0`).
+    /// Triggers of the form `T<event>/<time>`.
     pub triggers: Vec<Trigger<'a>>,
+
+    /// Triggers of the form `T2_<event>/<time>`.
+    /// Note: the stored `event` string includes the `"2_"` prefix.
+    pub triggers2: Vec<Trigger<'a>>,
 }
 
-// Internal representation for parser results:
-// either a simple bitflags or a parameterized flag.
+/// Internal representation for parser results.
 #[derive(Debug)]
 enum ParsedFlag<'a> {
     Simple(FNISAnimFlags),
-    /// Blend time in seconds (e.g. `B1.5`).
+    /// Blend time in seconds (e.g. `D1.5`).
     DurationTime(f32),
-    /// Trigger event at given time (e.g. `TJump/2.0`).
+    /// Trigger event of the form `T<event>/<time>`.
     Trigger(Trigger<'a>),
+    /// Trigger event of the form `T2_<event>/<time>`.
+    Trigger2(Trigger<'a>),
 }
 
 /// Parse a list of animation flags separated by commas.
 ///
 /// # Errors
-/// pair and killMoves require a duration specified by `D<time>`. If this is missing, the parser will return an error.
+/// Pair and KillMove animations require a duration specified by `D<time>`.
+/// If this is missing, the parser will return an error.
 pub fn parse_anim_flags<'a>(
     input: &mut &'a str,
 ) -> ModalResult<FNISPairAndKillMoveAnimFlagSet<'a>> {
     preceded("-", __parse_anim_flags)
-    .context(StrContext::Label("FNISPairAndKillMoveAnimFlags"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "One of: bsa, h, o, D<time: f32> (e.g. `D1.5`), T<trigger>/<time> (e.g. `TJump/2.0`), <AnimObject>/<1 or 2>",
-    )))
-    .parse_next(input)
+        .context(StrContext::Label("FNISPairAndKillMoveAnimFlags"))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "One of: bsa, h, o, D<time: f32> (e.g. `D1.5`), \
+             T<trigger>/<time> (e.g. `TJump/2.0`), \
+             T2_<trigger>/<time> (e.g. `T2_killactor/3.333`), \
+             <AnimObject>/<1 or 2>",
+        )))
+        .parse_next(input)
 }
 
 /// Parse a list of animation flags separated by commas.
@@ -62,9 +78,10 @@ fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISPairAndKillMov
                 has_duration = true;
             }
             ParsedFlag::Trigger(trigger) => set.triggers.push(trigger),
+            ParsedFlag::Trigger2(trigger) => set.triggers2.push(trigger),
         }
 
-        // Intended `md ,`
+        // intended `,` separator
         if opt((space0, ',')).parse_next(input)?.is_some() {
             space0.parse_next(input)?;
             continue;
@@ -104,9 +121,25 @@ fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
 fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     alt((
         preceded(Caseless("D"), float).map(ParsedFlag::DurationTime),
-        parse_trigger_options.map(ParsedFlag::Trigger),
+        parse_trigger_flag,
     ))
     .parse_next(input)
+}
+
+/// Parse trigger flags (`T...` or `T2_...`).
+///
+/// - `TJump/2.0` → `ParsedFlag::Trigger`
+/// - `T2_killactor/3.333` → `ParsedFlag::Trigger2` (event includes `"2_"`)
+fn parse_trigger_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
+    parse_trigger_options
+        .map(|trig: Trigger<'a>| {
+            if trig.event.starts_with("2_") {
+                ParsedFlag::Trigger2(trig)
+            } else {
+                ParsedFlag::Trigger(trig)
+            }
+        })
+        .parse_next(input)
 }
 
 #[cfg(test)]
@@ -139,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_trigger_flag() {
+    fn parse_trigger_flag_t() {
         let input = "-D2.0,TJump/2.0";
         let parsed = must_parse(parse_anim_flags, input);
 
@@ -152,13 +185,33 @@ mod tests {
                     event: "Jump",
                     time: 2.0,
                 }],
+                triggers2: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn parse_trigger_flag_t2() {
+        let input = "-D2.0,T2_2_killactor/3.333";
+        let parsed = must_parse(parse_anim_flags, input);
+
+        assert_eq!(
+            parsed,
+            FNISPairAndKillMoveAnimFlagSet {
+                flags: FNISAnimFlags::empty(),
+                duration: 2.0,
+                triggers: vec![],
+                triggers2: vec![Trigger {
+                    event: "2_killactor",
+                    time: 3.333,
+                }],
             }
         );
     }
 
     #[test]
     fn parse_full_flagset() {
-        let input = "-bsa,D1.0,TJump/1.0";
+        let input = "-bsa,D1.0,TJump/1.0,T2_2_killactor/3.333";
         let parsed = must_parse(parse_anim_flags, input);
 
         assert_eq!(
@@ -170,13 +223,16 @@ mod tests {
                     event: "Jump",
                     time: 1.0,
                 }],
+                triggers2: vec![Trigger {
+                    event: "2_killactor",
+                    time: 3.333,
+                }],
             }
         );
     }
 
     #[test]
     fn fail_without_duration() {
-        // missing D<time>
         must_fail(parse_anim_flags, "-bsa,TJump/1.0");
     }
 

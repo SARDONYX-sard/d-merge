@@ -87,6 +87,7 @@ pub fn collect_borrowed_patches<'a>(
             {
                 let master_template_key =
                     owned_data.behavior_entry.to_master_behavior_template_key();
+                let is_3rd_person_master_patch = master_template_key == THREAD_PERSON_0_MASTER_KEY;
 
                 // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
                 if !template_keys.contains(&master_template_key) {
@@ -122,7 +123,7 @@ pub fn collect_borrowed_patches<'a>(
                     entry.seq.insert(path, patch);
                 }
 
-                // TODO: Existing events must avoid duplicate additions. To achieve this, a table must be created. - FNIS_base, 0_master, mt_behavior
+                // FIXME: Existing events must avoid duplicate additions. To achieve this, a table must be created. - FNIS_base, 0_master, mt_behavior
                 // However, creating a table for each creature is impractical; in reality, it would likely be limited to pairAndKillMoves(character).
                 if !events.is_empty() {
                     let mut events: Vec<_> = events.into_iter().collect(); // We'll probably end up using `.filter` and `phf_set!` to check here.
@@ -133,6 +134,12 @@ pub fn collect_borrowed_patches<'a>(
                         owned_data.priority,
                     );
                     for (path, patch) in patches {
+                        entry.seq.insert(path, patch);
+                    }
+
+                    if is_3rd_person_master_patch {
+                        let (path, patch) =
+                            new_push_transitions_seq_patch(&events, owned_data.priority);
                         entry.seq.insert(path, patch);
                     }
                 }
@@ -191,9 +198,9 @@ pub fn collect_borrowed_patches<'a>(
             .or_default()
             .one
             .0
-            // Safety: This only adds a private global index and does not conflict with the class_name index.
+            // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
             .par_extend(new_global_alt_flags(0));
-    };
+    }
 
     (
         BorrowedPatches {
@@ -344,10 +351,10 @@ fn new_push_anim_seq_patch<'a>(
 }
 
 fn new_push_events_seq_patch<'a>(
-    events: &[&'a str],
+    events: &[Cow<'a, str>],
     behavior_entry: &BehaviorEntry,
     priority: usize,
-) -> [(JsonPath<'a>, ValueWithPriority<'a>); 3] {
+) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
     [
         (
             json_path![
@@ -387,52 +394,58 @@ fn new_push_events_seq_patch<'a>(
                 priority,
             },
         ),
-        {
-            // It seems necessary to register the eventID and stateID of kill_move's event_names to existing transitions.
-            let transitions: Vec<_> = events
-            .par_iter()
-            // Register events other than sound.(Alt Determination Method: `!event[0..10].eq_ascii_ignore("SoundPlay.")`)
-            .filter(|event| !event.starts_with("SoundPlay."))
-            .map(|event| {
-                let to_state_id = kill_move::calculate_hash(event); // FIXME: Is this correct?
-
-                json_typed!(borrowed, {
-                    "triggerInterval": {
-                        "enterEventId": -1,
-                        "exitEventId": -1,
-                        "enterTime": 0.0,
-                        "exitTime": 0.0
-                    },
-                    "initiateInterval": {
-                        "enterEventId": -1,
-                        "exitEventId": -1,
-                        "enterTime": 0.0,
-                        "exitTime": 0.0
-                    },
-                    "transition": "#0111",
-                    "condition": "#0000",
-                    "eventId": format!("$eventID[{event}]$"), // use Nemesis variable
-                    "toStateId": to_state_id,
-                    "fromNestedStateId": 0,
-                    "toNestedStateId": 0,
-                    "priority": 0,
-                    "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
-                })
-            })
-            .collect();
-
-            (
-                json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        op: PUSH_OP,
-                        value: json_typed!(borrowed, transitions),
-                    },
-                    priority,
-                },
-            )
-        },
     ]
+}
+
+/// This is a PairedAndKillMove and specific to `character/behaviors/0_master.xml`,
+///
+/// FIXME: and should prevent duplicate registrations of existing events by filtering via table references.
+fn new_push_transitions_seq_patch<'a>(
+    events: &[Cow<'a, str>],
+    priority: usize,
+) -> (JsonPath<'a>, ValueWithPriority<'a>) {
+    let transitions: Vec<_> = events
+        .par_iter()
+        // Register events other than sound.(Alt Determination Method: `!event[0..10].eq_ascii_ignore("SoundPlay.")`)
+        .filter(|event| !event.starts_with("SoundPlay."))
+        .map(|event| {
+            let to_state_id = kill_move::calculate_hash(event); // FIXME: Is this correct?
+
+            json_typed!(borrowed, {
+                "triggerInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0
+                },
+                "initiateInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0
+                },
+                "transition": "#0111",
+                "condition": "#0000",
+                "eventId": format!("$eventID[{event}]$"), // use Nemesis variable
+                "toStateId": to_state_id,
+                "fromNestedStateId": 0,
+                "toNestedStateId": 0,
+                "priority": 0,
+                "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
+            })
+        })
+        .collect();
+
+    (
+        json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
+        ValueWithPriority {
+            patch: JsonPatch {
+                op: PUSH_OP,
+                value: json_typed!(borrowed, transitions),
+            },
+            priority,
+        },
+    )
 }
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`

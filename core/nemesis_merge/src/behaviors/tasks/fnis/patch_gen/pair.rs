@@ -12,7 +12,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::{
-        calculate_hash, get_anim_object_index, make_state_info_patch, make_state_info_patch2,
+        calculate_hash, make_player_root_state_info_patch, make_state_info_patch2,
         new_event_property_array, new_synchronized_clip_generator,
     },
     JsonPatchPairs, PUSH_OP,
@@ -41,12 +41,13 @@ pub fn new_pair_patches<'a>(
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
+    // Push and register the Root `hkbStateMachineStateInfo` for both Player and NPC.
     seq_patches.push((
         json_path!["#0788", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,
-                value: json_typed!(borrowed, class_indexes),
+                value: json_typed!(borrowed, [class_indexes[0], class_indexes[12]]),
             },
             priority,
         },
@@ -320,10 +321,8 @@ pub fn new_pair_patches<'a>(
 
     // #$RI+7$  hkbStateMachineEventPropertyArray
     one_patches.push({
-        let first_anim_object_index = class_index_to_anim_object_map
-            .get(&0)
-            .map_or(Cow::Borrowed("#0000"), |p| Cow::Owned(p.value().clone()));
-        new_event_property_array(flags, &first_anim_object_index, &class_indexes[7], priority)
+        let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
+        new_event_property_array(flags, anim_obj_class_index, &class_indexes[7], priority)
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
@@ -418,7 +417,7 @@ pub fn new_pair_patches<'a>(
         )
     });
 
-    one_patches.push(make_state_info_patch(
+    one_patches.push(make_player_root_state_info_patch(
         &class_indexes[11],
         &class_indexes[12],
         flags,
@@ -510,6 +509,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
+
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[15].clone()),
@@ -578,14 +578,9 @@ pub fn new_pair_patches<'a>(
         format!("FNISpa_{namespace}"), // FNISpa_$1/1$
     ));
     one_patches.push({
-        // "payload": "#$:AnimObj+&ao2$" (fallback to first)
-        let maybe_2nd_anim_object_index = get_anim_object_index(&class_index_to_anim_object_map, 1);
-        new_event_property_array(
-            flags,
-            &maybe_2nd_anim_object_index,
-            &class_indexes[18],
-            priority,
-        )
+        // "payload": "#$:AnimObj+&ao2$"
+        let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
+        new_event_property_array(flags, anim_obj_class_index, &class_indexes[18], priority)
     });
     one_patches.push((
         vec![
