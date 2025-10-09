@@ -41,6 +41,8 @@ pub fn take_till_fnis_ignores<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trigger<'a> {
+    /// A new/old event name of `hkbBehaviorGraphStringData.eventNames`. (e.g. `HeadTrackingOn`)
     pub event: &'a str,
+    /// e.g. 2.555,
     pub time: f32,
 }
