@@ -1,6 +1,6 @@
 use rayon::prelude::*;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
 pub fn remove_meshes_dir_all(output_dir: impl AsRef<Path>) {
