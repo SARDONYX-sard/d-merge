@@ -4,14 +4,15 @@ use crate::{
         patches::types::BehaviorStringDataMap, templates::types::BorrowedTemplateMap,
     },
     config::{ReportType, StatusReportCounter},
-    errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
+    errors::{DedupEventVariableSnafu, Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
     results::filter_results,
     Config, OutPutTarget,
 };
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
 use serde_hkx_features::{
-    id_maker::crate_maps_from_id_class as create_maps_from_id_class, ClassMap,
+    id_maker::{create_maps, dedup_event_variables},
+    ClassMap,
 };
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
@@ -45,35 +46,44 @@ pub(crate) fn generate_hkx_files(
             }
 
             let hkx_bytes = {
-                if config.debug.output_merged_json {
-                    let debug_path = debug_file_path(&config.output_dir, inner_path);
-                    write_patched_json(&debug_path, &template_json)?;
-                }
-
                 let mut class_map: ClassMap =
                     from_borrowed_value(template_json).with_context(|_| JsonSnafu {
                         path: output_path.clone(),
                     })?;
 
-                if config.debug.output_merged_xml {
-                    let debug_path = debug_file_path(&config.output_dir, inner_path);
-                    write_patched_xml(&debug_path, &class_map)?;
-                };
-
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
                 if let Some(pair) = variable_class_map.0.get(&key) {
-                    let ptr = pair.value();
+                    let master_behavior_graph_index = pair.value();
 
                     // Create eventID & variableId maps from hkbBehaviorGraphStringData class
-                    if let Some((event_map, var_map)) = class_map
-                        .get(*ptr)
-                        .and_then(|class| create_maps_from_id_class(class))
+                    dedup_event_variables(&mut class_map, master_behavior_graph_index)
+                        .with_context(|_| DedupEventVariableSnafu {
+                            path: output_path.clone(),
+                        })?;
+
+                    // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
+                    class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.
+
+                    if let Some((event_map, var_map)) =
+                        create_maps(&class_map, master_behavior_graph_index)
                     {
                         event_id_map = Some(event_map);
                         variable_id_map = Some(var_map);
                     };
+                } else {
+                    class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.
                 }
+
+                // NOTE: View the debug output after removing duplicates. Otherwise, duplicate eventNames will appear.
+                if config.debug.output_merged_json {
+                    let debug_path = debug_file_path(&config.output_dir, inner_path);
+                    write_patched_json(&debug_path, &class_map)?;
+                }
+                if config.debug.output_merged_xml {
+                    let debug_path = debug_file_path(&config.output_dir, inner_path);
+                    write_patched_xml(&debug_path, &class_map)?;
+                };
 
                 // Convert to hkx bytes & Replace nemesis id.
                 let header = match config.output_target {
@@ -82,9 +92,6 @@ pub(crate) fn generate_hkx_files(
                 };
                 let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
                 let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
-
-                // NOTE: T-pause if we don't sort before `to_bytes`.
-                class_map.sort_for_bytes();
 
                 // Output error info
                 // serialize target class, field ptr number.

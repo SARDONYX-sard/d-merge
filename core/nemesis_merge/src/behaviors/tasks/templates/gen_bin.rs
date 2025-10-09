@@ -366,11 +366,10 @@ mod tests {
             if class.is_empty() || class.len() > 2 {
                 return None;
             }
-            class[0].__ptr.as_ref().map(|ptr| ptr.to_string())
+            Some(class[0].__ptr.as_ref()?.to_string())
         }
 
-        // let root_dir = Path::new("../../resource/xml/templates/meshes");
-        let root_dir = Path::new("../../dummy/overwrited_xml/meshes");
+        let root_dir = Path::new("../../resource/xml/templates/meshes");
         let mut errors: Vec<String> = Vec::new();
 
         // -------------------------------
@@ -401,6 +400,106 @@ mod tests {
         if !errors.is_empty() {
             let joined = errors.join("\n");
             fs::write("../../dummy/fnis/table/errors_list.log", joined).unwrap();
+        }
+    }
+
+    #[ignore = "local only"]
+    #[test]
+    fn test_extract_indexes() {
+        use crate::behaviors::tasks::templates::key::NEMESIS_3RD_PERSON_MAP;
+        use havok_classes::Classes;
+        use rayon::prelude::*;
+        use serde::{Deserialize, Serialize};
+        use std::{collections::BTreeMap, fs, path::Path};
+
+        #[derive(Debug, Serialize, Deserialize)]
+        struct Extracted {
+            string_data_index: Option<String>,
+            variable_data_index: Option<String>,
+        }
+
+        let root_dir = Path::new("../../resource/xml/templates");
+        let mut errors: Vec<String> = Vec::new();
+
+        // output: file_stem, indexes
+        let mut results: BTreeMap<String, Extracted> = BTreeMap::new();
+
+        NEMESIS_3RD_PERSON_MAP
+            .values()
+            // NEMESIS_1ST_PERSON_MAP
+            //     .values()
+            .copied()
+            .for_each(|rel_path| {
+                // bin → xml
+                let mut xml_path = root_dir.join(rel_path);
+                xml_path.set_extension("xml");
+                let file_stem = xml_path.file_stem().unwrap().to_string_lossy().to_string();
+
+                match std::fs::read_to_string(&xml_path) {
+                    Ok(content) => {
+                        match serde_hkx::from_str::<serde_hkx_features::ClassMap>(&content) {
+                            Ok(class_map) => {
+                                let string_classes: Vec<_> = class_map
+                                    .par_iter()
+                                    .filter_map(|(_, class)| match class {
+                                        Classes::hkbBehaviorGraphStringData(c) => c.__ptr.clone(),
+                                        _ => None,
+                                    })
+                                    .map(|ptr| ptr.to_string())
+                                    .collect();
+
+                                let variable_classes: Vec<_> = class_map
+                                    .par_iter()
+                                    .filter_map(|(_, class)| match class {
+                                        Classes::hkbBehaviorGraphData(c) => c.__ptr.clone(),
+                                        _ => None,
+                                    })
+                                    .map(|ptr| ptr.to_string())
+                                    .collect();
+
+                                if string_classes.len() > 1 {
+                                    errors.push(format!(
+                                        "{}: multiple hkbBehaviorGraphStringData found",
+                                        xml_path.display()
+                                    ));
+                                    return;
+                                }
+                                if variable_classes.len() > 1 {
+                                    errors.push(format!(
+                                        "{}: multiple hkbBehaviorGraphData found",
+                                        xml_path.display()
+                                    ));
+                                    return;
+                                }
+
+                                results.insert(
+                                    file_stem,
+                                    Extracted {
+                                        string_data_index: string_classes.first().cloned(),
+                                        variable_data_index: variable_classes.first().cloned(),
+                                    },
+                                );
+                            }
+                            Err(e) => {
+                                errors.push(format!(
+                                    "serde_hkx parse error in {}: {}",
+                                    xml_path.display(),
+                                    e
+                                ));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        errors.push(format!("read error in {}: {}", xml_path.display(), e));
+                    }
+                }
+            });
+
+        let json = simd_json::to_string_pretty(&results).unwrap();
+        fs::write("../../dummy/extracted_indexes.json", json).unwrap();
+
+        if !errors.is_empty() {
+            fs::write("../../dummy/extracted_errors.log", errors.join("\n")).unwrap();
         }
     }
 }

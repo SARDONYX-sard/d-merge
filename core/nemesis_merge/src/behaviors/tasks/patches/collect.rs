@@ -9,11 +9,13 @@ use crate::{
             adsf::types::OwnedAdsfPatchMap,
             asdsf::types::OwnedAsdsfPatchMap,
             patches::types::{BorrowedPatches, OwnedPatchMap, OwnedPatches},
-            templates::key::TemplateKey,
+            templates::key::{MasterIndex, TemplateKey},
         },
     },
     config::{ReportType, StatusReportCounter},
-    errors::{Error, FailedIoSnafu, FailedParseNemesisPatchPath2Snafu, NemesisXmlErrSnafu, Result},
+    errors::{
+        Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
+    },
     results::filter_results,
     Config,
 };
@@ -136,51 +138,50 @@ pub fn collect_borrowed_patches<'a>(
         owned_patches.len(),
     );
 
-    let results: Vec<Result<()>> =
-        owned_patches
-            .par_iter()
-            .map(|(path, (xml, priority))| {
-                reporter.increment();
-                // Since we could not make a destructing assignment, we have to write it this way.
-                let priority = *priority;
+    let results: Vec<Result<()>> = owned_patches
+        .par_iter()
+        .map(|(path, (xml, priority))| {
+            reporter.increment();
+            // Since we could not make a destructing assignment, we have to write it this way.
+            let priority = *priority;
 
-                let (json_patches, variable_class_index) =
-                    parse_nemesis_patch(xml, config.hack_options.map(Into::into))
-                        .with_context(|_| NemesisXmlErrSnafu { path })?;
+            let (json_patches, _) = parse_nemesis_patch(xml, config.hack_options.map(Into::into))
+                .with_context(|_| NemesisXmlErrSnafu { path })?;
 
-                let (template_file_stem, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
-                let key = TemplateKey::from_nemesis_file(template_file_stem, is_1st_person)
-                    .with_context(|| FailedParseNemesisPatchPath2Snafu { path })?;
+            let (template_file_stem, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
+            let key = TemplateKey::from_nemesis_file(template_file_stem, is_1st_person)
+                .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
 
-                template_keys.insert(key.clone());
-                if let Some(class_index) = variable_class_index {
-                    variable_class_map
-                        .0
-                        .entry(key.clone())
-                        .or_insert(class_index);
-                }
+            template_keys.insert(key.clone());
+            if let Some(master_pair_index) =
+                MasterIndex::from_nemesis_file(template_file_stem, is_1st_person)
+            {
+                variable_class_map
+                    .0
+                    .entry(key.clone())
+                    .or_insert(master_pair_index.master_behavior_graph_index);
+            }
 
-                json_patches.into_par_iter().for_each(|(json_path, value)| {
-                    // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                    let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
+            json_patches.into_par_iter().for_each(|(json_path, value)| {
+                // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
+                let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
 
-                    match &value.op {
-                        // Overwrite to match patch structure
-                        // Pure: no add and remove because of single value
-                        json_patch::OpRangeKind::Pure(_) => {
-                            let value = ValueWithPriority::new(value, priority);
-                            entry.value().one.insert(json_path, value);
-                        }
-                        json_patch::OpRangeKind::Seq(_) => {
-                            let value = ValueWithPriority::new(value, priority);
-                            entry.value().seq.insert(json_path, value);
-                        }
-                        json_patch::OpRangeKind::Discrete(range_vec) => {
-                            let json_patch::JsonPatch { value, .. } = value;
+                match &value.op {
+                    // Overwrite to match patch structure
+                    // Pure: no add and remove because of single value
+                    json_patch::OpRangeKind::Pure(_) => {
+                        let value = ValueWithPriority::new(value, priority);
+                        entry.value().one.insert(json_path, value);
+                    }
+                    json_patch::OpRangeKind::Seq(_) => {
+                        let value = ValueWithPriority::new(value, priority);
+                        entry.value().seq.insert(json_path, value);
+                    }
+                    json_patch::OpRangeKind::Discrete(range_vec) => {
+                        let json_patch::JsonPatch { value, .. } = value;
 
-                            let array = match simd_json::derived::ValueTryIntoArray::try_into_array(
-                                value,
-                            ) {
+                        let array =
+                            match simd_json::derived::ValueTryIntoArray::try_into_array(value) {
                                 Ok(array) => array,
                                 Err(_err) => {
                                     #[cfg(feature = "tracing")]
@@ -189,24 +190,27 @@ pub fn collect_borrowed_patches<'a>(
                                 }
                             };
 
-                            let iter = range_vec.clone().into_par_iter().zip(array).map(
-                                |(range, value)| {
+                        let iter =
+                            range_vec
+                                .clone()
+                                .into_par_iter()
+                                .zip(array)
+                                .map(|(range, value)| {
                                     let value = json_patch::JsonPatch {
                                         op: json_patch::OpRangeKind::Seq(range),
                                         value,
                                     };
                                     let value = ValueWithPriority::new(value, priority);
                                     value
-                                },
-                            );
-                            entry.value().seq.extend(json_path, iter);
-                        }
+                                });
+                        entry.value().seq.extend(json_path, iter);
                     }
-                });
+                }
+            });
 
-                Ok(())
-            })
-            .collect();
+            Ok(())
+        })
+        .collect();
 
     let errors = match filter_results(results) {
         Ok(()) => vec![],

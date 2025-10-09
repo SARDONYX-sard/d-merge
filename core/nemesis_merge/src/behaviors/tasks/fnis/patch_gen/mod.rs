@@ -1,4 +1,3 @@
-mod event_table;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod kill_move;
@@ -56,8 +55,6 @@ pub fn collect_borrowed_patches<'a>(
     let (adsf_patches, errors): (Vec<_>, Vec<_>) = mods_patches
         .par_iter()
         .map(|owned_data| {
-            reporter.increment();
-
             let list = match parse_fnis_list
                 .parse(&owned_data.list_content)
                 .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
@@ -65,7 +62,10 @@ pub fn collect_borrowed_patches<'a>(
                     path: PathBuf::from(owned_data.to_list_path()),
                 }) {
                 Ok(list) => list,
-                Err(err) => return Either::Right(err),
+                Err(err) => {
+                    reporter.increment();
+                    return Either::Right(err);
+                }
             };
             #[cfg(feature = "tracing")]
             tracing::debug!(
@@ -88,7 +88,6 @@ pub fn collect_borrowed_patches<'a>(
             {
                 let master_template_key =
                     owned_data.behavior_entry.to_master_behavior_template_key();
-                let is_3rd_person_master_patch = master_template_key == THREAD_PERSON_0_MASTER_KEY;
 
                 // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
                 if !template_keys.contains(&master_template_key) {
@@ -97,7 +96,7 @@ pub fn collect_borrowed_patches<'a>(
                 if !variable_class_map.0.contains_key(&master_template_key) {
                     variable_class_map.0.insert(
                         master_template_key.clone(),
-                        owned_data.behavior_entry.master_string_data_index,
+                        owned_data.behavior_entry.master_behavior_graph_index,
                     );
                 }
 
@@ -124,16 +123,8 @@ pub fn collect_borrowed_patches<'a>(
                     entry.seq.insert(path, patch);
                 }
 
-                // FIXME: Existing events must avoid duplicate additions. To achieve this, a table must be created. - FNIS_base, 0_master, mt_behavior
-                // However, creating a table for each creature is impractical; in reality, it would likely be limited to pairAndKillMoves(character).
                 if !events.is_empty() {
-                    let mut events: Vec<_> = match is_3rd_person_master_patch {
-                        true => events
-                            .into_iter()
-                            .filter(|event| !event_table::TABLE_0_MASTER.contains(event))
-                            .collect(),
-                        false => events.into_iter().collect(),
-                    };
+                    let mut events: Vec<_> = events.into_iter().collect();
                     events.par_sort_unstable();
                     let patches = new_push_events_seq_patch(
                         &events,
@@ -185,6 +176,7 @@ pub fn collect_borrowed_patches<'a>(
                 }
             };
 
+            reporter.increment();
             Either::Left(adsf_patches)
         })
         .collect();

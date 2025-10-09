@@ -114,6 +114,13 @@ pub enum Error {
         path: PathBuf,
     },
 
+    /// hkbBehaviorGraphData/hkbBehaviorGraphStringData missing or length check error.
+    #[snafu(display("{}:\n {source}", path.display()))]
+    DedupEventVariableError {
+        path: PathBuf,
+        source: serde_hkx_features::id_maker::DedupError,
+    },
+
     /// serde_hkx serialize error.
     #[snafu(display("{}:\n {source}", path.display()))]
     HkxSerError {
@@ -150,8 +157,8 @@ pub enum Error {
     FailedParseNemesisPatchPath { source: ReadableError },
 
     /// Failed to parse path as nemesis path
-    #[snafu(display("Failed to parse path as nemesis path: {}", path.display()))]
-    FailedParseNemesisPatchPath2 { path: PathBuf },
+    #[snafu(display("No template matching this path was found.: {}", path.display()))]
+    FailedToCastNemesisPathToTemplateKey { path: PathBuf },
 
     #[snafu(transparent)]
     ParsedAdsfPathError {

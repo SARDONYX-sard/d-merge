@@ -12,13 +12,7 @@ pub struct TemplateKey<'a> {
     template_name: Cow<'a, str>,
 }
 
-impl<'a> TemplateKey<'a> {
-    /// # Safety
-    /// valid template path(from `meshes`)
-    pub const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
-        Self { template_name }
-    }
-
+impl TemplateKey<'static> {
     /// From nemesis file stem. e.g. `0_master` -> `meshes/actors/character/behaviors/0_master.bin`
     pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
         let template_name = match is_1st_person {
@@ -28,6 +22,13 @@ impl<'a> TemplateKey<'a> {
         Some(Self {
             template_name: Cow::Borrowed(template_name),
         })
+    }
+}
+impl<'a> TemplateKey<'a> {
+    /// # Safety
+    /// valid template path(from `meshes`)
+    pub const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
+        Self { template_name }
     }
 
     /// As utf-8
@@ -128,7 +129,7 @@ pub const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
 
 /// Nemesis 1st person to meshes rel template .bin path
 #[rustfmt::skip]
-static NEMESIS_1ST_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
+pub(crate) static NEMESIS_1ST_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "0_master" => "meshes/actors/character/_1stperson/behaviors/0_master.bin",
     "1hm_behavior" => "meshes/actors/character/_1stperson/behaviors/1hm_behavior.bin",
     "1hm_locomotion" => "meshes/actors/character/_1stperson/behaviors/1hm_locomotion.bin",
@@ -152,19 +153,16 @@ static NEMESIS_1ST_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_m
 
 /// Nemesis third person to meshes rel template .bin path
 #[rustfmt::skip]
-static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
+pub(crate) static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "0_master" => "meshes/actors/character/behaviors/0_master.bin",
     "1hm_behavior" => "meshes/actors/character/behaviors/1hm_behavior.bin",
     "1hm_locomotion" => "meshes/actors/character/behaviors/1hm_locomotion.bin",
-    "AttackBehavior" => "meshes/actors/character/behaviors/AttackBehavior.bin",
-    "WeapUnequip" => "meshes/actors/character/behaviors/WeapUnequip.bin",
     "atronachflamebehavior" => "meshes/actors/atronachflame/behaviors/atronachflamebehavior.bin",
     "atronachfrostbehavior" => "meshes/actors/atronachfrost/behaviors/atronachfrostbehavior.bin",
     "atronachstormbehavior" => "meshes/actors/atronachstorm/behaviors/atronachstormbehavior.bin",
     "bashbehavior" => "meshes/actors/character/behaviors/bashbehavior.bin",
     "bcbehavior" => "meshes/actors/dlc02/dwarvenballistacenturion/behaviors/bcbehavior.bin",
     "bearbehavior" => "meshes/actors/bear/behaviors/bearbehavior.bin",
-    "behavior" => "meshes/actors/character/behaviors/behavior.bin",
     "benthiclurkerbehavior" => "meshes/actors/dlc02/benthiclurker/behaviors/benthiclurkerbehavior.bin",
     "blockbehavior" => "meshes/actors/character/behaviors/blockbehavior.bin",
     "boarbehavior" => "meshes/actors/dlc02/boarriekling/behaviors/boarbehavior.bin",
@@ -175,9 +173,7 @@ static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_m
     "crossbow_direction_behavior" => "meshes/actors/character/behaviors/crossbow_direction_behavior.bin",
     "deerbehavior" => "meshes/actors/deer/behaviors/deerbehavior.bin",
     "defaultfemale" => "meshes/actors/character/characters female/defaultfemale.bin",
-    "defaultfemale_Project" => "meshes/actors/character/defaultfemale_Project.bin",
     "defaultmale" => "meshes/actors/character/characters/defaultmale.bin",
-    "defaultmale_Project" => "meshes/actors/character/defaultmale_Project.bin",
     "dogbehavior" => "meshes/actors/canine/behaviors/dogbehavior.bin",
     "dragon_priest" => "meshes/actors/dragonpriest/behaviors/dragon_priest.bin",
     "dragonbehavior" => "meshes/actors/dragon/behaviors/dragonbehavior.bin",
@@ -224,4 +220,112 @@ static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> = phf::phf_m
     "wispbehavior" => "meshes/actors/wisp/behaviors/wispbehavior.bin",
     "witchlightbehavior" => "meshes/actors/witchlight/behaviors/witchlightbehavior.bin",
     "wolfbehavior" => "meshes/actors/canine/behaviors wolf/wolfbehavior.bin",
+};
+
+/// Map from full template path to actor name
+#[derive(Debug, Clone)]
+pub struct MasterIndex {
+    #[allow(unused)]
+    pub master_string_data_index: &'static str,
+    pub master_behavior_graph_index: &'static str,
+}
+
+impl MasterIndex {
+    /// From nemesis file stem. e.g. `0_master` -> MasterIndex
+    pub fn from_nemesis_file(
+        template_file_stem: &str,
+        is_1st_person: bool,
+    ) -> Option<&'static Self> {
+        if is_1st_person {
+            FIRST_PERSON_INDEX_MAP.get(template_file_stem)
+        } else {
+            MASTER_INDEX_MAP.get(template_file_stem)
+        }
+    }
+}
+
+static FIRST_PERSON_INDEX_MAP: phf::Map<&'static str, MasterIndex> = phf::phf_map! {
+    "0_master" => MasterIndex { master_string_data_index: "#0095", master_behavior_graph_index: "#0097" },
+    "1hm_behavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "1hm_locomotion" => MasterIndex { master_string_data_index: "#0063", master_behavior_graph_index: "#0065" },
+    "bashbehavior" => MasterIndex { master_string_data_index: "#0056", master_behavior_graph_index: "#0058" },
+    "blockbehavior" => MasterIndex { master_string_data_index: "#0076", master_behavior_graph_index: "#0078" },
+    "bow_direction_behavior" => MasterIndex { master_string_data_index: "#0060", master_behavior_graph_index: "#0062" },
+    "crossbow_direction_behavior" => MasterIndex { master_string_data_index: "#0060", master_behavior_graph_index: "#0062" },
+    "horsebehavior" => MasterIndex { master_string_data_index: "#0087", master_behavior_graph_index: "#0089" },
+    "idlebehavior" => MasterIndex { master_string_data_index: "#0055", master_behavior_graph_index: "#0057" },
+    "magicbehavior" => MasterIndex { master_string_data_index: "#0077", master_behavior_graph_index: "#0079" },
+    "magicmountedbehavior" => MasterIndex { master_string_data_index: "#0071", master_behavior_graph_index: "#0073" },
+    "mt_behavior" => MasterIndex { master_string_data_index: "#0076", master_behavior_graph_index: "#0078" },
+    "shout_behavior" => MasterIndex { master_string_data_index: "#0063", master_behavior_graph_index: "#0065" },
+    "shoutmounted_behavior" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+    "sprintbehavior" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+    "staggerbehavior" => MasterIndex { master_string_data_index: "#0052", master_behavior_graph_index: "#0054" },
+    "weapequip" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+};
+
+/// For 3rd person
+static MASTER_INDEX_MAP: phf::Map<&'static str, MasterIndex> = phf::phf_map! {
+    "0_master" => MasterIndex { master_string_data_index: "#0106", master_behavior_graph_index: "#0108" },
+    "1hm_behavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "1hm_locomotion" => MasterIndex { master_string_data_index: "#0063", master_behavior_graph_index: "#0065" },
+    "atronachflamebehavior" => MasterIndex { master_string_data_index: "#0086", master_behavior_graph_index: "#0088" },
+    "atronachfrostbehavior" => MasterIndex { master_string_data_index: "#0088", master_behavior_graph_index: "#0090" },
+    "atronachstormbehavior" => MasterIndex { master_string_data_index: "#0083", master_behavior_graph_index: "#0085" },
+    "bashbehavior" => MasterIndex { master_string_data_index: "#0056", master_behavior_graph_index: "#0058" },
+    "bcbehavior" => MasterIndex { master_string_data_index: "#0088", master_behavior_graph_index: "#0090" },
+    "bearbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "benthiclurkerbehavior" => MasterIndex { master_string_data_index: "#0093", master_behavior_graph_index: "#0095" },
+    "blockbehavior" => MasterIndex { master_string_data_index: "#0076", master_behavior_graph_index: "#0078" },
+    "boarbehavior" => MasterIndex { master_string_data_index: "#0093", master_behavior_graph_index: "#0095" },
+    "bow_direction_behavior" => MasterIndex { master_string_data_index: "#0060", master_behavior_graph_index: "#0062" },
+    "chaurusbehavior" => MasterIndex { master_string_data_index: "#0091", master_behavior_graph_index: "#0093" },
+    "chaurusflyerbehavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "chickenbehavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "crossbow_direction_behavior" => MasterIndex { master_string_data_index: "#0060", master_behavior_graph_index: "#0062" },
+    "deerbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "dogbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "dragon_priest" => MasterIndex { master_string_data_index: "#0088", master_behavior_graph_index: "#0090" },
+    "dragonbehavior" => MasterIndex { master_string_data_index: "#0101", master_behavior_graph_index: "#0103" },
+    "draugrbehavior" => MasterIndex { master_string_data_index: "#0092", master_behavior_graph_index: "#0094" },
+    "dwarvenspiderbehavior" => MasterIndex { master_string_data_index: "#0082", master_behavior_graph_index: "#0084" },
+    "falmerbehavior" => MasterIndex { master_string_data_index: "#0099", master_behavior_graph_index: "#0101" },
+    "frostbitespiderbehavior" => MasterIndex { master_string_data_index: "#0084", master_behavior_graph_index: "#0086" },
+    "giantbehavior" => MasterIndex { master_string_data_index: "#0093", master_behavior_graph_index: "#0095" },
+    "goatbehavior" => MasterIndex { master_string_data_index: "#0077", master_behavior_graph_index: "#0079" },
+    "h-cowbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "h-cowbehavior_lod" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "harebehavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "havgravenbehavior" => MasterIndex { master_string_data_index: "#0088", master_behavior_graph_index: "#0090" },
+    "hmdaedra" => MasterIndex { master_string_data_index: "#0086", master_behavior_graph_index: "#0088" },
+    "horkerbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "horsebehavior" => MasterIndex { master_string_data_index: "#0087", master_behavior_graph_index: "#0089" },
+    "icewraithbehavior" => MasterIndex { master_string_data_index: "#0079", master_behavior_graph_index: "#0081" },
+    "idlebehavior" => MasterIndex { master_string_data_index: "#0062", master_behavior_graph_index: "#0064" },
+    "magic_readied_direction_behavior" => MasterIndex { master_string_data_index: "#0054", master_behavior_graph_index: "#0056" },
+    "magicbehavior" => MasterIndex { master_string_data_index: "#0077", master_behavior_graph_index: "#0079" },
+    "magicmountedbehavior" => MasterIndex { master_string_data_index: "#0071", master_behavior_graph_index: "#0073" },
+    "mammothbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
+    "mt_behavior" => MasterIndex { master_string_data_index: "#0083", master_behavior_graph_index: "#0085" },
+    "mudcrabbehavior" => MasterIndex { master_string_data_index: "#0086", master_behavior_graph_index: "#0088" },
+    "netchbehavior" => MasterIndex { master_string_data_index: "#0081", master_behavior_graph_index: "#0083" },
+    "rieklingbehavior" => MasterIndex { master_string_data_index: "#0095", master_behavior_graph_index: "#0097" },
+    "sabrecatbehavior" => MasterIndex { master_string_data_index: "#0077", master_behavior_graph_index: "#0079" },
+    "scbehavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "scribbehavior" => MasterIndex { master_string_data_index: "#0094", master_behavior_graph_index: "#0096" },
+    "shout_behavior" => MasterIndex { master_string_data_index: "#0063", master_behavior_graph_index: "#0065" },
+    "shoutmounted_behavior" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+    "skeeverbehavior" => MasterIndex { master_string_data_index: "#0077", master_behavior_graph_index: "#0079" },
+    "slaughterfishbehavior" => MasterIndex { master_string_data_index: "#0081", master_behavior_graph_index: "#0083" },
+    "sprigganbehavior" => MasterIndex { master_string_data_index: "#0090", master_behavior_graph_index: "#0092" },
+    "sprintbehavior" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+    "staggerbehavior" => MasterIndex { master_string_data_index: "#0052", master_behavior_graph_index: "#0054" },
+    "steambehavior" => MasterIndex { master_string_data_index: "#0085", master_behavior_graph_index: "#0087" },
+    "trollbehavior" => MasterIndex { master_string_data_index: "#0089", master_behavior_graph_index: "#0091" },
+    "vampirebrutebehavior" => MasterIndex { master_string_data_index: "#0093", master_behavior_graph_index: "#0095" },
+    "weapequip" => MasterIndex { master_string_data_index: "#0057", master_behavior_graph_index: "#0059" },
+    "werewolfbehavior" => MasterIndex { master_string_data_index: "#0096", master_behavior_graph_index: "#0098" },
+    "wispbehavior" => MasterIndex { master_string_data_index: "#0086", master_behavior_graph_index: "#0088" },
+    "witchlightbehavior" => MasterIndex { master_string_data_index: "#0064", master_behavior_graph_index: "#0066" },
+    "wolfbehavior" => MasterIndex { master_string_data_index: "#0078", master_behavior_graph_index: "#0080" },
 };

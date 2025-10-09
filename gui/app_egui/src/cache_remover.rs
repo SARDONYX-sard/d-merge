@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+use std::fs;
 
 /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
 pub fn remove_meshes_dir_all(output_dir: impl AsRef<Path>) {
@@ -10,6 +11,7 @@ pub fn remove_meshes_dir_all(output_dir: impl AsRef<Path>) {
             let _ = remove_if_exists(output_dir.join("meshes"));
         },
         || {
+            let _ = fs::remove_file(output_dir.join(".d_merge").join("d_merge_errors.log"));
             let _ = remove_if_exists(output_dir.join(".d_merge").join(".debug"));
         },
     );
@@ -24,8 +26,6 @@ pub fn remove_meshes_dir_all(output_dir: impl AsRef<Path>) {
 /// For some reason, egui on MO2 throws an error saying the path doesn't exist when I try to use `std::remove_dir_all`,
 /// so I manually perform a recursive deletion starting from the end.
 fn remove_if_exists(path: impl AsRef<Path>) -> std::io::Result<()> {
-    use std::fs;
-
     let path = path.as_ref();
 
     if !path.exists() {

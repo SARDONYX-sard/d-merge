@@ -81,15 +81,15 @@ impl RawBorrowedPatches<'_> {
 }
 
 /// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
-/// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphStringData`.
+/// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphData`.
 ///
 /// This mapping is necessary for replacing Nemesis variables such as `$variableID[]$`, `$eventID[]$`,
 /// where the variable needs to be resolved to the corresponding behavior string data name.
 ///
 /// - key: template_name
-/// - value: index(e.g. `#0000`) of `hkbBehaviorGraphStringData`
+/// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorStringDataMap<'a>(pub DashMap<TemplateKey<'a>, &'a str>);
+pub struct BehaviorStringDataMap<'a>(pub DashMap<TemplateKey<'a>, &'static str>);
 impl BehaviorStringDataMap<'_> {
     /// Create `Self`
     #[inline]
