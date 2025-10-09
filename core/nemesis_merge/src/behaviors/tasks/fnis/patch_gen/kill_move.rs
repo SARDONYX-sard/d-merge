@@ -572,52 +572,14 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
-    one_patches.push({
-        let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
-            class_indexes[22].as_str()
-        } else if flags.contains(FNISAnimFlags::HeadTracking) {
-            "#0000"
-        } else {
-            FNIS_AA_GLOBAL_AUTO_GEN_2526
-        };
-        // $-h,o|#2528|h|null|o|#2529|#2527$
-        let exit_notify_events =
-            if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-                FNIS_AA_GLOBAL_AUTO_GEN_2528
-            } else if flags.contains(FNISAnimFlags::HeadTracking) {
-                "#0000"
-            } else if flags.contains(FNISAnimFlags::AnimObjects) {
-                FNIS_AA_GLOBAL_AUTO_GEN_2529
-            } else {
-                FNIS_AA_GLOBAL_AUTO_GEN_2527
-            };
-
-        (
-            vec![
-                Cow::Owned(class_indexes[21].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[21],
-                        "variableBindingSet": "#0000",
-                        "listeners": [],
-                        "enterNotifyEvents": enter_notify_events,
-                        "exitNotifyEvents": exit_notify_events,
-                        "transitions": "#0000",
-                        "generator": &class_indexes[23],
-                        "name": player_event,
-                        "stateId": 0,
-                        "probability": 1.0,
-                        "enable": true
-                    }),
-                },
-                priority,
-            },
-        )
-    });
+    one_patches.push(make_event_state_info_patch(
+        &class_indexes[21],
+        flags,
+        &class_indexes[22],
+        &class_indexes[23],
+        priority,
+        player_event,
+    ));
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
         let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
