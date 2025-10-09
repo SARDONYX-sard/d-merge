@@ -1,6 +1,24 @@
-//! -     Behavior Variable: AnimVar <AnimVar> [ BOOL | INT32 | REAL ] <numeric_value>
-
-use winnow::ascii::{float, space1, Caseless};
+//! AnimVar Parser
+//!
+//! This module parses lines of the form:
+//!
+//! ```text
+//! AnimVar <Name> [ BOOL | INT32 | REAL ] <numeric_value>
+//! ```
+//!
+//! - **Name**: Identifier of the variable.
+//! - **BOOL**: Must be `0` or `1`. Parsed into `Value::Bool(false|true)`.
+//! - **INT32**: Parsed as `i32`, stored as `Value::Int32`.
+//! - **REAL**: Parsed as `f32`, stored as `Value::Real`.
+//!
+//! Example:
+//!
+//! ```text
+//! AnimVar Enabled BOOL 1
+//! AnimVar Counter INT32 42
+//! AnimVar Speed REAL 2.5
+//! ```
+use winnow::ascii::{dec_int, float, space1, Caseless};
 use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
@@ -8,21 +26,29 @@ use winnow::{ModalResult, Parser};
 use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 use crate::behaviors::tasks::fnis::list_parser::combinator::take_till_space;
 
+/// Value stored in AnimVar
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ValueType {
-    Bool,
-    Int32,
-    Real,
+pub enum Value {
+    Bool(bool),
+    Int32(i32),
+    Real(f32),
 }
 
-#[derive(Debug, PartialEq)]
+/// Parsed AnimVar definition
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnimVar<'a> {
-    /// variable name
+    /// Variable name
     pub name: &'a str,
-    pub value_type: ValueType,
-    pub default_value: f32,
+    /// Typed value
+    pub value: Value,
 }
 
+/// Parse a single AnimVar line
+///
+/// Expected format:
+/// ```text
+/// AnimVar <Name> [ BOOL | INT32 | REAL ] <numeric_value>
+/// ```
 pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> {
     seq! {
         AnimVar {
@@ -30,17 +56,7 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
             _: space1,
             name: take_till_space.context(StrContext::Label("name: str")),
             _: space1,
-            value_type: alt((
-                Caseless("BOOL").value(ValueType::Bool),
-                Caseless("INT32").value(ValueType::Int32),
-                Caseless("REAL").value(ValueType::Real)
-            ))
-            .context(StrContext::Label("value_type"))
-            .context(StrContext::Expected(StrContextValue::StringLiteral("BOOL")))
-            .context(StrContext::Expected(StrContextValue::StringLiteral("INT32")))
-            .context(StrContext::Expected(StrContextValue::StringLiteral("REAL"))) ,
-            _: space1,
-            default_value: parse_default_value(value_type),
+            value: parse_value,
             _: skip_ws_and_comments,
         }
     }
@@ -51,21 +67,39 @@ pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> 
     .parse_next(input)
 }
 
-fn parse_default_value<'a>(value_type: ValueType) -> impl FnMut(&mut &'a str) -> ModalResult<f32> {
-    move |input: &mut &'a str| {
-        Ok(match value_type {
-            ValueType::Bool => float
-                .verify(|n: &f32| matches!(*n, 0.0 | 1.0))
-                .context(StrContext::Label("default_value: 0 | 1"))
-                .parse_next(input)?,
-            ValueType::Int32 => float
-                .context(StrContext::Label("default_value: i32"))
-                .parse_next(input)?,
-            ValueType::Real => float
-                .context(StrContext::Label("default_value: f32"))
-                .parse_next(input)?,
-        })
-    }
+/// Parse the value portion: `[ BOOL | INT32 | REAL ] <value>`
+fn parse_value<'a>(input: &mut &'a str) -> ModalResult<Value> {
+    alt((
+        move |input: &mut &'a str|{
+            let (v,) = seq!{
+                _: Caseless("BOOL"),
+                _: space1,
+                alt(("0".value(false), "1".value(true))).map(Value::Bool).context(StrContext::Label("value: 0 | 1"))
+            }.parse_next(input)?;
+            Ok(v)
+        },
+        move |input: &mut &'a str|{
+            let (v,) = seq!{
+                _: Caseless("INT32"),
+                _: space1,
+                dec_int.map(Value::Int32).context(StrContext::Label("value: i32")),
+            }.parse_next(input)?;
+            Ok(v)
+        },
+        move |input: &mut &'a str|{
+            let (v,) = seq!{
+                _: Caseless("REAL"),
+                _: space1,
+                float.map(Value::Real).context(StrContext::Label("value: f32")),
+            }.parse_next(input)?;
+            Ok(v)
+        }
+    ))
+    .context(StrContext::Label("value"))
+    .context(StrContext::Expected(StrContextValue::StringLiteral("BOOL")))
+    .context(StrContext::Expected(StrContextValue::StringLiteral("INT32")))
+    .context(StrContext::Expected(StrContextValue::StringLiteral("REAL")))
+    .parse_next(input)
 }
 
 #[cfg(test)]
@@ -80,8 +114,7 @@ mod tests {
             parsed,
             AnimVar {
                 name: "MyFlag",
-                value_type: ValueType::Bool,
-                default_value: 0.0,
+                value: Value::Bool(false),
             }
         );
     }
@@ -93,8 +126,7 @@ mod tests {
             parsed,
             AnimVar {
                 name: "Enabled",
-                value_type: ValueType::Bool,
-                default_value: 1.0,
+                value: Value::Bool(true),
             }
         );
     }
@@ -113,8 +145,7 @@ mod tests {
             parsed,
             AnimVar {
                 name: "Counter",
-                value_type: ValueType::Int32,
-                default_value: 42.0,
+                value: Value::Int32(42),
             }
         );
     }
@@ -126,8 +157,7 @@ mod tests {
             parsed,
             AnimVar {
                 name: "Speed",
-                value_type: ValueType::Real,
-                default_value: 2.5,
+                value: Value::Real(2.5),
             }
         );
     }
@@ -139,8 +169,7 @@ mod tests {
             parsed,
             AnimVar {
                 name: "Accel",
-                value_type: ValueType::Real,
-                default_value: 0.123,
+                value: Value::Real(0.123),
             }
         );
     }
