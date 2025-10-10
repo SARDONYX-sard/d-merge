@@ -48,6 +48,7 @@ pub fn new_pair_patches<'a>(
     let npc_root_state_name = format!("NPC_FNISpa{priority}");
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
+        "#0111",
         [player_event, npc_event.as_str()],
         [&player_root_state_name, &npc_root_state_name],
         priority,

@@ -8,7 +8,9 @@ use simd_json::json_typed;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::FNISAnimFlags;
 use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::FNISAnimation;
-use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior;
+use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
+    self, FNIS_BA_BLEND_TRANSITION_5230,
+};
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::{
@@ -48,6 +50,7 @@ pub fn new_offset_arm_patches<'a>(
 
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
+        FNIS_BA_BLEND_TRANSITION_5230,
         [right_offset_event.as_str(), left_offset_event.as_str()],
         [&right_offset_state_name, &left_offset_state_name],
         priority,

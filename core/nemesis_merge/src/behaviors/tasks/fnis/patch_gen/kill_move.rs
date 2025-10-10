@@ -43,6 +43,7 @@ pub fn new_kill_patches<'a>(
 
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
+        "#0111",
         [player_event, npc_event.as_str()],
         [&player_root_state_name, &npc_root_state_name],
         priority,
@@ -1010,6 +1011,7 @@ pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
 /// at the moment the animation is played.
 pub fn new_push_transitions_seq_patch<'a>(
     index: &'static str,
+    transition_index: &'static str,
     events: [&str; 2],
     root_state_names: [&String; 2],
     priority: usize,
@@ -1031,7 +1033,7 @@ pub fn new_push_transitions_seq_patch<'a>(
                     "enterTime": 0.0,
                     "exitTime": 0.0
                 },
-                "transition": "#0111",
+                "transition": transition_index,
                 "condition": "#0000",
                 // eventId is Nemesis variable, derived from `events`
                 "eventId": format!("$eventID[{event_name}]$"),
