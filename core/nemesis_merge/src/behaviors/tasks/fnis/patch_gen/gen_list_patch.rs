@@ -17,6 +17,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
     FNISList, SyntaxPattern,
 };
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_kill_patches;
+use crate::behaviors::tasks::fnis::patch_gen::offset_arm::new_offset_arm_patches;
 use crate::behaviors::tasks::fnis::patch_gen::pair::new_pair_patches;
 
 #[derive(Debug)]
@@ -113,12 +114,29 @@ pub fn generate_patch<'a>(
                 all_events.par_extend(events);
                 all_adsf_patches.par_extend(adsf_patches.into_par_iter().flatten());
             }
-            SyntaxPattern::Basic(fnis_animation) => {
-                let FNISAnimation { anim_file, .. } = &fnis_animation;
+            SyntaxPattern::OffsetArm(fnis_animation) => {
+                let FNISAnimation {
+                    anim_event,
+                    anim_file,
+                    ..
+                } = &fnis_animation;
                 all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                all_events.insert(Cow::Borrowed(anim_event));
 
-                let adsf_patches = new_adsf_patch(owned_data, namespace, fnis_animation);
-                all_adsf_patches.par_extend(adsf_patches);
+                let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
+                one_master_patches.par_extend(one);
+                seq_master_patches.par_extend(seq);
+                all_adsf_patches.par_extend(new_adsf_patch(owned_data, namespace, fnis_animation));
+            }
+            SyntaxPattern::Basic(fnis_animation) | SyntaxPattern::AnimObject(fnis_animation) => {
+                let FNISAnimation {
+                    anim_event,
+                    anim_file,
+                    ..
+                } = &fnis_animation;
+                all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                all_events.insert(Cow::Borrowed(*anim_event));
+                all_adsf_patches.par_extend(new_adsf_patch(owned_data, namespace, fnis_animation));
             }
         };
     }

@@ -126,6 +126,11 @@ pub const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
         "meshes/actors/character/behaviors/0_master.bin",
     ))
 };
+pub const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
+    TemplateKey::new_unchecked(Cow::Borrowed(
+        "meshes/actors/character/behaviors/mt_behavior.bin",
+    ))
+};
 
 /// Nemesis 1st person to meshes rel template .bin path
 #[rustfmt::skip]

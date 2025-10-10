@@ -107,7 +107,33 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic parallel merge.
   - [x] Fix unknown merge race condition(The cause was a deadlock in applying patches.)
 
+- FNIS Patch
+
+| Status | Feature                         | Abbreviation(s) | Notes                                                                          |
+| ------ | ------------------------------- | --------------- | ------------------------------------------------------------------------------ |
+| ✅     | Basic                           | b               |                                                                                |
+| ✅     | Sequenced Animations            | s, so           |                                                                                |
+| ✅     | Arm Offset Animations           | ofa             |                                                                                |
+| ❌     | Furniture Animations            | fu, fuo         |                                                                                |
+| ⚠️     | Paired Animations and KillMoves | pa, km          | KillMove: only animation checked, not tested in actual kill. Paired: untested. |
+| ❌     | Chair Animations                | ch              |                                                                                |
+| ❌     | Alternate Animations            | AAprefix        |                                                                                |
+
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
+
+## Build
+
+requirements: Rust1.87
+
+```shell
+cargo build -p d_merge_egui --profile release-no-lto # Simple GUI by egui
+```
+
+requirements: Rust1.87, Node.js LTS
+
+```shell
+npm run build # Rich GUI by tauri
+```
 
 ## Licenses
 

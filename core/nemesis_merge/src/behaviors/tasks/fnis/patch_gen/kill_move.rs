@@ -10,12 +10,12 @@ use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
-use crate::behaviors::tasks::fnis::patch_gen::{
-    JsonPatchPairs, FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
-    FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530,
-    FNIS_AA_GLOBAL_AUTO_GEN_2532, FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
-    PUSH_OP,
+use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::{
+    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
+    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+    FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
 };
+use crate::behaviors::tasks::fnis::patch_gen::{JsonPatchPairs, PUSH_OP};
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_kill_patches<'a>(
@@ -42,6 +42,7 @@ pub fn new_kill_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.push(new_push_transitions_seq_patch(
+        "#0789",
         [player_event, npc_event.as_str()],
         [&player_root_state_name, &npc_root_state_name],
         priority,
@@ -970,6 +971,7 @@ pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
 
 /// This is a PairedAndKillMove and specific to `character/behaviors/0_master.xml`,
 ///
+/// - `index`: `hkbStateMachineTransitionInfoArray` index. 0_master: `#0789`, mt_behavior: `#4038`
 /// - `events`: the actual event names
 ///   - e.g. `["back_grab", "pa_back_grab"]`
 /// - `root_events`:
@@ -1007,6 +1009,7 @@ pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
 /// `hkbStateMachineInfo`, the game will **crash instantly**
 /// at the moment the animation is played.
 pub fn new_push_transitions_seq_patch<'a>(
+    index: &'static str,
     events: [&str; 2],
     root_state_names: [&String; 2],
     priority: usize,
@@ -1043,7 +1046,7 @@ pub fn new_push_transitions_seq_patch<'a>(
         .collect();
 
     (
-        json_path!["#0789", "hkbStateMachineTransitionInfoArray", "transitions"],
+        json_path![index, "hkbStateMachineTransitionInfoArray", "transitions"],
         ValueWithPriority {
             patch: JsonPatch {
                 op: PUSH_OP,

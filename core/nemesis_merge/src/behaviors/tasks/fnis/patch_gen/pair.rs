@@ -10,6 +10,10 @@ use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
+use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::{
+    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
+    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+};
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::{
@@ -17,10 +21,6 @@ use crate::behaviors::tasks::fnis::patch_gen::{
         new_event_property_array, new_synchronized_clip_generator,
     },
     JsonPatchPairs, PUSH_OP,
-};
-use crate::behaviors::tasks::fnis::patch_gen::{
-    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
-    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
@@ -47,6 +47,7 @@ pub fn new_pair_patches<'a>(
     let player_root_state_name = format!("Player_FNISpa{priority}");
     let npc_root_state_name = format!("NPC_FNISpa{priority}");
     seq_patches.push(new_push_transitions_seq_patch(
+        "#0789",
         [player_event, npc_event.as_str()],
         [&player_root_state_name, &npc_root_state_name],
         priority,

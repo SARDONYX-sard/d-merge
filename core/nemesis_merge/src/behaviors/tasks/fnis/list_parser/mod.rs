@@ -28,11 +28,13 @@ use crate::behaviors::tasks::fnis::list_parser::patterns::{
 #[derive(Debug, PartialEq)]
 pub(crate) enum SyntaxPattern<'a> {
     AltAnim(AlternativeAnimation<'a>),
-    PairAndKillMove(FNISPairedAndKillAnimation<'a>),
+    AnimObject(FNISAnimation<'a>),
+    Basic(FNISAnimation<'a>),
     Chair(FNISChairAnimation<'a>),
     Furniture(FurnitureAnimation<'a>),
+    OffsetArm(FNISAnimation<'a>),
+    PairAndKillMove(FNISPairedAndKillAnimation<'a>),
     Sequenced(SequencedAnimation<'a>),
-    Basic(FNISAnimation<'a>),
 }
 
 /// One mod FNIS_<mod namespace>_List.txt
@@ -62,12 +64,15 @@ pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
     {
         // FIXME: Need validate OffsetArm
         let pattern = match anim_type {
-            FNISAnimType::Basic | FNISAnimType::AnimObject | FNISAnimType::OffsetArm => {
-                parse_fnis_animation
-                    .map(SyntaxPattern::Basic)
-                    .parse_next(input)?
-            }
-
+            FNISAnimType::Basic => parse_fnis_animation
+                .map(SyntaxPattern::Basic)
+                .parse_next(input)?,
+            FNISAnimType::AnimObject => parse_fnis_animation
+                .map(SyntaxPattern::AnimObject)
+                .parse_next(input)?,
+            FNISAnimType::OffsetArm => parse_fnis_animation
+                .map(SyntaxPattern::OffsetArm)
+                .parse_next(input)?,
             FNISAnimType::Sequenced | FNISAnimType::SequencedOptimized => parse_seq_animation
                 .map(SyntaxPattern::Sequenced)
                 .parse_next(input)?,
