@@ -29,7 +29,9 @@ pub fn new_offset_arm_patches<'a>(
     let priority = owned_data.priority;
     let flags = animation.flag_set.flags;
 
+    // NOTE: Assign a unique ID for each sentence in `ofa`(OffsetArm) to the event + Right & Left stateId.
     let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+
     let class_index_1_id = calculate_hash(&class_indexes[1]); // Must be 1 file unique
 
     let right_offset_event = format!("FNIS_RightOffsetCG{class_index_0_id}");
@@ -52,8 +54,8 @@ pub fn new_offset_arm_patches<'a>(
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
         FNIS_BA_BLEND_TRANSITION_5230,
-        [right_offset_event.as_str(), left_offset_event.as_str()],
-        [&right_offset_state_name, &left_offset_state_name],
+        [animation.anim_event],
+        [&class_indexes[0]],
         priority,
     ));
 
@@ -118,7 +120,7 @@ pub fn new_offset_arm_patches<'a>(
                     "transitions": "#5111",
                     "generator": &class_indexes[1],
                     "name": right_offset_state_name,
-                    "stateId": calculate_hash(&right_offset_state_name), // $99/1$
+                    "stateId": class_index_0_id, // $99/1$
                     "probability": 1.0,
                     "enable": true
                 }),
@@ -207,7 +209,7 @@ pub fn new_offset_arm_patches<'a>(
                         "transitions": transition,
                         "generator": &class_indexes[3],
                         "name": left_offset_state_name,
-                        "stateId": calculate_hash(&left_offset_state_name),
+                        "stateId": class_index_0_id,
                         "probability": 1.0,
                         "enable": true
                     }),

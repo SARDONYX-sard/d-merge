@@ -31,8 +31,8 @@ pub fn new_kill_patches<'a>(
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
     let player_event = paired_and_kill_animation.anim_event;
+    let npc_event = format!("pa_{player_event}"); // NOTE: Since items in eventNames are inherently unique, this approach is acceptable.
 
-    let npc_event = format!("pa_{player_event}_{class_index_0_id}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{}\\{}",
@@ -1013,11 +1013,11 @@ pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
 /// If `eventId` and `toStateId` do not correctly match the root
 /// `hkbStateMachineInfo`, the game will **crash instantly**
 /// at the moment the animation is played.
-pub fn new_push_transitions_seq_patch<'a>(
+pub fn new_push_transitions_seq_patch<'a, const N: usize>(
     index: &'static str,
     transition_index: &'static str,
-    events: [&str; 2],
-    root_state_names: [&String; 2],
+    events: [&str; N],
+    root_state_names: [&String; N],
     priority: usize,
 ) -> (json_path::JsonPath<'a>, ValueWithPriority<'a>) {
     let transitions: Vec<_> = events
