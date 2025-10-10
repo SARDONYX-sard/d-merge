@@ -149,7 +149,8 @@ pub fn collect_borrowed_patches<'a>(
                     events.par_sort_unstable();
                     let patches = new_push_events_seq_patch(
                         &events,
-                        owned_data.behavior_entry,
+                        owned_data.behavior_entry.master_string_data_index,
+                        owned_data.behavior_entry.master_behavior_graph_index,
                         owned_data.priority,
                     );
                     for (path, patch) in patches {
@@ -374,15 +375,16 @@ fn new_push_anim_seq_patch<'a>(
         .insert(json_path, patch);
 }
 
-fn new_push_events_seq_patch<'a>(
-    events: &[Cow<'a, str>],
-    behavior_entry: &BehaviorEntry,
+pub fn new_push_events_seq_patch<'a>(
+    events: &[Cow<'_, str>],
+    string_data_index: &'static str,
+    behavior_graph_index: &'static str,
     priority: usize,
 ) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
     [
         (
             json_path![
-                behavior_entry.master_string_data_index,
+                string_data_index,
                 "hkbBehaviorGraphStringData",
                 "eventNames",
             ],
@@ -395,11 +397,7 @@ fn new_push_events_seq_patch<'a>(
             },
         ),
         (
-            json_path![
-                behavior_entry.master_behavior_graph_index,
-                "hkbBehaviorGraphData",
-                "eventInfos",
-            ],
+            json_path![behavior_graph_index, "hkbBehaviorGraphData", "eventInfos",],
             ValueWithPriority {
                 patch: JsonPatch {
                     op: PUSH_OP,

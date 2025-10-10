@@ -10,6 +10,7 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::flags::FNISAnimFlags
 use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::FNISAnimation;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior;
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
+use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::calculate_hash, JsonPatchPairs, PUSH_OP,
 };
@@ -34,6 +35,17 @@ pub fn new_offset_arm_patches<'a>(
 
     let right_offset_state_name = format!("FNIS_RightOffset{priority}");
     let left_offset_state_name = format!("FNIS_LeftOffset{priority}");
+
+    seq_patches.extend(new_push_events_seq_patch(
+        &[
+            right_offset_event.as_str().into(),
+            left_offset_event.as_str().into(),
+        ],
+        "#0083",
+        "#0085",
+        priority,
+    ));
+
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
         [right_offset_event.as_str(), left_offset_event.as_str()],
