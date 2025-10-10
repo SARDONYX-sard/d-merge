@@ -23,15 +23,21 @@ use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
 };
 
+/// A patch with borrowed references to a single FNIS_*_List.txt file.
 #[derive(Debug)]
 pub struct OneListPatch<'a> {
-    /// `["Animations\\<namespace>\\anim_file.hkx"]`
+    /// `hkbCharacterStringData.animationNames` of each default(behavior) file(e.g. `defaultmale.xml`).
     pub animation_paths: HashSet<String>,
+    /// `hkbBehaviorGraphStringData.eventNames` of each master file(e.g. `0_master.xml`).
     pub events: HashSet<Cow<'a, str>>,
+    /// `animationdatasinglefile.txt` patch
+    ///
+    /// That txt file actually has the key first, followed by a sequence of values.
+    /// This is an array of those key(target)-value pairs.
     pub adsf_patches: Vec<AdsfPatch<'a>>,
-
-    /// replace one field, Add one class patches to `0_master.xml`(or each creature master xml)
+    /// Add/Replace one field/class patches to master file(e.g. `0_master.xml`).
     pub one_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+    /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
     pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 }
 
