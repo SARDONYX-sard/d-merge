@@ -5,7 +5,7 @@ mod tests {
     #[derive(Debug, serde::Deserialize)]
     pub struct BehaviorEntry {
         pub behavior_object: String,
-        pub base_folder: String,
+        pub base_dir: String,
         pub default_behavior: String,
         pub default_behavior_index: String,
         pub master_behavior: String,
@@ -15,6 +15,10 @@ mod tests {
         pub master_behavior_graph_index: String,
         /// `hkbVariableValueSet` index
         pub master_value_set_index: String,
+        /// `animationdatasinglefile.txt` map key.
+        ///
+        /// - e.g. `DefaultMale~1`
+        pub anim_data_key: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -32,28 +36,33 @@ mod tests {
 
         let mut map_entries = String::new();
         for entry in entries {
+            let BehaviorEntry {
+                behavior_object,
+                base_dir,
+                default_behavior,
+                default_behavior_index,
+                master_behavior,
+                master_behavior_index,
+                master_string_data_index,
+                master_behavior_graph_index,
+                master_value_set_index,
+                anim_data_key,
+            } = entry;
+
             map_entries.push_str(&format!(
-                r###"    "{bo}" => BehaviorEntry {{
-        behavior_object: "{bo}",
-        base_dir: "{bf}",
-        default_behavior: "{db}",
-        default_behavior_index: "{dbi}",
-        master_behavior: "{mb}",
-        master_behavior_index: "{mbi}",
-        master_string_data_index: "{msi}",
-        master_behavior_graph_index: "{mb_g_i}",
-        master_value_set_index: "{mvi}",
+                r###"    "{behavior_object}" => BehaviorEntry {{
+        behavior_object: "{behavior_object}",
+        base_dir: "{base_dir}",
+        default_behavior: "{default_behavior}",
+        default_behavior_index: "{default_behavior_index}",
+        master_behavior: "{master_behavior}",
+        master_behavior_index: "{master_behavior_index}",
+        master_string_data_index: "{master_string_data_index}",
+        master_behavior_graph_index: "{master_behavior_graph_index}",
+        master_value_set_index: "{master_value_set_index}",
+        anim_data_key: "{anim_data_key}",
     }},
-"###,
-                bo = entry.behavior_object,
-                bf = entry.base_folder,
-                db = entry.default_behavior,
-                dbi = entry.default_behavior_index,
-                mb = entry.master_behavior,
-                mbi = entry.master_behavior_index,
-                msi = entry.master_string_data_index,
-                mb_g_i = entry.master_behavior_graph_index,
-                mvi = entry.master_value_set_index,
+"###
             ));
         }
 
@@ -127,6 +136,15 @@ pub struct BehaviorEntry {
     /// - hkbVariableValueSet.wordVariableValues
     /// - hkbBehaviorGraphData.variableInfos
     pub master_value_set_index: &'static str,
+
+    /// `animationdatasinglefile.txt` map key.
+    /// Used for generating FNIS patches with MD and RD.
+    /// - e.g. `DefaultMale~1`
+    ///
+    /// # Note
+    /// If `character` or `character/_1stperson`, patches must be
+    /// applied to both `DefaultMale~1` and `DefaultFemale~1`.
+    pub anim_data_key: &'static str,
 }
 
 impl BehaviorEntry {
@@ -150,14 +168,25 @@ impl BehaviorEntry {
         unsafe { TemplateKey::new_unchecked(Cow::Owned(path)) }
     }
 
-    /// Is humanoid patch.
+    /// Is `character` or `character/_1stperson` patch.
     ///
     /// # Usage
     /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
     /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
     /// This is the condition check for that purpose.
+    #[inline]
     pub fn is_humanoid(&self) -> bool {
         HUMANOID.contains_key(self.behavior_object)
+    }
+
+    /// This patch returns whether `draugr` is the target.
+    ///
+    /// # Use cases for this API
+    /// `draugr` shares `draugrskeleton` and skeleton, so the same Animation must be registered. This is used for that determination.
+    /// Consequently, `event` and `animationdatasinglefile.txt` are also synchronized. (It's unclear if this is actually correct)
+    #[inline]
+    pub fn is_draugr(&self) -> bool {
+        self.behavior_object == "draugr"
     }
 }
 
@@ -172,6 +201,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0095",
         master_behavior_graph_index: "#0097",
         master_value_set_index: "#0096",
+        anim_data_key: "DefaultMale~1", // Need `DefaultFemale~1` too
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -185,6 +215,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0106",
         master_behavior_graph_index: "#0108",
         master_value_set_index: "#0107",
+        anim_data_key: "DefaultMale~1", // Need `DefaultFemale~1` too
     },
 };
 
@@ -201,6 +232,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     master_string_data_index: "#0106",
     master_behavior_graph_index: "#0108",
     master_value_set_index: "#0107",
+    anim_data_key: "DefaultFemale~1",
 };
 
 /// # Why need this?
@@ -216,6 +248,7 @@ pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     master_string_data_index: "#0092",
     master_behavior_graph_index: "#0094",
     master_value_set_index: "#0093",
+    anim_data_key: "DraugrSkeletonProject~1"
 };
 "###
         .to_string();

@@ -48,6 +48,15 @@ pub struct BehaviorEntry {
     /// - hkbVariableValueSet.wordVariableValues
     /// - hkbBehaviorGraphData.variableInfos
     pub master_value_set_index: &'static str,
+
+    /// `animationdatasinglefile.txt` map key.
+    /// Used for generating FNIS patches with MD and RD.
+    /// - e.g. `DefaultMale~1`
+    ///
+    /// # Note
+    /// If `character` or `character/_1stperson`, patches must be
+    /// applied to both `DefaultMale~1` and `DefaultFemale~1`.
+    pub anim_data_key: &'static str,
 }
 
 impl BehaviorEntry {
@@ -71,14 +80,25 @@ impl BehaviorEntry {
         unsafe { TemplateKey::new_unchecked(Cow::Owned(path)) }
     }
 
-    /// Is humanoid patch.
+    /// Is `character` or `character/_1stperson` patch.
     ///
     /// # Usage
     /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
     /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
     /// This is the condition check for that purpose.
+    #[inline]
     pub fn is_humanoid(&self) -> bool {
         HUMANOID.contains_key(self.behavior_object)
+    }
+
+    /// This patch returns whether `draugr` is the target.
+    ///
+    /// # Use cases for this API
+    /// `draugr` shares `draugrskeleton` and skeleton, so the same Animation must be registered. This is used for that determination.
+    /// Consequently, `event` and `animationdatasinglefile.txt` are also synchronized. (It's unclear if this is actually correct)
+    #[inline]
+    pub fn is_draugr(&self) -> bool {
+        self.behavior_object == "draugr"
     }
 }
 
@@ -93,6 +113,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0095",
         master_behavior_graph_index: "#0097",
         master_value_set_index: "#0096",
+        anim_data_key: "DefaultMale~1", // Need `DefaultFemale~1` too
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -106,6 +127,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0106",
         master_behavior_graph_index: "#0108",
         master_value_set_index: "#0107",
+        anim_data_key: "DefaultMale~1", // Need `DefaultFemale~1` too
     },
 };
 
@@ -122,6 +144,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     master_string_data_index: "#0106",
     master_behavior_graph_index: "#0108",
     master_value_set_index: "#0107",
+    anim_data_key: "DefaultFemale~1",
 };
 
 /// # Why need this?
@@ -137,6 +160,7 @@ pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     master_string_data_index: "#0092",
     master_behavior_graph_index: "#0094",
     master_value_set_index: "#0093",
+    anim_data_key: "DraugrSkeletonProject~1",
 };
 
 pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
@@ -150,6 +174,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0086",
         master_behavior_graph_index: "#0088",
         master_value_set_index: "#0087",
+        anim_data_key: "AtronachFlame~1",
     },
     "atronachfrost" => BehaviorEntry {
         behavior_object: "atronachfrost",
@@ -161,6 +186,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0088",
         master_behavior_graph_index: "#0090",
         master_value_set_index: "#0089",
+        anim_data_key: "AtronachFrostProject~1",
     },
     "atronachstorm" => BehaviorEntry {
         behavior_object: "atronachstorm",
@@ -172,6 +198,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0083",
         master_behavior_graph_index: "#0085",
         master_value_set_index: "#0084",
+        anim_data_key: "AtronachStormProject~1",
     },
     "bear" => BehaviorEntry {
         behavior_object: "bear",
@@ -183,6 +210,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "BearProject~1",
     },
     "benthiclurker" => BehaviorEntry {
         behavior_object: "benthiclurker",
@@ -194,6 +222,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0093",
         master_behavior_graph_index: "#0095",
         master_value_set_index: "#0094",
+        anim_data_key: "BenthicLurkerProject~1",
     },
     "boarriekling" => BehaviorEntry {
         behavior_object: "boarriekling",
@@ -205,6 +234,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0093",
         master_behavior_graph_index: "#0095",
         master_value_set_index: "#0094",
+        anim_data_key: "BoarProject~1",
     },
     "chaurus" => BehaviorEntry {
         behavior_object: "chaurus",
@@ -216,6 +246,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0091",
         master_behavior_graph_index: "#0093",
         master_value_set_index: "#0092",
+        anim_data_key: "ChickenProject~1",
     },
     "chaurusflyer" => BehaviorEntry {
         behavior_object: "chaurusflyer",
@@ -227,6 +258,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0085",
         master_behavior_graph_index: "#0087",
         master_value_set_index: "#0086",
+        anim_data_key: "ChaurusFlyer~1",
     },
     "chicken" => BehaviorEntry {
         behavior_object: "chicken",
@@ -238,6 +270,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0085",
         master_behavior_graph_index: "#0087",
         master_value_set_index: "#0086",
+        anim_data_key: "ChickenProject~1",
     },
     "cow" => BehaviorEntry {
         behavior_object: "cow",
@@ -249,6 +282,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "HighlandCowProject~1",
     },
     "deer" => BehaviorEntry {
         behavior_object: "deer",
@@ -260,6 +294,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "DeerProject~1",
     },
     "dog" => BehaviorEntry {
         behavior_object: "dog",
@@ -271,6 +306,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "DogProject~1",
     },
     "dragon" => BehaviorEntry {
         behavior_object: "dragon",
@@ -282,6 +318,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0101",
         master_behavior_graph_index: "#0103",
         master_value_set_index: "#0102",
+        anim_data_key: "DragonProject~1",
     },
     "dragonpriest" => BehaviorEntry {
         behavior_object: "dragonpriest",
@@ -293,6 +330,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0088",
         master_behavior_graph_index: "#0090",
         master_value_set_index: "#0089",
+        anim_data_key: "Dragon_Priest~1",
     },
     "draugr" => BehaviorEntry {
         behavior_object: "draugr",
@@ -304,6 +342,7 @@ pub static CREATURES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0092",
         master_behavior_graph_index: "#0094",
         master_value_set_index: "#0093",
+        anim_data_key: "DraugrProject~1",
     },
 };
 
@@ -318,6 +357,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0092",
         master_behavior_graph_index: "#0094",
         master_value_set_index: "#0093",
+        anim_data_key: "DraugrSkeletonProject~1",
     },
     "dwarvenballistacenturion" => BehaviorEntry {
         behavior_object: "dwarvenballistacenturion",
@@ -329,6 +369,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0088",
         master_behavior_graph_index: "#0090",
         master_value_set_index: "#0089",
+        anim_data_key: "BallistaCenturion~1",
     },
     "dwarvenspherecenturion" => BehaviorEntry {
         behavior_object: "dwarvenspherecenturion",
@@ -340,6 +381,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0085",
         master_behavior_graph_index: "#0087",
         master_value_set_index: "#0086",
+        anim_data_key: "SphereCenturion~1",
     },
     "dwarvenspider" => BehaviorEntry {
         behavior_object: "dwarvenspider",
@@ -351,6 +393,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0082",
         master_behavior_graph_index: "#0084",
         master_value_set_index: "#0083",
+        anim_data_key: "DwarvenSpiderCenturionProject~1",
     },
     "dwarvensteamcenturion" => BehaviorEntry {
         behavior_object: "dwarvensteamcenturion",
@@ -362,6 +405,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0085",
         master_behavior_graph_index: "#0087",
         master_value_set_index: "#0086",
+        anim_data_key: "SteamProject~1",
     },
     "falmer" => BehaviorEntry {
         behavior_object: "falmer",
@@ -373,6 +417,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0099",
         master_behavior_graph_index: "#0101",
         master_value_set_index: "#0100",
+        anim_data_key: "FalmerProject~1",
     },
     "frostbitespider" => BehaviorEntry {
         behavior_object: "frostbitespider",
@@ -384,6 +429,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0084",
         master_behavior_graph_index: "#0086",
         master_value_set_index: "#0085",
+        anim_data_key: "FrostbiteSpiderProject~1",
     },
     "giant" => BehaviorEntry {
         behavior_object: "giant",
@@ -395,6 +441,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0093",
         master_behavior_graph_index: "#0095",
         master_value_set_index: "#0094",
+        anim_data_key: "GiantProject~1",
     },
     "goat" => BehaviorEntry {
         behavior_object: "goat",
@@ -406,6 +453,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0077",
         master_behavior_graph_index: "#0079",
         master_value_set_index: "#0078",
+        anim_data_key: "GoatProject~1",
     },
     "hagraven" => BehaviorEntry {
         behavior_object: "hagraven",
@@ -417,6 +465,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0088",
         master_behavior_graph_index: "#0090",
         master_value_set_index: "#0089",
+        anim_data_key: "HagravenProject~1",
     },
     "hare" => BehaviorEntry {
         behavior_object: "hare",
@@ -428,6 +477,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0085",
         master_behavior_graph_index: "#0087",
         master_value_set_index: "#0086",
+        anim_data_key: "HareProject~1",
     },
     "hmdaedra" => BehaviorEntry {
         behavior_object: "hmdaedra",
@@ -439,6 +489,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0086",
         master_behavior_graph_index: "#0088",
         master_value_set_index: "#0087",
+        anim_data_key: "HMDaedra~1",
     },
     "horker" => BehaviorEntry {
         behavior_object: "horker",
@@ -450,6 +501,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "HorkerProject~1",
     },
     "horse" => BehaviorEntry {
         behavior_object: "horse",
@@ -461,6 +513,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0087",
         master_behavior_graph_index: "#0089",
         master_value_set_index: "#0088",
+        anim_data_key: "HorseProject~1",
     },
     "icewraith" => BehaviorEntry {
         behavior_object: "icewraith",
@@ -472,6 +525,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0079",
         master_behavior_graph_index: "#0081",
         master_value_set_index: "#0080",
+        anim_data_key: "IceWraithProject~1",
     },
     "mammoth" => BehaviorEntry {
         behavior_object: "mammoth",
@@ -483,6 +537,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "MammothProject~1",
     },
     "mudcrab" => BehaviorEntry {
         behavior_object: "mudcrab",
@@ -494,6 +549,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0086",
         master_behavior_graph_index: "#0088",
         master_value_set_index: "#0087",
+        anim_data_key: "MudcrabProject~1",
     },
     "netch" => BehaviorEntry {
         behavior_object: "netch",
@@ -505,6 +561,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0081",
         master_behavior_graph_index: "#0083",
         master_value_set_index: "#0082",
+        anim_data_key: "NetchProject~1",
     },
     "riekling" => BehaviorEntry {
         behavior_object: "riekling",
@@ -516,6 +573,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0095",
         master_behavior_graph_index: "#0097",
         master_value_set_index: "#0096",
+        anim_data_key: "RieklingProject~1",
     },
     "sabrecat" => BehaviorEntry {
         behavior_object: "sabrecat",
@@ -527,6 +585,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0077",
         master_behavior_graph_index: "#0079",
         master_value_set_index: "#0078",
+        anim_data_key: "SabreCatProject~1",
     },
     "scrib" => BehaviorEntry {
         behavior_object: "scrib",
@@ -538,6 +597,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0094",
         master_behavior_graph_index: "#0096",
         master_value_set_index: "#0095",
+        anim_data_key: "ScribProject~1",
     },
     "skeever" => BehaviorEntry {
         behavior_object: "skeever",
@@ -549,6 +609,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0077",
         master_behavior_graph_index: "#0079",
         master_value_set_index: "#0078",
+        anim_data_key: "SkeeverProject~1",
     },
     "slaughterfish" => BehaviorEntry {
         behavior_object: "slaughterfish",
@@ -560,6 +621,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0081",
         master_behavior_graph_index: "#0083",
         master_value_set_index: "#0082",
+        anim_data_key: "SlaughterfishProject~1",
     },
     "spriggan" => BehaviorEntry {
         behavior_object: "spriggan",
@@ -571,6 +633,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0090",
         master_behavior_graph_index: "#0092",
         master_value_set_index: "#0091",
+        anim_data_key: "Spriggan~1",
     },
     "troll" => BehaviorEntry {
         behavior_object: "troll",
@@ -582,6 +645,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0089",
         master_behavior_graph_index: "#0091",
         master_value_set_index: "#0090",
+        anim_data_key: "TrollProject~1",
     },
     "vampirebrute" => BehaviorEntry {
         behavior_object: "vampirebrute",
@@ -593,6 +657,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0093",
         master_behavior_graph_index: "#0095",
         master_value_set_index: "#0094",
+        anim_data_key: "VampireBruteProject~1",
     },
     "vampirelord" => BehaviorEntry {
         behavior_object: "vampirelord",
@@ -604,6 +669,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0101",
         master_behavior_graph_index: "#0103",
         master_value_set_index: "#0102",
+        anim_data_key: "VampireLord~1",
     },
     "werewolfbeast" => BehaviorEntry {
         behavior_object: "werewolfbeast",
@@ -615,6 +681,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0096",
         master_behavior_graph_index: "#0098",
         master_value_set_index: "#0097",
+        anim_data_key: "WerewolfBeastProject~1",
     },
     "wisp" => BehaviorEntry {
         behavior_object: "wisp",
@@ -626,6 +693,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0086",
         master_behavior_graph_index: "#0088",
         master_value_set_index: "#0087",
+        anim_data_key: "WispProject~1",
     },
     "witchlight" => BehaviorEntry {
         behavior_object: "witchlight",
@@ -637,6 +705,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0064",
         master_behavior_graph_index: "#0066",
         master_value_set_index: "#0065",
+        anim_data_key: "WitchlightProject~1",
     },
     "wolf" => BehaviorEntry {
         behavior_object: "wolf",
@@ -648,6 +717,7 @@ pub static SKELETONS: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0078",
         master_behavior_graph_index: "#0080",
         master_value_set_index: "#0079",
+        anim_data_key: "WolfProject~1",
     },
 };
 
@@ -662,6 +732,7 @@ pub static AUXBONES: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0062",
         master_behavior_graph_index: "#0064",
         master_value_set_index: "#0063",
+        anim_data_key: "TailProject~1",
     },
 };
 
@@ -676,6 +747,7 @@ pub static PLANTS_ACTIVATORS: phf::Map<&'static str, BehaviorEntry> = phf::phf_m
         master_string_data_index: "#0052",
         master_behavior_graph_index: "#0054",
         master_value_set_index: "#0053",
+        anim_data_key: "Caveworm~1",
     },
     "cavewormgroup" => BehaviorEntry {
         behavior_object: "cavewormgroup",
@@ -687,6 +759,7 @@ pub static PLANTS_ACTIVATORS: phf::Map<&'static str, BehaviorEntry> = phf::phf_m
         master_string_data_index: "#0052",
         master_behavior_graph_index: "#0054",
         master_value_set_index: "#0053",
+        anim_data_key: "Caveworm3Group~1",
     },
     "cavewormsmall" => BehaviorEntry {
         behavior_object: "cavewormsmall",
@@ -698,5 +771,6 @@ pub static PLANTS_ACTIVATORS: phf::Map<&'static str, BehaviorEntry> = phf::phf_m
         master_string_data_index: "#0052",
         master_behavior_graph_index: "#0054",
         master_value_set_index: "#0053",
+        anim_data_key: "CavewormSmall~1",
     },
 };
