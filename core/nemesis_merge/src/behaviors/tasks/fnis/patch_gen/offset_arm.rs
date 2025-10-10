@@ -144,7 +144,7 @@ pub fn new_offset_arm_patches<'a>(
                         "__ptr": class_indexes[1],
                         "variableBindingSet": "#0000",
                         "userData": 0,
-                        "name": format!("FNIS_RightOffsetCG{priority}"),
+                        "name": right_offset_event,
                         "animationName": anim_file,
                         "triggers": "#0000",
                         "cropStartAmountLocalTime": 0.0,
@@ -202,8 +202,8 @@ pub fn new_offset_arm_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": transition,
                         "generator": &class_indexes[3],
-                        "name": left_offset_event,
-                        "stateId": 0,
+                        "name": left_offset_state_name,
+                        "stateId": calculate_hash(&left_offset_state_name),
                         "probability": 1.0,
                         "enable": true
                     }),
@@ -236,7 +236,7 @@ pub fn new_offset_arm_patches<'a>(
                         "__ptr": class_indexes[3],
                         "variableBindingSet": "#0000",
                         "userData": 0,
-                        "name": format!("FNIS_LeftOffsetCG{priority}"),
+                        "name": left_offset_event,
                         "animationName": anim_file, // Animations\\Fofa$
                         "triggers": "#0000",
                         "cropStartAmountLocalTime": 0.0,
