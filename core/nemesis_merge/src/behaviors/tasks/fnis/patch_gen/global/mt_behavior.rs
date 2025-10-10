@@ -107,7 +107,7 @@ pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
                 op: OpRangeKind::Pure(Op::Add),
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_BA_BLEND_TRANSITION_5230,
-                    "variableBindingSet": null,
+                    "variableBindingSet": "#0000",
                     "userData": 0,
                     "name": "FNIS_BlendTransition1",
                     "selfTransitionMode": "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC",
