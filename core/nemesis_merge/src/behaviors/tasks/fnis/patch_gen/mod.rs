@@ -82,10 +82,28 @@ pub fn collect_borrowed_patches<'a>(
                 adsf_patches,
                 one_master_patches,
                 seq_master_patches,
+                one_mt_behavior_patches,
+                seq_mt_behavior_patches,
             } = match generate_patch(owned_data, list) {
                 Ok(patches) => patches,
                 Err(err) => return Either::Right(Error::from(err)),
             };
+
+            if owned_data.behavior_entry.behavior_object == "character" {
+                let entry = raw_borrowed_patches
+                    .0
+                    .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
+                    .or_default();
+                if !template_keys.contains(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
+                    template_keys.insert(THREAD_PERSON_MT_BEHAVIOR_KEY.clone());
+                };
+                for (path, patch) in one_mt_behavior_patches {
+                    entry.one.insert(path, patch);
+                }
+                for (path, patch) in seq_mt_behavior_patches {
+                    entry.seq.insert(path, patch);
+                }
+            }
 
             // Add patches to master.xml
             {

@@ -39,6 +39,11 @@ pub struct OneListPatch<'a> {
     pub one_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
     /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
     pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+
+    /// Add/Replace one field/class patches to master file(e.g. `0_master.xml`).
+    pub one_mt_behavior_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+    /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
+    pub seq_mt_behavior_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 }
 
 /// Generate from one list file.
@@ -54,6 +59,8 @@ pub fn generate_patch<'a>(
     let mut all_adsf_patches = vec![];
     let mut one_master_patches = vec![];
     let mut seq_master_patches = vec![];
+    let mut one_mt_behavior_patches = vec![];
+    let mut seq_mt_behavior_patches = vec![];
 
     let namespace = owned_data.namespace.as_str();
     for pattern in list.patterns {
@@ -138,11 +145,19 @@ pub fn generate_patch<'a>(
                 }
                 all_events.insert(Cow::Borrowed(anim_event));
 
-                if matches!(*anim_type, FNISAnimType::OffsetArm) {
+                if matches!(*anim_type, FNISAnimType::OffsetArm)
+                    && owned_data.behavior_entry.behavior_object == "character"
+                {
                     let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
-                    one_master_patches.par_extend(one);
-                    seq_master_patches.par_extend(seq);
+                    one_mt_behavior_patches.par_extend(one);
+                    seq_mt_behavior_patches.par_extend(seq);
+                } else {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(
+                        "The OffsetArm patch does not support anything other than characters."
+                    );
                 };
+
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
         };
@@ -154,6 +169,8 @@ pub fn generate_patch<'a>(
         adsf_patches: all_adsf_patches,
         one_master_patches,
         seq_master_patches,
+        one_mt_behavior_patches,
+        seq_mt_behavior_patches,
     })
 }
 
