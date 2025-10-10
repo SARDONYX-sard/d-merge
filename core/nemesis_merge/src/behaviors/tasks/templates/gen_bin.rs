@@ -205,19 +205,22 @@ mod tests {
             pub master_string_data_index: String,
             /// `hkbBehaviorGraphData` index. e.g. `#0108`
             pub master_behavior_graph_index: String,
+            /// `hkbVariableValueSet` index
+            pub master_value_set_index: String,
         }
 
         impl NewEntry {
-            fn from_indexes(entry: &Entry, indexes: (String, String, String, String)) -> Self {
+            fn from_indexes(entry: &Entry, indexes: BehaviorIndexes) -> Self {
                 Self {
                     behavior_object: entry.behavior_object.clone(),
                     base_folder: entry.base_folder.replace("\\", "/"),
                     default_behavior: entry.default_behavior.replace("\\", "/"),
-                    default_behavior_index: indexes.0,
+                    default_behavior_index: indexes.default_root_index,
                     master_behavior: entry.master_behavior.replace("\\", "/"),
-                    master_behavior_index: indexes.1,
-                    master_string_data_index: indexes.2,
-                    master_behavior_graph_index: indexes.3,
+                    master_behavior_index: indexes.master_root_index,
+                    master_string_data_index: indexes.master_string_data_index,
+                    master_behavior_graph_index: indexes.master_behavior_graph_index,
+                    master_value_set_index: indexes.master_value_set_index,
                 }
             }
         }
@@ -248,13 +251,18 @@ mod tests {
                 .collect()
         }
 
+        struct BehaviorIndexes {
+            default_root_index: String,
+            master_root_index: String,
+            master_string_data_index: String,
+            master_value_set_index: String,
+            master_behavior_graph_index: String,
+        }
+
         // -------------------------------
         // Behavior analyzers
         // -------------------------------
-        fn get_behavior(
-            root_dir: &Path,
-            entry: &Entry,
-        ) -> Result<(String, String, String, String), String> {
+        fn get_behavior(root_dir: &Path, entry: &Entry) -> Result<BehaviorIndexes, String> {
             let mut master = root_dir
                 .join(&entry.base_folder)
                 .join(&entry.master_behavior);
@@ -264,26 +272,30 @@ mod tests {
                 .join(&entry.default_behavior);
             default.set_extension("xml");
 
-            let default_res = get_default_root_state(&default)
-                .ok_or_else(|| format!("default not found: {}", default.display()))?;
-            let master_res = get_master_root_behavior(&master)
+            let default_root_index = get_default_root_state(&default)?;
+            let master_root_index = get_master_root_behavior(&master)
                 .ok_or_else(|| format!("master not found: {}", master.display()))?;
-            let master_string_data_res = get_master_string_data(&master)
-                .ok_or_else(|| format!("master_var not found: {}", master.display()))?;
-            let master_behavior_graph_res = get_master_behavior_graph_data(&master)
-                .ok_or_else(|| format!("master_info not found: {}", master.display()))?;
+            let (master_behavior_graph_index, master_string_data_index, master_value_set_index) =
+                get_master_behavior_graph_data(&master)
+                    .ok_or_else(|| format!("master_info not found: {}", master.display()))?;
 
-            Ok((
-                default_res,
-                master_res,
-                master_string_data_res,
-                master_behavior_graph_res,
-            ))
+            Ok(BehaviorIndexes {
+                default_root_index,
+                master_root_index,
+                master_string_data_index,
+                master_value_set_index,
+                master_behavior_graph_index,
+            })
         }
 
-        fn get_default_root_state(default: &Path) -> Option<String> {
-            let string = std::fs::read_to_string(default).ok()?;
-            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
+        fn get_default_root_state(default: &Path) -> Result<String, String> {
+            let string = std::fs::read_to_string(default)
+                .map_err(|e| format!("failed to read default file {}: {}", default.display(), e))?;
+
+            let class_map: serde_hkx_features::ClassMap =
+                serde_hkx::from_str(&string).map_err(|e| {
+                    format!("failed to parse default file {}: {}", default.display(), e)
+                })?;
 
             let class: Vec<_> = class_map
                 .par_iter()
@@ -294,10 +306,17 @@ mod tests {
                 .collect();
 
             if class.is_empty() || class.len() > 2 {
-                return None;
+                return Err(format!(
+                    "unexpected number of hkbCharacterStringData classes: {}",
+                    class.len()
+                ));
             }
 
-            class[0].__ptr.as_ref().map(|ptr| ptr.to_string())
+            class[0]
+                .__ptr
+                .as_ref()
+                .map(|ptr| ptr.to_string())
+                .ok_or_else(|| "default_root_index pointer is None".to_string())
         }
 
         fn get_master_root_behavior(master: &Path) -> Option<String> {
@@ -317,41 +336,11 @@ mod tests {
                 }
             }
 
-            let class: Vec<_> = class_map
-                .par_iter()
-                .filter_map(|(_, class)| match class {
-                    Classes::hkbBehaviorGraphStringData(class) => Some(class),
-                    _ => None,
-                })
-                .collect();
-
-            if class.is_empty() || class.len() > 2 {
-                return None;
-            }
-            class[0].__ptr.as_ref().map(|ptr| ptr.to_string());
-
             None
         }
 
-        fn get_master_string_data(master: &Path) -> Option<String> {
-            let string = std::fs::read_to_string(master).ok()?;
-            let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
-
-            let class: Vec<_> = class_map
-                .par_iter()
-                .filter_map(|(_, class)| match class {
-                    Classes::hkbBehaviorGraphStringData(class) => Some(class),
-                    _ => None,
-                })
-                .collect();
-
-            if class.is_empty() || class.len() > 2 {
-                return None;
-            }
-            class[0].__ptr.as_ref().map(|ptr| ptr.to_string())
-        }
-
-        fn get_master_behavior_graph_data(master: &Path) -> Option<String> {
+        /// Return (behavior index, hkbBehaviorGraphStringData index, hkbVariableValueSet index)
+        fn get_master_behavior_graph_data(master: &Path) -> Option<(String, String, String)> {
             let string = std::fs::read_to_string(master).ok()?;
             let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
 
@@ -366,7 +355,12 @@ mod tests {
             if class.is_empty() || class.len() > 2 {
                 return None;
             }
-            Some(class[0].__ptr.as_ref()?.to_string())
+
+            Some((
+                class[0].__ptr.as_ref()?.to_string(),
+                class[0].m_stringData.get().to_string(),
+                class[0].m_variableInitialValues.get().to_string(),
+            ))
         }
 
         let root_dir = Path::new("../../resource/xml/templates/meshes");
@@ -399,7 +393,7 @@ mod tests {
 
         if !errors.is_empty() {
             let joined = errors.join("\n");
-            fs::write("../../dummy/fnis/table/errors_list.log", joined).unwrap();
+            fs::write("../../dummy/behaviors_table_errors.log", joined).unwrap();
         }
     }
 
