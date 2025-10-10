@@ -1,4 +1,5 @@
 mod gen_list_patch;
+#[allow(unused)] // TODO: use `master_value_set_index`
 pub mod generated_behaviors;
 mod kill_move;
 mod pair;

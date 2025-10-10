@@ -13,6 +13,8 @@ mod tests {
         pub master_string_data_index: String,
         /// `hkbBehaviorGraphData` index. e.g. `#0108`
         pub master_behavior_graph_index: String,
+        /// `hkbVariableValueSet` index
+        pub master_value_set_index: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -40,6 +42,7 @@ mod tests {
         master_behavior_index: "{mbi}",
         master_string_data_index: "{msi}",
         master_behavior_graph_index: "{mb_g_i}",
+        master_value_set_index: "{mvi}",
     }},
 "###,
                 bo = entry.behavior_object,
@@ -50,6 +53,7 @@ mod tests {
                 mbi = entry.master_behavior_index,
                 msi = entry.master_string_data_index,
                 mb_g_i = entry.master_behavior_graph_index,
+                mvi = entry.master_value_set_index,
             ));
         }
 
@@ -116,6 +120,13 @@ pub struct BehaviorEntry {
     /// `hkbBehaviorGraphData` index. e.g. `#0108`
     /// Used for pushing to eventInfos.
     pub master_behavior_graph_index: &'static str,
+    /// `hkbVariableValueSet` index.
+    ///
+    /// Used for pushing FNIS AnimVar.
+    /// - hkbBehaviorGraphStringData.variableNames
+    /// - hkbVariableValueSet.wordVariableValues
+    /// - hkbBehaviorGraphData.variableInfos
+    pub master_value_set_index: &'static str,
 }
 
 impl BehaviorEntry {
@@ -160,6 +171,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_behavior_index: "#0167",
         master_string_data_index: "#0095",
         master_behavior_graph_index: "#0097",
+        master_value_set_index: "#0096",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
@@ -172,6 +184,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_behavior_index: "#0340",
         master_string_data_index: "#0106",
         master_behavior_graph_index: "#0108",
+        master_value_set_index: "#0107",
     },
 };
 
@@ -187,6 +200,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     master_behavior_index: "#2521",
     master_string_data_index: "#0106",
     master_behavior_graph_index: "#0108",
+    master_value_set_index: "#0107",
 };
 
 /// # Why need this?
@@ -201,6 +215,7 @@ pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     master_behavior_index: "#2026",
     master_string_data_index: "#0092",
     master_behavior_graph_index: "#0094",
+    master_value_set_index: "#0093",
 };
 "###
         .to_string();
