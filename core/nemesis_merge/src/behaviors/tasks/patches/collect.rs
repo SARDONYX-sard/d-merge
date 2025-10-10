@@ -1,30 +1,27 @@
-use super::paths::{
-    collect::{collect_nemesis_paths, Category},
-    parse::parse_nemesis_path,
-};
-use crate::{
-    behaviors::{
-        priority_ids::{get_nemesis_id, types::PriorityMap},
-        tasks::{
-            adsf::types::OwnedAdsfPatchMap,
-            asdsf::types::OwnedAsdsfPatchMap,
-            patches::types::{BorrowedPatches, OwnedPatchMap, OwnedPatches},
-            templates::key::{MasterIndex, TemplateKey},
-        },
-    },
-    config::{ReportType, StatusReportCounter},
-    errors::{
-        Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
-    },
-    results::filter_results,
-    Config,
-};
 use json_patch::ValueWithPriority;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::{OptionExt as _, ResultExt as _};
 use std::path::{Path, PathBuf};
 use tokio::fs;
+
+use super::paths::{
+    collect::{collect_nemesis_paths, Category},
+    parse::parse_nemesis_path,
+};
+use crate::behaviors::priority_ids::{get_nemesis_id, types::PriorityMap};
+use crate::behaviors::tasks::{
+    adsf::types::OwnedAdsfPatchMap,
+    asdsf::types::OwnedAsdsfPatchMap,
+    patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+    templates::key::{MasterIndex, TemplateKey},
+};
+use crate::config::{ReportType, StatusReportCounter};
+use crate::errors::{
+    Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
+};
+use crate::results::filter_results;
+use crate::Config;
 
 struct OwnedPath {
     category: Category,
@@ -124,12 +121,12 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
 pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
-    fnis_patches: BorrowedPatches<'a>,
-) -> (BorrowedPatches<'a>, Vec<Error>) {
-    let BorrowedPatches {
-        template_keys,
+    fnis_patches: PatchCollection<'a>,
+) -> (PatchCollection<'a>, Vec<Error>) {
+    let PatchCollection {
+        needed_templates: template_keys,
         borrowed_patches: raw_borrowed_patches,
-        behavior_string_data_map: variable_class_map,
+        behavior_graph_data_map: variable_class_map,
     } = fnis_patches;
 
     let reporter = StatusReportCounter::new(
@@ -218,10 +215,10 @@ pub fn collect_borrowed_patches<'a>(
     };
 
     (
-        BorrowedPatches {
-            template_keys,
+        PatchCollection {
+            needed_templates: template_keys,
             borrowed_patches: raw_borrowed_patches,
-            behavior_string_data_map: variable_class_map,
+            behavior_graph_data_map: variable_class_map,
         },
         errors,
     )

@@ -4,7 +4,6 @@ mod kill_move;
 mod pair;
 
 use std::borrow::Cow;
-use std::path::PathBuf;
 
 use dashmap::DashSet;
 use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
@@ -22,7 +21,7 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
     BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
 };
 use crate::behaviors::tasks::patches::types::{
-    BehaviorStringDataMap, BorrowedPatches, RawBorrowedPatches,
+    BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
 };
 use crate::behaviors::tasks::templates::key::{TemplateKey, THREAD_PERSON_0_MASTER_KEY};
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
@@ -41,10 +40,10 @@ pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     status_reporter: &'a StatusReporterFn,
-) -> (BorrowedPatches<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
-    let raw_borrowed_patches = RawBorrowedPatches::default();
+) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
+    let raw_borrowed_patches = BehaviorPatchesMap::default();
     let template_keys = DashSet::new();
-    let variable_class_map = BehaviorStringDataMap::new(); // TODO: Change to compile time phf map.
+    let variable_class_map = BehaviorGraphDataMap::new(); // TODO: Change to compile time phf map.
 
     let reporter = StatusReportCounter::new(
         status_reporter,
@@ -59,7 +58,7 @@ pub fn collect_borrowed_patches<'a>(
                 .parse(&owned_data.list_content)
                 .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
                 .with_context(|_| FailedParseFnisModListSnafu {
-                    path: PathBuf::from(owned_data.to_list_path()),
+                    path: owned_data.to_list_path(),
                 }) {
                 Ok(list) => list,
                 Err(err) => {
@@ -68,10 +67,7 @@ pub fn collect_borrowed_patches<'a>(
                 }
             };
             #[cfg(feature = "tracing")]
-            tracing::debug!(
-                "{list_path}: \n{list:#?}",
-                list_path = owned_data.to_list_path(),
-            );
+            tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
 
             let OneListPatch {
                 animation_paths: animations,
@@ -161,7 +157,7 @@ pub fn collect_borrowed_patches<'a>(
                             &template_keys,
                         );
                     }
-                    // NOTE: Adding animation only to `draugr` will cause `dragurskeleton` to assume the A pose.
+                    // NOTE: Adding animation only to `draugr` will cause `draugrskeleton` to assume the A pose.
                     //       Therefore, we must add it in the same manner.
                     "draugr" => {
                         new_push_anim_seq_patch(
@@ -196,10 +192,10 @@ pub fn collect_borrowed_patches<'a>(
     }
 
     (
-        BorrowedPatches {
-            template_keys,
+        PatchCollection {
+            needed_templates: template_keys,
             borrowed_patches: raw_borrowed_patches,
-            behavior_string_data_map: variable_class_map,
+            behavior_graph_data_map: variable_class_map,
         },
         adsf_patches,
         errors,
@@ -311,7 +307,7 @@ fn new_push_anim_seq_patch<'a>(
     animations: &[String],
     behavior_entry: &BehaviorEntry,
     priority: usize,
-    raw_borrowed_patches: &RawBorrowedPatches<'a>,
+    raw_borrowed_patches: &BehaviorPatchesMap<'a>,
     template_keys: &DashSet<TemplateKey<'static>>,
 ) {
     let behavior_key = behavior_entry.to_default_behavior_template_key();
@@ -461,8 +457,7 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
         })
         .collect();
 
-    // multi events #2529
-    patches.push((
+    let multi_event_2529 = (
         json_path![
             FNIS_AA_GLOBAL_AUTO_GEN_2529,
             "hkbStateMachineEventPropertyArray"
@@ -480,10 +475,8 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
             },
             priority,
         },
-    ));
-
-    // multi events #2534
-    patches.push((
+    );
+    let multi_event_2534 = (
         json_path![
             FNIS_AA_GLOBAL_AUTO_GEN_2534,
             "hkbStateMachineEventPropertyArray"
@@ -501,10 +494,8 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
             },
             priority,
         },
-    ));
-
-    // StringEventPayload #2531
-    patches.push((
+    );
+    let camera_event_2531 = (
         json_path![FNIS_AA_STRING_PAYLOAD_2531, "hkbStringEventPayload"],
         ValueWithPriority {
             patch: JsonPatch {
@@ -516,7 +507,8 @@ fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
             },
             priority,
         },
-    ));
+    );
+    patches.par_extend([multi_event_2529, multi_event_2534, camera_event_2531]);
 
     patches
 }

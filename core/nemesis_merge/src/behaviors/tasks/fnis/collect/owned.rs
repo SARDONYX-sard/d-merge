@@ -34,9 +34,12 @@ use std::{
 use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry;
 
 /// The necessary information for creating a single FNIS mod as a d_merge patch for hkx.
+/// # Note
+/// This is derived by considering the information necessary to generate the Borrowed Nemesis patch after parsing the list.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
-    /// Actor name. (e.g. `character`, `dragon`, `dog`)
+    /// Information required for patch generation, such as actor names(e.g. `character`, `dragon`, `dog`)
+    /// and behavior file paths
     pub behavior_entry: &'static BehaviorEntry,
 
     /// Primarily used for generating havok class IDs(XML name attribute). e.g. `#namespace$1` (The value must be unique.)
@@ -92,13 +95,15 @@ pub struct OwnedFnisInjection {
     /// <hkobject name="#FNIS_Flyer$2" class="hkbStateMachine" signature="0x816c1dcb">...</hkobject>
     /// ```
     current_class_index: AtomicUsize,
-
+    /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
 }
 
 impl OwnedFnisInjection {
-    /// Returns `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}[_{behavior_object}]_List.txt`
-    pub fn to_list_path(&self) -> String {
+    /// Returns relative `meshes/.../FNIS_*_List.txt` path.
+    /// - Humanoid: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_List.txt`
+    /// - Creature: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt`
+    pub fn to_list_path(&self) -> PathBuf {
         let base_dir = self.behavior_entry.base_dir;
         let namespace = &self.namespace;
         if self.behavior_entry.is_humanoid() {
@@ -106,7 +111,7 @@ impl OwnedFnisInjection {
         } else {
             let behavior_object = self.behavior_entry.behavior_object;
             format!("meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt")
-        }
+        }.into()
     }
 
     /// Increments the index and returns the full `name` attribute
@@ -123,7 +128,8 @@ impl OwnedFnisInjection {
         format!("#{}${idx}", self.namespace)
     }
 
-    /// `#FNIS_{namespace}${idx}`
+    /// Returns a new ID for adding a patch to the new `animationdatasinglefile.txt`.
+    /// - `#FNIS_{namespace}${idx}`
     pub fn next_adsf_id(&self) -> String {
         let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire) + 1;
         format!("#FNIS_{}${idx}", self.namespace)

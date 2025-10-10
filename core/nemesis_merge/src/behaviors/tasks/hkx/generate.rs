@@ -1,7 +1,7 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
     behaviors::tasks::{
-        patches::types::BehaviorStringDataMap, templates::types::BorrowedTemplateMap,
+        patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
     },
     config::{ReportType, StatusReportCounter},
     errors::{DedupEventVariableSnafu, Error, FailedIoSnafu, HkxSerSnafu, JsonSnafu, Result},
@@ -24,7 +24,7 @@ use std::{
 pub(crate) fn generate_hkx_files(
     config: &Config,
     templates: BorrowedTemplateMap<'_>,
-    variable_class_map: BehaviorStringDataMap<'_>,
+    variable_class_map: BehaviorGraphDataMap<'_>,
 ) -> Result<(), Vec<Error>> {
     let reporter = StatusReportCounter::new(
         &config.status_report,

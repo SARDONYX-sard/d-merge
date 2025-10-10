@@ -21,7 +21,7 @@ use crate::behaviors::tasks::fnis::patch_gen::pair::new_pair_patches;
 
 #[derive(Debug)]
 pub struct OneListPatch<'a> {
-    /// `vec!["Animations\\<namespace>\\anim_file.hkx"]`
+    /// `["Animations\\<namespace>\\anim_file.hkx"]`
     pub animation_paths: HashSet<String>,
     pub events: HashSet<Cow<'a, str>>,
     pub adsf_patches: Vec<AdsfPatch<'a>>,
@@ -29,13 +29,6 @@ pub struct OneListPatch<'a> {
     /// replace one field, Add one class patches to `0_master.xml`(or each creature master xml)
     pub one_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
     pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
-}
-
-#[derive(Debug, snafu::Snafu)]
-pub enum FnisPatchGenerationError {
-    /// The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.
-    #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
-    UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 }
 
 /// Generate from one list file.
@@ -54,31 +47,29 @@ pub fn generate_patch<'a>(
     for pattern in list.patterns {
         match pattern {
             SyntaxPattern::AltAnim(_alt_animation) => {
-                tracing::error!("Unsupported Alternative Animation yet.");
+                return Err(FnisPatchGenerationError::UnsupportedAltAnimation {
+                    path: owned_data.to_list_path(),
+                });
             }
-            SyntaxPattern::PairAndKillMove(paired_and_kill_animation) => {
+            SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 let FNISPairedAndKillAnimation {
                     kind,
                     flag_set,
                     anim_file,
                     anim_event,
                     ..
-                } = &paired_and_kill_animation;
+                } = &paired_and_kill_anim;
+
                 all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
                 all_events.extend([
-                    Cow::Borrowed(*anim_event),
-                    Cow::Owned(format!("pa_{anim_event}")),
+                    Cow::Borrowed(*anim_event),             // Player
+                    Cow::Owned(format!("pa_{anim_event}")), // NPC
                 ]);
                 all_events.par_extend(
                     flag_set
                         .triggers
                         .par_iter()
-                        .map(|trigger| Cow::Borrowed(trigger.event)),
-                );
-                all_events.par_extend(
-                    flag_set
-                        .triggers2
-                        .par_iter()
+                        .chain(flag_set.triggers2.par_iter())
                         .map(|trigger| Cow::Borrowed(trigger.event)),
                 );
 
@@ -86,81 +77,29 @@ pub fn generate_patch<'a>(
                 if owned_data.behavior_entry.behavior_object != "character" {
                     return Err(
                         FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
-                            path: PathBuf::from(&owned_data.to_list_path()),
+                            path: owned_data.to_list_path(),
                         },
                     );
                 }
 
                 let (one, seq) = match kind {
-                    FNISPairedType::KilMove => {
-                        new_kill_patches(paired_and_kill_animation, owned_data)
-                    }
-                    FNISPairedType::Paired => {
-                        new_pair_patches(paired_and_kill_animation, owned_data)
-                    }
+                    FNISPairedType::KilMove => new_kill_patches(paired_and_kill_anim, owned_data),
+                    FNISPairedType::Paired => new_pair_patches(paired_and_kill_anim, owned_data),
                 };
                 one_master_patches.par_extend(one);
                 seq_master_patches.par_extend(seq);
             }
             SyntaxPattern::Chair(_chair_animation) => {
-                tracing::error!("Unsupported Chair Animation yet.");
+                return Err(FnisPatchGenerationError::UnsupportedChairAnimation {
+                    path: owned_data.to_list_path(),
+                });
             }
             SyntaxPattern::Furniture(_furniture_animation) => {
-                tracing::error!("Unsupported Furniture Animation yet.");
+                return Err(FnisPatchGenerationError::UnsupportedFurnitureAnimation {
+                    path: owned_data.to_list_path(),
+                });
             }
             SyntaxPattern::Sequenced(sequenced_animation) => {
-                fn collect_seq_patch<'a>(
-                    namespace: &'a str,
-                    owned_data: &'a OwnedFnisInjection,
-                    sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<Cow<'a, str>>, Vec<Vec<AdsfPatch<'a>>>) {
-                    sequenced_animation
-                        .animations
-                        .into_iter()
-                        .map(|fnis_animation| {
-                            let FNISAnimation {
-                                anim_file,
-                                anim_event,
-                                ..
-                            } = &fnis_animation;
-
-                            (
-                                format!("Animations\\{namespace}\\{anim_file}"),
-                                Cow::Borrowed(*anim_event),
-                                new_adsf_patch(owned_data, namespace, fnis_animation),
-                            )
-                        })
-                        .collect()
-                }
-                fn collect_seq_creature_patch<'a>(
-                    namespace: &str,
-                    sequenced_animation: SequencedAnimation<'a>,
-                ) -> (Vec<String>, Vec<Cow<'a, str>>) {
-                    sequenced_animation
-                        .animations
-                        .into_par_iter()
-                        .map(|fnis_animation| {
-                            let FNISAnimation {
-                                anim_file,
-                                anim_event,
-                                motions,
-                                rotations,
-                                ..
-                            } = fnis_animation;
-                            if !motions.is_empty() || !rotations.is_empty() {
-                                tracing::error!(
-                                    "Unsupported animationdatasinglefile.txt for Creature yet."
-                                );
-                            }
-
-                            (
-                                format!("Animations\\{namespace}\\{anim_file}"),
-                                Cow::Borrowed(anim_event),
-                            )
-                        })
-                        .collect()
-                }
-
                 let (anim_files, events, adsf_patches): (Vec<_>, Vec<_>, Vec<_>) =
                     if owned_data.behavior_entry.is_humanoid() {
                         collect_seq_patch(namespace, owned_data, sequenced_animation)
@@ -191,6 +130,76 @@ pub fn generate_patch<'a>(
         one_master_patches,
         seq_master_patches,
     })
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, snafu::Snafu)]
+pub enum FnisPatchGenerationError {
+    /// The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.
+    #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
+    UnsupportedPairAndKillMoveForCreature { path: PathBuf },
+
+    /// Alternative animation is not supported yet
+    #[snafu(display("Alternative Animation is not supported yet: {}", path.display()))]
+    UnsupportedAltAnimation { path: PathBuf },
+
+    /// Chair animation is not supported yet
+    #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
+    UnsupportedChairAnimation { path: PathBuf },
+
+    /// Furniture animation is not supported yet
+    #[snafu(display("Furniture Animation is not supported yet: {}", path.display()))]
+    UnsupportedFurnitureAnimation { path: PathBuf },
+}
+
+fn collect_seq_patch<'a>(
+    namespace: &'a str,
+    owned_data: &'a OwnedFnisInjection,
+    sequenced_animation: SequencedAnimation<'a>,
+) -> (Vec<String>, Vec<Cow<'a, str>>, Vec<Vec<AdsfPatch<'a>>>) {
+    sequenced_animation
+        .animations
+        .into_iter()
+        .map(|fnis_animation| {
+            let FNISAnimation {
+                anim_file,
+                anim_event,
+                ..
+            } = &fnis_animation;
+
+            (
+                format!("Animations\\{namespace}\\{anim_file}"),
+                Cow::Borrowed(*anim_event),
+                new_adsf_patch(owned_data, namespace, fnis_animation),
+            )
+        })
+        .collect()
+}
+fn collect_seq_creature_patch<'a>(
+    namespace: &str,
+    sequenced_animation: SequencedAnimation<'a>,
+) -> (Vec<String>, Vec<Cow<'a, str>>) {
+    sequenced_animation
+        .animations
+        .into_par_iter()
+        .map(|fnis_animation| {
+            let FNISAnimation {
+                anim_file,
+                anim_event,
+                motions,
+                rotations,
+                ..
+            } = fnis_animation;
+            if !motions.is_empty() || !rotations.is_empty() {
+                tracing::error!("Unsupported animationdatasinglefile.txt for Creature yet.");
+            }
+
+            (
+                format!("Animations\\{namespace}\\{anim_file}"),
+                Cow::Borrowed(anim_event),
+            )
+        })
+        .collect()
 }
 
 fn new_adsf_patch<'a>(
@@ -237,7 +246,7 @@ fn new_adsf_patch<'a>(
             .collect();
 
         let duration = match (motions.last(), rotations.last()) {
-            (None, None) => Cow::Borrowed("0.000000"), // FIXME: Correct?
+            (None, None) => Cow::Borrowed("0.000000"), // NOTE: Unreachable. The empty check has already been done above.
             (None | Some(_), Some(rd)) => rd.time.clone(),
             (Some(md), None) => md.time.clone(),
         };

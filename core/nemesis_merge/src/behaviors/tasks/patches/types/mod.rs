@@ -33,24 +33,26 @@ pub struct OwnedPatches {
 /// - value: nemesis xml
 pub type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
 
-pub struct BorrowedPatches<'a> {
-    /// Name of the template that needs to be read.
-    ///
+/// Collection of patches with metadata
+pub struct PatchCollection<'a> {
+    /// Templates needed for patch generation.
     /// - e.g. (`meshes/actors/character/_1stperson/behaviors/0_master.bin`)
-    pub template_keys: DashSet<TemplateKey<'static>>,
+    pub needed_templates: DashSet<TemplateKey<'static>>,
+    /// Actual template patch map
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
-    pub borrowed_patches: RawBorrowedPatches<'a>,
-    /// HashMap showing which index (e.g. `#0000`) of each template (e.g. `0_master.xml`)
-    /// contains `hkbBehaviorGraphStringData
-    ///
-    /// This information exists because it is needed to replace variables
-    /// such as the Nemesis variable `$variableID[]$`, `$eventID[]$`.
-    pub behavior_string_data_map: BehaviorStringDataMap<'a>,
+    pub borrowed_patches: BehaviorPatchesMap<'a>,
+    /// Map showing which index of each template contains hkbBehaviorGraphData
+    /// Used to replace Nemesis variables such as `$variableID[]$` or `$eventID[]$`.
+    pub behavior_graph_data_map: BehaviorGraphDataMap<'a>,
 }
-
+/// A patch containing references to parsed strings.
+///
 /// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)
-/// - value: `Map<jsonPath, { patch, priority }>`
+/// - value: `DashMap<jsonPath, { patch, priority }>`
+///
+/// # Lifetime
+/// The duration during which the Nemesis patch remains active from the path.
 ///
 /// # Intended image
 /// ```json
@@ -65,9 +67,9 @@ pub struct BorrowedPatches<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub(crate) struct RawBorrowedPatches<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
+pub(crate) struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
-impl RawBorrowedPatches<'_> {
+impl BehaviorPatchesMap<'_> {
     pub(crate) fn len(&self) -> usize {
         use rayon::prelude::*;
         self.0
@@ -89,8 +91,8 @@ impl RawBorrowedPatches<'_> {
 /// - key: template_name
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorStringDataMap<'a>(pub DashMap<TemplateKey<'a>, &'static str>);
-impl BehaviorStringDataMap<'_> {
+pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, &'static str>);
+impl BehaviorGraphDataMap<'_> {
     /// Create `Self`
     #[inline]
     pub fn new() -> Self {

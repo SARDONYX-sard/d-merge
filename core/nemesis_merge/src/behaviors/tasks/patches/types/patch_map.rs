@@ -97,11 +97,6 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
-    ///
-    /// # Parameters
-    ///
-    /// - `key`: The JSON path.
-    /// - `new_value`: The value to insert.
     pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut existing) => {
@@ -117,11 +112,6 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new values are added using `par_extend`.
     /// - Otherwise, a new entry is created from the parallel iterator.
-    ///
-    /// # Parameters
-    ///
-    /// - `key`: The JSON path.
-    /// - `new_values`: A parallel iterator yielding `ValueWithPriority` instances.
     pub fn extend<I>(&self, key: JsonPath<'a>, new_values: I)
     where
         I: IntoParallelIterator<Item = ValueWithPriority<'a>>,

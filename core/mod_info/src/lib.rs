@@ -116,7 +116,7 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, Error> {
 fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
     use std::collections::HashSet;
 
-    fn inner(fnis_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
+    fn _get_all_fnis(fnis_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
         let mods = collect_paths(fnis_pattern)?
             .par_iter()
             .filter_map(|path| {
@@ -144,14 +144,10 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
     }
 
     let fnis_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
-    let mut mods = inner(&fnis_pattern)?;
-
     // TkDodgeSE lacks FNIS_*_List.txt and consists solely of animations, making acquisition difficult.
-    // To avoid false positives with other standard animation searches, it requires special handling.
-    let fnis_tk_dodge = format!("{skyrim_data_dir}/meshes/actors/character/animations/TkDodge");
-    mods.par_extend(inner(&fnis_tk_dodge)?);
+    // It would be easier to distribute the FNIS patch separately as a Nemesis patch.
 
-    let mut mods: Vec<_> = mods.into_par_iter().collect();
+    let mut mods: Vec<_> = _get_all_fnis(&fnis_pattern)?.into_par_iter().collect();
     mods.sort_unstable_by(|a, b| a.name.cmp(&b.name));
 
     Ok(mods)
@@ -209,13 +205,11 @@ fn deserialize_remove_null<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::Deserialize;
-    use std::borrow::Cow;
-
-    let s = Cow::<'de, str>::deserialize(deserializer)?;
-    Ok(match s.as_ref() {
-        "null" => String::new(), // 0 alloc
-        _ => s.to_string(),
+    let s: std::borrow::Cow<'de, str> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(if s.eq_ignore_ascii_case("null") {
+        String::new() // 0 alloc
+    } else {
+        s.to_string()
     })
 }
 

@@ -3,7 +3,7 @@ mod priority_ids;
 pub(crate) mod tasks;
 
 pub use crate::behaviors::priority_ids::types::{PatchMaps, PriorityMap};
-use crate::behaviors::tasks::fnis::collect::collect_all_fnis_injections;
+use crate::behaviors::tasks::fnis;
 pub use tasks::templates::gen_bin::create_bin_templates;
 
 pub(crate) use tasks::{
@@ -18,7 +18,7 @@ use crate::behaviors::tasks::patches::types::OwnedPatches;
 use crate::behaviors::tasks::patches::{
     apply::apply_patches,
     collect::{collect_borrowed_patches, collect_owned_patches},
-    types::{BorrowedPatches, OwnedPatchMap},
+    types::{OwnedPatchMap, PatchCollection},
 };
 use crate::config::{Config, Status};
 use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
@@ -48,22 +48,19 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         });
     }
 
-    let (owned_fnis_patches, mut fnis_errors) = if !fnis_entries.is_empty() {
+    let (owned_fnis_patches, mut fnis_errors) = if fnis_entries.is_empty() {
+        (vec![], vec![])
+    } else {
         let skyrim_data_dir_glob = config
             .skyrim_data_dir_glob
             .as_ref()
             .ok_or(Error::MissingSkyrimDataDirGlob)?;
-        collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries)
-    } else {
-        (vec![], vec![])
+        fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries)
     };
 
     let (fnis_hkx_patches, fnis_adsf_patches) = {
         let (fnis_hkx_patches, fnis_adsf_patches, errors) =
-            tasks::fnis::patch_gen::collect_borrowed_patches(
-                &owned_fnis_patches,
-                &config.status_report,
-            );
+            fnis::patch_gen::collect_borrowed_patches(&owned_fnis_patches, &config.status_report);
         fnis_errors.par_extend(errors);
 
         (fnis_hkx_patches, fnis_adsf_patches)
@@ -153,16 +150,16 @@ struct Errors {
 fn apply_and_gen_patched_hkx<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
-    fnis_patches: BorrowedPatches<'a>,
+    fnis_patches: PatchCollection<'a>,
 ) -> Errors {
     let mut all_errors = vec![];
 
     // 1/3: Parse nemesis patches
     let (
-        BorrowedPatches {
-            template_keys: template_names,
+        PatchCollection {
+            needed_templates: template_names,
             borrowed_patches,
-            behavior_string_data_map: variable_class_map,
+            behavior_graph_data_map: variable_class_map,
         },
         patch_errors_len,
     ) = {

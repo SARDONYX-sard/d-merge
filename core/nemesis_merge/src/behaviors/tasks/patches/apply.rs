@@ -1,7 +1,7 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
     behaviors::tasks::{
-        patches::types::{HkxPatchMaps, RawBorrowedPatches},
+        patches::types::{BehaviorPatchesMap, HkxPatchMaps},
         templates::{key::TemplateKey, types::BorrowedTemplateMap},
     },
     config::{ReportType, StatusReportCounter},
@@ -24,7 +24,7 @@ use std::path::Path;
 /// Therefore, this seemingly strange lifetime annotation is intentional.
 pub fn apply_patches<'t, 'p: 't>(
     templates: &mut BorrowedTemplateMap<'t>,
-    borrowed_patches: RawBorrowedPatches<'p>,
+    borrowed_patches: BehaviorPatchesMap<'p>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
     let status_report = &config.status_report;
