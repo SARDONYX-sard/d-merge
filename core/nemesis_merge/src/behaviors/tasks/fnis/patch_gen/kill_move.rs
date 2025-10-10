@@ -25,18 +25,22 @@ pub fn new_kill_patches<'a>(
     // new C++ Havok class XML name attributes
     let class_indexes: [String; 26] =
         core::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
+
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
     let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("pa_{player_event}");
+
+    let npc_event = format!("pa_{player_event}_{class_index_0_id}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{}\\{}",
         &owned_data.namespace, paired_and_kill_animation.anim_file
     ); // Animations\\$Fkm$
 
-    let player_root_state_name = format!("Player_FNISkm{priority}"); // NOTE: must be unique in 0_master.xml
-    let npc_root_state_name = format!("NPC_FNISkm{priority}"); // NOTE: must be unique in 0_master.xml
+    let player_root_state_name = format!("Player_FNISkm{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
+    let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];

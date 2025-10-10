@@ -30,11 +30,16 @@ pub fn new_pair_patches<'a>(
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
     let class_indexes: [String; 22] =
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
+
+    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
+
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
+
     let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("FNISpa_{priority}");
+    let npc_event = format!("FNISpa_{class_index_0_id}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{namespace}\\{}",
@@ -44,8 +49,9 @@ pub fn new_pair_patches<'a>(
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
-    let player_root_state_name = format!("Player_FNISpa{priority}");
-    let npc_root_state_name = format!("NPC_FNISpa{priority}");
+    let player_root_state_name = format!("Player_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
+    let npc_root_state_name = format!("NPC_FNISpa{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
+
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
         "#0111",

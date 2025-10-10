@@ -28,21 +28,22 @@ pub fn new_offset_arm_patches<'a>(
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = animation.flag_set.flags;
-    let right_offset_event = format!("FNIS_RightOffsetCG{priority}");
-    let left_offset_event = format!("FNIS_LeftOffsetCG{priority}");
+
+    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+    let class_index_1_id = calculate_hash(&class_indexes[1]); // Must be 1 file unique
+
+    let right_offset_event = format!("FNIS_RightOffsetCG{class_index_0_id}");
+    let left_offset_event = format!("FNIS_LeftOffsetCG{class_index_1_id}");
     let anim_file = format!("Animations\\{namespace}\\{}", animation.anim_file); // Animations\\$Foa$
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
-    let right_offset_state_name = format!("FNIS_RightOffset{priority}");
-    let left_offset_state_name = format!("FNIS_LeftOffset{priority}");
+    let right_offset_state_name = format!("FNIS_RightOffset{class_index_0_id}");
+    let left_offset_state_name = format!("FNIS_LeftOffset{class_index_1_id}");
 
     seq_patches.extend(new_push_events_seq_patch(
-        &[
-            right_offset_event.as_str().into(),
-            left_offset_event.as_str().into(),
-        ],
+        &[animation.anim_event.into()],
         "#0083",
         "#0085",
         priority,

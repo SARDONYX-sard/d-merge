@@ -9,7 +9,6 @@ use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotat
 
 use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType;
 use crate::behaviors::tasks::fnis::list_parser::combinator::flags::FNISAnimFlags;
 use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::{
     FNISPairedAndKillAnimation, FNISPairedType,
@@ -129,13 +128,9 @@ pub fn generate_patch<'a>(
                 all_events.par_extend(events);
                 all_adsf_patches.par_extend(adsf_patches);
             }
-            SyntaxPattern::Basic(fnis_animation)
-            | SyntaxPattern::OffsetArm(fnis_animation)
-            | SyntaxPattern::AnimObject(fnis_animation) => {
+            SyntaxPattern::OffsetArm(fnis_animation) => {
                 let FNISAnimation {
-                    anim_type,
                     flag_set,
-                    anim_event,
                     anim_file,
                     ..
                 } = &fnis_animation;
@@ -143,11 +138,8 @@ pub fn generate_patch<'a>(
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
                 }
-                all_events.insert(Cow::Borrowed(anim_event));
 
-                if matches!(*anim_type, FNISAnimType::OffsetArm)
-                    && owned_data.behavior_entry.behavior_object == "character"
-                {
+                if owned_data.behavior_entry.behavior_object == "character" {
                     let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
                     one_mt_behavior_patches.par_extend(one);
                     seq_mt_behavior_patches.par_extend(seq);
@@ -158,6 +150,20 @@ pub fn generate_patch<'a>(
                     );
                 };
 
+                all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
+            }
+            SyntaxPattern::Basic(fnis_animation) | SyntaxPattern::AnimObject(fnis_animation) => {
+                let FNISAnimation {
+                    flag_set,
+                    anim_event,
+                    anim_file,
+                    ..
+                } = &fnis_animation;
+
+                if !flag_set.flags.contains(FNISAnimFlags::Known) {
+                    all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                }
+                all_events.insert(Cow::Borrowed(anim_event));
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
         };
