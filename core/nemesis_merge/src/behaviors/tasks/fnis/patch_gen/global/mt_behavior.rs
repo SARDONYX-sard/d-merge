@@ -5,22 +5,22 @@ use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use rayon::prelude::*;
 
 /// FNIS XML(name="#5218") - `HeadTrackingOn`
-pub(crate) const FNIS_AA_MT_AUTO_GEN_5218: &str = "FNIS_aa_global_auto_gen5218";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5218: &str = "#FNIS_aa_global_auto_gen5218";
 
 /// FNIS XML(name="#5219") - `HeadTrackingOff`
-pub(crate) const FNIS_AA_MT_AUTO_GEN_5219: &str = "FNIS_aa_global_auto_gen5219";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5219: &str = "#FNIS_aa_global_auto_gen5219";
 
 /// FNIS XML(name="#5220") - `StartAnimatedCamera`
-pub(crate) const FNIS_AA_MT_AUTO_GEN_5220: &str = "FNIS_aa_global_auto_gen5220";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5220: &str = "#FNIS_aa_global_auto_gen5220";
 
 /// FNIS XML(name="#5221") - `EndAnimatedCamera`
-pub(crate) const FNIS_AA_MT_AUTO_GEN_5221: &str = "FNIS_aa_global_auto_gen5221";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5221: &str = "#FNIS_aa_global_auto_gen5221";
 
 /// FNIS XML(name="#5222") - `ClipTriggerArray`
-pub(crate) const FNIS_AA_MT_CLIP_TRIGGER_5222: &str = "FNIS_aa_global_auto_gen5222";
+pub(crate) const FNIS_AA_MT_CLIP_TRIGGER_5222: &str = "#FNIS_aa_global_auto_gen5222";
 
 /// FNIS XML(name="#5230") - `FNIS_BlendTransition1`
-pub(crate) const FNIS_BA_BLEND_TRANSITION_5230: &str = "FNIS_aa_global_auto_gen5230";
+pub(crate) const FNIS_BA_BLEND_TRANSITION_5230: &str = "#FNIS_aa_global_auto_gen5230";
 
 /// Generate the Havok class of `character/behaviors/mt_behavior.xml`.
 ///

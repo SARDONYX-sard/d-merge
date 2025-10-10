@@ -3,31 +3,31 @@ use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
 use rayon::prelude::*;
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2526: &str = "FNIS_aa_global_auto_gen2526";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2526: &str = "#FNIS_aa_global_auto_gen2526";
 
 /// FNIS XML(name="#2527") - `HeadTrackingOn`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2527: &str = "FNIS_aa_global_auto_gen2527";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2527: &str = "#FNIS_aa_global_auto_gen2527";
 
 /// FNIS XML(name="#2528") - `AnimObjectUnequip`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2528: &str = "FNIS_aa_global_auto_gen2528";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2528: &str = "#FNIS_aa_global_auto_gen2528";
 
 /// FNIS XML(name="#2529") - `Multi (HeadTrackingOn + AnimObjectUnequip)`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2529: &str = "FNIS_aa_global_auto_gen2529";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2529: &str = "#FNIS_aa_global_auto_gen2529";
 
 /// FNIS XML(name="#2530") - `StartAnimatedCamera`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2530: &str = "FNIS_aa_global_auto_gen2530";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2530: &str = "#FNIS_aa_global_auto_gen2530";
 
 /// FNIS XML(name="#2531") - `StringEventPayload (Camera3rd [Cam3])`
-pub(crate) const FNIS_AA_STRING_PAYLOAD_2531: &str = "FNIS_aa_global_auto_gen2531";
+pub(crate) const FNIS_AA_STRING_PAYLOAD_2531: &str = "#FNIS_aa_global_auto_gen2531";
 
 /// FNIS XML(name="#2532") - `EndAnimatedCamera`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2532: &str = "FNIS_aa_global_auto_gen2532";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2532: &str = "#FNIS_aa_global_auto_gen2532";
 
 /// FNIS XML(name="#2533") - `PairedKillTarget`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2533: &str = "FNIS_aa_global_auto_gen2533";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2533: &str = "#FNIS_aa_global_auto_gen2533";
 
 /// FNIS XML(name="#2534") - `Multi (StartAnimatedCamera + PairedKillTarget)`
-pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "FNIS_aa_global_auto_gen2534";
+pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "#FNIS_aa_global_auto_gen2534";
 
 /// Generate the Havok class corresponding to the options flags in FNIS_*_List.txt.
 ///
