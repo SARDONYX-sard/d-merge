@@ -154,7 +154,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[1],
                     "variableBindingSet": class_indexes[2],
                     "userData": 0,
-                    "name": format!("Player_FNISpa{priority}_Behavior"),
+                    "name": format!("Player_FNISpa{class_index_0_id}_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": [{
                         "id": -1,
                         "payload": null
@@ -219,7 +219,7 @@ pub fn new_pair_patches<'a>(
                     "exitNotifyEvents": "#0000",
                     "transitions": "#0000",
                     "generator": &class_indexes[4],
-                    "name": format!("Player_FNISpa{priority}_DisablePitch"),
+                    "name": format!("Player_FNISpa{class_index_0_id}_DisablePitch"),
                     "stateId": 0,
                     "probability": 1.0,
                     "enable": true
@@ -242,7 +242,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[4],
                     "variableBindingSet": class_indexes[5],
                     "userData": 0,
-                    "name": format!("Player_FNISpa{priority}_DisablePitch_Behavior"),
+                    "name": format!("Player_FNISpa{class_index_0_id}_DisablePitch_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": [{
                         "id": -1,
                         "payload": null
@@ -365,7 +365,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[9],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("Paired_FNISpa{priority}"),
+                    "name": format!("Paired_FNISpa{class_index_0_id}"),
                     "animationName": anim_file,
                     "triggers": class_indexes[10],
                     "cropStartAmountLocalTime": 0.0,
@@ -455,7 +455,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[12],
                     "variableBindingSet": class_indexes[13],
                     "userData": 0,
-                    "name": format!("NPC_FNISpa{priority}$_Behavior"),
+                    "name": format!("NPC_FNISpa{class_index_0_id}$_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -519,7 +519,7 @@ pub fn new_pair_patches<'a>(
                     "exitNotifyEvents": "#0000",
                     "transitions": "#0000",
                     "generator": &class_indexes[15],
-                    "name": format!("NPC_FNISpa{priority}_DisablePitch"),
+                    "name": format!("NPC_FNISpa{class_index_0_id}_DisablePitch"),
                     "stateId": 0,
                     "probability": 1.0,
                     "enable": true
@@ -541,7 +541,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[15],
                     "variableBindingSet": &class_indexes[16],
                     "userData": 0,
-                    "name": format!("NPC_FNISpa{priority}_DisablePitch_Behavior"),
+                    "name": format!("NPC_FNISpa{class_index_0_id}_DisablePitch_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -640,7 +640,7 @@ pub fn new_pair_patches<'a>(
                     "__ptr": class_indexes[20],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("NPC_Paired_FNISpa{priority}"),
+                    "name": format!("NPC_Paired_FNISpa{class_index_0_id}"),
                     "animationName": anim_file,
                     "triggers": &class_indexes[21],
                     "cropStartAmountLocalTime": 0.0,

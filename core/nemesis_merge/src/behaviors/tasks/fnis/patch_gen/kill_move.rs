@@ -116,7 +116,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[1],
                     "variableBindingSet": "#0000", // null
                     "userData": 1,
-                    "name": format!("Player_FNISkm{priority}_ModGen"), // StringPtr
+                    "name": format!("Player_FNISkm{class_index_0_id}_ModGen"), // StringPtr
                     "modifier": class_indexes[14], // StringPtr
                     "generator": class_indexes[2], // StringPtr
                 }),
@@ -136,7 +136,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[2],
                     "variableBindingSet": class_indexes[3],
                     "userData": 0,
-                    "name": format!("Player_FNISkm{priority}$_Behavior"), // FIXME? $1/1$
+                    "name": format!("Player_FNISkm{class_index_0_id}$_Behavior"), // FIXME? $1/1$
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -199,7 +199,7 @@ pub fn new_kill_patches<'a>(
                     "exitNotifyEvents": "#0000",
                     "transitions": "#0000",
                     "generator": &class_indexes[5],
-                    "name": format!("Player_FNISkm{priority}_DisablePitch"),
+                    "name": format!("Player_FNISkm{class_index_0_id}_DisablePitch"),
                     "stateId": 0,
                     "probability": 1.0,
                     "enable": true
@@ -220,7 +220,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[5],
                     "variableBindingSet": &class_indexes[6],
                     "userData": 0,
-                    "name": format!("Player_FNISkm{priority}_DisablePitch_Behavior"),
+                    "name": format!("Player_FNISkm{class_index_0_id}_DisablePitch_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -300,7 +300,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[10],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("Paired_FNISkm{priority}"), // FIXME?: priority <- $1/1$
+                    "name": format!("Paired_FNISkm{class_index_0_id}"), // FIXME?: priority <- $1/1$
                     "animationName": anim_file, // Animations\\$Fkm$
                     "triggers": &class_indexes[11],
                     "cropStartAmountLocalTime": 0.0,
@@ -374,7 +374,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[13],
                     "variableBindingSet": "#0000",
                     "userData": 1,
-                    "name": format!("NPC_FNISkm{priority}_ModGen"),
+                    "name": format!("NPC_FNISkm{class_index_0_id}_ModGen"),
                     "modifier": &class_indexes[14],
                     "generator": &class_indexes[16]
                 }),
@@ -394,7 +394,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[14],
                     "variableBindingSet": &class_indexes[15],
                     "userData": 2,
-                    "name": format!("FNISkm{priority}_ActiveModifier"),
+                    "name": format!("FNISkm{class_index_0_id}_ActiveModifier"),
                     "enable": true,
                     "bIsActive0": false,
                     "bInvertActive0": false,
@@ -447,7 +447,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[16],
                     "variableBindingSet": &class_indexes[17],
                     "userData": 0,
-                    "name": format!("NPC_FNISkm{priority}_Behavior"),
+                    "name": format!("NPC_FNISkm{class_index_0_id}_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -510,7 +510,7 @@ pub fn new_kill_patches<'a>(
                     "exitNotifyEvents": "#0000",
                     "transitions": "#0000",
                     "generator": &class_indexes[19],
-                    "name": format!("NPC_FNISkm{priority}_DisablePitch"),
+                    "name": format!("NPC_FNISkm{class_index_0_id}_DisablePitch"),
                     "stateId": 0,
                     "probability": 1.0,
                     "enable": true
@@ -531,7 +531,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[19],
                     "variableBindingSet": &class_indexes[20],
                     "userData": 0,
-                    "name": format!("NPC_FNISkm{priority}_DisablePitch_Behavior"),
+                    "name": format!("NPC_FNISkm{class_index_0_id}_DisablePitch_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -630,7 +630,7 @@ pub fn new_kill_patches<'a>(
                     "__ptr": class_indexes[24],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("NPCPaired_FNISkm{priority}"),
+                    "name": format!("NPCPaired_FNISkm{class_index_0_id}"),
                     "animationName": anim_file, // Animations\\$Fkm$
                     "triggers": &class_indexes[25],
                     "cropStartAmountLocalTime": 0.0,
@@ -692,7 +692,7 @@ pub fn new_kill_patches<'a>(
     (one_patches, seq_patches)
 }
 
-/// - `state_name`:  e.g. `Player_FNIS_km{priority}`, `Player_FNISpa$1/1$`
+/// - `state_name`:  e.g. `Player_FNIS_km{class_index_0_id}`, `Player_FNISpa$1/1$`
 ///
 /// # Note
 /// - `enter_notify_events`: #2530 or null
@@ -801,7 +801,7 @@ pub fn make_event_state_info_patch<'a>(
     )
 }
 
-/// - `state_name`:  e.g. `NPC_FNIS_km{priority}`, `NPC_FNISpa$1/1$`
+/// - `state_name`:  e.g. `NPC_FNIS_km{class_index_0_id}`, `NPC_FNISpa$1/1$`
 #[must_use]
 pub fn make_npc_root_state_info_patch<'a>(
     class_index: &str,
