@@ -113,7 +113,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
         master_string_data_index: "#0095",
         master_behavior_graph_index: "#0097",
         master_value_set_index: "#0096",
-        anim_data_key: "DefaultMale~1", // Need `DefaultFemale~1` too
+        anim_data_key: "FirstPerson~1",
     },
     "character" => BehaviorEntry {
         behavior_object: "character",
