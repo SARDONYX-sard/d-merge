@@ -24,8 +24,8 @@ pub struct FNISAnimFlagSet<'a> {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimVar<'a> {
-    name: &'a str,
-    inverse: bool,
+    pub name: &'a str,
+    pub inverse: bool,
 }
 
 bitflags::bitflags! {

@@ -114,11 +114,11 @@ pub fn new_kill_patches<'a>(
                 op: OpRangeKind::Pure(Op::Add),
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[1],
-                    "variableBindingSet": "#0000", // null
+                    "variableBindingSet": "#0000", // null ptr
                     "userData": 1,
                     "name": format!("Player_FNISkm{class_index_0_id}_ModGen"), // StringPtr
-                    "modifier": class_indexes[14], // StringPtr
-                    "generator": class_indexes[2], // StringPtr
+                    "modifier": class_indexes[14],
+                    "generator": class_indexes[2],
                 }),
             },
             priority,

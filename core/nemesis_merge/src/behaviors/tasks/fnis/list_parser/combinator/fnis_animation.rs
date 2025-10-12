@@ -20,20 +20,24 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::{
 
 #[derive(Debug, PartialEq)]
 pub struct FNISAnimation<'a> {
+    /// Animation kind
     pub anim_type: FNISAnimType,
+    /// SimpleFlags + Flag with Values
     pub flag_set: FNISAnimFlagSet<'a>,
+    /// event name. e.g. `HeadTrackingOff`
     pub anim_event: &'a str,
     pub anim_file: &'a str,
     pub anim_objects: Vec<&'a str>,
     /// This variable likely needs to be registered below.
-    /// - hkbBehaviorGraphStringData.variableNames
-    /// - hkbVariableValueSet.wordVariableValues
-    /// - hkbBehaviorGraphData.variableInfos
+    /// - `hkbBehaviorGraphStringData.variableNames`
+    /// - `hkbVariableValueSet.wordVariableValues`
+    /// - `hkbBehaviorGraphData.variableInfos`
     ///
-    /// TODO: It's unclear whether this is per animation file or per mod list.
-    ///       This needs to be determined.
+    /// TODO: It's unclear whether this is per animation file or per mod list. This needs to be determined.
     pub anim_vars: Vec<AnimVar<'a>>,
+    /// For `animationdatasinglefile.txt`
     pub motions: Vec<Translation<'a>>,
+    /// For `animationdatasinglefile.txt`
     pub rotations: Vec<RotationData<'a>>,
 }
 
