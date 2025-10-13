@@ -33,6 +33,26 @@ impl<'a> StatusReportCounter<'a> {
         kind: ReportType,
         total: usize,
     ) -> Self {
+        if let Some(status_reporter) = status_reporter {
+            match kind {
+                ReportType::GeneratingFnisPatches => {
+                    (status_reporter)(Status::GeneratingFnisPatches { index: 0, total });
+                }
+                ReportType::ReadingPatches => {
+                    (status_reporter)(Status::ReadingPatches { index: 0, total });
+                }
+                ReportType::ParsingPatches => {
+                    (status_reporter)(Status::ParsingPatches { index: 0, total });
+                }
+                ReportType::ApplyingPatches => {
+                    (status_reporter)(Status::ApplyingPatches { index: 0, total });
+                }
+                ReportType::GeneratingHkxFiles => {
+                    (status_reporter)(Status::GeneratingHkxFiles { index: 0, total });
+                }
+            };
+        }
+
         Self {
             status_reporter,
             total,
