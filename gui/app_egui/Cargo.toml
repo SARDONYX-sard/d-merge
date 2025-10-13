@@ -17,7 +17,7 @@ build = "build.rs"
 winres = "0.1.12"
 
 [dependencies]
-eframe = { version = "0.32.1" }
+eframe = { version = "0.33.0" }
 egui = { version = "0.32.1", features = ["rayon"] }
 egui_dnd = "0.13.0"
 egui_extras = "0.32.1"
