@@ -9,7 +9,6 @@ mod pair;
 
 use std::borrow::Cow;
 
-use dashmap::DashSet;
 use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
 use rayon::iter::Either;
 use rayon::prelude::*;
@@ -25,12 +24,12 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
     BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
-use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::new_global_alt_flags;
+use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::new_global_master_patch;
 use crate::behaviors::tasks::patches::types::{
     BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
 };
 use crate::behaviors::tasks::templates::key::{
-    TemplateKey, THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY,
+    THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY,
 };
 use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
@@ -49,9 +48,8 @@ pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     status_reporter: &'a StatusReporterFn,
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
-    let raw_borrowed_patches = BehaviorPatchesMap::default();
-    let template_keys = DashSet::new();
-    let variable_class_map = BehaviorGraphDataMap::new();
+    let borrowed_patches = BehaviorPatchesMap::default();
+    let behavior_graph_data_map = BehaviorGraphDataMap::new();
 
     let reporter = StatusReportCounter::new(
         status_reporter,
@@ -91,13 +89,11 @@ pub fn collect_borrowed_patches<'a>(
             };
 
             if owned_data.behavior_entry.is_3rd_person_character() {
-                let entry = raw_borrowed_patches
+                let entry = borrowed_patches
                     .0
                     .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
                     .or_default();
-                if !template_keys.contains(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
-                    template_keys.insert(THREAD_PERSON_MT_BEHAVIOR_KEY.clone());
-                };
+
                 for (path, patch) in one_mt_behavior_patches {
                     entry.one.insert(path, patch);
                 }
@@ -112,21 +108,15 @@ pub fn collect_borrowed_patches<'a>(
                     owned_data.behavior_entry.to_master_behavior_template_key();
 
                 // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
-                if !template_keys.contains(&master_template_key) {
-                    template_keys.insert(master_template_key.clone());
-                };
-                if !variable_class_map.0.contains_key(&master_template_key) {
-                    variable_class_map.0.insert(
+                if !behavior_graph_data_map.0.contains_key(&master_template_key) {
+                    behavior_graph_data_map.0.insert(
                         master_template_key.clone(),
                         owned_data.behavior_entry.master_behavior_graph_index,
                     );
                 }
 
                 // Push Mod Root behavior to master xml
-                let entry = raw_borrowed_patches
-                    .0
-                    .entry(master_template_key)
-                    .or_default();
+                let entry = borrowed_patches.0.entry(master_template_key).or_default();
                 {
                     let (one_gen, one_state_info, seq_state) =
                         new_injectable_mod_root_behavior(owned_data);
@@ -169,8 +159,7 @@ pub fn collect_borrowed_patches<'a>(
                     &animations,
                     owned_data.behavior_entry,
                     owned_data.priority,
-                    &raw_borrowed_patches,
-                    &template_keys,
+                    &borrowed_patches,
                 );
 
                 // NOTE: Since `events` shares the master file, there's no need to add it.
@@ -181,8 +170,7 @@ pub fn collect_borrowed_patches<'a>(
                             &animations,
                             &DEFAULT_FEMALE,
                             owned_data.priority,
-                            &raw_borrowed_patches,
-                            &template_keys,
+                            &borrowed_patches,
                         );
                     }
                     // NOTE: Adding animation only to `draugr` will cause `draugrskeleton` to assume the A pose.
@@ -192,8 +180,7 @@ pub fn collect_borrowed_patches<'a>(
                             &animations,
                             &DRAUGR_SKELETON,
                             owned_data.priority,
-                            &raw_borrowed_patches,
-                            &template_keys,
+                            &borrowed_patches,
                         );
                     }
                     _ => {}
@@ -208,18 +195,21 @@ pub fn collect_borrowed_patches<'a>(
     let adsf_patches: Vec<_> = adsf_patches.into_par_iter().flatten().collect();
 
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
-    if template_keys.contains(&THREAD_PERSON_0_MASTER_KEY) {
-        raw_borrowed_patches
+    if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
+        borrowed_patches
             .0
             .entry(THREAD_PERSON_0_MASTER_KEY)
             .or_default()
             .one
             .0
             // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
-            .par_extend(new_global_alt_flags(0));
+            .par_extend(new_global_master_patch(0));
     }
-    if template_keys.contains(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
-        raw_borrowed_patches
+    if borrowed_patches
+        .0
+        .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
+    {
+        borrowed_patches
             .0
             .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
             .or_default()
@@ -231,9 +221,8 @@ pub fn collect_borrowed_patches<'a>(
 
     (
         PatchCollection {
-            needed_templates: template_keys,
-            borrowed_patches: raw_borrowed_patches,
-            behavior_graph_data_map: variable_class_map,
+            borrowed_patches,
+            behavior_graph_data_map,
         },
         adsf_patches,
         errors,
@@ -346,11 +335,8 @@ fn new_push_anim_seq_patch<'a>(
     behavior_entry: &BehaviorEntry,
     priority: usize,
     raw_borrowed_patches: &BehaviorPatchesMap<'a>,
-    template_keys: &DashSet<TemplateKey<'static>>,
 ) {
     let behavior_key = behavior_entry.to_default_behavior_template_key();
-
-    template_keys.insert(behavior_key.clone());
 
     let (json_path, patch) = {
         let index = behavior_entry.default_behavior_index;

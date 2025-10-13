@@ -124,7 +124,6 @@ pub fn collect_borrowed_patches<'a>(
     fnis_patches: PatchCollection<'a>,
 ) -> (PatchCollection<'a>, Vec<Error>) {
     let PatchCollection {
-        needed_templates: template_keys,
         borrowed_patches: raw_borrowed_patches,
         behavior_graph_data_map: variable_class_map,
     } = fnis_patches;
@@ -149,7 +148,6 @@ pub fn collect_borrowed_patches<'a>(
             let key = TemplateKey::from_nemesis_file(template_file_stem, is_1st_person)
                 .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
 
-            template_keys.insert(key.clone());
             if let Some(master_pair_index) =
                 MasterIndex::from_nemesis_file(template_file_stem, is_1st_person)
             {
@@ -216,7 +214,6 @@ pub fn collect_borrowed_patches<'a>(
 
     (
         PatchCollection {
-            needed_templates: template_keys,
             borrowed_patches: raw_borrowed_patches,
             behavior_graph_data_map: variable_class_map,
         },

@@ -1,6 +1,6 @@
 mod patch_map;
 
-use dashmap::{DashMap, DashSet};
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use std::path::PathBuf;
 
@@ -35,9 +35,6 @@ pub type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
 
 /// Collection of patches with metadata
 pub struct PatchCollection<'a> {
-    /// Templates needed for patch generation.
-    /// - e.g. (`meshes/actors/character/_1stperson/behaviors/0_master.bin`)
-    pub needed_templates: DashSet<TemplateKey<'static>>,
     /// Actual template patch map
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`

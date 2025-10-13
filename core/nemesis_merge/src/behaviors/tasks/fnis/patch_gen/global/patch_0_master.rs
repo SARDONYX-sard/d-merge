@@ -38,7 +38,7 @@ pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "#FNIS_aa_global_auto_gen2
 /// However, they are actually also reused in PairedAndKillMoves, so they must be generated.
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt`
-pub fn new_global_alt_flags<'a>(priority: usize) -> JsonPatchPairs<'a> {
+pub fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
     // single event (#2526, #2527, #2528, #2530, #2532, #2533)
     let single_events: [(&'static str, i32, Option<&'static str>); 6] = [
         (FNIS_AA_GLOBAL_AUTO_GEN_2526, 366, None), // HeadTrackingOff

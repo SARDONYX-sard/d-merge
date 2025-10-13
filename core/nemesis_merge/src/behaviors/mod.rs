@@ -157,7 +157,6 @@ fn apply_and_gen_patched_hkx<'a>(
     // 1/3: Parse nemesis patches
     let (
         PatchCollection {
-            needed_templates: template_names,
             borrowed_patches,
             behavior_graph_data_map: variable_class_map,
         },
@@ -169,19 +168,22 @@ fn apply_and_gen_patched_hkx<'a>(
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
 
-        // borrowed_patches
         (borrowed_patches, patch_errors_len)
     };
-    #[cfg(feature = "tracing")]
-    tracing::debug!("needed template_names = {template_names:#?}");
 
     let mut template_error_len;
     let owned_templates = {
         use self::tasks::templates::collect::owned;
-        let template_dir = &config.resource_dir;
+
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
+        let needed_template_names: std::collections::HashSet<_> = borrowed_patches
+            .0
+            .par_iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+
         let (owned_templates, errors) =
-            owned::collect_templates(template_dir, template_names.into_par_iter().collect());
+            owned::collect_templates(&config.resource_dir, needed_template_names);
         template_error_len = errors.len();
         all_errors.par_extend(errors);
         owned_templates
