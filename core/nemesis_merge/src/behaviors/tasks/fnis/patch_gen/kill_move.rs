@@ -15,7 +15,9 @@ use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::{
     FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
     FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
 };
-use crate::behaviors::tasks::fnis::patch_gen::{JsonPatchPairs, PUSH_OP};
+use crate::behaviors::tasks::fnis::patch_gen::{
+    new_push_events_seq_patch, JsonPatchPairs, PUSH_OP,
+};
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_kill_patches<'a>(
@@ -45,6 +47,12 @@ pub fn new_kill_patches<'a>(
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
+    seq_patches.extend(new_push_events_seq_patch(
+        &[player_event.into(), (&npc_event).into()],
+        owned_data.behavior_entry.master_string_data_index,
+        owned_data.behavior_entry.master_behavior_graph_index,
+        priority,
+    ));
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
         "#0111",

@@ -83,17 +83,11 @@ pub fn generate_patch<'a>(
                     kind,
                     flag_set,
                     anim_file,
-                    anim_event,
                     ..
                 } = &paired_and_kill_anim;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
-                }
-                {
-                    let player_event = Cow::Borrowed(*anim_event);
-                    let npc_event = Cow::Owned(format!("pa_{anim_event}"));
-                    all_events.extend([player_event, npc_event]);
                 }
                 all_events.par_extend(
                     flag_set
@@ -163,6 +157,7 @@ pub fn generate_patch<'a>(
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
                 }
+                // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
                 all_events.insert(Cow::Borrowed(anim_event));
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
