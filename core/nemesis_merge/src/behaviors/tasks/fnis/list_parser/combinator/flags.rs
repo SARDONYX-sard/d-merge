@@ -19,6 +19,11 @@ pub struct FNISAnimFlagSet<'a> {
     /// Trigger event at given time (e.g. `TJump/2.0`).
     pub triggers: Vec<Trigger<'a>>,
     /// Animation variable set/inverse (e.g. `AVfoo`, `AVIbar`).
+    ///
+    /// This variable likely needs to be registered below.
+    /// - `hkbBehaviorGraphStringData.variableNames`
+    /// - `hkbVariableValueSet.wordVariableValues`
+    /// - `hkbBehaviorGraphData.variableInfos`
     pub anim_vars: Vec<AnimVar<'a>>,
 }
 

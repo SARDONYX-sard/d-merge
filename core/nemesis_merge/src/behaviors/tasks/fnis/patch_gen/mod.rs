@@ -1,3 +1,4 @@
+mod furniture;
 mod gen_list_patch;
 #[allow(unused)] // TODO: use `master_value_set_index`
 pub mod generated_behaviors;
@@ -172,6 +173,7 @@ pub fn collect_borrowed_patches<'a>(
                     &template_keys,
                 );
 
+                // NOTE: Since `events` shares the master file, there's no need to add it.
                 match owned_data.behavior_entry.behavior_object {
                     // NOTE: The sync between `defaultmale` and `defaultfemale` must be performed.
                     "character" => {
@@ -375,6 +377,7 @@ fn new_push_anim_seq_patch<'a>(
         .insert(json_path, patch);
 }
 
+/// Register event name & event flag(`"0"`).
 pub fn new_push_events_seq_patch<'a>(
     events: &[Cow<'_, str>],
     string_data_index: &'static str,
@@ -397,7 +400,7 @@ pub fn new_push_events_seq_patch<'a>(
             },
         ),
         (
-            json_path![behavior_graph_index, "hkbBehaviorGraphData", "eventInfos",],
+            json_path![behavior_graph_index, "hkbBehaviorGraphData", "eventInfos"],
             ValueWithPriority {
                 patch: JsonPatch {
                     op: PUSH_OP,

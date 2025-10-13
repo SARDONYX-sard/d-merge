@@ -18,6 +18,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
     patterns::sequenced::SequencedAnimation,
     FNISList, SyntaxPattern,
 };
+use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
 };
@@ -52,7 +53,7 @@ pub fn generate_patch<'a>(
 ) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     // TODO: Support AsciiCaseIgnore
     let mut all_anim_files = HashSet::new();
-    // TODO: Support AsciiCaseIgnore
+    // NOTE: Currently, during the creation of the event/variable map immediately before hkx conversion in serde_hkx, duplicates are removed using ASCII ignore.
     let mut all_events = HashSet::new();
 
     let mut all_adsf_patches = vec![];
@@ -109,10 +110,18 @@ pub fn generate_patch<'a>(
                     path: owned_data.to_list_path(),
                 });
             }
-            SyntaxPattern::Furniture(_furniture_animation) => {
-                return Err(FnisPatchGenerationError::UnsupportedFurnitureAnimation {
-                    path: owned_data.to_list_path(),
-                });
+            SyntaxPattern::Furniture(furniture_animation) => {
+                if !owned_data.behavior_entry.is_humanoid() {
+                    return Err(
+                        FnisPatchGenerationError::UnsupportedFurnitureAnimationToCreature {
+                            path: owned_data.to_list_path(),
+                        },
+                    );
+                }
+
+                let (one, seq) = new_furniture_one_group_patches(&furniture_animation, owned_data);
+                one_mt_behavior_patches.par_extend(one);
+                seq_mt_behavior_patches.par_extend(seq);
             }
             SyntaxPattern::Sequenced(sequenced_animation) => {
                 let (anim_files, events, adsf_patches) =
@@ -123,6 +132,14 @@ pub fn generate_patch<'a>(
                 all_adsf_patches.par_extend(adsf_patches);
             }
             SyntaxPattern::OffsetArm(fnis_animation) => {
+                if !owned_data.behavior_entry.is_humanoid() {
+                    return Err(
+                        FnisPatchGenerationError::UnsupportedOffsetArmAnimationToCreature {
+                            path: owned_data.to_list_path(),
+                        },
+                    );
+                }
+
                 let FNISAnimation {
                     flag_set,
                     anim_file,
@@ -190,9 +207,13 @@ pub enum FnisPatchGenerationError {
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
     UnsupportedChairAnimation { path: PathBuf },
 
-    /// Furniture animation is not supported yet
-    #[snafu(display("Furniture Animation is not supported yet: {}", path.display()))]
-    UnsupportedFurnitureAnimation { path: PathBuf },
+    /// The addition of furniture animation applies only to humanoids; creatures are not supported.
+    #[snafu(display("The addition of furniture(fu, fuo) animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
+    UnsupportedFurnitureAnimationToCreature { path: PathBuf },
+
+    /// The addition of OffsetArm animation applies only to humanoids; creatures are not supported.
+    #[snafu(display("The addition of OffsetArm(ofa) animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
+    UnsupportedOffsetArmAnimationToCreature { path: PathBuf },
 }
 
 fn collect_seq_patch<'a>(
