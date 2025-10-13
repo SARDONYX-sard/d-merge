@@ -32,8 +32,6 @@ pub struct FNISAnimation<'a> {
     /// - `hkbBehaviorGraphStringData.variableNames`
     /// - `hkbVariableValueSet.wordVariableValues`
     /// - `hkbBehaviorGraphData.variableInfos`
-    ///
-    /// TODO: It's unclear whether this is per animation file or per mod list. This needs to be determined.
     pub anim_vars: Vec<AnimVar<'a>>,
     /// For `animationdatasinglefile.txt`
     pub motions: Vec<Translation<'a>>,

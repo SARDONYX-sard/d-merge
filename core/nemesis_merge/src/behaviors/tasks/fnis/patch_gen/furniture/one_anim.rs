@@ -206,6 +206,7 @@ pub fn new_furniture_one_anim_patches<'a>(
     });
     one_patches.push(new_event_property_array_ri2(
         flags,
+        current_phase,
         &class_indexes[2],
         priority,
     ));
@@ -506,6 +507,7 @@ fn new_event_property_array_ri1<'a>(
 #[must_use]
 fn new_event_property_array_ri2<'a>(
     flags: FNISAnimFlags,
+    current_phase: FurniturePhase,
     class_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
@@ -527,11 +529,12 @@ fn new_event_property_array_ri2<'a>(
         }));
     }
 
-    // TODO: Unknown block (-F)
-    events.push(json_typed!(borrowed, {
-        "id": 14, // IdleChairSitting
-        "payload": "#0000"
-    }));
+    if matches!(current_phase, FurniturePhase::Start) {
+        events.push(json_typed!(borrowed, {
+            "id": 14, // IdleChairSitting
+            "payload": "#0000"
+        }));
+    }
 
     // AnimatedCameraReset block (-ac0)
     if flags.contains(FNISAnimFlags::AnimatedCameraReset) {

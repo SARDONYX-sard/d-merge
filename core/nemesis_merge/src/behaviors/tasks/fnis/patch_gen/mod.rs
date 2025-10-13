@@ -51,7 +51,7 @@ pub fn collect_borrowed_patches<'a>(
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
     let raw_borrowed_patches = BehaviorPatchesMap::default();
     let template_keys = DashSet::new();
-    let variable_class_map = BehaviorGraphDataMap::new(); // TODO: Change to compile time phf map.
+    let variable_class_map = BehaviorGraphDataMap::new();
 
     let reporter = StatusReportCounter::new(
         status_reporter,

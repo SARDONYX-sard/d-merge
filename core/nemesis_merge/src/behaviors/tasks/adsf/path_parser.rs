@@ -36,8 +36,6 @@ use snafu::ResultExt;
 use super::path_parser::parse_error::IndexMustBeNumberSnafu;
 use crate::behaviors::priority_ids::get_nemesis_id;
 
-// TODO: Support replace operation
-
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
 pub enum ParserType<'a> {
@@ -50,8 +48,11 @@ pub enum ParserType<'a> {
     /// Indicates an individual animation (e.g., `Run~slide.txt`)
     AddAnim,
 
-    /// Indicates a motion ID replacement or override (e.g., ???) // TODO:
-    /// - include 1-based index
+    /// `<Name>~<clip_id>`
+    /// - e.g. `Jump~42`
+    ///
+    /// NOTE: Unlike Motion, Anim sometimes references the same clip_id, so it cannot be used as an id.
+    /// Therefore, Name is used instead
     EditAnim(&'a str),
 
     /// Indicates a motion ID add(e.g., `slide$10.txt`)

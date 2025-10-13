@@ -71,7 +71,7 @@ pub fn generate_patch<'a>(
                 });
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
-                // TODO: It seems FNIS doesn't support `_1stperson` kill moves.
+                // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
                 if owned_data.behavior_entry.behavior_object != "character" {
                     return Err(
                         FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
