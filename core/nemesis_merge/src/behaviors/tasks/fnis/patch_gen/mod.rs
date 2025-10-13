@@ -90,7 +90,7 @@ pub fn collect_borrowed_patches<'a>(
                 Err(err) => return Either::Right(Error::from(err)),
             };
 
-            if owned_data.behavior_entry.behavior_object == "character" {
+            if owned_data.behavior_entry.is_3rd_person_character() {
                 let entry = raw_borrowed_patches
                     .0
                     .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)

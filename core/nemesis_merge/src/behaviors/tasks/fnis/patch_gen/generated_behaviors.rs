@@ -52,10 +52,10 @@ pub struct BehaviorEntry {
     /// `animationdatasinglefile.txt` map key.
     /// Used for generating FNIS patches with MD and RD.
     /// - e.g. `DefaultMale~1`
+    /// - e.g. `FirstPerson~1` for `character/_1stperson`,
     ///
     /// # Note
-    /// If `character` or `character/_1stperson`, patches must be
-    /// applied to both `DefaultMale~1` and `DefaultFemale~1`.
+    /// If `character` patches must be applied to both `DefaultMale~1` and `DefaultFemale~1`.
     pub anim_data_key: &'static str,
 }
 
@@ -78,6 +78,12 @@ impl BehaviorEntry {
         let path = format!("meshes/{}/{}", self.base_dir, self.master_behavior);
         // Safety: caller guarantees the path is a valid TemplateKey
         unsafe { TemplateKey::new_unchecked(Cow::Owned(path)) }
+    }
+
+    /// Is `character` patch.
+    #[inline]
+    pub fn is_3rd_person_character(&self) -> bool {
+        self.behavior_object == "character"
     }
 
     /// Is `character` or `character/_1stperson` patch.

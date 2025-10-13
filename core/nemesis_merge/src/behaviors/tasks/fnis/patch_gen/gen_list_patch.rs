@@ -111,7 +111,7 @@ pub fn generate_patch<'a>(
                 });
             }
             SyntaxPattern::Furniture(furniture_animation) => {
-                if !owned_data.behavior_entry.is_humanoid() {
+                if !owned_data.behavior_entry.is_3rd_person_character() {
                     return Err(
                         FnisPatchGenerationError::UnsupportedFurnitureAnimationToCreature {
                             path: owned_data.to_list_path(),
@@ -132,7 +132,7 @@ pub fn generate_patch<'a>(
                 all_adsf_patches.par_extend(adsf_patches);
             }
             SyntaxPattern::OffsetArm(fnis_animation) => {
-                if !owned_data.behavior_entry.is_humanoid() {
+                if !owned_data.behavior_entry.is_3rd_person_character() {
                     return Err(
                         FnisPatchGenerationError::UnsupportedOffsetArmAnimationToCreature {
                             path: owned_data.to_list_path(),
@@ -150,17 +150,9 @@ pub fn generate_patch<'a>(
                     all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
                 }
 
-                if owned_data.behavior_entry.behavior_object == "character" {
-                    let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
-                    one_mt_behavior_patches.par_extend(one);
-                    seq_mt_behavior_patches.par_extend(seq);
-                } else {
-                    #[cfg(feature = "tracing")]
-                    tracing::error!(
-                        "The OffsetArm patch does not support anything other than characters."
-                    );
-                };
-
+                let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
+                one_mt_behavior_patches.par_extend(one);
+                seq_mt_behavior_patches.par_extend(seq);
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
             SyntaxPattern::Basic(fnis_animation) | SyntaxPattern::AnimObject(fnis_animation) => {
@@ -207,12 +199,12 @@ pub enum FnisPatchGenerationError {
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
     UnsupportedChairAnimation { path: PathBuf },
 
-    /// The addition of furniture animation applies only to humanoids; creatures are not supported.
-    #[snafu(display("The addition of furniture(fu, fuo) animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
+    /// The addition of furniture animation applies only to 3rd person character; `_1stperson`, creatures are not supported.
+    #[snafu(display("The addition of furniture(fu, fuo) animation applies only to 3rd person `character`; `_1stperson`, creatures are not supported.: {}", path.display()))]
     UnsupportedFurnitureAnimationToCreature { path: PathBuf },
 
-    /// The addition of OffsetArm animation applies only to humanoids; creatures are not supported.
-    #[snafu(display("The addition of OffsetArm(ofa) animation applies only to humanoids; creatures are not supported.: {}", path.display()))]
+    /// The addition of OffsetArm animation applies only to 3rd person character; `_1stperson`, creatures are not supported.
+    #[snafu(display("The addition of OffsetArm(ofa) animation applies only to 3rd person `character`; `_1stperson`, creatures are not supported.: {}", path.display()))]
     UnsupportedOffsetArmAnimationToCreature { path: PathBuf },
 }
 
@@ -307,7 +299,7 @@ fn new_adsf_patch<'a>(
 
     let namespace = &owned_data.namespace;
     let anim_data_target = owned_data.behavior_entry.anim_data_key;
-    if owned_data.behavior_entry.is_humanoid() {
+    if owned_data.behavior_entry.is_3rd_person_character() {
         vec![
             AdsfPatch {
                 target: anim_data_target,
