@@ -174,7 +174,7 @@ pub struct ModInfo {
     pub author: String,
 
     /// Mod download link
-    #[serde(default, deserialize_with = "deserialize_remove_null")]
+    #[serde(default, deserialize_with = "deserialize_site")]
     pub site: String,
 
     /// TODO: Unknown
@@ -211,6 +211,21 @@ where
     } else {
         s.to_string()
     })
+}
+
+/// Remove "null" and prepend "https://" if starts with "www."
+fn deserialize_site<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: std::borrow::Cow<'de, str> = serde::Deserialize::deserialize(deserializer)?;
+    if s.eq_ignore_ascii_case("null") || s.trim().is_empty() {
+        Ok(String::new())
+    } else if s.starts_with("www.") {
+        Ok(format!("https://{s}"))
+    } else {
+        Ok(s.to_string())
+    }
 }
 
 #[cfg(test)]
