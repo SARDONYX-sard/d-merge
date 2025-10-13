@@ -161,44 +161,15 @@ pub fn collect_borrowed_patches<'a>(
                 // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
                 let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
 
-                match &value.op {
-                    // Overwrite to match patch structure
-                    // Pure: no add and remove because of single value
-                    json_patch::OpRangeKind::Pure(_) => {
+                // Overwrite to match patch structure
+                match &value.action {
+                    json_patch::Action::Pure { .. } => {
                         let value = ValueWithPriority::new(value, priority);
-                        entry.value().one.insert(json_path, value);
+                        entry.value().one.insert(json_path, value); // Pure: no add and remove because of single value
                     }
-                    json_patch::OpRangeKind::Seq(_) => {
+                    json_patch::Action::Seq { .. } | json_patch::Action::SeqPush => {
                         let value = ValueWithPriority::new(value, priority);
                         entry.value().seq.insert(json_path, value);
-                    }
-                    json_patch::OpRangeKind::Discrete(range_vec) => {
-                        let json_patch::JsonPatch { value, .. } = value;
-
-                        let array =
-                            match simd_json::derived::ValueTryIntoArray::try_into_array(value) {
-                                Ok(array) => array,
-                                Err(_err) => {
-                                    #[cfg(feature = "tracing")]
-                                    tracing::error!("{_err}",);
-                                    return;
-                                }
-                            };
-
-                        let iter =
-                            range_vec
-                                .clone()
-                                .into_par_iter()
-                                .zip(array)
-                                .map(|(range, value)| {
-                                    let value = json_patch::JsonPatch {
-                                        op: json_patch::OpRangeKind::Seq(range),
-                                        value,
-                                    };
-                                    let value = ValueWithPriority::new(value, priority);
-                                    value
-                                });
-                        entry.value().seq.extend(json_path, iter);
                     }
                 }
             });

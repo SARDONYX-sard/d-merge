@@ -9,7 +9,7 @@ mod pair;
 
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, JsonPath, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, JsonPath, Op, ValueWithPriority};
 use rayon::iter::Either;
 use rayon::prelude::*;
 use simd_json::json_typed;
@@ -35,12 +35,6 @@ use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
 pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
-
-/// For Seq patch
-pub(crate) const PUSH_OP: OpRangeKind = OpRangeKind::Seq(json_patch::OpRange {
-    op: Op::Add,
-    range: 9998..9999,
-});
 
 pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
@@ -256,7 +250,7 @@ fn new_injectable_mod_root_behavior<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                         "__ptr": new_root_state_info_index,
                         "variableBindingSet": "#0000",
@@ -282,7 +276,7 @@ fn new_injectable_mod_root_behavior<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": new_generator_index,
                     "variableBindingSet": "#0000", // null
@@ -302,7 +296,7 @@ fn new_injectable_mod_root_behavior<'a>(
         json_path![master_index, "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: PUSH_OP,
+                action: Action::SeqPush,
                 value: json_typed!(borrowed, [new_root_state_info_index]),
             },
             priority,
@@ -344,7 +338,7 @@ fn new_push_anim_seq_patch<'a>(
             json_path![index, "hkbCharacterStringData", "animationNames"],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: json_typed!(borrowed, animations),
                 },
                 priority,
@@ -379,7 +373,7 @@ pub fn new_push_events_seq_patch<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: simd_json::json_typed!(borrowed, events),
                 },
                 priority,
@@ -389,7 +383,7 @@ pub fn new_push_events_seq_patch<'a>(
             json_path![behavior_graph_index, "hkbBehaviorGraphData", "eventInfos"],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: simd_json::json_typed!(
                         borrowed,
                         events

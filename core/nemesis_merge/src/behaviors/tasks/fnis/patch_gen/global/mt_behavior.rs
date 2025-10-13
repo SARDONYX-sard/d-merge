@@ -1,7 +1,7 @@
 //! For `character/behaviors/mt_behavior.xml` 1 file patch
 
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
-use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 
 /// FNIS XML(name="#5218") - `HeadTrackingOn`
@@ -50,7 +50,7 @@ pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
                 json_path![class_index, "hkbStateMachineEventPropertyArray"],
                 ValueWithPriority {
                     patch: JsonPatch {
-                        op: OpRangeKind::Pure(Op::Add),
+                        action: Action::Pure { op: Op::Add },
                         value: simd_json::json_typed!(borrowed, {
                             "__ptr": class_index,
                             "events": [
@@ -72,7 +72,7 @@ pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         json_path![FNIS_AA_MT_CLIP_TRIGGER_5222, "hkbClipTriggerArray"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_AA_MT_CLIP_TRIGGER_5222,
                     "triggers": [
@@ -108,7 +108,7 @@ pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         json_path![FNIS_BA_BLEND_TRANSITION_5231, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_BA_BLEND_TRANSITION_5231,
                     "variableBindingSet": "#0000",
@@ -130,7 +130,7 @@ pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         json_path![FNIS_BA_BLEND_TRANSITION_5232, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_BA_BLEND_TRANSITION_5232,
                     "variableBindingSet": "#0000",

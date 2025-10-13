@@ -3,7 +3,7 @@ use crate::common_parser::lines::one_line;
 use crate::diff_line::current_state::CurrentState;
 use crate::diff_line::error::{Error, Result};
 use crate::diff_line::DiffLines;
-use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
@@ -186,10 +186,10 @@ impl<'de> Deserializer<'de> {
             let values = if op == Op::Remove { vec![] } else { lines };
             let values = ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Seq(OpRange {
+                    action: Action::Seq {
                         op,
                         range: self.current.take_range()?,
-                    }),
+                    },
                     value: values.into(),
                 },
                 priority: self.priority,
@@ -232,10 +232,10 @@ TextAdd.txt
         let expected = DiffLines(vec![
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Seq(OpRange {
+                    action: Action::Seq {
                         op: Op::Replace,
                         range: 0..1,
-                    }),
+                    },
                     value: simd_json::json_typed! { borrowed, [
                         "TextReplace.txt"
                     ] },
@@ -244,10 +244,10 @@ TextAdd.txt
             },
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Seq(OpRange {
+                    action: Action::Seq {
                         op: Op::Add,
                         range: 7..9,
-                    }),
+                    },
                     value: simd_json::json_typed! { borrowed, [
                         "TextAdd.txt",
                         "TextAdd.txt"

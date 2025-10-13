@@ -1,7 +1,7 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt"
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
@@ -13,9 +13,7 @@ use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::{
-    kill_move::calculate_hash, JsonPatchPairs, PUSH_OP,
-};
+use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
 
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.
@@ -64,7 +62,7 @@ pub fn new_offset_arm_patches<'a>(
         json_path!["#5138", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: PUSH_OP,
+                action: Action::SeqPush,
                 value: json_typed!(borrowed, [class_indexes[0], class_indexes[2]]),
             },
             priority,
@@ -89,7 +87,7 @@ pub fn new_offset_arm_patches<'a>(
                     ],
                     ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Pure(Op::Add),
+                            action: Action::Pure { op: Op::Add },
                             value: simd_json::json_typed!(borrowed, {
                                 "__ptr": new_anim_object_index,
                                 "data": name, // StringPtr
@@ -110,7 +108,7 @@ pub fn new_offset_arm_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[0],
                     "variableBindingSet": "#0000",
@@ -145,7 +143,7 @@ pub fn new_offset_arm_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[1],
                         "variableBindingSet": "#0000",
@@ -199,7 +197,7 @@ pub fn new_offset_arm_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[2],
                         "variableBindingSet": "#0000",
@@ -237,7 +235,7 @@ pub fn new_offset_arm_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[3],
                         "variableBindingSet": "#0000",
@@ -306,7 +304,7 @@ fn new_event_property_array<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_index,
                     "events": events

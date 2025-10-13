@@ -1,5 +1,6 @@
 /// Operation for the JSON patch
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Op {
     /// Add a new value to the JSON at the specified path.

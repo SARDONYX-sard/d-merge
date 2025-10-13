@@ -1,9 +1,9 @@
 mod current_state;
 pub mod deserializer;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Range};
 
-use json_patch::{Op, OpRange};
+use json_patch::Op;
 
 use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation};
 
@@ -51,7 +51,8 @@ impl<'a> ClipMotionDiffPatch<'a> {
         }
 
         if let Some(translations) = self.translations {
-            let OpRange { op, range } = translations.op.clone();
+            let op = translations.op;
+            let range = translations.range.clone();
             match op {
                 Op::Add => {
                     if range.start >= motion_block.translations.len() {
@@ -97,7 +98,8 @@ impl<'a> ClipMotionDiffPatch<'a> {
         }
 
         if let Some(rotations) = self.rotations {
-            let OpRange { op, range } = rotations.op.clone();
+            let op = rotations.op;
+            let range = rotations.range.clone();
             match op {
                 Op::Add => {
                     if range.start >= motion_block.rotations.len() {
@@ -147,14 +149,16 @@ impl<'a> ClipMotionDiffPatch<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffTransitions<'a> {
-    op: OpRange,
+    op: Op,
+    range: Range<usize>,
     values: Vec<Translation<'a>>,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffRotations<'a> {
-    op: OpRange,
+    op: Op,
+    range: Range<usize>,
     values: Vec<Rotation<'a>>,
 }
 

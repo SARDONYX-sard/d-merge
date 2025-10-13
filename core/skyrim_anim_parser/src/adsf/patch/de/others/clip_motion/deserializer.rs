@@ -18,7 +18,7 @@ use crate::{
     },
     common_parser::delete_line::delete_this_line,
 };
-use json_patch::{Op, OpRange};
+use json_patch::Op;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending},
@@ -336,20 +336,15 @@ impl<'de> Deserializer<'de> {
                     if let Some(transitions) = partial_patch.translations.take() {
                         let PartialTranslations { range, values } = transitions;
                         let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.translations = Some(DiffTransitions {
-                            op: OpRange { op, range },
-                            values,
-                        });
+                        self.output_patches.translations =
+                            Some(DiffTransitions { op, range, values });
                     }
                 }
                 LineKind::Rotation => {
                     if let Some(rotations) = partial_patch.rotations.take() {
                         let PartialRotations { range, values } = rotations;
                         let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.rotations = Some(DiffRotations {
-                            op: OpRange { op, range },
-                            values,
-                        });
+                        self.output_patches.rotations = Some(DiffRotations { op, range, values });
                     }
                 }
             }
@@ -410,10 +405,8 @@ mod tests {
                 duration: None,
                 translations: None,
                 rotations: Some(DiffRotations {
-                    op: OpRange {
-                        op: Op::Replace,
-                        range: 0..3,
-                    },
+                    op: Op::Replace,
+                    range: 0..3,
                     values: vec![
                         Rotation {
                             time: "6".into(),
@@ -471,10 +464,8 @@ mod tests {
         let expected = ClipMotionDiffPatch {
             duration: Some("1.25".into()),
             translations: Some(DiffTransitions {
-                op: OpRange {
-                    op: Op::Replace,
-                    range: 0..3,
-                },
+                op: Op::Replace,
+                range: 0..3,
                 values: vec![
                     Translation {
                         time: "0.43".into(),
@@ -497,10 +488,8 @@ mod tests {
                 ],
             }),
             rotations: Some(DiffRotations {
-                op: OpRange {
-                    op: Op::Remove,
-                    range: 0..1,
-                },
+                op: Op::Remove,
+                range: 0..1,
                 values: vec![],
             }),
             ..Default::default()

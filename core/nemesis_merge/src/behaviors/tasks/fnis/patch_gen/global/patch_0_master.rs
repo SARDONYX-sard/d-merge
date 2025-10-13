@@ -1,5 +1,5 @@
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
-use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`
@@ -56,7 +56,7 @@ pub fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
                 json_path![class_index, "hkbStateMachineEventPropertyArray"],
                 ValueWithPriority {
                     patch: JsonPatch {
-                        op: OpRangeKind::Pure(Op::Add),
+                        action: Action::Pure { op: Op::Add },
                         value: simd_json::json_typed!(borrowed, {
                             "__ptr": class_index,
                             "events": [
@@ -80,7 +80,7 @@ pub fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2529,
                     "events": [
@@ -99,7 +99,7 @@ pub fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2534,
                     "events": [
@@ -115,7 +115,7 @@ pub fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         json_path![FNIS_AA_STRING_PAYLOAD_2531, "hkbStringEventPayload"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": FNIS_AA_STRING_PAYLOAD_2531,
                     "data": "Camera3rd [Cam3]"

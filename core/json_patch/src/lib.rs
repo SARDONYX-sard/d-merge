@@ -21,4 +21,4 @@ pub use self::apply::{
 };
 pub use self::json_path::JsonPath;
 pub use self::operation::Op;
-pub use self::patch_types::{JsonPatch, OpRange, OpRangeKind, ValueWithPriority};
+pub use self::patch_types::{Action, JsonPatch, ValueWithPriority};

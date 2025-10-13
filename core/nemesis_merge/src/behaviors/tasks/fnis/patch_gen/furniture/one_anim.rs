@@ -8,7 +8,7 @@
 //! `-L`: End of the Furniture syntax sequence (Last).
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::{borrowed::Value, json_typed};
 
@@ -18,9 +18,7 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::FNIS
 use crate::behaviors::tasks::fnis::list_parser::combinator::Trigger;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5231;
 use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::{
-    kill_move::calculate_hash, JsonPatchPairs, PUSH_OP,
-};
+use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
 
 /// Represents the phase of a Furniture animation sequence as defined in FNIS.
 ///
@@ -95,7 +93,7 @@ pub fn new_furniture_one_anim_patches<'a>(
         json_path!["#5138", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: PUSH_OP,
+                action: Action::SeqPush,
                 value: json_typed!(borrowed, [class_indexes[0], class_indexes[2]]),
             },
             priority,
@@ -120,7 +118,7 @@ pub fn new_furniture_one_anim_patches<'a>(
                     ],
                     ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Pure(Op::Add),
+                            action: Action::Pure { op: Op::Add },
                             value: simd_json::json_typed!(borrowed, {
                                 "__ptr": new_anim_object_index,
                                 "data": name, // StringPtr
@@ -175,7 +173,7 @@ pub fn new_furniture_one_anim_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[0],
                         "variableBindingSet": "#0000",
@@ -219,7 +217,7 @@ pub fn new_furniture_one_anim_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[3],
                     "transitions": [
@@ -266,7 +264,7 @@ pub fn new_furniture_one_anim_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[4],
                         "variableBindingSet": "#0000", // null
@@ -297,7 +295,7 @@ pub fn new_furniture_one_anim_patches<'a>(
                 ],
                 ValueWithPriority {
                     patch: JsonPatch {
-                        op: OpRangeKind::Pure(Op::Add),
+                        action: Action::Pure { op: Op::Add },
                         value: simd_json::json_typed!(borrowed, {
                             "__ptr": class_indexes[5],
                             "variableBindingSet": &class_indexes[6],
@@ -344,7 +342,7 @@ pub fn new_furniture_one_anim_patches<'a>(
                 ],
                 ValueWithPriority {
                     patch: JsonPatch {
-                        op: OpRangeKind::Pure(Op::Add),
+                        action: Action::Pure { op: Op::Add },
                         value: simd_json::json_typed!(borrowed, {
                             "__ptr": class_indexes[6],
                             "bindings": bindings,
@@ -397,7 +395,7 @@ pub fn new_furniture_one_anim_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: json_typed!(borrowed, {
                         "__ptr": class_indexes[7],
                         "variableBindingSet": "#0000",
@@ -436,7 +434,7 @@ pub fn new_furniture_one_anim_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: simd_json::json_typed!(borrowed, {
                         "__ptr": class_indexes[8],
                         "triggers": triggers,
@@ -493,7 +491,7 @@ fn new_event_property_array_ri1<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_index,
                     "events": events
@@ -551,7 +549,7 @@ fn new_event_property_array_ri2<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_index,
                     "events": events
@@ -660,7 +658,7 @@ pub fn new_push_values_seq_patch<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: values.iter().map(|value| value.name).collect(),
                 },
                 priority,
@@ -670,7 +668,7 @@ pub fn new_push_values_seq_patch<'a>(
             json_path![variable_index, "hkbVariableValueSet", "wordVariableValues"],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: simd_json::json_typed!(
                         borrowed,
                         values
@@ -694,7 +692,7 @@ pub fn new_push_values_seq_patch<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: PUSH_OP,
+                    action: Action::SeqPush,
                     value: simd_json::json_typed!(
                         borrowed,
                         values

@@ -7,7 +7,7 @@ use crate::asdsf::patch::de::{
 use crate::asdsf::patch::de::{AnimInfoDiff, ConditionDiff};
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
 use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line, verify_line_parses_to};
-use json_patch::{JsonPatch, Op, OpRange, OpRangeKind, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
@@ -506,10 +506,10 @@ impl<'de> Deserializer<'de> {
                     let values = if op == Op::Remove { vec![] } else { triggers };
                     let values = ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Seq(OpRange {
+                            action: Action::Seq {
                                 op,
                                 range: self.current.take_main_range()?,
-                            }),
+                            },
                             value: values.into(),
                         },
                         priority: self.priority,
@@ -557,7 +557,7 @@ impl<'de> Deserializer<'de> {
                         let values = if op == Op::Remove { vec![] } else { conditions };
                         let values = ValueWithPriority {
                             patch: JsonPatch {
-                                op: OpRangeKind::Seq(OpRange { op, range }),
+                                action: Action::Seq { op, range },
                                 value: values.into(),
                             },
                             priority: self.priority,
@@ -609,7 +609,7 @@ impl<'de> Deserializer<'de> {
                         let values = if op == Op::Remove { vec![] } else { anim_infos };
                         let values = ValueWithPriority {
                             patch: JsonPatch {
-                                op: OpRangeKind::Seq(OpRange { op, range }),
+                                action: Action::Seq { op, range },
                                 value: values.into(),
                             },
                             priority: self.priority,
@@ -655,7 +655,7 @@ fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
 mod tests {
     use super::*;
     use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff};
-    use json_patch::{JsonPatch, OpRangeKind, ValueWithPriority};
+    use json_patch::{Action, JsonPatch, ValueWithPriority};
 
     // V3                             <- version
     // 0                              <- triggers_len
@@ -765,10 +765,10 @@ MC 1HM AttackRight01
                 seq: vec![
                     ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Seq(OpRange {
+                            action: Action::Seq {
                                 op: Op::Replace,
                                 range: 0..1,
-                            }),
+                            },
                             value: simd_json::json_typed!(borrowed, [
                                 {
                                     "hashed_path": "4000000000",
@@ -781,10 +781,10 @@ MC 1HM AttackRight01
                     },
                     ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Seq(OpRange {
+                            action: Action::Seq {
                                 op: Op::Add,
                                 range: 2..5,
-                            }),
+                            },
                             value: simd_json::json_typed!(borrowed, [
                                 {
                                     "hashed_path": "4000000003",

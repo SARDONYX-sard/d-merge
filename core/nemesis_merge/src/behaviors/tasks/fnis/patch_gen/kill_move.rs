@@ -1,7 +1,7 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt"
 use std::borrow::Cow;
 
-use json_patch::{json_path, JsonPatch, Op, OpRangeKind, ValueWithPriority};
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
@@ -15,9 +15,7 @@ use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::{
     FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
     FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
 };
-use crate::behaviors::tasks::fnis::patch_gen::{
-    new_push_events_seq_patch, JsonPatchPairs, PUSH_OP,
-};
+use crate::behaviors::tasks::fnis::patch_gen::{new_push_events_seq_patch, JsonPatchPairs};
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub fn new_kill_patches<'a>(
@@ -65,7 +63,7 @@ pub fn new_kill_patches<'a>(
         json_path!["#0788", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: PUSH_OP,
+                action: Action::SeqPush,
                 value: json_typed!(borrowed, [class_indexes[0], class_indexes[12]]),
             },
             priority,
@@ -91,7 +89,7 @@ pub fn new_kill_patches<'a>(
                     ],
                     ValueWithPriority {
                         patch: JsonPatch {
-                            op: OpRangeKind::Pure(Op::Add),
+                            action: Action::Pure { op: Op::Add },
                             value: simd_json::json_typed!(borrowed, {
                                 "__ptr": new_anim_object_index,
                                 "data": name, // StringPtr
@@ -119,7 +117,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[1],
                     "variableBindingSet": "#0000", // null ptr
@@ -139,7 +137,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[2],
                     "variableBindingSet": class_indexes[3],
@@ -174,7 +172,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                         "__ptr": class_indexes[3],
                         "bindings": [
@@ -198,7 +196,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[4],
                     "variableBindingSet": "#0000",
@@ -223,7 +221,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[5],
                     "variableBindingSet": &class_indexes[6],
@@ -258,7 +256,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[6],
                     "bindings": [
@@ -303,7 +301,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[10],
                     "variableBindingSet": "#0000",
@@ -353,7 +351,7 @@ pub fn new_kill_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: simd_json::json_typed!(borrowed, {
                         "__ptr": class_indexes[11],
                         "triggers": triggers
@@ -377,7 +375,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[13],
                     "variableBindingSet": "#0000",
@@ -397,7 +395,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[14],
                     "variableBindingSet": &class_indexes[15],
@@ -426,7 +424,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[15],
                     "bindings": [
@@ -450,7 +448,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[16],
                     "variableBindingSet": &class_indexes[17],
@@ -485,7 +483,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[17],
                     "bindings": [
@@ -509,7 +507,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[18],
                     "variableBindingSet": "#0000",
@@ -534,7 +532,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[19],
                     "variableBindingSet": &class_indexes[20],
@@ -569,7 +567,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[20],
                     "bindings": [
@@ -606,7 +604,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[23],
                     "variableBindingSet": "#0000",
@@ -633,7 +631,7 @@ pub fn new_kill_patches<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_indexes[24],
                     "variableBindingSet": "#0000",
@@ -686,7 +684,7 @@ pub fn new_kill_patches<'a>(
             ],
             ValueWithPriority {
                 patch: JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add),
+                    action: Action::Pure { op: Op::Add },
                     value: simd_json::json_typed!(borrowed, {
                         "__ptr": class_indexes[25],
                         "triggers": triggers,
@@ -729,7 +727,7 @@ pub fn make_player_root_state_info_patch<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
@@ -789,7 +787,7 @@ pub fn make_event_state_info_patch<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
@@ -836,7 +834,7 @@ pub fn make_npc_root_state_info_patch<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
@@ -870,7 +868,7 @@ pub fn new_synchronized_clip_generator<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
@@ -930,7 +928,7 @@ pub fn new_event_property_array<'a>(
         ],
         ValueWithPriority {
             patch: JsonPatch {
-                op: OpRangeKind::Pure(Op::Add),
+                action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_index,
                     "events": events
@@ -1063,7 +1061,7 @@ pub fn new_push_transitions_seq_patch<'a, const N: usize>(
         json_path![index, "hkbStateMachineTransitionInfoArray", "transitions"],
         ValueWithPriority {
             patch: JsonPatch {
-                op: PUSH_OP,
+                action: Action::SeqPush,
                 value: json_typed!(borrowed, transitions),
             },
             priority,

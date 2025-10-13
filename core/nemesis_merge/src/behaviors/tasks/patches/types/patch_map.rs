@@ -11,7 +11,6 @@
 
 use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
-use rayon::prelude::*;
 
 /// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
 ///
@@ -104,24 +103,6 @@ impl<'a> SeqPatchMap<'a> {
             }
             dashmap::Entry::Vacant(v) => {
                 v.insert(vec![new_value]);
-            }
-        }
-    }
-
-    /// Extends the values for the given JSON path in parallel.
-    ///
-    /// - If the path already has an entry, the new values are added using `par_extend`.
-    /// - Otherwise, a new entry is created from the parallel iterator.
-    pub fn extend<I>(&self, key: JsonPath<'a>, new_values: I)
-    where
-        I: IntoParallelIterator<Item = ValueWithPriority<'a>>,
-    {
-        match self.0.entry(key) {
-            dashmap::Entry::Occupied(mut existing) => {
-                existing.get_mut().par_extend(new_values);
-            }
-            dashmap::Entry::Vacant(v) => {
-                v.insert(new_values.into_par_iter().collect());
             }
         }
     }
