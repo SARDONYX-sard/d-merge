@@ -49,15 +49,37 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-Portable-${{ runner.os }}-v${{ github.ref_name }}.zip'
+
+      - name: Update CHANGELOG
+        id: changelog
+        if: runner.os == 'macOS'
+        uses: requarks/changelog-action@v1.10.3
+        with:
+          token: ${{ github.token }}
+          tag: ${{ github.ref_name }}
+
       - name: Release Portable Version(Windows)
         uses: ncipollo/release-action@v1.16.0
         if: runner.os == 'Windows'
         with:
           allowUpdates: true
           artifacts: ./*.zip
+          body: ${{ steps.changelog.outputs.changes }}
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
           omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
+
+      - name: Commit CHANGELOG.md
+        if: runner.os == 'macOS'
+        run: |
+          git fetch origin main:main
+          git checkout main
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: update \`CHANGELOG.md\` for \`${{ github.ref_name }}\`" || echo "No changes to commit"
+          git push origin main
+
       - name: Compress outputs(MacOS/Linux)
         shell: bash
         if: runner.os != 'Windows'
@@ -123,31 +145,11 @@ jobs:
         run: |
           tar -czf ./${{ env.APP_NAME }}_egui-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
 
-      - name: Update CHANGELOG
-        id: changelog
-        if: runner.os == 'macOS'
-        uses: requarks/changelog-action@v1.10.3
-        with:
-          token: ${{ github.token }}
-          tag: ${{ github.ref_name }}
-
       - name: Release Portable Version
         uses: ncipollo/release-action@v1.16.0
         with:
           allowUpdates: true
           artifacts: ./*.tar.gz
-          body: ${{ steps.changelog.outputs.changes }}
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
           omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
-
-      - name: Commit CHANGELOG.md
-        if: runner.os == 'macOS'
-        run: |
-          git fetch origin main:main
-          git checkout main
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "docs: update \`CHANGELOG.md\` for \`${{ github.ref_name }}\`" || echo "No changes to commit"
-          git push origin main
