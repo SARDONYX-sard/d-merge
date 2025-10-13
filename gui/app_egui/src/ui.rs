@@ -32,26 +32,27 @@ pub fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
 
 /// Truncate text to fit within given width.
 fn truncate_to_width(ui: &Ui, text: &str, width: f32) -> String {
-    let fonts = ui.fonts(|f| f.clone());
-    let galley = fonts.layout_no_wrap(
-        text.to_string(),
-        egui::TextStyle::Body.resolve(ui.style()),
-        ui.style().visuals.text_color(),
-    );
+    let text_color = ui.style().visuals.text_color();
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
 
-    if galley.size().x <= width {
+    let galley_x_size = ui.fonts_mut(|font| {
+        font.layout_no_wrap(text.to_string(), font_id.clone(), text_color)
+            .size()
+            .x
+    });
+    if galley_x_size <= width {
         return text.to_string();
     }
 
     let mut truncated = String::new();
     for ch in text.chars() {
-        let test = format!("{truncated}{ch}...");
-        let galley = fonts.layout_no_wrap(
-            test.clone(),
-            egui::TextStyle::Body.resolve(ui.style()),
-            ui.style().visuals.text_color(),
-        );
-        if galley.size().x > width {
+        let galley_x_size = ui.fonts_mut(|font| {
+            font.layout_no_wrap(format!("{truncated}{ch}..."), font_id.clone(), text_color)
+                .size()
+                .x
+        });
+
+        if galley_x_size > width {
             truncated.push_str("...");
             break;
         }
