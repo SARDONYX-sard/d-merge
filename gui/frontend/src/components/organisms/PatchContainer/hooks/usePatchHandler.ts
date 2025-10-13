@@ -44,7 +44,8 @@ function toPatches(vfsSkyrimDataDir: string, isVfsMode: boolean, modInfoList: Mo
       path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}` : mod.id;
       nemesis_entries[path] = mod.priority;
     } else if (mod.modType === 'fnis') {
-      path = isVfsMode ? `${vfsSkyrimDataDir}/meshes/actors/character/animations/${mod.id}` : mod.id;
+      // Note that duplicates may cause malfunctions due to FNIS specifications.
+      path = mod.id;
       fnis_entries[path] = mod.priority;
     }
   }
