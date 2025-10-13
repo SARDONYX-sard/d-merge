@@ -14,10 +14,7 @@ use crate::errors::{
 use crate::results::partition_results;
 use crate::{Config, PatchMaps};
 use rayon::prelude::*;
-use skyrim_anim_parser::adsf::alt::{
-    ser::{serialize_alt_adsf, serialize_alt_adsf_with_patches},
-    AltAdsf,
-};
+use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
 pub use skyrim_anim_parser::adsf::patch::de::add::{
     parse_clip_anim_block_patch, parse_clip_motion_block_patch,
@@ -294,16 +291,12 @@ fn write_alt_adsf_file(
 ) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let serialized = if patches.is_empty() {
-        serialize_alt_adsf(&alt_adsf)
-    } else {
-        serialize_alt_adsf_with_patches(alt_adsf, patches)
-    }
-    .with_context(|_| FailedSerializeSnafu {
-        kind: AnimPatchErrKind::Adsf,
-        sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
-        path,
-    })?;
+    let serialized = serialize_alt_adsf(alt_adsf, patches.is_empty().then_some(patches))
+        .with_context(|_| FailedSerializeSnafu {
+            kind: AnimPatchErrKind::Adsf,
+            sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
+            path,
+        })?;
 
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);

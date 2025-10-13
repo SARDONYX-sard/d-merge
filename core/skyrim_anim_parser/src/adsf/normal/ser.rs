@@ -43,7 +43,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     // Hints:
     // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
 
-    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new();
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
     let mut clip_id_map = std::collections::HashMap::new();
     for block in &anim_data.add_clip_anim_blocks {
         let new_id = clip_id_manager.next_id();

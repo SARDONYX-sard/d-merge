@@ -1,62 +1,69 @@
+//! Clip ID manager
+//!
+//! # Why is this necessary?
+//! Since `clip_id` is undecided at the mod patch stage, it is replaced with the Nemesis variable. If the variable exists, it needs to be replaced with an unused id.
+//!
+//! In other words, it is used at the serialization stage of animationdatasinglefile.txt.
 use bitvec::prelude::*;
 
-/// # Why is this necessary?
-/// Since `clip_id` is undecided at the mod patch stage, it is replaced with the Nemesis variable. If the variable exists, it needs to be replaced with an unused id.
+/// Manages unique clip IDs for animation serialization.
 ///
-/// In other words, it is used at the serialization stage of animationdatasinglefile.txt.
+/// This manager starts allocating IDs *after* the known maximum used ID.
+/// Each call to `next_id()` returns the next unused ID, incrementing
+/// until it reaches `i16::MAX`. After that, it returns `None`.
 pub struct ClipIdManager {
     used_ids: BitVec,
     current: usize,
 }
 
 impl ClipIdManager {
-    /// i16::MAX
-    pub const MAX_ID: usize = 32767;
+    /// The maximum valid clip ID (i16::MAX).
+    const MAX_ID: usize = i16::MAX as usize;
 
-    pub fn new() -> Self {
+    /// Creates a new manager, starting from an existing maximum ID. (e.g., 1655).
+    ///
+    /// The next available ID will start from `start_from + 1`.
+    fn new(start_from: usize) -> Self {
         Self {
-            used_ids: bitvec![0; Self::MAX_ID + 1], // 0..=32767
-            current: Self::MAX_ID,
+            used_ids: bitvec![0; Self::MAX_ID + 1],
+            current: start_from,
         }
     }
 
-    /// register used id
+    /// Creates a new manager using the vanilla Skyrim SE baseline.
+    ///
+    /// This starts from `1655`, which is the **last used clip ID**
+    /// found in the vanilla *Skyrim Special Edition* file
+    /// `animationdatasinglefile.txt`.
+    ///
+    /// The next available ID will therefore be `1656`.
+    pub fn new_vanilla() -> Self {
+        Self::new(1655)
+    }
+
+    /// Registers an existing used ID.
+    ///
+    /// * `id` - The clip ID to mark as used.
     pub fn register(&mut self, id: usize) {
         if id <= Self::MAX_ID {
             self.used_ids.set(id, true);
         }
     }
 
-    /// 32767 -> 0
+    /// Returns the next available unused ID, incrementing upward.
+    ///
+    /// # Returns
+    /// * `Some(id)` - The next unused ID.
+    /// * `None` - If all possible IDs are used or the limit (`i16::MAX`) is reached.
     pub fn next_id(&mut self) -> Option<usize> {
-        while self.current > 0 {
+        while self.current < Self::MAX_ID {
+            self.current += 1;
             if !self.used_ids[self.current] {
                 self.used_ids.set(self.current, true);
                 return Some(self.current);
             }
-            self.current -= 1;
         }
-
-        // zero check
-        if !self.used_ids[0] {
-            self.used_ids.set(0, true);
-            return Some(0);
-        }
-
-        // used all
         None
-    }
-
-    /// reset for test
-    pub fn reset(&mut self) {
-        self.used_ids.fill(false);
-        self.current = Self::MAX_ID;
-    }
-}
-
-impl Default for ClipIdManager {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -65,19 +72,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_clip_id_decrementing() {
-        let mut manager = ClipIdManager::new();
+    fn test_clip_id_incrementing() {
+        let mut manager = ClipIdManager::new(1655);
 
-        // fist id
-        assert_eq!(manager.next_id(), Some(32767));
-        assert_eq!(manager.next_id(), Some(32766));
+        // Normal increment
+        assert_eq!(manager.next_id(), Some(1656));
+        assert_eq!(manager.next_id(), Some(1657));
 
-        // manual
-        manager.register(32765);
-        assert_eq!(manager.next_id(), Some(32764));
+        // Skip registered IDs
+        manager.register(1658);
+        assert_eq!(manager.next_id(), Some(1659));
 
-        // reset
-        manager.reset();
-        assert_eq!(manager.next_id(), Some(32767));
+        // Stop at MAX
+        manager.current = ClipIdManager::MAX_ID - 1;
+        assert_eq!(manager.next_id(), Some(ClipIdManager::MAX_ID));
+        assert_eq!(manager.next_id(), None);
     }
 }

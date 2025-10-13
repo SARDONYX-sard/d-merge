@@ -17,9 +17,9 @@ use rayon::prelude::*;
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-pub fn serialize_alt_adsf_with_patches(
+pub fn serialize_alt_adsf(
     alt_adsf: AltAdsf,
-    patches: DiffLines,
+    project_names_patches: Option<DiffLines>,
 ) -> Result<String, SerializeError> {
     let mut output = String::new();
 
@@ -28,9 +28,12 @@ pub fn serialize_alt_adsf_with_patches(
         .into_par_iter()
         .map(|(k, v)| (to_adsf_key(k), v))
         .unzip();
-    patches.into_apply(&mut project_names)?;
 
-    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new();
+    if let Some(patches) = project_names_patches {
+        patches.into_apply(&mut project_names)?;
+    }
+
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
     // Serialize clip animation blocks
     // TODO: clip id unique check
     // Hints:
@@ -47,42 +50,6 @@ pub fn serialize_alt_adsf_with_patches(
 
     // Serialize animation data
     for anim_data in &anim_list {
-        output.push_str(&serialize_anim_data(
-            anim_data,
-            &mut clip_id_manager,
-            &mut clip_id_map,
-        )?);
-    }
-
-    Ok(output)
-}
-
-/// Serializes to `animationdatasinglefile.txt` string.
-///
-/// # Errors
-/// Returns an error if serialization fails.
-pub fn serialize_alt_adsf(alt_adsf: &AltAdsf) -> Result<String, SerializeError> {
-    let mut output = String::new();
-    let project_names = alt_adsf.0.keys();
-    let anim_list = alt_adsf.0.values();
-
-    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new();
-    // Serialize clip animation blocks
-    // TODO: clip id unique check
-    // Hints:
-    // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
-    let mut clip_id_map = HashMap::new();
-
-    // Serialize project names
-    output.push_str(&format!("{}\r\n", project_names.len()));
-    for name in project_names {
-        let name = to_adsf_key(name.as_ref().into());
-        output.push_str(name.as_ref());
-        output.push_str("\r\n");
-    }
-
-    // Serialize animation data
-    for anim_data in anim_list {
         output.push_str(&serialize_anim_data(
             anim_data,
             &mut clip_id_manager,
@@ -220,7 +187,7 @@ mod tests {
             "../../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
         );
         let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
-        let actual = serialize_alt_adsf(&alt_adsf).unwrap();
+        let actual = serialize_alt_adsf(alt_adsf, None).unwrap();
 
         let expected = normalize_to_crlf(include_str!(
             "../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
