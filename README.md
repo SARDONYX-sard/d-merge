@@ -52,6 +52,10 @@
 
 ## Release
 
+There have been reports that the Tauri-based GUI may not work in virtual environments such as MO2.
+
+In such cases, we recommend using the egui version build.
+
 - [Click assets](https://github.com/SARDONYX-sard/d-merge/releases)
 
 ## Intended Use of Automatic Settings File Loading
@@ -111,13 +115,13 @@ The only thing we are considering at this time is support for the Nemesis patch.
 
 | Status | Feature                         | Abbreviation(s) | Notes                                                                          |
 | ------ | ------------------------------- | --------------- | ------------------------------------------------------------------------------ |
-| ✅     | Basic                           | b               |                                                                                |
-| ✅     | Sequenced Animations            | s, so           |                                                                                |
-| ✅     | Arm Offset Animations           | ofa             |                                                                                |
-| ❌     | Furniture Animations            | fu, fuo         |                                                                                |
+| ✅     | Basic                           | b               | Creature also supported (tested with FNISZoo converted to SE)                  |
+| ✅     | Sequenced Animations            | s, so           | Creature also supported                                                        |
+| ✅     | Arm Offset Animations           | ofa             | Tested with(Immersive Animated Looting v2.7)                                   |
+| ❌     | Furniture Animations            | fu, fuo         | I couldn't find any mods that could be tested.                                 |
 | ⚠️     | Paired Animations and KillMoves | pa, km          | KillMove: only animation checked, not tested in actual kill. Paired: untested. |
-| ❌     | Chair Animations                | ch              |                                                                                |
-| ❌     | Alternate Animations            | AAprefix        |                                                                                |
+| ❌     | Chair Animations                | ch              | I couldn't find any mods that could be tested.                                 |
+| ❌     | Alternate Animations            | AAprefix        | I'm debating whether to convert it to OAR.                                     |
 
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
 
