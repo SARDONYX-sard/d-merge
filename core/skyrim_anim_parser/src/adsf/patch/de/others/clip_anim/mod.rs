@@ -1,8 +1,8 @@
 mod current_state;
 pub mod deserializer;
 
-use json_patch::{Op, OpRange};
-use std::borrow::Cow;
+use json_patch::Op;
+use std::{borrow::Cow, ops::Range};
 
 use crate::adsf::normal::ClipAnimDataBlock;
 
@@ -72,7 +72,8 @@ impl<'a> ClipAnimDiffPatch<'a> {
         }
 
         if let Some(trigger_patch) = self.trigger_names {
-            let OpRange { op, range } = trigger_patch.op.clone();
+            let op = trigger_patch.op;
+            let range = trigger_patch.range.clone();
             match op {
                 Op::Add => {
                     if range.start >= anim_block.trigger_names.len() {
@@ -122,7 +123,8 @@ impl<'a> ClipAnimDiffPatch<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffTriggerNames<'a> {
-    op: OpRange,
+    op: Op,
+    range: Range<usize>,
     values: Vec<Cow<'a, str>>,
 }
 

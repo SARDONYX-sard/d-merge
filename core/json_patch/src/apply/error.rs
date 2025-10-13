@@ -38,7 +38,7 @@ pub enum JsonPatchError {
     ))]
     MismatchApplyType {
         /// The unexpected type encountered.
-        unexpected: crate::OpRangeKind,
+        unexpected: crate::Action,
         /// The path in the JSON structure.
         path: String,
         /// The JSON patch value debug representation.
@@ -85,7 +85,7 @@ pub enum JsonPatchError {
     WrongMatrix { path: String, value: String },
 
     #[snafu(display("Expected Seq. but got {unexpected:#?}"))]
-    ExpectedSeq { unexpected: crate::OpRangeKind },
+    ExpectedSeq { unexpected: crate::Action },
 }
 
 impl JsonPatchError {
@@ -125,7 +125,7 @@ impl JsonPatchError {
 
     /// Creates a `MismatchApplyType` error with the unexpected type, path, and value.
     pub fn mismatch_apply_type_from<'a>(
-        unexpected: crate::OpRangeKind,
+        unexpected: crate::Action,
         path: &[Cow<'a, str>],
         value: impl core::fmt::Debug,
     ) -> Self {

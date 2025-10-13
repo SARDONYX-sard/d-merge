@@ -5,7 +5,7 @@ use crate::adsf::patch::de::others::clip_anim::{
 };
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
 use crate::common_parser::lines::{one_line, verify_line_parses_to};
-use json_patch::{Op, OpRange};
+use json_patch::Op;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
@@ -314,10 +314,8 @@ impl<'de> Deserializer<'de> {
                     if let Some(trigger_names) = partial_patch.trigger_names.take() {
                         let PartialRotations { range, values } = trigger_names;
                         let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.trigger_names = Some(DiffTriggerNames {
-                            op: OpRange { op, range },
-                            values,
-                        });
+                        self.output_patches.trigger_names =
+                            Some(DiffTriggerNames { op, range, values });
                     }
                 }
             }
@@ -358,10 +356,8 @@ clipEnd:6.65767
         let expected = ClipAnimDiffPatch {
             name: Some("TurnRight[test]".into()),
             trigger_names: Some(DiffTriggerNames {
-                op: OpRange {
-                    op: Op::Replace,
-                    range: 1..2,
-                },
+                op: Op::Replace,
+                range: 1..2,
                 values: vec!["clipEnd:8.1234".into()],
             }),
             ..Default::default()
@@ -393,10 +389,8 @@ clipEnd:6.65767
         let expected = ClipAnimDiffPatch {
             name: Some("TurnRight[test]".into()),
             trigger_names: Some(DiffTriggerNames {
-                op: OpRange {
-                    op: Op::Add,
-                    range: 0..2,
-                },
+                op: Op::Add,
+                range: 0..2,
                 values: vec!["clipStart:6.65767".into(), "clipEnd:6.65767".into()],
             }),
             ..Default::default()

@@ -27,48 +27,44 @@ impl<'a> ValueWithPriority<'a> {
     }
 }
 
-/// A JSON patch operation targeting a specific range in an array.
+/// Represents the kind of modification applied to a value or array field.
 ///
-/// This is used only for array-based (sequence) operations.
+/// This enum distinguishes between scalar/object changes and array operations:
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OpRange {
-    /// The type of operation (Add, Remove, Replace).
-    pub op: Op,
-    /// The target index range in the array (0-based, exclusive at the end).
-    pub range: Range<usize>,
+pub enum Action {
+    /// Single field operation on a scalar or object.
+    /// Only `replace` or `remove` are valid.
+    Pure {
+        /// The type of operation (Add, Remove, Replace).
+        op: Op,
+    },
+
+    /// Operation on a contiguous range of an array.
+    /// Supports `add`, `replace`, and `remove`.
+    Seq {
+        /// The type of operation (Add, Remove, Replace).
+        op: Op,
+
+        /// The target index range in the array (0-based, exclusive at the end).
+        range: Range<usize>,
+    },
+
+    /// Append operation to the end of an array.
+    /// The target index is implicit; no internal fields are needed.
+    SeqPush,
 }
 
-/// Represents the kind of patch operation, depending on the JSON data structure.
-///
-/// This enum allows distinguishing between patches on scalars vs. sequences.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OpRangeKind {
-    /// A non-array operation (e.g., replacing an object or scalar).
-    Pure(Op),
-
-    /// An operation on a continuous range of array indices.
-    Seq(OpRange),
-
-    /// An operation on discrete array ranges.
-    ///
-    /// Operations that remain due to compatibility issues.
-    /// Currently disassembled and merged in Seq.
-    ///
-    /// TODO: Remove this.
-    Discrete(Vec<OpRange>),
-}
-
-impl OpRangeKind {
+impl Action {
     /// Returns the `OpRange` if the operation is of kind `Seq`.
     ///
     /// # Errors
-    /// If not the kind is `Seq.
+    /// If the kind is `Pure`/ `SeqPush`
     #[inline]
-    pub fn try_as_seq(&self) -> Result<&OpRange, JsonPatchError> {
+    pub fn try_as_seq(&self) -> Result<(Op, Range<usize>), JsonPatchError> {
         match self {
-            Self::Seq(op_range) => Ok(op_range),
+            Self::Seq { op, range } => Ok((*op, range.clone())),
             _ => Err(JsonPatchError::ExpectedSeq {
                 unexpected: self.clone(),
             }),
@@ -76,9 +72,10 @@ impl OpRangeKind {
     }
 }
 
-impl Default for OpRangeKind {
+impl Default for Action {
+    #[inline]
     fn default() -> Self {
-        Self::Pure(Op::Add)
+        Self::Pure { op: Op::Add }
     }
 }
 
@@ -89,7 +86,7 @@ impl Default for OpRangeKind {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct JsonPatch<'a> {
     /// The type and target of the operation (including range if applicable).
-    pub op: OpRangeKind,
+    pub action: Action,
 
     /// The value involved in the patch (e.g., value to add or replace).
     #[cfg_attr(

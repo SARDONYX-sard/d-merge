@@ -17,15 +17,13 @@ use crate::{
     error::{Error, Result},
     helpers::tag::PointerType,
 };
-use json_patch::{JsonPatch, JsonPath, Op, OpRange, OpRangeKind};
+use json_patch::{Action, JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
 use serde_hkx::{
     errors::readable::ReadableError,
     xml::de::parser::type_kind::{boolean, real, string},
 };
-use simd_json::{
-    base::ValueTryAsArrayMut, borrowed::Object, BorrowedValue, StaticNode, ValueBuilder,
-};
+use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
 use std::{collections::HashMap, mem};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
@@ -198,7 +196,7 @@ impl<'de> PatchDeserializer<'de> {
             self.output_patches.insert(
                 path,
                 JsonPatch {
-                    op: OpRangeKind::Pure(Op::Add), // root class
+                    action: Action::Pure { op: Op::Add }, // root class
                     value: BorrowedValue::Object(Box::new(obj)),
                 },
             );
@@ -608,12 +606,12 @@ impl<'de> PatchDeserializer<'de> {
                             tracing::trace!("{:#?}", self.current);
                         }
                         self.parse_next(take_till_close)?;
-                        self.extend_output_patches();
+                        self.extend_output_patches()?;
                     }
                     return Ok(true);
                 }
                 CommentKind::Close => {
-                    self.extend_output_patches();
+                    self.extend_output_patches()?;
                     return Ok(true);
                 }
                 _ => {}
@@ -623,7 +621,7 @@ impl<'de> PatchDeserializer<'de> {
     }
 
     /// This is the method that is called when a single differential change comment pair finishes calling.
-    fn extend_output_patches(&mut self) {
+    fn extend_output_patches(&mut self) -> Result<()> {
         // range diff pattern
         if let Some(new_range) = self.current.seq_range.take() {
             // NOTE: If op is not calculated before taking `seq_values`,
@@ -631,105 +629,61 @@ impl<'de> PatchDeserializer<'de> {
             let op = self.current.judge_operation();
 
             let path = self.current.path.clone(); // needless clone? replace?
-            let seq_values = mem::take(&mut self.current.seq_values);
 
+            let seq_values = mem::take(&mut self.current.seq_values);
             let value = if op == Op::Remove {
                 BorrowedValue::null() // no add
             } else {
                 BorrowedValue::Array(Box::new(seq_values))
             };
 
-            // Discrete
-            if let Some(prev_patch) = self.output_patches.remove(&path) {
-                match prev_patch.op {
-                    // twice discrete array
-                    OpRangeKind::Seq(OpRange {
-                        op: prev_op,
-                        range: prev_range,
-                    }) => {
-                        let merged_op_range = OpRangeKind::Discrete(vec![
-                            OpRange {
-                                op: prev_op,
-                                range: prev_range,
-                            },
-                            OpRange {
-                                op,
-                                range: new_range,
-                            },
-                        ]);
-
-                        self.output_patches.insert(
-                            path,
-                            JsonPatch {
-                                op: merged_op_range,
-                                value: vec![prev_patch.value, value].into(),
-                            },
-                        );
-                    }
-                    // 3 times and more discrete array
-                    OpRangeKind::Discrete(prev_vec_range) => {
-                        let mut merged_op_range = prev_vec_range;
-                        merged_op_range.push(OpRange {
-                            op,
-                            range: new_range,
-                        });
-
-                        let mut new_value = prev_patch.value;
-                        if let Ok(array) = new_value.try_as_array_mut() {
-                            array.push(value);
-                        }
-
-                        self.output_patches.insert(
-                            path,
-                            JsonPatch {
-                                op: OpRangeKind::Discrete(merged_op_range),
-                                value: new_value,
-                            },
-                        );
-                    }
-                    OpRangeKind::Pure(_) => {} // We do not consider it strange that a patch to an existing field comes twice.
-                }
-            } else {
-                // New array patch
+            if matches!(op, Op::Add) && self.parse_peek(opt(end_tag("hkparam")))?.is_some() {
                 self.output_patches.insert(
                     path,
                     JsonPatch {
-                        op: OpRangeKind::Seq(OpRange {
+                        action: Action::SeqPush,
+                        value,
+                    },
+                );
+            } else {
+                self.output_patches.insert(
+                    path,
+                    JsonPatch {
+                        action: Action::Seq {
                             op,
                             range: new_range,
-                        }),
+                        },
                         value,
                     },
                 );
             }
 
-            self.current.clear_flags(); // new patch is generated so clear flags.
-            return;
+            self.current.clear_flags();
+            return Ok(());
         }
 
         // one diff pattern
         let (op, patches) = self.current.take_patches();
-        self.output_patches.par_extend(
-            patches
-                .into_par_iter()
-                .map(|CurrentJsonPatch { path, value }| {
-                    (
-                        path,
-                        JsonPatch {
-                            op: OpRangeKind::Pure(op),
-                            value,
-                        },
-                    )
-                })
-                .collect::<HashMap<JsonPath<'_>, JsonPatch<'_>>>(),
-        );
+        self.output_patches.par_extend(patches.into_par_iter().map(
+            |CurrentJsonPatch { path, value }| {
+                (
+                    path,
+                    JsonPatch {
+                        action: Action::Pure { op },
+                        value,
+                    },
+                )
+            },
+        ));
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use json_patch::{json_path, OpRange};
+    use json_patch::json_path;
     use simd_json::json_typed;
 
     #[test]
@@ -753,7 +707,7 @@ mod tests {
         hash_map.insert(
             json_path!["#0010", "hkbProjectData", "stringData"],
             JsonPatch {
-                op: OpRangeKind::Pure(Op::Replace),
+                action: Action::Pure { op: Op::Replace },
                 value: "$id".into(),
             },
         );
@@ -809,10 +763,7 @@ mod tests {
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
             JsonPatch {
-                op: OpRangeKind::Seq(OpRange {
-                    op: Op::Add,
-                    range: 1..7,
-                }),
+                action: Action::SeqPush,
                 // path: https://crates.io/crates/jsonpath-rust
                 value: json_typed!(
                     borrowed,
@@ -832,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn discrete_push_array() {
+    fn discrete_array_patch() {
         let nemesis_xml = r###"
 		<hkobject name="#0009" class="hkbProjectStringData" signature="0x76ad60a">
 			<hkparam name="animationFilenames" numelements="0"></hkparam>
@@ -866,33 +817,35 @@ mod tests {
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let mut hash_map = HashMap::new();
 
-        let array_value = json_typed!(
-            borrowed,
-            [
-                "PushDummy",
-                "PushDummy",
-                "PushDummy",
-                "PushDummy",
-                "PushDummy",
-                "PushDummy"
-            ]
-        );
-
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
             JsonPatch {
-                op: OpRangeKind::Discrete(vec![
-                    OpRange {
-                        op: Op::Add,
-                        range: 1..7,
-                    },
-                    OpRange {
-                        op: Op::Remove,
-                        range: 11..13,
-                    },
-                ]),
+                action: Action::Seq {
+                    op: Op::Add,
+                    range: 1..7,
+                },
                 // path: https://crates.io/crates/jsonpath-rust
-                value: json_typed!(borrowed, [array_value, null]),
+                value: json_typed!(
+                    borrowed,
+                    [
+                        "PushDummy",
+                        "PushDummy",
+                        "PushDummy",
+                        "PushDummy",
+                        "PushDummy",
+                        "PushDummy"
+                    ]
+                ),
+            },
+        );
+        hash_map.insert(
+            json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
+            JsonPatch {
+                action: Action::Seq {
+                    op: Op::Remove,
+                    range: 11..13,
+                },
+                value: json_typed!(borrowed, null),
             },
         );
 
@@ -935,10 +888,10 @@ mod tests {
         hash_map.insert(
             json_path,
             JsonPatch {
-                op: OpRangeKind::Seq(OpRange {
+                action: Action::Seq {
                     op: Op::Remove,
                     range: 5..7,
-                }),
+                },
                 value: Default::default(),
             },
         );
@@ -977,7 +930,7 @@ mod tests {
         hash_map.insert(
             json_path.clone(),
             JsonPatch {
-                op: OpRangeKind::Pure(Op::Replace),
+                action: Action::Pure { op: Op::Replace },
                 // path: https://crates.io/crates/jsonpath-rust
                 value: "ReplaceDummy".into(),
             },
@@ -1027,7 +980,7 @@ mod tests {
         hash_map.insert(
             json_path,
             JsonPatch {
-                op: OpRangeKind::Pure(Op::Replace),
+                action: Action::Pure { op: Op::Replace },
                 value: 0.into(),
             },
         );
