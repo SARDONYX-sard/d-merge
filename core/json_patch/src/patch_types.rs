@@ -31,7 +31,7 @@ impl<'a> ValueWithPriority<'a> {
 ///
 /// This enum distinguishes between scalar/object changes and array operations:
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     /// Single field operation on a scalar or object.
@@ -94,4 +94,44 @@ pub struct JsonPatch<'a> {
         serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>"))
     )]
     pub value: BorrowedValue<'a>,
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn json_fmt_test() {
+        use super::*;
+
+        let pure = Action::Pure { op: Op::Replace };
+        let seq = Action::Seq {
+            op: Op::Add,
+            range: 2..5,
+        };
+        let push = Action::SeqPush;
+
+        let pure_json = simd_json::to_string(&pure).unwrap();
+        let seq_json = simd_json::to_string(&seq).unwrap();
+        let push_json = simd_json::to_string(&push).unwrap();
+
+        let expected_pure = "{\
+\"kind\":\"pure\",\
+\"op\":\"replace\"\
+}";
+
+        let expected_seq = "{\
+\"kind\":\"seq\",\
+\"op\":\"add\",\
+\"range\":{\"start\":2,\"end\":5}\
+}";
+
+        let expected_push = "{\
+\"kind\":\"seq_push\"\
+}";
+
+        assert_eq!(pure_json, expected_pure);
+        assert_eq!(seq_json, expected_seq);
+        assert_eq!(push_json, expected_push);
+    }
 }
