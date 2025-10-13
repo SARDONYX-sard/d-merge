@@ -4,8 +4,9 @@ use crate::{
     adsf::{
         alt::{to_adsf_key, AltAdsf, AltAnimData},
         clip_id_manager::ClipIdManager,
-        normal::ser::{
-            serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block,
+        normal::{
+            ser::{serialize_clip_anim_block, serialize_clip_motion_block},
+            AnimDataHeader,
         },
     },
     diff_line::DiffLines,
@@ -103,14 +104,18 @@ fn serialize_anim_data<'a>(
 ) -> Result<String, SerializeError> {
     let mut output = String::new();
 
+    let base_len = anim_data.clip_anim_blocks.len();
+    let add_clip_len = anim_data.add_clip_anim_blocks.len();
+    // NOTE: Due to the addition of patches, motion may sometimes be present.
+    // Therefore, ignore the header's `has_motion_data` field and determine based on the actual presence of data
+    let has_motion_data = !(base_len == 0 && add_clip_len == 0);
+
     // Serialize header
     output.push_str(&serialize_anim_header(
         &anim_data.header,
+        has_motion_data,
         anim_data.to_line_range(),
     ));
-
-    let base_len = anim_data.clip_anim_blocks.len();
-    let add_clip_len = anim_data.add_clip_anim_blocks.len();
 
     for block in &anim_data.add_clip_anim_blocks {
         let new_id = clip_id_manager.next_id();
@@ -136,7 +141,7 @@ fn serialize_anim_data<'a>(
     if clip_motion_blocks_line_len > 0 {
         output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
     };
-    if anim_data.header.has_motion_data {
+    if has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
             if let Some(&new_id) = clip_id_map.get(block.clip_id.as_ref()) {
                 output.push_str(&serialize_clip_motion_block(
@@ -158,6 +163,29 @@ fn serialize_anim_data<'a>(
     }
 
     Ok(output)
+}
+
+fn serialize_anim_header(
+    header: &AnimDataHeader,
+    has_motion_data: bool,
+    line_range: usize,
+) -> String {
+    let mut output = String::new();
+
+    output.push_str(&line_range.to_string());
+    output.push_str("\r\n");
+    output.push_str(&header.lead_int.to_string());
+    output.push_str("\r\n");
+    output.push_str(&header.project_assets.len().to_string());
+    output.push_str("\r\n");
+
+    for asset in &header.project_assets {
+        output.push_str(asset.as_ref());
+        output.push_str("\r\n");
+    }
+    output.push_str(&format!("{}\r\n", if has_motion_data { 1 } else { 0 }));
+
+    output
 }
 
 #[derive(Debug, snafu::Snafu)]
@@ -218,14 +246,34 @@ mod tests {
         });
         let alt_adsf: AltAdsf = adsf.into();
 
+        pub fn max_clip_id(adsf: &AltAdsf) -> Option<u64> {
+            adsf.0
+                .par_values()
+                .filter_map(|anim_data| {
+                    anim_data
+                        .clip_anim_blocks
+                        .par_values()
+                        .filter_map(|block| block.clip_id.parse::<u64>().ok())
+                        .max()
+                })
+                .max()
+        }
+        assert_eq!(max_clip_id(&alt_adsf).unwrap(), 1655);
+
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
 
-        std::fs::write(
-            "../../dummy/debug/animationdatasinglefile_keys.log",
-            format!("{:#?}", alt_adsf.0.keys()),
-        )
-        .unwrap();
-
+        {
+            let mut keys = alt_adsf.0.par_keys().collect::<Vec<_>>();
+            keys.par_sort_unstable();
+            let keys_json = serde_json::to_string_pretty(&keys).unwrap_or_else(|err| {
+                panic!("Failed to serialize adsf to JSON:\n{err}");
+            });
+            std::fs::write(
+                "../../dummy/debug/animationdatasinglefile_keys.json",
+                keys_json,
+            )
+            .unwrap();
+        }
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
             panic!("Failed to serialize adsf to JSON:\n{err}");
         });

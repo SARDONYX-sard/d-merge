@@ -95,7 +95,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-pub(crate) fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
+fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
     let mut output = String::new();
 
     output.push_str(&line_range.to_string());
