@@ -7,7 +7,7 @@ use crate::{
 use core::ops::Range;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
-use simd_json::{borrowed::Value, derived::ValueTryIntoArray};
+use simd_json::borrowed::Value;
 use std::borrow::Cow;
 
 const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed("##Mark_As_Removed##"));
@@ -156,9 +156,7 @@ fn apply_ops_parallel<'a>(
         let seq = op.try_as_seq()?;
         match seq.op {
             Op::Replace => {
-                let values = value
-                    .try_into_array()
-                    .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
+                let values = value_to_array(value)?;
 
                 if let Some(add_patch) =
                     apply_replace_with_overflow(&mut base, seq.range.clone(), values, priority)?
@@ -186,11 +184,7 @@ fn apply_ops_parallel<'a>(
     let mut offset = 0;
     for value in add_ops {
         let seq = value.patch.op.try_as_seq()?;
-        let values = value
-            .patch
-            .value
-            .try_into_array()
-            .map_err(|err| JsonPatchError::try_type_from(err, &["".into()], ""))?;
+        let values = value_to_array(value.patch.value)?;
         let insert_at = seq.range.start + offset;
 
         if insert_at < base.len() {
@@ -203,6 +197,33 @@ fn apply_ops_parallel<'a>(
     }
 
     Ok(base)
+}
+
+/// Convert a `simd_json::Value` to a reference to an array (`Vec<Value>`).
+///
+/// # Why manual type checking?
+/// Using `value.try_into_array()` will consume the value and on error the original
+/// `Value` is not available, making it hard to include the actual value in error messages.
+/// By manually matching the type, we can:
+/// 1. Verify the type is correct.
+/// 2. Return a reference to the array if successful.
+/// 3. Include the original value in the error for better debugging/logging.
+fn value_to_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError> {
+    match value {
+        Value::Array(arr) => Ok(*arr),
+        other => {
+            let value_type = simd_json::base::TypedValue::value_type(&other);
+
+            Err(JsonPatchError::try_type_from(
+                simd_json::TryTypeError {
+                    expected: simd_json::ValueType::Array,
+                    got: value_type,
+                },
+                &["".into()],
+                other.clone(),
+            ))
+        }
+    }
 }
 
 type SplitValue<'a> = (

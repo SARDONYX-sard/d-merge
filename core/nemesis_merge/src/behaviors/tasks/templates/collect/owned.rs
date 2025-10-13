@@ -1,37 +1,36 @@
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 use std::{collections::HashSet, path::Path};
 
-use crate::behaviors::tasks::templates::types::{OwnedTemplateMap, TemplateKey};
+use crate::{
+    behaviors::tasks::templates::{key::TemplateKey, types::OwnedTemplateMap},
+    errors::Error,
+};
 
-/// Return HashMap<template key, `meshes` inner path>
+/// Collect templates path & content map.
+///
+/// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
 pub fn collect_templates(
-    path: &Path,
-    template_names: HashSet<TemplateKey<'_>>,
-) -> OwnedTemplateMap {
-    let map: OwnedTemplateMap = jwalk::WalkDir::new(path)
-        .into_iter()
-        .par_bridge()
+    template_root: &Path,
+    template_names: HashSet<TemplateKey<'static>>,
+) -> (OwnedTemplateMap, Vec<Error>) {
+    template_names
         .into_par_iter()
-        .flat_map(|entry| {
-            let path = entry.ok()?.path();
-            if !path.is_file() {
-                return None;
+        .map(|template_key| {
+            // Intended sample: `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.bin`
+            let template_path = template_root.join(template_key.as_meshes_inner_path());
+
+            if !template_path.exists() || !template_path.is_file() {
+                return Either::Right(Error::NotFoundTemplate {
+                    template_name: template_path.display().to_string(),
+                });
             }
 
-            let file_stem = path.file_stem()?;
-            if file_stem.eq_ignore_ascii_case("animationdatasinglefile") {
-                return None;
+            match std::fs::read(&template_path) {
+                Ok(bytes) => Either::Left((template_key, bytes)),
+                Err(_err) => Either::Right(Error::NotFoundTemplate {
+                    template_name: template_path.display().to_string(),
+                }),
             }
-
-            let is_1st_person = path
-                .components()
-                .any(|c| c.as_os_str().eq_ignore_ascii_case("_1stperson"));
-            template_names.get(&TemplateKey::new(file_stem.to_str()?, is_1st_person))?;
-
-            let bytes = std::fs::read(&path).ok()?;
-            Some((path, bytes))
         })
-        .collect();
-
-    map
+        .partition_map(|either| either)
 }

@@ -7,7 +7,9 @@ use tauri::path::BaseDirectory;
 
 use crate::cmd::{bail, time};
 use crate::error::NotFoundResourceDirSnafu;
-use nemesis_merge::{behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, Status};
+use nemesis_merge::{
+    behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
+};
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
@@ -35,14 +37,19 @@ pub(crate) struct GuiPatchOptions {
     output_target: OutPutTarget,
     auto_remove_meshes: bool,
     use_progress_reporter: bool,
+
+    /// Skyrim data directories glob (required **only when using FNIS**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
-/// - ids: `e.g. vec!["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 #[tauri::command]
 pub(crate) async fn patch(
     window: Window,
     output: PathBuf,
-    ids: Vec<PathBuf>,
+    patches: PatchMaps,
     options: GuiPatchOptions,
 ) -> Result<(), String> {
     cancel_patch_inner().await?; // Abort previous task if exists
@@ -75,9 +82,10 @@ pub(crate) async fn patch(
                 hack_options: options.hack_options,
                 debug: options.debug,
                 output_target: options.output_target,
+                skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             };
 
-            let _ = time!("[patch]", behavior_gen(ids, config).await);
+            let _ = time!("[patch]", behavior_gen(patches, config).await);
         }
     });
 

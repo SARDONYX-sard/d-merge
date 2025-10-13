@@ -1,6 +1,6 @@
-use crate::cmd::bail;
+use crate::cmd::{bail, IS_VFS_MODE};
 use crate::error::NotFoundSkyrimDataDirSnafu;
-use mod_info::{GetModsInfo as _, ModInfo, ModsInfo};
+use mod_info::ModInfo;
 use skyrim_data_dir::Runtime;
 use snafu::ResultExt as _;
 use std::path::PathBuf;
@@ -12,8 +12,8 @@ use std::path::PathBuf;
 /// - MO2: `D:/GAME/ModOrganizer Skyrim SE/mods/*`
 #[tauri::command]
 pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
-    let pattern = format!("{glob}/Nemesis_Engine/mod/*/info.ini");
-    let info = ModsInfo::get_all(&pattern).or_else(|err| bail!(err))?;
+    let is_vfs = IS_VFS_MODE.load(std::sync::atomic::Ordering::Acquire);
+    let info = mod_info::get_all(glob, is_vfs).or_else(|err| bail!(err))?;
     Ok(info)
 }
 

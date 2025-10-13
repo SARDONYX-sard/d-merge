@@ -128,6 +128,13 @@ pub struct Config {
     /// Defaults to `Info` if not provided.
     #[pyo3(get, set)]
     pub log_level: Option<LogLevel>,
+
+    #[pyo3(get, set)]
+    /// Skyrim data directories glob (required **only when using FNIS**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
 #[pymethods]
@@ -147,6 +154,7 @@ impl Config {
         output_merged_xml: bool,
         log_path: Option<String>,
         log_level: Option<LogLevel>,
+        skyrim_data_dir_glob: Option<String>,
     ) -> Self {
         Config {
             resource_dir,
@@ -158,6 +166,7 @@ impl Config {
             output_merged_xml,
             log_path,
             log_level,
+            skyrim_data_dir_glob,
         }
     }
 }
@@ -181,6 +190,7 @@ impl From<Config> for RustConfig {
                 output_merged_json: value.output_merged_json,
                 output_merged_xml: value.output_merged_xml,
             },
+            skyrim_data_dir_glob: value.skyrim_data_dir_glob,
         }
     }
 }

@@ -4,9 +4,9 @@ use dashmap::{DashMap, DashSet};
 use indexmap::IndexMap;
 use std::path::PathBuf;
 
-pub use self::patch_map::{OnePatchMap, SeqPatchMap};
+pub use self::patch_map::HkxPatchMaps;
 use crate::behaviors::tasks::{
-    adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::types::TemplateKey,
+    adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::key::TemplateKey,
 };
 
 pub struct OwnedPatches {
@@ -33,50 +33,49 @@ pub struct OwnedPatches {
 /// - value: nemesis xml
 pub type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
 
-pub struct BorrowedPatches<'a> {
-    /// Name of the template that needs to be read.
-    ///
-    /// - format: template_name, is_1st_person
-    /// - e.g. (`0_master`, false)
-    pub template_names: DashSet<TemplateKey<'a>>,
+/// Collection of patches with metadata
+pub struct PatchCollection<'a> {
+    /// Templates needed for patch generation.
+    /// - e.g. (`meshes/actors/character/_1stperson/behaviors/0_master.bin`)
+    pub needed_templates: DashSet<TemplateKey<'static>>,
+    /// Actual template patch map
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
-    pub borrowed_patches: RawBorrowedPatches<'a>,
-    /// HashMap showing which index (e.g. `#0000`) of each template (e.g. `0_master.xml`)
-    /// contains `hkbBehaviorGraphStringData
-    ///
-    /// This information exists because it is needed to replace variables
-    /// such as the Nemesis variable `$variableID[]$`, `$eventID[]$`.
-    pub behavior_string_data_map: BehaviorStringDataMap<'a>,
+    pub borrowed_patches: BehaviorPatchesMap<'a>,
+    /// Map showing which index of each template contains hkbBehaviorGraphData
+    /// Used to replace Nemesis variables such as `$variableID[]$` or `$eventID[]$`.
+    pub behavior_graph_data_map: BehaviorGraphDataMap<'a>,
 }
-
-/// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
-/// - value: `Map<jsonPath, { patch, priority }>`
+/// A patch containing references to parsed strings.
 ///
-/// # Intended
+/// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)
+/// - value: `DashMap<jsonPath, { patch, priority }>`
+///
+/// # Lifetime
+/// The duration during which the Nemesis patch remains active from the path.
+///
+/// # Intended image
 /// ```json
-/// "0_master": {
+/// "meshes/.../0_master.bin": {
 ///     ["#0001", "hkbProjectData", "variable"]: OneField { op, patch, priority },
 ///     ["#0001", "hkbProjectData", "variableNames"]: Seq {
 ///         [{ op, patch, priority }, { op, patch, priority }]
 ///     }
 /// },
-/// "_1stperson/0_master": {
+/// "meshes/.../_1stperson/0_master.bin": {
 ///     ["#0001", "hkbProjectData", "variable"]: { op, patch, priority }
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub(crate) struct RawBorrowedPatches<'a>(
-    pub DashMap<TemplateKey<'a>, (OnePatchMap<'a>, SeqPatchMap<'a>)>,
-);
+pub(crate) struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
-impl RawBorrowedPatches<'_> {
+impl BehaviorPatchesMap<'_> {
     pub(crate) fn len(&self) -> usize {
         use rayon::prelude::*;
         self.0
             .par_iter()
             .map(|pair| {
-                let (one, seq) = pair.value();
+                let HkxPatchMaps { one, seq } = pair.value();
                 one.0.len() + seq.0.len()
             })
             .sum()
@@ -84,16 +83,16 @@ impl RawBorrowedPatches<'_> {
 }
 
 /// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
-/// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphStringData`.
+/// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphData`.
 ///
 /// This mapping is necessary for replacing Nemesis variables such as `$variableID[]$`, `$eventID[]$`,
 /// where the variable needs to be resolved to the corresponding behavior string data name.
 ///
 /// - key: template_name
-/// - value: index(e.g. `#0000`) of `hkbBehaviorGraphStringData`
+/// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorStringDataMap<'a>(pub DashMap<TemplateKey<'a>, &'a str>);
-impl BehaviorStringDataMap<'_> {
+pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, &'static str>);
+impl BehaviorGraphDataMap<'_> {
     /// Create `Self`
     #[inline]
     pub fn new() -> Self {

@@ -5,19 +5,16 @@ pub mod types;
 use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
 use self::sort::dedup_patches_by_priority_parallel;
 use self::types::OwnedAdsfPatchMap;
-use crate::behaviors::priority_ids::types::PriorityMap;
 use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
     FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu,
+    FailedSerializeSnafu,
 };
 use crate::results::partition_results;
-use crate::Config;
+use crate::{Config, PatchMaps};
 use rayon::prelude::*;
-use skyrim_anim_parser::adsf::alt::{
-    ser::{serialize_alt_adsf, serialize_alt_adsf_with_patches},
-    AltAdsf,
-};
+use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
 pub use skyrim_anim_parser::adsf::patch::de::add::{
     parse_clip_anim_block_patch, parse_clip_motion_block_patch,
@@ -28,20 +25,26 @@ pub use skyrim_anim_parser::adsf::patch::de::others::{
 };
 use skyrim_anim_parser::diff_line::{deserializer::parse_lines_diff_patch, DiffLines};
 use snafu::ResultExt as _;
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-pub struct AdsfPatch<'a> {
-    /// e.g. `DefaultMale`, `DefaultFemale`
+pub(crate) struct AdsfPatch<'a> {
+    /// When multiple entries share the same `project_name`, the `~n` suffix,
+    /// where `n` is 1-based and indicates the nth occurrence (with `1` meaning the first).
+    ///
+    /// e.g. `DefaultMale~1`, `DefaultFemale~1`
     pub target: &'a str,
-    /// e.g. `/some/Nemesis_Engine/mod/slide`
+
+    /// Ordering priority id.
+    /// # Example
+    /// - Vfs => `slide`
+    /// - Manual => `/some/Nemesis_Engine/mod/slide`
     pub id: &'a str,
-    patch: PatchKind<'a>,
+    pub(crate) patch: PatchKind<'a>,
 }
 
 #[derive(serde::Serialize, Debug, Clone, PartialEq)]
-enum PatchKind<'a> {
+pub(crate) enum PatchKind<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     ProjectNamesHeader(DiffLines<'a>),
     #[allow(unused)]
@@ -57,7 +60,7 @@ enum PatchKind<'a> {
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-struct EditAnim<'a> {
+pub(crate) struct EditAnim<'a> {
     patch: ClipAnimDiffPatch<'a>,
     priority: usize,
     /// `<Name>~<clip_id>`
@@ -69,7 +72,7 @@ struct EditAnim<'a> {
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-struct EditMotion<'a> {
+pub(crate) struct EditMotion<'a> {
     patch: ClipMotionDiffPatch<'a>,
     priority: usize,
     clip_id: &'a str,
@@ -86,10 +89,14 @@ const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.bin";
 
 // "dmco", "slide"
 /// Patch to `animationdatasinglefile.txt`
+///
+/// # Note
+/// - `entries`: (nemesis, fnis)
 pub(crate) fn apply_adsf_patches(
     owned_anim_data_patches: OwnedAdsfPatchMap,
-    id_order: &PriorityMap,
+    entries: &PatchMaps,
     config: &Config,
+    fnis_adsf_patches: Vec<AdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse adsf patch (1 loop with par_iter)
     let results: Vec<Result<AdsfPatch, Error>> = owned_anim_data_patches
@@ -99,9 +106,10 @@ pub(crate) fn apply_adsf_patches(
         .collect(); // back iter
 
     let (mut borrowed_patches, mut errors) = partition_results(results);
+    borrowed_patches.par_extend(fnis_adsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
-    sort_patches_by_priority(&mut borrowed_patches, id_order);
+    sort_patches_by_priority(&mut borrowed_patches, entries);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
     if config.debug.output_patch_json {
@@ -252,8 +260,18 @@ fn parse_anim_data_patch<'a>(
 }
 
 /// Sorts AdsfPatch list based on the given ID priority list.
-fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_order: &PriorityMap) {
-    patches.par_sort_by_key(|patch| id_order.get(patch.id).copied().unwrap_or(usize::MAX));
+fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_orders: &PatchMaps) {
+    patches.par_sort_by_key(|patch| {
+        let priority = id_orders.nemesis_entries.get(patch.id).copied();
+        match priority {
+            Some(priority) => priority,
+            None => id_orders
+                .fnis_entries
+                .get(patch.id)
+                .copied()
+                .unwrap_or(usize::MAX), // FIXME: MAX
+        }
+    });
 }
 
 /// Read the ADSF file from the resource directory
@@ -273,17 +291,13 @@ fn write_alt_adsf_file(
 ) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let serialized = if patches.is_empty() {
-        serialize_alt_adsf(&alt_adsf)
-    } else {
-        serialize_alt_adsf_with_patches(alt_adsf, patches).with_context(|_| {
-            FailedDiffLinesPatchSnafu {
-                kind: AnimPatchErrKind::Adsf,
-                sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
-                path,
-            }
-        })?
-    };
+    let serialized = serialize_alt_adsf(alt_adsf, patches.is_empty().then_some(patches))
+        .with_context(|_| FailedSerializeSnafu {
+            kind: AnimPatchErrKind::Adsf,
+            sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
+            path,
+        })?;
+
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);
     }
@@ -294,69 +308,29 @@ fn write_alt_adsf_file(
 }
 
 /// Outputs debug JSON files for each patch in the provided slice.
-///
-/// Each file is written to a subdirectory under `.d_merge/.debug/` and is
-/// categorized by patch type and target. The filenames are structured to support
-/// easy sorting and searching, using a shared patch identifier (`patchXX`) across
-/// both `Add` and `Edit` variants.
-///
-/// ### Filename Format
-///
-/// | Field         | Description                                                                 | Example                       |
-/// |---------------|-----------------------------------------------------------------------------|-------------------------------|
-/// | `clip_anim`   | Category of the patch (`clip_anim` or `clip_motion`)                        | `clip_anim`                   |
-/// | `edit`/`add`  | Indicates whether the patch modifies existing data or adds new content      | `edit`, `add`                 |
-/// | `_idxNNN`     | Only included for `Edit` patches; shows the index of the edited entry       | `_idx044`                     |
-/// | `patchXX`     | Shared patch group index formatted as a two-digit number                    | `patch07`                     |
-///
-/// ### Full Filename Examples
-///
-/// - `clip_anim_add_patch07.json`
-/// - `clip_anim_edit_idx044_patch07.json`
-/// - `clip_motion_edit_idx005_patch12.json`
-///
-/// This naming convention helps ensure:
-///
-/// - Easy grouping and lookup by `patchXX`
-/// - Clear distinction between `add` and `edit` actions
-/// - Fine-grained identification of edits via index
-fn output_debug_patch_json(borrowed_patches: &[AdsfPatch], config: &Config) {
-    for (patch_id, patch) in borrowed_patches.iter().enumerate() {
-        let mut debug_path = config.output_dir.join(".d_merge").join(".debug");
-        let (kind, index_str): (_, Cow<'_, str>) = match &patch.patch {
-            PatchKind::ProjectNamesHeader(_) => ("txt_project_header", "".into()),
-            PatchKind::AnimDataHeader(_) => ("anim_header", "".into()),
-            PatchKind::AddAnim(_) => ("clip_anim", "".into()),
-            PatchKind::AddMotion(_) => ("clip_motion", "".into()),
-            PatchKind::EditAnim(edit) => ("clip_anim", format!("_id{}", edit.name_clip).into()),
-            PatchKind::EditMotion(edit) => ("clip_motion", format!("_id{}", edit.clip_id).into()),
-        };
-
-        let action = match &patch.patch {
-            PatchKind::ProjectNamesHeader(_) | PatchKind::AnimDataHeader(_) => "patch",
-            PatchKind::AddAnim(_) | PatchKind::AddMotion(_) => "add",
-            PatchKind::EditAnim(_) | PatchKind::EditMotion(_) => "edit",
-        };
-
-        let target = patch.target;
-        let inner_path = format!(
-            "patches/animationdatasinglefile/{target}/{kind}_{action}{index_str}_{patch_id:04}.json",
-        );
-        debug_path.push(inner_path);
-        if let Err(_err) = write_patched_json(&debug_path, patch) {
-            #[cfg(feature = "tracing")]
-            tracing::error!("{_err}");
-        };
-    }
+fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
+    let mut adsf_path = config
+        .output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join("patches")
+        .join(ADSF_INNER_PATH);
+    adsf_path.set_extension("patch.json");
+    if let Err(_err) = write_patched_json(&adsf_path, patches) {
+        #[cfg(feature = "tracing")]
+        tracing::error!("{_err}");
+    };
 }
 
+/// Debug merged json.
 fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
-    let adsf_path = config
+    let mut dest_path = config
         .output_dir
         .join(".d_merge")
         .join(".debug")
         .join(ADSF_INNER_PATH);
-    write_patched_json(&adsf_path, alt_adsf)
+    dest_path.set_extension("json");
+    write_patched_json(&dest_path, alt_adsf)
 }
 
 #[cfg(test)]
@@ -388,7 +362,14 @@ mod tests {
 
         sort_patches_by_priority(
             &mut patches,
-            &ids.iter().enumerate().map(|(i, &p)| (p, i)).collect(),
+            &PatchMaps {
+                nemesis_entries: ids
+                    .iter()
+                    .enumerate()
+                    .map(|(priority, &id)| (id.to_string(), priority))
+                    .collect(),
+                ..Default::default()
+            },
         );
 
         let sorted_ids: Vec<&str> = patches.iter().map(|p| p.id).collect();

@@ -54,6 +54,25 @@
 
 - [Click assets](https://github.com/SARDONYX-sard/d-merge/releases)
 
+## Intended Use of Automatic Settings File Loading
+
+The load order configuration file is automatically loaded each time the application runs.
+
+It is written to <skyrim data dir>/.d_merge/d_merge_settings.json immediately before the application closes.
+
+By utilizing this behavior as follows, settings will be automatically loaded and updated whenever you switch profiles.
+
+```txt
+D:/MO2/mods/
+├── male_profile_dir/
+│   └── .d_merge/
+│       └── d_merge_settings.json <- output_dir: D:/MO2/mods/male_profile_dir
+│
+└── female_profile_dir/
+    └── .d_merge/
+        └── d_merge_settings.json <- output_dir: D:/MO2/mods/female_profile_dir
+```
+
 ## Patch Page Progress
 
 This currently works to some extent(Sliding, Paraglider, MCO, DMCO-Dodge, ...), but there seems to be a conflict where the patch changes every time the button is pressed.
@@ -64,16 +83,16 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic frontend(patch, convert, settings)
   - [x] Support MO2 mode/Virtual file system mode(auto read settings file) when use auto detect(Current: windows only)
   - [ ] hkx json/patch editor
-  - [ ] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
+  - [x] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
 
 - AnimData(`animationdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - [ ] txt project header patch
+  - [x] txt project header patch
   - [ ] anim header patch
   - [x] Add Operation
   - [x] Replace/Remove Operation
-  - [ ] Conflict resolver
+  - [x] Conflict resolver
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
   - [x] Serialization
@@ -88,7 +107,33 @@ The only thing we are considering at this time is support for the Nemesis patch.
   - [x] Basic parallel merge.
   - [x] Fix unknown merge race condition(The cause was a deadlock in applying patches.)
 
+- FNIS Patch
+
+| Status | Feature                         | Abbreviation(s) | Notes                                                                          |
+| ------ | ------------------------------- | --------------- | ------------------------------------------------------------------------------ |
+| ✅     | Basic                           | b               |                                                                                |
+| ✅     | Sequenced Animations            | s, so           |                                                                                |
+| ✅     | Arm Offset Animations           | ofa             |                                                                                |
+| ❌     | Furniture Animations            | fu, fuo         |                                                                                |
+| ⚠️     | Paired Animations and KillMoves | pa, km          | KillMove: only animation checked, not tested in actual kill. Paired: untested. |
+| ❌     | Chair Animations                | ch              |                                                                                |
+| ❌     | Alternate Animations            | AAprefix        |                                                                                |
+
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
+
+## Build
+
+requirements: Rust1.87
+
+```shell
+cargo build -p d_merge_egui --profile release-no-lto # Simple GUI by egui
+```
+
+requirements: Rust1.87, Node.js LTS
+
+```shell
+npm run build # Rich GUI by tauri
+```
 
 ## Licenses
 
@@ -101,14 +146,16 @@ This project includes multiple crates with different licenses. The overall licen
 ### License Tree
 
 ```txt
-gui/backend (GPL-3.0)
+gui (GPL-3.0)
 ├── nemesis_merge (GPL-3.0)
-│   ├── skyrim_anim_parser (GPL-3.0)
+│   ├── json_patch (MIT OR Apache-2.0)
 │   ├── nemesis_xml (MIT OR Apache-2.0)
-│   ├── skyrim_crc (MIT OR Apache-2.0)
-│   └── json_patch (MIT OR Apache-2.0)
+│   ├── skyrim_anim_parser (GPL-3.0)
+│   └── skyrim_crc (MIT OR Apache-2.0)
+├── node_expr (MIT OR Apache-2.0)
 ├── mod_info (MIT OR Apache-2.0)
-└── node_expr (MIT OR Apache-2.0)
+├── serde_hkx_for_gui (MIT OR Apache-2.0)
+└── tracing_rotation (MIT OR Apache-2.0)
 ```
 
 #### License Propagation

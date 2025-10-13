@@ -11,6 +11,26 @@ pub enum Error {
     /// {msg}
     Custom { msg: String },
 
+    /// Applying the FNIS mod patch requires input for config.skyrim_data_dir_glob, but it is not provided.
+    MissingSkyrimDataDirGlob,
+
+    #[snafu(transparent)]
+    FnisError {
+        source: crate::behaviors::tasks::fnis::collect::owned::FnisError,
+    },
+
+    /// Failed to parse FNIS_*_List.txt file.
+    #[snafu(display("[FNIS_*_List.txt file Parse Error]{}:\n{source}", path.display()))]
+    FailedParseFnisModList {
+        source: ReadableError,
+        path: PathBuf,
+    },
+
+    #[snafu(transparent)]
+    FnisPatchGenerationError {
+        source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,
+    },
+
     /// Failed to read file from {path}
     #[snafu(display("{source}: {}", path.display()))]
     FailedIo { source: io::Error, path: PathBuf },
@@ -48,17 +68,19 @@ pub enum Error {
         source: nemesis_xml::error::Error,
     },
 
-    /// Failed to get `meshes` path from this template path.
-    #[snafu(display("Failed to get `meshes` path from this template path -> {source}: {}", path.display()))]
-    FailedToGetInnerPathFromTemplate {
-        path: PathBuf,
-        source: crate::behaviors::TemplateError,
-    },
-
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n{source}", path.display()))]
     FailedParseAdsfTemplate {
         source: rmp_serde::decode::Error,
+        path: PathBuf,
+    },
+
+    /// Failed to diff line patch error
+    #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
+    FailedSerialize {
+        source: skyrim_anim_parser::adsf::alt::ser::SerializeError,
+        kind: AnimPatchErrKind,
+        sub_kind: AnimPatchErrSubKind,
         path: PathBuf,
     },
 
@@ -90,6 +112,13 @@ pub enum Error {
     FailedParseAdsfPatch {
         source: ReadableError,
         path: PathBuf,
+    },
+
+    /// hkbBehaviorGraphData/hkbBehaviorGraphStringData missing or length check error.
+    #[snafu(display("{}:\n {source}", path.display()))]
+    DedupEventVariableError {
+        path: PathBuf,
+        source: serde_hkx_features::id_maker::DedupError,
     },
 
     /// serde_hkx serialize error.
@@ -126,6 +155,10 @@ pub enum Error {
     /// Failed to parse path as nemesis path
     #[snafu(display("Failed to parse path as nemesis path:\n{source}"))]
     FailedParseNemesisPatchPath { source: ReadableError },
+
+    /// Failed to parse path as nemesis path
+    #[snafu(display("No template matching this path was found.: {}", path.display()))]
+    FailedToCastNemesisPathToTemplateKey { path: PathBuf },
 
     #[snafu(transparent)]
     ParsedAdsfPathError {
@@ -197,6 +230,7 @@ impl AnimPatchErrSubKind {
 
 #[derive(Debug, Clone)]
 pub struct BehaviorGenerationError {
+    pub fnis_errors_errors_len: usize,
     pub owned_file_errors_len: usize,
     pub adsf_errors_len: usize,
     pub asdsf_errors_len: usize,
@@ -208,6 +242,7 @@ pub struct BehaviorGenerationError {
 impl core::fmt::Display for BehaviorGenerationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self {
+            fnis_errors_errors_len: fnis_errors_len,
             owned_file_errors_len,
             adsf_errors_len,
             asdsf_errors_len,
@@ -217,6 +252,7 @@ impl core::fmt::Display for BehaviorGenerationError {
         } = *self;
 
         if adsf_errors_len == 0
+            && fnis_errors_len == 0
             && asdsf_errors_len == 0
             && owned_file_errors_len == 0
             && patch_errors_len == 0
@@ -227,6 +263,12 @@ impl core::fmt::Display for BehaviorGenerationError {
         }
 
         writeln!(f, "Behavior generation failed with the following errors:")?;
+        if fnis_errors_len > 0 {
+            writeln!(
+                f,
+                "-    Generating FNIS patch Error count: {fnis_errors_len}",
+            )?;
+        }
         if owned_file_errors_len > 0 {
             writeln!(f, "-    Reading file Error count: {owned_file_errors_len}",)?;
         }

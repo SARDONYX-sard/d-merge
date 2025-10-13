@@ -7,7 +7,6 @@ use std::{
 
 use crate::{
     app::ModManagerApp,
-    i18n::{I18nKey, I18nMap},
     mod_item::{ModItem, SortColumn},
 };
 
@@ -30,15 +29,14 @@ pub struct AppSettings {
     pub log_level: crate::app::LogLevel,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
-    pub i18n: I18nMap,
     pub sort_asc: bool,
     pub sort_column: SortColumn,
     pub transparent: bool,
+    pub window_width: f32,
     pub window_height: f32,
-    pub window_maximized: bool,
     pub window_pos_x: f32,
     pub window_pos_y: f32,
-    pub window_width: f32,
+    pub window_maximized: bool,
 
     pub vfs_skyrim_data_dir: String,
     pub vfs_mod_list: Vec<ModItem>,
@@ -54,7 +52,6 @@ impl Default for AppSettings {
             enable_debug_output: false,
             filter_text: String::new(),
             font_path: None,
-            i18n: I18nKey::default_map(),
             log_level: crate::app::LogLevel::Debug,
             mode: crate::app::DataMode::Vfs,
             output_dir: "./d_merge_output".into(),
@@ -63,11 +60,11 @@ impl Default for AppSettings {
             target_runtime: skyrim_data_dir::Runtime::Se,
             template_dir: "./assets/templates".into(),
             transparent: false, // For white there, visibility becomes poor, so the default is off.
+            window_width: 900.0,
             window_height: 900.0,
-            window_maximized: false,
             window_pos_x: 0.0,
             window_pos_y: 0.0,
-            window_width: 900.0,
+            window_maximized: false,
 
             vfs_skyrim_data_dir: String::new(),
             vfs_mod_list: Vec::new(),
@@ -78,14 +75,7 @@ impl Default for AppSettings {
 }
 
 impl From<ModManagerApp> for AppSettings {
-    fn from(mut app: ModManagerApp) -> Self {
-        let i18n = if app.i18n.is_empty() {
-            I18nKey::default_map()
-        } else {
-            app.i18n.par_sort_unstable_keys();
-            app.i18n
-        };
-
+    fn from(app: ModManagerApp) -> Self {
         Self {
             vfs_skyrim_data_dir: app.vfs_skyrim_data_dir,
             vfs_mod_list: app.vfs_mod_list,
@@ -97,7 +87,6 @@ impl From<ModManagerApp> for AppSettings {
             enable_debug_output: app.enable_debug_output,
             filter_text: app.filter_text,
             font_path: app.font_path,
-            i18n,
             log_level: app.log_level,
             mode: app.mode,
             output_dir: app.output_dir,
@@ -106,11 +95,11 @@ impl From<ModManagerApp> for AppSettings {
             target_runtime: app.target_runtime,
             template_dir: app.template_dir,
             transparent: app.transparent,
+            window_width: app.last_window_size.x,
             window_height: app.last_window_size.y,
-            window_maximized: app.last_window_maximized,
             window_pos_x: app.last_window_pos.x,
             window_pos_y: app.last_window_pos.y,
-            window_width: app.last_window_size.x,
+            window_maximized: app.last_window_maximized,
         }
     }
 }
@@ -132,7 +121,6 @@ impl From<AppSettings> for ModManagerApp {
             filter_text: settings.filter_text,
             sort_column: settings.sort_column,
             sort_asc: settings.sort_asc,
-            i18n: settings.i18n,
             log_level: settings.log_level,
             transparent: settings.transparent,
             last_window_size: egui::vec2(settings.window_width, settings.window_height),

@@ -1,8 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
     adsf::{
         alt::{to_adsf_key, AltAdsf, AltAnimData},
-        normal::ser::{
-            serialize_anim_header, serialize_clip_anim_block, serialize_clip_motion_block,
+        clip_id_manager::ClipIdManager,
+        normal::{
+            ser::{serialize_clip_anim_block, serialize_clip_motion_block},
+            AnimDataHeader,
         },
     },
     diff_line::DiffLines,
@@ -13,10 +17,10 @@ use rayon::prelude::*;
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-pub fn serialize_alt_adsf_with_patches(
+pub fn serialize_alt_adsf(
     alt_adsf: AltAdsf,
-    patches: DiffLines,
-) -> Result<String, crate::diff_line::error::Error> {
+    project_names_patches: Option<DiffLines>,
+) -> Result<String, SerializeError> {
     let mut output = String::new();
 
     let (mut project_names, anim_list): (Vec<_>, Vec<_>) = alt_adsf
@@ -24,7 +28,17 @@ pub fn serialize_alt_adsf_with_patches(
         .into_par_iter()
         .map(|(k, v)| (to_adsf_key(k), v))
         .unzip();
-    patches.into_apply(&mut project_names)?;
+
+    if let Some(patches) = project_names_patches {
+        patches.into_apply(&mut project_names)?;
+    }
+
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
+    // Serialize clip animation blocks
+    // TODO: clip id unique check
+    // Hints:
+    // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
+    let mut clip_id_map = HashMap::new();
 
     // Serialize project names
     output.push_str(&format!("{}\r\n", project_names.len()));
@@ -36,64 +50,49 @@ pub fn serialize_alt_adsf_with_patches(
 
     // Serialize animation data
     for anim_data in &anim_list {
-        output.push_str(&serialize_anim_data(anim_data));
+        output.push_str(&serialize_anim_data(
+            anim_data,
+            &mut clip_id_manager,
+            &mut clip_id_map,
+        )?);
     }
 
     Ok(output)
-}
-
-/// Serializes to `animationdatasinglefile.txt` string.
-///
-/// # Errors
-/// Returns an error if serialization fails.
-pub fn serialize_alt_adsf(alt_adsf: &AltAdsf) -> String {
-    let mut output = String::new();
-    let project_names = alt_adsf.0.keys();
-    let anim_list = alt_adsf.0.values();
-
-    // Serialize project names
-    output.push_str(&format!("{}\r\n", project_names.len()));
-    for name in project_names {
-        let name = to_adsf_key(name.as_ref().into());
-        output.push_str(name.as_ref());
-        output.push_str("\r\n");
-    }
-
-    // Serialize animation data
-    for anim_data in anim_list {
-        output.push_str(&serialize_anim_data(anim_data));
-    }
-
-    output
 }
 
 /// Serializes animation data into a string.
 ///
 /// # Errors
 /// Returns an error if serialization fails.
-fn serialize_anim_data(anim_data: &AltAnimData) -> String {
+fn serialize_anim_data<'a>(
+    anim_data: &'a AltAnimData<'a>,
+    clip_id_manager: &mut ClipIdManager,
+    clip_id_map: &mut HashMap<&'a str, usize>,
+) -> Result<String, SerializeError> {
     let mut output = String::new();
+
+    let base_len = anim_data.clip_anim_blocks.len();
+    let add_clip_len = anim_data.add_clip_anim_blocks.len();
+    // NOTE: Due to the addition of patches, motion may sometimes be present.
+    // Therefore, ignore the header's `has_motion_data` field and determine based on the actual presence of data
+    let has_motion_data = !(base_len == 0 && add_clip_len == 0);
 
     // Serialize header
     output.push_str(&serialize_anim_header(
         &anim_data.header,
+        has_motion_data,
         anim_data.to_line_range(),
     ));
 
-    // Serialize clip animation blocks
-    // TODO: clip id unique check
-    // Hints:
-    // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
-
-    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new();
-    let mut clip_id_map = std::collections::HashMap::new();
     for block in &anim_data.add_clip_anim_blocks {
         let new_id = clip_id_manager.next_id();
         if let Some(new_id) = new_id {
             clip_id_map.insert(&block.clip_id, new_id);
         } else {
-            #[cfg(feature = "tracing")]
-            tracing::error!("clip_id allocation has reached its limit");
+            return Err(SerializeError::ClipIdLimitReached {
+                base_len,
+                needed: add_clip_len,
+            });
         }
         output.push_str(&serialize_clip_anim_block(
             block,
@@ -109,9 +108,9 @@ fn serialize_anim_data(anim_data: &AltAnimData) -> String {
     if clip_motion_blocks_line_len > 0 {
         output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
     };
-    if anim_data.header.has_motion_data {
+    if has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
-            if let Some(&new_id) = clip_id_map.get(&block.clip_id) {
+            if let Some(&new_id) = clip_id_map.get(block.clip_id.as_ref()) {
                 output.push_str(&serialize_clip_motion_block(
                     block,
                     Some(new_id.to_string().into()),
@@ -130,7 +129,44 @@ fn serialize_anim_data(anim_data: &AltAnimData) -> String {
         }
     }
 
+    Ok(output)
+}
+
+fn serialize_anim_header(
+    header: &AnimDataHeader,
+    has_motion_data: bool,
+    line_range: usize,
+) -> String {
+    let mut output = String::new();
+
+    output.push_str(&line_range.to_string());
+    output.push_str("\r\n");
+    output.push_str(&header.lead_int.to_string());
+    output.push_str("\r\n");
+    output.push_str(&header.project_assets.len().to_string());
+    output.push_str("\r\n");
+
+    for asset in &header.project_assets {
+        output.push_str(asset.as_ref());
+        output.push_str("\r\n");
+    }
+    output.push_str(&format!("{}\r\n", if has_motion_data { 1 } else { 0 }));
+
     output
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum SerializeError {
+    #[snafu(display(
+        "Clip ID allocation failed: base({base_len})) {needed} IDs needed but maximum i16 value is 32767. \
+         Consider reducing the number of clips or splitting animations.",
+    ))]
+    ClipIdLimitReached { base_len: usize, needed: usize },
+
+    #[snafu(transparent)]
+    DiffLine {
+        source: crate::diff_line::error::Error,
+    },
 }
 
 #[cfg(test)]
@@ -151,7 +187,7 @@ mod tests {
             "../../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
         );
         let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
-        let actual = serialize_alt_adsf(&alt_adsf);
+        let actual = serialize_alt_adsf(alt_adsf, None).unwrap();
 
         let expected = normalize_to_crlf(include_str!(
             "../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
@@ -177,7 +213,34 @@ mod tests {
         });
         let alt_adsf: AltAdsf = adsf.into();
 
+        pub fn max_clip_id(adsf: &AltAdsf) -> Option<u64> {
+            adsf.0
+                .par_values()
+                .filter_map(|anim_data| {
+                    anim_data
+                        .clip_anim_blocks
+                        .par_values()
+                        .filter_map(|block| block.clip_id.parse::<u64>().ok())
+                        .max()
+                })
+                .max()
+        }
+        assert_eq!(max_clip_id(&alt_adsf).unwrap(), 1655);
+
         std::fs::create_dir_all("../../dummy/debug/").unwrap();
+
+        {
+            let mut keys = alt_adsf.0.par_keys().collect::<Vec<_>>();
+            keys.par_sort_unstable();
+            let keys_json = serde_json::to_string_pretty(&keys).unwrap_or_else(|err| {
+                panic!("Failed to serialize adsf to JSON:\n{err}");
+            });
+            std::fs::write(
+                "../../dummy/debug/animationdatasinglefile_keys.json",
+                keys_json,
+            )
+            .unwrap();
+        }
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
             panic!("Failed to serialize adsf to JSON:\n{err}");
         });

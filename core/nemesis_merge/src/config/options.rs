@@ -38,6 +38,25 @@ pub struct Config {
 
     /// Options controlling the output of debug artifacts.
     pub debug: DebugOptions,
+
+    /// Skyrim data directories glob (required **only when using FNIS mods**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    ///
+    /// Skyrim data directories to be searched.
+    /// This must include all directories containing `animations/<namespace>` or FNIS will fail.
+    /// Examples:
+    /// - `"MO2/mods/*"`
+    /// - `"steamapps/Skyrim Special Edition/Data"`
+    ///
+    /// **Important:**
+    /// - If this glob does not cover the correct data directories, FNIS entries will not be
+    ///   detected and the process will error out.
+    /// - In manual mode (outside of VFS), if multiple versions of the same mod exist,
+    ///   they share the same namespace and may cause unintended conflicts such as
+    ///   duplicate animation registrations and bugs.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
 impl Config {

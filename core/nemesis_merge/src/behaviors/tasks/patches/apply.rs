@@ -1,8 +1,8 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use crate::{
     behaviors::tasks::{
-        patches::types::{OnePatchMap, RawBorrowedPatches, SeqPatchMap},
-        templates::types::{BorrowedTemplateMap, TemplateKey},
+        patches::types::{BehaviorPatchesMap, HkxPatchMaps},
+        templates::{key::TemplateKey, types::BorrowedTemplateMap},
     },
     config::{ReportType, StatusReportCounter},
     errors::{Error, PatchSnafu, Result},
@@ -22,9 +22,9 @@ use std::path::Path;
 /// shrinking the lifetime of the patch by the higher-level function.
 ///
 /// Therefore, this seemingly strange lifetime annotation is intentional.
-pub fn apply_patches<'a, 'b: 'a>(
-    templates: &mut BorrowedTemplateMap<'a>,
-    borrowed_patches: RawBorrowedPatches<'b>,
+pub fn apply_patches<'t, 'p: 't>(
+    templates: &mut BorrowedTemplateMap<'t>,
+    borrowed_patches: BehaviorPatchesMap<'p>,
     config: &Config,
 ) -> Result<(), Vec<Error>> {
     let status_report = &config.status_report;
@@ -51,16 +51,10 @@ pub fn apply_patches<'a, 'b: 'a>(
     // Step 2: Apply patches in parallel
     let (results, updated_templates): (Vec<_>, Vec<_>) = working_set
         .into_par_iter()
-        .map(|(key, patches, (template_name, mut template_value))| {
-            let patch_results = apply_to_one_template(
-                config,
-                &key,
-                template_name,
-                &mut template_value,
-                patches,
-                &status_reporter,
-            );
-            (patch_results, (key, (template_name, template_value)))
+        .map(|(key, patches, mut template_value)| {
+            let patch_results =
+                apply_to_one_template(config, &key, &mut template_value, patches, &status_reporter);
+            (patch_results, (key, template_value))
         })
         .unzip();
 
@@ -79,9 +73,8 @@ pub fn apply_patches<'a, 'b: 'a>(
 fn apply_to_one_template<'a, 'b: 'a>(
     config: &Config,
     key: &TemplateKey<'a>,
-    template_name: &'a str,
     template_value: &mut Value<'a>,
-    patches: (OnePatchMap<'b>, SeqPatchMap<'b>),
+    patches: HkxPatchMaps<'b>,
     status_reporter: &StatusReportCounter,
 ) -> Vec<Result<(), Error>> {
     if config.debug.output_patch_json {
@@ -91,9 +84,13 @@ fn apply_to_one_template<'a, 'b: 'a>(
         }
     }
 
-    let (one_patch_map, seq_patch_map) = patches;
+    let patches_len = patches.len();
+    let HkxPatchMaps {
+        one: one_patch_map,
+        seq: seq_patch_map,
+    } = patches;
 
-    let mut results = Vec::with_capacity(one_patch_map.0.len() + seq_patch_map.0.len());
+    let mut results = Vec::with_capacity(patches_len);
 
     // NOTE: Why not use par_iter here?
     // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
@@ -106,9 +103,9 @@ fn apply_to_one_template<'a, 'b: 'a>(
     }
 
     for (path, patches) in seq_patch_map.0 {
-        let result = apply_seq_by_priority(template_name, template_value, path, patches)
+        let result = apply_seq_by_priority(key.as_str(), template_value, path, patches)
             .with_context(|_| PatchSnafu {
-                template_name: template_name.to_string(),
+                template_name: key.to_string(),
             });
         status_reporter.increment();
         results.push(result);
@@ -122,30 +119,22 @@ fn apply_to_one_template<'a, 'b: 'a>(
 fn write_debug_json_patch(
     output_dir: &Path,
     key: &TemplateKey,
-    patches: &(OnePatchMap, SeqPatchMap),
+    patches: &HkxPatchMaps,
 ) -> Result<(), Error> {
     use crate::errors::FailedIoSnafu;
     use snafu::ResultExt as _;
 
-    let output_dir = if key.is_1st_person {
-        let output_dir_1st_person = output_dir
-            .join(".d_merge")
-            .join(".debug")
-            .join("patches")
-            .join("_1stperson");
-        std::fs::create_dir_all(&output_dir_1st_person).context(FailedIoSnafu {
-            path: output_dir_1st_person.clone(),
-        })?;
-        output_dir_1st_person
-    } else {
-        output_dir.join(".d_merge").join(".debug").join("patches")
-    };
+    let mut output_path = output_dir
+        .join(".d_merge")
+        .join(".debug")
+        .join("patches")
+        .join(key.as_meshes_inner_path());
+    output_path.set_extension("patch.json");
 
-    std::fs::create_dir_all(&output_dir).context(FailedIoSnafu {
-        path: output_dir.clone(),
-    })?;
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
+    }
 
-    let output_path = output_dir.join(format!("{}.patch.json", key.template_name));
     let json = simd_json::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
         path: output_path.clone(),
     })?;

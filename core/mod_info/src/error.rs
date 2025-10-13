@@ -13,6 +13,3 @@ pub enum Error {
     #[snafu(transparent)]
     InvalidGlob { source: glob::PatternError },
 }
-
-/// `Result` for this crate.
-pub type Result<T, E = Error> = core::result::Result<T, E>;

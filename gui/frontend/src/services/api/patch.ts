@@ -29,35 +29,52 @@ export type FetchedModInfo = {
   author: string;
   site: string;
   auto: string;
-
-  enabled?: boolean;
-  priority?: number;
+  modType: 'nemesis' | 'fnis';
 };
 
 export type ModInfo = {
+  /**
+   * Mod-specific dir name.
+   * - Nemesis/FNIS(vfs): e.g. `aaaa`
+   * - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+   * - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
+   */
   id: string;
   name: string;
   author: string;
   site: string;
   auto: string;
+  modType: 'nemesis' | 'fnis';
 
   enabled: boolean;
   priority: number;
 };
 
-export type ModIds = readonly string[];
+export type PatchMaps = {
+  /** Nemesis patch path
+   * - key: path until mod_code (e.g.: `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+   * - value: priority
+   */
+  nemesisEntries: Record<string, number>;
+
+  /** FNIS patch path
+   * - key: path until namespace (e.g.: `<skyrim_data_dir>/meshes/actors/character/animations/FNISFlyer`)
+   * - value: priority
+   */
+  fnisEntries: Record<string, number>;
+};
 
 /**
  * Load mods `info.ini`
  * @throws Error
  */
-export async function loadModsInfo(searchGlob: string) {
+export async function loadModsInfo(skyrimDataDir: string) {
   if (isTauri()) {
-    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: searchGlob });
+    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir });
   }
 
   if (isElectron()) {
-    return await electronApi.loadModsInfo(searchGlob);
+    return await electronApi.loadModsInfo(skyrimDataDir);
   }
 
   throw new Error('Unsupported platform: Neither Tauri nor Electron');
@@ -78,6 +95,12 @@ export type PatchOptions = {
   autoRemoveMeshes: boolean;
   /** Report progress status +2s */
   useProgressReporter: boolean;
+  /** Skyrim data directories glob (required **only when using FNIS**).
+   *
+   * This must include all directories containing `animations/<namespace>`, otherwise FNIS
+   * entries will not be detected and the process will fail.
+   **/
+  skyrimDataDirGlob?: string;
 };
 
 export const patchOptionsSchema = z
@@ -93,6 +116,7 @@ export const patchOptionsSchema = z
     outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
     autoRemoveMeshes: z.boolean(),
     useProgressReporter: z.boolean(),
+    skyrimDataDirGlob: z.optional(z.string()),
   })
   .catch({
     hackOptions: {
@@ -119,13 +143,13 @@ export const patchOptionsSchema = z
  * ```
  * @throws Error
  */
-export async function patch(output: string, ids: ModIds, options: PatchOptions) {
+export async function patch(output: string, patches: PatchMaps, options: PatchOptions) {
   if (isTauri()) {
-    return await invoke('patch', { output, ids, options });
+    return await invoke('patch', { output, patches, options });
   }
 
   if (isElectron()) {
-    return await electronApi.patch(output, ids, options);
+    return await electronApi.patch(output, patches, options);
   }
 
   throw new Error('Unsupported platform: Neither Tauri nor Electron');

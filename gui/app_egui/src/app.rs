@@ -2,7 +2,7 @@ use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
-    mod_item::{from_mod_infos, ModItem, SortColumn},
+    mod_item::{inherit_reorder_cast, to_patches, ModItem, SortColumn},
 };
 use eframe::{egui, App, Frame};
 use egui::{Checkbox, Separator};
@@ -77,7 +77,7 @@ pub struct ModManagerApp {
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
-    pub i18n: I18nMap,
+    pub i18n: Arc<I18nMap>,
     pub log_level: LogLevel,
     pub transparent: bool,
     pub last_window_size: egui::Vec2,
@@ -98,6 +98,7 @@ pub struct ModManagerApp {
     pub log_lines: Arc<Mutex<Vec<String>>>,
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
+    /// It exists because mod_info must be loaded automatically only on the first run.
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
     /// Even if no mod info can be retrieved, We want to maintain the check status and display it as empty.
@@ -124,7 +125,7 @@ impl Default for ModManagerApp {
             filter_text: String::new(),
             sort_column: SortColumn::Priority,
             sort_asc: true,
-            i18n: I18nKey::default_map(),
+            i18n: Arc::new(I18nMap::load_translation()),
             log_level: LogLevel::Debug,
             transparent: true,
             last_window_size: egui::Vec2::ZERO,
@@ -168,26 +169,9 @@ impl App for ModManagerApp {
     //
     // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        match x_win::get_active_window() {
-            // When maximized, neither position nor size is necessary.
-            Ok(active_window) => {
-                let x_win::WindowPosition {
-                    x,
-                    y,
-                    width,
-                    height,
-                    is_full_screen: _,
-                } = active_window.position;
-                self.last_window_size = egui::Vec2::new(width as f32, height as f32);
-                self.last_window_pos = egui::Pos2::new(x as f32, y as f32);
-            }
-            Err(err) => {
-                tracing::error!("error occurred while getting the active window: {err}");
-            }
-        }
-
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
+        crate::i18n::I18nMap::save_translation();
     }
 }
 
@@ -208,10 +192,33 @@ impl ModManagerApp {
 
     /// To save settings.
     fn update_window_info(&mut self, ctx: &egui::Context) {
-        // self.last_window_size = rect.size(); // Get by on_exit(If couldn't then get here.)
-        ctx.viewport(|state| {
-            self.last_window_maximized = state.builder.maximized.unwrap_or_default();
+        let (pos, size, maximized) = ctx.input(|i| {
+            // NOTE: Accessing self internally causes deadlock
+            // Do not write directly to self within the closure
+            let mut temp_pos = None;
+            let mut temp_size = None;
+            let mut temp_maximized = None;
+
+            if let Some(view_info) = i.raw.viewports.get(&egui::ViewportId::ROOT) {
+                temp_maximized = Some(view_info.maximized.unwrap_or(false));
+                if let Some(outer_rect) = view_info.outer_rect {
+                    temp_size = Some(outer_rect.size());
+                    temp_pos = Some(outer_rect.min);
+                }
+            }
+
+            (temp_pos, temp_size, temp_maximized)
         });
+
+        if let Some(pos) = pos {
+            self.last_window_pos = pos;
+        }
+        if let Some(size) = size {
+            self.last_window_size = size;
+        }
+        if let Some(max) = maximized {
+            self.last_window_maximized = max;
+        }
     }
 
     fn ui_execution_mode(&mut self, ctx: &egui::Context) {
@@ -233,20 +240,19 @@ impl ModManagerApp {
                     .on_hover_text(vfs_mode_hover)
                     .clicked()
                 {
-                    let pattern =
-                        format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
-                    self.update_vfs_mod_list(&pattern);
+                    self.update_mod_list();
                 };
                 if ui
                     .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
                     .on_hover_text(manual_mode_hover)
                     .clicked()
                 {
-                    let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
-                    self.update_mod_list(&pattern);
+                    self.update_mod_list();
                 };
 
                 ui.add(Separator::default().vertical());
+
+                self.ui_target_runtime_box(ui);
 
                 let debug_output_label = self.t(I18nKey::DebugOutput).to_string();
                 let debug_output_hover = self.t(I18nKey::DebugOutputHover).to_string();
@@ -268,6 +274,37 @@ impl ModManagerApp {
         });
     }
 
+    fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(self.t(I18nKey::RuntimeTargetLabel))
+                .on_hover_text(self.t(I18nKey::RuntimeTargetHover));
+
+            egui::ComboBox::from_id_salt("skyrim_runtime_target")
+                .selected_text(self.target_runtime.as_str())
+                .show_ui(ui, |ui| {
+                    let runtimes = [
+                        (skyrim_data_dir::Runtime::Le, "SkyrimLE"),
+                        (skyrim_data_dir::Runtime::Se, "SkyrimSE"),
+                        (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
+                    ];
+
+                    for (runtime, label) in runtimes {
+                        if ui
+                            .selectable_value(&mut self.target_runtime, runtime, label)
+                            .changed()
+                            && self.mode == DataMode::Vfs
+                        {
+                            if let Ok(data_dir) =
+                                skyrim_data_dir::get_skyrim_data_dir(self.target_runtime)
+                            {
+                                self.skyrim_data_dir = data_dir.display().to_string();
+                            };
+                        }
+                    }
+                });
+        });
+    }
+
     /// Skyrim data directory selection panel.
     fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_data_dir");
@@ -277,30 +314,42 @@ impl ModManagerApp {
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t(I18nKey::SkyrimDataDirLabel));
+                if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked() {
+                    if let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
+                    {
+                        self.set_notification(err);
+                    };
+                };
+
                 self.draw_skyrim_dir_ui(ui);
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
+                    .add_sized(
+                        [60.0, 40.0],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
-                    let dir = match self.mode {
-                        DataMode::Vfs => &self.vfs_skyrim_data_dir,
-                        DataMode::Manual => &self.skyrim_data_dir,
-                    };
-                    let dialog = if !dir.is_empty() {
-                        rfd::FileDialog::new().set_directory(dir)
-                    } else {
-                        rfd::FileDialog::new()
+                    let dialog = {
+                        let default_dir = {
+                            let path = Path::new(self.current_skyrim_data_dir());
+                            path.canonicalize().ok()
+                        };
+                        match default_dir {
+                            Some(default_dir) => rfd::FileDialog::new().set_directory(default_dir),
+                            None => rfd::FileDialog::new(),
+                        }
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
                         match self.mode {
                             DataMode::Vfs => {
-                                self.update_vfs_mod_list(&dir.display().to_string());
+                                self.vfs_skyrim_data_dir = dir.display().to_string();
+                                self.update_mod_list();
                             }
                             DataMode::Manual => {
-                                self.update_mod_list(&dir.display().to_string());
+                                self.skyrim_data_dir = dir.display().to_string();
+                                self.update_mod_list();
                             }
                         };
                     }
@@ -330,7 +379,10 @@ impl ModManagerApp {
                 );
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::OpenButton)))
+                    .add_sized(
+                        [60.0, 40.0],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
                     let dialog = if !self.output_dir.is_empty() {
@@ -382,9 +434,8 @@ impl ModManagerApp {
                 }
 
                 if self.is_locked {
-                    ui.add_space(ui.available_width() - 60.0);
                     let lock_button_response = ui
-                        .add_sized([60.0, 40.0], egui::Button::new("🔒"))
+                        .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::LockButton)))
                         .on_hover_text(self.t(I18nKey::LockButtonHover));
                     if lock_button_response.clicked() {
                         self.unlock_readonly_table();
@@ -429,8 +480,8 @@ impl ModManagerApp {
                 self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
-                self.add_button(ui, ctx, I18nKey::PatchButton, |s, ctx| {
-                    s.patch(ctx);
+                self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
+                    s.patch();
                 });
             });
         });
@@ -451,7 +502,7 @@ impl ModManagerApp {
 
     fn ui_log_level_box(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            ui.label("Log Level");
+            ui.label(self.t(I18nKey::LogLevelLabel));
 
             egui::ComboBox::from_id_salt("log_level")
                 .selected_text(self.log_level.as_str())
@@ -603,7 +654,7 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
-        let table_max_height = ui.available_height() * 0.8;
+        let table_max_height = ui.available_height() * 0.9;
         let total_width = ui.available_width();
 
         let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5; // ignore 0.5px diff
@@ -736,6 +787,15 @@ impl ModManagerApp {
 
 // mod info loader
 impl ModManagerApp {
+    /// - vfs -> self.vfs_skyrim_data_dir
+    /// - others -> self.skyrim_data_dir
+    const fn current_skyrim_data_dir(&self) -> &str {
+        match self.mode {
+            DataMode::Vfs => self.vfs_skyrim_data_dir.as_str(),
+            DataMode::Manual => self.skyrim_data_dir.as_str(),
+        }
+    }
+
     /// - vfs -> vfs_mod_list
     /// - others -> mod_list
     const fn mod_list(&self) -> &Vec<ModItem> {
@@ -809,8 +869,7 @@ impl ModManagerApp {
             );
 
             if self.is_first_render || response.changed() {
-                let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.vfs_skyrim_data_dir);
-                self.update_vfs_mod_list(&pattern);
+                self.update_mod_list();
             }
         } else {
             let response = ui.add_sized(
@@ -820,94 +879,33 @@ impl ModManagerApp {
             );
 
             if self.is_first_render || response.changed() {
-                let pattern = format!("{}/Nemesis_Engine/mod/*/info.ini", self.skyrim_data_dir);
-                self.update_mod_list(&pattern);
+                self.update_mod_list();
             }
         }
     }
 
-    fn update_mod_list(&mut self, pattern: &str) {
-        use mod_info::GetModsInfo as _;
-        match mod_info::ModsInfo::get_all(pattern) {
-            Ok(mods) => {
-                let is_empty = mods.is_empty();
-                self.fetch_is_empty = is_empty;
-                if is_empty {
-                    return; // To preserve check state even if empty
-                }
-
-                // Turn the IDs of previously enabled mods into a HashSet
-                let enabled_ids: std::collections::HashSet<&str> = self
-                    .mod_list
-                    .par_iter()
-                    .filter(|m| m.enabled)
-                    .map(|m| m.id.as_str())
-                    .collect();
-
-                // take over enabled for new mods
-                let new_mods: Vec<_> = from_mod_infos(mods)
-                    .into_par_iter()
-                    .map(|mut m| {
-                        if enabled_ids.contains(m.id.as_str()) {
-                            m.enabled = true;
-                        }
-                        m
-                    })
-                    .collect();
-
-                let _ = core::mem::replace(&mut self.mod_list, new_mods);
-            }
-            Err(err) => {
-                let err_title = self.t(I18nKey::ErrorReadingModInfo);
-                self.set_notification(format!("{err_title} {err}"));
-            }
-        }
-    }
-
+    /// Update mod info based on file search according to the current mode (vfs or manual).
+    ///
     /// # Note
     /// The only difference between vfs and manual is the id.
     /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
-    fn update_vfs_mod_list(&mut self, pattern: &str) {
-        if let Some(mods) = self.fetch_vfs_mod_list(pattern) {
-            let is_empty = mods.is_empty();
-            self.fetch_is_empty = is_empty;
-            if is_empty {
-                return; // To preserve check state even if empty
+    fn update_mod_list(&mut self) {
+        match mod_info::get_all(self.current_skyrim_data_dir(), self.mode == DataMode::Vfs) {
+            Ok(new_mods) => {
+                let is_empty = new_mods.is_empty();
+                self.fetch_is_empty = is_empty;
+                if is_empty {
+                    return; // To preserve check state even if empty
+                }
+
+                let new_mods = inherit_reorder_cast(self.mod_list(), new_mods);
+                let _ = core::mem::replace(self.mod_list_mut(), new_mods);
             }
-
-            // Turn the IDs of previously enabled mods into a HashSet
-            let enabled_ids: std::collections::HashSet<&str> = self
-                .vfs_mod_list
-                .par_iter()
-                .filter(|m| m.enabled)
-                .map(|m| m.id.as_str())
-                .collect();
-
-            // take over enabled for new mods
-            let new_mods: Vec<_> = mods
-                .into_par_iter()
-                .map(|mut m| {
-                    if enabled_ids.contains(m.id.as_str()) {
-                        m.enabled = true;
-                    }
-                    m
-                })
-                .collect();
-
-            let _ = core::mem::replace(&mut self.vfs_mod_list, new_mods);
-        };
-    }
-
-    fn fetch_vfs_mod_list(&self, pattern: &str) -> Option<Vec<ModItem>> {
-        use mod_info::GetModsInfo as _;
-        match mod_info::ModsInfo::vfs_get_all(pattern) {
-            Ok(mods) => Some(from_mod_infos(mods)),
             Err(err) => {
                 let err_title = self.t(I18nKey::ErrorReadingModInfo);
                 self.set_notification(format!("{err_title} {err}"));
-                None
             }
         }
     }
@@ -917,7 +915,9 @@ impl ModManagerApp {
     /// Set message to notification
     pub fn set_notification<S: Into<String>>(&self, msg: S) {
         if let Ok(mut guard) = self.notification.lock() {
-            *guard = msg.into();
+            let msg = msg.into();
+            tracing::info!("{msg}");
+            *guard = msg;
         }
     }
 
@@ -942,52 +942,29 @@ impl ModManagerApp {
     /// Translate given key or fallback to default English.
     #[inline]
     fn t(&self, key: I18nKey) -> &str {
-        self.i18n
-            .get(&key)
-            .map_or_else(|| key.default_eng(), |s| s.as_ref())
+        self.i18n.t(key)
     }
 }
 
 impl ModManagerApp {
-    fn patch(&self, ctx: &egui::Context) {
-        // mod Items to nemesis_path
-        let data_dir = match self.mode {
-            DataMode::Vfs => &self.vfs_skyrim_data_dir,
-            DataMode::Manual => &self.skyrim_data_dir,
-        };
+    fn patch(&self) {
+        let start_time = std::time::Instant::now();
 
-        let nemesis_paths = match self.mode {
-            DataMode::Vfs => self
-                .vfs_mod_list
-                .par_iter()
-                .filter(|item| item.enabled)
-                .map(|item| {
-                    let mut path = PathBuf::new();
-                    path.push(data_dir);
-                    path.push("Nemesis_Engine");
-                    path.push("mod");
-                    path.push(&item.id);
-                    path
-                })
-                .collect(),
-            DataMode::Manual => self
-                .mod_list
-                .par_iter()
-                .filter(|item| item.enabled)
-                .map(|item| {
-                    let mut path = PathBuf::new();
-                    path.push(&item.id);
-                    path
-                })
-                .collect(),
+        let patches = match self.mode {
+            DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
+            DataMode::Manual => to_patches(&self.skyrim_data_dir, false, &self.mod_list),
         };
         let is_debug_mode = self.enable_debug_output;
 
-        self.auto_remove_meshes(ctx);
+        if self.auto_remove_meshes {
+            self.remove_meshes_dir_all();
+        }
 
         let notify = Arc::clone(&self.notification);
+        let i18n = Arc::clone(&self.i18n);
+
         self.async_rt.spawn(nemesis_merge::behavior_gen(
-            nemesis_paths,
+            patches,
             nemesis_merge::Config {
                 resource_dir: self.template_dir.clone().into(),
                 output_dir: self.output_dir.clone().into(),
@@ -999,7 +976,7 @@ impl ModManagerApp {
                 },
                 status_report: Some(Box::new(move |status| {
                     let mut n = notify.lock().unwrap();
-                    *n = status.to_string();
+                    *n = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {
                     cast_ragdoll_event: true,
@@ -1009,62 +986,31 @@ impl ModManagerApp {
                     output_merged_json: is_debug_mode,
                     output_merged_xml: false,
                 },
+                skyrim_data_dir_glob: Some(self.current_skyrim_data_dir().to_string()),
             },
         ));
     }
 
-    /// Removes the auto meshes/debug directories with a safety warning if output_dir equals Skyrim data dir.
-    fn auto_remove_meshes(&self, ctx: &egui::Context) {
-        if self.auto_remove_meshes {
-            self.set_notification(format!(
-                "Deleting `{}/meshes` directory...",
-                self.output_dir
-            ));
+    /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
+    fn remove_meshes_dir_all(&self) {
+        let output_dir = &self.output_dir;
+        let skyrim_data_directory = self.current_skyrim_data_dir();
 
-            let skyrim_data_directory = match self.mode {
-                DataMode::Vfs => &self.vfs_skyrim_data_dir,
-                DataMode::Manual => &self.skyrim_data_dir,
-            };
+        let is_dangerous_remove = Path::new(output_dir)
+            .canonicalize()
+            .unwrap_or_else(|_| Path::new(output_dir).to_path_buf())
+            == Path::new(skyrim_data_directory)
+                .canonicalize()
+                .unwrap_or_else(|_| Path::new(skyrim_data_directory).to_path_buf());
 
-            let mut proceed = true;
+        if is_dangerous_remove {
+            let warn = "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.";
+            tracing::warn!("{warn}");
+        } else {
+            let removing_msg = self.t(I18nKey::RemovingMeshesMessage);
+            self.set_notification(format!("0/6: {removing_msg} `{output_dir}/meshes`"));
 
-            if &self.output_dir == skyrim_data_directory {
-                let mut user_choice: Option<bool> = None;
-
-                egui::Window::new(self.t(I18nKey::WarningTitle))
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, |ui| {
-                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody1));
-                        ui.label(self.t(I18nKey::AutoRemoveMeshesWarningBody2));
-
-                        ui.horizontal(|ui| {
-                            if ui.button(self.t(I18nKey::ExecuteButton)).clicked() {
-                                user_choice = Some(true);
-                            }
-                            if ui.button(self.t(I18nKey::CancelButton)).clicked() {
-                                user_choice = Some(false);
-                            }
-                        });
-                    });
-
-                if user_choice == Some(false) {
-                    proceed = false; // Skip deletion if user cancels
-                }
-            }
-
-            if proceed {
-                let meshes_path = Path::new(&self.output_dir).join("meshes");
-                let debug_path = Path::new(&self.output_dir).join(".d_merge").join(".debug");
-                rayon::join(
-                    || {
-                        let _ = remove_if_exists(meshes_path);
-                    },
-                    || {
-                        let _ = remove_if_exists(debug_path);
-                    },
-                );
-            }
+            crate::cache_remover::remove_meshes_dir_all(output_dir);
         }
     }
 }
@@ -1113,41 +1059,4 @@ where
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir)
         .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
-}
-
-/// Removes a directory if it exists, with debug logging.
-///
-/// # Why need this?
-/// This is because the presence of a previous hkx may leave unintended changes behind.
-///
-/// # Reasons for not using `std::fs::remove_dir_all`
-/// For some reason, egui on MO2 throws an error saying the path doesn't exist when I try to use `std::remove_dir_all`,
-/// so I manually perform a recursive deletion starting from the end.
-fn remove_if_exists(path: impl AsRef<Path>) -> std::io::Result<()> {
-    use std::fs;
-
-    let path = path.as_ref();
-
-    if !path.exists() {
-        return Ok(());
-    }
-
-    // Get the contents
-    let entries: Vec<PathBuf> = fs::read_dir(path)?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .collect();
-
-    // directories recursively deleted in parallel, files deleted in parallel
-    entries.par_iter().for_each(|entry_path| {
-        if entry_path.is_dir() {
-            let _ = remove_if_exists(entry_path); // recursion
-        } else {
-            let _ = fs::remove_file(entry_path);
-        }
-    });
-
-    // remove itself after deleting the contents
-    fs::remove_dir(path)?;
-    Ok(())
 }

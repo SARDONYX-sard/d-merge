@@ -1,10 +1,6 @@
-use crate::behaviors::tasks::templates::collect::path::template_name_and_inner_path;
-use crate::behaviors::tasks::templates::types::{
-    BorrowedTemplateMap, OwnedTemplateMap, TemplateKey,
-};
-use crate::errors::{
-    Error, FailedToGetInnerPathFromTemplateSnafu, JsonSnafu, Result, TemplateSnafu,
-};
+use crate::behaviors::tasks::templates::key::TemplateKey;
+use crate::behaviors::tasks::templates::types::{BorrowedTemplateMap, OwnedTemplateMap};
+use crate::errors::{Error, JsonSnafu, Result, TemplateSnafu};
 use rayon::{iter::Either, prelude::*};
 use simd_json::{serde::to_borrowed_value, BorrowedValue};
 use snafu::ResultExt as _;
@@ -12,37 +8,39 @@ use std::path::Path;
 
 /// Return  Map<name, (inner_path, value)>
 pub fn collect_templates(templates: &OwnedTemplateMap) -> (BorrowedTemplateMap<'_>, Vec<Error>) {
-    templates.into_par_iter().partition_map(|(path, bytes)| {
-        let parse_template = || -> Result<(TemplateKey, (&str, BorrowedValue<'_>))> {
-            fn is_value_bin(path: &Path) -> bool {
-                path.extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("bin"))
-            }
-            fn is_xml(path: &Path) -> bool {
-                path.extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"))
-            }
+    templates
+        .into_par_iter()
+        .partition_map(|(template_key, bytes)| {
+            let path = template_key.as_meshes_inner_path();
 
-            let value = match path {
-                path if is_value_bin(path) => template_bin_to_value(bytes, path),
-                path if is_xml(path) => template_xml_to_value(bytes, path),
-                other => {
-                    return Err(Error::UnsupportedTemplatePath {
-                        path: other.clone(),
-                    })
+            let parse_template = || -> Result<(TemplateKey<'_>, BorrowedValue<'_>)> {
+                fn is_value_bin(path: &Path) -> bool {
+                    path.extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("bin"))
                 }
-            }?;
-            let (name, inner_path) = template_name_and_inner_path(path)
-                .with_context(|_| FailedToGetInnerPathFromTemplateSnafu { path: path.clone() })?;
+                fn is_xml(path: &Path) -> bool {
+                    path.extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"))
+                }
 
-            Ok((name, (inner_path, value)))
-        };
+                let value = match path {
+                    path if is_value_bin(path) => template_bin_to_value(bytes, path),
+                    path if is_xml(path) => template_xml_to_value(bytes, path),
+                    other => {
+                        return Err(Error::UnsupportedTemplatePath {
+                            path: other.to_path_buf(),
+                        })
+                    }
+                }?;
 
-        match parse_template() {
-            Ok(v) => Either::Left(v),
-            Err(e) => Either::Right(e),
-        }
-    })
+                Ok((template_key.clone(), value))
+            };
+
+            match parse_template() {
+                Ok(v) => Either::Left(v),
+                Err(e) => Either::Right(e),
+            }
+        })
 }
 
 pub(crate) fn template_xml_to_value(bytes: &[u8], path: &Path) -> Result<BorrowedValue<'static>> {

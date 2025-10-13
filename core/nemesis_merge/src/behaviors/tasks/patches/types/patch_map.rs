@@ -13,6 +13,34 @@ use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 
+/// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
+///
+/// This is useful when you want to manage both *single-value patches*
+/// and *multi-value patches* in the same context.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HkxPatchMaps<'a> {
+    /// Stores one value per path (highest priority wins).
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
+    )]
+    pub one: OnePatchMap<'a>,
+    /// Stores multiple values per path.
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))
+    )]
+    pub seq: SeqPatchMap<'a>,
+}
+
+impl HkxPatchMaps<'_> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.one.0.len() + self.seq.0.len()
+    }
+}
+
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default)]
@@ -69,11 +97,6 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
-    ///
-    /// # Parameters
-    ///
-    /// - `key`: The JSON path.
-    /// - `new_value`: The value to insert.
     pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut existing) => {
@@ -89,11 +112,6 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new values are added using `par_extend`.
     /// - Otherwise, a new entry is created from the parallel iterator.
-    ///
-    /// # Parameters
-    ///
-    /// - `key`: The JSON path.
-    /// - `new_values`: A parallel iterator yielding `ValueWithPriority` instances.
     pub fn extend<I>(&self, key: JsonPath<'a>, new_values: I)
     where
         I: IntoParallelIterator<Item = ValueWithPriority<'a>>,

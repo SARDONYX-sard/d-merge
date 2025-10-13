@@ -13,7 +13,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bitflags = "2.9.1"
 dashmap = { workspace = true }
+glob = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
@@ -38,6 +40,7 @@ nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
 [dev-dependencies]
+havok_classes = { workspace = true }
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
 tokio = { workspace = true, features = [
@@ -55,7 +58,12 @@ default = ["debug"]
 debug = ["serde", "tracing", "dashmap/serde"]
 
 # tracing = ["dep:tracing", "json_patch/tracing", "serde_hkx/tracing"]
-tracing = ["dep:tracing", "dep:tracing-subscriber", "json_patch/tracing"]
+tracing = [
+  "dep:tracing",
+  "dep:tracing-subscriber",
+  "json_patch/tracing",
+  "serde_hkx_features/dedup_tracing",
+]
 
 serde = ["dep:serde", "json_patch/serde"]
 

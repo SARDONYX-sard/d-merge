@@ -10,6 +10,13 @@ pub type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
 #[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone)]
 pub enum Status {
+    /// Status when generating FNIS patches.
+    GeneratingFnisPatches {
+        /// 0 based index
+        index: usize,
+        total: usize,
+    },
+
     /// Status when reading patches.
     ReadingPatches {
         /// 0 based index
@@ -47,19 +54,22 @@ pub enum Status {
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GeneratingFnisPatches { index, total } => {
+                write!(f, "[1/6] Generating FNIS patches...({index}/{total})")
+            }
             Self::ReadingPatches { index, total } => {
-                write!(f, "[1/5] Reading templates and patches...({index}/{total})")
+                write!(f, "[2/6] Reading templates and patches...({index}/{total})")
             }
             Self::ParsingPatches { index, total } => {
-                write!(f, "[2/5] Parsing patches...({index}/{total})")
+                write!(f, "[3/6] Parsing patches...({index}/{total})")
             }
             Self::ApplyingPatches { index, total } => {
-                write!(f, "[3/5] Applying patches...({index}/{total})")
+                write!(f, "[4/6] Applying patches...({index}/{total})")
             }
             Self::GeneratingHkxFiles { index, total } => {
-                write!(f, "[4/5] Generating .hkx files...({index}/{total})")
+                write!(f, "[5/6] Generating .hkx files...({index}/{total})")
             }
-            Self::Done => write!(f, "[5/5] Done."),
+            Self::Done => write!(f, "[6/6] Done."),
             Self::Error(msg) => write!(f, "[Error] {msg}"),
         }
     }

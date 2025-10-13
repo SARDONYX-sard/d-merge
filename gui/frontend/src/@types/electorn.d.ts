@@ -8,7 +8,7 @@
  */
 
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
-import type { ModIds, ModInfo, PatchOptions } from '@/services/api/patch';
+import type { ModInfo, PatchMaps, PatchOptions } from '@/services/api/patch';
 
 /**
  * Electron APIs exposed to the frontend.
@@ -52,7 +52,7 @@ export interface ElectronApi {
   /** Load mods info from `info.ini` files matching the glob. */
   loadModsInfo(searchGlob: string): Promise<ModInfo[]>;
   /** Patch mods to hkx files with the specified options. */
-  patch(output: string, ids: ModIds, options: PatchOptions): Promise<void>;
+  patch(output: string, patches: PatchMaps, options: PatchOptions): Promise<void>;
 
   /** Cancel the current patch operation. */
   cancelPatch(): Promise<void>;

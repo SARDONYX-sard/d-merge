@@ -11,7 +11,14 @@ maturin develop
 python ./test/test.py
 """
 
-from d_merge_python import Config, LogLevel, OutPutTarget, Status, behavior_gen
+from d_merge_python import (
+    Config,
+    LogLevel,
+    OutPutTarget,
+    PatchMaps,
+    Status,
+    behavior_gen,
+)
 
 
 import time
@@ -76,13 +83,15 @@ def test_behavior_gen():
 
     # Nemesis patch ids
     with open("../../dummy/ids.txt", "r", encoding="utf-8") as f:
-        paths = f.read().splitlines()
+        nemesis_paths = f.read().splitlines()
+        nemesis_entries = {path: idx for idx, path in enumerate(nemesis_paths)}
+    patches = PatchMaps(nemesis_entries, fnis_entries={})
 
     import asyncio
 
     async def run():
         try:
-            await behavior_gen(paths, config, status_report=on_status)
+            await behavior_gen(patches, config, status_report=on_status)
             print("✅ behavior_gen_py executed successfully.")
         except Exception as e:
             print(f"❌ Error: {e}")

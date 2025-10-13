@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
-use mod_info::{GetModsInfo as _, ModInfo as RustModInfo, ModsInfo};
+use mod_info::ModInfo as RustModInfo;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 use nemesis_merge::{
     Config as RustConfig, DebugOptions as RustDebugOptions, HackOptions as RustHackOptions,
-    OutPutTarget as RustOutPutTarget, Status as RustStatus,
+    OutPutTarget as RustOutPutTarget, PatchMaps as RustPatchMaps, Status as RustStatus,
 };
 use rayon::prelude::*;
 use skyrim_data_dir::Runtime;
@@ -92,6 +92,12 @@ pub struct Config {
 
     /// Options controlling the output of debug artifacts.
     pub debug: DebugOptions,
+
+    /// Skyrim data directories glob (required **only when using FNIS**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    pub skyrim_data_dir_glob: Option<String>,
 }
 
 impl Config {
@@ -126,6 +132,7 @@ impl Config {
                 output_merged_xml: self.debug.output_merged_xml,
             },
             status_report,
+            skyrim_data_dir_glob: self.skyrim_data_dir_glob,
         })
     }
 }
@@ -152,6 +159,13 @@ pub struct ProgressContent {
 /// - Mirrors Rust enum with serde(tag="type", content="content").
 #[napi]
 pub enum PatchStatus {
+    /// Status when generating FNIS patches.
+    GeneratingFnisPatches {
+        /// 0 based index
+        index: u32,
+        total: u32,
+    },
+
     /// Status when reading patches.
     ReadingPatches {
         /// 0 based index
@@ -190,6 +204,12 @@ pub enum PatchStatus {
 impl From<RustStatus> for PatchStatus {
     fn from(s: RustStatus) -> Self {
         match s {
+            RustStatus::GeneratingFnisPatches { index, total } => {
+                PatchStatus::GeneratingFnisPatches {
+                    index: index as u32,
+                    total: total as u32,
+                }
+            }
             RustStatus::ReadingPatches { index, total } => PatchStatus::ReadingPatches {
                 index: index as u32,
                 total: total as u32,
@@ -246,6 +266,38 @@ impl From<RustModInfo> for ModInfo {
 // Exported APIs
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[napi(object)]
+#[derive(Debug, Default)]
+pub struct PatchMaps {
+    /// Nemesis patch path
+    /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+    /// - value: priority
+    pub nemesis_entries: PriorityMap,
+    /// FNIS patch path
+    /// - key: path until namespace(e.g. `<skyrim_data_dir>/path/Meshes/actors/character/animations/FNISFlyer`)
+    /// - value: priority
+    pub fnis_entries: PriorityMap,
+}
+
+// Node.js unsupported usize. So we use u32
+type PriorityMap = HashMap<String, u32>;
+
+#[inline]
+fn into_rust_priority_map(map: PatchMaps) -> RustPatchMaps {
+    RustPatchMaps {
+        nemesis_entries: map
+            .nemesis_entries
+            .into_par_iter()
+            .map(|(k, v)| (k, v as usize))
+            .collect(),
+        fnis_entries: map
+            .fnis_entries
+            .into_par_iter()
+            .map(|(k, v)| (k, v as usize))
+            .collect(),
+    }
+}
+
 /// Generates Nemesis behaviors for given mod IDs using a configuration.
 ///
 /// - nemesis_paths: `e.g. ["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
@@ -258,14 +310,14 @@ impl From<RustModInfo> for ModInfo {
     ts_args_type = "nemesis_paths: string[], config: Config, status_fn?: (err: Error | null, status: PatchStatus) => void"
 )]
 pub async fn behavior_gen(
-    nemesis_paths: Vec<String>,
+    patch_entries: PatchMaps,
     config: Config,
     status_fn: Option<ThreadsafeFunction<PatchStatus>>,
 ) -> napi::Result<()> {
-    let ids = nemesis_paths.into_par_iter().map(PathBuf::from).collect();
+    let patches = into_rust_priority_map(patch_entries);
     let config: RustConfig = config.try_into_rust(status_fn)?;
 
-    nemesis_merge::behavior_gen(ids, config)
+    nemesis_merge::behavior_gen(patches, config)
         .await
         .map_err(|e| napi::Error::from_reason(e.to_string()))?;
 
@@ -294,14 +346,28 @@ pub fn get_skyrim_data_dir(runtime: String) -> napi::Result<String> {
         .map_err(|e| napi::Error::from_reason(e.to_string()))
 }
 
-/// Loads mod information matching the given glob pattern.
+/// Collect both Nemesis and FNIS mods into a single vector.
+///
+/// # Nemesis
+/// | is_vfs | glob pattern                                               | id extracted as                   |
+/// |--------|------------------------------------------------------------|-----------------------------------|
+/// | true   | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
+/// | false  | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
+///
+/// # FNIS
+/// | is_vfs | glob pattern                                                         | id extracted as                   |
+/// |--------|----------------------------------------------------------------------|-----------------------------------|
+/// |  any   | `{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
+///
+/// - `is_vfs`:
+///   Whether the lookup is done in the virtualized `Data` directory (true) or
+///   directly under the mods directory (false).
 ///
 /// # Errors
-///
-/// Returns `napi::Error` if loading fails.
+/// Returns [`napi::Error`] if glob expansion fails or files cannot be read.
 #[napi]
-pub fn load_mods_info(glob: String) -> napi::Result<Vec<ModInfo>> {
-    let pattern = format!("{glob}/Nemesis_Engine/mod/*/info.ini");
-    let infos = ModsInfo::get_all(&pattern).map_err(|e| napi::Error::from_reason(e.to_string()))?;
+pub fn load_mods_info(glob: String, is_vfs: bool) -> napi::Result<Vec<ModInfo>> {
+    let infos =
+        mod_info::get_all(&glob, is_vfs).map_err(|e| napi::Error::from_reason(e.to_string()))?;
     Ok(infos.into_par_iter().map(Into::into).collect())
 }
