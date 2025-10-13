@@ -56,6 +56,7 @@ jobs:
           allowUpdates: true
           artifacts: ./*.zip
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
       - name: Compress outputs(MacOS/Linux)
         shell: bash
@@ -70,6 +71,7 @@ jobs:
           allowUpdates: true
           artifacts: ./*.tar.gz
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
 
   release_egui:
@@ -112,6 +114,7 @@ jobs:
           allowUpdates: true
           artifacts: ./*.zip
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
 
       - name: Compress outputs(MacOS/Linux)
@@ -130,12 +133,12 @@ jobs:
 
       - name: Release Portable Version
         uses: ncipollo/release-action@v1.16.0
-        if: runner.os != 'Windows'
         with:
           allowUpdates: true
           artifacts: ./*.tar.gz
-          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
           body: ${{ steps.changelog.outputs.changes }}
+          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
 
       - name: Commit CHANGELOG.md
@@ -144,5 +147,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
-          git commit -m "docs: update `CHANGELOG.md` for `${{ github.ref_name }}`" || echo "No changes to commit"
+          git commit -m "docs: update \`CHANGELOG.md\` for \`${{ github.ref_name }}\`" || echo "No changes to commit"
           git push origin main
