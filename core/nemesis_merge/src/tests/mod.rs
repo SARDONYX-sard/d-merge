@@ -14,12 +14,12 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
     let patches = {
         use crate::behaviors::PriorityMap;
 
-        let string = std::fs::read_to_string("../../dummy/ids.txt")?;
+        let string = std::fs::read_to_string("../../dummy/ids.ini")?;
 
         let lines: Vec<_> = string
             .par_lines()
             .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .filter(|line| !line.is_empty() && !line.starts_with(";"))
             .collect();
         let nemesis_mods_count = lines.len();
 
@@ -34,7 +34,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
             "FNISCreatureVersion",
             "FNISZoo",
             "P1FlyingRing",
-            "XPMSE",
+            // "XPMSE",
             "backgrab",
             "backgrabnosneak",
             "backstabnosneak",
