@@ -42,8 +42,10 @@ pub fn apply_seq_by_priority<'a>(
         let target_len = template_array.len();
         let visualizer = visualize_ops(&patches, target_len);
         tracing::debug!(
-            "Seq merge conflict resolution for `{file_name}` file:
-Path: {path}, Seq target length: {target_len}
+            "Seq Json Patch Conflict Resolution report
+ file=\"{file_name}\"
+ path: {path}(len: {target_len})
+---
 {visualizer}"
         );
     }
@@ -73,9 +75,7 @@ pub fn apply_seq_array_directly<'a>(
         let visualizer = visualize_ops(&patches, target_array.len());
         let target_len = target_array.len();
         tracing::debug!(
-            "Seq merge conflict resolution:
-Path: maybe asdsf, Seq target length: {target_len}
-{visualizer}"
+            "Seq Json Patch Conflict Resolution\n target_len={target_len}\n ---\n{visualizer}"
         );
     }
 
