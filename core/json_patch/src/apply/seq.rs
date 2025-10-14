@@ -312,7 +312,6 @@ fn visualize_ops(
     array_len: usize, // target array length
 ) -> Result<String, JsonPatchError> {
     use std::collections::BTreeSet;
-    use std::ops::Range;
 
     const SPACE_SYMBOL: &str = "     ";
     const ADD_SYMBOL: &str = " [+] ";
@@ -422,7 +421,7 @@ fn visualize_ops(
         points.insert(row.range.start);
         points.insert(row.range.end);
     }
-    let points: Vec<_> = points.into_iter().collect();
+    let points: Vec<_> = points.smart_iter().collect();
 
     // --- 3. create segments
     let mut segments = Vec::new();
@@ -469,11 +468,15 @@ fn visualize_ops(
     out.push_str(&sep_line);
 
     // --- 6. sort rows by op rank then priority
-    rows.sort_by(|a, b| {
+    let priority_sort = |a: &TableRow, b: &TableRow| {
         a.op.rank()
             .cmp(&b.op.rank())
             .then(a.priority.cmp(&b.priority))
-    });
+    };
+    #[cfg(feature = "rayon")]
+    rows.par_sort_unstable_by(priority_sort);
+    #[cfg(not(feature = "rayon"))]
+    rows.sort_by(priority_sort);
 
     // --- 7. render each row
     for row in &rows {
