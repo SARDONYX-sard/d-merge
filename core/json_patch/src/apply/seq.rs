@@ -406,7 +406,7 @@ fn visualize_ops(
     }
 
     let cell_width = match max_index {
-        0..=99 => 7,
+        0..=99 => 7, // <- e.g. ` 98-99 `.len()
         100..=999 => 9,
         1000..=9999 => 11,
         _ => 13, // safety, though impossible
