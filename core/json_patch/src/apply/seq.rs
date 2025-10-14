@@ -7,6 +7,7 @@ use core::ops::Range;
 use rayon::prelude::*;
 use simd_json::borrowed::Value;
 use std::borrow::Cow;
+use std::sync::atomic::Ordering;
 
 const MARK_AS_REMOVED_STR: &str = "##Mark_As_Removed##"; // Separate inner str for test
 const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed(MARK_AS_REMOVED_STR));
@@ -39,7 +40,7 @@ pub fn apply_seq_by_priority<'a>(
     {
         let path = path.join("/");
         let target_len = template_array.len();
-        let visualizer = visualize_ops(&patches, target_len)?;
+        let visualizer = visualize_ops(&patches, target_len);
         tracing::debug!(
             "Seq merge conflict resolution for `{file_name}` file:
 Path: {path}, Seq target length: {target_len}
@@ -69,7 +70,7 @@ pub fn apply_seq_array_directly<'a>(
 ) -> Result<()> {
     #[cfg(feature = "tracing")]
     {
-        let visualizer = visualize_ops(&patches, target_array.len())?;
+        let visualizer = visualize_ops(&patches, target_array.len());
         let target_len = target_array.len();
         tracing::debug!(
             "Seq merge conflict resolution:
@@ -264,19 +265,38 @@ fn apply_replace_with_overflow<'a>(
     let (in_bounds_opt, overflow_opt) = split_for_replace(range.clone(), base.len(), values);
 
     if let Some((in_bounds_range, in_bounds_values)) = in_bounds_opt {
-        let Some(slice) = base.get_mut(in_bounds_range) else {
+        let Some(slice) = base.get_mut(in_bounds_range.clone()) else {
             return Err(JsonPatchError::UnexpectedRange {
                 patch_range: range,
                 actual_len: base.len(),
             });
         };
 
+        let written = std::sync::atomic::AtomicUsize::new(0);
         slice
             .smart_iter_mut()
             .zip(in_bounds_values)
             .for_each(|(element, patch)| {
                 *element = patch;
+                written.fetch_add(1, Ordering::Relaxed);
             });
+
+        let written_count = written.load(Ordering::Relaxed);
+        if written_count < slice.len() {
+            let remain_range = written_count..slice.len();
+            #[cfg(feature = "tracing")]
+            tracing::info!(
+                "Replace range {:?}: only {} values provided for {} elements, \
+                marking remaining {:?} elements as removed",
+                in_bounds_range,
+                written_count,
+                slice.len(),
+                remain_range
+            );
+            slice[remain_range]
+                .smart_iter_mut()
+                .for_each(|element| *element = MARK_AS_REMOVED);
+        }
     }
 
     if let Some((_overflow_range, overflow_values)) = overflow_opt {
@@ -306,12 +326,8 @@ fn apply_replace_with_overflow<'a>(
 }
 
 #[cfg(any(feature = "tracing", test))]
-#[allow(clippy::cognitive_complexity)]
-fn visualize_ops(
-    patches: &[ValueWithPriority<'_>],
-    array_len: usize, // target array length
-) -> Result<String, JsonPatchError> {
-    use std::collections::BTreeSet;
+fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> String {
+    use std::{collections::BTreeSet, sync::atomic::AtomicUsize};
 
     const SPACE_SYMBOL: &str = "     ";
     const ADD_SYMBOL: &str = " [+] ";
@@ -366,54 +382,54 @@ fn visualize_ops(
     }
 
     // --- 1. convert patches to TableRow
-    let mut max_index = 0;
-    let mut rows: Vec<TableRow> = Vec::new();
-    for patch in patches {
-        match &patch.patch.action {
-            Action::Seq { op, range } => {
-                let action_type = match op {
-                    Op::Add => ActionType::Add,
-                    Op::Replace => ActionType::Replace,
-                    Op::Remove => ActionType::Remove,
-                };
-                rows.push(TableRow {
-                    op: action_type,
-                    priority: patch.priority,
-                    range: range.clone(),
-                });
-                max_index = max_index.max(range.end);
-            }
-            Action::SeqPush => {
-                use simd_json::derived::ValueTryAsArray as _;
-                let push_len = patch
-                    .patch
-                    .value
-                    .try_as_array()
-                    .map(|a| a.len())
-                    .unwrap_or(1);
-                let start = array_len;
-                let end = start + push_len;
-                rows.push(TableRow {
-                    op: ActionType::Push,
-                    priority: patch.priority,
-                    range: start..end,
-                });
-                max_index = max_index.max(end);
-            }
-            Action::Pure { .. } => {}
-        }
-    }
+    let max_index = AtomicUsize::new(0);
+    let mut rows: Vec<TableRow> = patches
+        .smart_iter()
+        .filter_map(|patch| {
+            match &patch.patch.action {
+                Action::Seq { op, range } => {
+                    let action_type = match op {
+                        Op::Add => ActionType::Add,
+                        Op::Replace => ActionType::Replace,
+                        Op::Remove => ActionType::Remove,
+                    };
+                    max_index.fetch_max(range.end, Ordering::Relaxed);
+                    Some(TableRow {
+                        op: action_type,
+                        priority: patch.priority,
+                        range: range.clone(),
+                    })
+                }
+                Action::SeqPush => {
+                    let push_len =
+                        simd_json::derived::ValueTryAsArray::try_as_array(&patch.patch.value)
+                            .map(|a| a.len())
+                            .unwrap_or(1);
 
+                    let start = target_array_len;
+                    let end = start + push_len;
+                    max_index.fetch_max(end, Ordering::Relaxed);
+                    Some(TableRow {
+                        op: ActionType::Push,
+                        priority: patch.priority,
+                        range: start..end,
+                    })
+                }
+                Action::Pure { .. } => None, // skip
+            }
+        })
+        .collect();
+    let max_index = max_index.load(Ordering::Relaxed);
+
+    if rows.is_empty() {
+        return String::new();
+    }
     let cell_width = match max_index {
         0..=99 => 7, // <- e.g. ` 98-99 `.len()
         100..=999 => 9,
         1000..=9999 => 11,
         _ => 13, // safety, though impossible
     };
-
-    if rows.is_empty() {
-        return Ok(String::new());
-    }
 
     // --- 2. collect all start/end points for non-overlapping segments
     let mut points = BTreeSet::new();
@@ -468,15 +484,17 @@ fn visualize_ops(
     out.push_str(&sep_line);
 
     // --- 6. sort rows by op rank then priority
-    let priority_sort = |a: &TableRow, b: &TableRow| {
-        a.op.rank()
-            .cmp(&b.op.rank())
-            .then(a.priority.cmp(&b.priority))
-    };
-    #[cfg(feature = "rayon")]
-    rows.par_sort_unstable_by(priority_sort);
-    #[cfg(not(feature = "rayon"))]
-    rows.sort_by(priority_sort);
+    {
+        let priority_sort = |a: &TableRow, b: &TableRow| {
+            a.op.rank()
+                .cmp(&b.op.rank())
+                .then(a.priority.cmp(&b.priority))
+        };
+        #[cfg(feature = "rayon")]
+        rows.par_sort_unstable_by(priority_sort);
+        #[cfg(not(feature = "rayon"))]
+        rows.sort_by(priority_sort);
+    }
 
     // --- 7. render each row
     for row in &rows {
@@ -504,16 +522,39 @@ fn visualize_ops(
     // --- 8. final separator
     out.push_str(&sep_line);
 
-    Ok(out)
+    out
 }
 
 #[cfg(test)]
 mod tests {
+    use simd_json::{base::ValueTryAsArrayMut as _, json_typed};
+
     use super::*;
 
     #[test]
+    fn test_replace_with_less_values_than_range() {
+        // replace range 1..4 but has 2
+        let patches: Vec<ValueWithPriority<'_>> = vec![ValueWithPriority {
+            patch: JsonPatch {
+                action: Action::Seq {
+                    op: Op::Replace,
+                    range: 1..4,
+                },
+                value: json_typed! {borrowed, ["A", "B"]},
+            },
+            priority: 0,
+        }];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "A", "B", "4", "5"]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn test_seq_patch_with_push() {
-        let mut patches: Vec<ValueWithPriority<'_>> = vec![
+        let patches: Vec<ValueWithPriority<'_>> = vec![
             // Add in the middle
             ValueWithPriority {
                 patch: JsonPatch {
@@ -557,29 +598,15 @@ mod tests {
             },
         ];
 
-        let mut base_seq: Vec<Value<'_>> = (0..6).map(|i| i.to_string().into()).collect();
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        let seq_mut = actual.try_as_array_mut().unwrap();
+        let visual = visualize_ops(&patches, seq_mut.len());
+        apply_seq_array_directly(seq_mut, patches).unwrap();
 
-        // Visualizer before applying patches
-        let visual = visualize_ops(&patches, base_seq.len()).unwrap();
+        let expected = json_typed!(borrowed, ["0", "a", "b", "1", "x1", "x2", "P1", "P2"]);
+        assert_eq!(actual, expected);
 
-        // Apply patches
-        sort_by_priority(&mut patches);
-        apply_seq_array_directly(&mut base_seq, patches).unwrap();
-
-        // Expected array after patches
-        let expected: Vec<Value> = vec!["0", "a", "b", "1", "x1", "x2", "P1", "P2"]
-            .smart_iter()
-            .map(|v| v.into())
-            .collect();
-
-        assert_eq!(
-            base_seq, expected,
-            "Final patched array does not match expected"
-        );
-
-        println!("{visual}");
-
-        let expected_visual = "\
+        const EXPECTED_VISUAL: &str = "\
 Op      | Ord |   1      2      3     4-5    6-7  |\n\
 ---------------------------------------------------\n\
 Replace |   0 |                       [*]         |\n\
@@ -588,10 +615,7 @@ Add     |   1 |  [+]    [+]                       |\n\
 Push    |   1 |                              [>]  |\n\
 ---------------------------------------------------\n\
 ";
-
-        assert_eq!(
-            visual, expected_visual,
-            "Visualizer output does not match expected"
-        );
+        println!("{visual}");
+        assert_eq!(visual, EXPECTED_VISUAL);
     }
 }
