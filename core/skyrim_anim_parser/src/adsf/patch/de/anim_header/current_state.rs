@@ -115,6 +115,16 @@ impl<'de> CurrentState<'de> {
         Ok(())
     }
 
+    pub fn increment_project_assets_range(&mut self) {
+        let project_assets = self
+            .patch
+            .get_or_insert_default()
+            .project_assets
+            .get_or_insert_default();
+
+        project_assets.range.end += 1;
+    }
+
     /// Sets the range start index for either transitions or rotations.
     pub fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();

@@ -153,7 +153,7 @@ impl<'de> Deserializer<'de> {
 
                         if self.parse_next(opt(delete_this_line))?.is_some() {
                             start_index += 1;
-                            continue;
+                            self.current.increment_project_assets_range();
                         } else {
                             let project_asset = self.parse_next(one_line)?;
                             if self.current.mode_code.is_some() {
