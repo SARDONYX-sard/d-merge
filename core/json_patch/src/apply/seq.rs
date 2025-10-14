@@ -39,7 +39,7 @@ pub fn apply_seq_by_priority<'a>(
     {
         let path = path.join("/");
         let target_len = template_array.len();
-        let visualizer = visualize_ops(&patches)?;
+        let visualizer = visualize_ops(&patches, target_len)?;
         tracing::debug!(
             "Seq merge conflict resolution for `{file_name}` file:
 Path: {path}, Seq target length: {target_len}
@@ -69,7 +69,7 @@ pub fn apply_seq_array_directly<'a>(
 ) -> Result<()> {
     #[cfg(feature = "tracing")]
     {
-        let visualizer = visualize_ops(&patches)?;
+        let visualizer = visualize_ops(&patches, target_array.len())?;
         let target_len = target_array.len();
         tracing::debug!(
             "Seq merge conflict resolution:
@@ -307,253 +307,199 @@ fn apply_replace_with_overflow<'a>(
 
 #[cfg(any(feature = "tracing", test))]
 #[allow(clippy::cognitive_complexity)]
-fn visualize_ops(patches: &[ValueWithPriority<'_>]) -> Result<String, JsonPatchError> {
-    use simd_json::derived::ValueTryAsArray as _;
+fn visualize_ops(
+    patches: &[ValueWithPriority<'_>],
+    array_len: usize, // target array length
+) -> Result<String, JsonPatchError> {
     use std::collections::BTreeSet;
+    use std::ops::Range;
 
-    #[derive(Debug, Clone, Copy)]
-    enum DisplayIndex {
-        Index(usize),
-        Ellipsis,
-    }
-
-    const CELL_WIDTH: usize = 5;
     const SPACE_SYMBOL: &str = "     ";
     const ADD_SYMBOL: &str = " [+] ";
     const REPLACE_SYMBOL: &str = " [*] ";
     const REMOVE_SYMBOL: &str = " [-] ";
     const PUSH_SYMBOL: &str = " [>] ";
     const ELLIPSIS: &str = " ... ";
-    const GAP_THRESHOLD: usize = 5;
+    const GAP_THRESHOLD: usize = 20;
 
-    // --- 1. collect used indices
-    let mut indices = BTreeSet::new();
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum ActionType {
+        Replace,
+        Remove,
+        Add,
+        Push,
+    }
+
+    impl ActionType {
+        const fn symbol(&self) -> &'static str {
+            match self {
+                Self::Replace => REPLACE_SYMBOL,
+                Self::Remove => REMOVE_SYMBOL,
+                Self::Add => ADD_SYMBOL,
+                Self::Push => PUSH_SYMBOL,
+            }
+        }
+
+        const fn as_str(&self) -> &'static str {
+            match self {
+                Self::Replace => "Replace",
+                Self::Remove => "Remove",
+                Self::Add => "Add",
+                Self::Push => "Push",
+            }
+        }
+
+        const fn rank(&self) -> usize {
+            match self {
+                Self::Replace => 0,
+                Self::Remove => 1,
+                Self::Add => 2,
+                Self::Push => 3,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct TableRow {
+        op: ActionType,
+        priority: usize,
+        range: Range<usize>,
+    }
+
+    // --- 1. convert patches to TableRow
     let mut max_index = 0;
-
-    for p in patches {
-        match &p.patch.action {
-            Action::Seq { range, .. } => {
-                for i in range.clone() {
-                    indices.insert(i);
-                }
+    let mut rows: Vec<TableRow> = Vec::new();
+    for patch in patches {
+        match &patch.patch.action {
+            Action::Seq { op, range } => {
+                let action_type = match op {
+                    Op::Add => ActionType::Add,
+                    Op::Replace => ActionType::Replace,
+                    Op::Remove => ActionType::Remove,
+                };
+                rows.push(TableRow {
+                    op: action_type,
+                    priority: patch.priority,
+                    range: range.clone(),
+                });
                 max_index = max_index.max(range.end);
             }
             Action::SeqPush => {
-                let push_len = p.patch.value.try_as_array().map(|a| a.len()).unwrap_or(1);
-                for i in max_index..(max_index + push_len) {
-                    indices.insert(i);
-                }
-                max_index += push_len;
-            }
-            Action::Pure { .. } => {}
-        }
-    }
-
-    if indices.is_empty() {
-        return Ok(String::new());
-    }
-
-    // --- 2. compress indices with ellipsis markers
-    let mut display_indices = Vec::new();
-    let all_indices: Vec<_> = indices.iter().copied().collect();
-
-    let mut last = all_indices[0];
-    for &v in &all_indices {
-        if v > last + GAP_THRESHOLD {
-            display_indices.push(DisplayIndex::Ellipsis);
-        }
-        display_indices.push(DisplayIndex::Index(v));
-        last = v;
-    }
-
-    let sep_line = {
-        let mut sep_line = "--------|-----|--".to_string();
-        sep_line.push_str(&"-".repeat(display_indices.len() * CELL_WIDTH));
-        sep_line.push('\n');
-        sep_line
-    };
-
-    // --- 3. build header
-    let mut out = String::new();
-    out.push_str("Op      | Ord |");
-    for idx in &display_indices {
-        match idx {
-            DisplayIndex::Index(i) => out.push_str(&format!("{i:^CELL_WIDTH$}")),
-            DisplayIndex::Ellipsis => out.push_str(&format!("{ELLIPSIS:^CELL_WIDTH$}")),
-        }
-    }
-    out.push_str(" |\n");
-    out.push_str(&sep_line);
-
-    // --- 4. sort operations
-    let mut sorted = patches.to_vec();
-    sorted.sort_by(|a, b| {
-        use Action::*;
-        let rank = |act: &Action| match act {
-            Seq { op, .. } => match op {
-                Op::Replace | Op::Remove => 0,
-                Op::Add => 1,
-            },
-            SeqPush => 2,
-            Pure { .. } => 3,
-        };
-        let a_rank = rank(&a.patch.action);
-        let b_rank = rank(&b.patch.action);
-        a_rank.cmp(&b_rank).then(a.priority.cmp(&b.priority))
-    });
-
-    // --- 5. render each op row
-    for patch in &sorted {
-        let (label, draw): (&str, Box<dyn Fn(usize) -> &'static str>) = match &patch.patch.action {
-            Action::Seq { op, range } => match op {
-                Op::Add => (
-                    "Add",
-                    Box::new(move |i| {
-                        if i >= range.start && i < range.end {
-                            ADD_SYMBOL
-                        } else {
-                            SPACE_SYMBOL
-                        }
-                    }),
-                ),
-                Op::Replace => (
-                    "Replace",
-                    Box::new(move |i| {
-                        if i >= range.start && i < range.end {
-                            REPLACE_SYMBOL
-                        } else {
-                            SPACE_SYMBOL
-                        }
-                    }),
-                ),
-                Op::Remove => (
-                    "Remove",
-                    Box::new(move |i| {
-                        if i >= range.start && i < range.end {
-                            REMOVE_SYMBOL
-                        } else {
-                            SPACE_SYMBOL
-                        }
-                    }),
-                ),
-            },
-            Action::SeqPush => {
+                use simd_json::derived::ValueTryAsArray as _;
                 let push_len = patch
                     .patch
                     .value
                     .try_as_array()
                     .map(|a| a.len())
                     .unwrap_or(1);
-                let start = max_index - push_len;
-                (
-                    "Push",
-                    Box::new(move |i| {
-                        if i >= start && i < start + push_len {
-                            PUSH_SYMBOL
-                        } else {
-                            SPACE_SYMBOL
-                        }
-                    }),
-                )
+                let start = array_len;
+                let end = start + push_len;
+                rows.push(TableRow {
+                    op: ActionType::Push,
+                    priority: patch.priority,
+                    range: start..end,
+                });
+                max_index = max_index.max(end);
             }
-            Action::Pure { .. } => continue,
-        };
-
-        out.push_str(&format!("{:<7} | {:>3} |", label, patch.priority));
-        for idx in &display_indices {
-            match idx {
-                DisplayIndex::Index(i) => out.push_str(draw(*i)),
-                DisplayIndex::Ellipsis => out.push_str(ELLIPSIS),
-            }
+            Action::Pure { .. } => {}
         }
-        out.push_str(" |\n");
     }
 
-    // --- 6. render result line with original indices for removed elements
-    {
-        let mut orig_indices: Vec<Option<usize>> = (0..max_index).map(Some).collect();
+    let cell_width = match max_index {
+        0..=99 => 7,
+        100..=999 => 9,
+        1000..=9999 => 11,
+        _ => 13, // safety, though impossible
+    };
 
-        // --- simulate the effect of patches on original indices
-        for patch in &sorted {
-            match &patch.patch.action {
-                Action::Seq { op, range } => match op {
-                    Op::Add => {
-                        // Insert None for new elements (shifts right the existing indices)
-                        let insert_at = range.start.min(orig_indices.len());
-                        for _ in 0..(range.end - range.start) {
-                            orig_indices.insert(insert_at, None);
-                        }
-                    }
-                    Op::Remove | Op::Replace => {
-                        // Replace does not shift indices
-                        // Remove elements (left shift the rest)
-                        // No action needed here; orig_indices already contains Some(index)
-                    }
-                },
-                Action::SeqPush => {
-                    let push_len = patch
-                        .patch
-                        .value
-                        .try_as_array()
-                        .map(|a| a.len())
-                        .unwrap_or(1);
-                    for _ in 0..push_len {
-                        orig_indices.push(None);
-                    }
-                }
-                Action::Pure { .. } => {}
-            }
-        }
-
-        // Build Result line
-        out.push_str(&sep_line);
-        out.push_str("Result  |     |");
-        for cell in display_indices.iter() {
-            match cell {
-                DisplayIndex::Index(idx) => {
-                    // Check if this index was a Remove original
-                    let mut sym = if let Some(orig) = orig_indices.get(*idx).copied().flatten() {
-                        format!(" [{orig}] ").into()
-                    } else {
-                        Cow::Borrowed(SPACE_SYMBOL)
-                    };
-
-                    // Override with Add / Replace / Push symbols if applicable
-                    for patch in &sorted {
-                        match &patch.patch.action {
-                            Action::Seq { op, range } => {
-                                if *idx >= range.start && *idx < range.end {
-                                    sym = match op {
-                                        Op::Add => ADD_SYMBOL.into(),
-                                        Op::Replace => REPLACE_SYMBOL.into(),
-                                        Op::Remove => sym, // keep original index
-                                    };
-                                }
-                            }
-                            Action::SeqPush => {
-                                let push_len = patch
-                                    .patch
-                                    .value
-                                    .try_as_array()
-                                    .map(|a| a.len())
-                                    .unwrap_or(1);
-                                let start = max_index - push_len;
-                                if *idx >= start && *idx < start + push_len {
-                                    sym = PUSH_SYMBOL.into();
-                                }
-                            }
-                            Action::Pure { .. } => {}
-                        }
-                    }
-
-                    out.push_str(&sym);
-                }
-                DisplayIndex::Ellipsis => out.push_str(ELLIPSIS),
-            }
-        }
-        out.push_str(" |\n");
-        out.push_str(&sep_line);
+    if rows.is_empty() {
+        return Ok(String::new());
     }
+
+    // --- 2. collect all start/end points for non-overlapping segments
+    let mut points = BTreeSet::new();
+    for row in &rows {
+        points.insert(row.range.start);
+        points.insert(row.range.end);
+    }
+    let points: Vec<_> = points.into_iter().collect();
+
+    // --- 3. create segments
+    let mut segments = Vec::new();
+    for w in points.windows(2) {
+        segments.push(w[0]..w[1]);
+    }
+
+    // --- 4. build header
+    let mut header = String::new();
+    header.push_str("Op      | Ord |");
+    let mut last = None;
+
+    for seg in &segments {
+        if let Some(prev) = last {
+            if seg.start > prev + GAP_THRESHOLD {
+                header.push_str(&format!("{ELLIPSIS:^cell_width$}"));
+            }
+        }
+
+        if seg.end == seg.start + 1 {
+            // single index
+            header.push_str(&format!("{:^cell_width$}", seg.start));
+        } else {
+            // multiple indices
+            header.push_str(&format!(
+                "{:^cell_width$}",
+                format!("{}-{}", seg.start, seg.end - 1)
+            ));
+        }
+
+        last = Some(seg.end - 1);
+    }
+    header.push_str("|\n");
+
+    // --- 5. separator line
+    let sep_line = {
+        let mut sep_line = "-".repeat(header.len() - 1);
+        sep_line.push('\n');
+        sep_line
+    };
+
+    let mut out = String::new();
+    out.push_str(&header);
+    out.push_str(&sep_line);
+
+    // --- 6. sort rows by op rank then priority
+    rows.sort_by(|a, b| {
+        a.op.rank()
+            .cmp(&b.op.rank())
+            .then(a.priority.cmp(&b.priority))
+    });
+
+    // --- 7. render each row
+    for row in &rows {
+        out.push_str(&format!("{:<7} | {:>3} |", row.op.as_str(), row.priority));
+        let mut last = None;
+        for seg in &segments {
+            if let Some(prev) = last {
+                if seg.start > prev + GAP_THRESHOLD {
+                    out.push_str(ELLIPSIS);
+                }
+            }
+            last = Some(seg.end - 1);
+
+            // check if this segment overlaps with row.range
+            let content = if row.range.start < seg.end && row.range.end > seg.start {
+                row.op.symbol()
+            } else {
+                SPACE_SYMBOL
+            };
+            out.push_str(&format!("{content:^cell_width$}"));
+        }
+        out.push_str("|\n");
+    }
+
+    // --- 8. final separator
+    out.push_str(&sep_line);
 
     Ok(out)
 }
@@ -608,12 +554,13 @@ mod tests {
             },
         ];
 
+        let mut base_seq: Vec<Value<'_>> = (0..6).map(|i| i.to_string().into()).collect();
+
         // Visualizer before applying patches
-        let visual = visualize_ops(&patches).unwrap();
+        let visual = visualize_ops(&patches, base_seq.len()).unwrap();
 
         // Apply patches
         sort_by_priority(&mut patches);
-        let mut base_seq: Vec<Value<'_>> = (0..6).map(|i| i.to_string().into()).collect();
         apply_seq_array_directly(&mut base_seq, patches).unwrap();
 
         // Expected array after patches
@@ -630,15 +577,13 @@ mod tests {
         println!("{visual}");
 
         let expected_visual = "\
-Op      | Ord |  1    2    3    4    5    6    7   |\n\
---------|-----|-------------------------------------\n\
-Replace |   0 |                [*]  [*]            |\n\
-Remove  |   2 |      [-]  [-]                      |\n\
-Add     |   1 | [+]  [+]                           |\n\
-Push    |   1 |                          [>]  [>]  |\n\
---------|-----|-------------------------------------\n\
-Result  |     | [+]  [+]  [1]  [*]  [*]  [>]  [>]  |\n\
---------|-----|-------------------------------------\n\
+Op      | Ord |   1      2      3     4-5    6-7  |\n\
+---------------------------------------------------\n\
+Replace |   0 |                       [*]         |\n\
+Remove  |   2 |         [-]    [-]                |\n\
+Add     |   1 |  [+]    [+]                       |\n\
+Push    |   1 |                              [>]  |\n\
+---------------------------------------------------\n\
 ";
 
         assert_eq!(
