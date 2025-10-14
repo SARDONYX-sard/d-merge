@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-10-14
+### :sparkles: New Features
+- [`3f4c99f`](https://github.com/SARDONYX-sard/d-merge/commit/3f4c99f482fb8179429c54f9f4da609e74f1e203) - **adsf**: support anim data header *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d4ffda3`](https://github.com/SARDONYX-sard/d-merge/commit/d4ffda31668bbb9483997b71af59a4ee94ddcc5d) - **seq**: change the replace operation in seq to remove elements if there are few *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`bd2dc43`](https://github.com/SARDONYX-sard/d-merge/commit/bd2dc4310feefd58e28d32d1d74b30188c8fdaf1) - new visualizer *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`3ee3ab6`](https://github.com/SARDONYX-sard/d-merge/commit/3ee3ab6e73ce1af958eac658d498e00406d633a2) - **adsf**: fix `delete this line` range bug *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d3f4745`](https://github.com/SARDONYX-sard/d-merge/commit/d3f4745a60cfbe8c2dbe48dde0d72f65f935609d) - **adsf**: fix `delete this line` range bug *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`fa6c4b4`](https://github.com/SARDONYX-sard/d-merge/commit/fa6c4b437dfcbcde878f0dbccb6302555a160cc8) - fix json patch seq visualizer *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`791ef12`](https://github.com/SARDONYX-sard/d-merge/commit/791ef126344daded38370260bad62d83d3fc5758) - use rayon *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`cb088e0`](https://github.com/SARDONYX-sard/d-merge/commit/cb088e02380aeba659bae684d968f0584426d760) - use `JoinSet` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :white_check_mark: Tests
+- [`b0c3020`](https://github.com/SARDONYX-sard/d-merge/commit/b0c302025689b81cb5aba2d1d90df6ab1df58ae8) - use ini *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`5a9e332`](https://github.com/SARDONYX-sard/d-merge/commit/5a9e332c3f9cce09c80cc623746a2943e9034790) - update adsf template *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.1.0] - 2025-10-13
 ### :sparkles: New Features
 - [`68f8cf6`](https://github.com/SARDONYX-sard/d-merge/commit/68f8cf6704f219907532052815c5583fc28c6c68) - add copy button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -24,3 +48,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [`f384a3e`](https://github.com/SARDONYX-sard/d-merge/commit/f384a3ee8a64694adc89f92d7361944a9781306c) - eliminate duplicate management of template_key *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
 
 [0.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0-beta.3...0.1.0
+[0.1.1]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0...0.1.1
