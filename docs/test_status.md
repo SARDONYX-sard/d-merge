@@ -6,20 +6,26 @@ This document records test results for both **Nemesis** and **FNIS**-based mods.
 Status Pattern
 
 - ✅: In the tested scenario, no crashes occurred and the animation functioned normally.
-- ❌: The patch itself cannot be applied. Or it is using syntax that is not yet supported.
 - ⚠️: The patch can be applied, but it does not perform as expected.
+- ❌: The patch itself cannot be applied. Or it is using syntax that is not yet supported.
 
 ## Repository Owner Test environment
 
-CPU: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz (3.19 GHz)
-DRAM: 32.0 GB (31.8 GB)
-GPU: NVIDIA GeForce GTX 1080 Ti
+Hardware
 
-Edition: Windows 11
-Version: 24H2
-OS build: 26100.6584
+- CPU: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz (3.19 GHz)
+- DRAM: 32.0 GB (31.8 GB)
+- GPU: NVIDIA GeForce GTX 1080 Ti
 
-SkyrimSE.exe version: 1.6.1170.0
+OS
+
+- Edition: Windows 11
+- Version: 24H2
+- OS build: 26100.6584
+
+SkyrimSE
+
+- file version: 1.6.1170.0
 
 ## Pure Nemesis Mods
 
@@ -77,14 +83,16 @@ SkyrimSE.exe version: 1.6.1170.0
 
 ## FNIS
 
-| Status | Mod Name                                  | Version | Note                                                                                               |
-| ------ | ----------------------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
-| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa:                                                                                               |
-| ✅     | Flying Mod 2.0s                           | 1.1     | b:                                                                                                 |
-| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+: Animation is possible. Movement is completely impossible. (Cause unknown)                   |
-| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b: We need to convert hkx to SE (otherwise it'll be an A pose).                                    |
-| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa:                                                                                             |
-| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b: We need to convert hkx to SE (otherwise it'll be an A pose).                                    |
-| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km: The animation played correctly, but the actual kill move has not been tested.                  |
-| ✅     | Ride Sharing SE                           | 0.4b    | b:                                                                                                 |
-| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix: The AltAnim syntax within this mod is not yet supported. (Planned for conversion to OAR) |
+| Status | Mod Name                                  | Version | Note                                                                               |
+| ------ | ----------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa:                                                                               |
+| ✅     | Flying Mod 2.0s                           | 1.1     | b:                                                                                 |
+| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+: Animation is possible. Movement is completely impossible. (Cause unknown)   |
+| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b: We need to convert hkx to SE (otherwise it'll be an A pose).                    |
+| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa:                                                                             |
+| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b: We need to convert hkx to SE (otherwise it'll be an A pose).                    |
+| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km: The animation played correctly, but the actual kill move has not been tested.  |
+| ✅     | Ride Sharing SE                           | 0.4b    | b:                                                                                 |
+| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix: The AltAnim syntax is not yet supported. (Planned for conversion to OAR) |
+
+Currently, since the bones themselves are usable in XP32 Maximum Skeleton Special Extended, we can check them in MO2 but do not need to check them in D Merge to use them.
