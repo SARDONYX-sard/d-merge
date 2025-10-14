@@ -92,21 +92,21 @@ The only thing we are considering at this time is support for the Nemesis patch.
 - AnimData(`animationdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - Patch
+  - Patch(Add/Remove/Replace)
     - [x] Txt project header
-    - [x] Anim data header(Add/Remove/Replace)
-    - [x] Clip Motion Block(Add/Remove/Replace)
-    - [x] Anim Data Block(Add/Remove/Replace)
+    - [x] Anim data header
+    - [x] Clip Motion Block
+    - [x] Anim Data Block
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - Patch
-    - [x] Version(Add/Remove/Replace)
-    - [x] Triggers(Add/Remove/Replace)
-    - [x] Conditions(Add/Remove/Replace)
+  - Patch(Add/Remove/Replace)
+    - [x] Version
+    - [x] Triggers
+    - [x] Conditions
     - [ ] Attacks(Add only. TODO: Remove/Replace)
-    - [x] AnimInfos(Add/Remove/Replace)
+    - [x] AnimInfos
 
 - hkx templates
   - [x] Change xml to message_pack bin.
