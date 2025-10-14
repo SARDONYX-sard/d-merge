@@ -135,6 +135,15 @@ impl<'de> CurrentState<'de> {
         Ok(())
     }
 
+    pub fn increment_trigger_names_range(&mut self) {
+        let trigger_names = self
+            .patch
+            .get_or_insert_default()
+            .trigger_names
+            .get_or_insert_default();
+        trigger_names.range.end += 1;
+    }
+
     /// Sets the range start index for either transitions or rotations.
     pub fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();

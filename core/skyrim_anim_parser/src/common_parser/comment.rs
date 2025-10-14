@@ -14,6 +14,8 @@ pub(crate) enum CommentKind<'a> {
     Unknown(&'a str),
 }
 
+/// `MOD_CODE ~<mod code>~ OPEN`
+///
 /// # Errors
 /// Parse failed.
 pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
@@ -35,7 +37,7 @@ pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'
             mod_code_parser.map(CommentKind::ModCode),
             // original_parser.value(CommentKind::Original),
             // close_parser.value(CommentKind::Close),
-            take_until(0.., "-->").map(CommentKind::Unknown),
+            // take_until(0.., "-->").map(CommentKind::Unknown),
         ))
     };
     let comment_parser = delimited("<!--", kind_parser, "-->");
@@ -81,7 +83,10 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
     terminated(
-        take_until(0.., "<!-- CLOSE -->"),
+        take_until_ext(
+            0..,
+            delimited("<!--", close_parser.value(CommentKind::Close), "-->"),
+        ),
         Caseless("<!-- CLOSE -->"),
     )
     .context(StrContext::Expected(StrContextValue::Description(
@@ -106,6 +111,25 @@ where
         let o2 = parser.parse_next(input)?;
         multispace0.parse_next(input).map(|_| o2)
     })
+}
+
+/// take_until implementation using only winnow
+pub fn take_until_ext<Input, Output, Error, ParseNext>(
+    occurrences: impl Into<winnow::stream::Range>,
+    parser: ParseNext,
+) -> impl Parser<Input, Input::Slice, Error>
+where
+    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
+    Error: winnow::error::ParserError<Input>,
+    ParseNext: Parser<Input, Output, Error>,
+{
+    use winnow::combinator::{not, peek, repeat, trace};
+    use winnow::token::any;
+
+    trace(
+        "take_until_ext",
+        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
+    )
 }
 
 #[cfg(test)]
@@ -133,5 +157,16 @@ mod tests {
             close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),
             Ok(CommentKind::Unknown("memSizeAndFlags SERIALIZE_IGNORED"))
         );
+    }
+
+    #[test]
+    fn test_take_till_close_basic() {
+        let mut input = "\
+Some data here
+<!-- something -->
+More data
+<!-- CLoSE -->After";
+        take_till_close.parse_next(&mut input).unwrap();
+        assert_eq!(input, "After");
     }
 }

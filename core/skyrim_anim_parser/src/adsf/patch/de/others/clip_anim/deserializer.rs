@@ -4,6 +4,7 @@ use crate::adsf::patch::de::others::clip_anim::{
     ClipAnimDiffPatch, DiffTriggerNames, LineKind,
 };
 use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
+use crate::common_parser::delete_line::delete_this_line;
 use crate::common_parser::lines::{one_line, verify_line_parses_to};
 use json_patch::Op;
 use serde_hkx::errors::readable::ReadableError;
@@ -201,11 +202,17 @@ impl<'de> Deserializer<'de> {
                         if diff_start {
                             self.current.set_range_start(start_index)?;
                         }
-                        let trigger_name = self.parse_next(
-                            one_line.context(Expected(Description("trigger_name: Str"))),
-                        )?;
-                        if self.current.mode_code.is_some() {
-                            self.current.push_as_trigger_name(trigger_name)?;
+
+                        if self.parse_next(opt(delete_this_line))?.is_some() {
+                            start_index += 1;
+                            self.current.increment_trigger_names_range();
+                        } else {
+                            let trigger_name = self.parse_next(
+                                one_line.context(Expected(Description("trigger_name: Str"))),
+                            )?;
+                            if self.current.mode_code.is_some() {
+                                self.current.push_as_trigger_name(trigger_name)?;
+                            }
                         }
 
                         self.parse_opt_close_comment()?;
@@ -227,6 +234,8 @@ impl<'de> Deserializer<'de> {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// Can parse `MOD_CODE ~<mod code>~ OPEN`?
+    ///
     /// # Return
     /// Is the mode code comment?
     fn parse_opt_start_comment(&mut self) -> Result<bool> {

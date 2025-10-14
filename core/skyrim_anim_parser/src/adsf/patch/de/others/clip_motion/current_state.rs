@@ -129,6 +129,15 @@ impl<'de> CurrentState<'de> {
         Ok(())
     }
 
+    pub fn increment_translations_range(&mut self) {
+        let transition = self
+            .patch
+            .get_or_insert_default()
+            .translations
+            .get_or_insert_default();
+        transition.range.end += 1;
+    }
+
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
@@ -154,6 +163,15 @@ impl<'de> CurrentState<'de> {
         };
 
         Ok(())
+    }
+
+    pub fn increment_rotations_range(&mut self) {
+        let rotation = self
+            .patch
+            .get_or_insert_default()
+            .rotations
+            .get_or_insert_default();
+        rotation.range.end += 1;
     }
 
     /// Sets the range start index for either transitions or rotations.

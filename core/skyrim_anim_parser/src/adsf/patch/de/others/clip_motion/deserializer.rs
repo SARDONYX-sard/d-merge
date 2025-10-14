@@ -161,7 +161,7 @@ impl<'de> Deserializer<'de> {
                     tracing::trace!("{line_kind:#?} = {_len:#?}");
                 }
                 LineKind::Translation => {
-                    // until transition/rotation length line
+                    // until rotation length line
                     let mut start_index = 0;
                     while self
                         .parse_peek(opt(verify_line_parses_to::<usize>))?
@@ -174,14 +174,11 @@ impl<'de> Deserializer<'de> {
 
                         if self.parse_next(opt(delete_this_line))?.is_some() {
                             start_index += 1;
-                            continue;
+                            self.current.increment_translations_range();
+                        } else {
+                            self.transition()?;
                         }
 
-                        let transition = self.transition()?;
-
-                        if self.current.mode_code.is_some() {
-                            self.current.push_as_translation(transition)?;
-                        }
                         self.parse_opt_close_comment()?;
                         self.parse_next(multispace0)?;
                         start_index += 1;
@@ -194,12 +191,13 @@ impl<'de> Deserializer<'de> {
                         if diff_start {
                             self.current.set_range_start(start_index)?;
                         }
+
                         if self.parse_next(opt(delete_this_line))?.is_some() {
                             start_index += 1;
-                            continue;
+                            self.current.increment_rotations_range();
+                        } else {
+                            self.rotation()?;
                         }
-
-                        self.rotation()?;
 
                         self.parse_opt_close_comment()?;
                         self.parse_next(multispace0)?;
@@ -218,7 +216,7 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
 
-    fn transition(&mut self) -> Result<Translation<'de>> {
+    fn transition(&mut self) -> Result<()> {
         let time = self
             .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
         let x =
@@ -234,7 +232,12 @@ impl<'de> Deserializer<'de> {
         .into();
         self.parse_next(opt(line_ending))?;
 
-        Ok(Translation { time, x, y, z })
+        if self.current.mode_code.is_some() {
+            self.current
+                .push_as_translation(Translation { time, x, y, z })?;
+        }
+
+        Ok(())
     }
 
     fn rotation(&mut self) -> Result<()> {
@@ -268,6 +271,8 @@ impl<'de> Deserializer<'de> {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// Can parse `MOD_CODE ~<mod code>~ OPEN`?
+    ///
     /// # Return
     /// Is the mode code comment?
     fn parse_opt_start_comment(&mut self) -> Result<bool> {
@@ -496,5 +501,71 @@ mod tests {
         };
 
         assert_eq!(patches, expected);
+    }
+
+    #[test]
+    fn test_delete_this_line_patch() {
+        let input = "
+152
+3
+10
+<!-- MOD_CODE ~test~ OPEN -->
+0.0 0 0 0
+0.34 0 72 0
+0.49 0 153 0
+//* delete this line *//
+//* delete this line *//
+//* delete this line *//
+//* delete this line *//
+//* delete this line *//
+//* delete this line *//
+<!-- ORIGINAL -->
+0.21 -0.372 5.61 0
+0.44 0.395 25.98 0
+0.57 0.425 36.30 0
+0.77 -0.523 40.18 0
+0.97 -1.81 34.40 0
+1.11 -1.06 23.63 0
+1.27 1.08 11.42 0
+1.69 2.12 0.22 0
+2.02 0.01 0.00 0
+<!-- CLOSE -->
+2
+2 0 0 0 1
+";
+
+        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            patches,
+            ClipMotionDiffPatch {
+                clip_id: None,
+                duration: None,
+                translations: Some(DiffTransitions {
+                    op: Op::Replace,
+                    range: 0..9,
+                    values: vec![
+                        Translation {
+                            time: "0.0".into(),
+                            x: "0".into(),
+                            y: "0".into(),
+                            z: "0".into()
+                        },
+                        Translation {
+                            time: "0.34".into(),
+                            x: "0".into(),
+                            y: "72".into(),
+                            z: "0".into()
+                        },
+                        Translation {
+                            time: "0.49".into(),
+                            x: "0".into(),
+                            y: "153".into(),
+                            z: "0".into()
+                        }
+                    ]
+                }),
+                rotations: None
+            }
+        );
     }
 }

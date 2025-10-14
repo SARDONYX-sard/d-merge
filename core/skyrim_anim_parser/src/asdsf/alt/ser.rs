@@ -29,7 +29,7 @@ pub fn serialize_alt_asdsf_with_patches(
             if to_normal_txt_project_name(&k, &mut out).is_none() {
                 // This should not occur as long as we are using vanilla's asdsf.
                 #[cfg(feature = "tracing")]
-                tracing::error!("Failed to convert path: {project_name}");
+                tracing::error!("Failed to convert path: {k}");
             }
             (k, v)
         })

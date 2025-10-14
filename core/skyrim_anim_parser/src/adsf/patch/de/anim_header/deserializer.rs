@@ -154,13 +154,13 @@ impl<'de> Deserializer<'de> {
                         if self.parse_next(opt(delete_this_line))?.is_some() {
                             start_index += 1;
                             continue;
+                        } else {
+                            let project_asset = self.parse_next(one_line)?;
+                            if self.current.mode_code.is_some() {
+                                self.current.push_as_project_assets(project_asset)?;
+                            }
                         }
 
-                        let project_asset = self.parse_next(one_line)?;
-
-                        if self.current.mode_code.is_some() {
-                            self.current.push_as_project_assets(project_asset)?;
-                        }
                         self.parse_opt_close_comment()?;
                         self.parse_next(multispace0)?;
                         start_index += 1;
