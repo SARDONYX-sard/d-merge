@@ -84,25 +84,29 @@ This currently works to some extent(Sliding, Paraglider, MCO, DMCO-Dodge, ...), 
 The only thing we are considering at this time is support for the Nemesis patch.(Since I only use the Nemesis patch).
 
 - GUI
-  - [x] Basic frontend(patch, convert, settings)
-  - [x] Support MO2 mode/Virtual file system mode(auto read settings file) when use auto detect(Current: windows only)
+  - [x] Basic frontend(Patch/Convert/Settings: Reports indicate that tauri ver. MO2 cannot be launched. Cause unknown.)
+  - [x] Support Virtual fs mode(Use `egui` ver.)
+  - [x] Auto read settings file(Use `egui` ver.)
   - [ ] hkx json/patch editor
-  - [x] In the case of vfs, use mod_code as the ID (if the ID is duplicated, the UI will bug out, but this will allow you to transfer your environment to others).
 
 - AnimData(`animationdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - [x] txt project header patch
-  - [x] anim header patch
-  - [x] Add Operation
-  - [x] Replace/Remove Operation
-  - [x] Conflict resolver
+  - Patch
+    - [x] Txt project header
+    - [x] Anim data header(Add/Remove/Replace)
+    - [x] Clip Motion Block(Add/Remove/Replace)
+    - [x] Anim Data Block(Add/Remove/Replace)
 
 - AnimSetData(`animationsetdatasinglefile.txt`)
   - [x] Serialization
   - [x] Deserialization
-  - [x] Add Operation (Support Triggers & AnimInfos, other is unsupported)
-  - [x] Replace/Remove Operation(Support Triggers & AnimInfos, other is unsupported)
+  - Patch
+    - [x] Version(Add/Remove/Replace)
+    - [x] Triggers(Add/Remove/Replace)
+    - [x] Conditions(Add/Remove/Replace)
+    - [ ] Attacks(Add only. TODO: Remove/Replace)
+    - [x] AnimInfos(Add/Remove/Replace)
 
 - hkx templates
   - [x] Change xml to message_pack bin.
