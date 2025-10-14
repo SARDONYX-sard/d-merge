@@ -1,6 +1,6 @@
 # `animationdatasinglefile.txt`(adsf) Format Specification
 
-- Project structure
+## Project structure
 
 ```txt
   project_names len: usize

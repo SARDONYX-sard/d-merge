@@ -6,7 +6,7 @@ pub enum Error {
     /// Mismatched type. Expected one, but got array patch
     ExpectedOne,
 
-    /// Mismatched type. Expected transitions/rotation, but got one replacer type.
+    /// Mismatched type. Expected array, but got one replacer type.
     ExpectedArray,
 
     /// Mismatched type. Expected transitions, but got other type

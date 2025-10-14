@@ -111,7 +111,7 @@ fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a
         .context(Expected(Description("anim_line_len: usize")))
         .parse_next(input)?;
 
-    let lead_int = parse_one_line
+    let lead_int = verify_line_parses_to::<i32>
         .context(Expected(Description("lead_int: i32")))
         .parse_next(input)?;
     let project_assets_len = parse_one_line

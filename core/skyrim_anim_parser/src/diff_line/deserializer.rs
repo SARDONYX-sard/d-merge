@@ -12,7 +12,7 @@ use winnow::{
     Parser,
 };
 
-/// Parse animationdatasinglefile.txt clip animation block patch.
+/// Parse multi line diff patch.
 ///
 /// # Errors
 /// Parse failed.

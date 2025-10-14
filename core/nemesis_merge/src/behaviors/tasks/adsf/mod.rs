@@ -8,8 +8,8 @@ use self::types::OwnedAdsfPatchMap;
 use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
-    FailedParseAdsfPatchSnafu, FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu,
-    FailedSerializeSnafu,
+    FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
+    FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeSnafu,
 };
 use crate::results::partition_results;
 use crate::{Config, PatchMaps};
@@ -19,6 +19,8 @@ use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
 pub use skyrim_anim_parser::adsf::patch::de::add::{
     parse_clip_anim_block_patch, parse_clip_motion_block_patch,
 };
+use skyrim_anim_parser::adsf::patch::de::anim_header::deserializer::parse_anim_header_diff_patch;
+use skyrim_anim_parser::adsf::patch::de::anim_header::AnimHeaderDiffPatch;
 pub use skyrim_anim_parser::adsf::patch::de::others::{
     clip_anim::{deserializer::parse_clip_anim_diff_patch, ClipAnimDiffPatch},
     clip_motion::{deserializer::parse_clip_motion_diff_patch, ClipMotionDiffPatch},
@@ -47,9 +49,8 @@ pub(crate) struct AdsfPatch<'a> {
 pub(crate) enum PatchKind<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     ProjectNamesHeader(DiffLines<'a>),
-    #[allow(unused)]
     /// Indicates the special `<target>~<index>/$header$.txt`override
-    AnimDataHeader(DiffLines<'a>),
+    AnimDataHeader(AnimHeaderDiffPatch<'a>),
 
     AddAnim(ClipAnimDataBlock<'a>),
     /// diff patch, priority
@@ -150,11 +151,7 @@ pub(crate) fn apply_adsf_patches(
         if let Some(anim_data) = alt_adsf.0.get_mut(adsf_patch.target) {
             match adsf_patch.patch {
                 PatchKind::ProjectNamesHeader(_) => {}
-                PatchKind::AnimDataHeader(diff) => {
-                    if let Err(err) = diff.into_apply(&mut anim_data.header.project_assets) {
-                        tracing::error!("{err}");
-                    };
-                }
+                PatchKind::AnimDataHeader(diff) => diff.into_apply(&mut anim_data.header),
                 PatchKind::AddAnim(clip_anim_data_block) => {
                     anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
                 }
@@ -215,18 +212,10 @@ fn parse_anim_data_patch<'a>(
                 }
             })?,
         ),
-        ParserType::AnimHeader => {
-            return Err(Error::Custom {
-                msg: "Unsupported anim header $header$ yet.".to_owned(),
-            });
-            // PatchKind::AnimDataHeader(parse_lines_diff_patch(adsf_patch, priority).with_context(
-            //     |_| FailedDiffLinesPatchSnafu {
-            //         kind: AnimPatchErrKind::Adsf,
-            //         sub_kind: AnimPatchErrSubKind::AnimDataHeader,
-            //         path,
-            //     },
-            // )?)
-        }
+        ParserType::AnimHeader => PatchKind::AnimDataHeader(
+            parse_anim_header_diff_patch(adsf_patch)
+                .with_context(|_| FailedParseAdsfAnimDataHeaderPatchSnafu { path: path.clone() })?,
+        ),
 
         ParserType::AddAnim => PatchKind::AddAnim(
             parse_clip_anim_block_patch(adsf_patch)
@@ -269,7 +258,7 @@ fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_orders: &PatchMaps) {
                 .fnis_entries
                 .get(patch.id)
                 .copied()
-                .unwrap_or(usize::MAX), // FIXME: MAX
+                .unwrap_or(usize::MAX), // unreachable
         }
     });
 }

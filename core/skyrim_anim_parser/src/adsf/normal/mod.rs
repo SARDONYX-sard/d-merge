@@ -101,7 +101,9 @@ impl AnimData<'_> {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AnimDataHeader<'a> {
     /// An integer value related to the animation (meaning may vary based on context).
-    pub lead_int: i32,
+    ///
+    /// - type: [`i32`]
+    pub lead_int: Str<'a>,
 
     /// A list of project asset names.
     pub project_assets: Vec<Str<'a>>,

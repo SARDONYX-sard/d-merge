@@ -100,7 +100,7 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
 
     output.push_str(&line_range.to_string());
     output.push_str("\r\n");
-    output.push_str(&header.lead_int.to_string());
+    output.push_str(&header.lead_int);
     output.push_str("\r\n");
     output.push_str(&header.project_assets.len().to_string());
     output.push_str("\r\n");
@@ -109,10 +109,8 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
         output.push_str(asset.as_ref());
         output.push_str("\r\n");
     }
-    output.push_str(&format!(
-        "{}\r\n",
-        if header.has_motion_data { 1 } else { 0 }
-    ));
+    output.push(if header.has_motion_data { '1' } else { '0' });
+    output.push_str("\r\n");
 
     output
 }
