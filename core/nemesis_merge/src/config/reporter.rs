@@ -27,6 +27,8 @@ pub(crate) enum ReportType {
 }
 
 impl<'a> StatusReportCounter<'a> {
+    /// NOTE: The 0th one also serves as the initial report execution.
+    /// This is to avoid the appearance of freezing after loading the FNIS mod.
     #[inline]
     pub(crate) fn new(
         status_reporter: &'a StatusReporterFn,

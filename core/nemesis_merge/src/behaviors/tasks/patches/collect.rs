@@ -38,8 +38,6 @@ struct OwnedPath {
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
 pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Config) -> OwnedPatches {
-    let mut handles = vec![];
-
     fn get_priority_by_path_id(path: &Path, ids: &PriorityMap) -> Option<usize> {
         let id_str = get_nemesis_id(path.to_str()?).ok()?;
         ids.get(id_str).copied()
@@ -48,10 +46,12 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
     let paths = nemesis_entries
         .iter()
         .flat_map(|(path, _)| collect_nemesis_paths(path));
+
+    let mut handles = tokio::task::JoinSet::new();
     for (category, path) in paths {
         let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or(usize::MAX); // todo error handling
 
-        handles.push(tokio::spawn(async move {
+        handles.spawn(async move {
             let content = fs::read_to_string(&path)
                 .await
                 .with_context(|_| FailedIoSnafu { path: path.clone() })?;
@@ -62,7 +62,7 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
                 content,
                 priority,
             })
-        }));
+        });
     }
 
     let mut owned_patches = OwnedPatchMap::new();
@@ -76,10 +76,10 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
         handles.len(),
     );
 
-    for handle in handles {
+    while let Some(result) = handles.join_next().await {
         reporter.increment();
 
-        let result = match handle.await {
+        let result = match result {
             Ok(result) => result,
             Err(err) => {
                 errors.push(Error::JoinError { source: err });
