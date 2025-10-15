@@ -65,7 +65,7 @@ SkyrimSE
 | Status | Mod Name                           | Version | Note                                               |
 | ------ | ---------------------------------- | ------- | -------------------------------------------------- |
 | ✅     | ADXP MCO 1.6.0.6 Bug Fixes         | 2.0.6   |                                                    |
-| ✅     | Animated Interactions              | 0.3     |                                                    |
+| ✅     | Animated Interactions              | 1.7.3   |                                                    |
 | ✅     | Attack - MCO_DXP -SE               | 1.6.06  | Using MCO Universal Support                        |
 | ✅     | DMCO_stable                        | 0.9.6   | AE requires separate DLL overwrites and additions. |
 | ✅     | Elden Counter MCO-ADXP             | 1.6     | With dTry Plugin Updates                           |
