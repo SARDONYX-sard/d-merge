@@ -637,6 +637,19 @@ impl<'de> PatchDeserializer<'de> {
                 BorrowedValue::Array(Box::new(seq_values))
             };
 
+            // Why is a push determination possible here?
+            // - A patch can only be determined when an `ORIGINAL`/`CLOSE` comment arrives.
+            // - seq only arrives when it's an array field and at the end of the array.
+            //
+            // Therefore, when this function is called, if a patch-closing comment arrives and the next
+            // action is a push, the end of the array field should occur.
+            // ```xml
+            // <!-- ORIGINAL -->
+            //             <hkcstring>Original</hkcstring>
+            //             <hkcstring>Original</hkcstring>
+            // <!-- CLOSE -->
+            //         </hkparam>
+            // ```
             if matches!(op, Op::Add) && self.parse_peek(opt(end_tag("hkparam")))?.is_some() {
                 self.output_patches.insert(
                     path,
