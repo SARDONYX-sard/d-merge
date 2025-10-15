@@ -328,7 +328,7 @@ fn new_push_anim_seq_patch<'a>(
     animations: &[String],
     behavior_entry: &BehaviorEntry,
     priority: usize,
-    raw_borrowed_patches: &BehaviorPatchesMap<'a>,
+    patches: &BehaviorPatchesMap<'a>,
 ) {
     let behavior_key = behavior_entry.to_default_behavior_template_key();
 
@@ -349,7 +349,7 @@ fn new_push_anim_seq_patch<'a>(
     #[cfg(feature = "tracing")]
     tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
 
-    raw_borrowed_patches
+    patches
         .0
         .entry(behavior_key)
         .or_default()
