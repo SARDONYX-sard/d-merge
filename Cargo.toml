@@ -11,6 +11,7 @@ rust-version = "1.87"
 
 [workspace]
 members = [
+  "core/gh_issue_link",
   "core/json_patch",
   "core/mod_info",
   "core/nemesis_merge",
@@ -62,6 +63,7 @@ pretty_assertions = "1.4.1"                                  # Color diff assert
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
+gh_issue_link = { path= "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }
 mod_info = { path = "./core/mod_info" }
 nemesis_merge = { path = "./core/nemesis_merge" }

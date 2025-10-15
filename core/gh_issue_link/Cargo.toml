@@ -1,0 +1,22 @@
+[package]
+name = "gh_issue_link"
+version = "0.1.0"
+description = "D merge issue link generator"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sysinfo = "0.37.2"
+urlencoding = "2.1.3"
+
+[lints]
+workspace = true
+
+[features]

@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-description: File a bug report
+about: File a bug report
 title: '[Bug]: '
 labels: ['bug']
 
@@ -9,36 +9,97 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
-  - type: dropdown
+        Before submitting, please check if your issue has already been reported:
+        [Search existing issues](https://github.com/SARDONYX-sard/d-merge/issues?q=is%3Aissue)
+
+  # Software Version
+  - type: input
     id: version
     attributes:
-      label: Version
+      label: Software Version
       description: What version of our software are you running?
-      options:
-        - 0.1.0
-        - 0.1.0-alpha.8
+      placeholder: 0.1.1
     validations:
       required: true
+
+  # CPU
+  - type: input
+    id: cpu
+    attributes:
+      label: CPU brand
+      description: Enter your CPU model
+      placeholder: 'Intel(R) Core(TM) i7-8700'
+    validations:
+      required: false
+
+  # DRAM
+  - type: input
+    id: dram
+    attributes:
+      label: DRAM
+      description: Enter your total DRAM
+      placeholder: '32 GB'
+    validations:
+      required: false
+
+  # GPU
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      description: Enter your graphics card
+      placeholder: 'NVIDIA GeForce GTX 1080 Ti'
+    validations:
+      required: false
+
+  # OS
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: Enter your OS edition, version, and build (e.g., Windows 11 24H2 build 26100.6584)
+      placeholder: 'Windows 11 24H2 build 26100.6584'
+    validations:
+      required: true
+
+  # Skyrim Version
+  - type: input
+    id: skyrim-version
+    attributes:
+      label: Skyrim Version
+      description: Enter your Skyrim Special Edition version
+      placeholder: '1.6.1170.0'
+    validations:
+      required: true
+
+  # Unexpected behavior
   - type: textarea
     id: unexpected-behavior
     attributes:
-      label: Unexpected behavior here
-      description: May I ask you to tell us about the unexpected behavior?
-      placeholder: 'Example: logger is not worked.'
+      label: Unexpected behavior
+      description: Describe the behavior that is not working as expected.
+      placeholder: 'Example: FNIS Flyer SE(v7.0) can perform animations but cannot move.'
     validations:
       required: true
+
+  # Reproduction steps
   - type: textarea
-    id: expected-behavior
+    id: reproduction-steps
     attributes:
-      label: Expected behavior
-      description: May I ask you to tell us about the behavior you expect?
-      # yamllint disable-line rule:line-length
-      placeholder: 'Example: Reflects the level specification of the logger in the GUI.'
+      label: Steps to Reproduce
+      description: |
+        Describe step by step how to reproduce the issue.
+        Include minimal mod setup if applicable.
+      placeholder: '1. Start the game with only FNIS Flyer SE(v7.0) enabled\n2. Perform action X\n3. Observe unexpected behavior'
     validations:
       required: true
+
+  # Debug / Log output
   - type: textarea
-    id: logs
+    id: debug-output
     attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: Shell
+      label: Debug / Log Output
+      description: |
+        Include relevant logs. Check `<output dir>/.d_merge/logs/`, `<output dir>/.d_merge/debug/` if applicable.
+      placeholder: 'Example: Copy logs from `<output dir>/.d_merge/logs/`, <output dir>/.d_merge/debug/ here'
+      # We don't use `render: Shell` because it doesn't allow me to place files.
