@@ -43,8 +43,5 @@
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
   "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"],
-  "i18n-ally.sourceLanguage": "en",
-  "yaml.schemas": {
-    "https://www.schemastore.org/gitea-issue-forms.json": ".github/ISSUE_TEMPLATE/*.yaml"
-  }
+  "i18n-ally.sourceLanguage": "en"
 }
