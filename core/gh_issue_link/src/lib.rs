@@ -1,6 +1,26 @@
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use urlencoding::encode;
 
+#[derive(Debug, Clone, Copy)]
+pub enum SkyrimRuntime {
+    /// `Special/Anniversary Edition(64-bit)`
+    Se,
+    /// `VR(64bit)`
+    Vr,
+    /// `Legendary Edition(32bit)`
+    Le,
+}
+
+impl SkyrimRuntime {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Se => "Special/Anniversary Edition(64-bit)",
+            Self::Vr => "VR(64-bit)",
+            Self::Le => "Legendary Edition(32-bit)",
+        }
+    }
+}
+
 /// Creates a `System` instance with CPU and RAM information collected.
 ///
 /// This function should be called by the user once, and the returned `System`
@@ -31,7 +51,7 @@ pub fn create_system() -> System {
 /// use gh_issue_link::{create_system, EnvInfo};
 ///
 /// let sys = create_system();
-/// let env = EnvInfo::new(&sys, "0.1.0", "1.6.1170.0");
+/// let env = EnvInfo::new(&sys);
 ///
 /// println!("CPU: {:?}", env.cpu);
 /// println!("RAM: {}", env.dram);
@@ -45,10 +65,6 @@ pub struct EnvInfo<'a> {
     pub dram: String,
     /// OS version string
     pub os: String,
-    /// d-merge version
-    pub d_merge_version: &'a str,
-    /// Skyrim version
-    pub skyrim_version: &'a str,
 }
 
 impl<'a> EnvInfo<'a> {
@@ -57,7 +73,7 @@ impl<'a> EnvInfo<'a> {
     /// - `sys` - Reference to a `System` created by `create_system()`
     /// - `d_merge_version` - Version of d-merge
     /// - `skyrim_version` - Version of Skyrim
-    pub fn new(sys: &'a System, d_merge_version: &'a str, skyrim_version: &'a str) -> Self {
+    pub fn new(sys: &'a System) -> Self {
         let cpu = sys
             .cpus()
             .first()
@@ -69,13 +85,7 @@ impl<'a> EnvInfo<'a> {
         );
         let os = System::kernel_long_version();
 
-        Self {
-            cpu,
-            dram,
-            os,
-            d_merge_version,
-            skyrim_version,
-        }
+        Self { cpu, dram, os }
     }
 }
 
@@ -87,9 +97,15 @@ impl<'a> EnvInfo<'a> {
 /// # Example
 ///
 /// ```
-/// println!("{}", gh_issue_link::new_gh_issue_link());
+/// use gh_issue_link::{SkyrimRuntime, new_gh_issue_link};
+///
+/// println!("{}", new_gh_issue_link("0.1.0", SkyrimRuntime::Se, "1.6.1170.0"));
 /// ```
-pub fn new_gh_issue_link() -> String {
+pub fn new_gh_issue_link(
+    d_merge_version: &str,
+    skyrim_runtime: SkyrimRuntime,
+    skyrim_version: &str,
+) -> String {
     let base_url = "https://github.com/SARDONYX-sard/d-merge/issues/new";
     let template = "bug-report.yaml";
     let labels = "bug";
@@ -100,23 +116,24 @@ pub fn new_gh_issue_link() -> String {
         encode(template)
     );
 
-    let mut append_param = |key: &str, value: Option<&str>| {
-        if let Some(v) = value {
-            url.push('&');
-            url.push_str(key);
-            url.push('=');
-            url.push_str(&encode(v));
-        }
+    let mut append_param = |key: &str, v: &str| {
+        url.push('&');
+        url.push_str(key);
+        url.push('=');
+        url.push_str(&encode(v));
     };
 
     let sys = create_system();
-    let env = EnvInfo::new(&sys, "0.1.0", "1.6.1170.0");
-    append_param("version", Some(env.d_merge_version));
-    append_param("cpu", env.cpu);
-    append_param("dram", Some(&env.dram));
-    append_param("gpu", None);
-    append_param("os", Some(&env.os));
-    append_param("skyrim-version", Some(env.skyrim_version));
+    let env = EnvInfo::new(&sys);
+
+    append_param("version", d_merge_version);
+    if let Some(cpu) = env.cpu {
+        append_param("cpu", cpu);
+    }
+    append_param("dram", &env.dram);
+    append_param("os", &env.os);
+    append_param("skyrim-version", skyrim_runtime.as_str());
+    append_param("skyrim-version", skyrim_version);
 
     url
 }
@@ -128,9 +145,12 @@ mod tests {
     #[test]
     fn test_env_info_link() {
         let sys = create_system();
-        let env = EnvInfo::new(&sys, "0.1.0", "1.6.1170.0");
+        let env = EnvInfo::new(&sys);
         println!("env: {env:#?}");
 
-        println!("GitHub issue link:\n{}", new_gh_issue_link());
+        println!(
+            "GitHub issue link:\n{}",
+            new_gh_issue_link("0.1.0", SkyrimRuntime::Se, "1.6.1170.0")
+        );
     }
 }

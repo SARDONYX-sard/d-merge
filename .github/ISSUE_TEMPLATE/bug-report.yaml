@@ -63,6 +63,18 @@ body:
       required: true
 
   # Skyrim Version
+  - type: dropdown
+    id: skyrim-edition
+    attributes:
+      label: Skyrim Version
+      description: Enter your SkyrimEdition
+      options:
+        - Special/Anniversary Edition(64bit)
+        - VR(64bit)
+        - Legendary Edition(32bit)
+    validations:
+      required: true
+
   - type: input
     id: skyrim-version
     attributes:
@@ -78,7 +90,9 @@ body:
     attributes:
       label: Unexpected behavior
       description: Describe the behavior that is not working as expected.
-      placeholder: 'Example: FNIS Flyer SE(v7.0) can perform animations but cannot move.'
+      placeholder: |
+        Example:
+          FNIS Flyer SE(v7.0) can perform animations but cannot move.
     validations:
       required: true
 
@@ -89,8 +103,11 @@ body:
       label: Steps to Reproduce
       description: |
         Describe step by step how to reproduce the issue.
-        Include minimal mod setup if applicable.
-      placeholder: '1. Start the game with only FNIS Flyer SE(v7.0) enabled\n2. Perform action X\n3. Observe unexpected behavior'
+        (It's difficult to find the problem if it can't be reproduced.)
+      placeholder: |
+        1. Start the game with only FNIS Flyer SE(v7.0) enabled
+        2. Perform action X
+        3. Observe unexpected behavior'
     validations:
       required: true
 
@@ -101,5 +118,8 @@ body:
       label: Debug / Log Output
       description: |
         Include relevant logs. Check `<output dir>/.d_merge/logs/`, `<output dir>/.d_merge/debug/` if applicable.
-      placeholder: 'Example: Copy logs from `<output dir>/.d_merge/logs/`, <output dir>/.d_merge/debug/ here'
+      placeholder: |
+        Copy from
+        - `<output dir>/.d_merge/logs/`
+        - <output dir>/.d_merge/debug/
       # We don't use `render: Shell` because it doesn't allow me to place files.
