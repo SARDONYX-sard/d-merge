@@ -62,10 +62,98 @@ pub fn apply_seq_by_priority<'a>(
 
 /// Resolve conflicts in order of priority and apply them to the array.
 ///
-/// This function is applied directly to the target array without specifying a JSON path.
+/// This function applies multiple sequence-type JSON patches directly
+/// to a mutable JSON array, resolving conflicts by patch priority.
+///
+/// # Behavior Notes
+/// - Patches are applied in ascending order of `priority`.
+/// - `Replace` with fewer elements than its range implicitly removes the extra elements.
+/// - This function directly modifies the array in place.
 ///
 /// # Errors
-/// Returns an error if applying the patches fails.
+/// Returns [`JsonPatchError`] if the patch fails or if the target is not an array.
+///
+/// # Example
+/// ```
+/// use simd_json::{base::ValueTryAsArrayMut as _, borrowed::Value,json_typed};
+/// use json_patch::{apply_seq_array_directly, JsonPatch, Action, Op, ValueWithPriority, JsonPatchError};
+///
+/// fn main() -> Result<(), JsonPatchError> {
+///     // Prepare a mix of sequence operations with different priorities.
+///     let patches: Vec<ValueWithPriority<'_>> = vec![
+///         // 1/4 Replace elements 1..4 with ["A", "B"].
+///         // Range is longer than replacement (3 vs 2), so 1 element will be removed.
+///         ValueWithPriority {
+///             patch: JsonPatch {
+///                 action: Action::Seq {
+///                     op: Op::Replace,
+///                     range: 1..4,
+///                 },
+///                 value: json_typed! {borrowed, ["A", "B"]},
+///             },
+///             priority: 0,
+///         },
+///
+///         // 2/4 Add ["X"] before index 2 (after Replace has adjusted positions).
+///         ValueWithPriority {
+///             patch: JsonPatch {
+///                 action: Action::Seq {
+///                     op: Op::Add,
+///                     range: 2..2,
+///                 },
+///                 value: json_typed! {borrowed, ["X"]},
+///             },
+///             priority: 1,
+///         },
+///
+///         // 3/4 Remove elements 0..1 (remove the first element).
+///         ValueWithPriority {
+///             patch: JsonPatch {
+///                 action: Action::Seq {
+///                     op: Op::Remove,
+///                     range: 0..1,
+///                 },
+///                 value: json_typed! {borrowed, []},
+///             },
+///             priority: 2,
+///         },
+///
+///         // 4/4 Append ["Z1", "Z2"] to the end.
+///         ValueWithPriority {
+///             patch: JsonPatch {
+///                 action: Action::SeqPush,
+///                 value: json_typed! {borrowed, ["Z1", "Z2"]},
+///             },
+///             priority: 1,
+///         },
+///     ];
+///
+///     // Initial array
+///     let array_path = json_patch::json_path!["Example", "array"];
+///     let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+///
+///     // Get a mutable reference to the array value.
+///     let seq = match actual.try_as_array_mut() {
+///         Ok(seq) => seq,
+///         Err(e) => return Err(JsonPatchError::try_type_from(e, &array_path, &actual)),
+///     };
+///
+///     // Apply all patches directly.
+///     apply_seq_array_directly(seq, patches)?;
+///
+///     // Step-by-step visualization:
+///     // 1. Replace(1..4, ["A","B"]) → ["0", "A", "B", "4", "5"]
+///     // 2️. Remove mark(0..1)        → ["⛔", "A", "B", "4", "5"]
+///     // 3️. Add(2..2, ["X"])         → ["⛔", "A", "X", "B", "4", "5"]
+///     // 4️. SeqPush(["Z1","Z2"])     → ["⛔", "A", "X", "B", "4", "5", "Z1", "Z2"]
+///     // 5️. Final remove pass        → ["A", "X", "B", "4", "5", "Z1", "Z2"]
+///
+///     let expected = json_typed!(borrowed, ["A", "X", "B", "4", "5", "Z1", "Z2"]);
+///     assert_eq!(actual, expected);
+///
+///     Ok(())
+/// }
+/// ```
 pub fn apply_seq_array_directly<'a>(
     target_array: &mut Vec<Value<'a>>,
     mut patches: Vec<ValueWithPriority<'a>>,
@@ -425,7 +513,8 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
         return String::new();
     }
     let cell_width = match max_index {
-        0..=99 => 7, // <- e.g. ` 98-99 `.len()
+        0..=9 => 5,   // <- e.g. ` 0-9 `.len()
+        10..=99 => 7, // <- e.g. ` 98-99 `.len()
         100..=999 => 9,
         1000..=9999 => 11,
         _ => 13, // safety, though impossible
@@ -607,13 +696,13 @@ mod tests {
         assert_eq!(actual, expected);
 
         const EXPECTED_VISUAL: &str = "\
-Op      | Ord |   1      2      3     4-5    6-7  |\n\
----------------------------------------------------\n\
-Replace |   0 |                       [*]         |\n\
-Remove  |   2 |         [-]    [-]                |\n\
-Add     |   1 |  [+]    [+]                       |\n\
-Push    |   1 |                              [>]  |\n\
----------------------------------------------------\n\
+Op      | Ord |  1    2    3   4-5  6-7 |\n\
+-----------------------------------------\n\
+Replace |   0 |                [*]      |\n\
+Remove  |   2 |      [-]  [-]           |\n\
+Add     |   1 | [+]  [+]                |\n\
+Push    |   1 |                     [>] |\n\
+-----------------------------------------\n\
 ";
         println!("{visual}");
         assert_eq!(visual, EXPECTED_VISUAL);
