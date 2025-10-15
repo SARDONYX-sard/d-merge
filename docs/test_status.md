@@ -76,7 +76,7 @@ SkyrimSE
 | ✅     | POISE - Stagger Overhaul SE        | 1.02    |                                                    |
 | ✅     | Poisebreaker -SE                   | 0.7     |                                                    |
 | ✅     | Precision                          | 2.0.4   |                                                    |
-| ✅     | Precision Creatures                | 2.4     | Need Precision Creatures damage_patch              |
+| ✅     | Precision Creatures                | 2.4     | Need `Precision Creatures d_merge_patch`           |
 | ✅     | Project Impact SE                  | 2.72    |                                                    |
 | ✅     | SCAR - Skyrim Combos AI Revolution | 1.06b   | With SCAR AE Support(v1.6.1)                       |
 | ✅     | True Directional Movement -SE, AE  | 2.2.5   |                                                    |
