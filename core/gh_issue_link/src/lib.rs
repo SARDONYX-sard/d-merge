@@ -1,3 +1,5 @@
+pub mod version;
+
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use urlencoding::encode;
 
