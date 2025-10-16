@@ -1,5 +1,4 @@
 //! File version
-#[cfg(target_os = "windows")]
 use std::path::Path;
 
 /// Represents the version of a file (typically an executable or DLL).
@@ -202,6 +201,7 @@ where
 /// ```
 #[cfg(unix)]
 pub fn get_file_version<P: AsRef<Path>>(path: P) -> Result<Version, VersionError> {
+    let _ = path;
     Err(VersionError)
 }
 
