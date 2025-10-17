@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-10-17
+### :sparkles: New Features
+- [`8ce8e3a`](https://github.com/SARDONYX-sard/d-merge/commit/8ce8e3ab772dd729ef0a30160cf80e21489874ff) - create new issue template *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`3593738`](https://github.com/SARDONYX-sard/d-merge/commit/35937380f9c84d0337f86c8a580d03c20223f074) - change os name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`08ae28b`](https://github.com/SARDONYX-sard/d-merge/commit/08ae28bc5b9a4531e1cd26f19a55ad63388260f1) - add file version fn *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`eae2d34`](https://github.com/SARDONYX-sard/d-merge/commit/eae2d34179634b14b97f4012e50268d6ca2c434c) - fix import *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`3811efa`](https://github.com/SARDONYX-sard/d-merge/commit/3811efa02beb1324aaa2c631e4532a88389506c4) - rename arg name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`6aa3469`](https://github.com/SARDONYX-sard/d-merge/commit/6aa3469a0dfd4362a1bc1789e87d87d6f3f74ef3) - fix issue template *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`db34832`](https://github.com/SARDONYX-sard/d-merge/commit/db3483292a4691d5e957682396d487a43008f265) - **issue**: add edition *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2b3ce12`](https://github.com/SARDONYX-sard/d-merge/commit/2b3ce12bf8d913af0e61a12d164e16653baa0bb7) - **issue**: rename *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.1.1] - 2025-10-14
 ### :sparkles: New Features
 - [`3f4c99f`](https://github.com/SARDONYX-sard/d-merge/commit/3f4c99f482fb8179429c54f9f4da609e74f1e203) - **adsf**: support anim data header *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -49,3 +67,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0-beta.3...0.1.0
 [0.1.1]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0...0.1.1
+[0.1.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.1...0.1.2
