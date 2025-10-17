@@ -79,6 +79,8 @@ D:/MO2/mods/
 
 ## Patch Page Progress
 
+- [Mods Test status](./docs/test_status.md)
+
 - GUI
   - [x] Basic frontend(Patch/Convert/Settings: Reports indicate that tauri ver. MO2 cannot be launched. Cause unknown.)
   - [x] Support Virtual fs mode(Use `egui` ver.)
