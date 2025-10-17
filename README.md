@@ -79,10 +79,6 @@ D:/MO2/mods/
 
 ## Patch Page Progress
 
-This currently works to some extent(Sliding, Paraglider, MCO, DMCO-Dodge, ...), but there seems to be a conflict where the patch changes every time the button is pressed.
-
-The only thing we are considering at this time is support for the Nemesis patch.(Since I only use the Nemesis patch).
-
 - GUI
   - [x] Basic frontend(Patch/Convert/Settings: Reports indicate that tauri ver. MO2 cannot be launched. Cause unknown.)
   - [x] Support Virtual fs mode(Use `egui` ver.)
