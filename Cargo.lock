@@ -6152,6 +6152,8 @@ name = "serde_hkx_for_gui"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "havok_classes",
+ "havok_types",
  "node_expr",
  "pretty_assertions",
  "rayon",

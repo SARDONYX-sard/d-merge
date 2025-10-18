@@ -16,11 +16,14 @@ rust-version.workspace = true
 futures = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 serde_repr = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+havok_classes = { workspace = true }
+havok_types = { workspace = true }
+serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 
 # workspace members
 node_expr = { workspace = true }

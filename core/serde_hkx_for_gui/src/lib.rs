@@ -1,4 +1,5 @@
 pub mod hash;
+pub mod hkanno;
 mod par_walk_dir;
 pub mod path;
 pub mod status;
