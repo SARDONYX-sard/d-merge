@@ -69,10 +69,12 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // NOTE: Use this instead of `useDeferredValue` to delay API calls.
   const deferredModInfoDir = useDebounce(isVfsMode ? vfsSkyrimDataDir : skyrimDataDir, 450);
 
-  setPatchOptions((options) => ({
-    ...options,
-    skyrimDataDirGlob: deferredModInfoDir,
-  }));
+  useEffect(() => {
+    setPatchOptions((options) => ({
+      ...options,
+      skyrimDataDirGlob: deferredModInfoDir,
+    }));
+  }, [deferredModInfoDir, setPatchOptions]);
 
   useEffect(() => {
     if (!deferredModInfoDir) return;

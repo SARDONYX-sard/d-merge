@@ -9,6 +9,7 @@ import type { VimEnvironment } from 'monaco-vim';
 import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
 import { openUrl } from '@/services/api/shell';
 import { atomOneDarkPro } from './atom_onedark_pro';
+import { supportHkanno } from './support_hkanno';
 import { loadVimKeyBindings } from './vim_key_bindings';
 
 export type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
@@ -73,6 +74,8 @@ export const MonacoEditor = memo(function MonacoEditor({ id, vimMode = false, on
  * - json: enable schema
  * */
 const setLangCustomConfig = (monacoEnv: typeof monaco) => {
+  supportHkanno(monacoEnv);
+
   // NOTE: By default, the URL is opened in the app, so prevent this and call the backend API to open the URL in the browser of each PC.
   if (isTauri()) {
     monacoEnv.editor.registerLinkOpener({

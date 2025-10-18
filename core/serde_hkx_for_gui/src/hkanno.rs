@@ -45,6 +45,8 @@ use serde_hkx_features::ClassMap;
 use snafu::ResultExt as _;
 use std::{borrow::Cow, fmt, path::Path};
 
+pub use serde_hkx_features::OutFormat;
+
 /// # hkanno module
 ///
 /// Provides a structured representation of Havok animation annotations extracted
@@ -65,6 +67,128 @@ pub struct Hkanno<'a> {
     pub duration: f32,
     /// A list of annotation tracks, each containing time–text pairs.
     pub annotation_tracks: Vec<AnnotationTrack<'a>>,
+}
+
+impl<'a> Hkanno<'a> {
+    /// Converts a borrowed Hkanno into an owned `'static` Hkanno.
+    pub fn into_static(self) -> Hkanno<'static> {
+        Hkanno {
+            ptr: Cow::Owned(self.ptr.into_owned()),
+            num_original_frames: self.num_original_frames,
+            duration: self.duration,
+            annotation_tracks: self
+                .annotation_tracks
+                .into_par_iter()
+                .map(|track| AnnotationTrack {
+                    annotations: track
+                        .annotations
+                        .into_par_iter()
+                        .map(|ann| Annotation {
+                            time: ann.time,
+                            text: ann.text.map(|t| Cow::Owned(t.into_owned())),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Write the edited Hkanno back into an existing ClassMap
+    ///
+    /// # Errors
+    /// If missing/multiple `hkaSplineCompressedAnimation`.
+    pub fn write_to_classmap(self, class_map: &mut ClassMap<'a>) -> Result<(), HkannoError> {
+        use havok_classes::Classes;
+        use havok_types::I32;
+
+        // Find the spline(s)
+        let mut splines: Vec<_> = class_map
+            .par_iter_mut()
+            .filter(|(_, class)| matches!(class, Classes::hkaSplineCompressedAnimation(_)))
+            .collect();
+        let (_, spline) = {
+            match splines.len() {
+                0 => return MissingSplineSnafu.fail(),
+                1 => splines.swap_remove(0),
+                _ => {
+                    return Err(HkannoError::MultipleSplinesFound {
+                        count: splines.len(),
+                    })
+                }
+            }
+        };
+        let Classes::hkaSplineCompressedAnimation(anim) = spline else {
+            return MissingSplineSnafu.fail();
+        };
+
+        anim.m_numFrames = I32::Number(self.num_original_frames);
+        anim.parent.m_duration = self.duration;
+
+        for (track, edited_track) in anim
+            .parent
+            .m_annotationTracks
+            .iter_mut()
+            .zip(self.annotation_tracks)
+        {
+            for (ann, edited_ann) in track.m_annotations.iter_mut().zip(edited_track.annotations) {
+                ann.m_time = edited_ann.time;
+                ann.m_text = havok_types::StringPtr::from_option(edited_ann.text);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Updates the given HKX/XML file bytes with the annotation data in `self`.
+    ///
+    /// This function performs no file I/O. The caller is responsible for reading
+    /// and writing the file contents. It only mutates and serializes the
+    /// in-memory `ClassMap`.
+    ///
+    /// # Arguments
+    /// * `bytes` - Raw HKX or XML file bytes.
+    /// * `format` - output format
+    /// * `input` - The source file path (used only for error context and extension check).
+    ///
+    /// # Returns
+    /// A new byte vector containing the updated HKX data.
+    ///
+    /// # Errors
+    /// Returns a [`HkannoError`] if:
+    /// - Deserialization of the input bytes fails.
+    /// - Annotation update fails.
+    /// - Serialization of the updated data fails.
+    pub fn update_hkx_bytes(
+        self,
+        bytes: &mut Vec<u8>,
+        format: OutFormat,
+        input: &Path,
+    ) -> Result<Vec<u8>, HkannoError> {
+        let mut text = String::new();
+
+        // Deserialize bytes → ClassMap
+        let mut class_map: ClassMap<'_> =
+            serde_hkx_features::serde_extra::de::deserialize(bytes, &mut text, input)
+                .context(SerdeHkxFeatureSnafu)?;
+        self.write_to_classmap(&mut class_map)?; // Update annotations (pure memory operation)
+
+        // Serialize back to bytes(NOTE: Binary data requires pre-sorting, so it is marked as &mut class_map.)
+        // FIXME: xml preserve ordering.
+        let updated_bytes = match format {
+            OutFormat::Amd64 | OutFormat::Win32 | OutFormat::Xml => {
+                serde_hkx_features::serde::ser::to_bytes(input, format, &mut class_map)
+            }
+            OutFormat::Json | OutFormat::Toml => {
+                let mut class_map =
+                    serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(class_map);
+                serde_hkx_features::serde_extra::ser::to_bytes(input, format, &mut class_map)
+            }
+            _ => unreachable!("This being called means a new format type has been created."),
+        }
+        .context(SerdeHkxFeatureSnafu)?;
+
+        Ok(updated_bytes)
+    }
 }
 
 /// Represents a single annotation track extracted from a Havok animation.
@@ -229,9 +353,9 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
 /// use serde_hkx_for_gui::hkanno::{parse_as_hkanno, HkannoError};
 ///
 /// fn example() -> Result<(), Box<dyn Error>> {
-///     let path = Path::new("example.hkx");
+///     let path = Path::new("example.hkx"); // or xml(from hkx)
 ///     let bytes = std::fs::read(path)?;
-///     let mut buffer = String::new();
+///     let mut buffer = String::new(); // To avoid ownership error xml receiver.
 ///
 ///     // parse_as_hkanno returns Result<Hkanno, HkannoError>
 ///     let hkanno = parse_as_hkanno(&bytes, &mut buffer, path)?;
@@ -245,8 +369,8 @@ pub fn parse_as_hkanno<'a>(
     text: &'a mut String,
     path: &Path,
 ) -> Result<Hkanno<'a>, HkannoError> {
-    let class_map: ClassMap<'a> =
-        serde_hkx_features::serde::de::deserialize(bytes, text, path).context(ParseSnafu)?;
+    let class_map: ClassMap<'a> = serde_hkx_features::serde::de::deserialize(bytes, text, path)
+        .context(SerdeHkxFeatureSnafu)?;
     parse_hkanno_borrowed(class_map)
 }
 
@@ -254,8 +378,8 @@ pub fn parse_as_hkanno<'a>(
 #[derive(Debug, snafu::Snafu)]
 pub enum HkannoError {
     /// Raised when the HKX data could not be parsed into a valid ClassMap.
-    #[snafu(display("Failed to parse HKX file: {source}"))]
-    ParseError {
+    #[snafu(display("internal serde_hkx_features err: {source}"))]
+    SerdeHkxFeatureError {
         source: serde_hkx_features::error::Error,
     },
 
@@ -330,6 +454,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Need Local file."]
     fn test_parse_as_hkanno_from_file_path() {
         let path = "../../dummy/convert/input/MCO_Dodge-B-1.xml";
 

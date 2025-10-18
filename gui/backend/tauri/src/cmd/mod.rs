@@ -1,5 +1,6 @@
 pub(crate) mod conversion;
 pub(crate) mod fs;
+pub(crate) mod hkanno;
 pub(crate) mod log;
 pub(crate) mod patch;
 pub(crate) mod updater;
