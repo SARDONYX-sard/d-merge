@@ -1,10 +1,12 @@
 import { type OnMount } from '@monaco-editor/react';
-import { registerHkannoCompletion } from './cmp';
-import { updateHkannoDiagnostics } from './diagnostic';
-import { registerHkannoFormatter } from './formatter';
-import { registerHkannoHover } from './hover';
-import { registerHkannoInlayHints } from './inlayhint';
-import { registerHkannoSemanticTokens } from './semantic_token';
+
+import { registerCompletionProvider } from './providers/completion';
+import { updateHkannoDiagnostics } from './providers/diagnostic';
+import { registerDocumentFormattingEditProvider } from './providers/formatter';
+import { registerHoverProvider } from './providers/hover';
+import { registerInlayHintsProvider } from './providers/inlay_hint';
+import { registerDocumentSemanticTokensProvider } from './providers/semantic_token';
+import { registerSignatureHelpProvider } from './providers/signature';
 
 export const supportHkanno: OnMount = (editor, monacoEnv) => {
   if (monacoEnv.languages.getLanguages().some((l) => l.id === 'hkanno')) {
@@ -20,11 +22,12 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
 
   updateHkannoDiagnostics(editor, monacoEnv);
 
-  registerHkannoCompletion(monacoEnv);
-  registerHkannoFormatter(monacoEnv);
-  registerHkannoHover(monacoEnv);
-  registerHkannoInlayHints(monacoEnv);
-  registerHkannoSemanticTokens(monacoEnv);
+  registerCompletionProvider(monacoEnv);
+  registerDocumentFormattingEditProvider(monacoEnv);
+  registerDocumentSemanticTokensProvider(monacoEnv);
+  registerHoverProvider(monacoEnv);
+  registerInlayHintsProvider(monacoEnv);
+  registerSignatureHelpProvider(editor, monacoEnv);
 
   // Monarch fallback tokenizer
   monacoEnv.languages.setMonarchTokensProvider('hkanno', {

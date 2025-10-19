@@ -161,6 +161,7 @@ function SplitEditors({
                 minimap: { enabled: false },
                 fontSize: 13,
               }}
+              vimMode={isVimMode}
             />
           </Box>
         </Allotment.Pane>
