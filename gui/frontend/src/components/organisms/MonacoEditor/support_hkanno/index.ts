@@ -39,10 +39,20 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
     tokenizer: {
       root: [
         [/#.*/, 'comment'],
-        [/\d+\.\d+/, 'number.float'],
-        [/\d+/, 'number'],
+
+        [/\b\d+\.\d+\b/, 'number.float'],
+        [/\b\d+\b/, 'number'],
+
+        [/\bSoundPlay\b/, 'identifier'],
+        [/\bPIE|pie\b/, 'identifier'],
+
+        [/\banimmotion\b/, 'keyword'],
+        [/\banimrotation\b/, 'keyword'],
+
+        [/-?\d+\.\d+|-?\d+/, 'number.float'],
+
         [/".*?"/, 'string'],
-        [/[a-zA-Z0-9_]+:/, 'keyword'],
+        [/[A-Za-z0-9_]+/, 'white'],
       ],
     },
   });
