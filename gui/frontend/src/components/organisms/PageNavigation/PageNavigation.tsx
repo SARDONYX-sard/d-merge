@@ -1,4 +1,5 @@
 import Layers from '@mui/icons-material/Layers';
+import Notes from '@mui/icons-material/Notes';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TransformIcon from '@mui/icons-material/Transform';
 import BottomNavigation from '@mui/material/BottomNavigation';
@@ -16,17 +17,19 @@ import { schemaStorage } from '@/lib/storage/schemaStorage';
  *
  * Otherwise it will jump to the wrong place.
  */
-const validPathNames = ['/convert', '/', '/settings'] as const;
+const validPathNames = ['/convert', '/', '/hkanno', '/settings'] as const;
 const lastPathSchema = z.enum(validPathNames);
 
 type LastPathName = (typeof validPathNames)[number];
 
-const getPageIndex = (pageName: LastPathName): 0 | 2 | 1 => {
+const getPageIndex = (pageName: LastPathName): 0 | 3 | 2 | 1 => {
   switch (pageName) {
     case '/convert':
       return 0;
-    case '/settings':
+    case '/hkanno':
       return 2;
+    case '/settings':
+      return 3;
     default:
       return 1; // Default to patch page
   }
@@ -42,7 +45,9 @@ const pathnameToLastPathName = (path: string): LastPathName => {
   if (path.endsWith('/convert/') || path.endsWith('/convert')) {
     return '/convert';
   }
-
+  if (path.endsWith('/hkanno/') || path.endsWith('/hkanno')) {
+    return '/hkanno';
+  }
   if (path.endsWith('/settings/') || path.endsWith('/settings')) {
     return '/settings';
   }
@@ -105,6 +110,7 @@ export function PageNavigation() {
       >
         <BottomNavigationAction icon={<TransformIcon />} label='Convert' />
         <BottomNavigationAction icon={<Layers />} label='Patch' />
+        <BottomNavigationAction icon={<Notes />} label='hkanno' />
         <BottomNavigationAction icon={<SettingsIcon />} label='Settings' />
       </BottomNavigation>
     </>
