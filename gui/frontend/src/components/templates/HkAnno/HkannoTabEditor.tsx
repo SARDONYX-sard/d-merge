@@ -152,6 +152,7 @@ function SplitEditors({
               Preview
             </Typography>
             <MonacoEditor
+              key='preview-editor'
               height='calc(100% - 24px)'
               defaultLanguage='json'
               value={JSON.stringify(hkannoFromFileTab(tab), null, 2)}

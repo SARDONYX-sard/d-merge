@@ -6,15 +6,15 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { isTauri } from '@tauri-apps/api/core';
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import type { VimEnvironment } from 'monaco-vim';
-import { type ComponentPropsWithoutRef, type MutableRefObject, memo, useCallback, useEffect, useRef } from 'react';
+import { type ComponentPropsWithoutRef, memo, type RefObject, useCallback, useEffect, useRef } from 'react';
 import { openUrl } from '@/services/api/shell';
 import { atomOneDarkPro } from './atom_onedark_pro';
 import { supportHkanno } from './support_hkanno';
 import { loadVimKeyBindings } from './vim_key_bindings';
 
 export type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
-export type VimModeRef = MutableRefObject<VimEnvironment | null>;
-export type VimStatusRef = MutableRefObject<HTMLDivElement | null>;
+export type VimModeRef = RefObject<VimEnvironment | null>;
+export type VimStatusRef = RefObject<HTMLDivElement | null>;
 
 type Props = ComponentPropsWithoutRef<typeof Editor> & {
   id?: string;
@@ -29,9 +29,10 @@ export const MonacoEditor = memo(function MonacoEditor({ id, vimMode = false, on
 
   const handleDidMount: OnMount = useCallback(
     (editor, monaco) => {
-      setLangCustomConfig(monaco);
+      setLangCustomConfig(editor, monaco);
 
       editorRef.current = editor;
+
       if (vimMode) {
         loadVimKeyBindings({ editor, vimModeRef, vimStatusRef });
       }
@@ -73,8 +74,8 @@ export const MonacoEditor = memo(function MonacoEditor({ id, vimMode = false, on
  * - javascript: enable inlay-hint
  * - json: enable schema
  * */
-const setLangCustomConfig = (monacoEnv: typeof monaco) => {
-  supportHkanno(monacoEnv);
+const setLangCustomConfig: OnMount = (editor, monacoEnv) => {
+  supportHkanno(editor, monacoEnv);
 
   // NOTE: By default, the URL is opened in the app, so prevent this and call the backend API to open the URL in the browser of each PC.
   if (isTauri()) {

@@ -109,6 +109,7 @@ export const HkannoEditorPage: React.FC = () => {
 
   return (
     <Box
+      component='main'
       sx={{
         display: 'flex',
         flexDirection: 'column',
