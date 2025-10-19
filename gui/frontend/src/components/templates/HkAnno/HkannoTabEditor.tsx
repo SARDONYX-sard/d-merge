@@ -138,7 +138,7 @@ function SplitEditors({
             defaultLanguage='hkanno' // NOTE: Comments starting with `#` are being used as pseudo-comments.
             value={tab.text}
             onChange={(val) => val && onTextChange(val)}
-            options={{ minimap: { enabled: true }, fontSize: 13 }}
+            options={{ minimap: { enabled: true }, rulers: [120], fontSize: 13 }}
             vimMode={isVimMode}
           />
         </Box>

@@ -29,9 +29,9 @@ export const MonacoEditor = memo(function MonacoEditor({ id, vimMode = false, on
 
   const handleDidMount: OnMount = useCallback(
     (editor, monaco) => {
-      setLangCustomConfig(editor, monaco);
-
       editorRef.current = editor;
+
+      setLangCustomConfig(editor, monaco);
 
       if (vimMode) {
         loadVimKeyBindings({ editor, vimModeRef, vimStatusRef });
