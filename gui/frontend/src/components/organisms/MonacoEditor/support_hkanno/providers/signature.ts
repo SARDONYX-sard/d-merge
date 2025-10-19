@@ -1,5 +1,6 @@
 import { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 import { parseHkannoLine } from '../parser';
 
 /**
@@ -29,14 +30,14 @@ export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
 
       // 2️⃣ Time is present → <time: float>
       if (!parsed.timeComplete) {
-        return valueOf('<time: float>', 'Timestamp in seconds (e.g., 0.100000)', 'time');
+        return valueOf('<time: f32>', 'Timestamp in seconds (e.g., 0.100000)', 'time');
       }
 
       // 4️⃣ Verb detected → AnimMotion / AnimRotation
       const verb = parsed.eventName?.toLowerCase();
       if (verb === 'animmotion') {
         return verbSignature(
-          'animmotion <x: float> <y: float> <z: float>',
+          'animmotion <x: f32> <y: f32> <z: f32>',
           'Applies linear motion offset to the animation.',
           ['x', 'y', 'z'],
           parsed.args?.length ?? 0,
@@ -45,7 +46,7 @@ export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
 
       if (verb === 'animrotation') {
         return verbSignature(
-          'animrotation <angle: float>',
+          'animrotation <angle: f32>',
           'Applies a rotation (in degrees) to the animation.',
           ['angle'],
           parsed.args?.length ?? 0,
@@ -66,7 +67,7 @@ export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
     },
   };
 
-  monacoNS.languages.registerSignatureHelpProvider('hkanno', provider);
+  monacoNS.languages.registerSignatureHelpProvider(HKANNO_LANGUAGE_ID, provider);
   return provider;
 };
 

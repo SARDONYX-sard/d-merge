@@ -8,29 +8,28 @@ import { registerInlayHintsProvider } from './providers/inlay_hint';
 import { registerDocumentSemanticTokensProvider } from './providers/semantic_token';
 import { registerSignatureHelpProvider } from './providers/signature';
 
+export const HKANNO_LANGUAGE_ID = 'hkanno';
+
 export const supportHkanno: OnMount = (editor, monacoEnv) => {
-  if (monacoEnv.languages.getLanguages().some((l) => l.id === 'hkanno')) {
+  if (monacoEnv.languages.getLanguages().some((l) => l.id === HKANNO_LANGUAGE_ID)) {
     return;
   }
 
-  monacoEnv.languages.register({ id: 'hkanno' });
-  monacoEnv.languages.setLanguageConfiguration('hkanno', {
+  monacoEnv.languages.register({ id: HKANNO_LANGUAGE_ID });
+  monacoEnv.languages.setLanguageConfiguration(HKANNO_LANGUAGE_ID, {
     comments: {
       lineComment: '#',
     },
   });
 
-  updateHkannoDiagnostics(editor, monacoEnv);
-
   registerCompletionProvider(monacoEnv);
   registerDocumentFormattingEditProvider(monacoEnv);
-  registerDocumentSemanticTokensProvider(monacoEnv);
   registerHoverProvider(monacoEnv);
   registerInlayHintsProvider(monacoEnv);
   registerSignatureHelpProvider(editor, monacoEnv);
 
   // Monarch fallback tokenizer
-  monacoEnv.languages.setMonarchTokensProvider('hkanno', {
+  monacoEnv.languages.setMonarchTokensProvider(HKANNO_LANGUAGE_ID, {
     tokenizer: {
       root: [
         [/#.*/, 'comment'],
@@ -41,4 +40,8 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
       ],
     },
   });
+
+  registerDocumentSemanticTokensProvider(monacoEnv);
+
+  updateHkannoDiagnostics(editor, monacoEnv);
 };

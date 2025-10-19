@@ -1,8 +1,9 @@
 import * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 import { parseHkannoLine } from '../parser';
 
-export function registerCompletionProvider(monacoEnv: typeof monaco) {
-  monacoEnv.languages.registerCompletionItemProvider('hkanno', {
+export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
+  monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
     provideCompletionItems(model, position) {
       const lineContent = model.getLineContent(position.lineNumber);
       const parsed = parseHkannoLine(lineContent, position.lineNumber);
@@ -91,4 +92,4 @@ export function registerCompletionProvider(monacoEnv: typeof monaco) {
       return { suggestions };
     },
   });
-}
+};

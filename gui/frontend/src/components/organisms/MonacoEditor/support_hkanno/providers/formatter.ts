@@ -1,12 +1,13 @@
 import * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 
-export function registerDocumentFormattingEditProvider(monacoEnv: typeof monaco) {
-  monacoEnv.languages.registerDocumentFormattingEditProvider('hkanno', {
+export const registerDocumentFormattingEditProvider = (monacoEnv: typeof monaco) => {
+  monacoEnv.languages.registerDocumentFormattingEditProvider(HKANNO_LANGUAGE_ID, {
     provideDocumentFormattingEdits(model) {
       return [{ range: model.getFullModelRange(), text: formatHkannoText(model.getValue()) }];
     },
   });
-}
+};
 
 export const formatHkannoText = (text: string): string => {
   const lines = text.split('\n');

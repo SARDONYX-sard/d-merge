@@ -1,27 +1,27 @@
 import * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 import { type ParsedHkanno, parseHkannoLine } from '../parser';
 
-export function registerHoverProvider(monacoEnv: typeof monaco) {
-  monacoEnv.languages.registerHoverProvider('hkanno', {
+export const registerHoverProvider = (monacoEnv: typeof monaco) => {
+  monacoEnv.languages.registerHoverProvider(HKANNO_LANGUAGE_ID, {
     provideHover(model, position) {
       const lineContent = model.getLineContent(position.lineNumber);
       const parsed = parseHkannoLine(lineContent, position.lineNumber);
 
       if (parsed.type === 'none') return null;
 
-      // markdown化
       const markdown = buildHoverMarkdown(parsed);
       if (!markdown) return null;
 
       return { contents: [{ value: markdown }] };
     },
   });
-}
+};
 
 /**
  * Build markdown hover text from ParsedHkanno result
  */
-function buildHoverMarkdown(parsed: ParsedHkanno): string | null {
+const buildHoverMarkdown = (parsed: ParsedHkanno): string | null => {
   switch (parsed.type) {
     case 'meta':
       return `**${parsed.eventName}**: ${parsed.rawText}`;
@@ -40,4 +40,4 @@ function buildHoverMarkdown(parsed: ParsedHkanno): string | null {
     default:
       return null;
   }
-}
+};

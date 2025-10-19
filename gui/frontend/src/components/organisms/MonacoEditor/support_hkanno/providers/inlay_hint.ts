@@ -1,8 +1,9 @@
 import * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 import { parseHkannoLine } from '../parser';
 
-export function registerInlayHintsProvider(monacoEnv: typeof monaco) {
-  monacoEnv.languages.registerInlayHintsProvider('hkanno', {
+export const registerInlayHintsProvider = (monacoEnv: typeof monaco) => {
+  monacoEnv.languages.registerInlayHintsProvider(HKANNO_LANGUAGE_ID, {
     provideInlayHints(model, range, _token) {
       const hints: monaco.languages.InlayHint[] = [];
 
@@ -43,4 +44,4 @@ export function registerInlayHintsProvider(monacoEnv: typeof monaco) {
       return { hints, dispose: () => {} };
     },
   });
-}
+};
