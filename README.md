@@ -181,4 +181,6 @@ Please ensure that your usage and redistribution of this software complies with 
 
 ### Deps NOTES
 
-need "zod": "^3.25.67"
+- "zod": "^3.25.67"
+
+- Do not include react or react-dom in frontend dependencies. Next.js appears to include its own React implementation, and adding it manually will cause vitest's React to throw errors. [See](https://t.co/1Oi722pfbb)
