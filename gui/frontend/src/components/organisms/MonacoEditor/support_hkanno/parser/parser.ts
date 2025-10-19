@@ -1,13 +1,4 @@
-import {
-  CommentNode,
-  FieldNode,
-  HkAnnoNode as HkannoNode,
-  MotionNode,
-  Pos,
-  RotationNode,
-  SpaceNode,
-  TextNode,
-} from './nodes';
+import { CommentNode, FieldNode, HkannoNode, MotionNode, Pos, RotationNode, SpaceNode, TextNode } from './nodes';
 
 type ParserState = {
   line: string;

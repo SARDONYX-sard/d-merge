@@ -22,6 +22,12 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
     },
   });
 
+  editor.onDidChangeModelContent(() => {
+    if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+      updateHkannoDiagnostics(editor, monacoEnv);
+    }
+  });
+
   registerCompletionProvider(monacoEnv);
   registerDocumentFormattingEditProvider(monacoEnv);
   registerHoverProvider(monacoEnv);
@@ -42,6 +48,4 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
   });
 
   registerDocumentSemanticTokensProvider(monacoEnv);
-
-  updateHkannoDiagnostics(editor, monacoEnv);
 };

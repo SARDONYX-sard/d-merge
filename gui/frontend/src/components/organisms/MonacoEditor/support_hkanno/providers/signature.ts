@@ -10,7 +10,7 @@ import { parseHkannoLine } from '../parser';
  */
 export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
   const provider: monaco.languages.SignatureHelpProvider = {
-    signatureHelpTriggerCharacters: [' ', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    signatureHelpTriggerCharacters: [' ', '.', '0'],
 
     provideSignatureHelp(model, position) {
       const lineNumber = position.lineNumber;
