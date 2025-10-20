@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bitflags = "2.9.1"
+bitflags = "2.10.0"
 dashmap = { workspace = true }
 glob = { workspace = true }
 indexmap = { workspace = true }
