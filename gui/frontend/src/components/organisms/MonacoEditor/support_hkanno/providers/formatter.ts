@@ -1,7 +1,7 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import type { HkannoNode } from '../parser/nodes';
-import { parseHkannoLine } from '../parser/parser';
+import type { HkannoNode } from '../parser/strict/nodes';
+import { parseHkannoLine } from '../parser/strict/parser';
 
 /**
  * Registers a document formatting provider for HKANNO language in Monaco.
@@ -24,7 +24,7 @@ export const registerDocumentFormattingEditProvider = (monacoEnv: typeof monaco)
  * Format the entire HKANNO text by parsing each line into Nodes and reconstructing with preserved spacing.
  * @param text Raw HKANNO text
  */
-export const formatHkannoText = (text: string): string => {
+const formatHkannoText = (text: string): string => {
   const lines = text.split('\n');
   const formattedLines: string[] = [];
 
@@ -66,5 +66,13 @@ const formatNode = (node: HkannoNode): string => {
 
     case 'comment':
       return joinSpace1('#', node.comment?.value);
+
+    case 'payload_instruction':
+      const event = node.event?.value ?? '';
+      const dot = node.dot?.value ?? '';
+      const instr = node.instruction?.name?.value ?? '';
+      const params = node.instruction?.parameters?.items.map((item) => item.value?.value ?? '').join('|');
+
+      return [event, dot + instr, params].filter((v) => v !== '').join('');
   }
 };

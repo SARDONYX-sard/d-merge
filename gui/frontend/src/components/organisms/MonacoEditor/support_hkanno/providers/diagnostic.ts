@@ -1,6 +1,6 @@
 import type { OnMount } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
-import { type ParsedHkanno, parseHkannoLine } from '../parser';
+import { type ParsedHkanno, parseHkannoLine } from '../parser/simple';
 
 export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
   const model = editor.getModel();

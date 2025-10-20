@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { type ParsedHkanno, parseHkannoLine } from '../parser';
+import { type ParsedHkanno, parseHkannoLine } from '../parser/simple';
 
 export const registerHoverProvider = (monacoEnv: typeof monaco) => {
   monacoEnv.languages.registerHoverProvider(HKANNO_LANGUAGE_ID, {

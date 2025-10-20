@@ -1,92 +1,216 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { parseHkannoLine } from '../parser';
+import { providePieCompletions } from '../parser/payload_interpreter/completion';
+import { parseHkannoLine } from '../parser/strict/parser';
 
 export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
   monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
-    provideCompletionItems(model, position) {
-      const lineContent = model.getLineContent(position.lineNumber);
-      const parsed = parseHkannoLine(lineContent, position.lineNumber);
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: 1,
-        endColumn: lineContent.length + 1,
-      };
+    triggerCharacters: [' ', '.', '0', '@'],
+    provideCompletionItems(document, position) {
+      const lineContent = document.getLineContent(position.lineNumber);
+      const node = parseHkannoLine(lineContent, position.lineNumber);
 
       const suggestions: monaco.languages.CompletionItem[] = [];
 
-      if (parsed.type === 'meta' || lineContent.trim() === '') {
-        // Meta suggestions
-        suggestions.push(
-          {
-            label: '# numAnnotations:',
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: '# numAnnotations: 0',
-            range,
-          },
-          {
-            label: '<time>',
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: position.column,
+        endColumn: lineContent.length + 1,
+      };
+
+      // ---------------------------
+      // CommentNode
+      // ---------------------------
+      if (node.kind === 'comment') {
+        return {
+          suggestions: [
+            {
+              label: '# numAnnotations:',
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: '# numAnnotations: 0',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+# numAnnotations: <number>
+\`\`\`
+Declare the number of annotations in this document.`,
+                isTrusted: true,
+              },
+            },
+          ],
+        };
+      }
+
+      // ---------------------------
+      // MotionNode
+      // ---------------------------
+      if (node.kind === 'motion') {
+        ['x', 'y', 'z'].forEach((axis, i) => {
+          const arg = [node.x, node.y, node.z][i];
+          if (!arg?.value) {
+            suggestions.push({
+              label: axis,
+              kind: monaco.languages.CompletionItemKind.Value,
+              insertText: '0.0',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+<time: f32> animmotion <x: f32> <y: f32> <z: f32>
+\`\`\`
+Set the ${axis.toUpperCase()} coordinate for the animmotion event.`,
+                isTrusted: true,
+              },
+            });
+          }
+        });
+
+        return { suggestions };
+      }
+
+      // ---------------------------
+      // RotationNode
+      // ---------------------------
+      if (node.kind === 'rotation') {
+        if (!node.degrees?.value) {
+          suggestions.push({
+            label: 'degrees',
             kind: monaco.languages.CompletionItemKind.Value,
             insertText: '0.0',
             range,
-          },
-        );
-      } else if (parsed.type === 'motion' || parsed.type === 'rotation' || parsed.type === 'text') {
-        const cursorCol = position.column;
+            documentation: {
+              value: `\`\`\`hkanno
+<time: f32> animrotation <degrees: f32>
+\`\`\`
+Insert an animrotation event with a rotation in degrees.`,
+              isTrusted: true,
+            },
+          });
+        }
+        return { suggestions };
+      }
 
-        // After time → suggest verb if empty
-        if (
-          !parsed.eventName ||
-          cursorCol > (parsed.tokenPositions?.time.startColumn ?? 0) + (parsed.tokenPositions?.time.length ?? 0)
-        ) {
+      // ---------------------------
+      // TextNode (fallback)
+      // ---------------------------
+      if (node.kind === 'text') {
+        const hasTime = node.time;
+
+        if (!hasTime) {
           suggestions.push(
+            {
+              label: '<time>',
+              kind: monaco.languages.CompletionItemKind.Value,
+              insertText: '0.0',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+<time: f32>
+\`\`\`
+The timestamp at which this annotation occurs.`,
+                isTrusted: true,
+              },
+            },
+            {
+              label: '# numAnnotations:',
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: '# numAnnotations: 0',
+              sortText: '<x',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+# numAnnotations: <number>
+\`\`\`
+Declare the number of annotations in this document.`,
+                isTrusted: true,
+              },
+            },
+          );
+        }
+
+        if (hasTime) {
+          suggestions.push(
+            {
+              label: '<eventName>',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: '${1:eventName}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+\${1:eventName}
+\`\`\`
+Annotation text event name(e.g. \`weaponSwing\`).`,
+                isTrusted: true,
+              },
+            },
+            {
+              label: 'SoundPlay',
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: 'SoundPlay.',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+SoundPlay.<event>
+\`\`\`
+Play a sound effect on the actor
+`,
+                isTrusted: true,
+              },
+            },
             {
               label: 'animmotion',
               kind: monaco.languages.CompletionItemKind.Function,
               insertText: 'animmotion',
               range,
+              documentation: {
+                value: `\`\`\`hkanno
+animmotion <x: f32> <y: f32> <z: f32>
+\`\`\`
+Insert an animmotion event with X, Y, Z coordinates.
+(Need \`AMR\` Mod)
+`,
+                isTrusted: true,
+              },
             },
             {
               label: 'animrotation',
               kind: monaco.languages.CompletionItemKind.Function,
               insertText: 'animrotation',
               range,
+              documentation: {
+                value: `\`\`\`hkanno
+animrotation <degrees: f32>
+\`\`\`
+Insert an animrotation event with a rotation in degrees.
+(Need \`AMR\` Mod)
+`,
+                isTrusted: true,
+              },
+            },
+            {
+              label: 'PIE',
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: 'PIE.',
+              range,
+              documentation: {
+                value: `\`\`\`hkanno
+<time: f32> PIE.@<inst>|...
+\`\`\`
+Dummy event that hosts payload instructions, does nothing by itself
+(Need \`PayloadInterpreter\` Mod)
+`,
+                isTrusted: true,
+              },
             },
           );
         }
 
-        // After verb → suggest args for motion/rotation
-        if (parsed.eventName?.toLowerCase() === 'animmotion') {
-          const argsCount = parsed.args?.length ?? 0;
-          if (argsCount < 3) {
-            suggestions.push({
-              label: ['x', 'y', 'z'][argsCount],
-              kind: monaco.languages.CompletionItemKind.Value,
-              insertText: '0.0',
-              range,
-            });
-          }
-        } else if (parsed.eventName?.toLowerCase() === 'animrotation') {
-          if (!parsed.args?.[0]) {
-            suggestions.push({
-              label: 'degrees',
-              kind: monaco.languages.CompletionItemKind.Value,
-              insertText: '0.0',
-              range,
-            });
-          }
-        }
+        return { suggestions };
+      }
 
-        // After verb/args → suggest <text>
-        if (parsed.type === 'text') {
-          suggestions.push({
-            label: '<text>',
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: 'Annotation text',
-            range,
-          });
-        }
+      if (node.kind === 'payload_instruction') {
+        suggestions.push(...providePieCompletions(node, range));
       }
 
       return { suggestions };

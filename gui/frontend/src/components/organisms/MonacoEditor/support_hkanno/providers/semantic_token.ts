@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { ParsedHkanno, parseHkannoLine, TokenPos } from '../parser';
+import { ParsedHkanno, parseHkannoLine, TokenPos } from '../parser/simple';
 
 export const registerDocumentSemanticTokensProvider = (monacoEnv: typeof monaco) => {
   const tokenTypes = ['number', 'keyword', 'variable', 'comment', 'invalid'];

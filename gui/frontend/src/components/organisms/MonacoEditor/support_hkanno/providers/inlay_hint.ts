@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { parseHkannoLine } from '../parser';
+import { parseHkannoLine } from '../parser/simple';
 
 export const registerInlayHintsProvider = (monacoEnv: typeof monaco) => {
   monacoEnv.languages.registerInlayHintsProvider(HKANNO_LANGUAGE_ID, {

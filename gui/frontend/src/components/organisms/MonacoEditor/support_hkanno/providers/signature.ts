@@ -1,7 +1,7 @@
 import { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { parseHkannoLine } from '../parser';
+import { parseHkannoLine } from '../parser/simple';
 
 /**
  * Registers hkanno signature help provider
