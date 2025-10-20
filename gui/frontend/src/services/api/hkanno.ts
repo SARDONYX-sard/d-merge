@@ -58,6 +58,23 @@ export async function saveHkanno(input: string, output: string, format: OutForma
   }
 }
 
+/**
+ * Previews a .hkx or .xml file after updating it with an Hkanno structure.
+ *
+ * @param path Path to the .hkx or .xml file.
+ * @param hkanno Hkanno structure to apply updates.
+ * @returns The updated file content as a string (XML).
+ * @throws If failed to read file or update hkanno.
+ */
+export async function previewHkanno(path: string, hkanno: Hkanno): Promise<string> {
+  try {
+    const result = await invoke<string>('preview_hkanno', { input: path, hkanno });
+    return result;
+  } catch (e) {
+    throw e;
+  }
+}
+
 /** Parse hkanno text into AnnotationTrack[] only */
 export function hkannoFromText(text: string): AnnotationTrack[] {
   const lines = text.split('\n');

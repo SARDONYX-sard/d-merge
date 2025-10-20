@@ -1,10 +1,11 @@
 import { Box, Button, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { Allotment } from 'allotment';
-import React from 'react';
+import React, { useState } from 'react';
+import { useMonacoSyncJump } from './useMonacoSyncJump';
 import 'allotment/dist/style.css';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
-import { Hkanno } from '@/services/api/hkanno';
+import { Hkanno, previewHkanno } from '@/services/api/hkanno';
 import { OutFormat } from '@/services/api/serde_hkx';
 import { hkannoFromFileTab } from '.';
 
@@ -125,6 +126,27 @@ function SplitEditors({
   showPreview: boolean;
   onTextChange: (v: string) => void;
 }) {
+  const [previewXml, setPreviewXml] = useState('');
+  const [hasError, setHasError] = useState(false);
+  const { registerLeft, registerRight, updateBaseLine } = useMonacoSyncJump();
+
+  React.useEffect(() => {
+    if (showPreview) {
+      (async () => {
+        if (!tab) return;
+        try {
+          const parsed = hkannoFromFileTab(tab);
+          const xml = await previewHkanno(tab.inputPath, parsed);
+          setPreviewXml(xml);
+          setHasError(false);
+          updateBaseLine(xml);
+        } catch (_err) {
+          setHasError(true);
+        }
+      })();
+    }
+  }, [showPreview, tab]);
+
   return (
     <Allotment>
       {/* Left: Annotation editor */}
@@ -134,12 +156,13 @@ function SplitEditors({
             Annotation
           </Typography>
           <MonacoEditor
-            height='calc(100% - 24px)'
+            height='calc(87% - 24px)'
             defaultLanguage='hkanno' // NOTE: Comments starting with `#` are being used as pseudo-comments.
             value={tab.text}
             onChange={(val) => val && onTextChange(val)}
             options={{ minimap: { enabled: true }, rulers: [120], fontSize: 13 }}
             vimMode={isVimMode}
+            onMount={registerLeft}
           />
         </Box>
       </Allotment.Pane>
@@ -148,20 +171,28 @@ function SplitEditors({
       {showPreview && (
         <Allotment.Pane minSize={200} preferredSize={480}>
           <Box sx={{ height: '100%' }}>
-            <Typography variant='subtitle2' sx={{ px: 2, pt: 1, color: '#aaa' }}>
-              Preview
+            <Typography
+              variant='subtitle2'
+              sx={{
+                px: 2,
+                pt: 1,
+                color: hasError ? '#ff5555' : '#aaa',
+              }}
+            >
+              {hasError ? 'Preview (Error occurred)' : 'Preview'}
             </Typography>
             <MonacoEditor
               key='preview-editor'
-              height='calc(100% - 24px)'
-              defaultLanguage='json'
-              value={JSON.stringify(hkannoFromFileTab(tab), null, 2)}
+              height='calc(87% - 24px)'
+              defaultLanguage='xml'
+              value={previewXml}
               options={{
                 readOnly: true,
                 minimap: { enabled: false },
                 fontSize: 13,
               }}
               vimMode={isVimMode}
+              onMount={registerRight}
             />
           </Box>
         </Allotment.Pane>
