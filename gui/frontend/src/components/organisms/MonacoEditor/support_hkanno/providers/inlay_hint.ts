@@ -33,7 +33,8 @@ export const registerInlayHintsProvider = (monacoEnv: typeof monaco) => {
 
         // args
         if (parsed.args && parsed.tokenPositions?.argPositions) {
-          const labels = parsed.type === 'motion' ? ['x', 'y', 'z'] : ['arg0', 'arg1', 'arg2'];
+          const labels =
+            parsed.type === 'motion' ? (['x', 'y', 'z'] as const) : (['degree', 'invalid', 'invalid'] as const);
           parsed.args.forEach((_, i) => {
             const pos = parsed.tokenPositions!.argPositions![i];
             if (pos) addHint(`${labels[i] ?? `arg${i}`}: `, pos);

@@ -1,54 +1,96 @@
 import type { OnMount } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
-import { type ParsedHkanno, parseHkannoLine } from '../parser/simple';
+import type * as monaco from 'monaco-editor';
+import { PIE_INSTRUCTIONS } from '../parser/payload_interpreter/completion';
+import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
+import { parseHkannoLineExt } from '../parser/strict/parser';
 
 export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
   const model = editor.getModel();
-  if (!model) {
-    return;
-  }
+  if (!model) return;
 
   const markers: monaco.editor.IMarkerData[] = [];
   const lines = model.getLinesContent();
 
   for (let lineNumber = 1; lineNumber <= lines.length; lineNumber++) {
     const line = lines[lineNumber - 1];
-    const parsed: ParsedHkanno = parseHkannoLine(line, lineNumber);
+    const node = parseHkannoLineExt(line, lineNumber);
 
-    if (parsed.errors && parsed.errors.length) {
-      for (const err of parsed.errors) {
+    // --- motion ---
+    if (node.kind === 'motion') {
+      (['x', 'y', 'z'] as const).forEach((axis) => {
+        if (node[axis]?.value === undefined) {
+          const f = node[axis as keyof typeof node] as any;
+          const startCol = f?.pos?.startColumn ?? 1;
+          const endCol = f?.pos?.endColumn ?? line.length + 1;
+          markers.push({
+            severity: monacoEnv.MarkerSeverity.Error,
+            message: `Missing ${axis} value in animmotion.`,
+            startLineNumber: lineNumber,
+            endLineNumber: lineNumber,
+            startColumn: startCol,
+            endColumn: endCol,
+          });
+        }
+      });
+    }
+
+    // --- rotation ---
+    if (node.kind === 'rotation') {
+      if (node.degrees?.value === undefined) {
+        const startCol = node.degrees?.pos?.startColumn ?? 1;
+        const endCol = node.degrees?.pos?.endColumn ?? line.length + 1;
         markers.push({
-          severity: monaco.MarkerSeverity.Error,
-          message: err,
+          severity: monacoEnv.MarkerSeverity.Error,
+          message: `Missing degrees value in animrotation.`,
           startLineNumber: lineNumber,
           endLineNumber: lineNumber,
-          startColumn: 1,
-          endColumn: line.length + 1,
+          startColumn: startCol,
+          endColumn: endCol,
         });
       }
     }
 
-    // Additional structural checks
-    if (parsed.type === 'motion' && parsed.args?.length !== 3) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: `animmotion requires exactly 3 numeric arguments (x, y, z). Found ${parsed.args?.length ?? 0}.`,
-        startLineNumber: lineNumber,
-        endLineNumber: lineNumber,
-        startColumn: 1,
-        endColumn: line.length + 1,
-      });
+    // --- payload instruction (PIE) ---
+    if (node.kind === 'payload_instruction') {
+      const pieNode = node as PayloadInstructionNode;
+      const name = pieNode.instruction?.name?.value?.toUpperCase();
+      if (name) {
+        const def = PIE_INSTRUCTIONS.find((i) => i.name.toUpperCase() === name);
+        if (def) {
+          const provided = pieNode.instruction?.parameters?.items.filter((item) => item.value).length ?? 0;
+          const expected = (def.snippet.match(/\$\{[0-9]+:/g) ?? []).length;
+          if (provided < expected) {
+            const startCol = pieNode.instruction?.atSymbol?.pos?.startColumn ?? 1;
+            const endCol =
+              pieNode.instruction?.parameters?.pos?.endColumn ??
+              pieNode.instruction?.name?.pos?.endColumn ??
+              line.length + 1;
+            markers.push({
+              severity: monacoEnv.MarkerSeverity.Error,
+              message: `PIE instruction '${name}' expects ${expected} parameters, but ${provided} provided.`,
+              startLineNumber: lineNumber,
+              endLineNumber: lineNumber,
+              startColumn: startCol,
+              endColumn: endCol,
+            });
+          }
+        }
+      }
     }
 
-    if (parsed.type === 'rotation' && parsed.args?.length !== 1) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: `animrotation requires exactly 1 numeric degree argument.`,
-        startLineNumber: lineNumber,
-        endLineNumber: lineNumber,
-        startColumn: 1,
-        endColumn: line.length + 1,
-      });
+    if (node.kind === 'text') {
+      if (node.time && !node.text?.value) {
+        const startCol = node.space1TimeToText?.pos?.startColumn ?? node.time?.pos?.endColumn ?? 1;
+        const endCol = node.space0AfterText?.pos?.endColumn ?? line.length + 1;
+        markers.push({
+          severity: monacoEnv.MarkerSeverity.Error,
+          message: `Text annotation is missing.`,
+          startLineNumber: lineNumber,
+          endLineNumber: lineNumber,
+          startColumn: startCol,
+          endColumn: endCol,
+        });
+      }
     }
   }
 

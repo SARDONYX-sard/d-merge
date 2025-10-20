@@ -38,7 +38,7 @@ Cast a spell on the actor. Spell may stay on actor.`,
   {
     name: 'APPLYSPELL',
     documentation: `\`\`\`hkanno
-PIE.APPLYSPELL|<spellID>|<esp>
+PIE.@APPLYSPELL|<spellID>|<esp>
 \`\`\`
 Apply a spell instantly.`,
     snippet: 'APPLYSPELL|${1:spellID}|${2:esp}',
@@ -75,17 +75,7 @@ export const providePieCompletions = (
 ): monaco.languages.CompletionItem[] => {
   if (node.event?.value?.toLocaleLowerCase() !== 'pie') return [];
   if (node.dot?.value !== '.') return [];
-  if (node.instruction?.atSymbol?.value !== '@') {
-    return [
-      {
-        label: '@',
-        kind: monaco.languages.CompletionItemKind.Field,
-        insertText: '@',
-        range,
-        documentation: { value: '`@`\nstart a PIE instruction', isTrusted: true },
-      },
-    ];
-  }
+  if (node.instruction?.atSymbol === undefined) return [];
 
   return PIE_INSTRUCTIONS.map((ins) => {
     return {
