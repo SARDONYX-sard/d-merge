@@ -1,13 +1,9 @@
 import { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { parseHkannoLine } from '../parser/simple';
+import { providePieSignatureHelp } from '../parser/payload_interpreter/signature';
+import { parseHkannoLineExt } from '../parser/strict/parser';
 
-/**
- * Registers hkanno signature help provider
- * @param editor Monaco editor instance
- * @param monaco Monaco namespace
- */
 export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
   const provider: monaco.languages.SignatureHelpProvider = {
     signatureHelpTriggerCharacters: [' ', '.', '0'],
@@ -17,53 +13,58 @@ export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
       const lineContent = model.getLineContent(lineNumber);
       const beforeCursor = lineContent.slice(0, position.column - 1);
 
-      const parsed = parseHkannoLine(beforeCursor, lineNumber);
+      const node = parseHkannoLineExt(beforeCursor, lineNumber);
 
-      // Meta line (#) → # numAnnotations / # numOriginalFrames
-      if (parsed.type === 'meta') {
-        return valueOf(
-          '# numAnnotations: <usize>',
-          'Push hkaSplineCompressedAnimation.annotationTracks. (e.g., # numAnnotations: 3)',
-          'numAnnotations',
-        );
+      // PIE instructions
+      if (node.kind === 'payload_instruction') {
+        return providePieSignatureHelp(node);
       }
 
-      // 2️⃣ Time is present → <time: float>
-      if (!parsed.timeComplete) {
-        return valueOf('<time: f32>', 'Timestamp in seconds (e.g., 0.100000)', 'time');
-      }
+      // Motion event
+      if (node.kind === 'motion') {
+        const activeParameter: 0 | 1 | 2 = (() => {
+          if (!node.x?.pos) return 0;
+          const cursorCol = position.column;
 
-      // 4️⃣ Verb detected → AnimMotion / AnimRotation
-      const verb = parsed.eventName?.toLowerCase();
-      if (verb === 'animmotion') {
-        return verbSignature(
+          if (node.x.pos.endColumn >= cursorCol) return 0;
+          if (node.y?.pos === undefined || node.y.pos.endColumn >= cursorCol) return 1;
+          if (node.z?.pos === undefined || node.z.pos.endColumn >= cursorCol) return 2;
+          return 2;
+        })();
+
+        return fnSignature(
           'animmotion <x: f32> <y: f32> <z: f32>',
           'Applies linear motion offset to the animation.',
           ['x', 'y', 'z'],
-          parsed.args?.length ?? 0,
+          activeParameter,
         );
       }
 
-      if (verb === 'animrotation') {
-        return verbSignature(
+      // Rotation event
+      if (node.kind === 'rotation') {
+        const argsProvided = node.degrees?.value !== undefined ? 1 : 0;
+        return fnSignature(
           'animrotation <angle: f32>',
           'Applies a rotation (in degrees) to the animation.',
           ['angle'],
-          parsed.args?.length ?? 0,
+          argsProvided,
         );
       }
 
-      // Text after time (free text, not verb) → <text: string>
-      if (parsed.timeComplete) {
-        return valueOf(
-          '<text: string>',
-          'Annotation label or event name (e.g., `MCO_DodgeOpen`, `animmotion`, `animrotation`)',
-          'text',
-        );
-      }
+      // Fallback Text line
+      if (node.kind === 'text') {
+        if (!node.time || !node.space1TimeToText) {
+          return valueOf('<time: f32>', 'Timestamp in seconds (e.g., 0.100000)', 'time');
+        }
 
-      // Fallback → nothing
-      return None();
+        if (node.space1TimeToText) {
+          return valueOf(
+            '<text: string>',
+            'Annotation label or event name (e.g., `MCO_DodgeOpen`, `animmotion`, `animrotation`)',
+            'text',
+          );
+        }
+      }
     },
   };
 
@@ -81,7 +82,7 @@ const valueOf = (label: string, doc: string, paramLabel: string): monaco.languag
   dispose() {},
 });
 
-const verbSignature = (
+const fnSignature = (
   label: string,
   doc: string,
   params: string[],
@@ -94,10 +95,5 @@ const verbSignature = (
     activeSignature: 0,
     activeParameter: Math.max(0, Math.min(activeParam, params.length - 1)),
   },
-  dispose() {},
-});
-
-const None = (): monaco.languages.SignatureHelpResult => ({
-  value: { signatures: [], activeSignature: 0, activeParameter: 0 },
   dispose() {},
 });

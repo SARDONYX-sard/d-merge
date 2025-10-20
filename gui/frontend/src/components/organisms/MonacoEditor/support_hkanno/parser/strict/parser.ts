@@ -1,5 +1,15 @@
 import { parsePayloadInstructionLine } from '../payload_interpreter/parser';
-import { CommentNode, FieldNode, HkannoNode, MotionNode, Pos, RotationNode, SpaceNode, TextNode } from './nodes';
+import {
+  CommentNode,
+  FieldNode,
+  HkannoNode,
+  HkannoNodeExt,
+  MotionNode,
+  Pos,
+  RotationNode,
+  SpaceNode,
+  TextNode,
+} from './nodes';
 
 export type ParserState = {
   line: string;
@@ -162,8 +172,40 @@ export function parseAnimRotationLine(line: string, lineNumber = 1): RotationNod
 }
 
 /**
- * Parse a single hkanno line and return the appropriate Node.
+ * Parse a single hkanno line and return the appropriate Node.(With PIE.)
  * Delegates to specialized parsers based on the content.
+ *
+ * @param line A single line of hkanno text
+ * @param lineNumber The line number (1-based)
+ */
+export const parseHkannoLineExt = (line: string, lineNumber = 1): HkannoNodeExt => {
+  const trimmed = line.trimStart();
+  const lowerTrimmed = trimmed.toLowerCase();
+
+  // Comment line starts with #
+  if (trimmed.startsWith('#')) {
+    return parseCommentLine(line, lineNumber);
+  }
+  if (lowerTrimmed.includes('pie')) {
+    return parsePayloadInstructionLine(line, lineNumber);
+  }
+
+  // animrotation line
+  if (lowerTrimmed.includes('animrotation')) {
+    return parseAnimRotationLine(line, lineNumber);
+  }
+
+  // animmotion line
+  if (lowerTrimmed.includes('animmotion')) {
+    return parseAnimMotionLine(line, lineNumber);
+  }
+
+  // Fallback: treat as text line
+  return parseTextLine(line, lineNumber);
+};
+
+/**
+ * PParser with lenient parsing for formatter applications.
  *
  * @param line A single line of hkanno text
  * @param lineNumber The line number (1-based)
@@ -176,9 +218,6 @@ export const parseHkannoLine = (line: string, lineNumber = 1): HkannoNode => {
   // Comment line starts with #
   if (trimmed.startsWith('#')) {
     return parseCommentLine(line, lineNumber);
-  }
-  if (lowerTrimmed.includes('pie')) {
-    return parsePayloadInstructionLine(line, lineNumber);
   }
 
   // animrotation line

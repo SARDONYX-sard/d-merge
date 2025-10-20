@@ -1,14 +1,14 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
 import { providePieCompletions } from '../parser/payload_interpreter/completion';
-import { parseHkannoLine } from '../parser/strict/parser';
+import { parseHkannoLineExt } from '../parser/strict/parser';
 
 export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
   monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
-    triggerCharacters: [' ', '.', '0', '@'],
+    triggerCharacters: ['@'],
     provideCompletionItems(document, position) {
       const lineContent = document.getLineContent(position.lineNumber);
-      const node = parseHkannoLine(lineContent, position.lineNumber);
+      const node = parseHkannoLineExt(lineContent, position.lineNumber);
 
       const suggestions: monaco.languages.CompletionItem[] = [];
 
@@ -23,23 +23,7 @@ export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
       // CommentNode
       // ---------------------------
       if (node.kind === 'comment') {
-        return {
-          suggestions: [
-            {
-              label: '# numAnnotations:',
-              kind: monaco.languages.CompletionItemKind.Keyword,
-              insertText: '# numAnnotations: 0',
-              range,
-              documentation: {
-                value: `\`\`\`hkanno
-# numAnnotations: <number>
-\`\`\`
-Declare the number of annotations in this document.`,
-                isTrusted: true,
-              },
-            },
-          ],
-        };
+        return { suggestions: [new_comment_snippet(range)] };
       }
 
       // ---------------------------
@@ -111,20 +95,7 @@ The timestamp at which this annotation occurs.`,
                 isTrusted: true,
               },
             },
-            {
-              label: '# numAnnotations:',
-              kind: monaco.languages.CompletionItemKind.Keyword,
-              insertText: '# numAnnotations: 0',
-              sortText: '<x',
-              range,
-              documentation: {
-                value: `\`\`\`hkanno
-# numAnnotations: <number>
-\`\`\`
-Declare the number of annotations in this document.`,
-                isTrusted: true,
-              },
-            },
+            new_comment_snippet(range),
           );
         }
 
@@ -147,7 +118,8 @@ Annotation text event name(e.g. \`weaponSwing\`).`,
             {
               label: 'SoundPlay',
               kind: monaco.languages.CompletionItemKind.Function,
-              insertText: 'SoundPlay.',
+              insertText: 'SoundPlay.${1:event}',
+              insertTextRules: monacoEnv.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
               documentation: {
                 value: `\`\`\`hkanno
@@ -161,7 +133,8 @@ Play a sound effect on the actor
             {
               label: 'animmotion',
               kind: monaco.languages.CompletionItemKind.Function,
-              insertText: 'animmotion',
+              insertText: 'animmotion ${1:0.0} ${2:0.0} ${3:0.0}',
+              insertTextRules: monacoEnv.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
               documentation: {
                 value: `\`\`\`hkanno
@@ -176,7 +149,8 @@ Insert an animmotion event with X, Y, Z coordinates.
             {
               label: 'animrotation',
               kind: monaco.languages.CompletionItemKind.Function,
-              insertText: 'animrotation',
+              insertText: 'animrotation ${1:0}',
+              insertTextRules: monacoEnv.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
               documentation: {
                 value: `\`\`\`hkanno
@@ -217,3 +191,18 @@ Dummy event that hosts payload instructions, does nothing by itself
     },
   });
 };
+
+const new_comment_snippet = (range: monaco.IRange) => ({
+  label: '# numAnnotations:',
+  kind: monaco.languages.CompletionItemKind.Keyword,
+  insertText: '# numAnnotations: ${1:usize}',
+  insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+  range,
+  documentation: {
+    value: `\`\`\`hkanno
+# numAnnotations: <number>
+\`\`\`
+Declare the number of annotations in this document.`,
+    isTrusted: true,
+  },
+});

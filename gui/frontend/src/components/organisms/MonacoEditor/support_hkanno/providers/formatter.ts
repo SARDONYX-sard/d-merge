@@ -66,13 +66,5 @@ const formatNode = (node: HkannoNode): string => {
 
     case 'comment':
       return joinSpace1('#', node.comment?.value);
-
-    case 'payload_instruction':
-      const event = node.event?.value ?? '';
-      const dot = node.dot?.value ?? '';
-      const instr = node.instruction?.name?.value ?? '';
-      const params = node.instruction?.parameters?.items.map((item) => item.value?.value ?? '').join('|');
-
-      return [event, dot + instr, params].filter((v) => v !== '').join('');
   }
 };

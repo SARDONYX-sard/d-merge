@@ -91,7 +91,7 @@ export const providePieCompletions = (
     return {
       label: ins.name,
       kind: monaco.languages.CompletionItemKind.Function,
-      insertText: '@' + ins.snippet,
+      insertText: ins.snippet,
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       range,
       documentation: { value: ins.documentation, isTrusted: true },
