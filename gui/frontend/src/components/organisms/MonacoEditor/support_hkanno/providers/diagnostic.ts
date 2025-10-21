@@ -19,9 +19,9 @@ export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
     if (node.kind === 'motion') {
       (['x', 'y', 'z'] as const).forEach((axis) => {
         if (node[axis]?.value === undefined) {
-          const f = node[axis as keyof typeof node] as any;
-          const startCol = f?.pos?.startColumn ?? 1;
-          const endCol = f?.pos?.endColumn ?? line.length + 1;
+          const pos = node[axis]?.pos;
+          const startCol = pos?.startColumn ?? 1;
+          const endCol = pos?.endColumn ?? line.length + 1;
           markers.push({
             severity: monacoEnv.MarkerSeverity.Error,
             message: `Missing ${axis} value in animmotion.`,

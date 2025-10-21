@@ -2,23 +2,26 @@
 
 import { Box, Button } from '@mui/material';
 import React, { useCallback, useState } from 'react';
+import z from 'zod';
+import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
+import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { openPath } from '@/services/api/dialog';
-import { Hkanno, hkannoFromText, loadHkanno, NULL_STR, saveHkanno } from '@/services/api/hkanno';
-import { OutFormat } from '@/services/api/serde_hkx';
+import { type Hkanno, hkannoFromText, loadHkanno, NULL_STR, saveHkanno } from '@/services/api/hkanno';
+import type { OutFormat } from '@/services/api/serde_hkx';
 import { ClosableTabs } from './ClosableTabs';
-import { FileTab, HkannoTabEditor } from './HkannoTabEditor';
+import { FileTab, FileTabSchema, HkannoTabEditor } from './HkannoTabEditor';
 import { useTauriDragDrop } from './useDrag';
 
-function inferFormatFromPath(path: string): OutFormat {
+const inferFormatFromPath = (path: string): OutFormat => {
   const p = path.toLowerCase();
   if (p.endsWith('.xml')) return 'xml';
   // heuristic: use hkx => amd64 by default (user can change)
   if (p.endsWith('.hkx')) return 'amd64';
   return 'xml';
-}
+};
 
-function inferOutputPath(input: string): string {
+const inferOutputPath = (input: string): string => {
   // default: input.basename + ".modified" + ext
   try {
     const idx = input.lastIndexOf('.');
@@ -29,10 +32,30 @@ function inferOutputPath(input: string): string {
   } catch {
     return input + '.modified';
   }
-}
+};
+
+const changeExtension = (outputPath: string, format: OutFormat): string => {
+  const lastDotIndex = outputPath.lastIndexOf('.');
+  if (lastDotIndex === -1) {
+    return outputPath;
+  }
+  const basePath = outputPath.slice(0, lastDotIndex);
+
+  switch (format) {
+    case 'amd64':
+    case 'win32':
+      return basePath + '.hkx';
+    case 'xml':
+      return basePath + '.xml';
+    case 'json':
+      return basePath + '.json';
+    default:
+      return outputPath;
+  }
+};
 
 export const HkannoEditorPage: React.FC = () => {
-  const [tabs, setTabs] = useState<FileTab[]>([]);
+  const [tabs, setTabs] = useStorageState(PRIVATE_CACHE_OBJ.hkannoFileTabs, z.array(FileTabSchema).catch([]));
   const [active, setActive] = useState(0);
 
   // common process: Open file, create tab
@@ -145,7 +168,13 @@ export const HkannoEditorPage: React.FC = () => {
           onOutputChange={(val) =>
             setTabs((prev) => prev.map((t, i) => (i === active ? { ...t, outputPath: val } : t)))
           }
-          onFormatChange={(val) => setTabs((prev) => prev.map((t, i) => (i === active ? { ...t, format: val } : t)))}
+          onFormatChange={(format) =>
+            setTabs((prev) =>
+              prev.map((t, i) =>
+                i === active ? { ...t, format, outputPath: changeExtension(t.outputPath, format) } : t,
+              ),
+            )
+          }
           onSave={() => saveCurrent(active)}
           onRevert={() => {
             const t = tabs[active];

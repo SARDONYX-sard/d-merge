@@ -39,6 +39,12 @@ const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const HKANNO_PRIVATE_CACHE_KEYS_OBJ = {
+  hkannoFileTabs: 'hkanno-file-tabs',
+} as const;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const SETTINGS_PUB_CACHE_KEYS_OBJ = {
   customCss: 'custom-css',
   customJs: 'custom-js',
@@ -79,6 +85,7 @@ export const PUB_CACHE_OBJ = {
 export const PRIVATE_CACHE_OBJ = {
   ...CONVERT_PRIVATE_CACHE_KEYS_OBJ,
   ...PATCH_PRIVATE_CACHE_KEYS_OBJ,
+  ...HKANNO_PRIVATE_CACHE_KEYS_OBJ,
   ...SETTINGS_PRIVATE_CACHE_KEYS_OBJ,
 } as const;
 

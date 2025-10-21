@@ -89,7 +89,7 @@ Payload instruction.
 
 # Format
 \`\`\`hkanno
-PIE.@CASTSPELL|<params>
+PIE.@<instruction>|<param1>|<param2>|...
 \`\`\``;
       }
 

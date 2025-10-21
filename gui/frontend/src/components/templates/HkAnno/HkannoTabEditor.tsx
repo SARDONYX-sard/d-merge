@@ -3,35 +3,36 @@ import { Allotment } from 'allotment';
 import React, { useState } from 'react';
 import { useMonacoSyncJump } from './useMonacoSyncJump';
 import 'allotment/dist/style.css';
+import z from 'zod';
+import { outFormatSchema } from '@/components/organisms/ConvertForm/schemas/out_format';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
-import { Hkanno, previewHkanno } from '@/services/api/hkanno';
+import { HkannoSchema, previewHkanno } from '@/services/api/hkanno';
 import { OutFormat } from '@/services/api/serde_hkx';
 import { hkannoFromFileTab } from '.';
 
-export type FileTab = {
-  id: string;
-  inputPath: string;
-  outputPath: string;
-  format: OutFormat;
-
+export const FileTabSchema = z.object({
+  id: z.string(),
+  inputPath: z.string(),
+  outputPath: z.string(),
+  format: outFormatSchema,
   /** XML index e.g. `#0003`  */
-  ptr: string;
-  num_original_frames: number;
-  duration: number;
+  ptr: z.string(),
+  num_original_frames: z.number(),
+  duration: z.number(),
   /** Hkanno.AnnotationTrack[] */
-  text: string;
+  text: z.string(), // or z.array(...) if meant to be structured
   /** file first loaded original hkanno(use on revert). readonly */
-  hkanno: Readonly<Hkanno>;
-
-  dirty?: boolean;
-};
+  hkanno: HkannoSchema.readonly(),
+  dirty: z.boolean().optional(),
+});
+export type FileTab = z.infer<typeof FileTabSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*                               Sub Components                               */
 /* -------------------------------------------------------------------------- */
 
-function HeaderToolbar({
+const HeaderToolbar = ({
   onSave,
   onRevert,
   showPreview,
@@ -41,7 +42,7 @@ function HeaderToolbar({
   onRevert: () => void;
   showPreview: boolean;
   setShowPreview: (v: boolean) => void;
-}) {
+}) => {
   return (
     <Box
       sx={{
@@ -66,9 +67,9 @@ function HeaderToolbar({
       </Button>
     </Box>
   );
-}
+};
 
-function FileSettingsBar({
+const FileSettingsBar = ({
   outputPath,
   format,
   onOutputChange,
@@ -78,7 +79,7 @@ function FileSettingsBar({
   format: OutFormat;
   onOutputChange: (v: string) => void;
   onFormatChange: (v: OutFormat) => void;
-}) {
+}) => {
   return (
     <Box
       sx={{
@@ -113,9 +114,9 @@ function FileSettingsBar({
       </FormControl>
     </Box>
   );
-}
+};
 
-function SplitEditors({
+const SplitEditors = ({
   tab,
   isVimMode,
   showPreview,
@@ -125,7 +126,7 @@ function SplitEditors({
   isVimMode: boolean;
   showPreview: boolean;
   onTextChange: (v: string) => void;
-}) {
+}) => {
   const [previewXml, setPreviewXml] = useState('');
   const [hasError, setHasError] = useState(false);
   const { registerLeft, registerRight, updateBaseLine } = useMonacoSyncJump();
@@ -160,7 +161,12 @@ function SplitEditors({
             defaultLanguage='hkanno' // NOTE: Comments starting with `#` are being used as pseudo-comments.
             value={tab.text}
             onChange={(val) => val && onTextChange(val)}
-            options={{ minimap: { enabled: true }, rulers: [120], fontSize: 13 }}
+            options={{
+              fontSize: 13,
+              minimap: { enabled: true },
+              renderWhitespace: 'boundary',
+              rulers: [80],
+            }}
             vimMode={isVimMode}
             onMount={registerLeft}
           />
@@ -169,7 +175,7 @@ function SplitEditors({
 
       {/* Right: Preview */}
       {showPreview && (
-        <Allotment.Pane minSize={200} preferredSize={480}>
+        <Allotment.Pane minSize={200} preferredSize={680}>
           <Box sx={{ height: '100%' }}>
             <Typography
               variant='subtitle2'
@@ -187,9 +193,10 @@ function SplitEditors({
               defaultLanguage='xml'
               value={previewXml}
               options={{
-                readOnly: true,
-                minimap: { enabled: false },
                 fontSize: 13,
+                minimap: { enabled: false },
+                readOnly: true,
+                renderWhitespace: 'boundary',
               }}
               vimMode={isVimMode}
               onMount={registerRight}
@@ -199,7 +206,7 @@ function SplitEditors({
       )}
     </Allotment>
   );
-}
+};
 
 /* -------------------------------------------------------------------------- */
 /*                               Main Component                               */

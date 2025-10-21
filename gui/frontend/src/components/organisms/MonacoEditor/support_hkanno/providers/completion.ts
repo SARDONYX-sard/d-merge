@@ -23,7 +23,7 @@ export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
       // CommentNode
       // ---------------------------
       if (node.kind === 'comment') {
-        return { suggestions: [new_comment_snippet(range)] };
+        return { suggestions: [newCommentSnippet(range)] };
       }
 
       // ---------------------------
@@ -95,7 +95,7 @@ The timestamp at which this annotation occurs.`,
                 isTrusted: true,
               },
             },
-            new_comment_snippet(range),
+            newCommentSnippet(range),
           );
         }
 
@@ -192,17 +192,19 @@ Dummy event that hosts payload instructions, does nothing by itself
   });
 };
 
-const new_comment_snippet = (range: monaco.IRange) => ({
-  label: '# numAnnotations:',
-  kind: monaco.languages.CompletionItemKind.Keyword,
-  insertText: '# numAnnotations: ${1:usize}',
-  insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-  range,
-  documentation: {
-    value: `\`\`\`hkanno
+const newCommentSnippet = (range: monaco.IRange) =>
+  ({
+    label: '# numAnnotations:',
+    kind: monaco.languages.CompletionItemKind.Keyword,
+    insertText: '# numAnnotations: ${1:usize}',
+    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+    range,
+    documentation: {
+      value: `\`\`\`hkanno
 # numAnnotations: <number>
 \`\`\`
 Declare the number of annotations in this document.`,
-    isTrusted: true,
-  },
-});
+      isTrusted: true,
+    },
+    sortText: 'z', // This brings the candidate to the very bottom.
+  }) as const satisfies monaco.languages.CompletionItem;
