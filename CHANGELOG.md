@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-10-21
+### :sparkles: New Features
+- [`c781a4b`](https://github.com/SARDONYX-sard/d-merge/commit/c781a4b8433a7232a9fb7680b8ba6b67ebce6838) - implement `hkanno` fn *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f1b9a69`](https://github.com/SARDONYX-sard/d-merge/commit/f1b9a6940b0dd86240d7a45ad27d301c5a854b97) - implement hkanno page *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`0a4d6d6`](https://github.com/SARDONYX-sard/d-merge/commit/0a4d6d647aac8b8fa2d210ea4d9516cb1078460d) - hkanno lsp *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`271c418`](https://github.com/SARDONYX-sard/d-merge/commit/271c4183ff843155c89268875b77e4878487e362) - **frontend**: add signatureProvider *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9b95e18`](https://github.com/SARDONYX-sard/d-merge/commit/9b95e18664d03d10c7fed9543cef52c5ba35490f) - implement strict parser *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`12ac785`](https://github.com/SARDONYX-sard/d-merge/commit/12ac785a543cd572573016abb1754463948b2835) - change syntax highlight *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c788905`](https://github.com/SARDONYX-sard/d-merge/commit/c78890528eaf025ca33fda8d2e2161177e6dab44) - **hkanno**: support pie event completion *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d5c4dde`](https://github.com/SARDONYX-sard/d-merge/commit/d5c4dde4c5d77a585f734deecfb9e9213e00976d) - use a new parser for the signature provider *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`10c5dea`](https://github.com/SARDONYX-sard/d-merge/commit/10c5dea8d7877ba04fbca7a4215750554f137092) - new hover *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f07a47c`](https://github.com/SARDONYX-sard/d-merge/commit/f07a47cca754aa64fae03b2ee013c8c3ca510983) - **preview**: implement sync preview *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f993800`](https://github.com/SARDONYX-sard/d-merge/commit/f993800451be739e2b8dbfb20b6f53ce814d808a) - **frontend**: implement hkanno state cache *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8c7eec1`](https://github.com/SARDONYX-sard/d-merge/commit/8c7eec12249512606ca04bc66ab3d07eb4687d53) - change diagnostic level *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`ee5c6d1`](https://github.com/SARDONYX-sard/d-merge/commit/ee5c6d10f88d51093710897d574a3b12e160db15) - **frontend**: fix react compiler *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f2330ff`](https://github.com/SARDONYX-sard/d-merge/commit/f2330ffce2d2f1b40c117976e9518778eb5ea911) - fix diagnostics *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7c44b26`](https://github.com/SARDONYX-sard/d-merge/commit/7c44b26354f8a01ac2c7bac2e0cdc729766443ea) - **hkanno**: fix diagnostic *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7dc1415`](https://github.com/SARDONYX-sard/d-merge/commit/7dc14158cc263798677ce5ea5f256aa89fb25ec0) - **frontend**: fix patch execution err *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`b80c35f`](https://github.com/SARDONYX-sard/d-merge/commit/b80c35f6d10f913e8f7ef1619db0bb159ba85a14) - use var *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`609e280`](https://github.com/SARDONYX-sard/d-merge/commit/609e2809d63fe79668e989ba5bde77c14537171e) - remove unused key *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.1.2] - 2025-10-17
 ### :sparkles: New Features
 - [`8ce8e3a`](https://github.com/SARDONYX-sard/d-merge/commit/8ce8e3ab772dd729ef0a30160cf80e21489874ff) - create new issue template *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -68,3 +94,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0-beta.3...0.1.0
 [0.1.1]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.0...0.1.1
 [0.1.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.1...0.1.2
+[0.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.2...0.2.0
