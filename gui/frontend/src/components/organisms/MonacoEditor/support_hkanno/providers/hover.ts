@@ -1,6 +1,5 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
-import { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
 import type { FieldNode, HkannoNodeExt } from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
@@ -78,7 +77,7 @@ animrotation <degrees: f32>
     }
 
     case 'payload_instruction': {
-      const pie = node as PayloadInstructionNode;
+      const pie = node;
 
       // Hover on PIE keyword
       if (isCursorInside(pie.event, cursorColumn)) {
@@ -88,16 +87,25 @@ Payload instruction.
 - See: [Reference](https://github.com/D7ry/PayloadInterpreter?tab=readme-ov-file#list-of-instructions)
 
 # Format
+- Native instruction
 \`\`\`hkanno
 PIE.@<instruction>|<param1>|<param2>|...
+- Custom instruction
+\`\`\`hkanno
+PIE.$KEY|instruction1|instruction2|...
+- Async instruction
+\`\`\`hkanno
+PIE.$[time]<rest>
 \`\`\``;
       }
 
       // Hover on instruction or params
       const name = pie.instruction?.name?.value ?? UNKNOWN;
       const params = pie.instruction?.parameters?.items.map((p) => p.value?.value ?? UNKNOWN) ?? [];
+      const kind = getPrefixKindDisplay(pie.instruction?.prefix?.value);
       return [
         `# PIE Instruction`,
+        `- Kind: \`${kind}\``,
         `- Name: \`${name}\``,
         params.length ? `- Parameters: ${params.join(' | ')}` : '- No parameters',
       ].join('\n');
@@ -105,5 +113,18 @@ PIE.@<instruction>|<param1>|<param2>|...
 
     default:
       return null;
+  }
+};
+
+const getPrefixKindDisplay = (ch?: '@' | '$' | '!') => {
+  switch (ch) {
+    case '@':
+      return 'Native';
+    case '$':
+      return 'Custom';
+    case '!':
+      return 'Async';
+    default:
+      return;
   }
 };

@@ -22,7 +22,7 @@ export interface PayloadInstructionNode {
   /** Dot between event and instruction */
   dot?: FieldNode<'.'>;
 
-  /** Actual instruction (starts with '@') */
+  /** Actual instruction (starts with '@' | '$' | '!') */
   instruction?: InstructionNode;
 }
 
@@ -35,8 +35,12 @@ export interface PayloadInstructionNode {
 export interface InstructionNode {
   kind: 'instruction';
 
-  /** '@' symbol */
-  atSymbol?: FieldNode<'@'>;
+  /**
+   * - `@`: native instruction
+   * - `$`: custom instruction
+   * - `!`: async instruction
+   */
+  prefix?: FieldNode<'@' | '$' | '!'>;
 
   /** Instruction name (e.g., CASTSPELL, SGVF, etc.) */
   name?: FieldNode<string>;

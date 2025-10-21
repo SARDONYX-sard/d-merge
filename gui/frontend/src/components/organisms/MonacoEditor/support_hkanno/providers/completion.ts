@@ -1,11 +1,12 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
 import { providePieCompletions } from '../parser/payload_interpreter/completion';
+import type { Pos } from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
   monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
-    triggerCharacters: ['@'],
+    triggerCharacters: [' ', '.', '@'],
     provideCompletionItems(document, position) {
       const lineContent = document.getLineContent(position.lineNumber);
       const node = parseHkannoLineExt(lineContent, position.lineNumber);
@@ -78,9 +79,7 @@ Insert an animrotation event with a rotation in degrees.`,
       // TextNode (fallback)
       // ---------------------------
       if (node.kind === 'text') {
-        const hasTime = node.time;
-
-        if (!hasTime) {
+        if (!node.time) {
           suggestions.push(
             {
               label: '<time>',
@@ -99,7 +98,7 @@ The timestamp at which this annotation occurs.`,
           );
         }
 
-        if (hasTime) {
+        if (isAfter(node.space1TimeToText?.pos, range)) {
           suggestions.push(
             {
               label: '<eventName>',
@@ -169,7 +168,7 @@ Insert an animrotation event with a rotation in degrees.
               range,
               documentation: {
                 value: `\`\`\`hkanno
-<time: f32> PIE.@<inst>|...
+PIE.@<inst>|...
 \`\`\`
 Dummy event that hosts payload instructions, does nothing by itself
 (Need \`PayloadInterpreter\` Mod)
@@ -208,3 +207,9 @@ Declare the number of annotations in this document.`,
     },
     sortText: 'z', // This brings the candidate to the very bottom.
   }) as const satisfies monaco.languages.CompletionItem;
+
+/** Check if the cursor is immediately after the specified node */
+export const isAfter = (pos: Pos | undefined, range: monaco.IRange) => {
+  if (!pos) return false;
+  return range.startLineNumber === pos.line && range.startColumn >= pos.endColumn;
+};

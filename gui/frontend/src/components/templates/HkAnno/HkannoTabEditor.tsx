@@ -162,6 +162,7 @@ const SplitEditors = ({
             value={tab.text}
             onChange={(val) => val && onTextChange(val)}
             options={{
+              'semanticHighlighting.enabled': true,
               fontSize: 13,
               minimap: { enabled: true },
               renderWhitespace: 'boundary',

@@ -37,7 +37,7 @@ describe('parsePayloadInstructionLine', () => {
       },
       instruction: {
         kind: 'instruction',
-        atSymbol: {
+        prefix: {
           value: '@',
           pos: { line: 1, startColumn: 9, endColumn: 10 },
         },

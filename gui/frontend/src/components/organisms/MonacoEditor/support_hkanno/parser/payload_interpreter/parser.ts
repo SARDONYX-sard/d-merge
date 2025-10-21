@@ -23,9 +23,10 @@ export const parsePayloadInstructionLine = (line: string, lineNumber = 1): Paylo
   }
 
   // --- Parse '@'
-  if (state.line[state.i] === '@') {
+  const ch = state.line[state.i];
+  if (ch === '@' || ch === '$' || ch === '!') {
     const instruction: InstructionNode = { kind: 'instruction' };
-    instruction.atSymbol = { value: '@', pos: makePos(state.lineNumber, state.i, state.i + 1) };
+    instruction.prefix = { value: ch, pos: makePos(state.lineNumber, state.i, state.i + 1) };
     state.i++;
 
     // --- Parse instruction name until '|' or end

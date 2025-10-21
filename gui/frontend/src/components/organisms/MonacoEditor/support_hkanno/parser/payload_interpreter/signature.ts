@@ -1,12 +1,12 @@
 import * as monaco from 'monaco-editor';
-import { PIE_INSTRUCTIONS } from './completion';
+import { PIE_NATIVE_INSTRUCTIONS } from './completion';
 import type { PayloadInstructionNode } from './nodes';
 
 export const providePieSignatureHelp = (node: PayloadInstructionNode): monaco.languages.SignatureHelpResult => {
   if (!node.instruction?.name?.value) return None();
 
   const instructionName = node.instruction.name.value.toUpperCase();
-  const insDef = PIE_INSTRUCTIONS.find((i) => i.name.toUpperCase() === instructionName);
+  const insDef = PIE_NATIVE_INSTRUCTIONS.find((i) => i.name.toUpperCase() === instructionName);
   if (!insDef) return None();
 
   const paramCount = node.instruction.parameters?.items.length ?? 0;

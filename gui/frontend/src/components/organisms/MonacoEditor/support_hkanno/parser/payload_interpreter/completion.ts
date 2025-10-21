@@ -1,7 +1,8 @@
 import * as monaco from 'monaco-editor';
+import { isAfter } from '../../providers/completion';
 import type { PayloadInstructionNode } from './nodes';
 
-export const PIE_INSTRUCTIONS = [
+export const PIE_NATIVE_INSTRUCTIONS = [
   {
     name: 'SGVB',
     documentation: `\`\`\`hkanno
@@ -69,22 +70,87 @@ Play a nif particle effect on the actor.`,
   },
 ] as const;
 
+export const PIE_CUSTOM_INSTRUCTIONS = [
+  {
+    name: 'MyCustom1',
+    documentation: 'Custom payload mapped via $KEY',
+    snippet: '${1:MyCustom1}|${2:param1}|${3:param2}',
+  },
+] as const;
+
+export const PIE_ASYNC_INSTRUCTIONS = [
+  {
+    name: 'DelayExample',
+    documentation: 'Async payload example ![time]payload',
+    snippet: '[${1:time}]${2:payload}',
+  },
+] as const;
+
 export const providePieCompletions = (
   node: PayloadInstructionNode,
   range: monaco.IRange,
 ): monaco.languages.CompletionItem[] => {
   if (node.event?.value?.toLocaleLowerCase() !== 'pie') return [];
-  if (node.dot?.value !== '.') return [];
-  if (node.instruction?.atSymbol === undefined) return [];
+  if (!node.dot && isAfter(node.event?.pos, range)) {
+    return [{ label: '.', kind: monaco.languages.CompletionItemKind.Enum, insertText: '.', range }];
+  }
 
-  return PIE_INSTRUCTIONS.map((ins) => {
-    return {
-      label: ins.name,
-      kind: monaco.languages.CompletionItemKind.Function,
-      insertText: ins.snippet,
-      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      range,
-      documentation: { value: ins.documentation, isTrusted: true },
-    };
-  });
+  const prefix = node.instruction?.prefix?.value;
+  if (prefix === undefined && isAfter(node.dot?.pos, range)) {
+    return prefixCompletions(range);
+  }
+
+  if (node.instruction?.name === undefined && isAfter(node.instruction?.prefix?.pos, range)) {
+    let instructions;
+    switch (prefix) {
+      case '@':
+        instructions = PIE_NATIVE_INSTRUCTIONS;
+        break;
+      case '$':
+        instructions = PIE_CUSTOM_INSTRUCTIONS;
+        break;
+      case '!':
+        instructions = PIE_ASYNC_INSTRUCTIONS;
+        break;
+      default:
+        return [];
+    }
+
+    return instructions.map(({ name, snippet, documentation }) => {
+      return {
+        label: name,
+        kind: monaco.languages.CompletionItemKind.Function,
+        insertText: snippet,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        documentation: { value: documentation, isTrusted: true },
+      };
+    });
+  }
+
+  return [];
 };
+
+const prefixCompletions = (range: monaco.IRange) => [
+  {
+    label: '@',
+    kind: monaco.languages.CompletionItemKind.EnumMember,
+    insertText: '@',
+    range,
+    documentation: { value: 'Native Instruction prefix' },
+  },
+  {
+    label: '$',
+    kind: monaco.languages.CompletionItemKind.EnumMember,
+    insertText: '$',
+    range,
+    documentation: { value: 'Custom Instruction prefix' },
+  },
+  {
+    label: '!',
+    kind: monaco.languages.CompletionItemKind.EnumMember,
+    insertText: '!',
+    range,
+    documentation: { value: 'Async payload prefix' },
+  },
+];

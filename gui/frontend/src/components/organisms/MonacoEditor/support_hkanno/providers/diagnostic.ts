@@ -1,6 +1,6 @@
 import type { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
-import { PIE_INSTRUCTIONS } from '../parser/payload_interpreter/completion';
+import { PIE_NATIVE_INSTRUCTIONS } from '../parser/payload_interpreter/completion';
 import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
@@ -55,12 +55,12 @@ export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
       const pieNode = node as PayloadInstructionNode;
       const name = pieNode.instruction?.name?.value?.toUpperCase();
       if (name) {
-        const def = PIE_INSTRUCTIONS.find((i) => i.name.toUpperCase() === name);
+        const def = PIE_NATIVE_INSTRUCTIONS.find((i) => i.name.toUpperCase() === name);
         if (def) {
           const provided = pieNode.instruction?.parameters?.items.filter((item) => item.value).length ?? 0;
           const expected = (def.snippet.match(/\$\{[0-9]+:/g) ?? []).length;
           if (provided < expected) {
-            const startCol = pieNode.instruction?.atSymbol?.pos?.startColumn ?? 1;
+            const startCol = pieNode.instruction?.prefix?.pos?.startColumn ?? 1;
             const endCol =
               pieNode.instruction?.parameters?.pos?.endColumn ??
               pieNode.instruction?.name?.pos?.endColumn ??
