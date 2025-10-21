@@ -83,7 +83,7 @@ export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
         const startCol = node.space1TimeToText?.pos?.startColumn ?? node.time?.pos?.endColumn ?? 1;
         const endCol = node.space0AfterText?.pos?.endColumn ?? line.length + 1;
         markers.push({
-          severity: monacoEnv.MarkerSeverity.Error,
+          severity: monacoEnv.MarkerSeverity.Warning,
           message: `Text annotation is missing.`,
           startLineNumber: lineNumber,
           endLineNumber: lineNumber,
