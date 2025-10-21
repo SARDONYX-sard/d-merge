@@ -59,7 +59,7 @@ jobs:
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-Portable-${{ runner.os }}-v${{ github.ref_name }}.zip'
+          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.zip'
 
       - name: Release Portable Version(Windows)
         uses: ncipollo/release-action@v1.16.0
@@ -72,7 +72,7 @@ jobs:
           tag: ${{ github.ref_name }}
 
       - name: Commit CHANGELOG.md
-        if: runner.os == 'macOS'
+        if: runner.os == 'Windows'
         run: |
           git fetch origin main:main
           git checkout main
