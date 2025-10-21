@@ -1,19 +1,30 @@
-import { CommentNode, FieldNode, HkannoNode, MotionNode, Pos, RotationNode, SpaceNode, TextNode } from './nodes';
+import { parsePayloadInstructionLine } from '../payload_interpreter/parser';
+import {
+  CommentNode,
+  FieldNode,
+  HkannoNode,
+  HkannoNodeExt,
+  MotionNode,
+  Pos,
+  RotationNode,
+  SpaceNode,
+  TextNode,
+} from './nodes';
 
-type ParserState = {
+export type ParserState = {
   line: string;
   i: number;
   lineNumber: number;
   len: number;
 };
 
-const makePos = (lineNumber: number, start: number, end: number): Pos => ({
+export const makePos = (lineNumber: number, start: number, end: number): Pos => ({
   line: lineNumber,
   startColumn: start + 1,
   endColumn: end + 1,
 });
 
-const parseSpace = (state: ParserState): SpaceNode | undefined => {
+export const parseSpace = (state: ParserState): SpaceNode | undefined => {
   const start = state.i;
   while (state.i < state.len && /\s/.test(state.line[state.i])) state.i++;
   if (state.i > start) {
@@ -26,7 +37,7 @@ const parseSpace = (state: ParserState): SpaceNode | undefined => {
   return undefined;
 };
 
-const parseNumberField = (state: ParserState): FieldNode<number> | undefined => {
+export const parseNumberField = (state: ParserState): FieldNode<number> | undefined => {
   const start = state.i;
   if (state.i >= state.len) return undefined;
 
@@ -59,7 +70,7 @@ const parseLiteralField = <T extends string>(state: ParserState, literal: T): Fi
  * Returns the consumed string and its position.
  *
  * @param state Parser state with current line and cursor
- * @param untilChars String containing all characters to stop at (e.g. '\n' or ' ')
+ * @param stopChars String containing all characters to stop at (e.g. '\n' or ' ')
  * @returns FieldNode<string> or undefined if nothing consumed
  *
  * @example
@@ -67,10 +78,10 @@ const parseLiteralField = <T extends string>(state: ParserState, literal: T): Fi
  * parseLiteralFieldUntil(state, '\n')
  * // returns { value: "# comment text", pos: { line, startColumn, endColumn } }
  */
-const parseLiteralFieldUntil = (state: ParserState, untilChars: string): FieldNode<string> | undefined => {
+export const parseFieldUntil = (state: ParserState, stopChars: string): FieldNode<string> | undefined => {
   const start = state.i;
   let value = '';
-  while (state.i < state.len && !untilChars.includes(state.line[state.i])) {
+  while (state.i < state.len && !stopChars.includes(state.line[state.i])) {
     value += state.line[state.i++];
   }
   if (!value) return undefined;
@@ -90,7 +101,7 @@ export const parseCommentLine = (line: string, lineNumber = 1): CommentNode => {
 
   node.hash = parseLiteralField(state, '#');
   node.space0HashToComment = parseSpace(state);
-  node.comment = parseLiteralFieldUntil(state, '\n');
+  node.comment = parseFieldUntil(state, '\n');
   node.space0AfterComment = parseSpace(state);
 
   return node;
@@ -108,7 +119,7 @@ export const parseTextLine = (line: string, lineNumber = 1): TextNode => {
   node.space0First = parseSpace(state);
   node.time = parseNumberField(state);
   node.space1TimeToText = parseSpace(state);
-  node.text = parseLiteralFieldUntil(state, '\n');
+  node.text = parseFieldUntil(state, '\n');
   node.space0AfterText = parseSpace(state);
 
   return node;
@@ -161,8 +172,40 @@ export function parseAnimRotationLine(line: string, lineNumber = 1): RotationNod
 }
 
 /**
- * Parse a single hkanno line and return the appropriate Node.
+ * Parse a single hkanno line and return the appropriate Node.(With PIE.)
  * Delegates to specialized parsers based on the content.
+ *
+ * @param line A single line of hkanno text
+ * @param lineNumber The line number (1-based)
+ */
+export const parseHkannoLineExt = (line: string, lineNumber = 1): HkannoNodeExt => {
+  const trimmed = line.trimStart();
+  const lowerTrimmed = trimmed.toLowerCase();
+
+  // Comment line starts with #
+  if (trimmed.startsWith('#')) {
+    return parseCommentLine(line, lineNumber);
+  }
+  if (lowerTrimmed.includes('pie')) {
+    return parsePayloadInstructionLine(line, lineNumber);
+  }
+
+  // animrotation line
+  if (lowerTrimmed.includes('animrotation')) {
+    return parseAnimRotationLine(line, lineNumber);
+  }
+
+  // animmotion line
+  if (lowerTrimmed.includes('animmotion')) {
+    return parseAnimMotionLine(line, lineNumber);
+  }
+
+  // Fallback: treat as text line
+  return parseTextLine(line, lineNumber);
+};
+
+/**
+ * PParser with lenient parsing for formatter applications.
  *
  * @param line A single line of hkanno text
  * @param lineNumber The line number (1-based)
@@ -170,6 +213,7 @@ export function parseAnimRotationLine(line: string, lineNumber = 1): RotationNod
  */
 export const parseHkannoLine = (line: string, lineNumber = 1): HkannoNode => {
   const trimmed = line.trimStart();
+  const lowerTrimmed = trimmed.toLowerCase();
 
   // Comment line starts with #
   if (trimmed.startsWith('#')) {
@@ -177,12 +221,12 @@ export const parseHkannoLine = (line: string, lineNumber = 1): HkannoNode => {
   }
 
   // animrotation line
-  if (trimmed.includes('animrotation')) {
+  if (lowerTrimmed.includes('animrotation')) {
     return parseAnimRotationLine(line, lineNumber);
   }
 
   // animmotion line
-  if (trimmed.includes('animmotion')) {
+  if (lowerTrimmed.includes('animmotion')) {
     return parseAnimMotionLine(line, lineNumber);
   }
 

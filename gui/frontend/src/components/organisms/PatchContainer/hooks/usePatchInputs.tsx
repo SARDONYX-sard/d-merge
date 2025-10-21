@@ -33,10 +33,7 @@ export const usePatchInputs = () => {
   const dataDir = isVfsMode ? vfsSkyrimDataDir : skyrimDataDir;
   const setDataDir = useCallback(
     (path: string) => {
-      if (isVfsMode) {
-        setVfsSkyrimDataDir(path);
-      }
-      setSkyrimDataDir(path);
+      isVfsMode ? setVfsSkyrimDataDir(path) : setSkyrimDataDir(path);
     },
     [setVfsSkyrimDataDir, setSkyrimDataDir],
   );

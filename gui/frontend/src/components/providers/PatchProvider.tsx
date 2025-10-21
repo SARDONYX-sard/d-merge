@@ -1,20 +1,12 @@
 // NOTE: This state is not normally necessary globally, but it must be placed globally because it needs to be accessible to everything for automatic backup.
 
 import type { Dispatch, FC, ReactNode, SetStateAction } from 'react';
-import { createContext, useContext, useEffect, useState, useTransition } from 'react';
-import { useDebounce } from '@/components/hooks/useDebounce';
+import { createContext, useContext, useState } from 'react';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { useModInfoState } from '@/components/organisms/PatchContainer/hooks/useModInfoState';
-import { NOTIFY } from '@/lib/notify';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { boolSchema, stringSchema } from '@/lib/zod/schema-utils';
-import {
-  FetchedModInfo,
-  loadModsInfo,
-  type ModInfo,
-  type PatchOptions,
-  patchOptionsSchema,
-} from '@/services/api/patch';
+import { type ModInfo, type PatchOptions, patchOptionsSchema } from '@/services/api/patch';
 
 type ContextType = {
   output: string;
@@ -36,12 +28,10 @@ type ContextType = {
 
   modInfoList: ModInfo[];
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
+  setFetchedModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
 
   /////////////////////////////////////////////////////////////////////
   // No cached
-
-  /** Loading info.ini for each Nemesis Mod? */
-  loading: boolean;
 
   /** When sorting, locked drag & drop */
   lockedDnd: boolean;
@@ -62,30 +52,8 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const [skyrimDataDir, setSkyrimDataDir] = useStorageState(PRIVATE_CACHE_OBJ.patchSkyrimDataDir, stringSchema);
 
-  const { modInfoList, setModInfoListActive: setModInfoList, setModInfoListRaw } = useModInfoState(isVfsMode);
-  const [loading, startTransition] = useTransition();
+  const { modInfoList, setModInfoList, setFetchedModInfoList } = useModInfoState(isVfsMode);
   const [lockedDnd, setLockedDnd] = useState(false);
-
-  // NOTE: Use this instead of `useDeferredValue` to delay API calls.
-  const deferredModInfoDir = useDebounce(isVfsMode ? vfsSkyrimDataDir : skyrimDataDir, 450);
-
-  useEffect(() => {
-    setPatchOptions((options) => ({
-      ...options,
-      skyrimDataDirGlob: deferredModInfoDir,
-    }));
-  }, [deferredModInfoDir, setPatchOptions]);
-
-  useEffect(() => {
-    if (!deferredModInfoDir) return;
-
-    startTransition(() => {
-      NOTIFY.asyncTry(async () => {
-        console.log('fetching');
-        setModInfoListRaw(intoModInfoList(await loadModsInfo(deferredModInfoDir)));
-      });
-    });
-  }, [deferredModInfoDir, isVfsMode]);
 
   const context = {
     output,
@@ -105,8 +73,7 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     modInfoList,
     setModInfoList,
-
-    loading,
+    setFetchedModInfoList,
 
     lockedDnd,
     setLockedDnd,
@@ -124,23 +91,4 @@ export const usePatchContext = () => {
     throw new Error('usePatchContext must be used within a PatchProvider');
   }
   return context;
-};
-
-/**
- * Convert FetchedModInfo[] to ModInfo(add default `enabled` & `priority`)
- * Existing fields are preserved. New fields are added only if missing.
- */
-const intoModInfoList = (modInfoList: FetchedModInfo[]): ModInfo[] => {
-  return modInfoList.map(({ id, name, author, site, auto, modType: mod_type }, index) => {
-    return {
-      id,
-      name,
-      author,
-      site,
-      auto,
-      modType: mod_type,
-      enabled: false,
-      priority: index + 1,
-    } as const satisfies ModInfo;
-  });
 };

@@ -1,18 +1,21 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { type ModItem, ModListSchema } from '@/services/api/egui/backup';
+import { type ActiveModItem, ModListSchema } from '@/services/api/egui/backup';
 import type { ModInfo } from '@/services/api/patch';
 
 /**
  * Convert ModInfo[] into a ModItem[] for storage.
  */
-const toModList = (mods: ModInfo[]): ModItem[] =>
-  mods.map((item) => ({
-    id: item.id,
-    enabled: item.enabled,
-    priority: item.priority,
-  }));
+const toActiveList = (mods: ModInfo[]): ActiveModItem[] =>
+  mods
+    .filter((item) => item.enabled)
+    .map(({ id, enabled, priority, mod_type }) => ({
+      id,
+      enabled,
+      priority,
+      mod_type,
+    }));
 
 /**
  * Synchronize and sort ModInfo list with cached ModList.
@@ -27,18 +30,18 @@ export const useModInfoState = (isVfsMode: boolean) => {
   const [activeModList, setActiveModList] = useStorageState(cacheKey, ModListSchema.catch([]));
 
   // Raw mod info list (fetched from API)
-  const [modInfoListRaw, setModInfoListRaw] = useState<ModInfo[]>([]);
+  const [fetchedInfoList, setFetchedModInfoList] = useState<ModInfo[]>([]);
 
   /**
    * Setter for local edits:
    * - Updates React state AND schemaStorage
    * - Keeps activeModList in sync
    */
-  const setModInfoListActive = useCallback(
+  const setModInfoList = useCallback(
     (updater: React.SetStateAction<ModInfo[]>) => {
-      setModInfoListRaw((prev) => {
+      setFetchedModInfoList((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
-        const nextList = toModList(next);
+        const nextList = toActiveList(next);
 
         setActiveModList(nextList);
 
@@ -48,19 +51,22 @@ export const useModInfoState = (isVfsMode: boolean) => {
     [cacheKey],
   );
 
-  /**
-   * Sorted mod info list:
-   * - Matches enabled/priority with activeModList
-   * - Sorted by priority
-   */
-  const modInfoList = useMemo(() => sortModInfoList(modInfoListRaw, activeModList), [modInfoListRaw, activeModList]);
+  const modInfoList = useMemo(
+    () => applyActiveModList(fetchedInfoList, activeModList),
+    [fetchedInfoList, activeModList],
+  );
 
   return {
+    /**
+     * Sorted mod info list:
+     * - Matches enabled/priority with activeModList
+     * - Sorted by priority
+     */
     modInfoList,
     /** for initial fetch, does NOT update activeModList */
-    setModInfoListRaw,
+    setFetchedModInfoList,
     /** for local edits, syncs with cache + activeModList */
-    setModInfoListActive,
+    setModInfoList,
   } as const;
 };
 
@@ -68,12 +74,12 @@ export const useModInfoState = (isVfsMode: boolean) => {
  * Sorts modInfoList according to activeModList priorities,
  * and synchronizes `enabled` / `priority` values.
  */
-const sortModInfoList = (modInfoList: ModInfo[], modList: ModItem[]): ModInfo[] => {
-  if (!modList || modList.length === 0) return modInfoList;
+const applyActiveModList = (fetchedModInfoList: ModInfo[], activeModList: ActiveModItem[]): ModInfo[] => {
+  if (!activeModList || activeModList.length === 0) return fetchedModInfoList;
 
-  const modMap = new Map(modList.map((m) => [m.id, m]));
+  const modMap = new Map(activeModList.map((m) => [m.id, m]));
 
-  return modInfoList
+  return fetchedModInfoList
     .map((modInfo) => {
       const ref = modMap.get(modInfo.id);
       return ref ? { ...modInfo, enabled: ref.enabled, priority: ref.priority } : modInfo;

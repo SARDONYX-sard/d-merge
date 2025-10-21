@@ -1,3 +1,5 @@
+import type { PayloadInstructionNode } from '../payload_interpreter/nodes';
+
 /**
  * - `<space0> # <comment until \n>`
  * - `<space0> <time> <space1> <text until \n but trim>`
@@ -7,6 +9,7 @@
  * - `<space0> <time> <space1> animrotation <space1> <degrees: f32> <space0>`
  */
 export type HkannoNode = RotationNode | MotionNode | TextNode | CommentNode;
+export type HkannoNodeExt = RotationNode | MotionNode | TextNode | CommentNode | PayloadInstructionNode;
 
 /**
  * Represents a position in the text (1-based line and column).

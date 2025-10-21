@@ -1,25 +1,32 @@
 import { invoke } from '@tauri-apps/api/core';
+import z from 'zod';
 import { OutFormat } from './serde_hkx';
 
 /** hkStringPtr/hkCString XML null display */
 export const NULL_STR = '\u2400';
 
-export type Annotation = {
-  time: number;
-  text: string | null;
-};
+// Annotation
+export const AnnotationSchema = z.object({
+  time: z.number(),
+  text: z.string().nullable(),
+});
+export type Annotation = z.infer<typeof AnnotationSchema>;
 
-export type AnnotationTrack = {
-  annotations: Annotation[];
-};
+// AnnotationTrack
+export const AnnotationTrackSchema = z.object({
+  annotations: z.array(AnnotationSchema),
+});
+export type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
 
-export type Hkanno = {
+// Hkanno
+export const HkannoSchema = z.object({
   /** XML index e.g. `#0003`  */
-  ptr: string;
-  num_original_frames: number;
-  duration: number;
-  annotation_tracks: AnnotationTrack[];
-};
+  ptr: z.string(), // e.g. "#0003"
+  num_original_frames: z.number(),
+  duration: z.number(),
+  annotation_tracks: z.array(AnnotationTrackSchema),
+});
+export type Hkanno = z.infer<typeof HkannoSchema>;
 
 /**
  * Loads a .hkx or .xml file and parses it as an Hkanno structure.
@@ -58,8 +65,25 @@ export async function saveHkanno(input: string, output: string, format: OutForma
   }
 }
 
+/**
+ * Previews a .hkx or .xml file after updating it with an Hkanno structure.
+ *
+ * @param path Path to the .hkx or .xml file.
+ * @param hkanno Hkanno structure to apply updates.
+ * @returns The updated file content as a string (XML).
+ * @throws If failed to read file or update hkanno.
+ */
+export const previewHkanno = async (path: string, hkanno: Hkanno): Promise<string> => {
+  try {
+    const result = await invoke<string>('preview_hkanno', { input: path, hkanno });
+    return result;
+  } catch (e) {
+    throw e;
+  }
+};
+
 /** Parse hkanno text into AnnotationTrack[] only */
-export function hkannoFromText(text: string): AnnotationTrack[] {
+export const hkannoFromText = (text: string): AnnotationTrack[] => {
   const lines = text.split('\n');
   const annotation_tracks: AnnotationTrack[] = [];
   let currentTrack: AnnotationTrack | null = null;
@@ -95,4 +119,4 @@ export function hkannoFromText(text: string): AnnotationTrack[] {
   if (currentTrack) annotation_tracks.push(currentTrack);
 
   return annotation_tracks;
-}
+};

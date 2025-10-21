@@ -19,6 +19,7 @@ fn main() {
             crate::cmd::conversion::load_dir_node,
             crate::cmd::fs::write_file,
             crate::cmd::hkanno::load_hkanno,
+            crate::cmd::hkanno::preview_hkanno,
             crate::cmd::hkanno::save_hkanno,
             crate::cmd::log::change_log_level,
             crate::cmd::patch::cancel_patch,
