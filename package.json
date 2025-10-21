@@ -1,6 +1,6 @@
 {
   "name": "d-merge",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "description": "patch",
   "homepage": "https://github.com/SARDONYX-sard/d-merge",
@@ -19,8 +19,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.6",
-    "@tauri-apps/cli": "2.8.4",
-    "@types/node": "24.8.1",
+    "@tauri-apps/cli": "2.9.0",
+    "@types/node": "24.9.1",
     "@vitejs/plugin-react-swc": "4.1.0",
     "concurrently": "^9.2.1",
     "prettier": "3.6.2",
