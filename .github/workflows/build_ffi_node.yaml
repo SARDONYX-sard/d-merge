@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  windows:
+  build:
     strategy:
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
