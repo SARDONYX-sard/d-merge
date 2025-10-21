@@ -21,7 +21,7 @@ export const FileTabSchema = z.object({
   num_original_frames: z.number(),
   duration: z.number(),
   /** Hkanno.AnnotationTrack[] */
-  text: z.string(), // or z.array(...) if meant to be structured
+  text: z.string(),
   /** file first loaded original hkanno(use on revert). readonly */
   hkanno: HkannoSchema.readonly(),
   dirty: z.boolean().optional(),
