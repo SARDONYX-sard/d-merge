@@ -47,7 +47,7 @@ jobs:
       #     prerelease: false
       #     projectPath: ${{ github.workspace }}/gui/backend/tauri
       - name: Build GUI
-        run: npm run build
+        run: npm run build:release
 
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
