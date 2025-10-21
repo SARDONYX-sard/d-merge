@@ -24,15 +24,6 @@ export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
 }
 
 export type FetchedModInfo = {
-  id: string;
-  name: string;
-  author: string;
-  site: string;
-  auto: string;
-  modType: 'nemesis' | 'fnis';
-};
-
-export type ModInfo = {
   /**
    * Mod-specific dir name.
    * - Nemesis/FNIS(vfs): e.g. `aaaa`
@@ -44,8 +35,10 @@ export type ModInfo = {
   author: string;
   site: string;
   auto: string;
-  modType: 'nemesis' | 'fnis';
+  mod_type: 'nemesis' | 'fnis';
+};
 
+export type ModInfo = FetchedModInfo & {
   enabled: boolean;
   priority: number;
 };
@@ -55,13 +48,13 @@ export type PatchMaps = {
    * - key: path until mod_code (e.g.: `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
    * - value: priority
    */
-  nemesisEntries: Record<string, number>;
+  nemesis_entries: Record<string, number>;
 
   /** FNIS patch path
    * - key: path until namespace (e.g.: `<skyrim_data_dir>/meshes/actors/character/animations/FNISFlyer`)
    * - value: priority
    */
-  fnisEntries: Record<string, number>;
+  fnis_entries: Record<string, number>;
 };
 
 /**

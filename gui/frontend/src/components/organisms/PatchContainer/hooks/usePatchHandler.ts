@@ -33,22 +33,22 @@ export function usePatchHandler({ start, setLoading, onStatus, onError }: Params
 }
 
 function toPatches(vfsSkyrimDataDir: string, isVfsMode: boolean, modInfoList: ModInfo[]): PatchMaps {
-  const nemesis_entries: Record<string, number> = {};
-  const fnis_entries: Record<string, number> = {};
+  const nemesisEntries: Record<string, number> = {};
+  const fnisEntries: Record<string, number> = {};
 
   for (const mod of modInfoList) {
     if (!mod.enabled) continue;
 
     let path: string;
-    if (mod.modType === 'nemesis') {
+    if (mod.mod_type === 'nemesis') {
       path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}` : mod.id;
-      nemesis_entries[path] = mod.priority;
-    } else if (mod.modType === 'fnis') {
+      nemesisEntries[path] = mod.priority;
+    } else if (mod.mod_type === 'fnis') {
       // Note that duplicates may cause malfunctions due to FNIS specifications.
       path = mod.id;
-      fnis_entries[path] = mod.priority;
+      fnisEntries[path] = mod.priority;
     }
   }
 
-  return { nemesisEntries: nemesis_entries, fnisEntries: fnis_entries };
+  return { nemesis_entries: nemesisEntries, fnis_entries: fnisEntries };
 }

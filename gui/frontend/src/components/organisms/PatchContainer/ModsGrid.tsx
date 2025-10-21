@@ -10,6 +10,7 @@ import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { ModInfo } from '@/services/api/patch';
 import { CustomToolbar } from './GridToolbar';
 import { useColumns } from './hooks/useColumns';
+import { useFetchModInfo } from './hooks/useFetchModInfo';
 import { useGridStatePersistence } from './hooks/useGridStatePersistence';
 
 type DragEndHandler = Exclude<DndCtxProps['onDragEnd'], undefined>;
@@ -18,7 +19,8 @@ type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModel
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
-  const { modInfoList, setModInfoList, loading, lockedDnd } = usePatchContext();
+  const { modInfoList, setModInfoList, lockedDnd } = usePatchContext();
+  const { loading } = useFetchModInfo();
   const columns = useColumns();
 
   const handleDragEnd = useCallback<DragEndHandler>(

@@ -3,7 +3,6 @@ import { OBJECT } from '@/lib/object-utils';
 import type { Cache } from '@/lib/storage';
 import { logLevelSchema } from '@/services/api/log';
 
-export type ModItem = z.infer<typeof ModItemSchema>;
 export const ModItemSchema = z.object({
   enabled: z.boolean(),
   /**
@@ -12,7 +11,10 @@ export const ModItemSchema = z.object({
    */
   id: z.string(),
   priority: z.number(),
+  mod_type: z.enum(['nemesis', 'fnis']),
 });
+/*** cached mod info */
+export type ActiveModItem = z.infer<typeof ModItemSchema>;
 export const ModListSchema = z.array(ModItemSchema);
 
 const EguiSettingsSchema = z.object({
