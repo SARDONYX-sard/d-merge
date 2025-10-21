@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use mod_info::ModInfo as RustModInfo;
+use mod_info::{ModInfo as RustModInfo, ModType as RustModType};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 use nemesis_merge::{
@@ -249,6 +249,28 @@ pub struct ModInfo {
     pub author: String,
     /// Mod download link
     pub site: String,
+    /// Mod type. Nemesis, FNIS
+    pub mod_type: ModType,
+}
+
+/// Mod type. Nemesis, FNIS
+#[napi(string_enum)]
+pub enum ModType {
+    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+    /// - `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+    Nemesis,
+    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+    /// - `<skyrim data dir>/meshes/actors/character/animations/<namespace>`
+    Fnis,
+}
+
+impl From<RustModType> for ModType {
+    fn from(value: RustModType) -> Self {
+        match value {
+            RustModType::Nemesis => ModType::Nemesis,
+            RustModType::Fnis => ModType::Fnis,
+        }
+    }
 }
 
 impl From<RustModInfo> for ModInfo {
@@ -258,6 +280,7 @@ impl From<RustModInfo> for ModInfo {
             name: m.name,
             author: m.author,
             site: m.site,
+            mod_type: ModType::from(m.mod_type),
         }
     }
 }
@@ -266,21 +289,19 @@ impl From<RustModInfo> for ModInfo {
 // Exported APIs
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mod entries
 #[napi(object)]
 #[derive(Debug, Default)]
 pub struct PatchMaps {
     /// Nemesis patch path
     /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
     /// - value: priority
-    pub nemesis_entries: PriorityMap,
+    pub nemesis_entries: HashMap<String, u32>, // Node.js unsupported usize. So we use u32
     /// FNIS patch path
-    /// - key: path until namespace(e.g. `<skyrim_data_dir>/path/Meshes/actors/character/animations/FNISFlyer`)
+    /// - key: FNIS namespace(e.g. `namespace` of `<skyrim_data_dir>/path/meshes/actors/character/animations/<namespace>`)
     /// - value: priority
-    pub fnis_entries: PriorityMap,
+    pub fnis_entries: HashMap<String, u32>,
 }
-
-// Node.js unsupported usize. So we use u32
-type PriorityMap = HashMap<String, u32>;
 
 #[inline]
 fn into_rust_priority_map(map: PatchMaps) -> RustPatchMaps {
@@ -302,12 +323,12 @@ fn into_rust_priority_map(map: PatchMaps) -> RustPatchMaps {
 ///
 /// - nemesis_paths: `e.g. ["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
 /// - `config.resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
-/// - `status_fn` - Optional threadsafe JS callback for patch status updates.
+/// - `status_fn` - Optional thread_safe JS callback for patch status updates.
 ///
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 #[napi(
-    ts_args_type = "nemesis_paths: string[], config: Config, status_fn?: (err: Error | null, status: PatchStatus) => void"
+    ts_args_type = "nemesis_paths: PatchMaps, config: Config, status_fn?: (err: Error | null, status: PatchStatus) => void"
 )]
 pub async fn behavior_gen(
     patch_entries: PatchMaps,
@@ -347,21 +368,6 @@ pub fn get_skyrim_data_dir(runtime: String) -> napi::Result<String> {
 }
 
 /// Collect both Nemesis and FNIS mods into a single vector.
-///
-/// # Nemesis
-/// | is_vfs | glob pattern                                               | id extracted as                   |
-/// |--------|------------------------------------------------------------|-----------------------------------|
-/// | true   | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
-/// | false  | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
-///
-/// # FNIS
-/// | is_vfs | glob pattern                                                         | id extracted as                   |
-/// |--------|----------------------------------------------------------------------|-----------------------------------|
-/// |  any   | `{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
-///
-/// - `is_vfs`:
-///   Whether the lookup is done in the virtualized `Data` directory (true) or
-///   directly under the mods directory (false).
 ///
 /// # Errors
 /// Returns [`napi::Error`] if glob expansion fails or files cannot be read.

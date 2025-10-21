@@ -5,12 +5,12 @@
  *
  * - nemesis_paths: `e.g. ["../../dummy/Data/Nemesis_Engine/mod/aaaaa"]`
  * - `config.resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
- * - `status_fn` - Optional threadsafe JS callback for patch status updates.
+ * - `status_fn` - Optional thread_safe JS callback for patch status updates.
  *
  * # Errors
  * Returns an error if file parsing, I/O operations, or JSON serialization fails.
  */
-export declare function behaviorGen(nemesis_paths: string[], config: Config, status_fn?: (err: Error | null, status: PatchStatus) => void): Promise<void>
+export declare function behaviorGen(nemesis_paths: PatchMaps, config: Config, status_fn?: (err: Error | null, status: PatchStatus) => void): Promise<void>
 
 /**
  * Changes the current logging level.
@@ -62,6 +62,13 @@ export interface Config {
   hackOptions?: HackOptions
   /** Options controlling the output of debug artifacts. */
   debug: DebugOptions
+  /**
+   * Skyrim data directories glob (required **only when using FNIS**).
+   *
+   * This must include all directories containing `animations/<namespace>`, otherwise FNIS
+   * entries will not be detected and the process will fail.
+   */
+  skyrimDataDirGlob?: string
 }
 
 /**
@@ -148,13 +155,12 @@ export interface HackOptions {
 export declare function loadDirNode(dirs: Array<string>): Promise<Array<DirEntry>>
 
 /**
- * Loads mod information matching the given glob pattern.
+ * Collect both Nemesis and FNIS mods into a single vector.
  *
  * # Errors
- *
- * Returns `napi::Error` if loading fails.
+ * Returns [`napi::Error`] if glob expansion fails or files cannot be read.
  */
-export declare function loadModsInfo(glob: string): Array<ModInfo>
+export declare function loadModsInfo(glob: string, isVfs: boolean): Array<ModInfo>
 
 /**
  * Logs a message at the DEBUG level.
@@ -236,6 +242,22 @@ export interface ModInfo {
   author: string
   /** Mod download link */
   site: string
+  /** Mod type. Nemesis, FNIS */
+  modType: ModType
+}
+
+/** Mod type. Nemesis, FNIS */
+export declare const enum ModType {
+  /**
+   * GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+   * - `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+   */
+  Nemesis = 'Nemesis',
+  /**
+   * GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+   * - `<skyrim data dir>/meshes/actors/character/animations/<namespace>`
+   */
+  Fnis = 'Fnis'
 }
 
 /** Behavior Output target */
@@ -244,6 +266,22 @@ export declare const enum OutPutTarget {
   SkyrimSE = 'SkyrimSE',
   /** Skyrim Special Edition */
   SkyrimLE = 'SkyrimLE'
+}
+
+/** Mod entries */
+export interface PatchMaps {
+  /**
+   * Nemesis patch path
+   * - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+   * - value: priority
+   */
+  nemesisEntries: Record<string, number>
+  /**
+   * FNIS patch path
+   * - key: FNIS namespace(e.g. `namespace` of `<skyrim_data_dir>/path/meshes/actors/character/animations/<namespace>`)
+   * - value: priority
+   */
+  fnisEntries: Record<string, number>
 }
 
 /**
@@ -256,7 +294,9 @@ export declare const enum OutPutTarget {
  * - Mirrors Rust enum with serde(tag="type", content="content").
  */
 export type PatchStatus =
-  | { type: 'ReadingPatches', /** 0 based index */
+  | { type: 'GeneratingFnisPatches', /** 0 based index */
+index: number, total: number }
+| { type: 'ReadingPatches', /** 0 based index */
 index: number, total: number }
 | { type: 'ParsingPatches', /** 0 based index */
 index: number, total: number }
