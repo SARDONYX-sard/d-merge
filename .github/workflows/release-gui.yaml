@@ -28,15 +28,24 @@ jobs:
           platform: ${{ matrix.platform }}
           build_profile: ${{ env.BUILD_PROFILE }}
 
-      - name: Build the app
-        uses: tauri-apps/tauri-action@action-v0.5.20
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update CHANGELOG
+        if: runner.os == 'Windows'
+        id: changelog
+        uses: requarks/changelog-action@v1.10.3
         with:
-          releaseName: "D merge v__VERSION__"
-          tagName: ${{ github.ref_name }}
-          prerelease: false
-          projectPath: ${{ github.workspace }}/gui/backend/tauri
+          token: ${{ github.token }}
+          tag: ${{ github.ref_name }}
+
+      # NOTE: The installer is not required at this time.
+      # - name: Build the app
+      #   uses: tauri-apps/tauri-action@action-v0.5.20
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     releaseName: "D merge v__VERSION__"
+      #     tagName: ${{ github.ref_name }}
+      #     prerelease: false
+      #     projectPath: ${{ github.workspace }}/gui/backend/tauri
 
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
@@ -50,23 +59,14 @@ jobs:
         run: |
           Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}-Portable-${{ runner.os }}-v${{ github.ref_name }}.zip'
 
-      - name: Update CHANGELOG
-        id: changelog
-        if: runner.os == 'macOS'
-        uses: requarks/changelog-action@v1.10.3
-        with:
-          token: ${{ github.token }}
-          tag: ${{ github.ref_name }}
-
       - name: Release Portable Version(Windows)
         uses: ncipollo/release-action@v1.16.0
         if: runner.os == 'Windows'
         with:
           allowUpdates: true
           artifacts: ./*.zip
-          body: ${{ steps.changelog.outputs.changes }}
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
-          omitBodyDuringUpdate: true
+          body: ${{ steps.changelog.outputs.changes }}
           tag: ${{ github.ref_name }}
 
       - name: Commit CHANGELOG.md
@@ -93,7 +93,6 @@ jobs:
           allowUpdates: true
           artifacts: ./*.tar.gz
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
-          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
 
   release_egui:
@@ -136,7 +135,6 @@ jobs:
           allowUpdates: true
           artifacts: ./*.zip
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
-          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
 
       - name: Compress outputs(MacOS/Linux)
@@ -151,5 +149,4 @@ jobs:
           allowUpdates: true
           artifacts: ./*.tar.gz
           name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
-          omitBodyDuringUpdate: true
           tag: ${{ github.ref_name }}
