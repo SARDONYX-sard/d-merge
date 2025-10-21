@@ -55,7 +55,6 @@ const SETTINGS_PUB_CACHE_KEYS_OBJ = {
   locale: 'locale',
   logLevel: 'log-level',
   presetNumber: 'css-preset-number',
-  selectedPage: 'selected-page',
   settingsTabSelect: 'settings-tab-select',
   settingsTabPosition: 'settings-tab-position',
   snackbarLimit: 'snackbar-limit',
