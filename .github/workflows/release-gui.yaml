@@ -46,6 +46,8 @@ jobs:
       #     tagName: ${{ github.ref_name }}
       #     prerelease: false
       #     projectPath: ${{ github.workspace }}/gui/backend/tauri
+      - name: Build GUI
+        run: npm run build
 
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
