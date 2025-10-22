@@ -223,6 +223,7 @@ Insert an animrotation event with a rotation in degrees.
       label: 'SpecialFrames_Invincible',
       kind: monaco.languages.CompletionItemKind.Function,
       insertText: 'SpecialFrames_Invincible{"Duration":${1:0.5}}',
+      insertTextRules: monacoEnv.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       range,
       documentation: {
         value: `\`\`\`hkanno

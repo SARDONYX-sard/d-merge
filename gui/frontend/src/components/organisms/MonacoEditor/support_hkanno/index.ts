@@ -1,5 +1,5 @@
 import { type OnMount } from '@monaco-editor/react';
-
+import { registerCodeActionProvider } from './providers/code_action';
 import { registerCompletionProvider } from './providers/completion';
 import { updateHkannoDiagnostics } from './providers/diagnostic';
 import { registerDocumentFormattingEditProvider } from './providers/formatter';
@@ -22,12 +22,17 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
     },
   });
 
+  // first
+  if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+    updateHkannoDiagnostics(editor, monacoEnv);
+  }
   editor.onDidChangeModelContent(() => {
     if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
       updateHkannoDiagnostics(editor, monacoEnv);
     }
   });
 
+  registerCodeActionProvider(monacoEnv);
   registerCompletionProvider(monacoEnv);
   registerDocumentFormattingEditProvider(monacoEnv);
   registerHoverProvider(monacoEnv);

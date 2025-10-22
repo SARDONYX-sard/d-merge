@@ -13,15 +13,10 @@ import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
  * This enables hover preview by pressing K twice.
  */
 const hover = async (editor: MonacoEditor) => {
-  /**
-   * Checks if the Monaco hover widget is currently visible.
-   */
-  const isHoverVisible = (): boolean => {
-    const hover = document.querySelector('.monaco-editor.focused .monaco-hover');
-    return !!(hover && !hover.classList.contains('hidden'));
-  };
+  const hovers = document.querySelectorAll('.monaco-editor .monaco-hover');
+  const isHoverVisible = Array.from(hovers).some((h) => !h.classList.contains('hidden'));
 
-  if (isHoverVisible()) {
+  if (isHoverVisible) {
     // Double press detected → show definition preview hover
     await editor.getAction('editor.action.showDefinitionPreviewHover')?.run();
   } else {

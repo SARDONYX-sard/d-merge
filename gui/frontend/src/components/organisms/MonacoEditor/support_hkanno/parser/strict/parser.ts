@@ -203,10 +203,6 @@ const commonParsers = [
     parser: parseCommentLine,
   },
   {
-    check: (line: string) => line.toLowerCase().includes('specialframes_invincible'),
-    parser: parseIFrameLine,
-  },
-  {
     check: (line: string) => line.toLowerCase().includes('animrotation'),
     parser: parseAnimRotationLine,
   },
@@ -216,10 +212,16 @@ const commonParsers = [
   },
 ];
 
-const pieParser = {
-  check: (line: string) => line.toLowerCase().includes('pie'),
-  parser: parsePayloadInstructionLine,
-};
+const extParser = [
+  {
+    check: (line: string) => line.toLowerCase().includes('specialframes_invincible'),
+    parser: parseIFrameLine,
+  },
+  {
+    check: (line: string) => line.toLowerCase().includes('pie'),
+    parser: parsePayloadInstructionLine,
+  },
+];
 
 /**
  * Parse a single hkanno line and return the appropriate Node.(With PIE.)
@@ -229,7 +231,7 @@ const pieParser = {
  * @param lineNumber The line number (1-based)
  */
 export const parseHkannoLineExt = (line: string, lineNumber = 1): HkannoNodeExt => {
-  const parsers = [pieParser, ...commonParsers];
+  const parsers = [...extParser, ...commonParsers];
   for (const { check, parser } of parsers) {
     if (check(line)) return parser(line, lineNumber);
   }

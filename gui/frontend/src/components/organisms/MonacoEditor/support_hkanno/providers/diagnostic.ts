@@ -2,6 +2,7 @@ import type { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import { PIE_NATIVE_INSTRUCTIONS } from '../parser/payload_interpreter/completion';
 import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
+import { IFrameNode } from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
@@ -14,6 +15,10 @@ export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
   for (let lineNumber = 1; lineNumber <= lines.length; lineNumber++) {
     const line = lines[lineNumber - 1];
     const node = parseHkannoLineExt(line, lineNumber);
+
+    if (node.kind == 'iframe') {
+      markers.push(...provideIFrameDiagnostics(node, lineNumber, line.length, monacoEnv));
+    }
 
     // --- motion ---
     if (node.kind === 'motion') {
@@ -95,4 +100,89 @@ export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
   }
 
   monacoEnv.editor.setModelMarkers(model, 'hkanno-diagnostics', markers);
+};
+
+const provideIFrameDiagnostics = (
+  node: IFrameNode,
+  lineNumber: number,
+  lineLength: number,
+  monacoEnv: typeof monaco,
+): monaco.editor.IMarkerData[] => {
+  const markers: monaco.editor.IMarkerData[] = [];
+
+  // time
+  if (node.time?.value === undefined) {
+    const startCol = node.time?.pos?.startColumn ?? 1;
+    const endCol = node.time?.pos?.endColumn ?? lineLength + 1;
+    markers.push({
+      severity: monacoEnv.MarkerSeverity.Error,
+      message: `Missing time value in IFrame event.`,
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: startCol,
+      endColumn: endCol,
+    });
+  }
+
+  // event
+  if (node.event?.value !== 'SpecialFrames_Invincible') {
+    const startCol = node.event?.pos?.startColumn ?? 1;
+    const endCol = node.event?.pos?.endColumn ?? lineLength + 1;
+    markers.push({
+      severity: monacoEnv.MarkerSeverity.Error,
+      message: `Invalid IFrame event name (expected 'SpecialFrames_Invincible').`,
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: startCol,
+      endColumn: endCol,
+    });
+  }
+
+  // JSON parse error
+  if (node.jsonParseError) {
+    const startCol = node.json?.pos?.startColumn ?? 1;
+    const endCol = node.json?.pos?.endColumn ?? lineLength + 1;
+    markers.push({
+      severity: monacoEnv.MarkerSeverity.Error,
+      message: `IFrame JSON parse error: ${node.jsonParseError.message}`,
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: startCol,
+      endColumn: endCol,
+    });
+  } else if (node.json?.value === undefined) {
+    const startCol = node.json?.pos?.startColumn ?? 1;
+    const endCol = node.json?.pos?.endColumn ?? lineLength + 1;
+    markers.push({
+      severity: monacoEnv.MarkerSeverity.Error,
+      message: `IFrame JSON is missing or invalid. Only "Duration" is supported (IFrame Generator RE v1.03).`,
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: startCol,
+      endColumn: endCol,
+    });
+  }
+
+  // JSON object contains unsupported keys
+  if (node.json?.value) {
+    const keys = Object.keys(node.json.value);
+
+    for (const key of keys) {
+      if (key !== 'Duration') {
+        const startCol = node.json?.pos?.startColumn ?? 1;
+        const endCol = node.json?.pos?.endColumn ?? lineLength + 1;
+        markers.push({
+          severity: monacoEnv.MarkerSeverity.Warning,
+          message: `Possible typo: "${key}". Did you mean "Duration"? (IFrame Generator RE v1.03 supports only "Duration")`,
+          startLineNumber: lineNumber,
+          endLineNumber: lineNumber,
+          startColumn: startCol,
+          endColumn: endCol,
+          code: 'fix-iframe-key',
+        });
+      }
+    }
+  }
+
+  return markers;
 };
