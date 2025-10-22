@@ -31,9 +31,11 @@
     "**/*.ts",
     "**/*.tsx",
     "./vitest.config.ts",
+    ".next/dev/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    "out/**/types/**/*.ts",
+    "out/types/**/*.ts",
+    "out\\dev/types/**/*.ts",
     "out\\dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
