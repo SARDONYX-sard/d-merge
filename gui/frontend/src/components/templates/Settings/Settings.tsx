@@ -2,9 +2,9 @@
 import { Box, type SxProps, type Theme } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import type { MouseEventHandler } from 'react';
-import packageJson from '@/../../package.json';
 import { Help } from '@/components/atoms/Help';
 import { useInjectJs } from '@/components/hooks/useInjectJs';
+import { HELP_INFO } from '@/components/meta/meta';
 import { CodeEditorTab } from '@/components/organisms/CodeEditorTab';
 import { Tabs } from '@/components/organisms/Tabs';
 import { useTabContext } from '@/components/providers/TabProvider';
@@ -42,7 +42,7 @@ export const Settings = () => {
 
 const TabsMenu = () => {
   const handleHelpClick: MouseEventHandler<HTMLButtonElement> = (_event) => {
-    openUrl(packageJson.homepage); // jump by backend api
+    openUrl(HELP_INFO.homepage); // jump by backend api
   };
 
   return (
@@ -51,7 +51,7 @@ const TabsMenu = () => {
         <Tabs />
       </Grid>
       <Grid size={4} sx={{ overflowX: 'auto' }}>
-        <Help onClick={handleHelpClick} version={packageJson.version} />
+        <Help onClick={handleHelpClick} version={HELP_INFO.version} />
       </Grid>
     </Grid>
   );
