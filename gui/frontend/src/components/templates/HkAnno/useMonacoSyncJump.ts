@@ -1,107 +1,135 @@
 import type * as monaco from 'monaco-editor';
 import { useRef } from 'react';
 
-type AnnotationPos = Readonly<{ trackName: string; lines: number[] }>;
-
 /**
- * useMonacoSyncJump (with cached annotation line map)
+ * useMonacoSyncJump (index-based jump)
  *
- * Synchronizes cursor movement between two Monaco Editors (left and right),
- * using a precomputed map of annotation lines for fast jumps.
+ * Synchronizes cursor movement between two Monaco Editors (left and right)
+ * based on line *index* (order of appearance) rather than trackName text.
+ *
+ * When the cursor moves on the left editor:
+ *  - If it's on a `trackName:` line → jumps to the corresponding <hkparam name="trackName"> line on the right.
+ *  - If it's on a time (float) line → jumps to the corresponding <hkparam name="time"> line on the right.
  */
-export function useMonacoSyncJump() {
+export const useMonacoSyncJump = () => {
   const leftEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const rightEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
-  /** Cached annotation line map: [trackName, lineNumbers[]] */
-  const annotationMapRef = useRef<AnnotationPos[]>([]);
+  /** Mapping tables: left line → right line */
+  const trackLineMapRef = useRef<Map<number, number>>(new Map());
+  const timeLineMapRef = useRef<Map<number, number>>(new Map());
 
-  /** Register the left Monaco editor */
+  /** Register editors */
   const registerLeft = (editor: monaco.editor.IStandaloneCodeEditor) => {
     leftEditorRef.current = editor;
     setupLeftCursorSync(editor);
   };
 
-  /** Register the right Monaco editor */
   const registerRight = (editor: monaco.editor.IStandaloneCodeEditor) => {
     rightEditorRef.current = editor;
   };
 
   /**
-   * Update base line and rebuild annotation map.
-   * Call this whenever the XML preview is updated.
+   * Update both mapping tables whenever left or right text changes.
    */
-  const updateBaseLine = (xmlText: string) => {
-    const base = findAnimationBaseLine(xmlText);
-    annotationMapRef.current = buildAnnotationMap(xmlText, base);
+  const updateBaseLine = (leftText: string, xmlText: string) => {
+    const { trackMap, timeMap } = buildIndexMaps(leftText, xmlText);
+    trackLineMapRef.current = trackMap;
+    timeLineMapRef.current = timeMap;
   };
 
-  /** Listen for left cursor movement and jump right editor */
+  /**
+   * Cursor listener on the left editor — jumps to corresponding line on the right.
+   */
   const setupLeftCursorSync = (editor: monaco.editor.IStandaloneCodeEditor) => {
+    const trackNameRegex = /^\s*trackName\s*:?\s*(.+)?$/i;
     editor.onDidChangeCursorPosition((e) => {
       const right = rightEditorRef.current;
-      const map = annotationMapRef.current;
-      if (!right || !map.length) return;
+      if (!right) return;
 
       const model = editor.getModel();
       if (!model) return;
 
-      // Count which annotation index the cursor is at
-      let annotationIndex = 0;
-      for (let i = 1; i < e.position.lineNumber; i++) {
-        const line = model.getLineContent(i).trim();
-        if (!isNaN(parseFloat(line))) annotationIndex++;
+      const lineNum = e.position.lineNumber;
+      const line = model.getLineContent(lineNum).trim();
+
+      const trackMap = trackLineMapRef.current;
+      const timeMap = timeLineMapRef.current;
+
+      // --- Handle "trackName:" lines ---
+      if (trackNameRegex.test(line)) {
+        // NOTE: We considered using a range, but abandoned it because it would prevent O(1) retrieval.
+        const target = trackMap.get(lineNum);
+        if (target) {
+          right.revealLineInCenter(target);
+          right.setPosition({ lineNumber: target, column: 1 });
+        }
+        return;
       }
 
-      // Find target line from cached map
-      let accumulated = 0;
-      for (const track of map) {
-        if (annotationIndex < accumulated + track.lines.length) {
-          const targetLine = track.lines[annotationIndex - accumulated];
-          right.revealLineInCenter(targetLine);
-          right.setPosition({ lineNumber: targetLine, column: 1 });
-          return;
+      // --- Handle "time" (float) lines ---
+      const first = parseFloat(line.split(/\s+/)[0]);
+      if (!Number.isNaN(first)) {
+        const target = timeMap.get(lineNum);
+        if (target) {
+          right.revealLineInCenter(target);
+          right.setPosition({ lineNumber: target, column: 1 });
         }
-        accumulated += track.lines.length;
       }
     });
   };
 
   return { registerLeft, registerRight, updateBaseLine };
-}
-
-/** Finds <hkaSplineCompressedAnimation> base line */
-const findAnimationBaseLine = (xmlText: string): number => {
-  const lines = xmlText.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes(' class="hkaSplineCompressedAnimation" signature="0x792ee0bb">')) return i + 1;
-  }
-  return 0;
 };
 
-/** Build cached annotation map: trackName -> line numbers of <hkparam name="time"> */
-const buildAnnotationMap = (xmlText: string, baseLine: number): AnnotationPos[] => {
-  const lines = xmlText.split(/\r?\n/);
-  const map: { trackName: string; lines: number[] }[] = [];
+/**
+ * Build mapping tables between left and right editors by index order.
+ *
+ * Each occurrence of:
+ *  - `trackName:` (left) ↔ <hkparam name="trackName"> (right)
+ *  - time line (left) ↔ <hkparam name="time"> (right)
+ */
+const buildIndexMaps = (leftText: string, xmlText: string) => {
+  const leftLines = leftText.split(/\r?\n/);
+  const xmlLines = xmlText.split(/\r?\n/);
 
-  let currentTrack: { trackName: string; lines: number[] } | null = null;
+  const trackMap = new Map<number, number>();
+  const timeMap = new Map<number, number>();
 
-  for (let i = baseLine; i < lines.length; i++) {
-    const line = lines[i];
+  // --- Collect all relevant line numbers on the left ---
+  const leftTrackLines: number[] = [];
+  const leftTimeLines: number[] = [];
 
-    const trackMatch = line.match(/<hkparam name="trackName">(.*)<\/hkparam>/);
-    if (trackMatch) {
-      if (currentTrack) map.push(currentTrack);
-      currentTrack = { trackName: trackMatch[1], lines: [] };
-      continue;
+  leftLines.forEach((line, i) => {
+    if (line.trim().startsWith('trackName')) {
+      leftTrackLines.push(i + 1);
+    } else if (!isNaN(parseFloat(line.trim().split(/\s+/)[0]))) {
+      leftTimeLines.push(i + 1);
     }
+  });
 
-    const timeMatch = line.match(/<hkparam name="time">([\d.]+)<\/hkparam>/);
-    if (timeMatch && currentTrack) {
-      currentTrack.lines.push(i + 1); // Monaco is 1-based
+  // --- Collect all relevant line numbers on the right ---
+  const rightTrackLines: number[] = [];
+  const rightTimeLines: number[] = [];
+
+  xmlLines.forEach((line, i) => {
+    if (/<hkparam name="trackName">/.test(line)) {
+      rightTrackLines.push(i + 1);
+    } else if (/<hkparam name="time">/.test(line)) {
+      rightTimeLines.push(i + 1);
     }
+  });
+
+  // --- Create index-based mappings ---
+  const minTrackCount = Math.min(leftTrackLines.length, rightTrackLines.length);
+  for (let i = 0; i < minTrackCount; i++) {
+    trackMap.set(leftTrackLines[i], rightTrackLines[i]);
   }
 
-  if (currentTrack) map.push(currentTrack);
-  return map;
+  const minTimeCount = Math.min(leftTimeLines.length, rightTimeLines.length);
+  for (let i = 0; i < minTimeCount; i++) {
+    timeMap.set(leftTimeLines[i], rightTimeLines[i]);
+  }
+
+  return { trackMap, timeMap };
 };

@@ -15,7 +15,7 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 // AnnotationTrack
 export const AnnotationTrackSchema = z.object({
   /** Track name, corresponds to hkaAnnotationTrack.trackName */
-  track_name: z.string(),
+  track_name: z.string().nullable(),
   annotations: z.array(AnnotationSchema),
 });
 export type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
@@ -100,7 +100,7 @@ export const hkannoFromText = (text: string): AnnotationTrack[] => {
         annotation_tracks.push(currentTrack);
       }
       const track_name = trimmed.split(':')[1].trim();
-      currentTrack = { annotations: [], track_name };
+      currentTrack = { annotations: [], track_name: track_name == NULL_STR ? null : track_name };
       continue;
     }
 
@@ -110,7 +110,7 @@ export const hkannoFromText = (text: string): AnnotationTrack[] => {
     // Annotation line: <time> <text>
     if (!currentTrack) {
       // If text starts before any trackName, create dummy track
-      currentTrack = { annotations: [], track_name: NULL_STR };
+      currentTrack = { annotations: [], track_name: null };
     }
 
     const [t, ...txt] = trimmed.split(/\s/); // tab or space
@@ -140,7 +140,7 @@ export function hkannoToText(h: Hkanno): string {
     lines.push(''); // Separate tracks with blank lines
 
     // Output trackName even if annotations are empty
-    lines.push(`trackName: ${track.track_name}`);
+    lines.push(`trackName: ${track.track_name?.trim() ?? NULL_STR}`);
 
     // Optional: numAnnotations comment
     lines.push(`# numAnnotations: ${track.annotations.length}`);

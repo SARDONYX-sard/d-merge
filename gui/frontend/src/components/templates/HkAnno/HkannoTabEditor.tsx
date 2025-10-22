@@ -140,7 +140,7 @@ const SplitEditors = ({
           const xml = await previewHkanno(tab.inputPath, parsed);
           setPreviewXml(xml);
           setHasError(false);
-          updateBaseLine(xml);
+          updateBaseLine(tab.text, xml);
         } catch (_err) {
           setHasError(true);
         }
