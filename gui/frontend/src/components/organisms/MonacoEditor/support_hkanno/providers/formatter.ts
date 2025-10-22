@@ -64,6 +64,9 @@ const formatNode = (node: HkannoNode): string => {
     case 'text':
       return joinSpace1(node.time?.value, node.text?.value);
 
+    case 'trackName':
+      return `trackName: ${node.name?.value?.trim() ?? ''}`;
+
     case 'comment':
       return joinSpace1('#', node.comment?.value);
   }

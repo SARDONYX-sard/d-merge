@@ -1,23 +1,27 @@
 //! # hkanno
 //!
 //! `hkanno` is a utility tool designed to extract and modify internal data from
-//! `hkaSplineCompressedAnimation` fields in a custom format.
+//! `hkaSplineCompressedAnimation` fields in a custom text format.
 //!
-//! It provides a lightweight and editable representation of animation annotations,
-//! allowing users to inspect and rewrite the embedded data used in Havok animation assets.
+//! It provides a lightweight and human-editable representation of animation annotations,
+//! allowing users to inspect and rewrite the embedded annotation data used in Havok animation assets.
 //!
-//! ## Output Format
+//! ## Output Format (hkanno v2)
 //!
 //! ```text
+//! # hkanno v2
 //! # numOriginalFrames: <usize>        <- hkaSplineCompressedAnimation.numFrames
 //! # duration: <f32>                   <- hkaSplineCompressedAnimation.duration
 //! # numAnnotationTracks: <usize>      <- hkaSplineCompressedAnimation.annotationTracks.len()
-//! # numAnnotations: <usize>           <- hkaSplineCompressedAnimation.annotationTracks[0].hkaAnnotationTrack.annotations.len()
-//! <time: f32> <text: StringPtr>       <- hkaSplineCompressedAnimation.annotationTracks[0].hkaAnnotationTrack.annotations[0].time, text
+//!
+//! trackName: <String>                 <- hkaAnnotationTrack.trackName
+//! # numAnnotations: <usize>           <- hkaAnnotationTrack.annotations.len()
+//! <time: f32> <text: StringPtr>       <- hkaAnnotationTrack.annotations[n].time, text
 //! <time: f32> <text: StringPtr>
 //! ...
-//! # numAnnotations: <usize>           <- hkaSplineCompressedAnimation.annotationTracks[1].hkaAnnotationTrack.annotations.len()
-//! <time: f32> <text: StringPtr>
+//!
+//! trackName: <String>
+//! # numAnnotations: <usize>
 //! <time: f32> <text: StringPtr>
 //! ...
 //! ```
@@ -25,20 +29,48 @@
 //! ## Sample
 //!
 //! ```txt
+//! # hkanno v2
 //! # numOriginalFrames: 38
 //! # duration: 1.5
-//! # numAnnotationTracks: 97
-//! # numAnnotations: 38
+//! # numAnnotationTracks: 3
+//!
+//! trackName: PairedRoot
+//! # numAnnotations: 3
 //! 0.100000 MCO_DodgeOpen
 //! 0.400000 MCO_DodgeClose
 //! 0.900000 MCO_Recovery
+//!
+//! trackName: 2_
+//! # numAnnotations: 0
+//!
+//! trackName: Foot_L
+//! # numAnnotations: 2
+//! 0.250000 MCO_Step
+//! 0.900000 MCO_Land
 //! ```
 //!
-//! Each annotation entry contains a timestamp (`time`) and a text pointer (`text`),
-//! representing a single annotation event extracted from the original animation data.
+//! ## Parsing Rules
 //!
-//! This format is intended to be both human-readable and easy to serialize back into
-//! the binary Havok format for modding or analysis purposes.
+//! - Lines beginning with `#` are treated as comments or metadata.
+//! - `trackName:` lines are **not comments** — they are structural delimiters that
+//!   explicitly mark the start of a new annotation track.
+//! - Each `trackName` section must be immediately followed by one `# numAnnotations` line
+//!   and then a list of `<time> <text>` pairs.
+//! - The order of tracks is significant and is preserved when writing back into HKX data.
+//! - Empty lines are ignored.
+//!
+//! ## Design Notes
+//!
+//! This format is designed for both human readability and strict structure.
+//! Each `trackName` block maps 1:1 with a `hkaAnnotationTrack`, making it possible
+//! to freely edit annotations (add/remove/reorder) while maintaining a stable mapping
+//! back to the Havok binary structure.
+//!
+//! The first metadata lines (`numOriginalFrames`, `duration`, `numAnnotationTracks`)
+//! represent global animation properties, followed by per-track sections.
+//!
+//! This makes the format easy to diff, version control, or reserialize back into
+//! the Havok binary format for modding, debugging, or data analysis purposes.
 
 use rayon::prelude::*;
 use serde_hkx_features::ClassMap;
@@ -80,6 +112,7 @@ impl<'a> Hkanno<'a> {
                 .annotation_tracks
                 .into_par_iter()
                 .map(|track| AnnotationTrack {
+                    track_name: track.track_name.map(|t| Cow::Owned(t.into_owned())),
                     annotations: track
                         .annotations
                         .into_par_iter()
@@ -99,7 +132,7 @@ impl<'a> Hkanno<'a> {
     /// If missing/multiple `hkaSplineCompressedAnimation`.
     pub fn write_to_classmap(self, class_map: &mut ClassMap<'a>) -> Result<(), HkannoError> {
         use havok_classes::Classes;
-        use havok_types::I32;
+        use havok_types::{StringPtr, I32};
 
         // Find the spline(s)
         let mut splines: Vec<_> = class_map
@@ -124,17 +157,23 @@ impl<'a> Hkanno<'a> {
         anim.m_numFrames = I32::Number(self.num_original_frames);
         anim.parent.m_duration = self.duration;
 
-        for (track, edited_track) in anim
-            .parent
-            .m_annotationTracks
-            .iter_mut()
-            .zip(self.annotation_tracks)
-        {
-            for (ann, edited_ann) in track.m_annotations.iter_mut().zip(edited_track.annotations) {
-                ann.m_time = edited_ann.time;
-                ann.m_text = havok_types::StringPtr::from_option(edited_ann.text);
-            }
-        }
+        anim.parent.m_annotationTracks = self
+            .annotation_tracks
+            .into_iter()
+            .map(|track| havok_classes::hkaAnnotationTrack {
+                __ptr: None,
+                m_trackName: StringPtr::new(track.track_name),
+                m_annotations: track
+                    .annotations
+                    .into_iter()
+                    .map(|ann| havok_classes::hkaAnnotationTrackAnnotation {
+                        __ptr: None,
+                        m_time: ann.time,
+                        m_text: StringPtr::from_option(ann.text),
+                    })
+                    .collect(),
+            })
+            .collect();
 
         Ok(())
     }
@@ -194,6 +233,10 @@ impl<'a> Hkanno<'a> {
 /// Represents a single annotation track extracted from a Havok animation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnnotationTrack<'a> {
+    /// The name of this annotation track (e.g. `PairedRoot`, `2_`, etc.).
+    /// Corresponds to `hkaAnnotationTrack.trackName`.
+    pub track_name: Option<Cow<'a, str>>,
+
     /// The collection of annotation entries in this track.
     pub annotations: Vec<Annotation<'a>>,
 }
@@ -212,20 +255,29 @@ pub struct Annotation<'a> {
 
 impl<'a> fmt::Display for Hkanno<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Header (global animation properties)
+        writeln!(f, "# hkanno v2")?;
         writeln!(f, "# numOriginalFrames: {}", self.num_original_frames)?;
         writeln!(f, "# duration: {}", self.duration)?;
         writeln!(f, "# numAnnotationTracks: {}", self.annotation_tracks.len())?;
+        writeln!(f)?;
 
+        // Each track block
         for track in &self.annotation_tracks {
-            if track.annotations.is_empty() {
-                continue;
-            }
-
+            writeln!(
+                f,
+                "trackName: {}",
+                track.track_name.as_deref().unwrap_or(havok_types::NULL_STR)
+            )?;
             writeln!(f, "# numAnnotations: {}", track.annotations.len())?;
+
             for ann in &track.annotations {
                 let text = ann.text.as_deref().unwrap_or(havok_types::NULL_STR);
                 writeln!(f, "{:.6} {}", ann.time, text)?;
             }
+
+            // Separate tracks by one blank line
+            writeln!(f)?;
         }
 
         Ok(())
@@ -291,7 +343,10 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
                     text: ann.m_text.into_inner(),
                 })
                 .collect::<Vec<_>>();
-            AnnotationTrack { annotations }
+            AnnotationTrack {
+                track_name: track.m_trackName.into_inner(),
+                annotations,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -403,7 +458,7 @@ pub enum HkannoError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::borrow::Cow;
+    use std::{borrow::Cow, path::Path};
 
     #[test]
     fn test_hkanno_to_string_format() {
@@ -414,6 +469,7 @@ mod tests {
             duration: 0.8,
             annotation_tracks: vec![
                 AnnotationTrack {
+                    track_name: Some(Cow::Borrowed("Track1")),
                     annotations: vec![
                         Annotation {
                             time: 0.1,
@@ -426,6 +482,7 @@ mod tests {
                     ],
                 },
                 AnnotationTrack {
+                    track_name: Some(Cow::Borrowed("Track2")),
                     annotations: vec![
                         Annotation {
                             time: 0.3,
@@ -433,8 +490,8 @@ mod tests {
                         },
                         Annotation {
                             time: 0.7,
-                            text: None,
-                        }, // missing text
+                            text: None, // missing text
+                        },
                     ],
                 },
             ],
@@ -444,20 +501,28 @@ mod tests {
 
         let output = hkanno.to_string();
 
-        // Basic structure checks
+        // Header checks
         assert!(output.contains("# numOriginalFrames: 10"));
         assert!(output.contains("# duration: 0.8"));
         assert!(output.contains("# numAnnotationTracks: 2"));
+
+        // Track1 checks
+        assert!(output.contains("trackName: Track1"));
         assert!(output.contains("# numAnnotations: 2"));
         assert!(output.contains("0.100000 Start"));
-        assert!(output.contains("0.700000 \u{2400}")); // None text replaced by NULL_STR
+        assert!(output.contains("0.500000 Mid"));
+
+        // Track2 checks
+        assert!(output.contains("trackName: Track2"));
+        assert!(output.contains("0.300000 Alt1"));
+        // None text replaced by NULL_STR
+        assert!(output.contains("0.700000 \u{2400}"));
     }
 
     #[test]
-    #[ignore = "Need Local file."]
+    #[ignore = "Requires local file"]
     fn test_parse_as_hkanno_from_file_path() {
         let path = "../../dummy/convert/input/MCO_Dodge-B-1.xml";
-
         let bytes = std::fs::read(path).expect("Failed to read test HKX file");
         let mut buffer = String::new();
 

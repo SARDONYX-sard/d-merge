@@ -1,7 +1,15 @@
 import * as monaco from 'monaco-editor';
 import { HKANNO_LANGUAGE_ID } from '..';
 import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
-import type { FieldNode, HkannoNodeExt, IFrameNode, MotionNode, RotationNode, TextNode } from '../parser/strict/nodes';
+import type {
+  FieldNode,
+  HkannoNodeExt,
+  IFrameNode,
+  MotionNode,
+  RotationNode,
+  TextNode,
+  TrackNameNode,
+} from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 const UNKNOWN = '<unknown>';
@@ -25,6 +33,8 @@ const isCursorInside = <T extends string>(field: FieldNode<T> | undefined, colum
 
 const buildHoverMarkdown = (node: HkannoNodeExt, cursorColumn: number): string | null => {
   switch (node.kind) {
+    case 'trackName':
+      return hoverTrackName(node);
     case 'motion':
       return hoverMotion(node, cursorColumn);
     case 'rotation':
@@ -179,4 +189,12 @@ Payload instruction.
     `- Name: \`${name}\``,
     params.length ? `- Parameters: ${params.join(' | ')}` : '- No parameters',
   ].join('\n');
+};
+
+const hoverTrackName = (node: TrackNameNode) => {
+  const name = node.name?.value ?? '<unnamed>';
+  return `# Annotation Track
+This defines a named annotation track. All following annotations belong to this track until the next trackName or end of file.
+
+- Track name: \`${name}\``;
 };

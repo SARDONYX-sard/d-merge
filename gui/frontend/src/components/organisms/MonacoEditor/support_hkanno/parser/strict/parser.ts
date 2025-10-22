@@ -11,6 +11,7 @@ import {
   RotationNode,
   SpaceNode,
   TextNode,
+  TrackNameNode,
 } from './nodes';
 
 export type ParserState = {
@@ -109,6 +110,24 @@ export const parseCommentLine = (line: string, lineNumber = 1): CommentNode => {
   return node;
 };
 
+export const parseTrackNameLine = (line: string, lineNumber = 1): TrackNameNode => {
+  const state: ParserState = { line, i: 0, lineNumber, len: line.length };
+  const node: TrackNameNode = { kind: 'trackName' };
+
+  node.space0First = parseSpace(state);
+  node.literal = parseLiteralField(state, 'trackName:');
+  node.space0LiteralToName = parseSpace(state);
+
+  // Track name until end of line, trim spaces
+  const field = parseFieldUntil(state, '\n');
+  if (field?.value) field.value = field.value.trim();
+  node.name = field;
+
+  node.space0AfterName = parseSpace(state);
+
+  return node;
+};
+
 /**
  * Parse a single animrotation line.
  * # Pattern
@@ -201,6 +220,10 @@ const commonParsers = [
   {
     check: (line: string) => line.trimStart().startsWith('#'),
     parser: parseCommentLine,
+  },
+  {
+    check: (line: string) => line.trimStart().toLowerCase().startsWith('trackname:'),
+    parser: parseTrackNameLine,
   },
   {
     check: (line: string) => line.toLowerCase().includes('animrotation'),

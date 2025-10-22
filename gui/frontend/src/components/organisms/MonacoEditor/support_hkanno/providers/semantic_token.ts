@@ -54,6 +54,11 @@ export const registerDocumentSemanticTokensProvider = (monacoEnv: typeof monaco)
             });
             break;
           }
+          case 'trackName': {
+            pushToken(node.literal?.pos, 'variable');
+            pushToken(node.name?.pos, 'string');
+            break;
+          }
 
           case 'motion': {
             if (node.event?.pos) pushToken(node.event.pos, 'identifier');

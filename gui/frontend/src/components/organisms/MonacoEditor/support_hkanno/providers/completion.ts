@@ -20,8 +20,6 @@ export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
       };
 
       switch (node.kind) {
-        case 'comment':
-          return { suggestions: [newCommentSnippet(range)] };
         case 'motion':
           return { suggestions: provideMotionCompletions(node, range, cursorNumber) };
         case 'rotation':
@@ -40,22 +38,35 @@ export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
   });
 };
 
-const newCommentSnippet = (range: monaco.IRange) =>
-  ({
+const hkannoSnippets = [
+  {
     label: '# numAnnotations:',
-    kind: monaco.languages.CompletionItemKind.Keyword,
     insertText: '# numAnnotations: ${1:usize}',
-    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-    range,
-    documentation: {
-      value: `\`\`\`hkanno
-# numAnnotations: <number>
-\`\`\`
-Declare the number of annotations in this document.`,
-      isTrusted: true,
-    },
-    sortText: 'z', // This brings the candidate to the very bottom.
-  }) as const satisfies monaco.languages.CompletionItem;
+    documentation: '```hkanno\n# numAnnotations: <number>\n```\nDeclare the number of annotations in this document.',
+  },
+  {
+    label: 'trackName:',
+    insertText: 'trackName: ${1:Name}',
+    documentation: '```hkanno\ntrackName: <name>\n```\nDeclare the track name for this annotation track.',
+  },
+] as const;
+
+const newStartSnippets = (range: monaco.IRange) =>
+  hkannoSnippets.map(
+    (snip) =>
+      ({
+        label: snip.label,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        insertText: snip.insertText,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        documentation: {
+          value: snip.documentation,
+          isTrusted: true,
+        },
+        sortText: 'z', // This brings the candidate to the very bottom.
+      }) as const,
+  ) satisfies readonly monaco.languages.CompletionItem[];
 
 /** Check if the cursor is immediately after the specified node */
 export const isAfter = (pos: Pos | undefined, range: monaco.IRange) => {
@@ -168,7 +179,7 @@ The timestamp at which this annotation occurs.`,
           isTrusted: true,
         },
       },
-      newCommentSnippet(range),
+      ...newStartSnippets(range),
     ];
   }
 

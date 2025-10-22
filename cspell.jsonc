@@ -62,6 +62,7 @@
     "refout",
     "repr",
     "requwest",
+    "reserialize",
     "rsplitn",
     "rustflags",
     "serde",

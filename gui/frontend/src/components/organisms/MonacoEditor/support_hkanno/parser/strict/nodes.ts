@@ -4,13 +4,15 @@ import type { PayloadInstructionNode } from '../payload_interpreter/nodes';
 
 /**
  * - `<space0> # <comment until \n>`
+ * - `<space0> trackName: <string> <space0>`
+ *
  * - `<space0> <time> <space1> <text until \n but trim>`
  *
  * special pattern
  * - `<space0> <time> <space1> animmotion <space1> <x: f32> <space1> <y: f32> <space1> <z: f32> <space0>`
  * - `<space0> <time> <space1> animrotation <space1> <degrees: f32> <space0>`
  */
-export type HkannoNode = RotationNode | MotionNode | TextNode | CommentNode;
+export type HkannoNode = RotationNode | MotionNode | TextNode | CommentNode | TrackNameNode;
 export type HkannoNodeExt = HkannoNode | IFrameNode | PayloadInstructionNode;
 
 /**
@@ -73,6 +75,21 @@ export type CommentNode = {
 
   /** Optional space after comment */
   space0AfterComment?: SpaceNode;
+};
+
+/** Track name line node */
+export type TrackNameNode = {
+  kind: 'trackName';
+  /** Optional leading space */
+  space0First?: SpaceNode;
+  /** Literal 'trackName:' */
+  literal?: FieldNode<'trackName:'>;
+  /** Optional space after literal */
+  space0LiteralToName?: SpaceNode;
+  /** Track name string (trimmed) */
+  name?: FieldNode<string>;
+  /** Optional trailing space */
+  space0AfterName?: SpaceNode;
 };
 
 /**

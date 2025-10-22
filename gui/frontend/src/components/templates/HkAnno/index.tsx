@@ -7,7 +7,7 @@ import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { openPath } from '@/services/api/dialog';
-import { type Hkanno, hkannoFromText, loadHkanno, NULL_STR, saveHkanno } from '@/services/api/hkanno';
+import { type Hkanno, hkannoFromText, hkannoToText, loadHkanno, saveHkanno } from '@/services/api/hkanno';
 import type { OutFormat } from '@/services/api/serde_hkx';
 import { ClosableTabs } from './ClosableTabs';
 import { FileTab, FileTabSchema, HkannoTabEditor } from './HkannoTabEditor';
@@ -220,27 +220,6 @@ export const HkannoEditorPage: React.FC = () => {
     </Box>
   );
 };
-
-// Example text <-> object conversion (frontend-side mirror)
-function hkannoToText(h: Hkanno): string {
-  const lines: string[] = [];
-
-  lines.push(`# numOriginalFrames: ${h.num_original_frames}`);
-  lines.push(`# duration: ${h.duration}`);
-  lines.push(`# numAnnotationTracks: ${h.annotation_tracks.length}`);
-
-  for (const track of h.annotation_tracks) {
-    if (!track.annotations.length) continue;
-
-    lines.push(`# numAnnotations: ${track.annotations.length}`);
-    for (const ann of track.annotations) {
-      const text = ann.text ?? NULL_STR;
-      lines.push(`${ann.time.toFixed(6)} ${text}`);
-    }
-  }
-
-  return lines.join('\n');
-}
 
 /** Parse hkanno text into frontend Hkanno object */
 export const hkannoFromFileTab = (fileTab: FileTab): Hkanno => {

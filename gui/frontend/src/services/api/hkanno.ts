@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import z from 'zod';
 import { OutFormat } from './serde_hkx';
 
-/** hkStringPtr/hkCString XML null display */
+/** `hkStringPtr`, `hkCString` XML null representation */
 export const NULL_STR = '\u2400';
 
 // Annotation
@@ -14,14 +14,16 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 
 // AnnotationTrack
 export const AnnotationTrackSchema = z.object({
+  /** Track name, corresponds to hkaAnnotationTrack.trackName */
+  track_name: z.string(),
   annotations: z.array(AnnotationSchema),
 });
 export type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
 
 // Hkanno
 export const HkannoSchema = z.object({
-  /** XML index e.g. `#0003`  */
-  ptr: z.string(), // e.g. "#0003"
+  /** XML index e.g. `#0003` */
+  ptr: z.string(),
   num_original_frames: z.number(),
   duration: z.number(),
   annotation_tracks: z.array(AnnotationTrackSchema),
@@ -82,7 +84,7 @@ export const previewHkanno = async (path: string, hkanno: Hkanno): Promise<strin
   }
 };
 
-/** Parse hkanno text into AnnotationTrack[] only */
+/** Parse hkanno v2 text into AnnotationTrack[] including track names */
 export const hkannoFromText = (text: string): AnnotationTrack[] => {
   const lines = text.split('\n');
   const annotation_tracks: AnnotationTrack[] = [];
@@ -92,24 +94,28 @@ export const hkannoFromText = (text: string): AnnotationTrack[] => {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    if (trimmed.startsWith('# numAnnotations')) {
+    // Start of a new track (flexible spacing around colon)
+    if (/^trackName\s*:/i.test(trimmed)) {
       if (currentTrack) {
         annotation_tracks.push(currentTrack);
       }
-      currentTrack = { annotations: [] };
+      const track_name = trimmed.split(':')[1].trim();
+      currentTrack = { annotations: [], track_name };
       continue;
     }
 
-    if (trimmed.startsWith('#')) continue; // other comment lines
+    // Comment lines (#) are ignored except numAnnotations (optional)
+    if (trimmed.startsWith('#')) continue;
 
+    // Annotation line: <time> <text>
     if (!currentTrack) {
-      // First track without numAnnotations header
-      currentTrack = { annotations: [] };
+      // If text starts before any trackName, create dummy track
+      currentTrack = { annotations: [], track_name: NULL_STR };
     }
 
-    const [t, ...txt] = trimmed.split(' ');
+    const [t, ...txt] = trimmed.split(/\s/); // tab or space
     const time = parseFloat(t);
-    const annText = txt.join(' ');
+    const annText = txt.join(' ').trim();
     currentTrack.annotations.push({
       time,
       text: annText === NULL_STR ? null : annText,
@@ -120,3 +126,30 @@ export const hkannoFromText = (text: string): AnnotationTrack[] => {
 
   return annotation_tracks;
 };
+
+/** Convert Hkanno object to editable text (frontend-side mirror) */
+export function hkannoToText(h: Hkanno): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`# numOriginalFrames: ${h.num_original_frames}`);
+  lines.push(`# duration: ${h.duration}`);
+  lines.push(`# numAnnotationTracks: ${h.annotation_tracks.length}`);
+
+  for (const track of h.annotation_tracks) {
+    lines.push(''); // Separate tracks with blank lines
+
+    // Output trackName even if annotations are empty
+    lines.push(`trackName: ${track.track_name}`);
+
+    // Optional: numAnnotations comment
+    lines.push(`# numAnnotations: ${track.annotations.length}`);
+
+    for (const ann of track.annotations) {
+      const text = ann.text?.trim() ?? NULL_STR;
+      lines.push(`${ann.time.toFixed(6)} ${text}`);
+    }
+  }
+
+  return lines.join('\n');
+}

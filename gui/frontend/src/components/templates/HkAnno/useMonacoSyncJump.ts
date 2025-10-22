@@ -1,24 +1,22 @@
 import type * as monaco from 'monaco-editor';
 import { useRef } from 'react';
 
+type AnnotationPos = Readonly<{ trackName: string; lines: number[] }>;
+
 /**
- * useMonacoSyncJump
+ * useMonacoSyncJump (with cached annotation line map)
  *
- * Synchronizes cursor movement between two Monaco Editors (left and right).
- * When the cursor in the left editor moves, the right editor automatically
- * jumps to the corresponding <hkparam name="time"> line in the XML preview.
- *
- * Assumptions:
- * - <hkaSplineCompressedAnimation> line is the base anchor.
- * - The first <hkparam name="time"> appears 13 lines below that base.
- * - Each annotation block consists of 4 lines.
+ * Synchronizes cursor movement between two Monaco Editors (left and right),
+ * using a precomputed map of annotation lines for fast jumps.
  */
 export function useMonacoSyncJump() {
   const leftEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const rightEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const baseLineRef = useRef<number | null>(null);
 
-  /** Register the left Monaco editor and attach cursor sync logic */
+  /** Cached annotation line map: [trackName, lineNumbers[]] */
+  const annotationMapRef = useRef<AnnotationPos[]>([]);
+
+  /** Register the left Monaco editor */
   const registerLeft = (editor: monaco.editor.IStandaloneCodeEditor) => {
     leftEditorRef.current = editor;
     setupLeftCursorSync(editor);
@@ -29,46 +27,81 @@ export function useMonacoSyncJump() {
     rightEditorRef.current = editor;
   };
 
-  /** Detects the base line of <hkaSplineCompressedAnimation> in the XML */
+  /**
+   * Update base line and rebuild annotation map.
+   * Call this whenever the XML preview is updated.
+   */
   const updateBaseLine = (xmlText: string) => {
     const base = findAnimationBaseLine(xmlText);
-    baseLineRef.current = base;
+    annotationMapRef.current = buildAnnotationMap(xmlText, base);
   };
 
-  /** Internal: listens for left cursor movement and jumps right editor */
+  /** Listen for left cursor movement and jump right editor */
   const setupLeftCursorSync = (editor: monaco.editor.IStandaloneCodeEditor) => {
     editor.onDidChangeCursorPosition((e) => {
-      const model = editor.getModel();
       const right = rightEditorRef.current;
-      const baseLine = baseLineRef.current;
-      if (!model || !right || baseLine == null) return;
+      const map = annotationMapRef.current;
+      if (!right || !map.length) return;
 
-      const BASE_OFFSET = 13;
-      const BLOCK_SIZE = 4;
+      const model = editor.getModel();
+      if (!model) return;
 
-      let index = 0;
+      // Count which annotation index the cursor is at
+      let annotationIndex = 0;
       for (let i = 1; i < e.position.lineNumber; i++) {
-        const l = model.getLineContent(i).trim();
-        if (!isNaN(parseFloat(l))) index++;
+        const line = model.getLineContent(i).trim();
+        if (!isNaN(parseFloat(line))) annotationIndex++;
       }
 
-      const targetLine = baseLine + BASE_OFFSET + BLOCK_SIZE * index;
-
-      right.revealLineInCenter(targetLine);
-      right.setPosition({ lineNumber: targetLine, column: 1 });
+      // Find target line from cached map
+      let accumulated = 0;
+      for (const track of map) {
+        if (annotationIndex < accumulated + track.lines.length) {
+          const targetLine = track.lines[annotationIndex - accumulated];
+          right.revealLineInCenter(targetLine);
+          right.setPosition({ lineNumber: targetLine, column: 1 });
+          return;
+        }
+        accumulated += track.lines.length;
+      }
     });
   };
 
   return { registerLeft, registerRight, updateBaseLine };
 }
 
-/**
- * Finds the line number of <hkaSplineCompressedAnimation> in the XML text.
- */
-function findAnimationBaseLine(xmlText: string): number {
+/** Finds <hkaSplineCompressedAnimation> base line */
+const findAnimationBaseLine = (xmlText: string): number => {
   const lines = xmlText.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes(' class="hkaSplineCompressedAnimation" signature="0x792ee0bb">')) return i + 1;
   }
   return 0;
-}
+};
+
+/** Build cached annotation map: trackName -> line numbers of <hkparam name="time"> */
+const buildAnnotationMap = (xmlText: string, baseLine: number): AnnotationPos[] => {
+  const lines = xmlText.split(/\r?\n/);
+  const map: { trackName: string; lines: number[] }[] = [];
+
+  let currentTrack: { trackName: string; lines: number[] } | null = null;
+
+  for (let i = baseLine; i < lines.length; i++) {
+    const line = lines[i];
+
+    const trackMatch = line.match(/<hkparam name="trackName">(.*)<\/hkparam>/);
+    if (trackMatch) {
+      if (currentTrack) map.push(currentTrack);
+      currentTrack = { trackName: trackMatch[1], lines: [] };
+      continue;
+    }
+
+    const timeMatch = line.match(/<hkparam name="time">([\d.]+)<\/hkparam>/);
+    if (timeMatch && currentTrack) {
+      currentTrack.lines.push(i + 1); // Monaco is 1-based
+    }
+  }
+
+  if (currentTrack) map.push(currentTrack);
+  return map;
+};
