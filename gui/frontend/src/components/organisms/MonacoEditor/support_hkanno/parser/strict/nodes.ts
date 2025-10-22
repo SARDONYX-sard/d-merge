@@ -1,3 +1,5 @@
+import z from 'zod';
+import type { Json } from '@/lib/zod/json-validation';
 import type { PayloadInstructionNode } from '../payload_interpreter/nodes';
 
 /**
@@ -8,8 +10,8 @@ import type { PayloadInstructionNode } from '../payload_interpreter/nodes';
  * - `<space0> <time> <space1> animmotion <space1> <x: f32> <space1> <y: f32> <space1> <z: f32> <space0>`
  * - `<space0> <time> <space1> animrotation <space1> <degrees: f32> <space0>`
  */
-export type HkannoNode = RotationNode | MotionNode | TextNode | CommentNode;
-export type HkannoNodeExt = RotationNode | MotionNode | TextNode | CommentNode | PayloadInstructionNode;
+export type HkannoNode = RotationNode | MotionNode | TextNode | CommentNode | IFrameNode;
+export type HkannoNodeExt = HkannoNode | PayloadInstructionNode;
 
 /**
  * Represents a position in the text (1-based line and column).
@@ -42,12 +44,12 @@ export interface SpaceNode {
  *
  * e.g., a `time` field, `x` coordinate, or `text` string.
  */
-export interface FieldNode<T extends string | number> {
+export type FieldNode<T extends string | number | Json> = {
   /** The actual value of the field */
   value?: T;
   /** Position of the value in the line */
   pos?: Pos;
-}
+};
 
 /**
  * Comment line node.
@@ -134,9 +136,9 @@ export type MotionNode = {
 /**
  * Rotation line node.
  *
- * Pattern: <space0> <time> <space1> animrotation <space1> <degrees> <space0>
+ * Pattern: `<space0> <time> <space1> animrotation <space1> <degrees> <space0>`
  *
- * e.g., "0.5 animrotation 90 "
+ * e.g., `0.5 animrotation 90 `
  */
 export type RotationNode = {
   kind: 'rotation';
@@ -155,4 +157,36 @@ export type RotationNode = {
   degrees?: FieldNode<number>;
   /** Optional space after degrees */
   space0AfterDegrees?: SpaceNode;
+};
+
+/**
+ * I-Frame line node.
+ *
+ * Pattern: `<space0> <time> <space1> SpecialFrames_Invincible{"<key>":value}<space0>`
+ *
+ * # Note
+ * `{"<key>":value}` is json format
+ *
+ * # Example
+ *
+ * e.g., `0.500000 SpecialFrames_Invincible{"Duration":0.5}`
+ */
+export type IFrameNode = {
+  kind: 'iframe';
+
+  /** Optional space before time */
+  space0First?: SpaceNode;
+  /** Time field */
+  time?: FieldNode<number>;
+  /** Mandatory space between time and event */
+  space1TimeToEvent?: SpaceNode;
+  /** Event name (fixed 'SpecialFrames_Invincible') */
+  event?: FieldNode<'SpecialFrames_Invincible'>;
+  /** JSON data, e.g., {"Duration": 0.5} */
+  json?: FieldNode<Json>;
+  /** Optional space after JSON */
+  space0AfterJson?: SpaceNode;
+
+  /** JSON parse error if invalid */
+  jsonParseError?: z.ZodError<string>;
 };

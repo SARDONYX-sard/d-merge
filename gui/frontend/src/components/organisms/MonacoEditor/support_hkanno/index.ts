@@ -43,11 +43,12 @@ export const supportHkanno: OnMount = (editor, monacoEnv) => {
         [/\b\d+\.\d+\b/, 'number.float'],
         [/\b\d+\b/, 'number'],
 
-        [/\bSoundPlay\b/, 'identifier'],
-        [/\bPIE|pie\b/, 'identifier'],
+        [/\bPIE|pie\b/, 'variable'],
 
         [/\banimmotion\b/, 'identifier'],
         [/\banimrotation\b/, 'identifier'],
+        [/\bSoundPlay\b/, 'identifier'],
+        [/\bSpecialFrames_Invincible\b/, 'identifier'],
 
         [/-?\d+\.\d+|-?\d+/, 'number.float'],
 

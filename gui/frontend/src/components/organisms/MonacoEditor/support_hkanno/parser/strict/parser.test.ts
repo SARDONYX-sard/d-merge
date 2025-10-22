@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CommentNode, MotionNode, RotationNode, TextNode } from './nodes';
-import { parseAnimMotionLine, parseAnimRotationLine, parseCommentLine, parseTextLine } from './parser';
+import type { CommentNode, IFrameNode, MotionNode, RotationNode, TextNode } from './nodes';
+import { parseAnimMotionLine, parseAnimRotationLine, parseCommentLine, parseIFrameLine, parseTextLine } from './parser';
 
 describe('Hkanno parsers', () => {
   it('parses a comment line with spaces', () => {
@@ -115,5 +115,38 @@ describe('parseAnimRotationLine', () => {
       degrees: { value: -90.5, pos: { line: 1, startColumn: 22, endColumn: 27 } },
       space0AfterDegrees: { rawText: ' ', kind: 'space', pos: { line: 1, startColumn: 27, endColumn: 28 } },
     } as const satisfies RotationNode);
+  });
+});
+
+describe('parseIFrameLine', () => {
+  it('parses a simple IFrame line', () => {
+    const line = '0.500000 SpecialFrames_Invincible{"Duration":0.5}';
+    const node = parseIFrameLine(line, 1);
+
+    expect(node).toEqual({
+      kind: 'iframe',
+      space0First: undefined,
+      time: { value: 0.5, pos: { line: 1, startColumn: 1, endColumn: 9 } },
+      space1TimeToEvent: { rawText: ' ', kind: 'space', pos: { line: 1, startColumn: 9, endColumn: 10 } },
+      event: { value: 'SpecialFrames_Invincible', pos: { line: 1, startColumn: 10, endColumn: 34 } },
+      json: { value: { Duration: 0.5 }, pos: { line: 1, startColumn: 34, endColumn: 50 } },
+      space0AfterJson: undefined,
+    } as const satisfies IFrameNode);
+  });
+
+  it('parses IFrame line with leading/trailing spaces', () => {
+    const line = '  0.25 SpecialFrames_Invincible{"Duration":1} ';
+    const node = parseIFrameLine(line, 1);
+
+    expect(node.space0First?.rawText).toBe('  ');
+    expect(node.json?.value).toEqual({ Duration: 1 });
+    expect(node.space0AfterJson?.rawText).toBeUndefined();
+  });
+
+  it('handles invalid JSON gracefully', () => {
+    const line = '0.5 SpecialFrames_Invincible{invalid}';
+    const node = parseIFrameLine(line, 1);
+    expect(node.json?.value).toBeUndefined();
+    expect(node.jsonParseError).toBeDefined();
   });
 });

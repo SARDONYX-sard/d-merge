@@ -1,9 +1,11 @@
+import { stringToJsonSchema } from '@/lib/zod/json-validation';
 import { parsePayloadInstructionLine } from '../payload_interpreter/parser';
 import {
   CommentNode,
   FieldNode,
   HkannoNode,
   HkannoNodeExt,
+  IFrameNode,
   MotionNode,
   Pos,
   RotationNode,
@@ -171,6 +173,54 @@ export function parseAnimRotationLine(line: string, lineNumber = 1): RotationNod
   return node;
 }
 
+export const parseIFrameLine = (line: string, lineNumber = 1): IFrameNode => {
+  const state: ParserState = { line, i: 0, lineNumber, len: line.length };
+  const node: IFrameNode = { kind: 'iframe' };
+
+  node.space0First = parseSpace(state);
+  node.time = parseNumberField(state);
+  node.space1TimeToEvent = parseSpace(state);
+  node.event = parseLiteralField(state, 'SpecialFrames_Invincible');
+  node.json = parseFieldUntil(state, '\n');
+  if (node.json?.value) {
+    const result = stringToJsonSchema.safeParse(node.json.value);
+    if (result.success) {
+      node.json.value = result.data;
+    } else {
+      node.json.value = undefined;
+      node.jsonParseError = result.error;
+    }
+  }
+
+  node.space0AfterJson = parseSpace(state);
+
+  return node;
+};
+
+const commonParsers = [
+  {
+    check: (line: string) => line.trimStart().startsWith('#'),
+    parser: parseCommentLine,
+  },
+  {
+    check: (line: string) => line.toLowerCase().includes('specialframes_invincible'),
+    parser: parseIFrameLine,
+  },
+  {
+    check: (line: string) => line.toLowerCase().includes('animrotation'),
+    parser: parseAnimRotationLine,
+  },
+  {
+    check: (line: string) => line.toLowerCase().includes('animmotion'),
+    parser: parseAnimMotionLine,
+  },
+];
+
+const pieParser = {
+  check: (line: string) => line.toLowerCase().includes('pie'),
+  parser: parsePayloadInstructionLine,
+};
+
 /**
  * Parse a single hkanno line and return the appropriate Node.(With PIE.)
  * Delegates to specialized parsers based on the content.
@@ -179,57 +229,24 @@ export function parseAnimRotationLine(line: string, lineNumber = 1): RotationNod
  * @param lineNumber The line number (1-based)
  */
 export const parseHkannoLineExt = (line: string, lineNumber = 1): HkannoNodeExt => {
-  const trimmed = line.trimStart();
-  const lowerTrimmed = trimmed.toLowerCase();
-
-  // Comment line starts with #
-  if (trimmed.startsWith('#')) {
-    return parseCommentLine(line, lineNumber);
+  const parsers = [pieParser, ...commonParsers];
+  for (const { check, parser } of parsers) {
+    if (check(line)) return parser(line, lineNumber);
   }
-  if (lowerTrimmed.includes('pie')) {
-    return parsePayloadInstructionLine(line, lineNumber);
-  }
-
-  // animrotation line
-  if (lowerTrimmed.includes('animrotation')) {
-    return parseAnimRotationLine(line, lineNumber);
-  }
-
-  // animmotion line
-  if (lowerTrimmed.includes('animmotion')) {
-    return parseAnimMotionLine(line, lineNumber);
-  }
-
-  // Fallback: treat as text line
+  // Fallback: text line
   return parseTextLine(line, lineNumber);
 };
 
 /**
- * PParser with lenient parsing for formatter applications.
+ * Parser with lenient parsing for formatter applications, no PIE
  *
  * @param line A single line of hkanno text
  * @param lineNumber The line number (1-based)
- * @returns HkannoNode (RotationNode | MotionNode | TextNode | CommentNode)
  */
 export const parseHkannoLine = (line: string, lineNumber = 1): HkannoNode => {
-  const trimmed = line.trimStart();
-  const lowerTrimmed = trimmed.toLowerCase();
-
-  // Comment line starts with #
-  if (trimmed.startsWith('#')) {
-    return parseCommentLine(line, lineNumber);
+  for (const { check, parser } of commonParsers) {
+    if (check(line)) return parser(line, lineNumber);
   }
-
-  // animrotation line
-  if (lowerTrimmed.includes('animrotation')) {
-    return parseAnimRotationLine(line, lineNumber);
-  }
-
-  // animmotion line
-  if (lowerTrimmed.includes('animmotion')) {
-    return parseAnimMotionLine(line, lineNumber);
-  }
-
-  // Fallback: treat as text line
+  // Fallback: text line
   return parseTextLine(line, lineNumber);
 };

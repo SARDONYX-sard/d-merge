@@ -67,6 +67,11 @@ export const registerDocumentSemanticTokensProvider = (monacoEnv: typeof monaco)
             break;
           }
 
+          case 'iframe': {
+            pushToken(node.event?.pos, 'identifier');
+            break;
+          }
+
           case 'text': {
             pushToken(node.time?.pos, 'number');
             pushToken(node.text?.pos, 'string');
