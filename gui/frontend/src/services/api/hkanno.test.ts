@@ -65,7 +65,7 @@ trackName                        :                Hi
 
     const tracks = hkannoFromText(text);
     expect(tracks.length).toBe(1);
-    expect(tracks[0].track_name).toBe(NULL_STR);
+    expect(tracks[0].track_name).toBeNull();
     expect(tracks[0].annotations[0].text).toBe('OrphanEvent');
   });
 
