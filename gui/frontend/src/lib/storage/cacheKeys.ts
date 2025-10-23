@@ -41,6 +41,8 @@ const PATCH_PRIVATE_CACHE_KEYS_OBJ = {
 
 const HKANNO_PRIVATE_CACHE_KEYS_OBJ = {
   hkannoFileTabs: 'hkanno-file-tabs',
+  hkannoActiveTab: 'hkanno-active-tab',
+  hkannoShowPreview: 'hkanno-show-preview',
 } as const;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,15 +13,15 @@ import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
  * This enables hover preview by pressing K twice.
  */
 const hover = async (editor: MonacoEditor) => {
-  const hovers = document.querySelectorAll('.monaco-editor .monaco-hover');
+  const hovers = document.querySelectorAll('.monaco-hover');
   const isHoverVisible = Array.from(hovers).some((h) => !h.classList.contains('hidden'));
 
   if (isHoverVisible) {
     // Double press detected → show definition preview hover
-    await editor.getAction('editor.action.showDefinitionPreviewHover')?.run();
-  } else {
-    await editor.getAction('editor.action.showHover')?.run();
+    return await editor.getAction('editor.action.showDefinitionPreviewHover')?.run();
   }
+
+  await editor.getAction('editor.action.showHover')?.run();
 };
 
 type DefineVimExCommand = {
@@ -47,11 +47,6 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
     vim.map(key, '<Esc>', 'insert');
   }
 
-  vim.defineEx('hover', 'hover', async () => {
-    await hover(editor);
-  });
-  vim.map('K', ':hover', 'normal');
-
   const vimExCommands = [
     { actionId: 'editor.action.jumpToBracket', key: '%' },
     { actionId: 'editor.action.openLink', key: 'gx' },
@@ -61,6 +56,11 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
   for (const command of vimExCommands) {
     defineVimExCommand({ ...command, vim, editor });
   }
+
+  vim.defineEx('hover', 'hover', async () => {
+    await hover(editor);
+  });
+  vim.map('K', ':hover', 'normal');
 };
 
 type VimKeyLoader = (props: { editor: MonacoEditor; vimModeRef: VimModeRef; vimStatusRef: VimStatusRef }) => void;

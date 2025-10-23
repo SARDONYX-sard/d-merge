@@ -1,6 +1,6 @@
 import { Box, Button, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { Allotment } from 'allotment';
-import React, { useState } from 'react';
+import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import { useMonacoSyncJump } from './useMonacoSyncJump';
 import 'allotment/dist/style.css';
 import z from 'zod';
@@ -25,6 +25,13 @@ export const FileTabSchema = z.object({
   /** file first loaded original hkanno(use on revert). readonly */
   hkanno: HkannoSchema.readonly(),
   dirty: z.boolean().optional(),
+  /** Monaco Editor last cursor position */
+  cursorPos: z
+    .object({
+      lineNumber: z.number(),
+      column: z.number(),
+    })
+    .optional(),
 });
 export type FileTab = z.infer<typeof FileTabSchema>;
 
@@ -35,13 +42,13 @@ export type FileTab = z.infer<typeof FileTabSchema>;
 const HeaderToolbar = ({
   onSave,
   onRevert,
-  showPreview,
   setShowPreview,
+  showPreview,
 }: {
   onSave: () => void;
   onRevert: () => void;
   showPreview: boolean;
-  setShowPreview: (v: boolean) => void;
+  setShowPreview: Dispatch<SetStateAction<boolean>>;
 }) => {
   return (
     <Box
@@ -62,7 +69,7 @@ const HeaderToolbar = ({
         Revert
       </Button>
       <Box sx={{ flexGrow: 1 }} />
-      <Button variant='text' onClick={() => setShowPreview(!showPreview)}>
+      <Button variant='text' onClick={() => setShowPreview((prev) => !prev)}>
         {showPreview ? 'Hide Preview' : 'Show Preview'}
       </Button>
     </Box>
@@ -120,15 +127,17 @@ const SplitEditors = ({
   tab,
   isVimMode,
   showPreview,
+  onCursorChange,
   onTextChange,
 }: {
   tab: FileTab;
   isVimMode: boolean;
   showPreview: boolean;
+  onCursorChange: (pos: FileTab['cursorPos']) => void;
   onTextChange: (v: string) => void;
 }) => {
   const [previewXml, setPreviewXml] = useState('');
-  const [hasError, setHasError] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
   const { registerLeft, registerRight, updateBaseLine } = useMonacoSyncJump();
 
   React.useEffect(() => {
@@ -139,14 +148,15 @@ const SplitEditors = ({
           const parsed = hkannoFromFileTab(tab);
           const xml = await previewHkanno(tab.inputPath, parsed);
           setPreviewXml(xml);
-          setHasError(false);
+          setErrMsg(null);
           updateBaseLine(tab.text, xml);
-        } catch (_err) {
-          setHasError(true);
+        } catch (err) {
+          setErrMsg(`${err}`);
+          setPreviewXml('');
         }
       })();
     }
-  }, [showPreview, tab]);
+  }, [tab]);
 
   return (
     <Allotment>
@@ -158,7 +168,7 @@ const SplitEditors = ({
           </Typography>
           <MonacoEditor
             height='calc(87% - 24px)'
-            defaultLanguage='hkanno' // NOTE: Comments starting with `#` are being used as pseudo-comments.
+            defaultLanguage='hkanno'
             value={tab.text}
             onChange={(val) => val && onTextChange(val)}
             options={{
@@ -167,26 +177,44 @@ const SplitEditors = ({
               minimap: { enabled: true },
               renderWhitespace: 'boundary',
               rulers: [80],
+              smoothScrolling: true,
             }}
             vimMode={isVimMode}
-            onMount={registerLeft}
+            onMount={(editor) => {
+              registerLeft(editor);
+
+              // Restore cursorPos in FileTab
+              if (tab.cursorPos) {
+                editor.setPosition(tab.cursorPos);
+                editor.revealPositionInCenter(tab.cursorPos);
+                editor.focus();
+              }
+
+              // Save position
+              editor.onDidChangeCursorPosition(() => {
+                const pos = editor.getPosition();
+                if (pos) {
+                  onCursorChange?.(pos);
+                }
+              });
+            }}
           />
         </Box>
       </Allotment.Pane>
 
       {/* Right: Preview */}
       {showPreview && (
-        <Allotment.Pane minSize={200} preferredSize={680}>
+        <Allotment.Pane minSize={200} preferredSize={650}>
           <Box sx={{ height: '100%' }}>
             <Typography
               variant='subtitle2'
               sx={{
                 px: 2,
                 pt: 1,
-                color: hasError ? '#ff5555' : '#aaa',
+                color: errMsg ? '#ff5555' : '#aaa',
               }}
             >
-              {hasError ? 'Preview (Error occurred)' : 'Preview'}
+              {errMsg ? `Preview (Error occurred): ${errMsg}` : 'Preview'}
             </Typography>
             <MonacoEditor
               key='preview-editor'
@@ -199,7 +227,8 @@ const SplitEditors = ({
                 readOnly: true,
                 renderWhitespace: 'boundary',
               }}
-              vimMode={isVimMode}
+              // NOTE: When multiple Vim mode editors are open simultaneously, commands like `hover` mysteriously stop working.
+              // vimMode={isVimMode}
               onMount={registerRight}
             />
           </Box>
@@ -215,14 +244,26 @@ const SplitEditors = ({
 
 export const HkannoTabEditor: React.FC<{
   tab: FileTab;
+  showPreview: boolean;
+  setShowPreview: Dispatch<SetStateAction<boolean>>;
   onTextChange: (val: string) => void;
+  onCursorChange: (pos: FileTab['cursorPos']) => void;
   onOutputChange: (val: string) => void;
   onFormatChange: (val: OutFormat) => void;
   onSave: () => void;
   onRevert: () => void;
-}> = ({ tab, onTextChange, onOutputChange, onFormatChange, onSave, onRevert }) => {
+}> = ({
+  tab,
+  showPreview,
+  setShowPreview,
+  onTextChange,
+  onCursorChange,
+  onOutputChange,
+  onFormatChange,
+  onSave,
+  onRevert,
+}) => {
   const { editorMode } = useEditorModeContext();
-  const [showPreview, setShowPreview] = React.useState(false);
   const isVimMode = editorMode === 'vim';
 
   return (
@@ -234,7 +275,13 @@ export const HkannoTabEditor: React.FC<{
         onOutputChange={onOutputChange}
         onFormatChange={onFormatChange}
       />
-      <SplitEditors tab={tab} isVimMode={isVimMode} showPreview={showPreview} onTextChange={onTextChange} />
+      <SplitEditors
+        tab={tab}
+        isVimMode={isVimMode}
+        onTextChange={onTextChange}
+        onCursorChange={onCursorChange}
+        showPreview={showPreview}
+      />
     </Box>
   );
 };

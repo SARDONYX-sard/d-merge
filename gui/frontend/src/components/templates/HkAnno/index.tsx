@@ -1,8 +1,9 @@
 'use client';
 
 import { Box, Button } from '@mui/material';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import z from 'zod';
+import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { useStorageState } from '@/components/hooks/useStorageState';
 import { NOTIFY } from '@/lib/notify';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
@@ -56,7 +57,10 @@ const changeExtension = (outputPath: string, format: OutFormat): string => {
 
 export const HkannoEditorPage: React.FC = () => {
   const [tabs, setTabs] = useStorageState(PRIVATE_CACHE_OBJ.hkannoFileTabs, z.array(FileTabSchema).catch([]));
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useStorageState(PRIVATE_CACHE_OBJ.hkannoActiveTab, z.number().catch(0));
+  const [showPreview, setShowPreview] = useStorageState(PRIVATE_CACHE_OBJ.hkannoShowPreview, z.boolean().catch(false));
+
+  useInjectJs();
 
   // common process: Open file, create tab
   const openFiles = useCallback(
@@ -162,9 +166,12 @@ export const HkannoEditorPage: React.FC = () => {
       {tabs[active] ? (
         <HkannoTabEditor
           tab={tabs[active]}
+          setShowPreview={setShowPreview}
+          showPreview={showPreview}
           onTextChange={(val) =>
             setTabs((prev) => prev.map((t, i) => (i === active ? { ...t, text: val, dirty: true } : t)))
           }
+          onCursorChange={(pos) => setTabs((prev) => prev.map((t, i) => (i === active ? { ...t, cursorPos: pos } : t)))}
           onOutputChange={(val) =>
             setTabs((prev) => prev.map((t, i) => (i === active ? { ...t, outputPath: val } : t)))
           }
