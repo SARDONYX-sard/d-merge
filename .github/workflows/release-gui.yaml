@@ -87,7 +87,7 @@ jobs:
         shell: bash
         if: runner.os != 'Windows'
         run: |
-          tar -czf ./${{ env.APP_NAME }}-Portable-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
+          tar -czf ./${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
 
       - name: Release Portable Version
         uses: ncipollo/release-action@v1.16.0
