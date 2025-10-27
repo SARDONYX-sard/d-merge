@@ -7,9 +7,8 @@ import z from 'zod';
 import { outFormatSchema } from '@/components/organisms/ConvertForm/schemas/out_format';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 import { useEditorModeContext } from '@/components/providers/EditorModeProvider';
-import { HkannoSchema, previewHkanno } from '@/services/api/hkanno';
+import { Hkanno, HkannoSchema, hkannoFromText, previewHkanno } from '@/services/api/hkanno';
 import { OutFormat } from '@/services/api/serde_hkx';
-import { hkannoFromFileTab } from '.';
 
 export const FileTabSchema = z.object({
   id: z.string(),
@@ -284,4 +283,14 @@ export const HkannoTabEditor: React.FC<{
       />
     </Box>
   );
+};
+
+/** Parse hkanno text into frontend Hkanno object */
+const hkannoFromFileTab = (fileTab: FileTab): Hkanno => {
+  return {
+    ptr: fileTab.ptr,
+    num_original_frames: fileTab.num_original_frames,
+    duration: fileTab.duration,
+    annotation_tracks: hkannoFromText(fileTab.text),
+  };
 };
