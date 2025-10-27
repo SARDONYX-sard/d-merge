@@ -167,5 +167,27 @@
       "bottom": "下",
       "top": "上"
     }
+  },
+  "welcome": {
+    "title": "D Merge: HKX Studio へようこそ",
+    "subtitle": "使いたいツールを選択してください",
+    "tools": {
+      "convert": {
+        "title": "Convert",
+        "desc": "HKX ⇄ XML の Havok アニメーションデータコンバーター"
+      },
+      "patch": {
+        "title": "Patch",
+        "desc": "Nemesis/FNIS 互換の HKX パッチャー"
+      },
+      "hkanno": {
+        "title": "HKAnno",
+        "desc": "HKX/XML 構造の注釈編集ツール"
+      },
+      "settings": {
+        "title": "Settings",
+        "desc": "アプリケーションの設定"
+      }
+    }
   }
 }

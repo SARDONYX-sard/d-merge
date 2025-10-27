@@ -167,5 +167,27 @@
       "bottom": "Bottom",
       "top": "Top"
     }
+  },
+  "welcome": {
+    "title": "Welcome to D Merge: HKX Studio",
+    "subtitle": "Select a tool to get started",
+    "tools": {
+      "convert": {
+        "title": "Convert",
+        "desc": "HKX ⇄ XML converter for Havok animation data."
+      },
+      "patch": {
+        "title": "Patch",
+        "desc": "Nemesis/FNIS compatible patcher for HKX files."
+      },
+      "hkanno": {
+        "title": "HKAnno",
+        "desc": "Annotation editor for HKX/XML structure."
+      },
+      "settings": {
+        "title": "Settings",
+        "desc": "Application preferences and configuration."
+      }
+    }
   }
 }

@@ -7,88 +7,74 @@ import TransformIcon from '@mui/icons-material/Transform';
 import { Box, Card, CardActionArea, CardContent, Grid, SxProps, Theme, Typography } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { useInjectJs } from '@/components/hooks/useInjectJs';
+import { useTranslation } from '@/components/hooks/useTranslation';
 
-const pages = [
-  {
-    path: '/convert',
-    icon: <TransformIcon sx={{ fontSize: 48 }} />,
-    title: 'Convert',
-    desc: 'HKX ⇄ XML converter for Havok animation data.',
-  },
-  {
-    path: '/patch',
-    icon: <LayersIcon sx={{ fontSize: 48 }} />,
-    title: 'Patch',
-    desc: 'Nemesis/FNIS compatible patcher for HKX files.',
-  },
-  {
-    path: '/hkanno',
-    icon: <NotesIcon sx={{ fontSize: 48 }} />,
-    title: 'HKAnno',
-    desc: 'Annotation editor for HKX/XML structure.',
-  },
-  {
-    path: '/settings',
-    icon: <SettingsIcon sx={{ fontSize: 48 }} />,
-    title: 'Settings',
-    desc: 'Application preferences and configuration.',
-  },
+const PAGES_DATA = [
+  { path: 'convert', icon: <TransformIcon sx={{ fontSize: 48 }} /> },
+  { path: 'patch', icon: <LayersIcon sx={{ fontSize: 48 }} /> },
+  { path: 'hkanno', icon: <NotesIcon sx={{ fontSize: 48 }} /> },
+  { path: 'settings', icon: <SettingsIcon sx={{ fontSize: 48 }} /> },
 ] as const;
 
 export const WelcomePage = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   useInjectJs();
 
   return (
     <Box component='main' sx={pageSx}>
       <Typography variant='h3' sx={{ mb: 1, fontWeight: 'bold', letterSpacing: 1 }}>
-        Welcome to HKX Studio
+        {t('welcome.title')}
       </Typography>
       <Typography variant='subtitle1' sx={{ mb: 6, color: 'text.secondary' }}>
-        Select a tool to get started
+        {t('welcome.subtitle')}
       </Typography>
 
       <Grid container spacing={4} justifyContent='center' sx={{ maxWidth: 900 }}>
-        {pages.map((p) => (
-          <Grid size={6} key={p.path}>
-            <Card
-              elevation={4}
-              sx={(theme) => ({
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.7)',
-                backdropFilter: 'blur(5px)',
-                borderRadius: 4,
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 8,
-                },
-              })}
-            >
-              <CardActionArea onClick={() => router.push(p.path)} sx={{ height: '100%' }}>
-                <CardContent
-                  sx={{
-                    textAlign: 'center',
-                    p: 4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    '&:hover': {
-                      color: 'var(--mui-palette-primary-main)',
-                    },
-                  }}
-                >
-                  {p.icon}
-                  <Typography variant='h6' sx={{ mt: 2 }}>
-                    {p.title}
-                  </Typography>
-                  <Typography variant='body2' sx={{ mt: 1 }}>
-                    {p.desc}
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
-        ))}
+        {PAGES_DATA.map((page) => {
+          const key = page.path;
+          const title = t(`welcome.tools.${key}.title`);
+          const desc = t(`welcome.tools.${key}.desc`);
+
+          return (
+            <Grid key={key} size={{ xs: 12, sm: 6, md: 6 }}>
+              <Card
+                elevation={4}
+                sx={(theme) => ({
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+                  backdropFilter: 'blur(5px)',
+                  borderRadius: 4,
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 8,
+                  },
+                })}
+              >
+                <CardActionArea onClick={() => router.push(`/${page.path}`)} sx={{ height: '100%' }}>
+                  <CardContent
+                    sx={{
+                      textAlign: 'center',
+                      p: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      '&:hover': { color: 'var(--mui-palette-primary-main)' },
+                    }}
+                  >
+                    {page.icon}
+                    <Typography variant='h6' sx={{ mt: 2 }}>
+                      {title}
+                    </Typography>
+                    <Typography variant='body2' sx={{ mt: 1 }}>
+                      {desc}
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
     </Box>
   );
