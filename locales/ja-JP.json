@@ -112,6 +112,7 @@
     "columns": {
       "author": "作成者",
       "mod_name": "MOD名",
+      "mod_type": "Modタイプ",
       "priority": "優先度",
       "site": "サイト"
     },

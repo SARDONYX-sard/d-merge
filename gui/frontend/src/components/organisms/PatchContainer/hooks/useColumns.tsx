@@ -15,6 +15,7 @@ export const useColumns = () => {
       headerName: t('patch.columns.mod_name'),
       flex: 1.2,
     },
+    { field: 'mod_type', headerName: t('patch.columns.mod_type'), flex: 0.4 },
     { field: 'author', headerName: t('patch.columns.author'), flex: 0.4 },
     {
       field: 'site',
@@ -38,7 +39,6 @@ export const useColumns = () => {
         );
       },
     },
-    { field: 'auto', headerName: 'Auto', flex: 1 },
     {
       field: 'priority',
       headerName: t('patch.columns.priority'),
@@ -46,7 +46,6 @@ export const useColumns = () => {
       flex: 0.3,
       align: 'center',
       headerAlign: 'center',
-      renderCell: (params) => params.api.getAllRowIds().indexOf(params.id) + 1,
     },
   ] as const satisfies GridColDef<ModInfo>[];
 

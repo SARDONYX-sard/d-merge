@@ -8,14 +8,12 @@ import type { ModInfo } from '@/services/api/patch';
  * Convert ModInfo[] into a ModItem[] for storage.
  */
 const toActiveList = (mods: ModInfo[]): ActiveModItem[] =>
-  mods
-    .filter((item) => item.enabled)
-    .map(({ id, enabled, priority, mod_type }) => ({
-      id,
-      enabled,
-      priority,
-      mod_type,
-    }));
+  mods.map(({ id, enabled, priority, mod_type }) => ({
+    id,
+    enabled,
+    priority,
+    mod_type,
+  }));
 
 /**
  * Synchronize and sort ModInfo list with cached ModList.
@@ -42,7 +40,6 @@ export const useModInfoState = (isVfsMode: boolean) => {
       setFetchedModInfoList((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
         const nextList = toActiveList(next);
-
         setActiveModList(nextList);
 
         return next;
@@ -77,21 +74,14 @@ export const useModInfoState = (isVfsMode: boolean) => {
 const applyActiveModList = (fetchedModInfoList: ModInfo[], activeModList: ActiveModItem[]): ModInfo[] => {
   if (!activeModList || activeModList.length === 0) return fetchedModInfoList;
 
-  const modMap = new Map(activeModList.map((m) => [m.id, m]));
+  const activeModMap = new Map(activeModList.map((m) => [m.id, m]));
 
-  return fetchedModInfoList
-    .map((modInfo) => {
-      const ref = modMap.get(modInfo.id);
-      return ref ? { ...modInfo, enabled: ref.enabled, priority: ref.priority } : modInfo;
-    })
-    .toSorted((a, b) => {
-      const modA = modMap.get(a.id);
-      const modB = modMap.get(b.id);
+  const result = fetchedModInfoList.map((modInfo) => {
+    const ref = activeModMap.get(modInfo.id);
+    return ref ? { ...modInfo, enabled: ref.enabled, priority: ref.priority } : modInfo;
+  });
 
-      if (!modA && !modB) return 0;
-      if (!modA) return 1;
-      if (!modB) return -1;
+  result.sort((a, b) => a.priority - b.priority);
 
-      return (modA.priority ?? 0) - (modB.priority ?? 0);
-    });
+  return result;
 };

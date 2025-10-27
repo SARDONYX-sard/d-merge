@@ -71,23 +71,30 @@ const mergeModInfoList = (prev: ModInfo[], fetched: FetchedModInfo[]): ModInfo[]
     prevMap.set(p.id, p);
   }
 
-  return fetched.map((f, index) => {
+  let newIndex = fetched.length;
+
+  const result = fetched.map((f) => {
     const existing = prevMap.get(f.id);
 
-    // prefer fetched fields for identity metadata, but reuse runtime flags from prev
     const merged: ModInfo = {
       id: f.id,
       name: f.name,
       author: f.author,
       site: f.site,
       auto: f.auto,
-      // fetched property is `modType` or sometimes `mod_type`; services/api should normalize,
-      // here we assume fetch provides `modType` (adjust if your shape differs).
       mod_type: f.mod_type,
       enabled: existing?.enabled ?? false,
-      priority: existing?.priority ?? index + 1,
+      priority: existing?.priority ?? newIndex,
     };
+    if (existing === undefined) {
+      newIndex += 1;
+    }
 
     return merged;
   });
+
+  console.log('sort');
+  result.sort((a, b) => a.priority - b.priority);
+
+  return result;
 };

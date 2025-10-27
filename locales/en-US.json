@@ -112,6 +112,7 @@
     "columns": {
       "author": "Author",
       "mod_name": "Mod Name",
+      "mod_type": "Mod Type",
       "priority": "Priority",
       "site": "Site"
     },
