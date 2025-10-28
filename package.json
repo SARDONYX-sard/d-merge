@@ -6,7 +6,7 @@
   "homepage": "https://github.com/SARDONYX-sard/d-merge",
   "license": "GPL3.0",
   "scripts": {
-    "build": "rimraf ./gui/frontend/out && tauri build --features extra_fmt,debug --no-bundle -- --profile release-no-lto",
+    "build": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release-no-lto",
     "build:release": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release",
     "build:front": "npm --workspace gui/frontend run build:front",
     "build:icons": "tauri icon ./gui/backend/tauri/icons/icon.svg",
