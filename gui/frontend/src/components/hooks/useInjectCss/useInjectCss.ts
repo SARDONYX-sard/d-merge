@@ -1,7 +1,6 @@
 import { useInsertionEffect, useRef, useState } from 'react';
 
 import { CSS, type CssPresets } from '@/lib/css';
-import { NOTIFY } from '@/lib/notify';
 
 /**
  * Inject CSS dynamically on the client side.
@@ -29,7 +28,11 @@ export function useInjectCss() {
       styleElement.id = CSS.css.id; // Assign ID so that user can edit
       styleElement.innerHTML = css;
       style.current = styleElement;
-      NOTIFY.try(() => document.head.appendChild(styleElement));
+      try {
+        document.head.appendChild(styleElement);
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     return () => {

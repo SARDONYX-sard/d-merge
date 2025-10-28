@@ -6,11 +6,11 @@
   "homepage": "https://github.com/SARDONYX-sard/d-merge",
   "license": "GPL3.0",
   "scripts": {
-    "build": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release-no-lto",
-    "build:release": "rimraf ./gui/frontend/out && tauri build --features debug --no-bundle -- --profile release",
+    "build": "npm --workspace gui/frontend run build",
+    "build:release": "npm --workspace gui/frontend run build:release",
     "build:front": "npm --workspace gui/frontend run build:front",
-    "build:icons": "npm run tauri icon ./gui/backend/tauri/icons/icon.svg",
-    "dev": "tauri dev",
+    "build:icons": "npm --workspace gui/frontend run build:icons",
+    "dev": "npm --workspace gui/frontend run dev",
     "dev:front": "npm --workspace gui/frontend run dev:front",
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
     "lint": "biome lint ./ && cargo clippy --workspace",
@@ -19,16 +19,14 @@
     "test": "npm --workspace gui/frontend run test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.6",
-    "@tauri-apps/cli": "2.9.0",
+    "@biomejs/biome": "2.3.1",
     "@types/node": "24.9.1",
-    "@vitejs/plugin-react-swc": "4.1.0",
-    "concurrently": "^9.2.1",
+    "@vitejs/plugin-react-swc": "4.2.0",
     "prettier": "3.6.2",
     "rimraf": "^6",
     "typescript": "5.9.3",
     "vite-tsconfig-paths": "5.1.4",
-    "vitest": "3.2.4"
+    "vitest": "4.0.4"
   },
   "workspaces": [
     "ffi/javascript/node",
