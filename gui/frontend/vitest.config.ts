@@ -9,8 +9,7 @@ export default defineConfig({
     globals: true,
     root: `./src/`,
     environment: 'jsdom',
-    setupFiles: ['./vitest.setup.mts', 'tests/vitest.customMatchers.ts'],
-    testTransformMode: { ssr: ['**/*'] },
+    setupFiles: ['./vitest.setup.mts'],
     reporters: ['default', 'hanging-process'],
   },
 });
