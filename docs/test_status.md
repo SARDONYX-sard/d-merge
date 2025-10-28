@@ -46,17 +46,17 @@ SkyrimSE
 
 ## Nemesis(+ esp, scripts)
 
-| Status | Mod Name                         | Version   | Note |
-| ------ | -------------------------------- | --------- | ---- |
-| ✅     | Crouch Sliding                   | 1.0       |      |
-| ✅     | Eating Animations And Sounds SE  | 1.9.4     |      |
-| ✅     | EVGAT Framework                  | 2.0beta   |      |
-| ✅     | Hot Key Skill                    | 0.8       |      |
-| ✅     | MaxsuBlockOverhaul MBO           | 0.21alpha |      |
-| ✅     | Recovery System                  | 1.01      |      |
-| ✅     | SBE True Prone System            | 1.00      |      |
-| ✅     | UnderwaterCombat                 | 1.02      |      |
-| ✅     | BFCO - Attack Behavior Framework | 3.3.13    |      |
+| Status | Mod Name                         | Version   | Note                                                                                             |
+| ------ | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| ✅     | Crouch Sliding                   | 1.0       | `SprintSlide.esp` must be placed after RecoverySystem (`RecoveryMechanic.esp`) or it won't work. |
+| ✅     | Eating Animations And Sounds SE  | 1.9.4     |                                                                                                  |
+| ✅     | EVGAT Framework                  | 2.0beta   |                                                                                                  |
+| ✅     | Hot Key Skill                    | 0.8       |                                                                                                  |
+| ✅     | MaxsuBlockOverhaul MBO           | 0.21alpha |                                                                                                  |
+| ✅     | Recovery System                  | 1.01      |                                                                                                  |
+| ✅     | SBE True Prone System            | 1.00      |                                                                                                  |
+| ✅     | UnderwaterCombat                 | 1.02      |                                                                                                  |
+| ✅     | BFCO - Attack Behavior Framework | 3.3.13    |                                                                                                  |
 
 ## Nemesis + SKSE plugin
 
