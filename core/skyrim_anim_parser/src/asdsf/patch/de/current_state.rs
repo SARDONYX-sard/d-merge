@@ -171,6 +171,7 @@ impl<'de> CurrentState<'de> {
         }
 
         self.one_field_patch = Some(value);
+        self.patch.get_or_insert_default();
         Ok(())
     }
 
@@ -228,10 +229,11 @@ impl<'de> CurrentState<'de> {
     ///
     /// # Errors
     /// If `Option::is_none`
-    pub fn take_main_range(&mut self) -> Result<Range<usize>, Error> {
-        self.main_range
-            .take()
-            .ok_or(Error::NeedMainRangeInformation)
+    pub const fn take_main_range(&mut self) -> Result<Range<usize>, Error> {
+        match self.main_range.take() {
+            Some(v) => Ok(v),
+            None => Err(Error::NeedMainRangeInformation),
+        }
     }
 
     /// Sets the range start index.
@@ -246,7 +248,7 @@ impl<'de> CurrentState<'de> {
         }
 
         if matches!(self.current_kind, Some(ParserKind::Attacks)) {
-            self.main_range = Some(start..start + 1);
+            self.sub_range = Some(start..start + 1);
         } else {
             return Err(Error::InvalidSubRangeUsage);
         }
@@ -274,7 +276,7 @@ impl<'de> CurrentState<'de> {
             }
 
             if self.is_passed_original {
-                if self.patch.is_some() {
+                if self.patch.is_some() || self.one_field_patch.is_some() {
                     Op::Replace
                 } else {
                     Op::Remove

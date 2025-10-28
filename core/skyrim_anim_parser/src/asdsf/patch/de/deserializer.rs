@@ -82,19 +82,6 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
 
-    /// Parse by argument parser no consume.
-    ///
-    /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek2<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<(&'de str, O)> {
-        let (remain, ret) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
-        Ok((remain, ret))
-    }
-
     /// Convert Visitor errors to position-assigned errors.
     ///
     /// # Why is this necessary?
@@ -197,18 +184,7 @@ impl<'de> Deserializer<'de> {
 
     fn conditions(&mut self) -> Result<(), Error> {
         let mut start_index = 0;
-        while {
-            // NOTE: In the case of patches, `attack_len: usize` cannot be trusted, so it is necessary to parse ahead.
-            let (remain, variable_name) =
-                self.parse_peek2(opt(one_line.verify(|s: &str| is_variable_name_starts(s))))?;
-            let (remain, _value_a) = opt(parse_one_line::<usize>)
-                .parse_peek(remain)
-                .map_err(|err| Error::Context { err })?;
-            let (_, value_b) = opt(parse_one_line::<usize>)
-                .parse_peek(remain)
-                .map_err(|err| Error::Context { err })?;
-            variable_name.is_some() && _value_a.is_some() && value_b.is_some()
-        } {
+        while is_next_maybe_condition(self.input)? {
             let diff_start = self.parse_opt_start_comment()?;
             if diff_start {
                 self.current.set_main_range_start(start_index)?;
@@ -227,6 +203,7 @@ impl<'de> Deserializer<'de> {
                 )?;
 
                 if should_take_in_this {
+                    self.current.set_main_range_start(start_index)?;
                     self.current.one_field_patch =
                         Some(FieldKind::ConditionVariableName(variable_name.clone()));
                     self.parse_opt_close_comment()?;
@@ -240,9 +217,13 @@ impl<'de> Deserializer<'de> {
                 let value_a = self.parse_next(
                     parse_one_line::<i32>.context(Expected(Description("value_a: i32"))),
                 )?;
+                #[cfg(feature = "tracing")]
+                tracing::trace!(should_take_in_this, value_a);
 
                 if should_take_in_this {
-                    self.current.one_field_patch = Some(FieldKind::ConditionValueA(value_a));
+                    self.current.set_main_range_start(start_index)?;
+                    self.current
+                        .replace_one(FieldKind::ConditionValueA(value_a))?;
                     self.parse_opt_close_comment()?;
                 }
                 value_a
@@ -254,9 +235,13 @@ impl<'de> Deserializer<'de> {
                 let value_b = self.parse_next(
                     parse_one_line::<i32>.context(Expected(Description("value_b: i32"))),
                 )?;
+                #[cfg(feature = "tracing")]
+                tracing::trace!(should_take_in_this, value_b);
 
                 if should_take_in_this {
-                    self.current.one_field_patch = Some(FieldKind::ConditionValueA(value_b));
+                    self.current.set_main_range_start(start_index)?;
+                    self.current
+                        .replace_one(FieldKind::ConditionValueB(value_b))?;
                     self.parse_opt_close_comment()?;
                 }
                 value_b
@@ -332,7 +317,7 @@ impl<'de> Deserializer<'de> {
             } {
                 let diff_start = self.parse_opt_start_comment()?;
                 if diff_start {
-                    self.current.set_main_range_start(clip_names_start_index)?;
+                    self.current.set_sub_range_start(clip_names_start_index)?;
                 }
                 let clip_name =
                     self.parse_next(one_line.context(Expected(Description("clip_name: Str"))))?;
@@ -344,12 +329,14 @@ impl<'de> Deserializer<'de> {
                 self.parse_opt_close_comment()?;
                 self.parse_next(multispace0)?;
                 clip_names_start_index += 1;
+                self.current.increment_sub_range();
 
                 #[cfg(feature = "tracing")]
                 tracing::debug!(?clip_name);
             }
 
             start_index += 1;
+            self.current.increment_main_range();
         }
         Ok(())
     }
@@ -361,7 +348,7 @@ impl<'de> Deserializer<'de> {
             if diff_start {
                 self.current.set_main_range_start(start_index)?;
             }
-            let anim_info = self.anim_info()?;
+            let anim_info = self.anim_info(start_index)?;
 
             #[cfg(feature = "tracing")]
             tracing::debug!(?anim_info);
@@ -382,13 +369,14 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
 
-    fn anim_info(&mut self) -> Result<AnimInfo<'de>> {
+    fn anim_info(&mut self, start_index: usize) -> Result<AnimInfo<'de>> {
         let hashed_path = {
             let should_take_in_this = self.parse_opt_start_comment()?;
             let hashed_path = self.parse_next(
                 verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
             )?;
             if should_take_in_this {
+                self.current.set_main_range_start(start_index)?;
                 // FIXME: correct clone?
                 self.current
                     .replace_one(FieldKind::AnimInfoHashedPath(hashed_path.clone()))?;
@@ -404,6 +392,7 @@ impl<'de> Deserializer<'de> {
                     .context(Expected(Description("hashed_file_name: u32"))),
             )?;
             if should_take_in_this {
+                self.current.set_main_range_start(start_index)?;
                 self.current
                     .replace_one(FieldKind::AnimInfoHashedFileName(hashed_file_name.clone()))?;
                 self.parse_opt_close_comment()?;
@@ -420,6 +409,7 @@ impl<'de> Deserializer<'de> {
                     .context(Expected(StringLiteral("7891816"))),
             )?;
             if should_take_in_this {
+                self.current.set_main_range_start(start_index)?;
                 self.current
                     .replace_one(FieldKind::AnimInfoAsciiExtension(ascii_extension.clone()))?;
                 self.parse_opt_close_comment()?;
@@ -489,8 +479,9 @@ impl<'de> Deserializer<'de> {
     /// This is the method that is called when a single differential change comment pair finishes calling.
     fn merge_to_output(&mut self) -> Result<(), Error> {
         let op = self.current.judge_operation();
+
         if let Some(mut partial_patch) = self.current.patch.take() {
-            #[allow(clippy::match_same_arms)] // TODO: Remove this
+            #[allow(clippy::match_same_arms)] // TODO: Remove this by supporting diff attacks.
             match self.current.current_kind()? {
                 ParserKind::Version => {
                     if let Some(version) = partial_patch.version.take() {
@@ -638,6 +629,32 @@ fn is_variable_name_starts(s: &str) -> bool {
         || s.starts_with("bWantMountedWeaponAnims")
 }
 
+/// Can the next one also be parsed as a `condition` clause?
+///
+/// In the case of patches, `attack_len: usize` cannot be trusted, so it is necessary to parse ahead.
+fn is_next_maybe_condition(input: &str) -> Result<bool, Error> {
+    let (remain, variable_name) = opt(one_line.verify(|s: &str| is_variable_name_starts(s)))
+        .parse_peek(input)
+        .map_err(|err| Error::Context { err })?;
+
+    let (remain, _comment) = opt(winnow::combinator::alt((comment_kind, close_comment)))
+        .parse_peek(remain)
+        .map_err(|err| Error::Context { err })?;
+
+    let (remain, _value_a) = opt(parse_one_line::<usize>)
+        .parse_peek(remain)
+        .map_err(|err| Error::Context { err })?;
+
+    let (remain, _comment) = opt(winnow::combinator::alt((comment_kind, close_comment)))
+        .parse_peek(remain)
+        .map_err(|err| Error::Context { err })?;
+
+    let (_, value_b) = opt(parse_one_line::<usize>)
+        .parse_peek(remain)
+        .map_err(|err| Error::Context { err })?;
+    Ok(variable_name.is_some() && _value_a.is_some() && value_b.is_some())
+}
+
 fn is_attack_starts(s: &str) -> bool {
     starts_with_ignore_ascii(s, "attackStart")
         || starts_with_ignore_ascii(s, "attackPowerStart")
@@ -693,7 +710,6 @@ mod tests {
     // 7891816                        <- ascii_extension[1]
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]
-    #[ignore = "Not complete yet"]
     #[test]
     fn test_replace_anim_block_diff_patch() {
         let input = "
@@ -750,7 +766,7 @@ MC 1HM AttackRight01
 ";
         let patches = parse_anim_set_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
 
-        // For local file test
+        // // For local file test
         // let path = r#""#;
         // let input = std::fs::read_to_string(path).unwrap();
         // let patches = parse_anim_set_diff_patch(&input, 0).unwrap_or_else(|e| panic!("{e}"));

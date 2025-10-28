@@ -43,6 +43,9 @@ pub enum Error {
         err: winnow::error::ErrMode<winnow::error::ContextError>,
     },
 
+    /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.
+    NotFoundApplyTarget { kind: String },
+
     /// Human readable XML parsing error
     #[snafu(transparent)]
     Readable {
