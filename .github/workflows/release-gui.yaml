@@ -37,17 +37,17 @@ jobs:
           tag: ${{ github.ref_name }}
 
       # NOTE: The installer is not required at this time.
-      # - name: Build the app
-      #   uses: tauri-apps/tauri-action@action-v0.5.20
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     releaseName: "D merge v__VERSION__"
-      #     tagName: ${{ github.ref_name }}
-      #     prerelease: false
-      #     projectPath: ${{ github.workspace }}/gui/backend/tauri
-      - name: Build GUI
-        run: npm run build:release
+      - name: Build the app
+        uses: tauri-apps/tauri-action@action-v0.5.20
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseName: "D merge v__VERSION__"
+          tagName: ${{ github.ref_name }}
+          prerelease: false
+          projectPath: ${{ github.workspace }}/gui/backend/tauri
+      # - name: Build GUI
+      # run: npm run build:release
 
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
