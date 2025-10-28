@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2025-10-28
+### :sparkles: New Features
+- [`ebc4152`](https://github.com/SARDONYX-sard/d-merge/commit/ebc4152b00d9cc549944d1f47c85354c358bfbe4) - add landing page *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`39ee35f`](https://github.com/SARDONYX-sard/d-merge/commit/39ee35f465d6efbb32da0b9fdd987dabf8e391dd) - **i18n**: apply i18n to landing page *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`01d18cb`](https://github.com/SARDONYX-sard/d-merge/commit/01d18cb9f41b77fa0ff8abcdc3a1f1d602fae6b2) - **frontend**: fix ordering *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :white_check_mark: Tests
+- [`5e52993`](https://github.com/SARDONYX-sard/d-merge/commit/5e52993678e6df1dae81811a57f6826cee446217) - remove custom matcher *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.2.3] - 2025-10-23
 ### :sparkles: New Features
 - [`01a5a16`](https://github.com/SARDONYX-sard/d-merge/commit/01a5a161a4686a5bc0d663d2e7c3f654e9766c66) - **hkanno**: cache preview & active tab *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -101,3 +113,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.1...0.1.2
 [0.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.2...0.2.0
 [0.2.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.2...0.2.3
+[0.2.4]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.3...0.2.4
