@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2025-10-30
+### :sparkles: New Features
+- [`bf44e4b`](https://github.com/SARDONYX-sard/d-merge/commit/bf44e4b2c67f33ec4cc3ebb9753533600e9d9329) - add template keys (for `Draugr MCO-DXP` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`23e850a`](https://github.com/SARDONYX-sard/d-merge/commit/23e850a0fc5b9da0e2a003ff25091e143129422c) - **asdsf**: fix one patch diff deserializer *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f99791c`](https://github.com/SARDONYX-sard/d-merge/commit/f99791c5278b251ea8de698190ef4d2730612cca) - fix wrong template key *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6451c35`](https://github.com/SARDONYX-sard/d-merge/commit/6451c359071369df5740d489110a1a9466b1e8d1) - fix duplicate eventName check to avoid breaking vanilla Skyrim behavior *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`24fbeb9`](https://github.com/SARDONYX-sard/d-merge/commit/24fbeb9e0adc8ad4675d127cf152e56e86e44b1b) - **json**: stop redundant heap alloc *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.2.4] - 2025-10-28
 ### :sparkles: New Features
 - [`ebc4152`](https://github.com/SARDONYX-sard/d-merge/commit/ebc4152b00d9cc549944d1f47c85354c358bfbe4) - add landing page *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -114,3 +127,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.1.2...0.2.0
 [0.2.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.2...0.2.3
 [0.2.4]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.3...0.2.4
+[0.2.5]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.4...0.2.5
