@@ -350,7 +350,10 @@ fn apply_replace_with_overflow<'a>(
     let (in_bounds_opt, overflow_opt) = split_for_replace(range.clone(), base.len(), values);
 
     if let Some((in_bounds_range, in_bounds_values)) = in_bounds_opt {
-        let Some(slice) = base.get_mut(in_bounds_range.clone()) else {
+        #[cfg(feature = "tracing")]
+        let cloned_in_bounds_range = in_bounds_range.clone();
+
+        let Some(slice) = base.get_mut(in_bounds_range) else {
             return Err(JsonPatchError::UnexpectedRange {
                 patch_range: range,
                 actual_len: base.len(),
@@ -371,12 +374,9 @@ fn apply_replace_with_overflow<'a>(
             let remain_range = written_count..slice.len();
             #[cfg(feature = "tracing")]
             tracing::info!(
-                "Replace range {:?}: only {} values provided for {} elements, \
-                marking remaining {:?} elements as removed",
-                in_bounds_range,
-                written_count,
+                "[Seq: Replace as Remove] Replace range {cloned_in_bounds_range:?}: only {written_count} values provided for {} elements, \
+                marking remaining {remain_range:?} elements as removed",
                 slice.len(),
-                remain_range
             );
             slice[remain_range]
                 .smart_iter_mut()
