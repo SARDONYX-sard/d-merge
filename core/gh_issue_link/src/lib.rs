@@ -142,7 +142,7 @@ pub fn new_gh_issue_link(
     }
     append_param("dram", &env.dram);
     append_param("os", &env.os);
-    append_param("skyrim-version", skyrim_runtime.as_str());
+    append_param("skyrim-edition", skyrim_runtime.as_str());
     if let Some(skyrim_version) = skyrim_version {
         append_param("skyrim-version", skyrim_version);
     }
