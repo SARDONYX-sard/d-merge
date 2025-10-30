@@ -112,7 +112,6 @@ function bumpVersion(current, type) {
 function updateFiles(version) {
   updateJsonVersion(paths.packageJson, version);
   updateCargoToml(paths.cargoToml, version);
-  updateIssueTemplate(paths.issueTemplate, version);
 }
 
 /**
@@ -138,28 +137,6 @@ function updateCargoToml(filePath, version) {
     `[workspace.package]\nversion = "${version}"`,
   );
   fs.writeFileSync(filePath, replaced);
-}
-
-/**
- * Adds the new version to the version list in the bug-report.yaml issue template.
- * @param {string} filePath - Path to the YAML file.
- * @param {string} version - New version string.
- */
-function updateIssueTemplate(filePath, version) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const match = content.match(/options:\n((\s+- .*\n)+)/);
-  if (!match) {
-    throw new Error('Cannot find options list in issue template.');
-  }
-
-  const currentVersions = match[1]
-    .split('\n')
-    .map((v) => v.trim().slice(2))
-    .filter(Boolean);
-  if (!currentVersions.includes(version)) {
-    const updated = content.replace(match[0], `${match[0]}        - ${version}\n`);
-    fs.writeFileSync(filePath, updated);
-  }
 }
 
 /**
