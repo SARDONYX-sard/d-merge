@@ -15,6 +15,7 @@ pub enum SkyrimRuntime {
 
 impl SkyrimRuntime {
     const fn as_str(&self) -> &'static str {
+        // NOTE: This must be identical to the string in `.github/ISSUE_TEMPLATE/bug-report.yaml`.
         match self {
             Self::Se => "Special/Anniversary Edition(64-bit)",
             Self::Vr => "VR(64-bit)",
@@ -113,7 +114,7 @@ impl<'a> EnvInfo<'a> {
 pub fn new_gh_issue_link(
     d_merge_version: &str,
     skyrim_runtime: SkyrimRuntime,
-    skyrim_version: &str,
+    skyrim_version: Option<&str>,
 ) -> String {
     let base_url = "https://github.com/SARDONYX-sard/d-merge/issues/new";
     let template = "bug-report.yaml";
@@ -142,7 +143,9 @@ pub fn new_gh_issue_link(
     append_param("dram", &env.dram);
     append_param("os", &env.os);
     append_param("skyrim-version", skyrim_runtime.as_str());
-    append_param("skyrim-version", skyrim_version);
+    if let Some(skyrim_version) = skyrim_version {
+        append_param("skyrim-version", skyrim_version);
+    }
 
     url
 }
@@ -159,7 +162,7 @@ mod tests {
 
         println!(
             "GitHub issue link:\n{}",
-            new_gh_issue_link("0.1.0", SkyrimRuntime::Se, "1.6.1170.0")
+            new_gh_issue_link("0.1.0", SkyrimRuntime::Se, Some("1.6.1170.0"))
         );
     }
 }

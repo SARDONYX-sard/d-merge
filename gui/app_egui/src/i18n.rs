@@ -19,6 +19,8 @@ pub enum I18nKey {
     ErrorReadingModInfo,
     ExecuteButton,
     ExecutionModeLabel,
+    IssueReportButton,
+    IssueReportHover,
     LockButton,
     LockButtonHover,
     LogButton,
@@ -36,13 +38,13 @@ pub enum I18nKey {
     SearchLabel,
     SelectButton,
     SkyrimDataDirLabel,
-    StatusGeneratingFnisPatches,
-    StatusReadingPatches,
-    StatusParsingPatches,
     StatusApplyingPatches,
-    StatusGeneratingHkxFiles,
     StatusDone,
     StatusError,
+    StatusGeneratingFnisPatches,
+    StatusGeneratingHkxFiles,
+    StatusParsingPatches,
+    StatusReadingPatches,
     Transparent,
     TransparentHover,
     VfsMode,
@@ -70,6 +72,8 @@ impl I18nKey {
             Self::ErrorReadingModInfo => "Error: reading mod info",
             Self::ExecuteButton      => "Execute",
             Self::ExecutionModeLabel => "Execution mode:",
+            Self::IssueReportButton => "Report Issue",
+            Self::IssueReportHover => "Report a bug on GitHub.\n This will auto-fill version info and some hardware.\n GitHub account required.",
             Self::LockButton => "🔒Locked",
             Self::LockButtonHover => "Row reordering is locked unless sorting by Priority ascending.\nClick to unlock.",
             Self::LogButton => "Log",
@@ -143,6 +147,8 @@ impl I18nMap {
         map.0.insert(ErrorReadingModInfo, Cow::Borrowed(ErrorReadingModInfo.default_eng()));
         map.0.insert(ExecuteButton, Cow::Borrowed(ExecuteButton.default_eng()));
         map.0.insert(ExecutionModeLabel, Cow::Borrowed(ExecutionModeLabel.default_eng()));
+        map.0.insert(IssueReportButton, Cow::Borrowed(IssueReportButton.default_eng()));
+        map.0.insert(IssueReportHover, Cow::Borrowed(IssueReportHover.default_eng()));
         map.0.insert(LockButton, Cow::Borrowed(LockButton.default_eng()));
         map.0.insert(LockButtonHover, Cow::Borrowed(LockButtonHover.default_eng()));
         map.0.insert(LogButton, Cow::Borrowed(LogButton.default_eng()));

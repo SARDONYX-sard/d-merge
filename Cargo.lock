@@ -1279,6 +1279,7 @@ dependencies = [
  "egui_dnd",
  "egui_extras",
  "egui_virtual_list",
+ "gh_issue_link",
  "ico",
  "indexmap 2.11.4",
  "mod_info",

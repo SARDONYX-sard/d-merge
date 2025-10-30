@@ -483,6 +483,19 @@ impl ModManagerApp {
                 self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
                     s.patch();
                 });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(self.t(I18nKey::IssueReportButton))
+                        .on_hover_text(self.t(I18nKey::IssueReportHover))
+                        .clicked()
+                    {
+                        ui.ctx().open_url(egui::OpenUrl {
+                            url: create_issue_link(self),
+                            new_tab: true,
+                        });
+                    }
+                });
             });
         });
     }
@@ -1059,4 +1072,31 @@ where
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir)
         .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
+}
+
+fn create_issue_link(app: &ModManagerApp) -> String {
+    let skyrim_runtime = match app.target_runtime {
+        skyrim_data_dir::Runtime::Le => gh_issue_link::SkyrimRuntime::Le,
+        skyrim_data_dir::Runtime::Se => gh_issue_link::SkyrimRuntime::Se,
+        skyrim_data_dir::Runtime::Vr => gh_issue_link::SkyrimRuntime::Vr,
+    };
+    let skyrim_version =
+        Path::new(app.current_skyrim_data_dir())
+            .parent()
+            .and_then(|skyrim_root_dir| {
+                let exe = match skyrim_runtime {
+                    gh_issue_link::SkyrimRuntime::Le => "TESV.exe",
+                    gh_issue_link::SkyrimRuntime::Se => "SkyrimSE.exe",
+                    gh_issue_link::SkyrimRuntime::Vr => "SkyrimVR.exe",
+                };
+                let exe_path = skyrim_root_dir.join(exe);
+                gh_issue_link::version::get_file_version(exe_path)
+                    .map(|ver| ver.to_string())
+                    .ok()
+            });
+    gh_issue_link::new_gh_issue_link(
+        env!("CARGO_PKG_VERSION"),
+        skyrim_runtime,
+        skyrim_version.as_deref(),
+    )
 }

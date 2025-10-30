@@ -9,16 +9,24 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
-        Before submitting, please check if your issue has already been reported:
+
+        Before submitting, please check whether your issue has already been reported:
         [Search existing issues](https://github.com/SARDONYX-sard/d-merge/issues?q=is%3Aissue)
+
+        Please note that patcher-related issues can be inherently difficult to diagnose,
+        as they depend on factors such as your load order and the combination of active patches.
+
+        The most effective way to identify bugs is to minimize the number of mods
+        and test with specific patches. The fewer variables involved, the easier it becomes
+        to pinpoint the root cause.
 
   # Software Version
   - type: input
     id: version
     attributes:
-      label: Software Version
+      label: D Merge Version
       description: What version of our software are you running?
-      placeholder: 0.1.1
+      placeholder: 0.1.0-beta.3
     validations:
       required: true
 
