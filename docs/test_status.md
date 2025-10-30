@@ -33,6 +33,8 @@ SkyrimSE
 
 | Status | Mod Name                                       | Version | Note                                       |
 | ------ | ---------------------------------------------- | ------- | ------------------------------------------ |
+| ✅     | Draugr Dagger Animation Fix                    | 1.0     |                                            |
+| ✅     | Draugr MCO-DXP                                 | 1.4     |                                            |
 | ✅     | Faster Draw                                    | 1.31    |                                            |
 | ✅     | FlinchingSSE                                   | 1.4     |                                            |
 | ⚠️     | Jump Behavior Overhaul SE                      | 1.5     | Can patch it, but it freezes upon landing. |
