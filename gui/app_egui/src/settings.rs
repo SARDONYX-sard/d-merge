@@ -59,7 +59,7 @@ impl Default for AppSettings {
             sort_column: SortColumn::Priority,
             target_runtime: skyrim_data_dir::Runtime::Se,
             template_dir: "./assets/templates".into(),
-            transparent: false, // For white there, visibility becomes poor, so the default is off.
+            transparent: false, // For white theme, visibility becomes poor, so the default is off.
             window_width: 900.0,
             window_height: 900.0,
             window_pos_x: 0.0,
