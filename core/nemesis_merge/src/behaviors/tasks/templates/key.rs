@@ -41,6 +41,24 @@ impl<'a> TemplateKey<'a> {
     pub fn as_meshes_inner_path(&self) -> &Path {
         Path::new(self.template_name.as_ref())
     }
+
+    // HACK: This is hack.
+    /// This template has event names ` iState_NPCSneaking`(has space prefix) and `iState_NPCSneaking`(non space prefix). If duplicates are removed,
+    /// the referenced targets will become misaligned.
+    ///
+    /// This is a check function to prevent that.
+    ///
+    /// # Note
+    /// Vanilla Skyrim is configured this way. Removing duplicates causes NPCs to become immobile when casting spells.
+    pub fn has_duplicate_event_names(&self) -> bool {
+        matches!(
+            self.as_str(),
+            "meshes/actors/character/_1stperson/behaviors/magicbehavior.bin"
+                | "meshes/actors/character/_1stperson/behaviors/magicmountedbehavior.bin"
+                | "meshes/actors/character/behaviors/magicbehavior.bin"
+                | "meshes/actors/character/behaviors/magicmountedbehavior.bin"
+        )
+    }
 }
 
 /* --- Path-like trait impls --- */
