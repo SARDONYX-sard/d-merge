@@ -7,7 +7,7 @@ use core::ops::Range;
 use rayon::prelude::*;
 use simd_json::borrowed::Value;
 use std::borrow::Cow;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const MARK_AS_REMOVED_STR: &str = "##Mark_As_Removed##"; // Separate inner str for test
 const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed(MARK_AS_REMOVED_STR));
@@ -219,20 +219,20 @@ fn apply_ops_parallel<'a>(
             .smart_iter()
             .partition(|ValueWithPriority { patch, .. }| match &patch.action {
                 Action::Pure { op } => matches!(op, Op::Replace | Op::Remove),
-                Action::Seq { op, .. } => *op != Op::Add,
+                Action::Seq { op, .. } => matches!(op, Op::Replace | Op::Remove),
                 Action::SeqPush => false,
             });
 
     // Apply Replace and Remove operations
     for ValueWithPriority { patch, priority } in non_add_ops {
-        let JsonPatch { action: op, value } = patch;
+        let JsonPatch { action, value } = patch;
 
         // Get sequence information if the action targets a sequence
-        let (op, range) = op.try_as_seq()?;
+        let (op, range) = action.try_as_seq()?;
 
         match op {
             Op::Replace => {
-                let values = value_to_array(value)?;
+                let values = value_as_array(value)?;
 
                 if let Some(add_patch) =
                     apply_replace_with_overflow(&mut base, range, values, priority)?
@@ -261,7 +261,7 @@ fn apply_ops_parallel<'a>(
     for value in add_ops {
         match &value.patch.action {
             Action::Seq { op: Op::Add, range } => {
-                let values = value_to_array(value.patch.value)?;
+                let values = value_as_array(value.patch.value)?;
                 let insert_at = range.start + offset;
 
                 if insert_at < base.len() {
@@ -273,7 +273,7 @@ fn apply_ops_parallel<'a>(
                 }
             }
             Action::SeqPush => {
-                let values = value_to_array(value.patch.value)?;
+                let values = value_as_array(value.patch.value)?;
                 base.smart_extend(values); // Always append at the end
             }
             _ => {} // Should not appear here
@@ -292,7 +292,7 @@ fn apply_ops_parallel<'a>(
 /// 1. Verify the type is correct.
 /// 2. Return a reference to the array if successful.
 /// 3. Include the original value in the error for better debugging/logging.
-fn value_to_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError> {
+fn value_as_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError> {
     match value {
         Value::Array(arr) => Ok(*arr),
         other => {
@@ -304,7 +304,7 @@ fn value_to_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError
                     got: value_type,
                 },
                 &["".into()],
-                other.clone(),
+                other,
             ))
         }
     }
@@ -325,22 +325,19 @@ type SplitValue<'a> = (
 fn split_for_replace<'a>(
     range: Range<usize>,
     base_len: usize,
-    values: Vec<Value<'a>>,
+    mut values: Vec<Value<'a>>,
 ) -> SplitValue<'a> {
     let (in_range, overflow_range) = split_range_at_len(range, base_len);
 
     match (in_range, overflow_range) {
         (Some(in_r), Some(over_r)) => {
             let in_len = in_r.len();
-            let (in_vals, overflow_vals) = values.split_at(in_len);
-            (
-                Some((in_r, in_vals.to_vec())),
-                Some((over_r, overflow_vals.to_vec())),
-            )
+            let overflow_vals = values.split_off(in_len);
+            (Some((in_r, values)), Some((over_r, overflow_vals)))
         }
         (Some(in_r), None) => (Some((in_r, values)), None),
         (None, Some(over_r)) => (None, Some((over_r, values))),
-        (None, None) => (None, None), // Should never happen
+        (None, None) => (None, None), // unreadable
     }
 }
 
@@ -360,7 +357,7 @@ fn apply_replace_with_overflow<'a>(
             });
         };
 
-        let written = std::sync::atomic::AtomicUsize::new(0);
+        let written = AtomicUsize::new(0);
         slice
             .smart_iter_mut()
             .zip(in_bounds_values)
@@ -415,8 +412,6 @@ fn apply_replace_with_overflow<'a>(
 
 #[cfg(any(feature = "tracing", test))]
 fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> String {
-    use std::{collections::BTreeSet, sync::atomic::AtomicUsize};
-
     const SPACE_SYMBOL: &str = "     ";
     const ADD_SYMBOL: &str = " [+] ";
     const REPLACE_SYMBOL: &str = " [*] ";
@@ -521,7 +516,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
     };
 
     // --- 2. collect all start/end points for non-overlapping segments
-    let mut points = BTreeSet::new();
+    let mut points = std::collections::BTreeSet::new();
     for row in &rows {
         points.insert(row.range.start);
         points.insert(row.range.end);
