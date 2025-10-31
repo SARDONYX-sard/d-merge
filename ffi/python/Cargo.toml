@@ -15,14 +15,23 @@ rust-version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "d_merge_python"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-nemesis_merge = { workspace = true }
-pyo3 = "0.25.1"
-pyo3-async-runtimes = { version = "0.25", features = [
+pyo3 = "0.27.1"
+pyo3-async-runtimes = { version = "0.27", features = [
   "attributes",
   "tokio-runtime",
 ] }
+pyo3-stub-gen = "0.16.1"
+
+rayon = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+# workspace members
+mod_info = { workspace = true }
+nemesis_merge = { workspace = true }
+serde_hkx_for_gui = { workspace = true }
+skyrim_data_dir = { workspace = true }
+tracing_rotation = { workspace = true }
