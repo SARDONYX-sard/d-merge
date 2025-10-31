@@ -109,7 +109,7 @@ impl<'a> EnvInfo<'a> {
 /// ```
 /// use gh_issue_link::{SkyrimRuntime, new_gh_issue_link};
 ///
-/// println!("{}", new_gh_issue_link("0.1.0", SkyrimRuntime::Se, "1.6.1170.0"));
+/// println!("{}", new_gh_issue_link("0.1.0", SkyrimRuntime::Se, Some("1.6.1170.0")));
 /// ```
 pub fn new_gh_issue_link(
     d_merge_version: &str,
