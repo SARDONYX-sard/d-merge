@@ -6,14 +6,15 @@ use eframe::egui::{self};
 use rayon::prelude::*;
 
 /// Handle drag-and-drop reordering of mods.
-pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 5]) {
+pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
     let row_height = 20.0;
 
     let checkbox_rect = [widths[0], row_height];
     let w_path = widths[1];
     let w_name = widths[2];
-    let w_site = widths[3];
-    let priority_size = [widths[4], row_height];
+    let w_mod_type = widths[3];
+    let w_site = widths[4];
+    let priority_size = [widths[5], row_height];
 
     let row_width = widths.par_iter().sum::<f32>() + 33.0;
 
@@ -46,6 +47,7 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 5]
                     draggable_handle.ui(ui, |ui| {
                         label_with_hover(ui, &item.name, w_name);
                     });
+                    label_with_hover(ui, item.mod_type.as_str(), w_mod_type);
                     hyperlink_with_hover(ui, &item.site, w_site);
                     ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()));
                 });
@@ -67,13 +69,13 @@ pub fn check_only_table_body(
     body: &mut egui_extras::TableBody,
     filtered_items: &[ModItem],
     original_items: &mut [ModItem],
-    widths: [f32; 5],
+    widths: [f32; 6],
 ) {
     let w_checkbox = widths[0];
     let w_path = widths[1];
     let w_name = widths[2];
-    let w_site = widths[3];
-    let _w_priority = widths[4];
+    let w_mod_type = widths[3];
+    let w_site = widths[4];
 
     for filtered_item in filtered_items {
         let orig_item = original_items
@@ -93,6 +95,9 @@ pub fn check_only_table_body(
             });
             row.col(|ui| {
                 label_with_hover(ui, &filtered_item.name, w_name);
+            });
+            row.col(|ui| {
+                label_with_hover(ui, filtered_item.mod_type.as_str(), w_mod_type);
             });
             row.col(|ui| {
                 hyperlink_with_hover(ui, &filtered_item.site, w_site);

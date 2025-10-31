@@ -187,7 +187,17 @@ pub struct ModInfo {
 }
 
 #[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum ModType {
@@ -198,6 +208,23 @@ pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
     /// - `<skyrim data dir>/meshes/actors/character/animations/aaaa`
     Fnis,
+}
+
+impl ModType {
+    /// Get the `&static str` corresponding to `ModType`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// assert_eq!(mod_info::ModType::Nemesis.as_str(), "Nemesis");
+    /// assert_eq!(mod_info::ModType::Fnis.as_str(), "FNIS");
+    /// ```
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Nemesis => "Nemesis",
+            Self::Fnis => "FNIS",
+        }
+    }
 }
 
 /// Remove `null` string

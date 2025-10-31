@@ -12,6 +12,7 @@ pub enum I18nKey {
     ClearButton,
     ColumnId,
     ColumnName,
+    ColumnModType,
     ColumnPriority,
     ColumnSite,
     DebugOutput,
@@ -65,6 +66,7 @@ impl I18nKey {
             Self::ClearButton => "Clear",
             Self::ColumnId => "ID",
             Self::ColumnName => "Name",
+            Self::ColumnModType => "Mod Type",
             Self::ColumnPriority => "Priority",
             Self::ColumnSite => "Site",
             Self::DebugOutput => "Debug output",
@@ -140,6 +142,7 @@ impl I18nMap {
         map.0.insert(ClearButton, Cow::Borrowed(ClearButton.default_eng()));
         map.0.insert(ColumnId, Cow::Borrowed(ColumnId.default_eng()));
         map.0.insert(ColumnName, Cow::Borrowed(ColumnName.default_eng()));
+        map.0.insert(ColumnModType, Cow::Borrowed(ColumnModType.default_eng()));
         map.0.insert(ColumnPriority, Cow::Borrowed(ColumnPriority.default_eng()));
         map.0.insert(ColumnSite, Cow::Borrowed(ColumnSite.default_eng()));
         map.0.insert(DebugOutput, Cow::Borrowed(DebugOutput.default_eng()));

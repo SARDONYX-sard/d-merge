@@ -645,6 +645,7 @@ impl ModManagerApp {
             let ord = match self.sort_column {
                 SortColumn::Id => a.id.cmp(&b.id),
                 SortColumn::Name => a.name.cmp(&b.name),
+                SortColumn::ModType => a.mod_type.cmp(&b.mod_type),
                 SortColumn::Site => a.site.cmp(&b.site),
                 SortColumn::Priority => a.priority.cmp(&b.priority),
             };
@@ -683,13 +684,14 @@ impl ModManagerApp {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
                     .column(egui_extras::Column::auto().resizable(true)) // 1/5: checkbox
-                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // 2/5: id
-                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // 3/5: name
-                    .column(Self::resizable_column(total_width, 0.40, changed_width)) // 4/5: site
-                    .column(egui_extras::Column::remainder().resizable(true)) // 5/5: priority
+                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // 2/6: id
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // 3/6: name
+                    .column(Self::resizable_column(total_width, 0.07, changed_width)) // 4/6: mod type(FNIS/Nemesis)
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // 5/6: site
+                    .column(egui_extras::Column::remainder().resizable(true)) // 6/6: priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
-                        let mut widths = [0.0; 5]; // 5 ==  column count
+                        let mut widths = [0.0; 6]; // 6 ==  column count
                         widths.clone_from_slice(body.widths());
 
                         let mod_list = if self.fetch_is_empty {
@@ -727,12 +729,14 @@ impl ModManagerApp {
     fn render_table_header(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
         let path_label = self.t(I18nKey::ColumnId).to_string();
         let name_label = self.t(I18nKey::ColumnName).to_string();
+        let mod_type_label = self.t(I18nKey::ColumnModType).to_string();
         let site_label = self.t(I18nKey::ColumnSite).to_string();
         let priority_label = self.t(I18nKey::ColumnPriority).to_string();
 
         self.checkbox_header_button(header);
         self.header_button(header, &path_label, SortColumn::Id);
         self.header_button(header, &name_label, SortColumn::Name);
+        self.header_button(header, &mod_type_label, SortColumn::ModType);
         self.header_button(header, &site_label, SortColumn::Site);
         self.header_button(header, &priority_label, SortColumn::Priority);
     }
@@ -785,15 +789,20 @@ impl ModManagerApp {
         column: SortColumn,
     ) {
         header.col(|ui| {
-            let text = match self.sort_column {
-                _ if self.sort_column == column && self.sort_asc => format!("{label} ▲"),
-                _ if self.sort_column == column && !self.sort_asc => format!("{label} ▼"),
-                _ => label.to_string(),
-            };
+            ui.with_layout(
+                egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                |ui| {
+                    let text = match self.sort_column {
+                        _ if self.sort_column == column && self.sort_asc => format!("{label} ▲"),
+                        _ if self.sort_column == column && !self.sort_asc => format!("{label} ▼"),
+                        _ => label.to_string(),
+                    };
 
-            if ui.button(text).clicked() {
-                self.toggle_sort(column);
-            }
+                    if ui.button(text).clicked() {
+                        self.toggle_sort(column);
+                    }
+                },
+            );
         });
     }
 }

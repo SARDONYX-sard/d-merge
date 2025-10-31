@@ -24,11 +24,12 @@ pub struct ModItem {
 }
 
 /// Columns that can be used for sorting mods.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortColumn {
     Id,
     Name,
+    ModType,
     Site,
     Priority,
 }
