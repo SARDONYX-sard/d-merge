@@ -78,6 +78,7 @@
     "UNEQUIP",
     "Uninit",
     "unlisten",
+    "usvfs",
     "viewports",
     "weapequip",
     "xorout"
