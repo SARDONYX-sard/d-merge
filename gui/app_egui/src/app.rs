@@ -330,15 +330,10 @@ impl ModManagerApp {
                     )
                     .clicked()
                 {
-                    let dialog = {
-                        let default_dir = {
-                            let path = Path::new(self.current_skyrim_data_dir());
-                            path.canonicalize().ok()
-                        };
-                        match default_dir {
-                            Some(default_dir) => rfd::FileDialog::new().set_directory(default_dir),
-                            None => rfd::FileDialog::new(),
-                        }
+                    let dialog = match find_existing_dir_or_ancestor(self.current_skyrim_data_dir())
+                    {
+                        Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
+                        Err(_) => rfd::FileDialog::new(),
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
