@@ -31,6 +31,12 @@ jobs:
 
       - name: Check format
         run: rustup component add rustfmt;cargo fmt --all -- --check
+
+      - name: Install Python 3.10(To avoid lint error)
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10
+          architecture: ${{ matrix.platform.target }}
       - name: Lint Check
         run: rustup component add clippy;cargo clippy --workspace -- -D warnings
 
