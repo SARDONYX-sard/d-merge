@@ -129,13 +129,13 @@ D:/MO2/mods/
 
 ## Build
 
-requirements: Rust1.87
+requirements: Rust1.91
 
 ```shell
 cargo build -p d_merge_egui --profile release-no-lto # Simple GUI by egui
 ```
 
-requirements: Rust1.87, Node.js LTS
+requirements: Rust1.91, Node.js LTS
 
 ```shell
 npm run build # Rich GUI by tauri
