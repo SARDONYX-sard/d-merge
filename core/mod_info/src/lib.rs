@@ -186,6 +186,7 @@ pub struct ModInfo {
     pub mod_type: ModType,
 }
 
+// NOTE: Order follows the sequence in which the tools were created. The first one created was FNIS.
 #[derive(
     Debug,
     Clone,
@@ -202,12 +203,12 @@ pub struct ModInfo {
 #[serde(rename_all = "lowercase")]
 pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+    /// - `<skyrim data dir>/meshes/actors/character/animations/aaaa`
+    Fnis,
+    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
     /// - `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     #[default]
     Nemesis,
-    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
-    /// - `<skyrim data dir>/meshes/actors/character/animations/aaaa`
-    Fnis,
 }
 
 impl ModType {
