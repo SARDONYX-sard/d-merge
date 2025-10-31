@@ -24,7 +24,7 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]
             } else {
                 ui.visuals().widgets.noninteractive.bg_fill // gray
             };
-            bg_color = bg_color.gamma_multiply(0.7);
+            bg_color = bg_color.gamma_multiply(0.5);
 
             let row_rect = ui
                 .allocate_rect(
