@@ -1,5 +1,8 @@
 use egui::{Align, Ui};
 
+/// Table: 1 row height size.
+pub const ROW_HEIGHT: f32 = 20.0;
+
 /// Add a label with hover tooltip (truncated if too long).
 pub fn label_with_hover(ui: &mut Ui, text: &str, width: f32) {
     let truncated = truncate_to_width(ui, text, width);
@@ -8,15 +11,18 @@ pub fn label_with_hover(ui: &mut Ui, text: &str, width: f32) {
     } else {
         truncated
     };
-    ui.add_sized([width, 20.0], egui::Label::new(display).halign(Align::LEFT))
-        .on_hover_text(text);
+    ui.add_sized(
+        [width, ROW_HEIGHT],
+        egui::Label::new(display).halign(Align::LEFT),
+    )
+    .on_hover_text(text);
 }
 
 /// Add a hyperlink with hover tooltip (truncated if too long).
 pub fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
     if url.trim().is_empty() {
         ui.add_sized(
-            [width, 20.0],
+            [width, ROW_HEIGHT],
             egui::Label::new(" ".repeat((width / 6.0).max(3.0) as usize)),
         );
         return;
@@ -24,7 +30,7 @@ pub fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
 
     let truncated = truncate_to_width(ui, url, width);
     ui.add_sized(
-        [width, 20.0],
+        [width, ROW_HEIGHT],
         egui::Hyperlink::from_label_and_url(truncated, url),
     )
     .on_hover_text(url);

@@ -1,20 +1,18 @@
 use crate::{
     mod_item::ModItem,
-    ui::{hyperlink_with_hover, label_with_hover},
+    ui::{hyperlink_with_hover, label_with_hover, ROW_HEIGHT},
 };
 use eframe::egui::{self};
 use rayon::prelude::*;
 
 /// Handle drag-and-drop reordering of mods.
 pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
-    let row_height = 20.0;
-
-    let checkbox_rect = [widths[0], row_height];
+    let checkbox_rect = [widths[0], ROW_HEIGHT];
     let w_path = widths[1];
     let w_name = widths[2];
     let w_mod_type = widths[3];
     let w_site = widths[4];
-    let priority_size = [widths[5], row_height];
+    let priority_size = [widths[5], ROW_HEIGHT];
 
     let row_width = widths.par_iter().sum::<f32>() + 33.0;
 
@@ -30,7 +28,7 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]
 
             let row_rect = ui
                 .allocate_rect(
-                    egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(row_width, row_height)),
+                    egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(row_width, ROW_HEIGHT)),
                     egui::Sense::hover(),
                 )
                 .rect;
@@ -47,6 +45,7 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]
                     draggable_handle.ui(ui, |ui| {
                         label_with_hover(ui, &item.name, w_name);
                     });
+
                     label_with_hover(ui, item.mod_type.as_str(), w_mod_type);
                     hyperlink_with_hover(ui, &item.site, w_site);
                     ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()));
@@ -83,10 +82,10 @@ pub fn check_only_table_body(
             .find(|o| o.id == filtered_item.id)
             .expect("Original item must exist");
 
-        body.row(20.0, |mut row| {
+        body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
                 ui.add_sized(
-                    [w_checkbox, 20.0],
+                    [w_checkbox, ROW_HEIGHT],
                     egui::Checkbox::without_text(&mut orig_item.enabled),
                 );
             });
@@ -103,7 +102,12 @@ pub fn check_only_table_body(
                 hyperlink_with_hover(ui, &filtered_item.site, w_site);
             });
             row.col(|ui| {
-                ui.label(filtered_item.priority.to_string());
+                ui.with_layout(
+                    egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                    |ui| {
+                        ui.label(filtered_item.priority.to_string());
+                    },
+                );
             });
         });
     }
