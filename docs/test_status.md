@@ -97,4 +97,7 @@ SkyrimSE
 | ✅     | Ride Sharing SE                           | 0.4b    | b:                                                                                 |
 | ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix: The AltAnim syntax is not yet supported. (Planned for conversion to OAR) |
 
-Currently, since the bones themselves are usable in XP32 Maximum Skeleton Special Extended, we can check them in MO2 but do not need to check them in D Merge to use them.
+XP32 Maximum Skeleton Special Extended works as long as the skeleton bones are installed, so you only need to enable it in MO2.
+You don't need to check it in D Merge.
+
+FNIS is only required for the optional alternate animation features (e.g., changing weapon placement via MCM), not for the skeleton itself.
