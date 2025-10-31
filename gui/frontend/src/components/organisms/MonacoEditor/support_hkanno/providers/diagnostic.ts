@@ -1,11 +1,24 @@
 import type { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
+import { HKANNO_LANGUAGE_ID } from '..';
 import { PIE_NATIVE_INSTRUCTIONS } from '../parser/payload_interpreter/completion';
 import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
 import { IFrameNode } from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
-export const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
+export const registerCodeLen: OnMount = (editor, monacoEnv) => {
+  // first
+  if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+    updateHkannoDiagnostics(editor, monacoEnv);
+  }
+  editor.onDidChangeModelContent(() => {
+    if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+      updateHkannoDiagnostics(editor, monacoEnv);
+    }
+  });
+};
+
+const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
   const model = editor.getModel();
   if (!model) return;
 

@@ -175,6 +175,9 @@ const SplitEditors = ({
               fontSize: 13,
               minimap: { enabled: true },
               renderWhitespace: 'boundary',
+              bracketPairColorization: {
+                enabled: true,
+              },
               rulers: [80],
               smoothScrolling: true,
             }}
