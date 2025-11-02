@@ -6,6 +6,8 @@ use std::borrow::Cow;
 )]
 #[serde(rename_all = "snake_case")]
 pub enum I18nKey {
+    AutoDetectButton,
+    AutoDetectHover,
     AutoRemoveMeshes,
     AutoRemoveMeshesHover,
     CancelButton,
@@ -31,6 +33,9 @@ pub enum I18nKey {
     ManualModeHover,
     ModsListTitle,
     NotificationClearButton,
+    NotifyErrPlatformNotSupported,
+    NotifyErrWindowsRegistryNotFound,
+    NotifyInfoUpdatingModList,
     OutputDirLabel,
     PatchButton,
     RemovingMeshesMessage,
@@ -60,6 +65,8 @@ pub enum I18nKey {
 impl I18nKey {
     pub const fn default_eng(&self) -> &'static str {
         match self {
+            Self::AutoDetectButton => "Auto Detect",
+            Self::AutoDetectHover => "Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once.",
             Self::AutoRemoveMeshes => "Auto remove `meshes`",
             Self::AutoRemoveMeshesHover => "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.\nNote: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods.",
             Self::CancelButton       => "Cancel",
@@ -85,6 +92,9 @@ impl I18nKey {
             Self::ManualModeHover => "When using it completely manually.\n(The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)",
             Self::ModsListTitle => "Mods",
             Self::NotificationClearButton => "Clear Notify",
+            Self::NotifyErrPlatformNotSupported => "Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.",
+            Self::NotifyErrWindowsRegistryNotFound => "Error: Could not find path in the Windows registry. \nIf you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually.",
+            Self::NotifyInfoUpdatingModList => "Updating Mod list…",
             Self::SelectButton => "Select",
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
@@ -136,6 +146,8 @@ impl I18nMap {
         // To preserve the order using serde, you have no choice but to use an index map.
         let mut map = Self::new();
 
+        map.0.insert(AutoDetectButton, Cow::Borrowed(AutoDetectButton.default_eng()));
+        map.0.insert(AutoDetectHover, Cow::Borrowed(AutoDetectHover.default_eng()));
         map.0.insert(AutoRemoveMeshes, Cow::Borrowed(AutoRemoveMeshes.default_eng()));
         map.0.insert(AutoRemoveMeshesHover, Cow::Borrowed(AutoRemoveMeshesHover.default_eng()));
         map.0.insert(CancelButton, Cow::Borrowed(CancelButton.default_eng()));
@@ -161,6 +173,9 @@ impl I18nMap {
         map.0.insert(ManualModeHover, Cow::Borrowed(ManualModeHover.default_eng()));
         map.0.insert(ModsListTitle, Cow::Borrowed(ModsListTitle.default_eng()));
         map.0.insert(NotificationClearButton, Cow::Borrowed(NotificationClearButton.default_eng()));
+        map.0.insert(NotifyErrPlatformNotSupported, Cow::Borrowed(NotifyErrPlatformNotSupported.default_eng()));
+        map.0.insert(NotifyErrWindowsRegistryNotFound, Cow::Borrowed(NotifyErrWindowsRegistryNotFound.default_eng()));
+        map.0.insert(NotifyInfoUpdatingModList, Cow::Borrowed(NotifyInfoUpdatingModList.default_eng()));
         map.0.insert(OutputDirLabel, Cow::Borrowed(OutputDirLabel.default_eng()));
         map.0.insert(PatchButton, Cow::Borrowed(PatchButton.default_eng()));
         map.0.insert(RuntimeTargetLabel, Cow::Borrowed(RuntimeTargetLabel.default_eng()));

@@ -287,19 +287,8 @@ impl ModManagerApp {
                         (skyrim_data_dir::Runtime::Se, "SkyrimSE"),
                         (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
                     ];
-
                     for (runtime, label) in runtimes {
-                        if ui
-                            .selectable_value(&mut self.target_runtime, runtime, label)
-                            .changed()
-                            && self.mode == DataMode::Vfs
-                        {
-                            if let Ok(data_dir) =
-                                skyrim_data_dir::get_skyrim_data_dir(self.target_runtime)
-                            {
-                                self.skyrim_data_dir = data_dir.display().to_string();
-                            };
-                        }
+                        ui.selectable_value(&mut self.target_runtime, runtime, label);
                     }
                 });
         });
@@ -322,6 +311,20 @@ impl ModManagerApp {
                 };
 
                 self.draw_skyrim_dir_ui(ui);
+
+                // NOTE: Due to the need to read the registry, it only works on Windows and is meaningless unless in VFS state.
+                #[cfg(target_os = "windows")]
+                if self.mode == DataMode::Vfs
+                    && ui
+                        .add_sized(
+                            [60.0, 40.0],
+                            egui::Button::new(self.t(I18nKey::AutoDetectButton)),
+                        )
+                        .on_hover_text(self.t(I18nKey::AutoDetectHover))
+                        .clicked()
+                {
+                    self.update_vfs_skyrim_data_dir_by_reg();
+                }
 
                 if ui
                     .add_sized(
@@ -683,7 +686,7 @@ impl ModManagerApp {
                     .column(Self::resizable_column(total_width, 0.30, changed_width)) // 3/6: name
                     .column(Self::resizable_column(total_width, 0.07, changed_width)) // 4/6: mod type(FNIS/Nemesis)
                     .column(Self::resizable_column(total_width, 0.30, changed_width)) // 5/6: site
-                    .column(egui_extras::Column::remainder().resizable(true)) // 6/6: priority
+                    .column(Self::resizable_column(total_width, 0.03, changed_width)) // 6/6: priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
                         let mut widths = [0.0; 6]; // 6 ==  column count
@@ -851,37 +854,12 @@ impl ModManagerApp {
 
     fn draw_skyrim_dir_ui(&mut self, ui: &mut egui::Ui) {
         if self.mode == DataMode::Vfs {
-            let dir = match skyrim_data_dir::get_skyrim_data_dir(self.target_runtime) {
-                Ok(dir) => dir,
-                Err(_err) => {
-                    #[cfg(target_os = "windows")]
-                    let exe_suffix = if self.target_runtime == skyrim_data_dir::Runtime::Se {
-                        "SE"
-                    } else {
-                        ""
-                    };
-
-                    #[cfg(target_os = "windows")]
-                    let err_msg = format!(
-                        "Error: Could not find Skyrim{exe_suffix}.exe path in the Windows registry: {_err}\n\
-                        If you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually."
-                    );
-
-                    #[cfg(not(target_os = "windows"))]
-                    let err_msg = "NOTE: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.".to_string();
-                    self.set_notification(err_msg);
-
-                    PathBuf::new()
-                }
-            };
-            let dir_str = dir.display().to_string();
-
-            if self.vfs_skyrim_data_dir.trim().is_empty() {
-                self.vfs_skyrim_data_dir = dir_str;
+            if self.is_first_render && self.vfs_skyrim_data_dir.trim().is_empty() {
+                self.update_vfs_skyrim_data_dir_by_reg();
             }
 
             let response = ui.add_sized(
-                [ui.available_width() * 0.9, 40.0],
+                [ui.available_width() * 0.85, 40.0],
                 egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
             );
 
@@ -897,6 +875,42 @@ impl ModManagerApp {
 
             if self.is_first_render || response.changed() {
                 self.update_mod_list();
+            }
+        }
+    }
+
+    /// Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once.
+    ///
+    /// # Note
+    /// Window only.
+    fn update_vfs_skyrim_data_dir_by_reg(&mut self) {
+        match skyrim_data_dir::get_skyrim_data_dir(self.target_runtime) {
+            Ok(dir) => {
+                let new_vfs_skyrim_data_dir = dir.display().to_string();
+                if self.vfs_skyrim_data_dir != new_vfs_skyrim_data_dir {
+                    self.vfs_skyrim_data_dir = new_vfs_skyrim_data_dir;
+
+                    let mut has_update_notify = false;
+                    let msg = self.t(I18nKey::NotifyInfoUpdatingModList);
+                    let _ = self.notification.try_lock().map(|mut guard| {
+                        *guard = msg.to_string();
+                        has_update_notify = true;
+                    });
+
+                    self.update_mod_list();
+                    if has_update_notify {
+                        self.clear_notification();
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::error!(%err);
+                #[cfg(target_os = "windows")]
+                let err_msg = self.t(I18nKey::NotifyErrWindowsRegistryNotFound);
+                #[cfg(not(target_os = "windows"))]
+                let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported);
+
+                self.set_notification(err_msg);
             }
         }
     }
@@ -921,6 +935,7 @@ impl ModManagerApp {
                 let _ = core::mem::replace(self.mod_list_mut(), new_mods);
             }
             Err(err) => {
+                tracing::error!(%err);
                 let err_title = self.t(I18nKey::ErrorReadingModInfo);
                 self.set_notification(format!("{err_title} {err}"));
             }
@@ -933,7 +948,6 @@ impl ModManagerApp {
     pub fn set_notification<S: Into<String>>(&self, msg: S) {
         if let Ok(mut guard) = self.notification.lock() {
             let msg = msg.into();
-            tracing::info!("{msg}");
             *guard = msg;
         }
     }
@@ -1021,11 +1035,12 @@ impl ModManagerApp {
                 .unwrap_or_else(|_| Path::new(skyrim_data_directory).to_path_buf());
 
         if is_dangerous_remove {
-            let warn = "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.";
-            tracing::warn!("{warn}");
+            tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
         } else {
-            let removing_msg = self.t(I18nKey::RemovingMeshesMessage);
-            self.set_notification(format!("0/6: {removing_msg} `{output_dir}/meshes`"));
+            self.set_notification(format!(
+                "0/6: {} `{output_dir}/meshes`",
+                self.t(I18nKey::RemovingMeshesMessage)
+            ));
 
             crate::cache_remover::remove_meshes_dir_all(output_dir);
         }
