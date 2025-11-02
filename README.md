@@ -120,10 +120,10 @@ D:/MO2/mods/
 | ✅     | Basic                           | b               | Creature also supported (tested with FNISZoo converted to SE)                  |
 | ✅     | Sequenced Animations            | s, so           | Creature also supported                                                        |
 | ✅     | Arm Offset Animations           | ofa             | Tested with(Immersive Animated Looting v2.7)                                   |
-| ❌     | Furniture Animations            | fu, fuo         | I couldn't find any mods that could be tested.                                 |
+| ⚠️     | Furniture Animations            | fu, fuo         | Implemented. But we couldn't find any mods that could be tested.               |
 | ⚠️     | Paired Animations and KillMoves | pa, km          | KillMove: only animation checked, not tested in actual kill. Paired: untested. |
-| ❌     | Chair Animations                | ch              | I couldn't find any mods that could be tested.                                 |
-| ❌     | Alternate Animations            | AAprefix        | I'm debating whether to convert it to OAR.                                     |
+| ❌     | Chair Animations                | ch              | Couldn't find any mods that could be tested.                                   |
+| ❌     | Alternate Animations            | AAprefix        | Debating whether to convert it to OAR.                                         |
 
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
 
