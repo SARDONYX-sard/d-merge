@@ -3,9 +3,16 @@ name: Build & Test
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - "**/*.md"
   pull_request:
     branches: ["*"]
+    paths-ignore:
+      - "**/*.md"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   APP_NAME: d_merge
