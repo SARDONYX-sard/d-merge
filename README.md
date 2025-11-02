@@ -66,16 +66,29 @@ It is written to <skyrim data dir>/.d_merge/d_merge_settings.json immediately be
 
 By utilizing this behavior as follows, settings will be automatically loaded and updated whenever you switch profiles.
 
+<details><summary>MO2 Directory tree</summary><div>
+
 ```txt
 D:/MO2/mods/
+├── d_merge_windows_egui/
+│       ├── .d_merge/
+│       │    └── translation.json
+│       ├── assets/                        <- templates files dir
+│       ├── interface/                     <- dummy dir
+│       └── d_merge_egui.exe               <- main exe
+│
 ├── male_profile_dir/
-│   └── .d_merge/
-│       └── d_merge_settings.json <- output_dir: D:/MO2/mods/male_profile_dir
+│       ├── meshes/
+│       └── .d_merge/
+│             └── d_merge_settings.json    <- (output_dir: D:/MO2/mods/male_profile_dir)
 │
 └── female_profile_dir/
-    └── .d_merge/
-        └── d_merge_settings.json <- output_dir: D:/MO2/mods/female_profile_dir
+           ├── meshes/
+           └── .d_merge/
+                  └── d_merge_settings.json <- (output_dir: D:/MO2/mods/female_profile_dir)
 ```
+
+</div></details>
 
 ## Patch Page Progress
 
