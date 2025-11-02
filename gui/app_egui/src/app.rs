@@ -288,7 +288,14 @@ impl ModManagerApp {
                         (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
                     ];
                     for (runtime, label) in runtimes {
-                        ui.selectable_value(&mut self.target_runtime, runtime, label);
+                        if ui
+                            .selectable_value(&mut self.target_runtime, runtime, label)
+                            .changed()
+                            && self.mode == DataMode::Vfs
+                        {
+                            #[cfg(target_os = "windows")]
+                            self.update_vfs_skyrim_data_dir_by_reg();
+                        }
                     }
                 });
         });
@@ -856,26 +863,29 @@ impl ModManagerApp {
         if self.mode == DataMode::Vfs {
             if self.is_first_render && self.vfs_skyrim_data_dir.trim().is_empty() {
                 self.update_vfs_skyrim_data_dir_by_reg();
+                return;
             }
 
-            let response = ui.add_sized(
-                [ui.available_width() * 0.85, 40.0],
-                egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
-            );
-
-            if self.is_first_render || response.changed() {
+            if ui
+                .add_sized(
+                    [ui.available_width() * 0.85, 40.0],
+                    egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
+                )
+                .changed()
+            {
                 self.update_mod_list();
             }
-        } else {
-            let response = ui.add_sized(
-                [ui.available_width() * 0.9, 40.0],
-                egui::TextEdit::singleline(&mut self.skyrim_data_dir)
-                    .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
-            );
+            return;
+        }
 
-            if self.is_first_render || response.changed() {
-                self.update_mod_list();
-            }
+        // Manual mode
+        let response = ui.add_sized(
+            [ui.available_width() * 0.9, 40.0],
+            egui::TextEdit::singleline(&mut self.skyrim_data_dir)
+                .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
+        );
+        if self.is_first_render || response.changed() {
+            self.update_mod_list();
         }
     }
 

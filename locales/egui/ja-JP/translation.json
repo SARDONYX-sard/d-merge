@@ -33,7 +33,7 @@
   "patch_button": "パッチ適用",
   "removing_meshes_message": "`<出力ディレクトリ>/meshes`を削除しています...",
   "runtime_target_label": "出力形式",
-  "runtime_target_hover": "hkxの出力形式。LE: win32, SE/VR: amd64",
+  "runtime_target_hover": "hkxの出力形式。LE: win32, SE/VR: amd64\n注意(Windows ver.ユーザーのみ): VFSモード状態で設定を変更した場合、レジストリを探索し `Skyrim data ディレクトリ`の自動更新を試みます",
   "search_label": "検索:",
   "select_button": "選択",
   "skyrim_data_dir_label": "Skyrim Dataディレクトリ:",
