@@ -88,18 +88,6 @@ pub fn new_furniture_one_anim_patches<'a>(
         ));
     }
 
-    // Push and register the Root `hkbStateMachineStateInfo` for both Right & Left offset arms.
-    seq_patches.push((
-        json_path!["#5138", "hkbStateMachine", "states"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0], class_indexes[2]]),
-            },
-            priority,
-        },
-    ));
-
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();
