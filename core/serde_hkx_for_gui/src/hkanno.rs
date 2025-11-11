@@ -139,7 +139,8 @@ impl<'a> Hkanno<'a> {
             .par_iter_mut()
             .filter(|(_, class)| matches!(class, Classes::hkaSplineCompressedAnimation(_)))
             .collect();
-        let (_, spline) = {
+        #[allow(unused_mut)] // To avoid clippy wrong warning rust 1.91.0
+        let (_, mut spline) = {
             match splines.len() {
                 0 => return MissingSplineSnafu.fail(),
                 1 => splines.swap_remove(0),
@@ -150,7 +151,7 @@ impl<'a> Hkanno<'a> {
                 }
             }
         };
-        let Classes::hkaSplineCompressedAnimation(anim) = spline else {
+        let Classes::hkaSplineCompressedAnimation(ref mut anim) = spline else {
             return MissingSplineSnafu.fail();
         };
 
@@ -212,7 +213,6 @@ impl<'a> Hkanno<'a> {
         self.write_to_classmap(&mut class_map)?; // Update annotations (pure memory operation)
 
         // Serialize back to bytes(NOTE: Binary data requires pre-sorting, so it is marked as &mut class_map.)
-        // FIXME: xml preserve ordering.
         let updated_bytes = match format {
             OutFormat::Amd64 | OutFormat::Win32 | OutFormat::Xml => {
                 serde_hkx_features::serde::ser::to_bytes(input, format, &mut class_map)
