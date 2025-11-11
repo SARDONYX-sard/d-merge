@@ -100,7 +100,7 @@ pub fn new_furniture_one_group_patches<'a>(
     // Push the first animation for furniture seq
     seq_patches.push(new_push_transitions_seq_patch(
         "#0089",
-        "#5216",
+        "#0088",
         [first_animation_event_name],
         [&class_indexes[0]],
         priority,

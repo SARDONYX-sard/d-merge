@@ -357,15 +357,18 @@ pub fn new_furniture_one_anim_patches<'a>(
     // #$RI+7$  hkbClipGenerator
     one_patches.push({
         //  $-F|IdleBlessingKneelEnter|FNISCG_%BI%$
+        //
         // The meaning of this template block is:
         // - first: `IdleBlessingKneelEnter`
         // - 2nd: `FNISCG_1`
         // - 3rd: `FNISCG_2`
-        // Since the fu syntax appears twice in one list, names overlap, so it's probably unnecessary to make them unique per file.
+        //
+        // NOTE: Even when the fu syntax appeared twice within a single list, the names did not duplicate.
+        // Therefore, it seems necessary to make them unique per file.
         let name = match current_phase {
             FurniturePhase::Start => Cow::Borrowed("IdleBlessingKneelEnter"),
-            FurniturePhase::Middle(index) | FurniturePhase::End(index) => {
-                format!("FNISCG_{index}").into()
+            FurniturePhase::Middle(_index) | FurniturePhase::End(_index) => {
+                format!("FNISCG_{class_index_0_id}").into()
             }
         };
 
