@@ -218,11 +218,19 @@ fn load_fnis_list_file(
         )
     };
 
+    // NOTE: Since a file named mod existed that was not in UTF-8 encoding, files with various encodings were read.
     let list_path = Path::new(&list_path_string);
-
-    let content = std::fs::read_to_string(list_path).map_err(|e| FnisError::ListMissing {
-        expected: list_path_string,
+    let bytes = std::fs::read(list_path).map_err(|e| FnisError::FailedReadingListFile {
+        expected: list_path_string.clone(),
         source: e,
+    })?;
+    let mut decoder = encoding_rs_io::DecodeReaderBytes::new(bytes.as_slice());
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut decoder, &mut content).map_err(|e| {
+        FnisError::FailedReadingListFile {
+            expected: list_path_string,
+            source: e,
+        }
     })?;
 
     Ok(content)
@@ -293,9 +301,9 @@ pub enum FnisError {
     ))]
     EmptyAnimPaths { animations_mod_dir: PathBuf },
 
-    /// Expected list file at `{expected}`, but the file was not found.
-    #[snafu(display("Expected list file at {expected}, but not found such a path."))]
-    ListMissing { expected: String, source: io::Error },
+    /// Expected list file at `{expected}`, but couldn't read this path.
+    #[snafu(display("Expected list file at {expected}, but couldn't read this path.: {source}"))]
+    FailedReadingListFile { expected: String, source: io::Error },
 
     /// Failed to get the parent directory of the animations mod directory.
     /// This indicates that the provided `animations_mod_dir` is too shallow in the filesystem hierarchy.

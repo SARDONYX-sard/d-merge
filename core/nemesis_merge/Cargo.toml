@@ -15,6 +15,7 @@ rust-version.workspace = true
 [dependencies]
 bitflags = "2.10.0"
 dashmap = { workspace = true }
+encoding_rs_io = "0.1.7"
 glob = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }

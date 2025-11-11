@@ -4172,6 +4172,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
  "dashmap",
+ "encoding_rs_io",
  "glob",
  "havok_classes",
  "indexmap 2.11.4",
