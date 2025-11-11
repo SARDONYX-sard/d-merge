@@ -860,31 +860,29 @@ impl ModManagerApp {
     }
 
     fn draw_skyrim_dir_ui(&mut self, ui: &mut egui::Ui) {
-        if self.mode == DataMode::Vfs {
-            if self.is_first_render && self.vfs_skyrim_data_dir.trim().is_empty() {
-                self.update_vfs_skyrim_data_dir_by_reg();
-                return;
-            }
+        let changed = match self.mode {
+            DataMode::Vfs => {
+                if self.is_first_render && self.vfs_skyrim_data_dir.trim().is_empty() {
+                    self.update_vfs_skyrim_data_dir_by_reg();
+                    return;
+                }
 
-            if ui
-                .add_sized(
+                ui.add_sized(
                     [ui.available_width() * 0.85, 40.0],
                     egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
                 )
                 .changed()
-            {
-                self.update_mod_list();
             }
-            return;
-        }
+            DataMode::Manual => ui
+                .add_sized(
+                    [ui.available_width() * 0.9, 40.0],
+                    egui::TextEdit::singleline(&mut self.skyrim_data_dir)
+                        .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
+                )
+                .changed(),
+        };
 
-        // Manual mode
-        let response = ui.add_sized(
-            [ui.available_width() * 0.9, 40.0],
-            egui::TextEdit::singleline(&mut self.skyrim_data_dir)
-                .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
-        );
-        if self.is_first_render || response.changed() {
+        if self.is_first_render || changed {
             self.update_mod_list();
         }
     }
