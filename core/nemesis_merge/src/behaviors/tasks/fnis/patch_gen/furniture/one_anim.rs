@@ -53,10 +53,10 @@ pub fn new_furniture_one_anim_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
     current_phase: FurniturePhase,
+    class_indexes: &[String; 9],
+    end_anim_state_id: i32,
     next_event_name: Option<&'a str>,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 9] =
-        std::array::from_fn(|_| owned_data.next_class_name_attribute());
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = animation.flag_set.flags;
@@ -209,7 +209,7 @@ pub fn new_furniture_one_anim_patches<'a>(
         priority,
     ));
 
-    // #$RI+1$  hkbClipGenerator
+    // #$RI+3$ hkbStateMachineTransitionInfoArray
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[3].clone()),
@@ -238,10 +238,9 @@ pub fn new_furniture_one_anim_patches<'a>(
                             "condition": "#0000",
                             "eventId": 152, // IdleChairExitStart
 
-                            // FIXME: $&fu$
                             // Last index of the sequence. (e.g., len 4 is 4. However,
-                            // we plan to use the hash of the last animation event here.)
-                            "toStateId": 0,
+                            // we use the hash of the last seq state class index here.)
+                            "toStateId": end_anim_state_id, // $&fu$
                             "fromNestedStateId": 0,
                             "toNestedStateId": 0,
                             "priority": 0,
@@ -327,7 +326,7 @@ pub fn new_furniture_one_anim_patches<'a>(
                 .enumerate()
                 .map(|(i, var)| {
                     simd_json::json_typed!(borrowed, {
-                        "memberPath": format!("bIsActive{i}"), // FIXME:
+                        "memberPath": format!("bIsActive{i}"), // FIXME ?: Is this correct?
                         "variableIndex": format!("$variableID{}$", var.name),  // $&AVI$
                         "bitIndex": -1,
                         "bindingType": "BINDING_TYPE_VARIABLE"
@@ -576,6 +575,8 @@ fn new_values_from_triggers<'a>(
                 "id": format!("$eventID[{event}]$"), // use Nemesis eventID variable. instead of $&TAE$
                 "payload": "#0000"
             },
+            // When there is no trigger time. The existence of this syntax may imply that the <time> element
+            // in the T<event>/<time> syntax is optional.
             "relativeToEndOfClip": false, // FIXME: $&TT-$
             "acyclic": false,
             "isAnnotation": false

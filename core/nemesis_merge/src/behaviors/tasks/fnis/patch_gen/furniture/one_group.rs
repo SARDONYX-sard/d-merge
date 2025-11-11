@@ -13,6 +13,7 @@ use crate::behaviors::tasks::fnis::patch_gen::furniture::one_anim::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
     FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
+    FNIS_BA_BLEND_TRANSITION_5232,
 };
 use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
@@ -35,7 +36,26 @@ pub fn new_furniture_one_group_patches<'a>(
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Furniture seq iter
     let total = furniture.animations.len();
-    for (i, animation) in furniture.animations.iter().enumerate() {
+
+    let all_class_indexes: Vec<[String; 9]> = furniture
+        .animations
+        .par_iter()
+        .map(|_| core::array::from_fn(|_| owned_data.next_class_name_attribute()))
+        .collect();
+
+    // Why need this?
+    // Analysis of the FNIS output reveals that the stateId for each $RI+3$ index in the Furniture sequence must be set to the sequence's final stateId.
+    let end_anim_state_id = match all_class_indexes.last() {
+        Some(lasts) => calculate_hash(&lasts[0]),
+        None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
+    };
+
+    for (i, (animation, class_indexes)) in furniture
+        .animations
+        .iter()
+        .zip(&all_class_indexes)
+        .enumerate()
+    {
         let phase = match i {
             0 => FurniturePhase::Start,
             n if n == total - 1 => FurniturePhase::End(total - 1),
@@ -44,8 +64,14 @@ pub fn new_furniture_one_group_patches<'a>(
 
         let next_event_name = furniture.animations.get(i + 1).map(|next| next.anim_event);
 
-        let (one, seq) =
-            new_furniture_one_anim_patches(animation, owned_data, phase, next_event_name);
+        let (one, seq) = new_furniture_one_anim_patches(
+            animation,
+            owned_data,
+            phase,
+            class_indexes,
+            end_anim_state_id,
+            next_event_name,
+        );
 
         one_patches.par_extend(one);
         seq_patches.par_extend(seq);
@@ -271,82 +297,99 @@ pub fn new_furniture_one_group_patches<'a>(
     }
 
     // RI+4
-    one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[4].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[4],
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": format!("FNIS_Furniture{class_index_0_id}_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": {
-                        "id": -1,
-                        "payload": "#0000"
-                    },
-                    "startStateChooser": "#0000",
-                    "startStateId": 1,
-                    "returnToPreviousStateEventId": -1,
-                    "randomTransitionEventId": -1,
-                    "transitionToNextHigherStateEventId": -1,
-                    "transitionToNextLowerStateEventId": -1,
-                    "syncVariableIndex": -1,
-                    "wrapAroundStateId": false,
-                    "maxSimultaneousTransitions": 32,
-                    "startStateMode": "START_STATE_MODE_DEFAULT",
-                    "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [], // FIXME: #$!fu$ -> all furniture animations indexes
-                    "wildcardTransitions": "#0000"
-                }),
+    one_patches.push({
+        let all_states_indexes: Vec<&str> = all_class_indexes
+            .iter()
+            .map(|indexes| indexes[0].as_str())
+            .collect();
+
+        (
+            vec![
+                Cow::Owned(class_indexes[4].clone()),
+                Cow::Borrowed("hkbStateMachine"),
+            ],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: simd_json::json_typed!(borrowed, {
+                        "__ptr": class_indexes[4],
+                        "variableBindingSet": "#0000",
+                        "userData": 0,
+                        "name": format!("FNIS_Furniture{class_index_0_id}_Behavior"),
+                        "eventToSendWhenStateOrTransitionChanges": {
+                            "id": -1,
+                            "payload": "#0000"
+                        },
+                        "startStateChooser": "#0000",
+                        "startStateId": 1,
+                        "returnToPreviousStateEventId": -1,
+                        "randomTransitionEventId": -1,
+                        "transitionToNextHigherStateEventId": -1,
+                        "transitionToNextLowerStateEventId": -1,
+                        "syncVariableIndex": -1,
+                        "wrapAroundStateId": false,
+                        "maxSimultaneousTransitions": 32,
+                        "startStateMode": "START_STATE_MODE_DEFAULT",
+                        "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
+                        "states": all_states_indexes, // #$!fu$ -> all furniture's hkbStateMachineStateInfo indexes
+                        "wildcardTransitions": class_indexes[5]
+                    }),
+                },
+                priority,
             },
-            priority,
-        },
-    ));
+        )
+    });
 
     // #$RI+5$ hkbStateMachineTransitionInfoArray
-    one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[5].clone()),
-            Cow::Borrowed("hkbStateMachineTransitionInfoArray"),
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_indexes[5],
-                    "transitions": [
-                        {
-                            "triggerInterval": {
-                                "enterEventId": -1,
-                                "exitEventId": -1,
-                                "enterTime": 0.0,
-                                "exitTime": 0.0,
-                            },
-                            "initiateInterval": {
-                                "enterEventId": -1,
-                                "exitEventId": -1,
-                                "enterTime": 0.0,
-                                "exitTime": 0.0,
-                            },
-                            "transition": FNIS_BA_BLEND_TRANSITION_5231, // #$:BlendTransition+&bl$
-                            "condition": "#0000",
-                            "eventId": format!("$eventID[{first_animation_event_name}]$"), // $AE1fu+%fu$
-                            "toStateId": calculate_hash(&furniture_one_seq_state_name), // $1/1$
-                            "fromNestedStateId": 0,
-                            "toNestedStateId": 0,
-                            "priority": 0,
-                            "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION",
-                        }
-                    ],
-                }),
+    one_patches.push({
+        let transitions: Vec<_> = all_class_indexes.iter().enumerate().map(|(index, class_indexes)| {
+            let blend_class_index = if index == 0 {
+                FNIS_BA_BLEND_TRANSITION_5231
+            } else {
+                FNIS_BA_BLEND_TRANSITION_5232
+            };
+
+            json_typed!(borrowed, {
+                "triggerInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0,
+                },
+                "initiateInterval": {
+                    "enterEventId": -1,
+                    "exitEventId": -1,
+                    "enterTime": 0.0,
+                    "exitTime": 0.0,
+                },
+                "transition": blend_class_index, // #$:BlendTransition+&bl$
+                "condition": "#0000",
+                "eventId": format!("$eventID[{first_animation_event_name}]$"), // $AE1fu+%fu$
+                "toStateId": calculate_hash(&class_indexes[0]), // $1/1$
+                "fromNestedStateId": 0,
+                "toNestedStateId": 0,
+                "priority": 0,
+                "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION",
+            })
+        }).collect();
+
+        (
+            vec![
+                Cow::Owned(class_indexes[5].clone()),
+                Cow::Borrowed("hkbStateMachineTransitionInfoArray"),
+            ],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: json_typed!(borrowed, {
+                        "__ptr": class_indexes[5],
+                        "transitions": transitions,
+                    }),
+                },
+                priority,
             },
-            priority,
-        },
-    ));
+        )
+    });
 
     (one_patches, seq_patches)
 }
