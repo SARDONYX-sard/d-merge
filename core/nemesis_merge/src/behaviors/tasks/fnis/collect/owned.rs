@@ -218,20 +218,16 @@ fn load_fnis_list_file(
         )
     };
 
-    // NOTE: Since a file named mod existed that was not in UTF-8 encoding, files with various encodings were read.
-    let list_path = Path::new(&list_path_string);
-    let bytes = std::fs::read(list_path).map_err(|e| FnisError::FailedReadingListFile {
+    let bytes = std::fs::read(&list_path_string).map_err(|e| FnisError::FailedReadingListFile {
         expected: list_path_string.clone(),
         source: e,
     })?;
-    let mut decoder = encoding_rs_io::DecodeReaderBytes::new(bytes.as_slice());
-    let mut content = String::new();
-    std::io::Read::read_to_string(&mut decoder, &mut content).map_err(|e| {
-        FnisError::FailedReadingListFile {
+    // NOTE: Since a file named mod existed that was not in UTF-8 encoding, files with various encodings were read.
+    let content =
+        auto_charset::decode_to_utf8(bytes).map_err(|e| FnisError::FailedReadingListFile {
             expected: list_path_string,
             source: e,
-        }
-    })?;
+        })?;
 
     Ok(content)
 }

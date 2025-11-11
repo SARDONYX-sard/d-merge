@@ -11,6 +11,7 @@ rust-version = "1.91"
 
 [workspace]
 members = [
+  "core/auto_charset",
   "core/gh_issue_link",
   "core/json_patch",
   "core/mod_info",
@@ -63,6 +64,7 @@ pretty_assertions = "1.4.1"                                  # Color diff assert
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
+auto_charset = { path= "./core/auto_charset" }
 gh_issue_link = { path= "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }
 mod_info = { path = "./core/mod_info" }
