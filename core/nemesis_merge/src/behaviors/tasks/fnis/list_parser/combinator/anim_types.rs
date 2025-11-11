@@ -4,6 +4,7 @@
 // This is based on the logic of Pandora-Behaviour-Engine-Plus.
 
 use winnow::{
+    ascii::Caseless,
     combinator::alt,
     error::{StrContext, StrContextValue},
     ModalResult, Parser as _,
@@ -45,20 +46,20 @@ pub enum FNISAnimType {
 
 pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
     alt((
-        "fuo".value(FNISAnimType::FurnitureOptimized),
-        "ofa".value(FNISAnimType::OffsetArm),
+        Caseless("fuo").value(FNISAnimType::FurnitureOptimized),
+        Caseless("ofa").value(FNISAnimType::OffsetArm),
         // 2 char
-        "aa".value(FNISAnimType::Alternate),
-        "ch".value(FNISAnimType::Chair),
-        "fu".value(FNISAnimType::Furniture),
-        "km".value(FNISAnimType::KillMove),
-        "pa".value(FNISAnimType::Paired),
-        "so".value(FNISAnimType::SequencedOptimized),
+        Caseless("aa").value(FNISAnimType::Alternate),
+        Caseless("ch").value(FNISAnimType::Chair),
+        Caseless("fu").value(FNISAnimType::Furniture),
+        Caseless("km").value(FNISAnimType::KillMove),
+        Caseless("pa").value(FNISAnimType::Paired),
+        Caseless("so").value(FNISAnimType::SequencedOptimized),
         // 1 char
-        "+".value(FNISAnimType::SequencedContinued),
-        "b".value(FNISAnimType::Basic),
-        "o".value(FNISAnimType::AnimObject),
-        "s".value(FNISAnimType::Sequenced),
+        Caseless("+").value(FNISAnimType::SequencedContinued),
+        Caseless("b").value(FNISAnimType::Basic),
+        Caseless("o").value(FNISAnimType::AnimObject),
+        Caseless("s").value(FNISAnimType::Sequenced),
     ))
     .context(StrContext::Label("AnimType"))
     .context(StrContext::Expected(StrContextValue::Description(
