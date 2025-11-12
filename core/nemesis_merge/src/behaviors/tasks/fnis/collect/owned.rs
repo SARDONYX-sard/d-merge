@@ -222,7 +222,7 @@ fn load_fnis_list_file(
         expected: list_path_string.clone(),
         source: e,
     })?;
-    // NOTE: Since a file named mod existed that was not in UTF-8 encoding, files with various encodings were read.
+    // NOTE: Since there are mod files that are not UTF-8, we need to support them.
     let content =
         auto_charset::decode_to_utf8(bytes).map_err(|e| FnisError::FailedReadingListFile {
             expected: list_path_string,
@@ -275,7 +275,7 @@ fn find_behavior_file(
     let mut behaviors_file = parent_dir.join(master_behavior_dir);
     behaviors_file.push(&file_name);
 
-    // e.g. `behaviors wolf\\FNIS_FNISZoo_wolf_Behavior.hkx`
+    // e.g. `behaviors wolf\FNIS_FNISZoo_wolf_Behavior.hkx`
     let behavior_relative_path = format!(
         "{}\\{file_name}",
         master_behavior_dir.display().to_string().replace("/", "\\")
