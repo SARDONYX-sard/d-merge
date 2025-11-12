@@ -486,7 +486,7 @@ pub(super) fn new_mt_global_patch<'a>(
                     "eventMode": "EVENT_MODE_PROCESS_ALL",
                     "duration": 0.5,
                     "toGeneratorStartTimeFraction": 0.0,
-                    "flags": 0,
+                    "flags": "0",
                     "endMode": "END_MODE_NONE",
                     "blendCurve": "BLEND_CURVE_SMOOTH"
                 }),
