@@ -81,16 +81,24 @@ pub fn new_furniture_one_group_patches<'a>(
 
     let class_indexes: [String; 6] =
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
+    // NOTE: Assign a unique ID for each furniture sequence. Must be 1 file unique.
+    let class_index_0_id = calculate_hash(&class_indexes[0]);
+    let furniture_one_seq_state_name = format!("FNIS_Furniture{class_index_0_id}_State"); // FNIS_Furniture$1/1$_State
     let priority = owned_data.priority;
 
     // Safety(no-panic): Since the list parser checks for length, the first animation must always exist.
     let first_animation = &furniture.animations[0];
-    let first_animation_event_id = format!("$eventID[{}]$", first_animation.anim_event);
     let first_animation_flags = first_animation.flag_set.flags;
     let first_animation_vars = first_animation.flag_set.anim_vars.as_slice();
+    // furniture seq hkbStateMachineStateInfo indexes
+    let all_state_infos_indexes: Vec<&str> = all_class_indexes
+        .iter()
+        .map(|indexes| indexes[0].as_str())
+        .collect();
 
     // Push the first animation for furniture seq
     seq_patches.push({
+        let first_animation_event_id = format!("$eventID[{}]$", first_animation.anim_event);
         let first_animation_state_id = match all_class_indexes.first() {
             Some(first) => calculate_hash(&first[0]),
             None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
@@ -133,11 +141,9 @@ pub fn new_furniture_one_group_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map = dashmap::DashMap::new();
     one_patches.par_extend(first_animation.anim_objects.par_iter().enumerate().map(
-        |(index, name)| {
+        |(_index, name)| {
             let new_anim_object_index = owned_data.next_class_name_attribute();
-            class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
             let one_anim_obj = (
                 vec![
                     Cow::Owned(new_anim_object_index.clone()),
@@ -157,11 +163,6 @@ pub fn new_furniture_one_group_patches<'a>(
             one_anim_obj
         },
     ));
-
-    // Root
-    // NOTE: Assign a unique ID for each furniture sequence. Must be 1 file unique.
-    let class_index_0_id = calculate_hash(&class_indexes[0]);
-    let furniture_one_seq_state_name = format!("FNIS_Furniture{class_index_0_id}_State"); // FNIS_Furniture$1/1$_State
 
     // $RI
     one_patches.push({
@@ -309,12 +310,6 @@ pub fn new_furniture_one_group_patches<'a>(
         });
     }
 
-    // furniture seq hkbStateMachineStateInfo indexes
-    let all_state_infos_indexes: Vec<&str> = all_class_indexes
-        .iter()
-        .map(|indexes| indexes[0].as_str())
-        .collect();
-
     // RI+4
     one_patches.push({
         (
@@ -356,7 +351,13 @@ pub fn new_furniture_one_group_patches<'a>(
 
     // #$RI+5$ hkbStateMachineTransitionInfoArray
     one_patches.push({
-        let transitions: Vec<_> = all_state_infos_indexes.iter().enumerate().map(|(index, class_indexes)| {
+        let all_event_ids: Vec<String> = furniture
+            .animations
+            .iter()
+            .map(|anim| format!("$eventID[{}]$", anim.anim_event)) // use Nemesis variable
+            .collect();
+
+        let transitions: Vec<_> = all_state_infos_indexes.iter().zip(&all_event_ids).enumerate().map(|(index, (class_index, event_id))| {
             let blend_class_index = if index == 0 {
                 FNIS_BA_BLEND_TRANSITION_5231
             } else {
@@ -378,8 +379,8 @@ pub fn new_furniture_one_group_patches<'a>(
                 },
                 "transition": blend_class_index, // #$:BlendTransition+&bl$
                 "condition": "#0000",
-                "eventId": first_animation_event_id, // $AE1fu+%fu$
-                "toStateId": calculate_hash(class_indexes), // $1/1$
+                "eventId": event_id, // $AE1fu+%fu$
+                "toStateId": calculate_hash(class_index), // $1/1$
                 "fromNestedStateId": 0,
                 "toNestedStateId": 0,
                 "priority": 0,

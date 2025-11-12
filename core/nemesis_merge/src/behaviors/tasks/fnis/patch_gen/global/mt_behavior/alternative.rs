@@ -19,7 +19,7 @@ pub(crate) const FNIS_AA_MT_AUTO_GEN_5221: &str = "#FNIS_aa_global_auto_gen5221"
 /// FNIS XML(name="#5222") - `ClipTriggerArray`
 pub(crate) const FNIS_AA_MT_CLIP_TRIGGER_5222: &str = "#FNIS_aa_global_auto_gen5222";
 
-/// FNIS XML(name="#5232") - `FNIS_BlendTransition1`(`#$:BlendTransition+&bl$`)
+/// FNIS XML(name="#5233") - `FNIS_BlendTransition1`(`#$:BlendTransition+&bl$`)
 /// - duration: 0.6
 pub(crate) const FNIS_BA_BLEND_TRANSITION_5231: &str = "#FNIS_aa_global_auto_gen5231";
 /// FNIS XML(name="#5232") - `FNIS_BlendTransition2`
