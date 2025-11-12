@@ -1,3 +1,4 @@
+mod anim_var;
 mod furniture;
 mod gen_list_patch;
 #[allow(unused)] // TODO: use `master_value_set_index`

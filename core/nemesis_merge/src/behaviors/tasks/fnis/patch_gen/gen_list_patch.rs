@@ -18,6 +18,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
     patterns::sequenced::SequencedAnimation,
     FNISList, SyntaxPattern,
 };
+use crate::behaviors::tasks::fnis::patch_gen::anim_var::new_push_anim_vars_patch;
 use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
@@ -70,6 +71,9 @@ pub fn generate_patch<'a>(
     let namespace = owned_data.namespace.as_str();
     for pattern in list.patterns {
         match pattern {
+            SyntaxPattern::AnimVar(anim_var) => {
+                seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
+            }
             SyntaxPattern::AltAnim(_alt_animation) => {
                 return Err(FnisPatchGenerationError::UnsupportedAltAnimation {
                     path: owned_data.to_list_path(),

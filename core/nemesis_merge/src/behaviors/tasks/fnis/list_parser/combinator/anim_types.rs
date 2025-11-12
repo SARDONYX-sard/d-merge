@@ -42,6 +42,10 @@ pub enum FNISAnimType {
     Alternate,
     /// **ch** – Chair Animation.
     Chair,
+
+    // -----------------------------------------------------------------------------------------------------------------
+    /// Although it does not exist in the FNIS PDF, We added it ourself for when `AnimVar` is declared at the top of the List.
+    AnimVar,
 }
 
 pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {

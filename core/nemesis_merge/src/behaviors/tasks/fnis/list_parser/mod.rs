@@ -11,6 +11,7 @@ use winnow::combinator::{alt, fail, opt};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
+use crate::behaviors::tasks::fnis::list_parser::combinator::anim_var::parse_anim_var_line;
 use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
 use crate::behaviors::tasks::fnis::list_parser::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},
@@ -35,6 +36,8 @@ pub(crate) enum SyntaxPattern<'a> {
     OffsetArm(FNISAnimation<'a>),
     PairAndKillMove(FNISPairedAndKillAnimation<'a>),
     Sequenced(SequencedAnimation<'a>),
+
+    AnimVar(combinator::anim_var::AnimVar<'a>),
 }
 
 /// One mod FNIS_<mod namespace>_List.txt
@@ -59,11 +62,15 @@ pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
     while let Ok((_, anim_type)) = alt((
         parse_anim_type,
         Caseless("AAprefix").value(FNISAnimType::Alternate),
+        Caseless("AnimVar").value(FNISAnimType::AnimVar),
     ))
     .parse_peek(input)
     {
         // FIXME: Need validate OffsetArm
         let pattern = match anim_type {
+            FNISAnimType::AnimVar => parse_anim_var_line
+                .map(SyntaxPattern::AnimVar)
+                .parse_next(input)?,
             FNISAnimType::Basic => parse_fnis_animation
                 .map(SyntaxPattern::Basic)
                 .parse_next(input)?,
