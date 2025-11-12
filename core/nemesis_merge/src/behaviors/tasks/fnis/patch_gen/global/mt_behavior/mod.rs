@@ -6,6 +6,7 @@ pub(crate) use alternative::{
     FNIS_AA_MT_AUTO_GEN_5218, FNIS_AA_MT_AUTO_GEN_5219, FNIS_AA_MT_AUTO_GEN_5220,
     FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231, FNIS_BA_BLEND_TRANSITION_5232,
 };
+pub(crate) use furniture_root::{FNIS_GLOBAL_FU_MT_STATE_ID, FNIS_FU_MT_5216 };
 
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 

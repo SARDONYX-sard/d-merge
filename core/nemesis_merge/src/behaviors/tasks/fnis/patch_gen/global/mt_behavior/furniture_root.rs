@@ -36,7 +36,14 @@ const FNIS_FU_MT_5214: &str = "#FNIS_fu_global_auto_gen5214";
 /// FNIS XML(name="#5215") - `hkbBlendingTransitionEffect`
 const FNIS_FU_MT_5215: &str = "#FNIS_fu_global_auto_gen5215";
 /// FNIS XML(name="#5216") - `hkbBlendingTransitionEffect`
-const FNIS_FU_MT_5216: &str = "#FNIS_fu_global_auto_gen5216";
+pub(crate) const FNIS_FU_MT_5216: &str = "#FNIS_fu_global_auto_gen5216";
+
+/// Global Furniture Root's stateId.
+///
+/// In the FNIS TEMPLATE, this is `555`.
+///
+/// FIXME :? Be careful about ID conflicts with other mods. -> Should we use `calc_id(FNIS_FU_MT_5200)`?
+pub(crate) const FNIS_GLOBAL_FU_MT_STATE_ID: i32 = 555;
 
 /// Generate the Havok class of `character/behaviors/mt_behavior.xml`.
 ///
@@ -79,7 +86,7 @@ pub(super) fn new_mt_global_patch<'a>(
                     "transitions": FNIS_FU_MT_5201,
                     "generator": FNIS_FU_MT_5202,
                     "name": "FNIS_FurnitureState",
-                    "stateId": 555, // FIXME :? Be careful about ID conflicts with other mods. -> Should we use `calc_id(FNIS_FU_MT_5200)`?
+                    "stateId": FNIS_GLOBAL_FU_MT_STATE_ID,
                     "probability": 1.0,
                     "enable": true
                 }),

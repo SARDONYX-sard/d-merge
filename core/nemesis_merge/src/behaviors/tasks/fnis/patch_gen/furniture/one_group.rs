@@ -13,10 +13,8 @@ use crate::behaviors::tasks::fnis::patch_gen::furniture::one_anim::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
     FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
-    FNIS_BA_BLEND_TRANSITION_5232,
+    FNIS_BA_BLEND_TRANSITION_5232, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
 };
-use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
 use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
 
 /// This patch treats a single piece of furniture as consisting of at least 4 animations.
@@ -37,6 +35,7 @@ pub fn new_furniture_one_group_patches<'a>(
     // Furniture seq iter
     let total = furniture.animations.len();
 
+    // par animation class indexes
     let all_class_indexes: Vec<[String; 9]> = furniture
         .animations
         .par_iter()
@@ -86,25 +85,51 @@ pub fn new_furniture_one_group_patches<'a>(
 
     // Safety(no-panic): Since the list parser checks for length, the first animation must always exist.
     let first_animation = &furniture.animations[0];
-    let first_animation_event_name = first_animation.anim_event;
+    let first_animation_event_id = format!("$eventID[{}]$", first_animation.anim_event);
     let first_animation_flags = first_animation.flag_set.flags;
     let first_animation_vars = first_animation.flag_set.anim_vars.as_slice();
 
-    seq_patches.extend(new_push_events_seq_patch(
-        &[first_animation_event_name.into()],
-        "#0083",
-        "#0085",
-        priority,
-    ));
-
     // Push the first animation for furniture seq
-    seq_patches.push(new_push_transitions_seq_patch(
-        "#0089",
-        "#0088",
-        [first_animation_event_name],
-        [&class_indexes[0]],
-        priority,
-    ));
+    seq_patches.push({
+        let first_animation_state_id = match all_class_indexes.first() {
+            Some(first) => calculate_hash(&first[0]),
+            None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
+        };
+
+        (
+            json_patch::json_path!["#0089", "hkbStateMachineTransitionInfoArray", "transitions"],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::SeqPush,
+                    value: json_typed!(borrowed, [{
+                        "triggerInterval": {
+                            "enterEventId": -1,
+                            "exitEventId": -1,
+                            "enterTime": 0.0,
+                            "exitTime": 0.0
+                        },
+                        "initiateInterval": {
+                            "enterEventId": -1,
+                            "exitEventId": -1,
+                            "enterTime": 0.0,
+                            "exitTime": 0.0
+                        },
+                        "transition": FNIS_FU_MT_5216,
+                        "condition": "#0000",
+                        // eventId is Nemesis variable, derived from `events`
+                        "eventId": first_animation_event_id,
+                        // toStateId must match root_event (NOT the event)
+                        "toStateId": FNIS_GLOBAL_FU_MT_STATE_ID,
+                        "fromNestedStateId": 0,
+                        "toNestedStateId": first_animation_state_id,
+                        "priority": 0,
+                        "flags": "FLAG_TO_NESTED_STATE_ID_IS_VALID|FLAG_IS_LOCAL_WILDCARD|FLAG_DISABLE_CONDITION"
+                    }]),
+                },
+                priority,
+            },
+        )
+    });
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
@@ -353,7 +378,7 @@ pub fn new_furniture_one_group_patches<'a>(
                 },
                 "transition": blend_class_index, // #$:BlendTransition+&bl$
                 "condition": "#0000",
-                "eventId": format!("$eventID[{first_animation_event_name}]$"), // $AE1fu+%fu$
+                "eventId": first_animation_event_id, // $AE1fu+%fu$
                 "toStateId": calculate_hash(class_indexes), // $1/1$
                 "fromNestedStateId": 0,
                 "toNestedStateId": 0,
