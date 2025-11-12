@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2025-11-12
+### :sparkles: New Features
+- [`5f38d2f`](https://github.com/SARDONYX-sard/d-merge/commit/5f38d2f1844adf86938400b93d01a5102bc1970d) - **egui**: add issue report button *(commit by @SARDONYX-sard)*
+- [`ffd9c2e`](https://github.com/SARDONYX-sard/d-merge/commit/ffd9c2e53d799f6a654a58fe79becb57a7e79c7d) - **ffi_python**: enhance API *(commit by @SARDONYX-sard)*
+- [`4097987`](https://github.com/SARDONYX-sard/d-merge/commit/4097987e71d3e80fd4c19baba581463b9635694c) - **ffi**: include stub generator *(commit by @SARDONYX-sard)*
+- [`7931313`](https://github.com/SARDONYX-sard/d-merge/commit/79313131e2c5ea149a7d0bb159bb75d7ec709b47) - **hkanno**: add color pair *(commit by @SARDONYX-sard)*
+- [`71afe67`](https://github.com/SARDONYX-sard/d-merge/commit/71afe672557b4dae1b4066e1c99a9310af1b6e51) - **egui**: add `ModType` column *(commit by @SARDONYX-sard)*
+- [`ac9a138`](https://github.com/SARDONYX-sard/d-merge/commit/ac9a13844b666bec609dd979624d177215245cfc) - **egui**: support ancestor dialog *(commit by @SARDONYX-sard)*
+- [`f002bce`](https://github.com/SARDONYX-sard/d-merge/commit/f002bce6e9a33d991e59262999f43863cecacafc) - **egui**: add `auto detect button` *(commit by @SARDONYX-sard)*
+- [`edcd20f`](https://github.com/SARDONYX-sard/d-merge/commit/edcd20fe487f7e00d037e10f7b515cedc118b8ee) - support any encode file reading *(commit by @SARDONYX-sard)*
+- [`2e31724`](https://github.com/SARDONYX-sard/d-merge/commit/2e317249f43617fde54b7c170d77e1cf60d5bd01) - support any encode file reading *(commit by @SARDONYX-sard)*
+- [`1e52885`](https://github.com/SARDONYX-sard/d-merge/commit/1e52885ccc99636e7296fd47eba501eb92d0efe8) - **fnis**: support caseless anim_type *(commit by @SARDONYX-sard)*
+- [`524f6c8`](https://github.com/SARDONYX-sard/d-merge/commit/524f6c8fcc711c13d901daa62379d31a6fa07539) - **FNIS**: support first anim_var *(commit by @SARDONYX-sard)*
+
+### :bug: Bug Fixes
+- [`ede0bde`](https://github.com/SARDONYX-sard/d-merge/commit/ede0bde2347bb4c2ed05d7bedb9f636ef7e4b7d8) - **egui**: fix issue link *(commit by @SARDONYX-sard)*
+- [`e300844`](https://github.com/SARDONYX-sard/d-merge/commit/e300844f2e256526f9b314f5cb068fe87deaea79) - **mod_info**: fix ord *(commit by @SARDONYX-sard)*
+- [`2d0ca83`](https://github.com/SARDONYX-sard/d-merge/commit/2d0ca8396b54c03ac0e1e44cb045787472f65f9a) - **FNIS furniture**: fix index *(commit by @SARDONYX-sard)*
+- [`4042a01`](https://github.com/SARDONYX-sard/d-merge/commit/4042a01879c22514734e1b2d8e67218da7352c4e) - **FNIS furniture**: fix index *(commit by @SARDONYX-sard)*
+- [`e50e3d2`](https://github.com/SARDONYX-sard/d-merge/commit/e50e3d2a24d784249c6d86aafb13c041c3c51a3f) - **egui**: fix mod list update timing *(commit by @SARDONYX-sard)*
+- [`fb7e787`](https://github.com/SARDONYX-sard/d-merge/commit/fb7e787a6caec4177812aba7c1f8500ad2ead76a) - fix wrong patch *(commit by @SARDONYX-sard)*
+- [`e718664`](https://github.com/SARDONYX-sard/d-merge/commit/e718664cf539bf3aeb556b36c9f275814eb1faa7) - **FNIS_furniture**: add missing furniture root gen *(commit by @SARDONYX-sard)*
+- [`45b6678`](https://github.com/SARDONYX-sard/d-merge/commit/45b6678223279ee228da95ba821dfbcd0f309547) - **FNIS**: fix type *(commit by @SARDONYX-sard)*
+- [`54a9234`](https://github.com/SARDONYX-sard/d-merge/commit/54a9234429e3415284de21cbd7fc56d9b0b940bb) - **FNIS furniture**: fix state id *(commit by @SARDONYX-sard)*
+- [`867aeae`](https://github.com/SARDONYX-sard/d-merge/commit/867aeae4cd805d4169dd95eaf36a821aaae2d897) - **FNIS furniture**: fix transition info *(commit by @SARDONYX-sard)*
+- [`17bce23`](https://github.com/SARDONYX-sard/d-merge/commit/17bce232b4afe444e1ffa5cc3eaee7707dbe1951) - **FNIS furniture**: fix event ID *(commit by @SARDONYX-sard)*
+
+### :recycle: Refactors
+- [`c519ca3`](https://github.com/SARDONYX-sard/d-merge/commit/c519ca3f2b9b4b93c22912738ebb637efea7c825) - **egui**: use const var *(commit by @SARDONYX-sard)*
+
+### :white_check_mark: Tests
+- [`f57ddfb`](https://github.com/SARDONYX-sard/d-merge/commit/f57ddfbe6e09f73f8e6f9cbdebf3c34d5180d96c) - fix doc test *(commit by @SARDONYX-sard)*
+
+### :wrench: Chores
+- [`900d44a`](https://github.com/SARDONYX-sard/d-merge/commit/900d44abf19e3c6c3dfa2386a70cf6d1c72e22e2) - fix typo *(commit by @SARDONYX-sard)*
+- [`59a1763`](https://github.com/SARDONYX-sard/d-merge/commit/59a1763a0742ff6e829ff678f08f6f807bfc309b) - fix typo *(commit by @SARDONYX-sard)*
+- [`58a2a26`](https://github.com/SARDONYX-sard/d-merge/commit/58a2a2662cd218fe0c4f9c642fcf79be96ed4ce4) - **i18n**: fix typo *(commit by @SARDONYX-sard)*
+- [`5e8c3b3`](https://github.com/SARDONYX-sard/d-merge/commit/5e8c3b39a9487b7768bdc16b95e63d0eac567e1a) - **egui**: change table alpha color *(commit by @SARDONYX-sard)*
+
+
 ## [0.2.5] - 2025-10-30
 ### :sparkles: New Features
 - [`bf44e4b`](https://github.com/SARDONYX-sard/d-merge/commit/bf44e4b2c67f33ec4cc3ebb9753533600e9d9329) - add template keys (for `Draugr MCO-DXP` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
