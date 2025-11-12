@@ -16,9 +16,20 @@ body:
         Please note that patcher-related issues can be inherently difficult to diagnose,
         as they depend on factors such as your load order and the combination of active patches.
 
-        The most effective way to identify bugs is to minimize the number of mods
-        and test with specific patches. The fewer variables involved, the easier it becomes
-        to pinpoint the root cause.
+        The key factor that determines how likely I can fix a bug is **how easily the cause can be narrowed down**.
+        In other words, the fewer mods and patches involved, the higher the chance of identifying the root cause.
+
+        Approximate likelihood of resolving an issue:
+
+        - ✅ **High (≈80-100%)** — The issue always occurs with one specific mod (and its dependencies).
+        - ⚠️ **Medium (≈40-70%)** — The issue consistently occurs when certain specific mods are active,
+          but involves multiple patches, making it harder to isolate.
+        - ❌ **Low (≈0-30%)** — The report is based on a large or unclear setup with many active patches,
+          and cannot be reproduced in a simplified environment.
+          In such cases, fixing the issue is often very difficult.
+
+        Even if the problem involves only one mod, a large number of generated patches
+        can still make root-cause analysis challenging.
 
   # Software Version
   - type: input
