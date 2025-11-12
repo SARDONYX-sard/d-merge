@@ -40,10 +40,14 @@ pub struct OneListPatch<'a> {
     /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
     pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 
-    /// Add/Replace one field/class patches to master file(e.g. `0_master.xml`).
+    /// Add/Replace one field/class patches to master file(e.g. `mt_behavior.xml`).
     pub one_mt_behavior_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
-    /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
+    /// Add/Replace/Remove array field patches to master file(e.g. `mt_behavior.xml`).
     pub seq_mt_behavior_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+
+    /// One group of furniture syntax must be pushed to the states of the Furniture root.
+    /// Therefore, it is placed here to be pushed when the furniture root is generated.
+    pub furniture_group_root_indexes: Vec<String>,
 }
 
 /// Generate from one list file.
@@ -61,6 +65,7 @@ pub fn generate_patch<'a>(
     let mut seq_master_patches = vec![];
     let mut one_mt_behavior_patches = vec![];
     let mut seq_mt_behavior_patches = vec![];
+    let mut furniture_group_root_indexes = vec![];
 
     let namespace = owned_data.namespace.as_str();
     for pattern in list.patterns {
@@ -119,9 +124,11 @@ pub fn generate_patch<'a>(
                     );
                 }
 
-                let (one, seq) = new_furniture_one_group_patches(&furniture_animation, owned_data);
+                let (one, seq, group_root_index) =
+                    new_furniture_one_group_patches(&furniture_animation, owned_data);
                 one_mt_behavior_patches.par_extend(one);
                 seq_mt_behavior_patches.par_extend(seq);
+                furniture_group_root_indexes.push(group_root_index);
             }
             SyntaxPattern::Sequenced(sequenced_animation) => {
                 let (anim_files, events, adsf_patches) =
@@ -181,6 +188,7 @@ pub fn generate_patch<'a>(
         seq_master_patches,
         one_mt_behavior_patches,
         seq_mt_behavior_patches,
+        furniture_group_root_indexes,
     })
 }
 

@@ -35,7 +35,7 @@ pub(crate) const FNIS_BA_BLEND_TRANSITION_5232: &str = "#FNIS_aa_global_auto_gen
 /// However, they are actually also reused in Offset Arm Animations, so they must be generated.
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt`
-pub fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
+pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
     let single_events: [(&'static str, i32); 4] = [
         (FNIS_AA_MT_AUTO_GEN_5218, 18),  // HeadTrackingOn
         (FNIS_AA_MT_AUTO_GEN_5219, 20),  // HeadTrackingOff

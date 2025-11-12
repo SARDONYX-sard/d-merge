@@ -1,7 +1,7 @@
 //! To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt"
 use std::borrow::Cow;
 
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
@@ -29,7 +29,7 @@ use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPa
 pub fn new_furniture_one_group_patches<'a>(
     furniture: &FurnitureAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
-) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
+) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>, String) {
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
@@ -104,18 +104,6 @@ pub fn new_furniture_one_group_patches<'a>(
         [first_animation_event_name],
         [&class_indexes[0]],
         priority,
-    ));
-
-    // Push the first animation for furniture seq
-    seq_patches.push((
-        json_path!["#5195", "hkbStateMachine", "states"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0]]),
-            },
-            priority,
-        },
     ));
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
@@ -391,5 +379,5 @@ pub fn new_furniture_one_group_patches<'a>(
         )
     });
 
-    (one_patches, seq_patches)
+    (one_patches, seq_patches, class_indexes[0].clone())
 }

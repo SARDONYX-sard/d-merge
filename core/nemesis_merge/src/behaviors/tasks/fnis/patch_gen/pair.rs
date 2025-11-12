@@ -10,7 +10,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
-use crate::behaviors::tasks::fnis::patch_gen::global::patch_0_master::{
+use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::{
     FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
     FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
 };
