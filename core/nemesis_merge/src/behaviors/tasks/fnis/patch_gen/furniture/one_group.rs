@@ -284,13 +284,14 @@ pub fn new_furniture_one_group_patches<'a>(
         });
     }
 
+    // furniture seq hkbStateMachineStateInfo indexes
+    let all_state_infos_indexes: Vec<&str> = all_class_indexes
+        .iter()
+        .map(|indexes| indexes[0].as_str())
+        .collect();
+
     // RI+4
     one_patches.push({
-        let all_states_indexes: Vec<&str> = all_class_indexes
-            .iter()
-            .map(|indexes| indexes[0].as_str())
-            .collect();
-
         (
             vec![
                 Cow::Owned(class_indexes[4].clone()),
@@ -319,7 +320,7 @@ pub fn new_furniture_one_group_patches<'a>(
                         "maxSimultaneousTransitions": 32,
                         "startStateMode": "START_STATE_MODE_DEFAULT",
                         "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                        "states": all_states_indexes, // #$!fu$ -> all furniture's hkbStateMachineStateInfo indexes
+                        "states": all_state_infos_indexes, // #$!fu$ -> all furniture's hkbStateMachineStateInfo indexes
                         "wildcardTransitions": class_indexes[5]
                     }),
                 },
@@ -330,7 +331,7 @@ pub fn new_furniture_one_group_patches<'a>(
 
     // #$RI+5$ hkbStateMachineTransitionInfoArray
     one_patches.push({
-        let transitions: Vec<_> = all_class_indexes.iter().enumerate().map(|(index, class_indexes)| {
+        let transitions: Vec<_> = all_state_infos_indexes.iter().enumerate().map(|(index, class_indexes)| {
             let blend_class_index = if index == 0 {
                 FNIS_BA_BLEND_TRANSITION_5231
             } else {
@@ -353,7 +354,7 @@ pub fn new_furniture_one_group_patches<'a>(
                 "transition": blend_class_index, // #$:BlendTransition+&bl$
                 "condition": "#0000",
                 "eventId": format!("$eventID[{first_animation_event_name}]$"), // $AE1fu+%fu$
-                "toStateId": calculate_hash(&class_indexes[0]), // $1/1$
+                "toStateId": calculate_hash(class_indexes), // $1/1$
                 "fromNestedStateId": 0,
                 "toNestedStateId": 0,
                 "priority": 0,

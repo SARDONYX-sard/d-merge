@@ -171,6 +171,10 @@ pub fn new_furniture_one_anim_patches<'a>(
                         "transitions": transition,
                         "generator": generator,
                         "name": event_name,
+                        // Actually, since this comes in as 1, 2, 3... every sequence, it seems fine to reuse the same stateId.
+                        // one FNIS_List.txt
+                        // - fu syntax: 1, 2, 3
+                        // - fu syntax: 1, 2, 3
                         "stateId": class_index_0_id, // $1+.fu$
                         "probability": 1.0,
                         "enable": true
