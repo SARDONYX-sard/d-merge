@@ -138,6 +138,52 @@ impl OwnedFnisInjection {
         }.into()
     }
 
+    /// Return information for conversion
+    ///
+    /// Returns (
+    ///  input_path: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`,
+    ///  inner path for output: `meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`
+    /// )
+    pub fn to_behavior_path(&self) -> Result<(PathBuf, PathBuf), FnisError> {
+        let animations_mod_dir = &self.animations_mod_dir;
+        let behavior_entry = self.behavior_entry;
+        let master_path = Path::new(behavior_entry.master_behavior);
+        let namespace = &self.namespace;
+
+        // e.g. `behaviors wolf/`
+        let master_behavior_dir = master_path
+            .parent()
+            .and_then(|p| p.file_name())
+            .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
+                sub_dir: master_path.to_path_buf(),
+            })?;
+
+        let file_name = if behavior_entry.is_humanoid() {
+            format!("FNIS_{namespace}_Behavior.hkx")
+        } else {
+            // e.g. wolf
+            let creature_object_name = behavior_entry.behavior_object;
+            format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
+        };
+
+        // e.g. ../meshes/actors/canine
+        let parent_dir = animations_mod_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .ok_or_else(|| FnisError::BehaviorParentMissing {
+                animations_mod_dir: animations_mod_dir.clone(),
+            })?;
+
+        // e.g., `behavior/FNIS_{namespace}_Behavior.hkx`
+        let behavior_path = Path::new(master_behavior_dir).join(&file_name);
+
+        let inner_path = Path::new("meshes")
+            .join(behavior_entry.base_dir)
+            .join(&behavior_path);
+
+        Ok((parent_dir.join(behavior_path), inner_path))
+    }
+
     /// Increments the index and returns the full `name` attribute
     /// string in Nemesis format: `#<mod_code>$<index>`.
     ///

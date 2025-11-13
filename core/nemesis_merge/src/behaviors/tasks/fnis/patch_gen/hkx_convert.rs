@@ -7,6 +7,42 @@ use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::config::Config;
 use crate::errors::Error;
 
+/// Converts FNIS behavior to the target format if necessary.
+///
+/// # Errors
+/// Returns a collection of errors if any file:
+/// - Cannot be read (I/O errors),
+/// - Has invalid HKX magic numbers,
+/// - Has a pointer size that cannot be determined.
+pub(super) fn convert_behavior<'a>(
+    owned_data: &'a OwnedFnisInjection,
+    config: &'a Config,
+) -> Result<(), Error> {
+    let base_dir = owned_data.behavior_entry.base_dir;
+    let output_dir = config.output_dir.display().to_string();
+    let output_format = config.output_target;
+
+    let (input_path, output_inner) = owned_data
+        .to_behavior_path()
+        .map_err(|e| Error::FnisError { source: e })?;
+    let output_path = Path::new(&output_dir).join(output_inner);
+
+    let current_format = check_hkx_header(&input_path, output_format)?;
+    if current_format == output_format {
+        return Ok(());
+    }
+
+    let output_dir = format!("{output_dir}/meshes/{base_dir}/behavior");
+    convert_hkx(&input_path, &output_path, output_dir, output_format)?;
+    #[cfg(feature = "tracing")]
+    tracing::info!(
+        "Converted FNIS HKX file '{}' -> '{}' for target {output_format:?}",
+        input_path.display(),
+        output_path.display(),
+    );
+    Ok(())
+}
+
 /// Converts FNIS HKX animation files to the target format if necessary.
 ///
 /// This function iterates over the provided FNIS animation file paths and checks each HKX file:
@@ -57,7 +93,12 @@ pub(super) fn convert_animations<'a>(
             format!("{output_dir}/meshes/{base_dir}/animations/{namespace}/{anim_file}");
         let output_dir = format!("{output_dir}/meshes/{base_dir}/animations/{namespace}");
 
-        match convert_hkx(&input_path, &output_path, output_dir, output_format) {
+        match convert_hkx(
+            &input_path,
+            Path::new(&output_path),
+            output_dir,
+            output_format,
+        ) {
             Ok(()) => {
                 #[cfg(feature = "tracing")]
                 tracing::info!(
@@ -144,7 +185,7 @@ fn check_hkx_header(
 
 fn convert_hkx(
     input_path: &Path,
-    output_path: &str,
+    output_path: &Path,
     output_dir: String,
     output_format: crate::OutPutTarget,
 ) -> Result<(), Error> {

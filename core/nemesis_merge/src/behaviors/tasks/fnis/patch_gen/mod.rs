@@ -123,6 +123,10 @@ pub fn collect_borrowed_patches<'a>(
                         entry.one.insert(one_gen.0, one_gen.1);
                         entry.one.insert(one_state_info.0, one_state_info.1);
                         entry.seq.insert(seq_state.0, seq_state.1);
+
+                        if let Err(e) = hkx_convert::convert_behavior(owned_data, config) {
+                            return Either::Right(vec![e]);
+                        };
                     }
 
                     // Insert patches for FNIS_*_List.txt
