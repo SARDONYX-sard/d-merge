@@ -93,6 +93,8 @@ fn check_hkx_header(
         }
     };
 
+    // Actually, both LE and SE versions of hkt can be loaded, and there are mods disguised as hkx files. Example: Ride Sharing's `rsh_horsepinion.hkx`
+    // This is the processing for that.
     // NOTE: Tag files cannot be converted by serde_hkx, so they are skipped.
     let is_tag = {
         const TAG_MAGIC0: [u8; 4] = [0x1E, 0x0D, 0xB0, 0xCA];
