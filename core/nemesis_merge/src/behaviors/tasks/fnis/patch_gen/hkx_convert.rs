@@ -18,7 +18,6 @@ pub(super) fn convert_behavior<'a>(
     owned_data: &'a OwnedFnisInjection,
     config: &'a Config,
 ) -> Result<(), Error> {
-    let base_dir = owned_data.behavior_entry.base_dir;
     let output_dir = config.output_dir.display().to_string();
     let output_format = config.output_target;
 
@@ -32,8 +31,7 @@ pub(super) fn convert_behavior<'a>(
         return Ok(());
     }
 
-    let output_dir = format!("{output_dir}/meshes/{base_dir}/behavior");
-    convert_hkx(&input_path, &output_path, output_dir, output_format)?;
+    convert_hkx(&input_path, &output_path, output_format)?;
     #[cfg(feature = "tracing")]
     tracing::info!(
         "Converted FNIS HKX file '{}' -> '{}' for target {output_format:?}",
@@ -91,14 +89,8 @@ pub(super) fn convert_animations<'a>(
 
         let output_path =
             format!("{output_dir}/meshes/{base_dir}/animations/{namespace}/{anim_file}");
-        let output_dir = format!("{output_dir}/meshes/{base_dir}/animations/{namespace}");
 
-        match convert_hkx(
-            &input_path,
-            Path::new(&output_path),
-            output_dir,
-            output_format,
-        ) {
+        match convert_hkx(&input_path, Path::new(&output_path), output_format) {
             Ok(()) => {
                 #[cfg(feature = "tracing")]
                 tracing::info!(
@@ -186,7 +178,6 @@ fn check_hkx_header(
 fn convert_hkx(
     input_path: &Path,
     output_path: &Path,
-    output_dir: String,
     output_format: crate::OutPutTarget,
 ) -> Result<(), Error> {
     use serde_hkx::bytes::serde::hkx_header::HkxHeader;
@@ -213,11 +204,13 @@ fn convert_hkx(
         source: e,
     })?;
 
-    std::fs::create_dir_all(&output_dir).map_err(|e| Error::FNISHkxIoError {
-        path: output_dir.into(),
-        target: output_format,
-        source: e,
-    })?;
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
+            path: parent.to_path_buf(),
+            target: output_format,
+            source: e,
+        })?;
+    }
 
     std::fs::write(output_path, bytes).map_err(|e| Error::FNISHkxIoError {
         path: output_path.into(),
