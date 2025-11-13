@@ -1,7 +1,6 @@
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
-#[allow(unused)] // TODO: use `master_value_set_index`
 pub mod generated_behaviors;
 mod global;
 mod kill_move;
@@ -32,7 +31,7 @@ use crate::behaviors::tasks::patches::types::{
 use crate::behaviors::tasks::templates::key::{
     THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY,
 };
-use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
+use crate::config::{Config, ReportType, StatusReportCounter};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
 pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
@@ -41,13 +40,13 @@ pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
-    status_reporter: &'a StatusReporterFn,
+    config: &'a Config,
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
     let borrowed_patches = BehaviorPatchesMap::default();
     let behavior_graph_data_map = BehaviorGraphDataMap::new();
 
     let reporter = StatusReportCounter::new(
-        status_reporter,
+        &config.status_report,
         ReportType::GeneratingFnisPatches,
         mods_patches.len(),
     );
@@ -65,7 +64,7 @@ pub fn collect_borrowed_patches<'a>(
                     Ok(list) => list,
                     Err(err) => {
                         reporter.increment();
-                        return Either::Right(err);
+                        return Either::Right(vec![err]);
                     }
                 };
                 #[cfg(feature = "tracing")]
@@ -82,7 +81,10 @@ pub fn collect_borrowed_patches<'a>(
                     furniture_group_root_indexes,
                 } = match generate_patch(owned_data, list) {
                     Ok(patches) => patches,
-                    Err(err) => return Either::Right(Error::from(err)),
+                    Err(err) => {
+                        reporter.increment();
+                        return Either::Right(vec![Error::from(err)]);
+                    }
                 };
 
                 if owned_data.behavior_entry.is_3rd_person_character() {
@@ -152,10 +154,16 @@ pub fn collect_borrowed_patches<'a>(
                     let mut animations: Vec<_> = animations.into_iter().collect();
                     animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
+                    let errors = convert_fnis_animation_files(&animations, owned_data, config);
+                    if !errors.is_empty() {
+                        reporter.increment();
+                        return Either::Right(errors);
+                    }
+
                     new_push_anim_seq_patch(
                         &animations,
+                        owned_data,
                         owned_data.behavior_entry,
-                        owned_data.priority,
                         &borrowed_patches,
                     );
 
@@ -165,8 +173,8 @@ pub fn collect_borrowed_patches<'a>(
                         "character" => {
                             new_push_anim_seq_patch(
                                 &animations,
+                                owned_data,
                                 &DEFAULT_FEMALE,
-                                owned_data.priority,
                                 &borrowed_patches,
                             );
                         }
@@ -175,8 +183,8 @@ pub fn collect_borrowed_patches<'a>(
                         "draugr" => {
                             new_push_anim_seq_patch(
                                 &animations,
+                                owned_data,
                                 &DRAUGR_SKELETON,
-                                owned_data.priority,
                                 &borrowed_patches,
                             );
                         }
@@ -230,7 +238,7 @@ pub fn collect_borrowed_patches<'a>(
             behavior_graph_data_map,
         },
         adsf_patches,
-        errors,
+        errors.into_par_iter().flatten().collect(),
     )
 }
 
@@ -317,57 +325,6 @@ fn new_injectable_mod_root_behavior<'a>(
     (one_gen, one_state_info, seq_state)
 }
 
-/// Insert a new animation sequence patch into the borrowed patches map.
-///
-/// Create an additional patch for the animations for one of the following template files.
-/// - `#0029`
-///    - `meshes/actors/character/_1stperson/firstperson.xml`
-///    - `meshes/actors/character/default_female/defaultfemale.xml`
-///    - `meshes/actors/character/defaultmale/defaultmale.xml`
-///
-/// # Note
-/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
-///
-/// - sample animations
-/// ```txt
-/// [
-///     "Animations\<FNIS one mod namespace>\sample.hkx",
-///     "Animations\<FNIS one mod namespace>\sample1.hkx"
-/// ]
-/// ```
-fn new_push_anim_seq_patch<'a>(
-    animations: &[String],
-    behavior_entry: &BehaviorEntry,
-    priority: usize,
-    patches: &BehaviorPatchesMap<'a>,
-) {
-    let behavior_key = behavior_entry.to_default_behavior_template_key();
-
-    let (json_path, patch) = {
-        let index = behavior_entry.default_behavior_index;
-        (
-            json_path![index, "hkbCharacterStringData", "animationNames"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: json_typed!(borrowed, animations),
-                },
-                priority,
-            },
-        )
-    };
-
-    #[cfg(feature = "tracing")]
-    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
-
-    patches
-        .0
-        .entry(behavior_key)
-        .or_default()
-        .seq
-        .insert(json_path, patch);
-}
-
 /// Register event name & event flag(`"0"`).
 pub fn new_push_events_seq_patch<'a>(
     events: &[Cow<'_, str>],
@@ -411,4 +368,179 @@ pub fn new_push_events_seq_patch<'a>(
             },
         ),
     ]
+}
+
+/// Insert a new animation sequence patch into the borrowed patches map.
+///
+/// Create an additional patch for the animations for one of the following template files.
+/// - `#0029`
+///    - `meshes/actors/character/_1stperson/firstperson.xml`
+///    - `meshes/actors/character/default_female/defaultfemale.xml`
+///    - `meshes/actors/character/defaultmale/defaultmale.xml`
+///
+/// # Note
+/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
+///
+/// - sample animations
+/// ```txt
+/// [
+///     "Animations\<FNIS one mod namespace>\sample.hkx",
+///     "Animations\<FNIS one mod namespace>\sample1.hkx"
+/// ]
+/// ```
+fn new_push_anim_seq_patch<'a>(
+    animations: &[&'a str],
+    owned_data: &'a OwnedFnisInjection,
+    behavior_entry: &'static BehaviorEntry,
+    patches: &BehaviorPatchesMap<'a>,
+) {
+    let namespace = &owned_data.namespace;
+    let priority = owned_data.priority;
+    let behavior_key = behavior_entry.to_default_behavior_template_key();
+
+    let (json_path, patch) = {
+        let index = behavior_entry.default_behavior_index;
+
+        let animations: Vec<String> = animations
+            .par_iter()
+            .map(|anim_file| format!("Animations\\{namespace}\\{anim_file}"))
+            .collect();
+
+        (
+            json_path![index, "hkbCharacterStringData", "animationNames"],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::SeqPush,
+                    value: json_typed!(borrowed, animations),
+                },
+                priority,
+            },
+        )
+    };
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
+
+    patches
+        .0
+        .entry(behavior_key)
+        .or_default()
+        .seq
+        .insert(json_path, patch);
+}
+
+/// Converts FNIS HKX animation files to the target format if necessary.
+///
+/// This function iterates over the provided FNIS animation file paths and checks each HKX file:
+/// 1. Reads the first 16 bytes of the file to inspect the magic numbers and pointer size.
+/// 2. Validates the HKX magic numbers (`0x57E0E057` and `0x10C0C010`).
+/// 3. Determines the pointer size to infer the current format (`Win32` for 32-bit, `Amd64` for 64-bit).
+/// 4. If the file's format matches the target format specified in `config.output_target`,
+///    the file is left unchanged.
+/// 5. If the file's format does not match, it is converted to the target format using the
+///    FNIS conversion routine.
+///
+/// # Behavior
+/// - Files with invalid magic numbers or headers will be reported as errors. The errors
+///   include the expected values and the actual values read from the file, helping users
+///   identify and fix issues (e.g., corrupted or unsupported HKX files).
+/// - Files that already match the target format are skipped.
+///
+/// # Errors
+/// Returns a collection of errors if any file:
+/// - Cannot be read (I/O errors),
+/// - Has invalid HKX magic numbers,
+/// - Has a pointer size that cannot be determined.
+#[must_use]
+fn convert_fnis_animation_files<'a>(
+    animations: &[&'a str],
+    owned_data: &'a OwnedFnisInjection,
+    config: &'a Config,
+) -> Vec<Error> {
+    let base_dir = owned_data.behavior_entry.base_dir;
+    let namespace = &owned_data.namespace;
+    let output_dir = config.output_dir.display();
+    let output_format = match config.output_target {
+        crate::OutPutTarget::SkyrimSe => serde_hkx_features::OutFormat::Amd64,
+        crate::OutPutTarget::SkyrimLe => serde_hkx_features::OutFormat::Win32,
+    };
+
+    let (_, errors): (Vec<_>, Vec<_>) = animations.par_iter().partition_map(|anim_file| {
+        let anim_file = anim_file.replace("\\", "//");
+        let input_path = owned_data.animations_mod_dir.join(&anim_file);
+
+        let header = match std::fs::File::open(&input_path).and_then(|mut f| {
+            use std::io::Read;
+            let mut buf = [0_u8; 16];
+            f.read_exact(&mut buf)?;
+            Ok(buf)
+        }) {
+            Ok(header) => header,
+            Err(e) => {
+                return rayon::iter::Either::Right(Error::FNISHkxIoError {
+                    input_path,
+                    target: output_format,
+                    source: e,
+                })
+            }
+        };
+
+        // check magic
+        const EXPECTED_MAGIC: [u8; 8] = [
+            0x57, 0xE0, 0xE0, 0x57, // magic0
+            0x10, 0xC0, 0xC0, 0x10, // magic1
+        ];
+        if header[0..8] != EXPECTED_MAGIC {
+            return rayon::iter::Either::Right(Error::FNISHkxInvalidMagic {
+                input_path,
+                target: output_format,
+                magic_bytes: header,
+            });
+        }
+
+        // check ptr size
+        let ptr_size = header[15];
+        let current_format = match ptr_size {
+            8 => serde_hkx_features::OutFormat::Amd64,
+            4 => serde_hkx_features::OutFormat::Win32,
+            _ => {
+                return rayon::iter::Either::Right(Error::FNISHkxInvalidHeader {
+                    input_path,
+                    target: output_format,
+                    expected: match output_format {
+                        serde_hkx_features::OutFormat::Win32 => 4,
+                        _ => 8,
+                    },
+                    actual: ptr_size,
+                })
+            }
+        };
+
+        if current_format == output_format {
+            Either::Left(())
+        } else {
+            let output =
+                format!("{output_dir}/meshes/{base_dir}/animations/{namespace}/{anim_file}");
+            match serde_hkx_features::convert::rayon::convert_file(
+                &input_path,
+                Some(&output),
+                output_format,
+            ) {
+                Ok(()) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::info!(
+                        "Converted FNIS HKX file '{}' -> '{output}' for target {output_format:?}",
+                        input_path.display(),
+                    );
+                    Either::Left(())
+                }
+                Err(err) => rayon::iter::Either::Right(Error::FNISHkxConversionError {
+                    input_path,
+                    source: err,
+                }),
+            }
+        }
+    });
+
+    errors
 }

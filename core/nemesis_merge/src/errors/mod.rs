@@ -26,6 +26,53 @@ pub enum Error {
         path: PathBuf,
     },
 
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        failed to read file {}: {source}. \
+        Please ensure the file exists and is readable.",
+        input_path.display()
+    ))]
+    FNISHkxIoError {
+        input_path: PathBuf,
+        target: serde_hkx_features::OutFormat,
+        source: io::Error,
+    },
+
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        the file {} did not have the expected Havok magic numbers. \
+        Expected magic=[0x57, 0xE0, 0xE0, 0x57, 0x10, 0xC0, 0xC0, 0x10, ...], \
+        but got {magic_bytes:?}. \
+        This file is not a valid Havok animation or may be from an unsupported version.",
+        input_path.display()
+    ))]
+    FNISHkxInvalidMagic {
+        input_path: PathBuf,
+        target: serde_hkx_features::OutFormat,
+        magic_bytes: [u8; 16],
+    },
+
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        pointer size check failed for {}. \
+        Expected pointer size {expected}-byte for {target:?}, \
+        but could not determine a valid header or got {actual}-byte. \
+        The HKX may be malformed or from an incompatible platform.",
+        input_path.display()
+    ))]
+    FNISHkxInvalidHeader {
+        input_path: PathBuf,
+        target: serde_hkx_features::OutFormat,
+        expected: u8,
+        actual: u8,
+    },
+
+    #[snafu(display("The conversion of FNIS's hkx failed. input_path: {}, why: {source}", input_path.display()))]
+    FNISHkxConversionError {
+        input_path: PathBuf,
+        source: serde_hkx_features::error::Error,
+    },
+
     #[snafu(transparent)]
     FnisPatchGenerationError {
         source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,
