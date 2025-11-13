@@ -28,13 +28,12 @@ pub enum Error {
 
     #[snafu(display(
         "While attempting to automatically convert FNIS HKX for target {target:?}, \
-        failed to read file {}: {source}. \
-        Please ensure the file exists and is readable.",
-        input_path.display()
+        failed to read/write file {}: {source}.",
+        path.display()
     ))]
     FNISHkxIoError {
-        input_path: PathBuf,
-        target: serde_hkx_features::OutFormat,
+        path: PathBuf,
+        target: crate::OutPutTarget,
         source: io::Error,
     },
 
@@ -48,7 +47,7 @@ pub enum Error {
     ))]
     FNISHkxInvalidMagic {
         input_path: PathBuf,
-        target: serde_hkx_features::OutFormat,
+        target: crate::OutPutTarget,
         magic_bytes: [u8; 16],
     },
 
@@ -62,7 +61,7 @@ pub enum Error {
     ))]
     FNISHkxInvalidHeader {
         input_path: PathBuf,
-        target: serde_hkx_features::OutFormat,
+        target: crate::OutPutTarget,
         expected: u8,
         actual: u8,
     },
@@ -182,6 +181,13 @@ pub enum Error {
         source: serde_hkx::errors::ser::Error,
     },
 
+    /// serde_hkx Deserialize error.
+    #[snafu(display("{}:\n {source}", path.display()))]
+    HkxDeError {
+        path: PathBuf,
+        source: serde_hkx::errors::de::Error,
+    },
+
     /// Deserialize template error
     #[snafu(display("[hkx template Parsing Error]{}:\n{source}", path.display()))]
     TemplateError {
@@ -231,16 +237,6 @@ pub enum Error {
     /// jwalk error
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
-
-    #[snafu(transparent)]
-    HkxDeError {
-        source: serde_hkx::errors::de::Error,
-    },
-
-    #[snafu(transparent)]
-    HkxError {
-        source: serde_hkx_features::error::Error,
-    },
 
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },

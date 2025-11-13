@@ -1,6 +1,6 @@
 use crate::behaviors::tasks::templates::key::TemplateKey;
 use crate::behaviors::tasks::templates::types::{BorrowedTemplateMap, OwnedTemplateMap};
-use crate::errors::{Error, JsonSnafu, Result, TemplateSnafu};
+use crate::errors::{Error, HkxDeSnafu, JsonSnafu, Result, TemplateSnafu};
 use rayon::{iter::Either, prelude::*};
 use simd_json::{serde::to_borrowed_value, BorrowedValue};
 use snafu::ResultExt as _;
@@ -47,7 +47,8 @@ pub(crate) fn template_xml_to_value(bytes: &[u8], path: &Path) -> Result<Borrowe
     let template_xml = core::str::from_utf8(bytes).map_err(|_| Error::NonUtf8Path {
         path: path.to_path_buf(),
     })?;
-    let ast: serde_hkx_features::ClassMap = serde_hkx::from_str(template_xml)?;
+    let ast: serde_hkx_features::ClassMap =
+        serde_hkx::from_str(template_xml).with_context(|_| HkxDeSnafu { path })?;
     let value = to_borrowed_value(ast).with_context(|_| JsonSnafu { path })?;
     Ok(value)
 }

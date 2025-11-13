@@ -3,6 +3,7 @@ mod furniture;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod global;
+mod hkx_convert;
 mod kill_move;
 mod offset_arm;
 mod pair;
@@ -154,7 +155,7 @@ pub fn collect_borrowed_patches<'a>(
                     let mut animations: Vec<_> = animations.into_iter().collect();
                     animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
-                    let errors = convert_fnis_animation_files(&animations, owned_data, config);
+                    let errors = hkx_convert::convert_animations(&animations, owned_data, config);
                     if !errors.is_empty() {
                         reporter.increment();
                         return Either::Right(errors);
@@ -427,120 +428,4 @@ fn new_push_anim_seq_patch<'a>(
         .or_default()
         .seq
         .insert(json_path, patch);
-}
-
-/// Converts FNIS HKX animation files to the target format if necessary.
-///
-/// This function iterates over the provided FNIS animation file paths and checks each HKX file:
-/// 1. Reads the first 16 bytes of the file to inspect the magic numbers and pointer size.
-/// 2. Validates the HKX magic numbers (`0x57E0E057` and `0x10C0C010`).
-/// 3. Determines the pointer size to infer the current format (`Win32` for 32-bit, `Amd64` for 64-bit).
-/// 4. If the file's format matches the target format specified in `config.output_target`,
-///    the file is left unchanged.
-/// 5. If the file's format does not match, it is converted to the target format using the
-///    FNIS conversion routine.
-///
-/// # Behavior
-/// - Files with invalid magic numbers or headers will be reported as errors. The errors
-///   include the expected values and the actual values read from the file, helping users
-///   identify and fix issues (e.g., corrupted or unsupported HKX files).
-/// - Files that already match the target format are skipped.
-///
-/// # Errors
-/// Returns a collection of errors if any file:
-/// - Cannot be read (I/O errors),
-/// - Has invalid HKX magic numbers,
-/// - Has a pointer size that cannot be determined.
-#[must_use]
-fn convert_fnis_animation_files<'a>(
-    animations: &[&'a str],
-    owned_data: &'a OwnedFnisInjection,
-    config: &'a Config,
-) -> Vec<Error> {
-    let base_dir = owned_data.behavior_entry.base_dir;
-    let namespace = &owned_data.namespace;
-    let output_dir = config.output_dir.display();
-    let output_format = match config.output_target {
-        crate::OutPutTarget::SkyrimSe => serde_hkx_features::OutFormat::Amd64,
-        crate::OutPutTarget::SkyrimLe => serde_hkx_features::OutFormat::Win32,
-    };
-
-    let (_, errors): (Vec<_>, Vec<_>) = animations.par_iter().partition_map(|anim_file| {
-        let anim_file = anim_file.replace("\\", "//");
-        let input_path = owned_data.animations_mod_dir.join(&anim_file);
-
-        let header = match std::fs::File::open(&input_path).and_then(|mut f| {
-            use std::io::Read;
-            let mut buf = [0_u8; 16];
-            f.read_exact(&mut buf)?;
-            Ok(buf)
-        }) {
-            Ok(header) => header,
-            Err(e) => {
-                return rayon::iter::Either::Right(Error::FNISHkxIoError {
-                    input_path,
-                    target: output_format,
-                    source: e,
-                })
-            }
-        };
-
-        // check magic
-        const EXPECTED_MAGIC: [u8; 8] = [
-            0x57, 0xE0, 0xE0, 0x57, // magic0
-            0x10, 0xC0, 0xC0, 0x10, // magic1
-        ];
-        if header[0..8] != EXPECTED_MAGIC {
-            return rayon::iter::Either::Right(Error::FNISHkxInvalidMagic {
-                input_path,
-                target: output_format,
-                magic_bytes: header,
-            });
-        }
-
-        // check ptr size
-        let ptr_size = header[15];
-        let current_format = match ptr_size {
-            8 => serde_hkx_features::OutFormat::Amd64,
-            4 => serde_hkx_features::OutFormat::Win32,
-            _ => {
-                return rayon::iter::Either::Right(Error::FNISHkxInvalidHeader {
-                    input_path,
-                    target: output_format,
-                    expected: match output_format {
-                        serde_hkx_features::OutFormat::Win32 => 4,
-                        _ => 8,
-                    },
-                    actual: ptr_size,
-                })
-            }
-        };
-
-        if current_format == output_format {
-            Either::Left(())
-        } else {
-            let output =
-                format!("{output_dir}/meshes/{base_dir}/animations/{namespace}/{anim_file}");
-            match serde_hkx_features::convert::rayon::convert_file(
-                &input_path,
-                Some(&output),
-                output_format,
-            ) {
-                Ok(()) => {
-                    #[cfg(feature = "tracing")]
-                    tracing::info!(
-                        "Converted FNIS HKX file '{}' -> '{output}' for target {output_format:?}",
-                        input_path.display(),
-                    );
-                    Either::Left(())
-                }
-                Err(err) => rayon::iter::Either::Right(Error::FNISHkxConversionError {
-                    input_path,
-                    source: err,
-                }),
-            }
-        }
-    });
-
-    errors
 }

@@ -180,7 +180,7 @@ impl DebugOptions {
 ///  SkyrimSE | SkyrimLE
 ///  ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum OutPutTarget {
     /// Amd64
     #[default]
