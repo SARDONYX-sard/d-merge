@@ -48,13 +48,13 @@ pub enum Error {
     FNISHkxInvalidMagic {
         input_path: PathBuf,
         target: crate::OutPutTarget,
-        magic_bytes: [u8; 16],
+        magic_bytes: [u8; 17],
     },
 
     #[snafu(display(
         "While attempting to automatically convert FNIS HKX for target {target:?}, \
         pointer size check failed for {}. \
-        Expected pointer size {expected}-byte for {target:?}, \
+        Expected pointer size 4/8-byte for {target:?}, \
         but could not determine a valid header or got {actual}-byte. \
         The HKX may be malformed or from an incompatible platform.",
         input_path.display()
@@ -62,7 +62,6 @@ pub enum Error {
     FNISHkxInvalidHeader {
         input_path: PathBuf,
         target: crate::OutPutTarget,
-        expected: u8,
         actual: u8,
     },
 

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rayon::iter::Either;
 use rayon::prelude::*;
 
@@ -72,12 +74,12 @@ pub(super) fn convert_animations<'a>(
 }
 
 fn check_hkx_header(
-    input_path: &std::path::Path,
+    input_path: &Path,
     output_format: crate::OutPutTarget,
 ) -> Result<crate::OutPutTarget, Error> {
     let header = match std::fs::File::open(input_path).and_then(|mut f| {
         use std::io::Read;
-        let mut buf = [0_u8; 16];
+        let mut buf = [0_u8; 17];
         f.read_exact(&mut buf)?;
         Ok(buf)
     }) {
@@ -105,7 +107,7 @@ fn check_hkx_header(
     }
 
     // check ptr size
-    let ptr_size = header[15];
+    let ptr_size = header[16];
     let current_format = match ptr_size {
         4 => crate::OutPutTarget::SkyrimLe,
         8 => crate::OutPutTarget::SkyrimSe,
@@ -113,10 +115,6 @@ fn check_hkx_header(
             return Err(Error::FNISHkxInvalidHeader {
                 input_path: input_path.to_path_buf(),
                 target: output_format,
-                expected: match output_format {
-                    crate::OutPutTarget::SkyrimSe => 8,
-                    crate::OutPutTarget::SkyrimLe => 4,
-                },
                 actual: ptr_size,
             })
         }
@@ -126,7 +124,7 @@ fn check_hkx_header(
 }
 
 fn convert_hkx(
-    input_path: &std::path::Path,
+    input_path: &Path,
     output_path: &str,
     output_dir: String,
     output_format: crate::OutPutTarget,
