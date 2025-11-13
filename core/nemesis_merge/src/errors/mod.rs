@@ -40,8 +40,8 @@ pub enum Error {
     #[snafu(display(
         "While attempting to automatically convert FNIS HKX for target {target:?}, \
         the file {} did not have the expected Havok magic numbers. \
-        Expected magic=[0x57, 0xE0, 0xE0, 0x57, 0x10, 0xC0, 0xC0, 0x10, ...], \
-        but got {magic_bytes:?}. \
+        Expected magic=[0x57, 0xe0, 0xe0, 0x57, 0x10, 0xc0, 0xc0, 0x10, ...], \
+        but got {magic_bytes:x?}. \
         This file is not a valid Havok animation or may be from an unsupported version.",
         input_path.display()
     ))]

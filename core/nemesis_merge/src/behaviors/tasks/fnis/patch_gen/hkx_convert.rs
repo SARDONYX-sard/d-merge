@@ -93,6 +93,23 @@ fn check_hkx_header(
         }
     };
 
+    // NOTE: Tag files cannot be converted by serde_hkx, so they are skipped.
+    let is_tag = {
+        const TAG_MAGIC0: [u8; 4] = [0x1E, 0x0D, 0xB0, 0xCA];
+        const TAG_MAGIC1: [u8; 4] = [0xCE, 0xFA, 0x11, 0xD0];
+        let magic0_ok = header[0..4] == TAG_MAGIC0;
+        let magic1_ok = header[4..8] == TAG_MAGIC1;
+        magic0_ok && magic1_ok
+    };
+    if is_tag {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            path = %input_path.display(),
+            "Tag files cannot be converted by serde_hkx, so they are skipped."
+        );
+        return Ok(output_format);
+    }
+
     // check magic
     const EXPECTED_MAGIC: [u8; 8] = [
         0x57, 0xE0, 0xE0, 0x57, // magic0
