@@ -1,11 +1,11 @@
+mod global_logger;
 mod status;
 
 #[tokio::test]
 #[ignore = "local test"]
 #[cfg(feature = "tracing")]
 async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::global_logger::global_logger;
-    use crate::tests::status::*;
+    use crate::tests::{global_logger::global_logger, status::*};
     use crate::{behavior_gen, PatchMaps};
     use rayon::prelude::*;
 

@@ -74,7 +74,7 @@ pub(super) fn convert_animations<'a>(
     let output_dir = config.output_dir.display();
     let output_format = config.output_target;
 
-    let (_, errors): (Vec<_>, Vec<_>) = animations.par_iter().partition_map(|anim_file| {
+    let (_, errors): ((), Vec<_>) = animations.par_iter().partition_map(|anim_file| {
         let anim_file = anim_file.replace("\\", "//");
         let input_path = owned_data.animations_mod_dir.join(&anim_file);
 
