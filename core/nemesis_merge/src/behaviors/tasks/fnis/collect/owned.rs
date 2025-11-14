@@ -38,6 +38,30 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry
 /// This is derived by considering the information necessary to generate the Borrowed Nemesis patch after parsing the list.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
+    /// # Format
+    /// `<skyrim_data_dir>/meshes/<base_dir>/<fnis_namespace>/animations`
+    ///
+    /// # Example
+    /// `D:/STEAM/steamapps/common/Skyrim Special Edition/Data/meshes/actors/character/FNISZoo/animations`
+    ///
+    /// # Where is it used?
+    /// The base directory used for converting FNIS animation files to the target HKX format (LE/SE).
+    ///
+    /// This path defines the starting point for automatic FNIS → HKX conversion.
+    ///
+    /// Conversion flow:
+    ///
+    /// ```text
+    /// (this path)
+    ///    ↓ join
+    /// <FNIS file path>
+    ///    ↓ canonicalize
+    /// <absolute HKX source path>
+    ///    ↓ convert
+    /// <output_dir>/meshes/<...>/converted.hkx
+    /// ```
+    pub animations_mod_dir: PathBuf,
+
     /// Information required for patch generation, such as actor names(e.g. `character`, `dragon`, `dog`)
     /// and behavior file paths
     pub behavior_entry: &'static BehaviorEntry,
@@ -114,6 +138,52 @@ impl OwnedFnisInjection {
         }.into()
     }
 
+    /// Return information for conversion
+    ///
+    /// Returns (
+    ///  input_path: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`,
+    ///  inner path for output: `meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`
+    /// )
+    pub fn to_behavior_path(&self) -> Result<(PathBuf, PathBuf), FnisError> {
+        let animations_mod_dir = &self.animations_mod_dir;
+        let behavior_entry = self.behavior_entry;
+        let master_path = Path::new(behavior_entry.master_behavior);
+        let namespace = &self.namespace;
+
+        // e.g. `behaviors wolf/`
+        let master_behavior_dir = master_path
+            .parent()
+            .and_then(|p| p.file_name())
+            .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
+                sub_dir: master_path.to_path_buf(),
+            })?;
+
+        let file_name = if behavior_entry.is_humanoid() {
+            format!("FNIS_{namespace}_Behavior.hkx")
+        } else {
+            // e.g. wolf
+            let creature_object_name = behavior_entry.behavior_object;
+            format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
+        };
+
+        // e.g. ../meshes/actors/canine
+        let parent_dir = animations_mod_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .ok_or_else(|| FnisError::BehaviorParentMissing {
+                animations_mod_dir: animations_mod_dir.clone(),
+            })?;
+
+        // e.g., `behavior/FNIS_{namespace}_Behavior.hkx`
+        let behavior_path = Path::new(master_behavior_dir).join(&file_name);
+
+        let inner_path = Path::new("meshes")
+            .join(behavior_entry.base_dir)
+            .join(&behavior_path);
+
+        Ok((parent_dir.join(behavior_path), inner_path))
+    }
+
     /// Increments the index and returns the full `name` attribute
     /// string in Nemesis format: `#<mod_code>$<index>`.
     ///
@@ -175,14 +245,15 @@ pub fn collect_fnis_injection<P>(
     priority: usize,
 ) -> Result<OwnedFnisInjection, FnisError>
 where
-    P: AsRef<Path>,
+    P: Into<PathBuf>,
 {
-    let animations_mod_dir = animations_mod_dir.as_ref();
+    let animations_mod_dir = animations_mod_dir.into();
 
-    let list_content = load_fnis_list_file(animations_mod_dir, behavior_entry, namespace)?;
-    let behavior_path = find_behavior_file(animations_mod_dir, behavior_entry, namespace)?;
+    let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace)?;
+    let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
     Ok(OwnedFnisInjection {
+        animations_mod_dir,
         behavior_entry,
         namespace: namespace.to_string(),
         priority,
@@ -218,14 +289,11 @@ fn load_fnis_list_file(
         )
     };
 
-    let bytes = std::fs::read(&list_path_string).map_err(|e| FnisError::FailedReadingListFile {
-        expected: list_path_string.clone(),
-        source: e,
-    })?;
     // NOTE: Since there are mod files that are not UTF-8, we need to support them.
-    let content =
-        auto_charset::decode_to_utf8(bytes).map_err(|e| FnisError::FailedReadingListFile {
-            expected: list_path_string,
+    let content = std::fs::read(&list_path_string)
+        .and_then(auto_charset::decode_to_utf8)
+        .map_err(|e| FnisError::FailedReadingListFile {
+            expected: list_path_string.clone(),
             source: e,
         })?;
 
@@ -272,21 +340,24 @@ fn find_behavior_file(
         let creature_object_name = behavior_entry.behavior_object;
         format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
     };
-    let mut behaviors_file = parent_dir.join(master_behavior_dir);
-    behaviors_file.push(&file_name);
 
+    {
+        let mut behaviors_file = parent_dir.join(master_behavior_dir);
+        behaviors_file.push(&file_name);
+        if !behaviors_file.exists() {
+            return Err(FnisError::BehaviorNotFound {
+                path: behaviors_file,
+            });
+        };
+    }
+
+    // NOTE: This relative path uses `\` as the path separator for the game to read it.
     // e.g. `behaviors wolf\FNIS_FNISZoo_wolf_Behavior.hkx`
     let behavior_relative_path = format!(
         "{}\\{file_name}",
         master_behavior_dir.display().to_string().replace("/", "\\")
     );
-    if behaviors_file.exists() {
-        return Ok(behavior_relative_path);
-    };
-
-    Err(FnisError::BehaviorNotFound {
-        path: behaviors_file,
-    })
+    Ok(behavior_relative_path)
 }
 
 #[derive(Debug, snafu::Snafu)]

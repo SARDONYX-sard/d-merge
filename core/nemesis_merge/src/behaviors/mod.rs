@@ -60,7 +60,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
 
     let (fnis_hkx_patches, fnis_adsf_patches) = {
         let (fnis_hkx_patches, fnis_adsf_patches, errors) =
-            fnis::patch_gen::collect_borrowed_patches(&owned_fnis_patches, &config.status_report);
+            fnis::patch_gen::collect_borrowed_patches(&owned_fnis_patches, &config);
         fnis_errors.par_extend(errors);
 
         (fnis_hkx_patches, fnis_adsf_patches)

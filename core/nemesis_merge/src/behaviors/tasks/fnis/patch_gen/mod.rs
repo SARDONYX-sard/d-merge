@@ -1,9 +1,9 @@
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
-#[allow(unused)] // TODO: use `master_value_set_index`
 pub mod generated_behaviors;
 mod global;
+mod hkx_convert;
 mod kill_move;
 mod offset_arm;
 mod pair;
@@ -32,7 +32,7 @@ use crate::behaviors::tasks::patches::types::{
 use crate::behaviors::tasks::templates::key::{
     THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY,
 };
-use crate::config::{ReportType, StatusReportCounter, StatusReporterFn};
+use crate::config::{Config, ReportType, StatusReportCounter};
 use crate::errors::{Error, FailedParseFnisModListSnafu};
 
 pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
@@ -41,13 +41,13 @@ pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
-    status_reporter: &'a StatusReporterFn,
+    config: &'a Config,
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
     let borrowed_patches = BehaviorPatchesMap::default();
     let behavior_graph_data_map = BehaviorGraphDataMap::new();
 
     let reporter = StatusReportCounter::new(
-        status_reporter,
+        &config.status_report,
         ReportType::GeneratingFnisPatches,
         mods_patches.len(),
     );
@@ -65,7 +65,7 @@ pub fn collect_borrowed_patches<'a>(
                     Ok(list) => list,
                     Err(err) => {
                         reporter.increment();
-                        return Either::Right(err);
+                        return Either::Right(vec![err]);
                     }
                 };
                 #[cfg(feature = "tracing")]
@@ -82,7 +82,10 @@ pub fn collect_borrowed_patches<'a>(
                     furniture_group_root_indexes,
                 } = match generate_patch(owned_data, list) {
                     Ok(patches) => patches,
-                    Err(err) => return Either::Right(Error::from(err)),
+                    Err(err) => {
+                        reporter.increment();
+                        return Either::Right(vec![Error::from(err)]);
+                    }
                 };
 
                 if owned_data.behavior_entry.is_3rd_person_character() {
@@ -120,6 +123,10 @@ pub fn collect_borrowed_patches<'a>(
                         entry.one.insert(one_gen.0, one_gen.1);
                         entry.one.insert(one_state_info.0, one_state_info.1);
                         entry.seq.insert(seq_state.0, seq_state.1);
+
+                        if let Err(e) = hkx_convert::convert_behavior(owned_data, config) {
+                            return Either::Right(vec![e]);
+                        };
                     }
 
                     // Insert patches for FNIS_*_List.txt
@@ -152,10 +159,16 @@ pub fn collect_borrowed_patches<'a>(
                     let mut animations: Vec<_> = animations.into_iter().collect();
                     animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
+                    let errors = hkx_convert::convert_animations(&animations, owned_data, config);
+                    if !errors.is_empty() {
+                        reporter.increment();
+                        return Either::Right(errors);
+                    }
+
                     new_push_anim_seq_patch(
                         &animations,
+                        owned_data,
                         owned_data.behavior_entry,
-                        owned_data.priority,
                         &borrowed_patches,
                     );
 
@@ -165,8 +178,8 @@ pub fn collect_borrowed_patches<'a>(
                         "character" => {
                             new_push_anim_seq_patch(
                                 &animations,
+                                owned_data,
                                 &DEFAULT_FEMALE,
-                                owned_data.priority,
                                 &borrowed_patches,
                             );
                         }
@@ -175,8 +188,8 @@ pub fn collect_borrowed_patches<'a>(
                         "draugr" => {
                             new_push_anim_seq_patch(
                                 &animations,
+                                owned_data,
                                 &DRAUGR_SKELETON,
-                                owned_data.priority,
                                 &borrowed_patches,
                             );
                         }
@@ -230,7 +243,7 @@ pub fn collect_borrowed_patches<'a>(
             behavior_graph_data_map,
         },
         adsf_patches,
-        errors,
+        errors.into_par_iter().flatten().collect(),
     )
 }
 
@@ -317,57 +330,6 @@ fn new_injectable_mod_root_behavior<'a>(
     (one_gen, one_state_info, seq_state)
 }
 
-/// Insert a new animation sequence patch into the borrowed patches map.
-///
-/// Create an additional patch for the animations for one of the following template files.
-/// - `#0029`
-///    - `meshes/actors/character/_1stperson/firstperson.xml`
-///    - `meshes/actors/character/default_female/defaultfemale.xml`
-///    - `meshes/actors/character/defaultmale/defaultmale.xml`
-///
-/// # Note
-/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
-///
-/// - sample animations
-/// ```txt
-/// [
-///     "Animations\<FNIS one mod namespace>\sample.hkx",
-///     "Animations\<FNIS one mod namespace>\sample1.hkx"
-/// ]
-/// ```
-fn new_push_anim_seq_patch<'a>(
-    animations: &[String],
-    behavior_entry: &BehaviorEntry,
-    priority: usize,
-    patches: &BehaviorPatchesMap<'a>,
-) {
-    let behavior_key = behavior_entry.to_default_behavior_template_key();
-
-    let (json_path, patch) = {
-        let index = behavior_entry.default_behavior_index;
-        (
-            json_path![index, "hkbCharacterStringData", "animationNames"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: json_typed!(borrowed, animations),
-                },
-                priority,
-            },
-        )
-    };
-
-    #[cfg(feature = "tracing")]
-    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
-
-    patches
-        .0
-        .entry(behavior_key)
-        .or_default()
-        .seq
-        .insert(json_path, patch);
-}
-
 /// Register event name & event flag(`"0"`).
 pub fn new_push_events_seq_patch<'a>(
     events: &[Cow<'_, str>],
@@ -411,4 +373,63 @@ pub fn new_push_events_seq_patch<'a>(
             },
         ),
     ]
+}
+
+/// Insert a new animation sequence patch into the borrowed patches map.
+///
+/// Create an additional patch for the animations for one of the following template files.
+/// - `#0029`
+///    - `meshes/actors/character/_1stperson/firstperson.xml`
+///    - `meshes/actors/character/default_female/defaultfemale.xml`
+///    - `meshes/actors/character/defaultmale/defaultmale.xml`
+///
+/// # Note
+/// `animations`: Windows path to the Animations dir containing files within `meshes/actors/character/animations/<FNIS one mod namespace>/*.hkx`.
+///
+/// - sample animations
+/// ```txt
+/// [
+///     "Animations\<FNIS one mod namespace>\sample.hkx",
+///     "Animations\<FNIS one mod namespace>\sample1.hkx"
+/// ]
+/// ```
+fn new_push_anim_seq_patch<'a>(
+    animations: &[&'a str],
+    owned_data: &'a OwnedFnisInjection,
+    behavior_entry: &'static BehaviorEntry,
+    patches: &BehaviorPatchesMap<'a>,
+) {
+    let namespace = &owned_data.namespace;
+    let priority = owned_data.priority;
+    let behavior_key = behavior_entry.to_default_behavior_template_key();
+
+    let (json_path, patch) = {
+        let index = behavior_entry.default_behavior_index;
+
+        let animations: Vec<String> = animations
+            .par_iter()
+            .map(|anim_file| format!("Animations\\{namespace}\\{anim_file}"))
+            .collect();
+
+        (
+            json_path![index, "hkbCharacterStringData", "animationNames"],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::SeqPush,
+                    value: json_typed!(borrowed, animations),
+                },
+                priority,
+            },
+        )
+    };
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
+
+    patches
+        .0
+        .entry(behavior_key)
+        .or_default()
+        .seq
+        .insert(json_path, patch);
 }

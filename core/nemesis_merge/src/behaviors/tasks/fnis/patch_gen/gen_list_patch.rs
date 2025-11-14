@@ -27,8 +27,24 @@ use crate::behaviors::tasks::fnis::patch_gen::{
 /// A patch with borrowed references to a single FNIS_*_List.txt file.
 #[derive(Debug)]
 pub struct OneListPatch<'a> {
-    /// `hkbCharacterStringData.animationNames` of each default(behavior) file(e.g. `defaultmale.xml`).
-    pub animation_paths: HashSet<String>,
+    /// A set of raw animation path entries extracted from FNIS list files.
+    ///
+    /// Each element represents a relative path (e.g. `"..\\sample.hkx"`)
+    ///
+    /// # How should this information be used?
+    /// referenced by a line such as:
+    ///
+    /// ```text
+    /// b ..\sample.hkx
+    /// ```
+    ///
+    /// in files like `character/FNISSample/animations/FNIS_FNISSample_List.txt`.
+    ///
+    /// These paths correspond to entries that will later be patched into
+    /// `hkbCharacterStringData.animationNames` of each default behavior file
+    /// (e.g. `defaultmale.xml`) as fully qualified paths such as
+    /// `Animations\FNISSample\..\sample.hkx`.
+    pub animation_paths: HashSet<&'a str>,
     /// `hkbBehaviorGraphStringData.eventNames` of each master file(e.g. `0_master.xml`).
     pub events: HashSet<Cow<'a, str>>,
     /// `animationdatasinglefile.txt` patch
@@ -68,7 +84,6 @@ pub fn generate_patch<'a>(
     let mut seq_mt_behavior_patches = vec![];
     let mut furniture_group_root_indexes = vec![];
 
-    let namespace = owned_data.namespace.as_str();
     for pattern in list.patterns {
         match pattern {
             SyntaxPattern::AnimVar(anim_var) => {
@@ -97,7 +112,7 @@ pub fn generate_patch<'a>(
                 } = &paired_and_kill_anim;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
-                    all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                    all_anim_files.insert(*anim_file);
                 }
                 all_events.par_extend(
                     flag_set
@@ -128,6 +143,7 @@ pub fn generate_patch<'a>(
                     );
                 }
 
+                // NOTE: Based on the temporal_log, it appears Furniture does not need to register its animation with behaviors like `defaultmale.xml`.
                 let (one, seq, group_root_index) =
                     new_furniture_one_group_patches(&furniture_animation, owned_data);
                 one_mt_behavior_patches.par_extend(one);
@@ -158,7 +174,7 @@ pub fn generate_patch<'a>(
                 } = &fnis_animation;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
-                    all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                    all_anim_files.insert(anim_file);
                 }
 
                 let (one, seq) = new_offset_arm_patches(&fnis_animation, owned_data);
@@ -175,7 +191,7 @@ pub fn generate_patch<'a>(
                 } = &fnis_animation;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
-                    all_anim_files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                    all_anim_files.insert(*anim_file);
                 }
                 // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
                 all_events.insert(Cow::Borrowed(anim_event));
@@ -223,7 +239,7 @@ pub enum FnisPatchGenerationError {
 fn collect_seq_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     sequenced_animation: SequencedAnimation<'a>,
-) -> (DashSet<String>, DashSet<Cow<'a, str>>, Vec<AdsfPatch<'a>>) {
+) -> (DashSet<&'a str>, DashSet<Cow<'a, str>>, Vec<AdsfPatch<'a>>) {
     let files = DashSet::new();
     let events = DashSet::new();
 
@@ -231,7 +247,6 @@ fn collect_seq_patch<'a>(
         .animations
         .into_par_iter()
         .flat_map(|fnis_animation| {
-            let namespace = &owned_data.namespace;
             let FNISAnimation {
                 flag_set,
                 anim_file,
@@ -240,7 +255,7 @@ fn collect_seq_patch<'a>(
             } = &fnis_animation;
 
             if !flag_set.flags.contains(FNISAnimFlags::Known) {
-                files.insert(format!("Animations\\{namespace}\\{anim_file}"));
+                files.insert(*anim_file);
             }
             events.insert(Cow::Borrowed(*anim_event));
 

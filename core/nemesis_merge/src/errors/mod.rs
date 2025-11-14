@@ -26,6 +26,51 @@ pub enum Error {
         path: PathBuf,
     },
 
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        failed to read/write file {}: {source}.",
+        path.display()
+    ))]
+    FNISHkxIoError {
+        path: PathBuf,
+        target: crate::OutPutTarget,
+        source: io::Error,
+    },
+
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        the file {} did not have the expected Havok magic numbers. \
+        Expected magic=[0x57, 0xe0, 0xe0, 0x57, 0x10, 0xc0, 0xc0, 0x10, ...], \
+        but got {magic_bytes:x?}. \
+        This file is not a valid Havok animation or may be from an unsupported version.",
+        input_path.display()
+    ))]
+    FNISHkxInvalidMagic {
+        input_path: PathBuf,
+        target: crate::OutPutTarget,
+        magic_bytes: [u8; 17],
+    },
+
+    #[snafu(display(
+        "While attempting to automatically convert FNIS HKX for target {target:?}, \
+        pointer size check failed for {}. \
+        Expected pointer size 4/8-byte for {target:?}, \
+        but could not determine a valid header or got {actual}-byte. \
+        The HKX may be malformed or from an incompatible platform.",
+        input_path.display()
+    ))]
+    FNISHkxInvalidHeader {
+        input_path: PathBuf,
+        target: crate::OutPutTarget,
+        actual: u8,
+    },
+
+    #[snafu(display("The conversion of FNIS's hkx failed. input_path: {}, why: {source}", input_path.display()))]
+    FNISHkxConversionError {
+        input_path: PathBuf,
+        source: serde_hkx_features::error::Error,
+    },
+
     #[snafu(transparent)]
     FnisPatchGenerationError {
         source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,
@@ -135,6 +180,13 @@ pub enum Error {
         source: serde_hkx::errors::ser::Error,
     },
 
+    /// serde_hkx Deserialize error.
+    #[snafu(display("{}:\n {source}", path.display()))]
+    HkxDeError {
+        path: PathBuf,
+        source: serde_hkx::errors::de::Error,
+    },
+
     /// Deserialize template error
     #[snafu(display("[hkx template Parsing Error]{}:\n{source}", path.display()))]
     TemplateError {
@@ -184,16 +236,6 @@ pub enum Error {
     /// jwalk error
     #[snafu(transparent)]
     JwalkErr { source: jwalk::Error },
-
-    #[snafu(transparent)]
-    HkxDeError {
-        source: serde_hkx::errors::de::Error,
-    },
-
-    #[snafu(transparent)]
-    HkxError {
-        source: serde_hkx_features::error::Error,
-    },
 
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
