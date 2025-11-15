@@ -19,7 +19,6 @@ pub enum I18nKey {
     ColumnSite,
     DebugOutput,
     DebugOutputHover,
-    ErrorReadingModInfo,
     ExecuteButton,
     ExecutionModeLabel,
     IssueReportButton,
@@ -31,6 +30,10 @@ pub enum I18nKey {
     LogLevelLabel,
     ManualMode,
     ManualModeHover,
+    ModsListFetchStateDone,
+    ModsListFetchStateEmpty,
+    ModsListFetchStateError,
+    ModsListFetchStateFetching,
     ModsListTitle,
     NotificationClearButton,
     NotifyErrPlatformNotSupported,
@@ -38,6 +41,8 @@ pub enum I18nKey {
     NotifyInfoUpdatingModList,
     OutputDirLabel,
     PatchButton,
+    PatchFetchingButton,
+    ReloadButton,
     RemovingMeshesMessage,
     RuntimeTargetHover,
     RuntimeTargetLabel,
@@ -78,7 +83,6 @@ impl I18nKey {
             Self::ColumnSite => "Site",
             Self::DebugOutput => "Debug output",
             Self::DebugOutputHover => "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)",
-            Self::ErrorReadingModInfo => "Error: reading mod info",
             Self::ExecuteButton      => "Execute",
             Self::ExecutionModeLabel => "Execution mode:",
             Self::IssueReportButton => "Report Issue",
@@ -90,6 +94,10 @@ impl I18nKey {
             Self::LogLevelLabel => "Log Level",
             Self::ManualMode => "Manual mode",
             Self::ManualModeHover => "When using it completely manually.\n(The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)",
+            Self::ModsListFetchStateDone => "Updated mod list",
+            Self::ModsListFetchStateEmpty=> "No mods found",
+            Self::ModsListFetchStateError => "Failed to update mod list",
+            Self::ModsListFetchStateFetching => "Fetching mod list...",
             Self::ModsListTitle => "Mods",
             Self::NotificationClearButton => "Clear Notify",
             Self::NotifyErrPlatformNotSupported => "Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.",
@@ -98,6 +106,8 @@ impl I18nKey {
             Self::SelectButton => "Select",
             Self::OutputDirLabel =>"Output dir:",
             Self::PatchButton => "Patch",
+            Self::PatchFetchingButton => "Updating list...",
+            Self::ReloadButton => "Reload",
             Self::RemovingMeshesMessage => "Removing the `<output_dir>/meshes` directory...",
             Self::RuntimeTargetLabel => "Output format",
             Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.",
@@ -159,7 +169,6 @@ impl I18nMap {
         map.0.insert(ColumnSite, Cow::Borrowed(ColumnSite.default_eng()));
         map.0.insert(DebugOutput, Cow::Borrowed(DebugOutput.default_eng()));
         map.0.insert(DebugOutputHover, Cow::Borrowed(DebugOutputHover.default_eng()));
-        map.0.insert(ErrorReadingModInfo, Cow::Borrowed(ErrorReadingModInfo.default_eng()));
         map.0.insert(ExecuteButton, Cow::Borrowed(ExecuteButton.default_eng()));
         map.0.insert(ExecutionModeLabel, Cow::Borrowed(ExecutionModeLabel.default_eng()));
         map.0.insert(IssueReportButton, Cow::Borrowed(IssueReportButton.default_eng()));
@@ -171,6 +180,10 @@ impl I18nMap {
         map.0.insert(LogLevelLabel, Cow::Borrowed(LogLevelLabel.default_eng()));
         map.0.insert(ManualMode, Cow::Borrowed(ManualMode.default_eng()));
         map.0.insert(ManualModeHover, Cow::Borrowed(ManualModeHover.default_eng()));
+        map.0.insert(ModsListFetchStateDone, Cow::Borrowed(ModsListFetchStateDone.default_eng()));
+        map.0.insert(ModsListFetchStateEmpty, Cow::Borrowed(ModsListFetchStateEmpty.default_eng()));
+        map.0.insert(ModsListFetchStateError, Cow::Borrowed(ModsListFetchStateError.default_eng()));
+        map.0.insert(ModsListFetchStateFetching, Cow::Borrowed(ModsListFetchStateFetching.default_eng()));
         map.0.insert(ModsListTitle, Cow::Borrowed(ModsListTitle.default_eng()));
         map.0.insert(NotificationClearButton, Cow::Borrowed(NotificationClearButton.default_eng()));
         map.0.insert(NotifyErrPlatformNotSupported, Cow::Borrowed(NotifyErrPlatformNotSupported.default_eng()));
@@ -178,6 +191,9 @@ impl I18nMap {
         map.0.insert(NotifyInfoUpdatingModList, Cow::Borrowed(NotifyInfoUpdatingModList.default_eng()));
         map.0.insert(OutputDirLabel, Cow::Borrowed(OutputDirLabel.default_eng()));
         map.0.insert(PatchButton, Cow::Borrowed(PatchButton.default_eng()));
+        map.0.insert(PatchFetchingButton, Cow::Borrowed(PatchFetchingButton.default_eng()));
+        map.0.insert(ReloadButton, Cow::Borrowed(ReloadButton.default_eng()));
+        map.0.insert(RemovingMeshesMessage, Cow::Borrowed(RemovingMeshesMessage.default_eng()));
         map.0.insert(RuntimeTargetLabel, Cow::Borrowed(RuntimeTargetLabel.default_eng()));
         map.0.insert(RuntimeTargetHover, Cow::Borrowed(RuntimeTargetHover.default_eng()));
         map.0.insert(SearchLabel, Cow::Borrowed(SearchLabel.default_eng()));

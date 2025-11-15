@@ -43,6 +43,23 @@ impl LogLevel {
     }
 }
 
+/// Represents the state of a mod list fetching task.
+#[derive(Debug)]
+pub enum FetchState {
+    /// No fetch is in progress.
+    Idle,
+    /// A background worker thread is currently fetching
+    Fetching { start_time: std::time::Instant },
+    /// Successfully fetched and the result is non-empty.
+    Done,
+    /// Fetch succeeded but returned zero items.
+    Empty,
+    /// Fetch failed with an error.
+    Error,
+}
+
+type ModScanResult = (u64, Result<Vec<mod_info::ModInfo>, mod_info::error::Error>);
+
 /// Main application state for Mod Manager.
 pub struct ModManagerApp {
     /// Execution mode. VFS or not
@@ -101,12 +118,32 @@ pub struct ModManagerApp {
     /// It exists because mod_info must be loaded automatically only on the first run.
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
-    /// Even if no mod info can be retrieved, We want to maintain the check status and display it as empty.
-    pub fetch_is_empty: bool,
+
+    /// Represents the current state of the mod list fetching process.
+    ///
+    /// Even if no mod info can be retrieved, we want to maintain the
+    /// check status and display it as empty.
+    pub fetch_state: FetchState,
+    /// A counter used to distinguish different fetch requests.
+    ///
+    /// Each fetch request increments this number. It is used to
+    /// ignore outdated results from previous fetch tasks, especially
+    /// when a forced fetch occurs while a previous fetch is still running.
+    pub fetch_generation: u64,
+
+    /// Sender channel to send the results of a fetch operation from
+    /// the background worker thread to the main UI thread.
+    pub mod_result_tx: std::sync::mpsc::Sender<ModScanResult>,
+    /// Receiver channel to receive the results of a fetch operation
+    /// in the main UI thread. It is polled regularly to update the
+    /// UI and the fetch state.
+    pub mod_result_rx: std::sync::mpsc::Receiver<ModScanResult>,
 }
 
 impl Default for ModManagerApp {
     fn default() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<ModScanResult>();
+
         Self {
             // == For Settings targets ==
             mode: DataMode::Vfs,
@@ -143,13 +180,17 @@ impl Default for ModManagerApp {
             notification: Arc::new(Mutex::new(String::new())),
             is_first_render: true,
             prev_table_available_width: 0.0,
-            fetch_is_empty: true,
+            fetch_state: FetchState::Idle,
+            fetch_generation: 0,
+            mod_result_tx: tx,
+            mod_result_rx: rx,
         }
     }
 }
 
 impl App for ModManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        self.poll_fetch_result();
         self.start_log_watcher(ctx);
         self.update_window_info(ctx);
 
@@ -235,19 +276,24 @@ impl ModManagerApp {
                 let manual_mode_hover = self.t(I18nKey::ManualModeHover).to_string();
 
                 ui.label(self.t(I18nKey::ExecutionModeLabel));
+
+                // Eliminate unnecessary fetches when the same button is pressed.
+                let prev_mode = self.mode;
                 if ui
                     .radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label)
                     .on_hover_text(vfs_mode_hover)
                     .clicked()
+                    && self.mode != prev_mode
                 {
-                    self.update_mod_list();
+                    self.start_fetch_mod_list();
                 };
                 if ui
                     .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
                     .on_hover_text(manual_mode_hover)
                     .clicked()
+                    && self.mode != prev_mode
                 {
-                    self.update_mod_list();
+                    self.start_fetch_mod_list();
                 };
 
                 ui.add(Separator::default().vertical());
@@ -350,11 +396,11 @@ impl ModManagerApp {
                         match self.mode {
                             DataMode::Vfs => {
                                 self.vfs_skyrim_data_dir = dir.display().to_string();
-                                self.update_mod_list();
+                                self.start_fetch_mod_list();
                             }
                             DataMode::Manual => {
                                 self.skyrim_data_dir = dir.display().to_string();
-                                self.update_mod_list();
+                                self.start_fetch_mod_list();
                             }
                         };
                     }
@@ -485,8 +531,22 @@ impl ModManagerApp {
                 self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
-                self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
-                    s.patch();
+
+                let is_fetching = matches!(self.fetch_state, FetchState::Fetching { .. });
+                ui.add_enabled_ui(!is_fetching, |ui| {
+                    if ui
+                        .add_sized(
+                            [120.0, 40.0],
+                            egui::Button::new(if is_fetching {
+                                self.t(I18nKey::PatchFetchingButton)
+                            } else {
+                                self.t(I18nKey::PatchButton)
+                            }),
+                        )
+                        .clicked()
+                    {
+                        self.patch();
+                    }
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -609,7 +669,16 @@ impl ModManagerApp {
         }
 
         panel.show(ctx, |ui| {
-            ui.heading(self.t(I18nKey::ModsListTitle));
+            ui.horizontal(|ui| {
+                ui.heading(self.t(I18nKey::ModsListTitle));
+
+                if ui
+                    .button(format!("🔄 {}", self.t(I18nKey::ReloadButton)))
+                    .clicked()
+                {
+                    self.start_fetch_mod_list();
+                }
+            });
             ui.separator();
 
             // 1. Filter
@@ -632,7 +701,7 @@ impl ModManagerApp {
     /// Filter cloned  mods according to current search text.
     fn filtered_mods(&self) -> Vec<ModItem> {
         self.mod_list()
-            .par_iter()
+            .iter()
             .filter(|&m| {
                 let q = self.filter_text.to_lowercase();
                 q.trim().is_empty()
@@ -699,7 +768,7 @@ impl ModManagerApp {
                         let mut widths = [0.0; 6]; // 6 ==  column count
                         widths.clone_from_slice(body.widths());
 
-                        let mod_list = if self.fetch_is_empty {
+                        let mod_list = if matches!(self.fetch_state, FetchState::Empty) {
                             &mut vec![] // Apply dummy to preserve check state.
                         } else {
                             self.mod_list_mut()
@@ -883,7 +952,7 @@ impl ModManagerApp {
         };
 
         if self.is_first_render || changed {
-            self.update_mod_list();
+            self.start_fetch_mod_list();
         }
     }
 
@@ -905,7 +974,7 @@ impl ModManagerApp {
                         has_update_notify = true;
                     });
 
-                    self.update_mod_list();
+                    self.start_fetch_mod_list();
                     if has_update_notify {
                         self.clear_notification();
                     }
@@ -923,29 +992,79 @@ impl ModManagerApp {
         }
     }
 
-    /// Update mod info based on file search according to the current mode (vfs or manual).
+    /// Starts a new fetch request.
     ///
     /// # Note
     /// The only difference between vfs and manual is the id.
     /// For manual, due to the possibility of duplicates, the path up to the Nemesis ID (e.g., `aaaa`) becomes the id, but vfs uses the Nemesis ID directly.
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
-    fn update_mod_list(&mut self) {
-        match mod_info::get_all(self.current_skyrim_data_dir(), self.mode == DataMode::Vfs) {
-            Ok(new_mods) => {
-                let is_empty = new_mods.is_empty();
-                self.fetch_is_empty = is_empty;
-                if is_empty {
-                    return; // To preserve check state even if empty
-                }
+    fn start_fetch_mod_list(&mut self) {
+        // For forced fetch: previous worker results will be ignored
+        self.fetch_generation += 1;
+        let fetch_generation = self.fetch_generation;
 
-                let new_mods = inherit_reorder_cast(self.mod_list(), new_mods);
-                let _ = core::mem::replace(self.mod_list_mut(), new_mods);
+        self.fetch_state = FetchState::Fetching {
+            start_time: std::time::Instant::now(),
+        };
+        self.set_notification(self.t(I18nKey::ModsListFetchStateFetching));
+
+        let tx = self.mod_result_tx.clone();
+        let dir = self.current_skyrim_data_dir().to_owned();
+        let use_vfs = self.mode == DataMode::Vfs;
+
+        std::thread::spawn(move || {
+            if let Err(e) = tx.send((fetch_generation, mod_info::get_all(&dir, use_vfs))) {
+                tracing::error!(%e);
+            };
+        });
+    }
+
+    /// Polls for worker results and updates the fetch state.
+    ///
+    /// Outdated worker results (due to a forced fetch) are ignored.
+    /// Only results matching the latest `fetch_generation` are applied.
+    fn poll_fetch_result(&mut self) {
+        let start_time = match self.fetch_state {
+            FetchState::Fetching { start_time } => start_time,
+            _ => return,
+        };
+
+        while let Ok((fetch_generation, result)) = self.mod_result_rx.try_recv() {
+            // Ignore outdated generation
+            if fetch_generation != self.fetch_generation {
+                continue;
             }
-            Err(err) => {
-                tracing::error!(%err);
-                let err_title = self.t(I18nKey::ErrorReadingModInfo);
-                self.set_notification(format!("{err_title} {err}"));
+
+            let elapsed_ms = start_time.elapsed().as_millis();
+
+            match result {
+                Ok(mods) if mods.is_empty() => {
+                    // To preserve check state even if empty
+                    self.fetch_state = FetchState::Empty;
+                    self.set_notification(format!(
+                        "{} ({elapsed_ms} ms)",
+                        self.t(I18nKey::ModsListFetchStateEmpty)
+                    ));
+                }
+                Ok(mods) => {
+                    let new_mods = inherit_reorder_cast(self.mod_list(), mods);
+                    let _ = core::mem::replace(self.mod_list_mut(), new_mods);
+
+                    self.fetch_state = FetchState::Done;
+                    self.set_notification(format!(
+                        "{} ({elapsed_ms} ms)",
+                        self.t(I18nKey::ModsListFetchStateDone)
+                    ));
+                }
+                Err(e) => {
+                    tracing::error!(%e, "mod_info::get_all error");
+                    self.fetch_state = FetchState::Error;
+                    self.set_notification(format!(
+                        "{}: {e} ({elapsed_ms} ms)",
+                        self.t(I18nKey::ModsListFetchStateError)
+                    ));
+                }
             }
         }
     }
