@@ -192,8 +192,7 @@ fn process_hkx(
     animation: &str,
     output_format: OutPutTarget,
 ) -> Result<(), Error> {
-    let current_format = check_hkx_header(input, output_format)?;
-
+    // FIXME: Exists sometimes misjudges virtualization as unstable for some reason in MO2.
     let actual_input: Cow<Path> = if input.exists() {
         Cow::Borrowed(input)
     } else if let Some(found) = find_case_insensitive(input) {
@@ -207,6 +206,7 @@ fn process_hkx(
         return Ok(());
     };
 
+    let current_format = check_hkx_header(input, output_format)?;
     let output = output_dir.join(animation);
 
     if current_format != output_format {
