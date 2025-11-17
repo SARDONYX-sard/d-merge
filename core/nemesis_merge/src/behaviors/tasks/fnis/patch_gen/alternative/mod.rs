@@ -171,6 +171,7 @@ pub fn alt_anim_to_oar(
     Ok(())
 }
 
+/// This is necessary because Unix systems are case-sensitive.
 fn find_case_insensitive(path: &Path) -> Option<PathBuf> {
     let parent = path.parent()?;
     let file_name = path.file_name()?;
@@ -211,8 +212,15 @@ fn process_hkx(
     if current_format != output_format {
         convert_hkx(&actual_input, &output, output_format)?;
     } else {
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent).map_err(|err| Error::FailedIo {
+                path: parent.to_path_buf(),
+                source: err,
+            })?;
+        }
+
         fs::copy(&actual_input, &output).map_err(|err| Error::FailedIo {
-            path: actual_input.to_path_buf(),
+            path: output,
             source: err,
         })?;
     }
