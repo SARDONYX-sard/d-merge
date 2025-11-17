@@ -106,7 +106,8 @@ pub(super) fn convert_animations<'a>(
     errors
 }
 
-fn check_hkx_header(
+/// Check the HKX file header to determine its format.
+pub fn check_hkx_header(
     input_path: &Path,
     output_format: crate::OutPutTarget,
 ) -> Result<crate::OutPutTarget, Error> {
@@ -175,7 +176,7 @@ fn check_hkx_header(
     Ok(current_format)
 }
 
-fn convert_hkx(
+pub fn convert_hkx(
     input_path: &Path,
     output_path: &Path,
     output_format: crate::OutPutTarget,

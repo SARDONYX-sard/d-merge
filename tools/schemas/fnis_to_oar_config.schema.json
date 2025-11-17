@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FnisToOarConfig",
+  "description": "Detailed settings for converting FNIS alt anim to OAR can be configured.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": ["string", "null"],
+      "description": "Name for mod-specific OAR settings in `animations/OpenAnimationReplacer/<name>/config.json`. If unspecified, FNIS's namespace is used. e.g., \"XPMSE\"."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "description for mod-specific OAR settings in `animations/OpenAnimationReplacer/<name>/config.json`"
+    },
+    "author": {
+      "type": ["string", "null"],
+      "description": "author for mod-specific OAR settings in `animations/OpenAnimationReplacer/<name>/config.json`"
+    },
+    "groups": {
+      "type": "object",
+      "description": "each `animations/OpenAnimationReplacer/<namespace>/<group name>_<slot>/config.json`",
+      "propertyNames": {
+        "$ref": "#/$defs/GroupKind"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/GroupConfig"
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "GroupKind": {
+      "type": "string",
+      "enum": [
+        "_mtidle",
+        "_1hmidle",
+        "_2hmidle",
+        "_2hwidle",
+        "_bowidle",
+        "_cbowidle",
+        "_h2hidle",
+        "_magidle",
+        "_sneakidle",
+        "_staffidle",
+        "_mt",
+        "_mtx",
+        "_mtturn",
+        "_1hmmt",
+        "_2hmmt",
+        "_bowmt",
+        "_magmt",
+        "_magcastmt",
+        "_sneakmt",
+        "_1hmatk",
+        "_1hmatkpow",
+        "_1hmblock",
+        "_1hmstag",
+        "_2hmatk",
+        "_2hmatkpow",
+        "_2hmblock",
+        "_2hmstag",
+        "_2hwatk",
+        "_2hwatkpow",
+        "_2hwblock",
+        "_2hwstag",
+        "_bowatk",
+        "_bowblock",
+        "_h2hatk",
+        "_h2hatkpow",
+        "_h2hstag",
+        "_magatk",
+        "_1hmeqp",
+        "_2hweqp",
+        "_2hmeqp",
+        "_axeeqp",
+        "_boweqp",
+        "_cboweqp",
+        "_dageqp",
+        "_h2heqp",
+        "_maceqp",
+        "_mageqp",
+        "_stfeqp",
+        "_shout",
+        "_magcon",
+        "_dw",
+        "_jump",
+        "_sprint",
+        "_shield"
+      ],
+      "description": "Allowed FNIS alternate animation groups."
+    },
+    "GroupConfig": {
+      "type": "object",
+      "description": "Override options applied to a single FNIS alternate animation group.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^\\d+$": {
+          "description": "Number of FNIS <prefix><number>_<vanilla name>.hkx.",
+          "type": "object",
+          "properties": {
+            "rename_to": {
+              "type": "string",
+              "description": "Optional animation rename for `animations/OpenAnimationReplacer/<namespace>/<rename_to>/config.json`(default: `group name>_<slot>`)\nNOTE: If not unique within groups, unintended overwrites will occur."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional description for this config.json"
+            },
+            "priority": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Optional priority for this config.json. Higher values take precedence in OAR.(default: 0)"
+            },
+            "conditions": {
+              "type": "array",
+              "description": "Arbitrary JSON array for OAR conditions. Unsafe: Does not check whether it is valid as an OAR.(default: [])",
+              "default": []
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "additionalProperties": false,
+        "default": {}
+      }
+    }
+  }
+}

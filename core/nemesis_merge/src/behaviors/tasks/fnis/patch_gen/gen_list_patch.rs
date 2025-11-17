@@ -71,6 +71,7 @@ pub struct OneListPatch<'a> {
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
+    config: &crate::Config,
 ) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     // TODO: Support AsciiCaseIgnore
     let mut all_anim_files = HashSet::new();
@@ -89,10 +90,10 @@ pub fn generate_patch<'a>(
             SyntaxPattern::AnimVar(anim_var) => {
                 seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
             }
-            SyntaxPattern::AltAnim(_alt_animation) => {
-                return Err(FnisPatchGenerationError::UnsupportedAltAnimation {
-                    path: owned_data.to_list_path(),
-                });
+            SyntaxPattern::AltAnim(alt_animation) => {
+                super::alternative::alt_anim_to_oar(owned_data, alt_animation, config).map_err(
+                    |e| FnisPatchGenerationError::FailedToConvertAltAnimToOAR { errors: e },
+                )?;
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
@@ -219,9 +220,10 @@ pub enum FnisPatchGenerationError {
     #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 
-    /// Alternative animation is not supported yet
-    #[snafu(display("Alternative Animation is not supported yet: {}", path.display()))]
-    UnsupportedAltAnimation { path: PathBuf },
+    #[snafu(display(
+        "Failed to convert alternative animation to OAR format. See inner errors for details."
+    ))]
+    FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
 
     /// Chair animation is not supported yet
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]

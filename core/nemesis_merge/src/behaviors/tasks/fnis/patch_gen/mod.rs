@@ -1,3 +1,4 @@
+mod alternative;
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
@@ -80,11 +81,16 @@ pub fn collect_borrowed_patches<'a>(
                     one_mt_behavior_patches,
                     seq_mt_behavior_patches,
                     furniture_group_root_indexes,
-                } = match generate_patch(owned_data, list) {
+                } = match generate_patch(owned_data, list, config) {
                     Ok(patches) => patches,
                     Err(err) => {
                         reporter.increment();
-                        return Either::Right(vec![Error::from(err)]);
+                        match err {
+                            FnisPatchGenerationError::FailedToConvertAltAnimToOAR { errors } => {
+                                return Either::Right(errors);
+                            }
+                            _ => return Either::Right(vec![Error::from(err)]),
+                        }
                     }
                 };
 
