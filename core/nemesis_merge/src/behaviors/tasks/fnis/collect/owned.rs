@@ -341,13 +341,16 @@ fn find_behavior_file(
         format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
     };
 
+    #[cfg(feature = "tracing")]
     {
         let mut behaviors_file = parent_dir.join(master_behavior_dir);
         behaviors_file.push(&file_name);
         if !behaviors_file.exists() {
-            return Err(FnisError::BehaviorNotFound {
-                path: behaviors_file,
-            });
+            tracing::warn!(
+                "FNIS behavior file not found: {}. \
+                Note: MO2 virtual filesystem may cause false negatives in fs::exists().",
+                behaviors_file.display()
+            );
         };
     }
 
