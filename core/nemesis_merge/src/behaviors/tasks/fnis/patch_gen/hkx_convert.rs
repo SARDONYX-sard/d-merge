@@ -222,6 +222,13 @@ fn convert_hkx(
     let current_format = check_hkx_header(&actual_input, output_format)?;
     if current_format == output_format {
         if need_copy {
+            if let Some(parent) = output_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
+                    path: parent.to_path_buf(),
+                    target: output_format,
+                    source: e,
+                })?;
+            }
             std::fs::copy(&actual_input, output_path).map_err(|e| Error::FNISHkxIoError {
                 path: actual_input.to_path_buf(),
                 target: output_format,
