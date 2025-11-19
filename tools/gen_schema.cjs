@@ -1,9 +1,8 @@
-import fs from 'fs';
-import path from 'path';
+const fs = require('fs');
+const path = require('path');
 
-const INPUT_JSON = 'Alternate_AnimationGroups.json';
-
-const OUTPUT_SCHEMA = path.join('.', 'fnis_to_oar_config.schema.json');
+const INPUT_JSON = path.join(__dirname, 'Alternate_AnimationGroups.json');
+const OUTPUT_SCHEMA = path.join(__dirname, 'schemas', 'fnis_to_oar_config.schema.json');
 
 // --- JSON  ---
 const rawData = fs.readFileSync(INPUT_JSON, 'utf-8');
@@ -17,6 +16,10 @@ const schema = {
   description: 'Detailed settings for converting FNIS alt anim to OAR can be configured.',
   type: 'object',
   properties: {
+    $schema: {
+      type: ['string', 'null'],
+      description: 'JSON Schema version identifier.',
+    },
     name: {
       type: ['string', 'null'],
       description:
@@ -43,6 +46,7 @@ const schema = {
       default: {},
     },
   },
+  additionalProperties: false,
   $defs: {
     GroupKind: {
       type: 'string',

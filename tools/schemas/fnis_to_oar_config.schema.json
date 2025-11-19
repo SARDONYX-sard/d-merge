@@ -4,6 +4,10 @@
   "description": "Detailed settings for converting FNIS alt anim to OAR can be configured.",
   "type": "object",
   "properties": {
+    "$schema": {
+      "type": ["string", "null"],
+      "description": "JSON Schema version identifier."
+    },
     "name": {
       "type": ["string", "null"],
       "description": "Name for mod-specific OAR settings in `animations/OpenAnimationReplacer/<name>/config.json`. If unspecified, FNIS's namespace is used. e.g., \"XPMSE\"."
@@ -28,6 +32,7 @@
       "default": {}
     }
   },
+  "additionalProperties": false,
   "$defs": {
     "GroupKind": {
       "type": "string",
