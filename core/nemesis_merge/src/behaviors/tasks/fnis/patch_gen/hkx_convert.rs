@@ -1,113 +1,120 @@
-use std::path::Path;
-
-use rayon::iter::Either;
-use rayon::prelude::*;
+use std::path::{Path, PathBuf};
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::config::Config;
+use crate::behaviors::tasks::fnis::patch_gen::alternative::AltAnimConfigJob;
+use crate::config::{Config, OutPutTarget};
 use crate::errors::Error;
 
-/// Converts FNIS behavior to the target format if necessary.
-///
-/// # Errors
-/// Returns a collection of errors if any file:
-/// - Cannot be read (I/O errors),
-/// - Has invalid HKX magic numbers,
-/// - Has a pointer size that cannot be determined.
-pub(super) fn convert_behavior<'a>(
-    owned_data: &'a OwnedFnisInjection,
-    config: &'a Config,
-) -> Result<(), Error> {
-    let output_dir = config.output_dir.display().to_string();
-    let output_format = config.output_target;
-
-    let (input_path, output_inner) = owned_data
-        .to_behavior_path()
-        .map_err(|e| Error::FnisError { source: e })?;
-    let output_path = Path::new(&output_dir).join(output_inner);
-
-    let current_format = check_hkx_header(&input_path, output_format)?;
-    if current_format == output_format {
-        return Ok(());
-    }
-
-    convert_hkx(&input_path, &output_path, output_format)?;
-    #[cfg(feature = "tracing")]
-    tracing::info!(
-        "Converted FNIS HKX file '{}' -> '{}' for target {output_format:?}",
-        input_path.display(),
-        output_path.display(),
-    );
-    Ok(())
+#[derive(Debug)]
+pub enum AnimIoJob {
+    Hkx(ConversionJob),
+    Config(AltAnimConfigJob),
 }
 
-/// Converts FNIS HKX animation files to the target format if necessary.
+/// A single HKX conversion job, containing input & output paths.
+#[derive(Debug)]
+pub struct ConversionJob {
+    /// Path to the source FNIS HKX animation file
+    pub input_path: PathBuf,
+    /// Path to the target converted HKX file
+    pub output_path: PathBuf,
+}
+
+/// Prepare a list of conversion jobs from animation filenames and `OwnedFnisInjection` metadata.
 ///
-/// This function iterates over the provided FNIS animation file paths and checks each HKX file:
-/// 1. Reads the first 16 bytes of the file to inspect the magic numbers and pointer size.
-/// 2. Validates the HKX magic numbers (`0x57E0E057` and `0x10C0C010`).
-/// 3. Determines the pointer size to infer the current format (`Win32` for 32-bit, `Amd64` for 64-bit).
-/// 4. If the file's format matches the target format specified in `config.output_target`,
-///    the file is left unchanged.
-/// 5. If the file's format does not match, it is converted to the target format using the
-///    FNIS conversion routine.
+/// This stage **performs no IO** and only calculates paths. The final job list can be
+/// safely passed to `run_conversion_jobs`.
 ///
-/// # Behavior
-/// - Files with invalid magic numbers or headers will be reported as errors. The errors
-///   include the expected values and the actual values read from the file, helping users
-///   identify and fix issues (e.g., corrupted or unsupported HKX files).
-/// - Files that already match the target format are skipped.
+/// The behavior file path is appended as the last job.
 ///
-/// # Errors
+/// # Returns
+/// Vector of `ConversionJob` ready for parallel processing.
+#[must_use]
+pub fn prepare_conversion_jobs(
+    animations: &[&str],
+    owned_data: &OwnedFnisInjection,
+    config: &Config,
+) -> Vec<AnimIoJob> {
+    let base_dir = &owned_data.behavior_entry.base_dir;
+    let namespace = &owned_data.namespace;
+    let output_dir = &config.output_dir;
+
+    animations
+        .iter()
+        .map(|anim| {
+            let anim_file = anim.replace("\\", "/"); // normalize path separators
+            let input_path = owned_data.animations_mod_dir.join(&anim_file);
+            let output_path = output_dir
+                .join("meshes")
+                .join(base_dir)
+                .join(namespace)
+                .join(&anim_file);
+            AnimIoJob::Hkx(ConversionJob {
+                input_path,
+                output_path,
+            })
+        })
+        .collect()
+}
+
+/// Prepare a single conversion job for the behavior file itself.
+#[must_use]
+pub fn prepare_behavior_conversion_job(
+    owned_data: &OwnedFnisInjection,
+    config: &Config,
+) -> Option<AnimIoJob> {
+    match owned_data.to_behavior_path() {
+        Ok((input_path, output_inner)) => {
+            let output_path = config.output_dir.join(output_inner);
+            Some(AnimIoJob::Hkx(ConversionJob {
+                input_path,
+                output_path,
+            }))
+        }
+        Err(_err) => {
+            #[cfg(feature = "tracing")]
+            tracing::error!("Failed to prepare behavior file conversion job(Since it should be checked at the collect::owned stage, it should not normally result in an error.): {_err}");
+            None
+        }
+    }
+}
+
+/// Run the HKX conversion jobs in parallel.
+///
+/// Checks each file header first; skips files already matching the target format.
+/// Returns all errors encountered during conversion.
+///
+/// # Returns Errors
 /// Returns a collection of errors if any file:
 /// - Cannot be read (I/O errors),
 /// - Has invalid HKX magic numbers,
 /// - Has a pointer size that cannot be determined.
 #[must_use]
-pub(super) fn convert_animations<'a>(
-    animations: &[&'a str],
-    owned_data: &'a OwnedFnisInjection,
-    config: &'a Config,
-) -> Vec<Error> {
-    let base_dir = owned_data.behavior_entry.base_dir;
-    let namespace = &owned_data.namespace;
-    let output_dir = config.output_dir.display();
-    let output_format = config.output_target;
-
-    let (_, errors): ((), Vec<_>) = animations.par_iter().partition_map(|anim_file| {
-        let anim_file = anim_file.replace("\\", "//");
-        let input_path = owned_data.animations_mod_dir.join(&anim_file);
-
-        let current_format = match check_hkx_header(&input_path, output_format) {
-            Ok(current_format) => current_format,
-            Err(err) => return Either::Right(err),
-        };
-
-        if current_format == output_format {
-            return Either::Left(());
-        }
-
-        let output_path =
-            format!("{output_dir}/meshes/{base_dir}/animations/{namespace}/{anim_file}");
-
-        match convert_hkx(&input_path, Path::new(&output_path), output_format) {
-            Ok(()) => {
-                #[cfg(feature = "tracing")]
-                tracing::info!(
-                    "Converted FNIS HKX file '{}' -> '{output_path}' for target {output_format:?}",
-                    input_path.display(),
-                );
-                Either::Left(())
-            }
-            Err(error) => Either::Right(error),
-        }
-    });
-
-    errors
+pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
+    // TODO: Avoid using `rayon::par_iter` because it causes errors due to mutexes in MO2
+    jobs.iter()
+        .filter_map(|job| match job {
+            AnimIoJob::Hkx(conversion_job) => convert_hkx(
+                &conversion_job.input_path,
+                &conversion_job.output_path,
+                output_target,
+            )
+            .err(),
+            AnimIoJob::Config(alt_anim_config_job) => write_file(
+                &alt_anim_config_job.output_path,
+                alt_anim_config_job.config.as_bytes(),
+                output_target,
+            )
+            .err(),
+        })
+        .collect()
 }
 
 /// Check the HKX file header to determine its format.
-pub fn check_hkx_header(
+///
+/// # Note
+/// use IO operations internally; avoid calling this function within `rayon::par_iter` directly.
+fn check_hkx_header(
     input_path: &Path,
     output_format: crate::OutPutTarget,
 ) -> Result<crate::OutPutTarget, Error> {
@@ -130,14 +137,15 @@ pub fn check_hkx_header(
     // Actually, both LE and SE versions of hkt can be loaded, and there are mods disguised as hkx files. Example: Ride Sharing's `rsh_horsepinion.hkx`
     // This is the processing for that.
     // NOTE: Tag files cannot be converted by serde_hkx, so they are skipped.
-    let is_tag = {
-        const TAG_MAGIC0: [u8; 4] = [0x1E, 0x0D, 0xB0, 0xCA];
-        const TAG_MAGIC1: [u8; 4] = [0xCE, 0xFA, 0x11, 0xD0];
-        let magic0_ok = header[0..4] == TAG_MAGIC0;
-        let magic1_ok = header[4..8] == TAG_MAGIC1;
-        magic0_ok && magic1_ok
+    let is_tag_file = {
+        /// Tag file(.hkt) magic bytes
+        const EXPECTED_MAGIC: [u8; 8] = [
+            0x1E, 0x0D, 0xB0, 0xCA, // magic0
+            0xCE, 0xFA, 0x11, 0xD0, // magic1
+        ];
+        header[0..8] == EXPECTED_MAGIC
     };
-    if is_tag {
+    if is_tag_file {
         #[cfg(feature = "tracing")]
         tracing::info!(
             path = %input_path.display(),
@@ -146,12 +154,15 @@ pub fn check_hkx_header(
         return Ok(output_format);
     }
 
-    // check magic
-    const EXPECTED_MAGIC: [u8; 8] = [
-        0x57, 0xE0, 0xE0, 0x57, // magic0
-        0x10, 0xC0, 0xC0, 0x10, // magic1
-    ];
-    if header[0..8] != EXPECTED_MAGIC {
+    let is_hkx = {
+        /// .hkx magic bytes
+        const EXPECTED_MAGIC: [u8; 8] = [
+            0x57, 0xE0, 0xE0, 0x57, // magic0
+            0x10, 0xC0, 0xC0, 0x10, // magic1
+        ];
+        header[0..8] == EXPECTED_MAGIC
+    };
+    if !is_hkx {
         return Err(Error::FNISHkxInvalidMagic {
             input_path: input_path.to_path_buf(),
             target: output_format,
@@ -176,22 +187,42 @@ pub fn check_hkx_header(
     Ok(current_format)
 }
 
-pub fn convert_hkx(
+fn convert_hkx(
     input_path: &Path,
     output_path: &Path,
     output_format: crate::OutPutTarget,
 ) -> Result<(), Error> {
     use serde_hkx::bytes::serde::hkx_header::HkxHeader;
     use serde_hkx_features::ClassMap;
+    use std::borrow::Cow;
 
-    let bytes = std::fs::read(input_path).map_err(|e| Error::FNISHkxIoError {
-        path: input_path.to_path_buf(),
+    // FIXME: Exists sometimes misjudges virtualization as unstable for some reason in MO2.
+    let actual_input: Cow<Path> = if input_path.exists() {
+        Cow::Borrowed(input_path)
+    } else if let Some(found) = find_case_insensitive(input_path) {
+        Cow::Owned(found)
+    } else {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            "FNIS alternative animation input_path file '{}' not found. Then Skipped.",
+            input_path.display()
+        );
+        return Ok(());
+    };
+
+    let current_format = check_hkx_header(&actual_input, output_format)?;
+    if current_format == output_format {
+        return Ok(());
+    }
+
+    let bytes = std::fs::read(&actual_input).map_err(|e| Error::FNISHkxIoError {
+        path: actual_input.to_path_buf(),
         target: output_format,
         source: e,
     })?;
 
     let class_map: ClassMap = serde_hkx::from_bytes(&bytes).map_err(|e| Error::HkxDeError {
-        path: input_path.to_path_buf(),
+        path: actual_input.to_path_buf(),
         source: e,
     })?;
 
@@ -201,10 +232,29 @@ pub fn convert_hkx(
     };
 
     let bytes = serde_hkx::to_bytes(&class_map, &header).map_err(|e| Error::HkxSerError {
-        path: input_path.to_path_buf(),
+        path: actual_input.to_path_buf(),
         source: e,
     })?;
 
+    write_file(output_path, &bytes, output_format)
+}
+
+/// This is necessary because Unix systems are case-sensitive.
+fn find_case_insensitive(path: &Path) -> Option<PathBuf> {
+    let parent = path.parent()?;
+    let file_name = path.file_name()?;
+
+    for entry in std::fs::read_dir(parent).ok()? {
+        let entry = entry.ok()?;
+        let name = entry.file_name();
+        if name.eq_ignore_ascii_case(file_name) {
+            return Some(entry.path());
+        }
+    }
+    None
+}
+
+fn write_file(output_path: &Path, bytes: &[u8], output_format: OutPutTarget) -> Result<(), Error> {
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
             path: parent.to_path_buf(),
@@ -218,6 +268,5 @@ pub fn convert_hkx(
         target: output_format,
         source: e,
     })?;
-
     Ok(())
 }

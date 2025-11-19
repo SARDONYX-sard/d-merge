@@ -4,10 +4,6 @@ use serde::{Deserialize, Serialize};
 use simd_json::borrowed::Object;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::path::Path;
-
-use crate::behaviors::tasks::hkx::generate::write_patched_json;
-use crate::errors::Error;
 
 /// Represents the configuration structure for the 'config.json' namespace.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -25,18 +21,21 @@ pub struct NamespaceConfig<'config> {
     pub author: &'config str,
 }
 
-pub fn write_namespace_json(
-    namespace: &str,
-    output_dir: &Path,
-    override_config: &FnisToOarConfig<'_>,
-) -> Result<(), Error> {
-    let namespace_config = NamespaceConfig {
+pub fn prepare_namespace_json(namespace: &str, override_config: &FnisToOarConfig<'_>) -> String {
+    let config = NamespaceConfig {
         name: override_config.name.as_deref().unwrap_or(namespace),
         description: override_config.description.as_deref().unwrap_or_default(),
         author: override_config.author.as_deref().unwrap_or_default(),
     };
-    let namespace_config_path = output_dir.join("config.json");
-    write_patched_json(&namespace_config_path, &namespace_config)
+
+    match simd_json::to_string_pretty(&config) {
+        Ok(json) => json,
+        Err(err) => {
+            #[cfg(feature = "tracing")]
+            tracing::error!("(Originally unreachable)Failed to serialize namespace config JSON for namespace '{namespace}': {err}");
+            String::new()
+        }
+    }
 }
 
 /// Represents the configuration for each animation root specified in a `config.json` file.
@@ -62,17 +61,16 @@ pub struct ConditionsConfig<'a> {
     pub conditions: &'a [Object<'a>],
 }
 
-/// Write the each `animations/OpenAnimationReplacer/<namespace>/<group name>_<slot>/config.json` for OAR, based on override config.
+/// For the each `animations/OpenAnimationReplacer/<namespace>/<group name>_<slot>/config.json` for OAR, based on override config.
 ///
 /// # Note
 /// - `group_config_dir`: The caller side has already applied the override_config.
-pub fn write_anim_config_json(
-    output_dir: &Path,
+pub fn prepare_anim_config_json(
     group_config_dir: &str,
     group_name: &str,
     slot: u64,
     override_config: &FnisToOarConfig<'_>,
-) -> Result<(), Error> {
+) -> String {
     let slot_cfg = override_config
         .groups
         .get(group_name)
@@ -92,8 +90,19 @@ pub fn write_anim_config_json(
             .unwrap_or_default(),
     };
 
-    let conditions_path = output_dir.join("config.json");
-    write_patched_json(&conditions_path, &config)
+    match simd_json::to_string_pretty(&config) {
+        Ok(json) => json,
+        Err(err) => {
+            #[cfg(feature = "tracing")]
+            tracing::error!(
+                "(Originally unreachable)Failed to serialize animation config JSON for group '{}', slot {}: {}",
+                group_name,
+                slot,
+                err
+            );
+            String::new()
+        }
+    }
 }
 
 /// Override configuration stored in:

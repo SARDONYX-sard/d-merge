@@ -20,6 +20,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::anim_var::new_push_anim_vars_patch;
 use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
+use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
 };
@@ -65,6 +66,8 @@ pub struct OneListPatch<'a> {
     /// One group of furniture syntax must be pushed to the states of the Furniture root.
     /// Therefore, it is placed here to be pushed when the furniture root is generated.
     pub furniture_group_root_indexes: Vec<String>,
+
+    pub conversion_jobs: Vec<AnimIoJob>,
 }
 
 /// Generate from one list file.
@@ -84,6 +87,7 @@ pub fn generate_patch<'a>(
     let mut one_mt_behavior_patches = vec![];
     let mut seq_mt_behavior_patches = vec![];
     let mut furniture_group_root_indexes = vec![];
+    let mut conversion_jobs = vec![];
 
     for pattern in list.patterns {
         match pattern {
@@ -91,9 +95,14 @@ pub fn generate_patch<'a>(
                 seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
             }
             SyntaxPattern::AltAnim(alt_animation) => {
-                super::alternative::alt_anim_to_oar(owned_data, alt_animation, config).map_err(
-                    |e| FnisPatchGenerationError::FailedToConvertAltAnimToOAR { errors: e },
-                )?;
+                let (jobs, errs) =
+                    super::alternative::alt_anim_to_oar(owned_data, alt_animation, config);
+                if !errs.is_empty() {
+                    return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR {
+                        errors: errs,
+                    });
+                }
+                conversion_jobs.par_extend(jobs);
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
@@ -210,6 +219,7 @@ pub fn generate_patch<'a>(
         one_mt_behavior_patches,
         seq_mt_behavior_patches,
         furniture_group_root_indexes,
+        conversion_jobs,
     })
 }
 

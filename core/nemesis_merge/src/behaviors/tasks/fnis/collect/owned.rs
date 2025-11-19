@@ -121,6 +121,7 @@ pub struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
+    pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
 impl OwnedFnisInjection {
@@ -252,6 +253,12 @@ where
     let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace)?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
+    let alt_anim_config = if list_content.contains("AAprefix") {
+        load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
+    } else {
+        None
+    };
+
     Ok(OwnedFnisInjection {
         animations_mod_dir,
         behavior_entry,
@@ -261,7 +268,27 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
+        alt_anim_config,
     })
+}
+
+fn load_to_oar_file(
+    animations_mod_dir: &Path,
+    behavior_entry: &'static BehaviorEntry,
+    namespace: &str,
+) -> Option<Vec<u8>> {
+    let override_config_path = {
+        let filename = if behavior_entry.is_humanoid() {
+            format!("FNIS_{namespace}_toOAR.json")
+        } else {
+            format!(
+                "FNIS_{namespace}_{}_toOAR.json",
+                behavior_entry.behavior_object // e.g, "dog", "horse"
+            )
+        };
+        animations_mod_dir.join(filename)
+    };
+    std::fs::read(&override_config_path).ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.
