@@ -49,11 +49,11 @@ pub fn prepare_conversion_jobs(
         .map(|anim| {
             let anim_file = anim.replace("\\", "/"); // normalize path separators
             let input_path = owned_data.animations_mod_dir.join(&anim_file);
-            let output_path = output_dir
-                .join("meshes")
-                .join(base_dir)
-                .join(namespace)
-                .join(&anim_file);
+            let mut output_path = output_dir.join("meshes");
+            output_path.push(base_dir);
+            output_path.push(namespace);
+            output_path.push(&anim_file);
+
             AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
