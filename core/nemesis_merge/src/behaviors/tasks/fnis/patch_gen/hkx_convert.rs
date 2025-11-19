@@ -18,6 +18,11 @@ pub struct ConversionJob {
     pub input_path: PathBuf,
     /// Path to the target converted HKX file
     pub output_path: PathBuf,
+
+    /// Do we need to copy to output_path even without conversion?
+    ///
+    /// This is required for FNIS AltAnim to OAR and should be set to true.
+    pub need_copy: bool,
 }
 
 /// Prepare a list of conversion jobs from animation filenames and `OwnedFnisInjection` metadata.
@@ -52,6 +57,7 @@ pub fn prepare_conversion_jobs(
             AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
+                need_copy: false,
             })
         })
         .collect()
@@ -69,6 +75,7 @@ pub fn prepare_behavior_conversion_job(
             Some(AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
+                need_copy: false,
             }))
         }
         Err(_err) => {
@@ -98,6 +105,7 @@ pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) ->
                 &conversion_job.input_path,
                 &conversion_job.output_path,
                 output_target,
+                conversion_job.need_copy,
             )
             .err(),
             AnimIoJob::Config(alt_anim_config_job) => write_file(
@@ -191,12 +199,13 @@ fn convert_hkx(
     input_path: &Path,
     output_path: &Path,
     output_format: crate::OutPutTarget,
+    need_copy: bool,
 ) -> Result<(), Error> {
     use serde_hkx::bytes::serde::hkx_header::HkxHeader;
     use serde_hkx_features::ClassMap;
     use std::borrow::Cow;
 
-    // FIXME: Exists sometimes misjudges virtualization as unstable for some reason in MO2.
+    // NOTE: Exists sometimes misjudges virtualization as unstable for `rayon::par_iter` in MO2.
     let actual_input: Cow<Path> = if input_path.exists() {
         Cow::Borrowed(input_path)
     } else if let Some(found) = find_case_insensitive(input_path) {
@@ -212,8 +221,17 @@ fn convert_hkx(
 
     let current_format = check_hkx_header(&actual_input, output_format)?;
     if current_format == output_format {
+        if need_copy {
+            std::fs::copy(&actual_input, output_path).map_err(|e| Error::FNISHkxIoError {
+                path: actual_input.to_path_buf(),
+                target: output_format,
+                source: e,
+            })?;
+        }
         return Ok(());
     }
+
+    // start conversion code ---
 
     let bytes = std::fs::read(&actual_input).map_err(|e| Error::FNISHkxIoError {
         path: actual_input.to_path_buf(),

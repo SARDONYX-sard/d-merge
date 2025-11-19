@@ -153,6 +153,7 @@ pub fn alt_anim_to_oar(
                     AnimIoJob::Hkx(ConversionJob {
                         input_path,
                         output_path: output_dir.join(animation_path),
+                        need_copy: true,
                     })
                 })
                 .collect();
