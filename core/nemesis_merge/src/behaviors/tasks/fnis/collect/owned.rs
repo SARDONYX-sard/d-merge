@@ -288,7 +288,13 @@ fn load_to_oar_file(
         };
         animations_mod_dir.join(filename)
     };
-    std::fs::read(&override_config_path).ok()
+    std::fs::read(&override_config_path)
+        .map_err(|e| {
+            #[cfg(feature = "tracing")]
+            tracing::info!(%e, ?override_config_path);
+            e
+        })
+        .ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.
