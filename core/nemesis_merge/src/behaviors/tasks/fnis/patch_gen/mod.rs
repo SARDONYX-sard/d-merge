@@ -21,13 +21,13 @@ use winnow::Parser;
 use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::{generate_patch, OneListPatch};
 use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
     BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::new_global_master_patch;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
+use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::patches::types::{
     BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
 };
