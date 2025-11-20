@@ -69,23 +69,18 @@ pub fn prepare_anim_config_json(
     group_config_dir: &str,
     group_name: &str,
     slot: u64,
-    override_config: &FnisToOarConfig<'_>,
+    slot_config: Option<&SlotConfig<'_>>,
 ) -> String {
-    let slot_cfg = override_config
-        .groups
-        .get(group_name)
-        .and_then(|group_cfg| group_cfg.slots.get(&slot));
-
     let config = ConditionsConfig {
         name: Cow::Borrowed(group_config_dir), // NOTE: The caller side has already applied the override_config.
         description: Cow::Borrowed(
-            slot_cfg
+            slot_config
                 .and_then(|slot| slot.description.as_deref())
                 .unwrap_or_default(),
         ),
-        priority: slot_cfg.and_then(|slot| slot.priority).unwrap_or(0) as i32,
+        priority: slot_config.and_then(|slot| slot.priority).unwrap_or(0) as i32,
         override_animations_folder: None,
-        conditions: slot_cfg
+        conditions: slot_config
             .map(|slot| slot.conditions.as_slice())
             .unwrap_or_default(),
     };
@@ -158,6 +153,7 @@ pub struct SlotConfig<'a> {
     pub rename_to: Option<Cow<'a, str>>,
 
     /// The description associated with the each config.json.
+    #[serde(borrow)]
     pub description: Option<Cow<'a, str>>,
 
     /// Optional OAR priority for this slot
@@ -165,7 +161,7 @@ pub struct SlotConfig<'a> {
 
     /// Arbitrary JSON object representing OAR conditions.
     /// Unsafe: ensure valid JSON for OAR `config.json`.
-    #[serde(borrow)]
+    #[serde(default, borrow)]
     #[serde(bound(deserialize = "Vec<Object<'a>>: serde::Deserialize<'de>"))]
     pub conditions: Vec<Object<'a>>,
 }

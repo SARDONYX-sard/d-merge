@@ -112,6 +112,7 @@ pub fn alt_anim_to_oar(
     for set in &alt_anim.set {
         let slots = set.slots;
         let group_name = set.group;
+        let group_config = override_config.groups.get(group_name);
 
         let Some(group) = generated_group_table::ALT_GROUPS.get(group_name) else {
             errors.push(Error::Custom {
@@ -122,10 +123,9 @@ pub fn alt_anim_to_oar(
 
         let group_jobs = (0..slots).into_par_iter().flat_map(|slot| {
             // each FNIS alt group output directory.(can rename by override config)
-            let group_config_dir = override_config
-                .groups
-                .get(group_name)
-                .and_then(|group_cfg| group_cfg.slots.get(&slot))
+            let slot_config = group_config.and_then(|group_cfg| group_cfg.slots.get(&slot));
+
+            let group_config_dir = slot_config
                 .and_then(|slot| slot.rename_to.as_deref().map(Cow::Borrowed))
                 .unwrap_or_else(|| Cow::Owned(format!("{group_name}_{slot}")));
 
@@ -160,12 +160,7 @@ pub fn alt_anim_to_oar(
 
             jobs.push(AnimIoJob::Config(AltAnimConfigJob {
                 output_path: output_dir.join("config.json"),
-                config: prepare_anim_config_json(
-                    &group_config_dir,
-                    group_name,
-                    slot,
-                    &override_config,
-                ),
+                config: prepare_anim_config_json(&group_config_dir, group_name, slot, slot_config),
             }));
 
             jobs
