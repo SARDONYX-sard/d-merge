@@ -229,9 +229,9 @@ pub fn collect_borrowed_patches<'a>(
         .reduce(
             || (Vec::new(), Vec::new(), Vec::new()),
             |(mut adsf1, mut furn1, mut jobs1), (adsf2, furn2, jobs2)| {
-                adsf1.extend(adsf2);
-                furn1.extend(furn2);
-                jobs1.extend(jobs2);
+                adsf1.par_extend(adsf2);
+                furn1.par_extend(furn2);
+                jobs1.par_extend(jobs2);
                 (adsf1, furn1, jobs1)
             },
         );
