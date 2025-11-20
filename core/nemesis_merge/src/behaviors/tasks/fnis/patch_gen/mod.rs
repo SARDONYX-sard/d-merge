@@ -135,7 +135,7 @@ pub fn collect_borrowed_patches<'a>(
                 }
 
                 // Push Mod Root behavior to master xml
-                let entry = borrowed_patches.0.entry(master_template_key).or_default();
+                let mut entry = borrowed_patches.0.entry(master_template_key).or_default();
                 {
                     let (one_gen, one_state_info, seq_state) =
                         new_injectable_mod_root_behavior(owned_data);
@@ -145,11 +145,8 @@ pub fn collect_borrowed_patches<'a>(
                 }
 
                 // Insert patches for FNIS_*_List.txt
-                // TODO: If it's strictly for additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
-                // entry.one.par_extend(one_master_patches);
-                for (path, patch) in one_master_patches {
-                    entry.one.insert(path, patch);
-                }
+                // additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
+                entry.one.0.par_extend(one_master_patches);
                 for (path, patch) in seq_master_patches {
                     entry.seq.insert(path, patch);
                 }

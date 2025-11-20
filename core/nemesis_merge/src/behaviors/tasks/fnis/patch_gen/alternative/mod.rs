@@ -92,6 +92,8 @@ pub fn alt_anim_to_oar(
         },
         None => FnisToOarConfig::default(),
     };
+    #[cfg(feature = "tracing")]
+    tracing::debug!("Using FNIS to OAR override config: {override_config:#?}");
 
     let output_dir = {
         let mut output_dir = output_dir.clone();
