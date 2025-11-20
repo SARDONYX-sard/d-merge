@@ -76,9 +76,9 @@ pub enum Error {
         source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,
     },
 
-    /// Failed to read file from {path}
-    #[snafu(display("{source}: {}", path.display()))]
-    FailedIo { source: io::Error, path: PathBuf },
+    /// Failed to io: path = {path}, source = {source}
+    #[snafu(display("Failed to io: path = {}, source = {source}", path.display()))]
+    FailedIo { path: PathBuf, source: io::Error },
 
     /// Reading file Error count: {errors_len}
     FailedToReadOwnedPatches { errors_len: usize },

@@ -13,9 +13,9 @@ use crate::behaviors::tasks::fnis::list_parser::patterns::alt_anim::one_line::{
 /// Alterative Animation
 #[derive(Debug, PartialEq)]
 pub struct AlternativeAnimation<'a> {
-    prefix: &'a str,
-    set: Vec<AASet<'a>>,
-    trigger: Vec<AnimTrigger<'a>>,
+    pub prefix: &'a str,
+    pub set: Vec<AASet<'a>>,
+    pub trigger: Vec<AnimTrigger<'a>>,
 }
 
 pub fn parse_alternative_animation<'a>(
