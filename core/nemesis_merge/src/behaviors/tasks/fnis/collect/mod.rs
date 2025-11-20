@@ -6,7 +6,6 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
 };
 use crate::errors::Error;
 use crate::PriorityMap;
-use rayon::prelude::*;
 use std::path::PathBuf;
 
 /// One job describing a single FNIS injection task.
@@ -76,20 +75,32 @@ fn gather_fnis_jobs(skyrim_data_dir: &str, fnis_entries: &PriorityMap) -> Vec<Fn
 ///
 /// Heavy file IO (reading FNIS_*_List.txt, etc.) is performed here,
 /// but since there is only one par_iter, USVFS behaves correctly.
-fn process_fnis_jobs_parallel(jobs: Vec<FnisJob>) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
-    jobs.into_par_iter()
-        .map(|job| {
-            Ok(collect_fnis_injection(
-                &job.ns_path,
-                job.entry,
-                &job.namespace,
-                job.priority,
-            )?)
-        })
-        .partition_map(|res| match res {
-            Ok(ok) => rayon::iter::Either::Left(ok),
-            Err(err) => rayon::iter::Either::Right(err),
-        })
+async fn process_fnis_jobs_parallel(jobs: Vec<FnisJob>) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
+    let mut handles = tokio::task::JoinSet::new();
+    for job in jobs {
+        handles.spawn(async move {
+            Ok(
+                collect_fnis_injection(&job.ns_path, job.entry, &job.namespace, job.priority)
+                    .await?,
+            )
+        });
+    }
+
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+    while let Some(result) = handles.join_next().await {
+        match result {
+            Err(join_err) => {
+                errs.push(Error::from(join_err));
+            }
+            Ok(inner) => match inner {
+                Ok(v) => oks.push(v),
+                Err(e) => errs.push(e),
+            },
+        }
+    }
+
+    (oks, errs)
 }
 
 /// Public API: collect all FNIS injections.
@@ -99,12 +110,12 @@ fn process_fnis_jobs_parallel(jobs: Vec<FnisJob>) -> (Vec<OwnedFnisInjection>, V
 /// - All directory scanning is done single-threaded
 /// - All IO-heavy tasks run in one parallel stage
 /// - Avoids nested parallel IO, which breaks USVFS (RecursiveBenaphore)
-pub fn collect_all_fnis_injections(
+pub async fn collect_all_fnis_injections(
     skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
 ) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
     let jobs = gather_fnis_jobs(skyrim_data_dir, fnis_entries);
-    process_fnis_jobs_parallel(jobs)
+    process_fnis_jobs_parallel(jobs).await
 }
 
 /// Collect case-insensitive paths using glob.
@@ -128,10 +139,11 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, glob::PatternError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rayon::prelude::*;
 
-    #[test]
+    #[tokio::test]
     #[ignore = "local only"]
-    fn test_parse_relative_path() {
+    async fn test_parse_relative_path() {
         let output_path = "../../dummy/debug/collect_all_fnis_injections.log";
 
         let fnis_entries = ["BiS_WashMe", "FNISFlyer", "FNISZoo", "XPMSE", "TKDodge"]
@@ -139,7 +151,7 @@ mod tests {
             .enumerate()
             .map(|(idx, namespace)| (namespace.to_string(), idx))
             .collect();
-        let res = collect_all_fnis_injections("../../dummy/fnis_test_mods/*", &fnis_entries);
+        let res = collect_all_fnis_injections("../../dummy/fnis_test_mods/*", &fnis_entries).await;
 
         std::fs::write(output_path, format!("{res:#?}")).unwrap();
     }

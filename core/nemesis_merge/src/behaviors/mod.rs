@@ -55,7 +55,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
             .skyrim_data_dir_glob
             .as_ref()
             .ok_or(Error::MissingSkyrimDataDirGlob)?;
-        fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries)
+        fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
     };
 
     let (fnis_hkx_patches, fnis_adsf_patches) = {
