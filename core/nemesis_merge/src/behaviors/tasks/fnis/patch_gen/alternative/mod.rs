@@ -59,9 +59,7 @@ pub fn alt_anim_to_oar(
     alt_anim: AlternativeAnimation<'_>,
     config: &Config,
 ) -> (Vec<AnimIoJob>, Vec<Error>) {
-    let base_dir = owned_data.behavior_entry.base_dir;
     let namespace = &owned_data.namespace;
-    let output_dir = &config.output_dir;
     let prefix = alt_anim.prefix;
 
     let mut errors = vec![];
@@ -96,9 +94,13 @@ pub fn alt_anim_to_oar(
     tracing::debug!("Using FNIS to OAR override config: {override_config:#?}");
 
     let output_dir = {
+        let base_dir = owned_data.behavior_entry.base_dir;
+        let output_dir = &config.output_dir;
+
         let mut output_dir = output_dir.clone();
         output_dir.push("meshes");
         output_dir.push(base_dir);
+        output_dir.push("animations");
         output_dir.push("OpenAnimationReplacer");
         output_dir.push(override_config.name.as_deref().unwrap_or(namespace));
         output_dir
