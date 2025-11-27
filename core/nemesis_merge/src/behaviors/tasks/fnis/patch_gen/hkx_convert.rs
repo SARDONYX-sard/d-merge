@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
@@ -23,6 +24,11 @@ pub struct ConversionJob {
     ///
     /// This is required for FNIS AltAnim to OAR and should be set to true.
     pub need_copy: bool,
+
+    /// Is this job optional? If true, missing input files will be skipped without error.
+    ///
+    /// This is required for FNIS AltAnim to OAR and should be set to true.
+    pub is_optional: bool,
 }
 
 /// Prepare a list of conversion jobs from animation filenames and `OwnedFnisInjection` metadata.
@@ -45,7 +51,7 @@ pub fn prepare_conversion_jobs(
     let output_dir = &config.output_dir;
 
     animations
-        .iter()
+        .par_iter()
         .map(|anim| {
             let anim_file = anim.replace("\\", "/"); // normalize path separators
             let input_path = owned_data.animations_mod_dir.join(&anim_file);
@@ -58,6 +64,7 @@ pub fn prepare_conversion_jobs(
                 input_path,
                 output_path,
                 need_copy: false,
+                is_optional: false,
             })
         })
         .collect()
@@ -76,6 +83,7 @@ pub fn prepare_behavior_conversion_job(
                 input_path,
                 output_path,
                 need_copy: false,
+                is_optional: false,
             }))
         }
         Err(_err) => {
@@ -98,16 +106,9 @@ pub fn prepare_behavior_conversion_job(
 /// - Has a pointer size that cannot be determined.
 #[must_use]
 pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
-    // TODO: Avoid using `rayon::par_iter` because it causes errors due to mutexes in MO2
-    jobs.iter()
+    jobs.par_iter()
         .filter_map(|job| match job {
-            AnimIoJob::Hkx(conversion_job) => convert_hkx(
-                &conversion_job.input_path,
-                &conversion_job.output_path,
-                output_target,
-                conversion_job.need_copy,
-            )
-            .err(),
+            AnimIoJob::Hkx(conversion_job) => convert_hkx(conversion_job, output_target).err(),
             AnimIoJob::Config(alt_anim_config_job) => write_file(
                 &alt_anim_config_job.output_path,
                 alt_anim_config_job.config.as_bytes(),
@@ -195,43 +196,51 @@ fn check_hkx_header(
     Ok(current_format)
 }
 
-fn convert_hkx(
-    input_path: &Path,
-    output_path: &Path,
-    output_format: crate::OutPutTarget,
-    need_copy: bool,
-) -> Result<(), Error> {
+fn convert_hkx(job: &ConversionJob, output_target: OutPutTarget) -> Result<(), Error> {
     use serde_hkx::bytes::serde::hkx_header::HkxHeader;
     use serde_hkx_features::ClassMap;
     use std::borrow::Cow;
+
+    let ConversionJob {
+        input_path,
+        output_path,
+        need_copy,
+        is_optional,
+    } = job;
 
     // NOTE: Exists sometimes misjudges virtualization as unstable for `rayon::par_iter` in MO2.
     let actual_input: Cow<Path> = if input_path.exists() {
         Cow::Borrowed(input_path)
     } else if let Some(found) = find_case_insensitive(input_path) {
         Cow::Owned(found)
-    } else {
+    } else if *is_optional {
         #[cfg(feature = "tracing")]
         tracing::info!(
             "FNIS alternative animation input_path file '{}' not found. Then Skipped.",
             input_path.display()
         );
         return Ok(());
+    } else {
+        return Err(Error::FNISHkxIoError {
+            path: input_path.clone(),
+            target: output_target,
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
+        });
     };
 
-    let current_format = check_hkx_header(&actual_input, output_format)?;
-    if current_format == output_format {
-        if need_copy {
+    let current_format = check_hkx_header(&actual_input, output_target)?;
+    if current_format == output_target {
+        if *need_copy {
             if let Some(parent) = output_path.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
                     path: parent.to_path_buf(),
-                    target: output_format,
+                    target: output_target,
                     source: e,
                 })?;
             }
             std::fs::copy(&actual_input, output_path).map_err(|e| Error::FNISHkxIoError {
                 path: actual_input.to_path_buf(),
-                target: output_format,
+                target: output_target,
                 source: e,
             })?;
         }
@@ -242,7 +251,7 @@ fn convert_hkx(
 
     let bytes = std::fs::read(&actual_input).map_err(|e| Error::FNISHkxIoError {
         path: actual_input.to_path_buf(),
-        target: output_format,
+        target: output_target,
         source: e,
     })?;
 
@@ -251,7 +260,7 @@ fn convert_hkx(
         source: e,
     })?;
 
-    let header = match output_format {
+    let header = match output_target {
         crate::OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
         crate::OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
     };
@@ -261,7 +270,7 @@ fn convert_hkx(
         source: e,
     })?;
 
-    write_file(output_path, &bytes, output_format)
+    write_file(output_path, &bytes, output_target)
 }
 
 /// This is necessary because Unix systems are case-sensitive.

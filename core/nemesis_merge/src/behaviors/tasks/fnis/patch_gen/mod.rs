@@ -237,10 +237,16 @@ pub fn collect_borrowed_patches<'a>(
         );
 
     let mut errors: Vec<Error> = errors.into_par_iter().flatten().collect();
-    errors.par_extend(hkx_convert::run_conversion_jobs(
-        conversion_jobs,
-        config.output_target,
-    ));
+
+    // FIXME?: Unknown causes errors due to mutexes in MO2
+    rayon::scope(|s| {
+        s.spawn(|_| {
+            errors.par_extend(hkx_convert::run_conversion_jobs(
+                conversion_jobs,
+                config.output_target,
+            ));
+        });
+    });
 
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {

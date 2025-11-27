@@ -158,6 +158,7 @@ pub fn alt_anim_to_oar(
                         input_path,
                         output_path: output_dir.join(animation_path),
                         need_copy: true,
+                        is_optional: true,
                     })
                 })
                 .collect();
