@@ -5,7 +5,7 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { isTauri } from '@tauri-apps/api/core';
 import type monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import type { VimEnvironment } from 'monaco-vim';
+import type { VimAdapterInstance } from 'monaco-vim';
 import { type ComponentPropsWithoutRef, memo, type RefObject, useCallback, useEffect, useRef } from 'react';
 import { openUrl } from '@/services/api/shell';
 import { atomOneDarkPro } from './atom_onedark_pro';
@@ -13,7 +13,7 @@ import { supportHkanno } from './support_hkanno';
 import { loadVimKeyBindings } from './vim_key_bindings';
 
 export type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
-export type VimModeRef = RefObject<VimEnvironment | null>;
+export type VimModeRef = RefObject<VimAdapterInstance | null>;
 export type VimStatusRef = RefObject<HTMLDivElement | null>;
 
 type Props = ComponentPropsWithoutRef<typeof Editor> & {
