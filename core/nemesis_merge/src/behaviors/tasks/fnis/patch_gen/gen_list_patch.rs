@@ -20,6 +20,7 @@ use crate::behaviors::tasks::fnis::list_parser::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::anim_var::new_push_anim_vars_patch;
 use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
+use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::fnis::patch_gen::{
     kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
 };
@@ -65,12 +66,15 @@ pub struct OneListPatch<'a> {
     /// One group of furniture syntax must be pushed to the states of the Furniture root.
     /// Therefore, it is placed here to be pushed when the furniture root is generated.
     pub furniture_group_root_indexes: Vec<String>,
+
+    pub conversion_jobs: Vec<AnimIoJob>,
 }
 
 /// Generate from one list file.
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
+    config: &crate::Config,
 ) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     // TODO: Support AsciiCaseIgnore
     let mut all_anim_files = HashSet::new();
@@ -83,16 +87,22 @@ pub fn generate_patch<'a>(
     let mut one_mt_behavior_patches = vec![];
     let mut seq_mt_behavior_patches = vec![];
     let mut furniture_group_root_indexes = vec![];
+    let mut conversion_jobs = vec![];
 
     for pattern in list.patterns {
         match pattern {
             SyntaxPattern::AnimVar(anim_var) => {
                 seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
             }
-            SyntaxPattern::AltAnim(_alt_animation) => {
-                return Err(FnisPatchGenerationError::UnsupportedAltAnimation {
-                    path: owned_data.to_list_path(),
-                });
+            SyntaxPattern::AltAnim(alt_animation) => {
+                let (jobs, errs) =
+                    super::alternative::alt_anim_to_oar(owned_data, alt_animation, config);
+                if !errs.is_empty() {
+                    return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR {
+                        errors: errs,
+                    });
+                }
+                conversion_jobs.par_extend(jobs);
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
@@ -209,6 +219,7 @@ pub fn generate_patch<'a>(
         one_mt_behavior_patches,
         seq_mt_behavior_patches,
         furniture_group_root_indexes,
+        conversion_jobs,
     })
 }
 
@@ -219,9 +230,10 @@ pub enum FnisPatchGenerationError {
     #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 
-    /// Alternative animation is not supported yet
-    #[snafu(display("Alternative Animation is not supported yet: {}", path.display()))]
-    UnsupportedAltAnimation { path: PathBuf },
+    #[snafu(display(
+        "Failed to convert alternative animation to OAR format. See inner errors for details."
+    ))]
+    FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
 
     /// Chair animation is not supported yet
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]

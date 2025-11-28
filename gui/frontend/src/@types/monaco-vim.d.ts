@@ -23,7 +23,7 @@ declare module 'monaco-vim' {
    *
    * - NOTE: TypeScript interface based on the provided devtool information
    */
-  interface VimEnvironment extends VimMode {
+  interface VimAdapterInstance extends VimMode {
     $uid: number;
     attached: boolean;
     ctxInsert: {
@@ -244,5 +244,5 @@ declare module 'monaco-vim' {
     rmClass(): void;
     signal: (e: any, t: any, n: any) => void;
   };
-  export function initVimMode(editor: editor.IStandaloneCodeEditor, statusbarNode?: HTMLElement): VimEnvironment;
+  export function initVimMode(editor: editor.IStandaloneCodeEditor, statusbarNode?: HTMLElement): VimAdapterInstance;
 }

@@ -157,9 +157,14 @@ impl App for ModManagerApp {
         self.ui_skyrim_dir(ctx);
         self.ui_output_dir(ctx);
         self.ui_search_panel(ctx);
-        self.ui_mod_list(ctx);
+
         self.ui_notification(ctx);
+        // NOTE: TopBottomPanel must be added before any other panels.
+        // The first added panel becomes the outermost (front-most), and the last
+        // becomes the innermost. Central panels must always be added last.
+        // See: https://docs.rs/flatbox/0.1.0/flatbox/egui/struct.TopBottomPanel.html
         self.ui_bottom_panel(ctx);
+        self.ui_mod_list(ctx);
         self.ui_log_window(ctx);
 
         self.is_first_render = false;
@@ -378,10 +383,13 @@ impl ModManagerApp {
                         self.set_notification(err);
                     };
                 };
-                let _ = ui.add_sized(
-                    [ui.available_width() * 0.9, 40.0],
-                    egui::TextEdit::singleline(&mut self.output_dir),
-                );
+                let text_line = egui::TextEdit::singleline(&mut self.output_dir);
+                let text_line = if self.transparent {
+                    text_line.background_color(egui::Color32::TRANSPARENT)
+                } else {
+                    text_line
+                };
+                let _ = ui.add_sized([ui.available_width() * 0.9, 40.0], text_line);
 
                 if ui
                     .add_sized(
@@ -423,10 +431,14 @@ impl ModManagerApp {
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(self.t(I18nKey::SearchLabel));
-                ui.add_sized(
-                    [300.0, 40.0],
-                    egui::TextEdit::singleline(&mut self.filter_text),
-                );
+
+                let text_line = egui::TextEdit::singleline(&mut self.filter_text);
+                let text_line = if self.transparent {
+                    text_line.background_color(egui::Color32::TRANSPARENT)
+                } else {
+                    text_line
+                };
+                ui.add_sized([300.0, 40.0], text_line);
 
                 if ui
                     .add_sized(
@@ -612,20 +624,13 @@ impl ModManagerApp {
             ui.heading(self.t(I18nKey::ModsListTitle));
             ui.separator();
 
-            // 1. Filter
             let mut filtered = self.filtered_mods();
-
-            // 2. Sort
             self.sort_mods(&mut filtered);
 
-            // 3. Decide if DnD is allowed
             let dnd_allowed = self.is_dnd_allowed();
             self.is_locked = !dnd_allowed;
 
-            // 4. Render
             self.render_table(ui, &filtered, dnd_allowed);
-
-            ui.add_space(10.0);
         });
     }
 
@@ -673,7 +678,7 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
-        let table_max_height = ui.available_height() * 0.9;
+        let table_max_height = ui.available_height() * 0.97;
         let total_width = ui.available_width();
 
         let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5; // ignore 0.5px diff
@@ -867,19 +872,28 @@ impl ModManagerApp {
                     return;
                 }
 
-                ui.add_sized(
-                    [ui.available_width() * 0.85, 40.0],
-                    egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir),
-                )
-                .changed()
+                let line = egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir);
+                let line = if self.transparent {
+                    line.background_color(egui::Color32::TRANSPARENT)
+                } else {
+                    line
+                };
+
+                ui.add_sized([ui.available_width() * 0.85, 40.0], line)
+                    .changed()
             }
-            DataMode::Manual => ui
-                .add_sized(
-                    [ui.available_width() * 0.9, 40.0],
-                    egui::TextEdit::singleline(&mut self.skyrim_data_dir)
-                        .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
-                )
-                .changed(),
+            DataMode::Manual => {
+                let line = egui::TextEdit::singleline(&mut self.skyrim_data_dir)
+                    .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*");
+                let line = if self.transparent {
+                    line.background_color(egui::Color32::TRANSPARENT)
+                } else {
+                    line
+                };
+
+                ui.add_sized([ui.available_width() * 0.9, 40.0], line)
+                    .changed()
+            }
         };
 
         if self.is_first_render || changed {

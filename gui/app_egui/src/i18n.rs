@@ -283,10 +283,14 @@ pub fn status_to_text(
         ),
         nemesis_merge::Status::Done => {
             let elapsed = start_time.elapsed();
-            format!("[6/6] {} ({:.2?})", i18n.t(I18nKey::StatusDone), elapsed)
+            format!("[6/6] {} ({elapsed:.2?})", i18n.t(I18nKey::StatusDone))
         }
         nemesis_merge::Status::Error(msg) => {
-            format!("[Error] {}: {}", i18n.t(I18nKey::StatusError), msg)
+            let elapsed = start_time.elapsed();
+            format!(
+                "[Error] {} ({elapsed:.2?}) {msg}",
+                i18n.t(I18nKey::StatusError),
+            )
         }
     }
 }

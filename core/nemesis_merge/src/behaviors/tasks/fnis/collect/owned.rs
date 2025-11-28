@@ -30,6 +30,7 @@ use std::{
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
+use tokio::fs;
 
 use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry;
 
@@ -121,6 +122,7 @@ pub struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
+    pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
 impl OwnedFnisInjection {
@@ -238,7 +240,7 @@ impl OwnedFnisInjection {
 /// - The animation directory is empty (`MissingNameSpace`)
 /// - The List file is missing (`ListMissing`)
 /// - The Behavior file is missing (`BehaviorMissing`)
-pub fn collect_fnis_injection<P>(
+pub async fn collect_fnis_injection<P>(
     animations_mod_dir: P,
     behavior_entry: &'static BehaviorEntry,
     namespace: &str,
@@ -249,8 +251,14 @@ where
 {
     let animations_mod_dir = animations_mod_dir.into();
 
-    let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace)?;
+    let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
+
+    let alt_anim_config = if list_content.contains("AAprefix") {
+        load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
+    } else {
+        None
+    };
 
     Ok(OwnedFnisInjection {
         animations_mod_dir,
@@ -261,7 +269,33 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
+        alt_anim_config,
     })
+}
+
+fn load_to_oar_file(
+    animations_mod_dir: &Path,
+    behavior_entry: &'static BehaviorEntry,
+    namespace: &str,
+) -> Option<Vec<u8>> {
+    let override_config_path = {
+        let filename = if behavior_entry.is_humanoid() {
+            format!("FNIS_{namespace}_toOAR.json")
+        } else {
+            format!(
+                "FNIS_{namespace}_{}_toOAR.json",
+                behavior_entry.behavior_object // e.g, "dog", "horse"
+            )
+        };
+        animations_mod_dir.join(filename)
+    };
+    std::fs::read(&override_config_path)
+        .map_err(|e| {
+            #[cfg(feature = "tracing")]
+            tracing::info!(%e, ?override_config_path);
+            e
+        })
+        .ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.
@@ -274,7 +308,7 @@ where
 ///
 /// # Errors
 /// Returns an error if no file is found.
-fn load_fnis_list_file(
+async fn load_fnis_list_file(
     animations_mod_dir: &Path,
     behavior_entry: &'static BehaviorEntry,
     namespace: &str,
@@ -290,7 +324,8 @@ fn load_fnis_list_file(
     };
 
     // NOTE: Since there are mod files that are not UTF-8, we need to support them.
-    let content = std::fs::read(&list_path_string)
+    let content = fs::read(&list_path_string)
+        .await
         .and_then(auto_charset::decode_to_utf8)
         .map_err(|e| FnisError::FailedReadingListFile {
             expected: list_path_string.clone(),
@@ -341,13 +376,16 @@ fn find_behavior_file(
         format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
     };
 
+    #[cfg(feature = "tracing")]
     {
         let mut behaviors_file = parent_dir.join(master_behavior_dir);
         behaviors_file.push(&file_name);
         if !behaviors_file.exists() {
-            return Err(FnisError::BehaviorNotFound {
-                path: behaviors_file,
-            });
+            tracing::warn!(
+                "FNIS behavior file not found: {}. \
+                Note: MO2 virtual filesystem may cause false negatives in fs::exists().",
+                behaviors_file.display()
+            );
         };
     }
 
@@ -391,14 +429,15 @@ pub enum FnisError {
 mod tests {
     use super::*;
 
-    #[test]
+    #[tokio::test]
     #[ignore = "local only"]
-    fn test_collect_fnis_injection() {
+    async fn test_collect_fnis_injection() {
         use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::HUMANOID;
 
         let input = "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
         let behavior_entry = HUMANOID.get("character").unwrap();
         let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0)
+            .await
             .unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);
     }

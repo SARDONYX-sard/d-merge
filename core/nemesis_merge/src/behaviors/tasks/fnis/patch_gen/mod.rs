@@ -1,3 +1,4 @@
+mod alternative;
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
@@ -26,6 +27,7 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::new_global_master_patch;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
+use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::patches::types::{
     BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
 };
@@ -39,174 +41,218 @@ pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGener
 
 pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
+struct LocalAgg<'a> {
+    borrowed_patches: BehaviorPatchesMap<'a>,
+    behavior_graph_data_map: BehaviorGraphDataMap<'a>,
+
+    adsf_patches: Vec<AdsfPatch<'a>>,
+    furniture_groups: Vec<String>,
+    conversion_jobs: Vec<AnimIoJob>,
+}
+
+impl<'a> LocalAgg<'a> {
+    fn new() -> Self {
+        Self {
+            borrowed_patches: BehaviorPatchesMap::default(),
+            behavior_graph_data_map: BehaviorGraphDataMap::new(),
+            adsf_patches: Vec::new(),
+            furniture_groups: Vec::new(),
+            conversion_jobs: Vec::new(),
+        }
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        self.borrowed_patches.merge(other.borrowed_patches);
+
+        self.behavior_graph_data_map
+            .0
+            .par_extend(other.behavior_graph_data_map.0);
+        self.adsf_patches.par_extend(other.adsf_patches);
+        self.furniture_groups.par_extend(other.furniture_groups);
+        self.conversion_jobs.par_extend(other.conversion_jobs);
+
+        self
+    }
+}
+
+/// Collect borrowed patches from multiple FNIS One Mods.
+///
+/// # Note
+/// Since this function uses I/O internally for operations like hkx conversion,
+/// do not call this function itself within `rayon::par_iter`.
+/// This is because semaphore locks in MO2 may potentially deadlock.
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
-    let borrowed_patches = BehaviorPatchesMap::default();
-    let behavior_graph_data_map = BehaviorGraphDataMap::new();
-
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::GeneratingFnisPatches,
         mods_patches.len(),
     );
 
-    let ((adsf_patches, furniture_group_root_indexes), errors): ((Vec<_>, Vec<_>), Vec<_>) =
-        mods_patches
-            .par_iter()
-            .map(|owned_data| {
-                let list = match parse_fnis_list
-                    .parse(&owned_data.list_content)
-                    .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
-                    .with_context(|_| FailedParseFnisModListSnafu {
-                        path: owned_data.to_list_path(),
-                    }) {
-                    Ok(list) => list,
-                    Err(err) => {
-                        reporter.increment();
-                        return Either::Right(vec![err]);
-                    }
-                };
-                #[cfg(feature = "tracing")]
-                tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
+    let (patches, mut errors): (Vec<_>, Vec<_>) =
+        mods_patches.par_iter().partition_map(|owned_data| {
+            match parse_fnis_list
+                .parse(&owned_data.list_content)
+                .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
+                .with_context(|_| FailedParseFnisModListSnafu {
+                    path: owned_data.to_list_path(),
+                })
+                .and_then(|list| {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
 
-                let OneListPatch {
-                    animation_paths: animations,
-                    events,
-                    adsf_patches,
-                    one_master_patches,
-                    seq_master_patches,
-                    one_mt_behavior_patches,
-                    seq_mt_behavior_patches,
-                    furniture_group_root_indexes,
-                } = match generate_patch(owned_data, list) {
-                    Ok(patches) => patches,
-                    Err(err) => {
-                        reporter.increment();
-                        return Either::Right(vec![Error::from(err)]);
-                    }
-                };
-
-                if owned_data.behavior_entry.is_3rd_person_character() {
-                    let entry = borrowed_patches
-                        .0
-                        .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
-                        .or_default();
-
-                    for (path, patch) in one_mt_behavior_patches {
-                        entry.one.insert(path, patch);
-                    }
-                    for (path, patch) in seq_mt_behavior_patches {
-                        entry.seq.insert(path, patch);
-                    }
+                    generate_patch(owned_data, list, config)
+                        .map_err(|e| Error::FnisPatchGenerationError { source: e })
+                }) {
+                Ok(patches) => Either::Left((owned_data, patches)),
+                Err(err) => {
+                    reporter.increment();
+                    Either::Right(err)
                 }
+            }
+        });
 
-                // Add patches to master.xml
-                {
-                    let master_template_key =
-                        owned_data.behavior_entry.to_master_behavior_template_key();
-
-                    // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
-                    if !behavior_graph_data_map.0.contains_key(&master_template_key) {
-                        behavior_graph_data_map.0.insert(
-                            master_template_key.clone(),
-                            owned_data.behavior_entry.master_behavior_graph_index,
-                        );
-                    }
-
-                    // Push Mod Root behavior to master xml
-                    let entry = borrowed_patches.0.entry(master_template_key).or_default();
-                    {
-                        let (one_gen, one_state_info, seq_state) =
-                            new_injectable_mod_root_behavior(owned_data);
-                        entry.one.insert(one_gen.0, one_gen.1);
-                        entry.one.insert(one_state_info.0, one_state_info.1);
-                        entry.seq.insert(seq_state.0, seq_state.1);
-
-                        if let Err(e) = hkx_convert::convert_behavior(owned_data, config) {
-                            return Either::Right(vec![e]);
-                        };
-                    }
-
-                    // Insert patches for FNIS_*_List.txt
-                    // TODO: If it's strictly for additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
-                    // entry.one.par_extend(one_master_patches);
-                    for (path, patch) in one_master_patches {
-                        entry.one.insert(path, patch);
-                    }
-                    for (path, patch) in seq_master_patches {
-                        entry.seq.insert(path, patch);
-                    }
-
-                    if !events.is_empty() {
-                        let mut events: Vec<_> = events.into_iter().collect();
-                        events.par_sort_unstable();
-                        let patches = new_push_events_seq_patch(
-                            &events,
-                            owned_data.behavior_entry.master_string_data_index,
-                            owned_data.behavior_entry.master_behavior_graph_index,
-                            owned_data.priority,
-                        );
-                        for (path, patch) in patches {
-                            entry.seq.insert(path, patch);
-                        }
-                    }
-                }
-
-                // Push One Mod animations
-                if !animations.is_empty() {
-                    let mut animations: Vec<_> = animations.into_iter().collect();
-                    animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
-
-                    let errors = hkx_convert::convert_animations(&animations, owned_data, config);
-                    if !errors.is_empty() {
-                        reporter.increment();
-                        return Either::Right(errors);
-                    }
-
-                    new_push_anim_seq_patch(
-                        &animations,
-                        owned_data,
-                        owned_data.behavior_entry,
-                        &borrowed_patches,
-                    );
-
-                    // NOTE: Since `events` shares the master file, there's no need to add it.
-                    match owned_data.behavior_entry.behavior_object {
-                        // NOTE: The sync between `defaultmale` and `defaultfemale` must be performed.
-                        "character" => {
-                            new_push_anim_seq_patch(
-                                &animations,
-                                owned_data,
-                                &DEFAULT_FEMALE,
-                                &borrowed_patches,
-                            );
-                        }
-                        // NOTE: Adding animation only to `draugr` will cause `draugrskeleton` to assume the A pose.
-                        //       Therefore, we must add it in the same manner.
-                        "draugr" => {
-                            new_push_anim_seq_patch(
-                                &animations,
-                                owned_data,
-                                &DRAUGR_SKELETON,
-                                &borrowed_patches,
-                            );
-                        }
-                        _ => {}
-                    }
-                };
-
-                reporter.increment();
-                Either::Left((adsf_patches, furniture_group_root_indexes))
-            })
-            .collect();
-
-    let adsf_patches: Vec<_> = adsf_patches.into_par_iter().flatten().collect();
-    let anim_groups_states: Vec<_> = furniture_group_root_indexes
+    let LocalAgg {
+        borrowed_patches,
+        behavior_graph_data_map,
+        adsf_patches,
+        furniture_groups,
+        conversion_jobs,
+    } = patches
         .into_par_iter()
-        .flatten()
-        .collect();
+        .fold(LocalAgg::new, |mut acc, (owned_data, patches)| {
+            let OneListPatch {
+                animation_paths: animations,
+                events,
+                adsf_patches,
+                one_master_patches,
+                seq_master_patches,
+                one_mt_behavior_patches,
+                seq_mt_behavior_patches,
+                furniture_group_root_indexes,
+                mut conversion_jobs,
+            } = patches;
+
+            let borrowed_patches = &mut acc.borrowed_patches;
+            let behavior_graph_data_map = &mut acc.behavior_graph_data_map;
+
+            if owned_data.behavior_entry.is_3rd_person_character() {
+                let entry = borrowed_patches
+                    .0
+                    .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
+                    .or_default();
+
+                for (path, patch) in one_mt_behavior_patches {
+                    entry.one.insert(path, patch);
+                }
+                for (path, patch) in seq_mt_behavior_patches {
+                    entry.seq.insert(path, patch);
+                }
+            }
+
+            // Add patches to master.xml
+            {
+                let master_template_key =
+                    owned_data.behavior_entry.to_master_behavior_template_key();
+
+                // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
+                if !behavior_graph_data_map.0.contains_key(&master_template_key) {
+                    behavior_graph_data_map.0.insert(
+                        master_template_key.clone(),
+                        owned_data.behavior_entry.master_behavior_graph_index,
+                    );
+                }
+
+                // Push Mod Root behavior to master xml
+                let mut entry = borrowed_patches.0.entry(master_template_key).or_default();
+                {
+                    let (one_gen, one_state_info, seq_state) =
+                        new_injectable_mod_root_behavior(owned_data);
+                    entry.one.insert(one_gen.0, one_gen.1);
+                    entry.one.insert(one_state_info.0, one_state_info.1);
+                    entry.seq.insert(seq_state.0, seq_state.1);
+                }
+
+                // Insert patches for FNIS_*_List.txt
+                // additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
+                entry.one.0.par_extend(one_master_patches);
+                for (path, patch) in seq_master_patches {
+                    entry.seq.insert(path, patch);
+                }
+
+                if !events.is_empty() {
+                    let mut events: Vec<_> = events.into_iter().collect();
+                    events.par_sort_unstable();
+                    let patches = new_push_events_seq_patch(
+                        &events,
+                        owned_data.behavior_entry.master_string_data_index,
+                        owned_data.behavior_entry.master_behavior_graph_index,
+                        owned_data.priority,
+                    );
+                    for (path, patch) in patches {
+                        entry.seq.insert(path, patch);
+                    }
+                }
+            }
+
+            // Push One Mod animations
+
+            if let Some(job) = hkx_convert::prepare_behavior_conversion_job(owned_data, config) {
+                conversion_jobs.push(job);
+            }
+            if !animations.is_empty() {
+                let mut animations: Vec<_> = animations.into_iter().collect();
+                animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
+
+                conversion_jobs.par_extend(hkx_convert::prepare_conversion_jobs(
+                    &animations,
+                    owned_data,
+                    config,
+                ));
+
+                new_push_anim_seq_patch(
+                    &animations,
+                    owned_data,
+                    owned_data.behavior_entry,
+                    borrowed_patches,
+                );
+
+                // NOTE: Since `events` shares the master file, there's no need to add it.
+                match owned_data.behavior_entry.behavior_object {
+                    // NOTE: The sync between `defaultmale` and `defaultfemale` must be performed.
+                    "character" => {
+                        new_push_anim_seq_patch(
+                            &animations,
+                            owned_data,
+                            &DEFAULT_FEMALE,
+                            borrowed_patches,
+                        );
+                    }
+                    // NOTE: Adding animation only to `draugr` will cause `draugrskeleton` to assume the A pose.
+                    //       Therefore, we must add it in the same manner.
+                    "draugr" => {
+                        new_push_anim_seq_patch(
+                            &animations,
+                            owned_data,
+                            &DRAUGR_SKELETON,
+                            borrowed_patches,
+                        );
+                    }
+                    _ => {}
+                }
+            };
+
+            reporter.increment();
+
+            acc.adsf_patches.par_extend(adsf_patches);
+            acc.furniture_groups
+                .par_extend(furniture_group_root_indexes);
+            acc.conversion_jobs.par_extend(conversion_jobs);
+            acc
+        })
+        .reduce(LocalAgg::new, |a, b| a.merge(b));
 
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
@@ -224,7 +270,7 @@ pub fn collect_borrowed_patches<'a>(
         .0
         .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
     {
-        let (one, seq) = new_mt_global_patch(anim_groups_states, 0);
+        let (one, seq) = new_mt_global_patch(furniture_groups, 0);
         let mut entry = borrowed_patches
             .0
             .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
@@ -237,13 +283,19 @@ pub fn collect_borrowed_patches<'a>(
         }
     }
 
+    // FIXME?: Unknown causes errors due to mutexes in MO2
+    errors.par_extend(hkx_convert::run_conversion_jobs(
+        conversion_jobs,
+        config.output_target,
+    ));
+
     (
         PatchCollection {
             borrowed_patches,
             behavior_graph_data_map,
         },
         adsf_patches,
-        errors.into_par_iter().flatten().collect(),
+        errors,
     )
 }
 

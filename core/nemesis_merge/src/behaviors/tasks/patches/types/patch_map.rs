@@ -11,6 +11,7 @@
 
 use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
+use rayon::prelude::*;
 
 /// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
 ///
@@ -33,10 +34,16 @@ pub struct HkxPatchMaps<'a> {
     pub seq: SeqPatchMap<'a>,
 }
 
-impl HkxPatchMaps<'_> {
+impl<'a> HkxPatchMaps<'a> {
     #[inline]
     pub fn len(&self) -> usize {
         self.one.0.len() + self.seq.0.len()
+    }
+
+    #[inline]
+    pub(crate) fn merge(&self, other: Self) {
+        self.one.merge(other.one);
+        self.seq.merge(other.seq);
     }
 }
 
@@ -77,6 +84,23 @@ impl<'a> OnePatchMap<'a> {
             self.0.insert(key, new_value);
         }
     }
+
+    /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
+    pub(crate) fn merge(&self, other: Self) {
+        for (path, new_val) in other.0 {
+            match self.0.entry(path) {
+                dashmap::Entry::Occupied(mut occ) => {
+                    let existing = occ.get_mut();
+                    if new_val.priority > existing.priority {
+                        *existing = new_val;
+                    }
+                }
+                dashmap::Entry::Vacant(v) => {
+                    v.insert(new_val);
+                }
+            }
+        }
+    }
 }
 
 /// A map that stores **multiple** values per JSON path,
@@ -103,6 +127,20 @@ impl<'a> SeqPatchMap<'a> {
             }
             dashmap::Entry::Vacant(v) => {
                 v.insert(vec![new_value]);
+            }
+        }
+    }
+
+    /// Extends the list of values for the given JSON path.
+    pub fn merge(&self, other: Self) {
+        for (path, other_vals) in other.0 {
+            match self.0.entry(path) {
+                dashmap::Entry::Occupied(mut occ) => {
+                    occ.get_mut().par_extend(other_vals);
+                }
+                dashmap::Entry::Vacant(v) => {
+                    v.insert(other_vals);
+                }
             }
         }
     }

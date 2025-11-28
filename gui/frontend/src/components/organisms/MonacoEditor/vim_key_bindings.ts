@@ -1,5 +1,4 @@
-import type MonacoVim from 'monaco-vim';
-import type { Vim } from 'monaco-vim';
+import { initVimMode, type Vim, VimMode } from 'monaco-vim';
 import type { MonacoEditor, VimModeRef, VimStatusRef } from './MonacoEditor';
 
 /**
@@ -60,24 +59,14 @@ const setCustomVimKeyConfig = (editor: MonacoEditor, vim: Vim) => {
   vim.defineEx('hover', 'hover', async () => {
     await hover(editor);
   });
-  vim.map('K', ':hover', 'normal');
+  vim.map('K', ':hover', 'normal'); // FIXME: For some reason, it doesn't work.
 };
 
 type VimKeyLoader = (props: { editor: MonacoEditor; vimModeRef: VimModeRef; vimStatusRef: VimStatusRef }) => void;
 export const loadVimKeyBindings: VimKeyLoader = ({ editor, vimModeRef, vimStatusRef }) => {
-  // @ts-ignore
-  window.require.config({
-    paths: {
-      'monaco-vim': 'https://unpkg.com/monaco-vim/dist/monaco-vim',
-    },
-  });
-  // @ts-ignore
-  window.require(['monaco-vim'], (monacoVim: typeof MonacoVim) => {
-    const { Vim } = monacoVim.VimMode;
-    setCustomVimKeyConfig(editor, Vim);
-
-    if (vimStatusRef.current) {
-      vimModeRef.current = monacoVim.initVimMode(editor, vimStatusRef.current);
-    }
-  });
+  if (vimStatusRef.current) {
+    const vim = initVimMode(editor, vimStatusRef.current);
+    vimModeRef.current = vim;
+    setCustomVimKeyConfig(editor, VimMode.Vim);
+  }
 };
