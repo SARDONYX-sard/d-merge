@@ -157,9 +157,14 @@ impl App for ModManagerApp {
         self.ui_skyrim_dir(ctx);
         self.ui_output_dir(ctx);
         self.ui_search_panel(ctx);
-        self.ui_mod_list(ctx);
+
         self.ui_notification(ctx);
+        // NOTE: TopBottomPanel must be added before any other panels.
+        // The first added panel becomes the outermost (front-most), and the last
+        // becomes the innermost. Central panels must always be added last.
+        // See: https://docs.rs/flatbox/0.1.0/flatbox/egui/struct.TopBottomPanel.html
         self.ui_bottom_panel(ctx);
+        self.ui_mod_list(ctx);
         self.ui_log_window(ctx);
 
         self.is_first_render = false;
