@@ -66,7 +66,7 @@ pub struct PatchCollection<'a> {
 #[derive(Debug, Default, Clone)]
 pub(crate) struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
-impl BehaviorPatchesMap<'_> {
+impl<'a> BehaviorPatchesMap<'a> {
     pub(crate) fn len(&self) -> usize {
         use rayon::prelude::*;
         self.0
@@ -76,6 +76,19 @@ impl BehaviorPatchesMap<'_> {
                 one.0.len() + seq.0.len()
             })
             .sum()
+    }
+
+    pub(crate) fn merge(&self, other: Self) {
+        for (key, other_maps) in other.0 {
+            match self.0.entry(key) {
+                dashmap::Entry::Vacant(v) => {
+                    v.insert(other_maps);
+                }
+                dashmap::Entry::Occupied(mut occ) => {
+                    occ.get_mut().merge(other_maps);
+                }
+            }
+        }
     }
 }
 

@@ -20,11 +20,6 @@ pub struct ConversionJob {
     /// Path to the target converted HKX file
     pub output_path: PathBuf,
 
-    /// Do we need to copy to output_path even without conversion?
-    ///
-    /// This is required for FNIS AltAnim to OAR and should be set to true.
-    pub need_copy: bool,
-
     /// Is this job optional? If true, missing input files will be skipped without error.
     ///
     /// This is required for FNIS AltAnim to OAR and should be set to true.
@@ -63,7 +58,6 @@ pub fn prepare_conversion_jobs(
             AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                need_copy: false,
                 is_optional: false,
             })
         })
@@ -82,7 +76,6 @@ pub fn prepare_behavior_conversion_job(
             Some(AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                need_copy: false,
                 is_optional: false,
             }))
         }
@@ -94,53 +87,27 @@ pub fn prepare_behavior_conversion_job(
     }
 }
 
-/// Run the HKX conversion jobs in parallel.
-///
-/// Checks each file header first; skips files already matching the target format.
-/// Returns all errors encountered during conversion.
-///
-/// # Returns Errors
-/// Returns a collection of errors if any file:
-/// - Cannot be read (I/O errors),
-/// - Has invalid HKX magic numbers,
-/// - Has a pointer size that cannot be determined.
-#[must_use]
-pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
-    jobs.par_iter()
-        .filter_map(|job| match job {
-            AnimIoJob::Hkx(conversion_job) => convert_hkx(conversion_job, output_target).err(),
-            AnimIoJob::Config(alt_anim_config_job) => write_file(
-                &alt_anim_config_job.output_path,
-                alt_anim_config_job.config.as_bytes(),
-                output_target,
-            )
-            .err(),
-        })
-        .collect()
-}
-
 /// Check the HKX file header to determine its format.
 ///
 /// # Note
 /// use IO operations internally; avoid calling this function within `rayon::par_iter` directly.
 fn check_hkx_header(
+    bytes: &[u8],
     input_path: &Path,
     output_format: crate::OutPutTarget,
 ) -> Result<crate::OutPutTarget, Error> {
-    let header = match std::fs::File::open(input_path).and_then(|mut f| {
-        use std::io::Read;
-        let mut buf = [0_u8; 17];
-        f.read_exact(&mut buf)?;
-        Ok(buf)
-    }) {
-        Ok(header) => header,
-        Err(e) => {
-            return Err(Error::FNISHkxIoError {
-                path: input_path.to_path_buf(),
-                target: output_format,
-                source: e,
-            })
-        }
+    if bytes.len() < 17 {
+        return Err(Error::FNISHkxInvalidHeader {
+            input_path: PathBuf::new(),
+            target: output_format,
+            actual: bytes.len() as u8,
+        });
+    }
+
+    let header = {
+        let mut header = [0_u8; 17];
+        header.copy_from_slice(&bytes[0..17]);
+        header
     };
 
     // Actually, both LE and SE versions of hkt can be loaded, and there are mods disguised as hkx files. Example: Ride Sharing's `rsh_horsepinion.hkx`
@@ -196,83 +163,6 @@ fn check_hkx_header(
     Ok(current_format)
 }
 
-fn convert_hkx(job: &ConversionJob, output_target: OutPutTarget) -> Result<(), Error> {
-    use serde_hkx::bytes::serde::hkx_header::HkxHeader;
-    use serde_hkx_features::ClassMap;
-    use std::borrow::Cow;
-
-    let ConversionJob {
-        input_path,
-        output_path,
-        need_copy,
-        is_optional,
-    } = job;
-
-    // NOTE: Exists sometimes misjudges virtualization as unstable for `rayon::par_iter` in MO2.
-    let actual_input: Cow<Path> = if input_path.exists() {
-        Cow::Borrowed(input_path)
-    } else if let Some(found) = find_case_insensitive(input_path) {
-        Cow::Owned(found)
-    } else if *is_optional {
-        #[cfg(feature = "tracing")]
-        tracing::info!(
-            "FNIS alternative animation input_path file '{}' not found. Then Skipped.",
-            input_path.display()
-        );
-        return Ok(());
-    } else {
-        return Err(Error::FNISHkxIoError {
-            path: input_path.clone(),
-            target: output_target,
-            source: std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
-        });
-    };
-
-    let current_format = check_hkx_header(&actual_input, output_target)?;
-    if current_format == output_target {
-        if *need_copy {
-            if let Some(parent) = output_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
-                    path: parent.to_path_buf(),
-                    target: output_target,
-                    source: e,
-                })?;
-            }
-            std::fs::copy(&actual_input, output_path).map_err(|e| Error::FNISHkxIoError {
-                path: actual_input.to_path_buf(),
-                target: output_target,
-                source: e,
-            })?;
-        }
-        return Ok(());
-    }
-
-    // start conversion code ---
-
-    let bytes = std::fs::read(&actual_input).map_err(|e| Error::FNISHkxIoError {
-        path: actual_input.to_path_buf(),
-        target: output_target,
-        source: e,
-    })?;
-
-    let class_map: ClassMap = serde_hkx::from_bytes(&bytes).map_err(|e| Error::HkxDeError {
-        path: actual_input.to_path_buf(),
-        source: e,
-    })?;
-
-    let header = match output_target {
-        crate::OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
-        crate::OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
-    };
-
-    let bytes = serde_hkx::to_bytes(&class_map, &header).map_err(|e| Error::HkxSerError {
-        path: actual_input.to_path_buf(),
-        source: e,
-    })?;
-
-    write_file(output_path, &bytes, output_target)
-}
-
 /// This is necessary because Unix systems are case-sensitive.
 fn find_case_insensitive(path: &Path) -> Option<PathBuf> {
     let parent = path.parent()?;
@@ -302,5 +192,137 @@ fn write_file(output_path: &Path, bytes: &[u8], output_format: OutPutTarget) -> 
         target: output_format,
         source: e,
     })?;
+    Ok(())
+}
+
+struct ConversionBytes {
+    pub input_path: PathBuf,
+    pub output_path: PathBuf,
+    pub bytes: Vec<u8>,
+}
+
+/// Run the HKX conversion jobs in parallel.
+///
+/// Checks each file header first; skips files already matching the target format.
+/// Returns all errors encountered during conversion.
+///
+/// # Returns Errors
+/// Returns a collection of errors if any file:
+/// - Cannot be read (I/O errors),
+/// - Has invalid HKX magic numbers,
+/// - Has a pointer size that cannot be determined.
+#[must_use]
+pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
+    // separate hkx / cofig
+    let (hkx_jobs, config_jobs): (Vec<_>, Vec<_>) =
+        jobs.into_par_iter().partition_map(|job| match job {
+            AnimIoJob::Hkx(hkx_job) => rayon::iter::Either::Left(hkx_job),
+            AnimIoJob::Config(cfg_job) => rayon::iter::Either::Right(cfg_job),
+        });
+
+    // --- Stage 1: Read all files in parallel ---
+    let read_results: Vec<Result<ConversionBytes, Error>> = hkx_jobs
+        .into_par_iter()
+        .filter_map(|job| read_hkx_bytes(job, output_target))
+        .collect();
+
+    // --- Stage 2: Convert all in-memory ---
+    let (converted_results, mut errors): (Vec<ConversionBytes>, Vec<Error>) =
+        read_results.into_par_iter().partition_map(|res| match res {
+            Ok(mut bytes_struct) => match convert_hkx_bytes(
+                &bytes_struct.input_path,
+                &mut bytes_struct.bytes,
+                output_target,
+            ) {
+                Ok(()) => rayon::iter::Either::Left(bytes_struct),
+                Err(e) => rayon::iter::Either::Right(e),
+            },
+            Err(e) => rayon::iter::Either::Right(e),
+        });
+
+    // --- Stage 3: Write all files in parallel ---
+    errors.par_extend(config_jobs.into_par_iter().filter_map(|res| {
+        write_file(&res.output_path, res.config.as_bytes(), output_target).err()
+    }));
+    errors.par_extend(
+        converted_results
+            .into_par_iter()
+            .filter_map(|res| write_file(&res.output_path, &res.bytes, output_target).err()),
+    );
+
+    errors
+}
+
+fn read_hkx_bytes(
+    job: ConversionJob,
+    output_target: OutPutTarget,
+) -> Option<Result<ConversionBytes, Error>> {
+    use std::borrow::Cow;
+
+    let actual_input = if job.input_path.exists() {
+        Cow::Borrowed(&job.input_path)
+    } else if let Some(found) = find_case_insensitive(&job.input_path) {
+        Cow::Owned(found)
+    } else if job.is_optional {
+        return None;
+    } else {
+        return Some(Err(Error::FNISHkxIoError {
+            path: job.input_path.clone(),
+            target: output_target,
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
+        }));
+    };
+
+    let bytes = match std::fs::read(actual_input.as_ref()) {
+        Ok(b) => b,
+        Err(e) => {
+            return Some(Err(Error::FNISHkxIoError {
+                path: actual_input.to_path_buf(),
+                target: output_target,
+                source: e,
+            }));
+        }
+    };
+
+    Some(Ok(ConversionBytes {
+        input_path: actual_input.into_owned(),
+        output_path: job.output_path.clone(),
+        bytes,
+    }))
+}
+
+fn convert_hkx_bytes(
+    input_path: &Path,
+    bytes: &mut Vec<u8>,
+    output_target: OutPutTarget,
+) -> Result<(), Error> {
+    use serde_hkx::bytes::serde::hkx_header::HkxHeader;
+    use serde_hkx_features::ClassMap;
+
+    if bytes.is_empty() {
+        // Optional skipped file
+        return Ok(());
+    }
+
+    let current_format = check_hkx_header(bytes, input_path, output_target)?;
+    if current_format == output_target {
+        return Ok(()); // no conversion needed
+    }
+
+    let class_map: ClassMap = serde_hkx::from_bytes(bytes).map_err(|e| Error::HkxDeError {
+        path: input_path.to_path_buf(),
+        source: e,
+    })?;
+
+    let header = match output_target {
+        OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
+        OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
+    };
+
+    *bytes = serde_hkx::to_bytes(&class_map, &header).map_err(|e| Error::HkxSerError {
+        path: input_path.to_path_buf(),
+        source: e,
+    })?;
+
     Ok(())
 }

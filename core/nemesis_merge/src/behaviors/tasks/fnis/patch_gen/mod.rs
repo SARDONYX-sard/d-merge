@@ -41,10 +41,38 @@ pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGener
 
 pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
-struct ModProcessingResult<'a> {
+struct LocalAgg<'a> {
+    borrowed_patches: BehaviorPatchesMap<'a>,
+    behavior_graph_data_map: BehaviorGraphDataMap<'a>,
+
     adsf_patches: Vec<AdsfPatch<'a>>,
     furniture_groups: Vec<String>,
     conversion_jobs: Vec<AnimIoJob>,
+}
+
+impl<'a> LocalAgg<'a> {
+    fn new() -> Self {
+        Self {
+            borrowed_patches: BehaviorPatchesMap::default(),
+            behavior_graph_data_map: BehaviorGraphDataMap::new(),
+            adsf_patches: Vec::new(),
+            furniture_groups: Vec::new(),
+            conversion_jobs: Vec::new(),
+        }
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        self.borrowed_patches.merge(other.borrowed_patches);
+
+        self.behavior_graph_data_map
+            .0
+            .par_extend(other.behavior_graph_data_map.0);
+        self.adsf_patches.par_extend(other.adsf_patches);
+        self.furniture_groups.par_extend(other.furniture_groups);
+        self.conversion_jobs.par_extend(other.conversion_jobs);
+
+        self
+    }
 }
 
 /// Collect borrowed patches from multiple FNIS One Mods.
@@ -57,33 +85,44 @@ pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
 ) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
-    let borrowed_patches = BehaviorPatchesMap::default();
-    let behavior_graph_data_map = BehaviorGraphDataMap::new();
-
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::GeneratingFnisPatches,
         mods_patches.len(),
     );
 
-    let (successes, errors): (Vec<ModProcessingResult<'a>>, Vec<_>) = mods_patches
-        .par_iter()
-        .map(|owned_data| {
-            let list = match parse_fnis_list
+    let (patches, mut errors): (Vec<_>, Vec<_>) =
+        mods_patches.par_iter().partition_map(|owned_data| {
+            match parse_fnis_list
                 .parse(&owned_data.list_content)
                 .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
                 .with_context(|_| FailedParseFnisModListSnafu {
                     path: owned_data.to_list_path(),
+                })
+                .and_then(|list| {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
+
+                    generate_patch(owned_data, list, config)
+                        .map_err(|e| Error::FnisPatchGenerationError { source: e })
                 }) {
-                Ok(list) => list,
+                Ok(patches) => Either::Left((owned_data, patches)),
                 Err(err) => {
                     reporter.increment();
-                    return Either::Right(vec![err]);
+                    Either::Right(err)
                 }
-            };
-            #[cfg(feature = "tracing")]
-            tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
+            }
+        });
 
+    let LocalAgg {
+        borrowed_patches,
+        behavior_graph_data_map,
+        adsf_patches,
+        furniture_groups,
+        conversion_jobs,
+    } = patches
+        .into_par_iter()
+        .fold(LocalAgg::new, |mut acc, (owned_data, patches)| {
             let OneListPatch {
                 animation_paths: animations,
                 events,
@@ -94,18 +133,10 @@ pub fn collect_borrowed_patches<'a>(
                 seq_mt_behavior_patches,
                 furniture_group_root_indexes,
                 mut conversion_jobs,
-            } = match generate_patch(owned_data, list, config) {
-                Ok(patches) => patches,
-                Err(err) => {
-                    reporter.increment();
-                    match err {
-                        FnisPatchGenerationError::FailedToConvertAltAnimToOAR { errors } => {
-                            return Either::Right(errors);
-                        }
-                        _ => return Either::Right(vec![Error::from(err)]),
-                    }
-                }
-            };
+            } = patches;
+
+            let borrowed_patches = &mut acc.borrowed_patches;
+            let behavior_graph_data_map = &mut acc.behavior_graph_data_map;
 
             if owned_data.behavior_entry.is_3rd_person_character() {
                 let entry = borrowed_patches
@@ -185,7 +216,7 @@ pub fn collect_borrowed_patches<'a>(
                     &animations,
                     owned_data,
                     owned_data.behavior_entry,
-                    &borrowed_patches,
+                    borrowed_patches,
                 );
 
                 // NOTE: Since `events` shares the master file, there's no need to add it.
@@ -196,7 +227,7 @@ pub fn collect_borrowed_patches<'a>(
                             &animations,
                             owned_data,
                             &DEFAULT_FEMALE,
-                            &borrowed_patches,
+                            borrowed_patches,
                         );
                     }
                     // NOTE: Adding animation only to `draugr` will cause `draugrskeleton` to assume the A pose.
@@ -206,7 +237,7 @@ pub fn collect_borrowed_patches<'a>(
                             &animations,
                             owned_data,
                             &DRAUGR_SKELETON,
-                            &borrowed_patches,
+                            borrowed_patches,
                         );
                     }
                     _ => {}
@@ -215,38 +246,13 @@ pub fn collect_borrowed_patches<'a>(
 
             reporter.increment();
 
-            Either::Left(ModProcessingResult {
-                adsf_patches,
-                furniture_groups: furniture_group_root_indexes,
-                conversion_jobs,
-            })
+            acc.adsf_patches.par_extend(adsf_patches);
+            acc.furniture_groups
+                .par_extend(furniture_group_root_indexes);
+            acc.conversion_jobs.par_extend(conversion_jobs);
+            acc
         })
-        .collect();
-
-    let (adsf_patches, anim_groups_states, conversion_jobs) = successes
-        .into_par_iter()
-        .map(|res| (res.adsf_patches, res.furniture_groups, res.conversion_jobs))
-        .reduce(
-            || (Vec::new(), Vec::new(), Vec::new()),
-            |(mut adsf1, mut furn1, mut jobs1), (adsf2, furn2, jobs2)| {
-                adsf1.par_extend(adsf2);
-                furn1.par_extend(furn2);
-                jobs1.par_extend(jobs2);
-                (adsf1, furn1, jobs1)
-            },
-        );
-
-    let mut errors: Vec<Error> = errors.into_par_iter().flatten().collect();
-
-    // FIXME?: Unknown causes errors due to mutexes in MO2
-    rayon::scope(|s| {
-        s.spawn(|_| {
-            errors.par_extend(hkx_convert::run_conversion_jobs(
-                conversion_jobs,
-                config.output_target,
-            ));
-        });
-    });
+        .reduce(LocalAgg::new, |a, b| a.merge(b));
 
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
@@ -264,7 +270,7 @@ pub fn collect_borrowed_patches<'a>(
         .0
         .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
     {
-        let (one, seq) = new_mt_global_patch(anim_groups_states, 0);
+        let (one, seq) = new_mt_global_patch(furniture_groups, 0);
         let mut entry = borrowed_patches
             .0
             .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
@@ -276,6 +282,12 @@ pub fn collect_borrowed_patches<'a>(
             entry.seq.insert(path, patch);
         }
     }
+
+    // FIXME?: Unknown causes errors due to mutexes in MO2
+    errors.par_extend(hkx_convert::run_conversion_jobs(
+        conversion_jobs,
+        config.output_target,
+    ));
 
     (
         PatchCollection {
