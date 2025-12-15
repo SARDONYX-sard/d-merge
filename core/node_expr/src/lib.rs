@@ -16,7 +16,7 @@ pub struct DirEntry {
     pub name: String,
     /// The sub-entries contained within this directory, if applicable.
     /// This will be `None` if the entry is a file.
-    pub children: Option<Vec<DirEntry>>,
+    pub children: Option<Vec<Self>>,
 }
 
 /// Creates a hierarchical structure representing the contents of a directory,
