@@ -64,40 +64,72 @@ SkyrimSE
 
 - Nemesis patch with DLL dependencies. This likely won't run in LE.
 
-| Status | Mod Name                           | Version | Note                                               |
-| ------ | ---------------------------------- | ------- | -------------------------------------------------- |
-| ✅     | ADXP MCO 1.6.0.6 Bug Fixes         | 2.0.6   |                                                    |
-| ✅     | Animated Interactions              | 1.7.3   |                                                    |
-| ✅     | Attack - MCO_DXP -SE               | 1.6.06  | Using MCO Universal Support                        |
-| ✅     | DMCO_stable                        | 0.9.6   | AE requires separate DLL overwrites and additions. |
-| ✅     | Elden Counter MCO-ADXP             | 1.6     | With dTry Plugin Updates                           |
-| ✅     | ModernStaggerLock SE/AE            | 1.7     |                                                    |
-| ✅     | NPC Block Loop Fix                 | 1.0     |                                                    |
-| ✅     | Paraglider -SE                     | 1.5     | Test using NG dll                                  |
-| ✅     | Payload Interpreter                | 1.1     |                                                    |
-| ✅     | POISE - Stagger Overhaul SE        | 1.02    |                                                    |
-| ✅     | Poisebreaker -SE                   | 0.7     |                                                    |
-| ✅     | Precision                          | 2.0.4   |                                                    |
-| ✅     | Precision Creatures                | 2.4     | Need `Precision Creatures d_merge_patch`           |
-| ✅     | Project Impact SE                  | 2.72    |                                                    |
-| ✅     | SCAR - Skyrim Combos AI Revolution | 1.06b   | With SCAR AE Support(v1.6.1)                       |
-| ✅     | True Directional Movement -SE, AE  | 2.2.5   |                                                    |
+| Status | Mod Name                            | Version          | Note                                               |
+| ------ | ----------------------------------- | ---------------- | -------------------------------------------------- |
+| ✅     | ADXP MCO 1.6.0.6 Bug Fixes          | 2.0.6            |                                                    |
+| ✅     | Animated Interactions               | 1.7.3            |                                                    |
+| ✅     | Attack - MCO_DXP -SE                | 1.6.06           | Using MCO Universal Support                        |
+| ✅     | DMCO_stable                         | 0.9.6            | AE requires separate DLL overwrites and additions. |
+| ✅     | Elden Counter MCO-ADXP              | 1.6              | With dTry Plugin Updates                           |
+| ✅     | ModernStaggerLock SE/AE             | 1.7              |                                                    |
+| ✅     | NPC Block Loop Fix                  | 1.0              |                                                    |
+| ✅     | Paraglider -SE                      | 1.5              | Test using NG dll                                  |
+| ✅     | Payload Interpreter                 | 1.1              |                                                    |
+| ✅     | POISE - Stagger Overhaul SE         | 1.02             |                                                    |
+| ✅     | Poisebreaker -SE                    | 0.7              |                                                    |
+| ✅     | Precision                           | 2.0.4            |                                                    |
+| ✅     | Precision Creatures                 | 2.4              | Need `Precision Creatures d_merge_patch`           |
+| ✅     | Project Impact SE                   | 2.72             |                                                    |
+| ✅     | SCAR - Skyrim Combos AI Revolution  | 1.06b            | With SCAR AE Support(v1.6.1)                       |
+| ✅     | True Directional Movement -SE, AE   | 2.2.5            |                                                    |
+| ✅     | TkDodgeUltimateCombat Nemesis patch | Nemesis0.84-beta |                                                    |
+
+### Notes
+
+- **TkDodgeUltimateCombat Nemesis patch**
+  - Tested with TK Dodge SE (v3.18) + TK Dodge RE (v0.55-rc3)
+  - Causes continuous MCO GreatSword combo when pressing left stick
+  - Likely conflicts with sprint key
 
 ## FNIS
 
-| Status | Mod Name                                  | Version | Note                                                                               |
-| ------ | ----------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa:                                                                               |
-| ✅     | Flying Mod 2.0s                           | 1.1     | b:                                                                                 |
-| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+: Animation is possible. Movement is completely impossible. (Cause unknown)   |
-| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b: We need to convert hkx to SE (otherwise it'll be an A pose).                    |
-| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa:                                                                             |
-| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b: We need to convert hkx to SE (otherwise it'll be an A pose).                    |
-| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km: The animation played correctly, but the actual kill move has not been tested.  |
-| ✅     | Ride Sharing SE                           | 0.4b    | b:                                                                                 |
-| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix: The AltAnim syntax is not yet supported. (Planned for conversion to OAR) |
+- (LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.
 
-XP32 Maximum Skeleton Special Extended works as long as the skeleton bones are installed, so you only need to enable it in MO2.
-You don't need to check it in D Merge.
+| Status | Mod Name                                  | Version | Used syntax |
+| ------ | ----------------------------------------- | ------- | ----------- |
+| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
+| ✅     | Flying Mod 2.0s                           | 1.1     | b           |
+| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
+| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b           |
+| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa       |
+| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
+| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
+| ✅     | Ride Sharing SE                           | 0.4b    | b           |
+| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
 
-FNIS is only required for the optional alternate animation features (e.g., changing weapon placement via MCM), not for the skeleton itself.
+Tag Legend
+
+- **b** : Basic animation
+- **s** : Sequenced animation
+- **+**: Sequenced continuous
+- **ofa** : Offset Arm animation
+- **fu/fuo** : Furniture animation
+- **pa** : Paired animation
+- **km** : KillMove animation
+- **ch** : Chair animation
+- **AAPrefix** : AltAnim syntax(Not supported yet)
+
+### Detailed Notes
+
+- **FNIS Flyer SE**
+  - Animation is possible
+  - Movement is completely impossible
+  - Cause unknown
+
+- **Low-blow human-human killmoves**
+  - Animation plays correctly
+  - Actual killmove behavior not fully tested
+
+- **XP32 Maximum Skeleton Special Extended**
+  - AltAnim syntax not supported
+  - Planned for conversion to OAR

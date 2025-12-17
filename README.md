@@ -116,15 +116,14 @@ D:/MO2/mods/
     - [x] Version
     - [x] Triggers
     - [x] Conditions
-    - [ ] Attacks(Add only. TODO: Remove/Replace)
-    - [x] AnimInfos
+    - [x] Attacks
+    - [x] AnimInfos(Only the directory and file name support the `$crc32[some/path]` macro syntax.)
 
 - hkx templates
   - [x] Change xml to message_pack bin.
 
 - Nemesis Patch
-  - [x] Basic parallel merge.
-  - [x] Fix unknown merge race condition(The cause was a deadlock in applying patches.)
+  - [x] Parallel merge.
 
 - FNIS Patch
 
