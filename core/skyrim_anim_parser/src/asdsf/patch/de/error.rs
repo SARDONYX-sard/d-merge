@@ -1,58 +1,25 @@
-//! errors of `patch de`
+//! errors of `This crate`
 
-/// Patch deserializer error
+/// GUI Error
 #[derive(Debug, snafu::Snafu)]
+#[snafu(visibility(pub))]
 pub enum Error {
-    /// Mismatched type. Expected one, but got array patch
-    InvalidOpForOneField { op: json_patch::Op },
-
-    /// Mismatched type. Expected transitions/rotation, but got one replacer type.
-    ExpectedArray,
-
-    /// Mismatched type. Expected Trigger(`Str`), but got other type
-    ExpectedTrigger,
-
-    /// The only thing that can be arranged in a double array is attacks. (This is a bug in the implementation.)
-    InvalidSubRangeUsage,
-
-    /// Mismatched type. Expected 1 field of `struct Condition`, but got other one field patch: {other}
-    ExpectedOneFieldOfCondition { other: String },
-
-    /// Mismatched type. Expected 1 field of `struct AnimInfo`, but got other one field patch: {other}
-    ExpectedOneFieldOfAnimInfo { other: String },
-
-    /// It should be a patch that requires range, but for some reason the information was missing.
-    NeedMainRangeInformation,
-
-    /// Iterator end. The following parsing target is required but could not be found.
-    EndOfLineKind,
-
-    /// Diff patch need `<! -- MODE_CODE ~<id>~ OPEN`. but not found.
-    NeedInModDiff,
-
-    /// `<! -- MODE_CODE ~<id>~ OPEN` and `<! -- CLOSE -->` should be a pair,
-    /// but before the `CLOSE` comment comes `<! -- MODE_CODE ~<id>~ OPEN` has come twice.
-    AlreadyPatchMode,
-
-    /// Incomplete animationdatasinglefile.txt patch
-    IncompleteParse,
-
     // NOTE: Cannot `#snafu(transparent)`
     /// Parser combinator Error: {err}
-    Context {
+    ContextError {
         err: winnow::error::ErrMode<winnow::error::ContextError>,
     },
 
-    /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.
-    NotFoundApplyTarget { kind: String },
-
     /// Human readable XML parsing error
     #[snafu(transparent)]
-    Readable {
+    ReadableError {
         source: serde_hkx::errors::readable::ReadableError,
     },
 
     //////////////////////////////////////////////////////////////////////
+    /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.
+    NotFoundApplyTarget { kind: String },
+
     // merge
     #[snafu(transparent)]
     SimdJson {
@@ -63,5 +30,5 @@ pub enum Error {
     JsonPatch { source: json_patch::JsonPatchError },
 }
 
-/// Result type alias for AnimSetData patch error.
+/// `Result` for this crate.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

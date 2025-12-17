@@ -6,6 +6,55 @@ pub struct AltGroup {
     pub animations: &'static [&'static str],
 }
 
+#[allow(unused)] // TODO: use & Support FNIS Alternate anim patch
+/// # FNIS Alternate Animation – Execution Model
+///
+/// ## Original behavior graph
+///
+/// ```text
+/// State
+///   -> hkbClipGenerator
+///      -> Play animation
+/// ```
+///
+/// ## After applying FNIS Alternate Animation
+///
+/// ```text
+/// State
+///   -> hkbManualSelectorGenerator
+///        (selector index driven by FNISaa_* variable)
+///      -> generators[0] -> hkbClipGenerator (base animation)
+///      -> generators[1] -> hkbClipGenerator (alternate animation)
+///      -> generators[n] -> hkbClipGenerator (additional alternates)
+/// ```
+///
+/// ## Runtime selection flow
+///
+/// ```text
+/// FNISaa_* variable value
+///   -> selectedGeneratorIndex
+///      -> generators[selectedGeneratorIndex]
+///         -> Play corresponding animation
+/// ```
+///
+/// ## Technical summary
+///
+/// FNIS Alternate Animation works by replacing an existing
+/// `hkbClipGenerator` with an `hkbManualSelectorGenerator`, and
+/// inserting multiple `hkbClipGenerator` instances into the
+/// selector's `generators` array.
+/// The animation played at runtime is selected by a behavior
+/// variable (`FNISaa_*`) bound to `selectedGeneratorIndex`.
+#[derive(Debug)]
+pub struct ReplaceTarget {
+    /// 0_master `hkbClipGenerator` index. e.g., `#0189`
+    pub clip_gen_index: &'static str,
+    /// e.g., `"male/mt_idle.hkx"`
+    ///
+    /// -> `meshes/actors/character/animations` + animations_path
+    pub animation_path: &'static str,
+}
+
 pub static ALT_GROUPS: phf::Map<&'static str, AltGroup> = phf::phf_map! {
     "_mtidle" => AltGroup {
         id: 0,

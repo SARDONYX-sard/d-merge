@@ -14,10 +14,9 @@ rust-version.workspace = true
 
 [dependencies]
 bitvec = "1.0.1"
-dashmap = { workspace = true, features = ["rayon"], optional = true }
 indexmap = { workspace = true }
 rayon = { workspace = true }
-serde = { workspace = true, optional = true }                         # Implement (De)Serializer
+serde = { workspace = true, optional = true }   # Implement (De)Serializer
 serde_hkx = { workspace = true }
 simd-json = { workspace = true }
 snafu = { workspace = true }
@@ -26,6 +25,7 @@ winnow = { workspace = true }
 
 # workspace members
 json_patch = { workspace = true, features = ["rayon"] }
+skyrim_crc = { workspace = true }
 
 [dev-dependencies]
 diff = { workspace = true }
@@ -42,7 +42,7 @@ default = ["alt_map"]
 # default = ["tracing", "alt_map"] # for debug
 
 # alternative to adsf indexmap
-alt_map = ["serde", "bitvec/serde", "dep:dashmap"]
+alt_map = ["serde", "bitvec/serde"]
 
 serde = ["dep:serde", "json_patch/serde", "indexmap/serde"]
 

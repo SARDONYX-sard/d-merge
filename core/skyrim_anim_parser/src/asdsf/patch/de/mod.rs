@@ -1,6 +1,8 @@
-mod current_state;
 pub mod deserializer;
-mod diff;
+pub mod diff;
 pub mod error;
+
+mod line_parsers;
+mod raw_diff;
 
 pub use diff::*;

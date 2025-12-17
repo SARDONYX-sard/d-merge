@@ -1,64 +1,110 @@
-use crate::asdsf::normal::{AnimInfo, Condition};
-use crate::asdsf::patch::de::error::{Error, Result};
-use crate::asdsf::patch::de::{
-    current_state::{CurrentState, FieldKind, ParserKind},
-    DiffPatchAnimSetData,
-};
-use crate::asdsf::patch::de::{AnimInfoDiff, ConditionDiff};
-use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
-use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line, verify_line_parses_to};
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
+use super::error::{Error, Result};
+use super::line_parsers::{take_raw_diff, version_v3};
+use crate::asdsf::patch::de::raw_diff::{Op, RawDiff};
+use crate::asdsf::patch::de::DiffPatchAnimSetData;
+use crate::common_parser::comment::close_comment_line;
+use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line};
+
+use json_patch::{JsonPath, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
+use simd_json::borrowed::Object;
+use simd_json::BorrowedValue;
+use std::collections::HashMap;
+use winnow::combinator::opt;
 use winnow::{
     ascii::multispace0,
-    combinator::{eof, opt},
-    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    combinator::alt,
+    error::{ContextError, ErrMode},
     Parser,
 };
 
-/// Parse animationsetdatasinglefile.txt patch.
+pub type PatchesMap<'a> = HashMap<JsonPath<'a>, ValueWithPriority<'a>>;
+
+/// Parse `animationsetdatasinglefile.txt` patch.
 ///
 /// # Errors
 /// Parse failed.
 pub fn parse_anim_set_diff_patch(
-    input: &str,
+    asdsf_patch: &str,
     priority: usize,
-) -> Result<DiffPatchAnimSetData<'_>, Error> {
-    let mut deserializer = Deserializer::new(input, priority);
-    deserializer
-        .root()
-        .map_err(|err| deserializer.to_readable_err(err))?;
-    Ok(deserializer.output_patches)
+) -> Result<DiffPatchAnimSetData<'_>> {
+    let mut patcher_de = PatchDeserializer::new(asdsf_patch);
+    patcher_de
+        .root_class()
+        .map_err(|err| patcher_de.to_readable_err(err))?;
+
+    super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
 }
 
 /// Nemesis patch deserializer
-#[derive(Debug)]
-struct Deserializer<'a> {
+#[derive(Debug, Clone)]
+struct PatchDeserializer<'a> {
     /// mutable pointer to str
     input: &'a str,
     /// This is readonly for error report. Not move position.
     original: &'a str,
 
-    /// Output
-    output_patches: DiffPatchAnimSetData<'a>,
+    /// Raw diff blocks captured during parsing.
+    raw_diffs: Vec<RawDiff<'a>>,
 
-    /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
-    /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
-    pub current: CurrentState<'a>,
+    ///When an `ORIGINAL` comment arrives,
+    /// we need to parse it for the number of len elements, but we don't treat it as a diff until CLOSE.
+    /// This is the flag for that purpose.
+    ignore_close: bool,
 
-    priority: usize,
+    /// Indicates the current json position during one patch file.
+    ///
+    /// e.g. `["attack", "[9]", "clip_names", "clip_name"]`
+    path: JsonPath<'a>,
+
+    /// Array end push Operation?
+    op: Op,
+
+    /// Parsed category.
+    ///
+    /// But that doesn't necessarily mean it's correct.
+    /// For example, an addition at the end of a category might actually be a diff for the next category.
+    category: ArrayType,
+
+    /// The index of the array being processed.
+    /// Since patching the entire array does not output the index to path, we store it here.
+    seq_index: Option<usize>,
 }
 
-impl<'de> Deserializer<'de> {
-    fn new(input: &'de str, priority: usize) -> Self {
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ArrayType {
+    /// `Array<Trigger(Str)>`
+    Trigger,
+
+    /// `Array<Condition>`
+    Condition,
+
+    /// `Array<Attack>`
+    Attack,
+
+    /// - `Array<Str>` for `Attack.clip_names`
+    ClipName,
+
+    /// `Array<AnimInfo>`
+    AnimInfo,
+}
+
+impl<'de> PatchDeserializer<'de> {
+    const fn new(input: &'de str) -> Self {
         Self {
             input,
             original: input,
-            output_patches: DiffPatchAnimSetData::default(),
-            current: CurrentState::new(),
-            priority,
+            raw_diffs: Vec::new(),
+            path: JsonPath::new(),
+            op: Op::Add,
+            ignore_close: false,
+            category: ArrayType::Trigger,
+            seq_index: None,
         }
     }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Parser methods
 
     fn parse_next<O>(
         &mut self,
@@ -66,20 +112,7 @@ impl<'de> Deserializer<'de> {
     ) -> Result<O> {
         parser
             .parse_next(&mut self.input)
-            .map_err(|err| Error::Context { err })
-    }
-
-    /// Parse by argument parser no consume.
-    ///
-    /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
-        Ok(res)
+            .map_err(|err| Error::ContextError { err })
     }
 
     /// Convert Visitor errors to position-assigned errors.
@@ -89,12 +122,12 @@ impl<'de> Deserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::Context { err } => ReadableError::from_context(
+            Error::ContextError { err } => ReadableError::from_context(
                 err,
                 self.original,
                 self.original.len() - self.input.len(),
             ),
-            Error::Readable { source } => source,
+            Error::ReadableError { source } => source,
             err => ReadableError::from_display(
                 err,
                 self.original,
@@ -102,577 +135,194 @@ impl<'de> Deserializer<'de> {
             ),
         };
 
-        Error::Readable { source: readable }
+        Error::ReadableError { source: readable }
+    }
+
+    /// Capture a raw diff block if present at the current position.
+    ///
+    /// The diff block is associated with the current JsonPath.
+    fn maybe_capture_diff(&mut self) -> Result<()> {
+        if self.ignore_close && self.parse_next(opt(close_comment_line))?.is_some() {
+            self.ignore_close = false;
+        };
+
+        if let Some((raw, has_original)) = self.parse_next(take_raw_diff)? {
+            let path = self.path.clone();
+
+            let op = match (has_original, raw.is_empty()) {
+                (true, true) => Op::Remove,
+                (true, false) => Op::Replace,
+                (false, true) => Op::Add,
+                (false, false) => self.op,
+            };
+
+            if has_original {
+                self.ignore_close = true;
+            }
+
+            self.raw_diffs.push(RawDiff {
+                path,
+                text: raw,
+                op,
+                seq_index: self.seq_index,
+                category: self.category,
+            });
+        }
+        Ok(())
+    }
+
+    fn parse_array(&mut self, inner_type: ArrayType) -> Result<()> {
+        self.category = inner_type;
+
+        let len = self.parse_len_line()?;
+        for index in 0..len {
+            self.seq_index = Some(index);
+
+            // The array of attacks is nested, so index specification is required.
+            if matches!(inner_type, ArrayType::Attack) {
+                self.path.push(format!("[{index}]").into());
+            }
+
+            // seq inner
+            match inner_type {
+                ArrayType::Condition => self.parse_condition()?,
+                ArrayType::Attack => self.parse_attack()?,
+                ArrayType::AnimInfo => self.parse_anim_info()?,
+                ArrayType::Trigger | ArrayType::ClipName => self.parse_str_line()?,
+            };
+
+            if matches!(inner_type, ArrayType::Attack) {
+                self.path.pop();
+            }
+        }
+
+        // capture array push
+        self.op = Op::SeqPush;
+        self.seq_index = None;
+        self.maybe_capture_diff()?;
+        self.op = Op::Add;
+
+        Ok(())
+    }
+
+    /// Any length info from 1 line.
+    fn parse_len_line(&mut self) -> Result<usize> {
+        use winnow::error::{StrContext::Expected, StrContextValue::Description};
+
+        self.maybe_capture_diff()?;
+        let len = self.parse_next(
+            parse_one_line::<usize>.context(Expected(Description("length_line: usize"))),
+        )?;
+        #[cfg(feature = "tracing")]
+        tracing::trace!("{:?}, line Length = {len}", self.path);
+        Ok(len)
+    }
+
+    fn parse_num_bool(&mut self) -> Result<BorrowedValue<'de>> {
+        self.maybe_capture_diff()?;
+        self.parse_next(num_bool_line.map(|boolean| if boolean { "1" } else { "0" }.into()))
+    }
+
+    /// Parse 1 line(but ignore new line)
+    fn parse_str_line(&mut self) -> Result<BorrowedValue<'de>> {
+        self.maybe_capture_diff()?;
+        let s = self.parse_next(alt((one_line.map(BorrowedValue::String),)))?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(?self.path, ?s);
+
+        Ok(s)
+    }
+
+    fn parse_line_to<T>(&mut self) -> Result<BorrowedValue<'de>>
+    where
+        T: core::str::FromStr + core::fmt::Debug + Copy,
+        BorrowedValue<'de>: From<T>,
+    {
+        self.maybe_capture_diff()?;
+        let value = self.parse_next(parse_one_line::<T>)?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(?self.path, ?value);
+
+        Ok(value.into())
     }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// Parse 1 file patch
-    fn root(&mut self) -> Result<()> {
+    /// Parse 1 asdsf patch
+    fn root_class(&mut self) -> Result<()> {
         self.parse_next(multispace0)?;
+        self.parse_next(version_v3)?;
 
-        while let Some(line_kind) = self.current.next() {
-            match line_kind {
-                ParserKind::Version => self.version()?,
-                ParserKind::TriggersLen
-                | ParserKind::ConditionsLen
-                | ParserKind::AttacksLen
-                | ParserKind::AnimInfosLen => {
-                    let _len = self.parse_next(
-                        verify_line_parses_to::<usize>
-                            .context(Expected(Description("length_line: usize"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("{line_kind:#?} = {_len:#?}");
-                }
-                ParserKind::Triggers => self.triggers()?,
-                ParserKind::Conditions => self.conditions()?,
-                ParserKind::Attacks => self.attacks()?,
-                ParserKind::AnimInfos => {
-                    self.anim_infos()?;
-                    break;
-                }
-            };
-        }
+        self.parse_array(ArrayType::Trigger)?; // triggers
+        self.parse_array(ArrayType::Condition)?;
+        self.parse_array(ArrayType::Attack)?;
+        self.parse_array(ArrayType::AnimInfo)?;
 
-        self.parse_next(multispace0)?;
-        if !self.input.is_empty() {
-            return Err(Error::IncompleteParse);
-        }
-
+        #[cfg(feature = "tracing")]
+        tracing::debug!("{:#?}", self.raw_diffs);
         Ok(())
     }
 
-    fn version(&mut self) -> Result<()> {
-        let should_take = self.parse_opt_start_comment()?;
+    fn parse_condition(&mut self) -> Result<BorrowedValue<'de>> {
+        let mut obj = Object::new();
+        self.path.push("name".into());
+        obj.insert("name".into(), self.parse_str_line()?);
+        self.path.pop();
 
-        let version = self.parse_next(
-            one_line
-                .verify(|s: &str| s.eq_ignore_ascii_case("V3"))
-                .context(Label("version"))
-                .context(Expected(StringLiteral("V3"))),
-        )?;
+        self.path.push("value_a".into());
+        obj.insert("value_a".into(), self.parse_line_to::<i32>()?);
+        self.path.pop();
 
-        if should_take {
-            self.current.replace_one(FieldKind::Version(version))?;
-            self.parse_opt_close_comment()?;
-        }
-        Ok(())
+        self.path.push("value_b".into());
+        obj.insert("value_b".into(), self.parse_line_to::<i32>()?);
+        self.path.pop();
+
+        Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
-    fn triggers(&mut self) -> Result<(), Error> {
-        let mut start_index = 0;
-        // until `condition_len`(usize)
-        while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
-            let diff_start = self.parse_opt_start_comment()?;
-            if diff_start {
-                self.current.set_main_range_start(start_index)?;
-            }
-            let trigger =
-                self.parse_next(one_line.context(Expected(Description("trigger: Str"))))?;
-            if self.current.mode_code.is_some() {
-                self.current.push_as_trigger(trigger)?;
-            }
+    fn parse_attack(&mut self) -> Result<BorrowedValue<'de>> {
+        let mut obj = Object::new();
 
-            self.parse_opt_close_comment()?;
-            self.parse_next(multispace0)?;
-            start_index += 1;
-            self.current.increment_main_range();
-        }
-        Ok(())
+        self.path.push("attack_trigger".into());
+        obj.insert("attack_trigger".into(), self.parse_str_line()?);
+        self.path.pop();
+
+        self.path.push("is_contextual".into());
+        obj.insert("is_contextual".into(), self.parse_num_bool()?);
+        self.path.pop();
+
+        self.path.push("clip_names".into());
+        self.parse_array(ArrayType::ClipName)?;
+        self.path.pop();
+
+        Ok(BorrowedValue::Object(Box::new(obj)))
     }
 
-    fn conditions(&mut self) -> Result<(), Error> {
-        let mut start_index = 0;
-        while is_next_maybe_condition(self.input)? {
-            let diff_start = self.parse_opt_start_comment()?;
-            if diff_start {
-                self.current.set_main_range_start(start_index)?;
-            }
+    fn parse_anim_info(&mut self) -> Result<BorrowedValue<'de>> {
+        let mut obj = Object::new();
+        self.path.push("hashed_path".into());
+        obj.insert("hashed_path".into(), self.parse_line_to::<u32>()?);
+        self.path.pop();
 
-            let variable_name = {
-                let should_take_in_this = self.parse_opt_start_comment()?;
-                let variable_name = self.parse_next(
-                    one_line
-                        .verify(|s: &str| is_variable_name_starts(s))
-                        .context(Label("variable_name: Str"))
-                        .context(Expected(StringLiteral("iLeftHandType")))
-                        .context(Expected(StringLiteral("iRightHandType")))
-                        .context(Expected(StringLiteral("iWantMountedWeaponAnims")))
-                        .context(Expected(StringLiteral("bWantMountedWeaponAnims"))),
-                )?;
+        self.path.push("hashed_file_name".into());
+        obj.insert("hashed_file_name".into(), self.parse_line_to::<u32>()?);
+        self.path.pop();
 
-                if should_take_in_this {
-                    self.current.set_main_range_start(start_index)?;
-                    self.current.one_field_patch =
-                        Some(FieldKind::ConditionVariableName(variable_name.clone()));
-                    self.parse_opt_close_comment()?;
-                }
-                variable_name
-            };
+        self.path.push("ascii_extension".into());
+        obj.insert("ascii_extension".into(), self.parse_line_to::<u32>()?);
+        self.path.pop();
 
-            let value_a = {
-                let should_take_in_this = self.parse_opt_start_comment()?;
-
-                let value_a = self.parse_next(
-                    parse_one_line::<i32>.context(Expected(Description("value_a: i32"))),
-                )?;
-                #[cfg(feature = "tracing")]
-                tracing::trace!(should_take_in_this, value_a);
-
-                if should_take_in_this {
-                    self.current.set_main_range_start(start_index)?;
-                    self.current
-                        .replace_one(FieldKind::ConditionValueA(value_a))?;
-                    self.parse_opt_close_comment()?;
-                }
-                value_a
-            };
-
-            let value_b = {
-                let should_take_in_this = self.parse_opt_start_comment()?;
-
-                let value_b = self.parse_next(
-                    parse_one_line::<i32>.context(Expected(Description("value_b: i32"))),
-                )?;
-                #[cfg(feature = "tracing")]
-                tracing::trace!(should_take_in_this, value_b);
-
-                if should_take_in_this {
-                    self.current.set_main_range_start(start_index)?;
-                    self.current
-                        .replace_one(FieldKind::ConditionValueB(value_b))?;
-                    self.parse_opt_close_comment()?;
-                }
-                value_b
-            };
-
-            #[cfg(feature = "tracing")]
-            tracing::trace!(?variable_name, ?value_a, ?value_b);
-
-            if self.current.mode_code.is_some() {
-                let condition = Condition {
-                    variable_name,
-                    value_a,
-                    value_b,
-                };
-
-                self.current
-                    .patch
-                    .get_or_insert_default()
-                    .conditions
-                    .push(condition);
-            }
-
-            self.parse_opt_close_comment()?;
-            self.parse_next(multispace0)?;
-            start_index += 1;
-            self.current.increment_main_range();
-        }
-        self.current.one_field_patch = None;
-
-        Ok(())
+        Ok(BorrowedValue::Object(Box::new(obj)))
     }
-
-    fn attacks(&mut self) -> Result<(), Error> {
-        let mut start_index = 0;
-        while self.parse_peek(opt(parse_one_line::<usize>))?.is_none() {
-            let diff_start = self.parse_opt_start_comment()?;
-            if diff_start {
-                self.current.set_main_range_start(start_index)?;
-            }
-
-            #[allow(unused)] // TODO: Support attack diff patch
-            let attack_trigger = self.parse_next(
-                one_line
-                    .verify(|s: &str| is_attack_starts(s))
-                    .context(Label("trigger: Str"))
-                    .context(Expected(Description("start_with(`bashPowerStart`)")))
-                    .context(Expected(Description("start_with(`attackStart`)")))
-                    .context(Expected(Description("start_with(`attackPowerStart`)"))),
-            )?;
-            if self.current.mode_code.is_some() {
-                // self.current.push_as_trigger(attack_trigger)?;
-            }
-
-            self.parse_opt_close_comment()?;
-            self.parse_next(multispace0)?;
-
-            let _is_contextual = self
-                .parse_next(num_bool_line.context(Expected(Description("is_contextual: bool"))))?;
-            let _clip_names_len = self.parse_next(
-                parse_one_line::<usize>.context(Expected(Description("clip_names_len: usize"))),
-            )?;
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?attack_trigger, ?_is_contextual, ?_clip_names_len);
-
-            let mut clip_names_start_index = 0;
-            while {
-                let is_attack_trigger = self
-                    .parse_peek(opt(one_line.verify(|s: &str| is_attack_starts(s))))?
-                    .is_some();
-
-                let is_anim_info_len = self.parse_peek(opt(parse_one_line::<usize>))?.is_some();
-                !is_attack_trigger && !is_anim_info_len
-            } {
-                let diff_start = self.parse_opt_start_comment()?;
-                if diff_start {
-                    self.current.set_sub_range_start(clip_names_start_index)?;
-                }
-                let clip_name =
-                    self.parse_next(one_line.context(Expected(Description("clip_name: Str"))))?;
-                if self.current.mode_code.is_some() {
-                    let _ = clip_name; // TODO: push
-                                       // self.current.push_as_trigger(clip_name)?;
-                }
-
-                self.parse_opt_close_comment()?;
-                self.parse_next(multispace0)?;
-                clip_names_start_index += 1;
-                self.current.increment_sub_range();
-
-                #[cfg(feature = "tracing")]
-                tracing::debug!(?clip_name);
-            }
-
-            start_index += 1;
-            self.current.increment_main_range();
-        }
-        Ok(())
-    }
-
-    fn anim_infos(&mut self) -> Result<(), Error> {
-        let mut start_index = 0;
-        while self.parse_peek(opt(eof))?.is_none() {
-            let diff_start = self.parse_opt_start_comment()?;
-            if diff_start {
-                self.current.set_main_range_start(start_index)?;
-            }
-            let anim_info = self.anim_info(start_index)?;
-
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?anim_info);
-
-            if self.current.mode_code.is_some() {
-                self.current
-                    .patch
-                    .get_or_insert_default()
-                    .anim_infos
-                    .push(anim_info);
-            }
-
-            self.parse_opt_close_comment()?;
-            self.parse_next(multispace0)?;
-            start_index += 1;
-            self.current.increment_main_range();
-        }
-        Ok(())
-    }
-
-    fn anim_info(&mut self, start_index: usize) -> Result<AnimInfo<'de>> {
-        let hashed_path = {
-            let should_take_in_this = self.parse_opt_start_comment()?;
-            let hashed_path = self.parse_next(
-                verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
-            )?;
-            if should_take_in_this {
-                self.current.set_main_range_start(start_index)?;
-                // FIXME: correct clone?
-                self.current
-                    .replace_one(FieldKind::AnimInfoHashedPath(hashed_path.clone()))?;
-                self.parse_opt_close_comment()?;
-            }
-            hashed_path
-        };
-
-        let hashed_file_name = {
-            let should_take_in_this = self.parse_opt_start_comment()?;
-            let hashed_file_name = self.parse_next(
-                verify_line_parses_to::<u32>
-                    .context(Expected(Description("hashed_file_name: u32"))),
-            )?;
-            if should_take_in_this {
-                self.current.set_main_range_start(start_index)?;
-                self.current
-                    .replace_one(FieldKind::AnimInfoHashedFileName(hashed_file_name.clone()))?;
-                self.parse_opt_close_comment()?;
-            }
-            hashed_file_name
-        };
-
-        let ascii_extension = {
-            let should_take_in_this = self.parse_opt_start_comment()?;
-            let ascii_extension = self.parse_next(
-                one_line
-                    .verify(|s: &str| s == "7891816")
-                    .context(Label("ascii_extension: u32"))
-                    .context(Expected(StringLiteral("7891816"))),
-            )?;
-            if should_take_in_this {
-                self.current.set_main_range_start(start_index)?;
-                self.current
-                    .replace_one(FieldKind::AnimInfoAsciiExtension(ascii_extension.clone()))?;
-                self.parse_opt_close_comment()?;
-            }
-            ascii_extension
-        };
-
-        Ok(AnimInfo {
-            hashed_path,
-            hashed_file_name,
-            ascii_extension,
-        })
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    /// # Return
-    /// Is the mode code comment?
-    fn parse_opt_start_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?comment_ty);
-            match comment_ty {
-                CommentKind::ModCode(id) => {
-                    self.current.mode_code = Some(id);
-                    // When there are no additional differences, it is 100% Remove.
-                    let found_end_diff_sym = self.parse_opt_close_comment()?;
-                    if found_end_diff_sym {
-                        self.current.force_removed = true;
-                    };
-                    return Ok(true);
-                }
-                _ => return Ok(false),
-            }
-        }
-        Ok(false)
-    }
-
-    /// Processes the close comment (`ORIGINAL` or `CLOSE`) depending on whether it was encountered,
-    /// and returns whether it was encountered or not.
-    fn parse_opt_close_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?comment_ty);
-            match comment_ty {
-                CommentKind::Original => {
-                    self.current.set_is_passed_original();
-                    let op = self.current.judge_operation();
-                    #[cfg(feature = "tracing")]
-                    tracing::debug!(?op, ?self.current);
-                    if op != Op::Remove {
-                        self.parse_next(take_till_close)?;
-                        self.merge_to_output()?;
-                    }
-                    return Ok(true);
-                }
-                CommentKind::Close => {
-                    self.merge_to_output()?;
-                    return Ok(true);
-                }
-                _ => {}
-            }
-        }
-        Ok(false)
-    }
-
-    /// This is the method that is called when a single differential change comment pair finishes calling.
-    fn merge_to_output(&mut self) -> Result<(), Error> {
-        let op = self.current.judge_operation();
-
-        if let Some(mut partial_patch) = self.current.patch.take() {
-            #[allow(clippy::match_same_arms)] // TODO: Remove this by supporting diff attacks.
-            match self.current.current_kind()? {
-                ParserKind::Version => {
-                    if let Some(version) = partial_patch.version.take() {
-                        self.output_patches.version.replace(version);
-                    }
-                }
-                ParserKind::TriggersLen
-                | ParserKind::ConditionsLen
-                | ParserKind::AttacksLen
-                | ParserKind::AnimInfosLen => {}
-                ParserKind::Triggers => {
-                    let triggers = core::mem::take(&mut partial_patch.triggers);
-                    let values = if op == Op::Remove { vec![] } else { triggers };
-                    let values = ValueWithPriority {
-                        patch: JsonPatch {
-                            action: Action::Seq {
-                                op,
-                                range: self.current.take_main_range()?,
-                            },
-                            value: values.into(),
-                        },
-                        priority: self.priority,
-                    };
-                    self.output_patches.triggers_patches.push(values);
-                }
-                ParserKind::Conditions => {
-                    let one_diff = match self.current.one_field_patch.take() {
-                        Some(FieldKind::ConditionVariableName(variable_name)) => {
-                            Some(ConditionDiff {
-                                variable_name: Some(variable_name),
-                                ..Default::default()
-                            })
-                        }
-                        Some(FieldKind::ConditionValueA(value_a)) => Some(ConditionDiff {
-                            value_a: Some(value_a),
-                            ..Default::default()
-                        }),
-                        Some(FieldKind::ConditionValueB(value_b)) => Some(ConditionDiff {
-                            value_b: Some(value_b),
-                            ..Default::default()
-                        }),
-                        None => None,
-                        unexpected => {
-                            return Err(Error::ExpectedOneFieldOfCondition {
-                                other: format!("{unexpected:?}"),
-                            })
-                        }
-                    };
-
-                    let range = self.current.take_main_range()?;
-                    if let Some(diff) = one_diff {
-                        // one_patch
-                        if op == Op::Replace {
-                            self.output_patches
-                                .conditions_patches
-                                .one
-                                .insert(range.start, diff);
-                        } else {
-                            return Err(Error::InvalidOpForOneField { op });
-                        }
-                    } else {
-                        // seq pattern
-                        let conditions = core::mem::take(&mut partial_patch.conditions);
-                        let values = if op == Op::Remove { vec![] } else { conditions };
-                        let values = ValueWithPriority {
-                            patch: JsonPatch {
-                                action: Action::Seq { op, range },
-                                value: values.into(),
-                            },
-                            priority: self.priority,
-                        };
-                        self.output_patches.conditions_patches.seq.push(values);
-                    }
-                }
-                ParserKind::Attacks => {} // TODO: Support attack diff
-                ParserKind::AnimInfos => {
-                    let one_diff = match self.current.one_field_patch.take() {
-                        Some(FieldKind::AnimInfoAsciiExtension(ascii_extension)) => {
-                            Some(AnimInfoDiff {
-                                ascii_extension: Some(ascii_extension),
-                                ..Default::default()
-                            })
-                        }
-                        Some(FieldKind::AnimInfoHashedFileName(hashed_file_name)) => {
-                            Some(AnimInfoDiff {
-                                hashed_file_name: Some(hashed_file_name),
-                                ..Default::default()
-                            })
-                        }
-                        Some(FieldKind::AnimInfoHashedPath(hashed_path)) => Some(AnimInfoDiff {
-                            hashed_path: Some(hashed_path),
-                            ..Default::default()
-                        }),
-                        None => None,
-                        unexpected => {
-                            return Err(Error::ExpectedOneFieldOfAnimInfo {
-                                other: format!("{unexpected:?}"),
-                            })
-                        }
-                    };
-
-                    let range = self.current.take_main_range()?;
-                    if let Some(diff) = one_diff {
-                        // one_patch
-                        if op == Op::Replace {
-                            self.output_patches
-                                .anim_infos_patches
-                                .one
-                                .insert(range.start, diff);
-                        } else {
-                            return Err(Error::InvalidOpForOneField { op });
-                        }
-                    } else {
-                        // seq pattern
-                        let anim_infos = core::mem::take(&mut partial_patch.anim_infos);
-                        let values = if op == Op::Remove { vec![] } else { anim_infos };
-                        let values = ValueWithPriority {
-                            patch: JsonPatch {
-                                action: Action::Seq { op, range },
-                                value: values.into(),
-                            },
-                            priority: self.priority,
-                        };
-                        self.output_patches.anim_infos_patches.seq.push(values);
-                    }
-                }
-            }
-
-            self.current.clear_flags(); // new patch is generated so clear flags.
-        }
-
-        Ok(())
-    }
-}
-
-/// In the case of patches, attack_len cannot be trusted, so we have no choice but to parse ahead.
-///
-/// To do so, we need to limit the variables that can be used.
-/// Fortunately, these are the only variables that appear in asdsf.
-/// However, this also means that other variables cannot be changed in the patch.
-fn is_variable_name_starts(s: &str) -> bool {
-    s.starts_with("iLeftHandType")
-        || s.starts_with("iRightHandType")
-        || s.starts_with("iWantMountedWeaponAnims")
-        || s.starts_with("bWantMountedWeaponAnims")
-}
-
-/// Can the next one also be parsed as a `condition` clause?
-///
-/// In the case of patches, `attack_len: usize` cannot be trusted, so it is necessary to parse ahead.
-fn is_next_maybe_condition(input: &str) -> Result<bool, Error> {
-    let (remain, variable_name) = opt(one_line.verify(|s: &str| is_variable_name_starts(s)))
-        .parse_peek(input)
-        .map_err(|err| Error::Context { err })?;
-
-    let (remain, _comment) = opt(winnow::combinator::alt((comment_kind, close_comment)))
-        .parse_peek(remain)
-        .map_err(|err| Error::Context { err })?;
-
-    let (remain, _value_a) = opt(parse_one_line::<usize>)
-        .parse_peek(remain)
-        .map_err(|err| Error::Context { err })?;
-
-    let (remain, _comment) = opt(winnow::combinator::alt((comment_kind, close_comment)))
-        .parse_peek(remain)
-        .map_err(|err| Error::Context { err })?;
-
-    let (_, value_b) = opt(parse_one_line::<usize>)
-        .parse_peek(remain)
-        .map_err(|err| Error::Context { err })?;
-    Ok(variable_name.is_some() && _value_a.is_some() && value_b.is_some())
-}
-
-fn is_attack_starts(s: &str) -> bool {
-    starts_with_ignore_ascii(s, "attackStart")
-        || starts_with_ignore_ascii(s, "attackPowerStart")
-        || starts_with_ignore_ascii(s, "bashStart")
-        || starts_with_ignore_ascii(s, "bashPowerStart")
-}
-
-fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
-    s.len() >= prefix.len()
-        && s.get(..prefix.len())
-            .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::asdsf::patch::de::{AnimInfosDiff, ConditionsDiff};
-    use json_patch::{Action, JsonPatch, ValueWithPriority};
+    use crate::asdsf::patch::de::{
+        patch_map::SeqPatchMap, AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff,
+    };
+    use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 
     // V3                             <- version
     // 0                              <- triggers_len
@@ -755,8 +405,8 @@ MC 1HM AttackRight01
 2000000003
 7891816
 
-4000000004
-2000000004
+$crc32[meshes\\actors\\dragon\\animations]$
+$crc32[ground_bite]$
 7891816
 
 4000000005
@@ -766,17 +416,34 @@ MC 1HM AttackRight01
 ";
         let patches = parse_anim_set_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
 
-        // // For local file test
-        // let path = r#""#;
-        // let input = std::fs::read_to_string(path).unwrap();
-        // let patches = parse_anim_set_diff_patch(&input, 0).unwrap_or_else(|e| panic!("{e}"));
-
         let expected = DiffPatchAnimSetData {
             version: None,
             triggers_patches: vec![],
-            conditions_patches: ConditionsDiff::default(),
-            attacks_patches: (),
-            anim_infos_patches: AnimInfosDiff {
+            conditions_patches: NonNestedArrayDiff::default(),
+            attacks_patches: AttacksDiff {
+                one: Default::default(),
+                seq: {
+                    let mut map = SeqPatchMap::new();
+                    map.insert(
+                        json_patch::json_path!["[0]", "clip_names"],
+                        ValueWithPriority {
+                            patch: JsonPatch {
+                                action: Action::Seq {
+                                    op: Op::Replace,
+                                    range: 0..1,
+                                },
+                                value: simd_json::json_typed!(
+                                    borrowed,
+                                    ["AttackTestReplacedClipName"]
+                                ),
+                            },
+                            priority: 0,
+                        },
+                    );
+                    map
+                },
+            },
+            anim_infos_patches: NonNestedArrayDiff {
                 one: Default::default(),
                 seq: vec![
                     ValueWithPriority {
@@ -797,10 +464,7 @@ MC 1HM AttackRight01
                     },
                     ValueWithPriority {
                         patch: JsonPatch {
-                            action: Action::Seq {
-                                op: Op::Add,
-                                range: 2..5,
-                            },
+                            action: Action::SeqPush,
                             value: simd_json::json_typed!(borrowed, [
                                 {
                                     "hashed_path": "4000000003",
@@ -808,8 +472,8 @@ MC 1HM AttackRight01
                                     "ascii_extension": "7891816"
                                 },
                                 {
-                                    "hashed_path": "4000000004",
-                                    "hashed_file_name": "2000000004",
+                                    "hashed_path": "3692944883", // crc32 macro replaced
+                                    "hashed_file_name": "3191128947", // crc32 macro replaced
                                     "ascii_extension": "7891816"
                                 },
                                 {
@@ -824,6 +488,18 @@ MC 1HM AttackRight01
                 ],
             },
         };
-        assert_eq!(patches, expected);
+        pretty_assertions::assert_eq!(patches, expected);
+    }
+
+    #[cfg_attr(feature = "tracing", quick_tracing::init)]
+    #[test]
+    #[ignore = "because we need external test files"]
+    fn parse() {
+        let nemesis_xml = {
+            let file_name = "1HMShield.txt";
+            let path = std::path::Path::new("../../dummy/debug/asdsf").join(file_name);
+            std::fs::read_to_string(path).unwrap()
+        };
+        dbg!(parse_anim_set_diff_patch(&nemesis_xml, 0).unwrap_or_else(|e| panic!("{e}")));
     }
 }

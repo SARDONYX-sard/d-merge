@@ -3,7 +3,9 @@ use crate::adsf::patch::de::others::clip_anim::{
     current_state::{CurrentState, PartialRotations},
     ClipAnimDiffPatch, DiffTriggerNames, LineKind,
 };
-use crate::common_parser::comment::{close_comment, comment_kind, take_till_close, CommentKind};
+use crate::common_parser::comment::{
+    open_comment, original_or_close_comment, take_till_close, CommentKind,
+};
 use crate::common_parser::delete_line::delete_this_line;
 use crate::common_parser::lines::{one_line, verify_line_parses_to};
 use json_patch::Op;
@@ -239,7 +241,7 @@ impl<'de> Deserializer<'de> {
     /// # Return
     /// Is the mode code comment?
     fn parse_opt_start_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
+        if let Some(comment_ty) = self.parse_next(opt(open_comment))? {
             #[cfg(feature = "tracing")]
             tracing::debug!(?comment_ty);
             match comment_ty {
@@ -261,7 +263,7 @@ impl<'de> Deserializer<'de> {
     /// Processes the close comment (`ORIGINAL` or `CLOSE`) depending on whether it was encountered,
     /// and returns whether it was encountered or not.
     fn parse_opt_close_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
+        if let Some(comment_ty) = self.parse_next(opt(original_or_close_comment))? {
             #[cfg(feature = "tracing")]
             tracing::debug!(?comment_ty);
             match comment_ty {
@@ -352,6 +354,7 @@ TurnRight[mirrored]
 18
 1
 0
+0
 2
 clipStart:6.65767
 <!-- MOD_CODE ~test~ OPEN -->
@@ -386,6 +389,7 @@ TurnRight[mirrored]
 <!-- CLOSE -->
 18
 1
+0
 0
 0
 <!-- MOD_CODE ~test~ OPEN -->

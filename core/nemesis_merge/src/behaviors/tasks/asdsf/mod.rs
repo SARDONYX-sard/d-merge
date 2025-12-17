@@ -38,7 +38,7 @@ enum PatchKind<'a> {
     TxtProjectHeader(DiffLines<'a>),
 
     /// diff patch, priority
-    EditAnimSet(EditAnimSet<'a>),
+    EditAnimSet(Box<EditAnimSet<'a>>),
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -54,7 +54,7 @@ struct EditAnimSet<'a> {
 impl<'a> Default for PatchKind<'a> {
     #[inline]
     fn default() -> Self {
-        Self::EditAnimSet(EditAnimSet::default())
+        Self::EditAnimSet(Box::new(EditAnimSet::default()))
     }
 }
 
@@ -171,11 +171,11 @@ fn parse_anim_data_patch<'a>(
         ParserType::EditAnimSet(file_name) => {
             let patch = parse_anim_set_diff_patch(asdsf_patch, priority)
                 .with_context(|_| FailedParseEditAsdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::EditAnimSet(EditAnimSet {
+            PatchKind::EditAnimSet(Box::new(EditAnimSet {
                 patch,
                 priority,
                 file_name,
-            })
+            }))
         }
     };
     Ok(AsdsfPatch { target, id, patch })
