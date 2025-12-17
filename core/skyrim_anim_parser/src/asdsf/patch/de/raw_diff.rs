@@ -242,9 +242,30 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
 
     let action = match (range, op) {
         (None, Op::SeqPush) => json_patch::Action::SeqPush,
-        (None, op) => json_patch::Action::Pure {
-            op: to_json_patch_op(op),
-        },
+        (None, op) => {
+            // NOTE: The one field replacer within an `Array<struct T>` requires the index to be specified first.
+            //
+            // For example, consider changing the value_b in Conditions.
+            // - actual: raw.path: ["value_b"], raw.seq_index(Some(6))
+            // - expected: ["[6]", "value_b"].
+            match raw.seq_index {
+                Some(diff_start_pos)
+                    if !matches!(raw.category, ArrayType::Trigger | ArrayType::ClipName) =>
+                {
+                    let mut vec = vec![];
+                    vec.push(format!("[{diff_start_pos}]").into());
+                    let prev = core::mem::take(&mut raw.path);
+                    vec.extend(prev);
+
+                    raw.path = vec;
+                }
+                _ => {}
+            }
+
+            json_patch::Action::Pure {
+                op: to_json_patch_op(op),
+            }
+        }
         (Some(range), op) => json_patch::Action::Seq {
             op: to_json_patch_op(op),
             range,
