@@ -9,19 +9,24 @@ use crate::behaviors::priority_ids::types::PriorityMap;
 use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
-    FailedParseAdsfTemplateSnafu, FailedParseEditAsdsfPatchSnafu,
+    FailedParseAdsfTemplateSnafu, FailedParseAsdsfPatchSnafu, FailedParseEditAsdsfPatchSnafu,
+    FailedSerializeAsdsfSnafu,
 };
 use crate::results::partition_results;
 use crate::Config;
+
 use rayon::prelude::*;
-use skyrim_anim_parser::asdsf::alt::ser::serialize_alt_asdsf_with_patches;
-use skyrim_anim_parser::asdsf::alt::{ser::serialize_alt_asdsf, AltAsdsf};
-pub use skyrim_anim_parser::asdsf::patch::de::deserializer::parse_anim_set_diff_patch;
-use skyrim_anim_parser::asdsf::patch::de::DiffPatchAnimSetData;
-use skyrim_anim_parser::diff_line::deserializer::parse_lines_diff_patch;
-use skyrim_anim_parser::diff_line::DiffLines;
+use skyrim_anim_parser::asdsf::alt::{
+    ser::{serialize_alt_asdsf, SubHeaderDiffMap},
+    AltAsdsf,
+};
+use skyrim_anim_parser::asdsf::patch::de::{
+    deserializer::parse_anim_set_diff_patch, DiffPatchAnimSetData,
+};
+use skyrim_anim_parser::diff_line::{deserializer::parse_lines_diff_patch, DiffLines};
 use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
+use winnow::Parser;
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub struct AsdsfPatch<'a> {
@@ -37,8 +42,18 @@ enum PatchKind<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     TxtProjectHeader(DiffLines<'a>),
 
+    /// Indicates the special `<target>/$header$.txt`override
+    SubTxtHeader(DiffLines<'a>),
+
     /// diff patch, priority
     EditAnimSet(Box<EditAnimSet<'a>>),
+
+    /// add patch
+    AddAnimSet {
+        patch: skyrim_anim_parser::asdsf::normal::AnimSetData<'a>,
+        priority: usize,
+        file_name: &'a str,
+    },
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -106,25 +121,54 @@ pub(crate) fn apply_asdsf_patches(
 
     let mut txt_project_header_patches = DiffLines::DEFAULT;
 
+    let mut sub_txt_header_patch_map = SubHeaderDiffMap::new();
+
     // 4/5. Apply adsf patch to base adsf(anim_data & motion data).
     for mut asdsf_patch in borrowed_patches {
-        if let PatchKind::TxtProjectHeader(ref mut diff) = asdsf_patch.patch {
-            txt_project_header_patches
-                .0
-                .par_extend(core::mem::take(&mut diff.0));
-            continue;
+        match asdsf_patch.patch {
+            PatchKind::TxtProjectHeader(ref mut diff) => {
+                txt_project_header_patches
+                    .0
+                    .par_extend(core::mem::take(&mut diff.0));
+                continue;
+            }
+            PatchKind::SubTxtHeader(ref mut diff) => {
+                use std::collections::hash_map::Entry;
+
+                let lines = core::mem::take(&mut diff.0);
+                match sub_txt_header_patch_map.entry(asdsf_patch.target) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().0.par_extend(lines);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(DiffLines(lines));
+                    }
+                }
+                continue;
+            }
+            _ => (),
         }
 
         if let Some(anim_data) = alt_adsf.txt_projects.0.get_mut(asdsf_patch.target) {
-            if let PatchKind::EditAnimSet(edit_anim) = asdsf_patch.patch {
-                let file_name = edit_anim.file_name;
-                if let Some(anim) = anim_data.0.get_mut(file_name) {
-                    bail!(edit_anim.patch.into_apply(anim).with_context(|_| {
-                        FailedParseEditAsdsfPatchSnafu {
-                            path: edit_anim.file_name,
-                        }
-                    }));
+            match asdsf_patch.patch {
+                PatchKind::AddAnimSet {
+                    patch, file_name, ..
+                } => {
+                    anim_data
+                        .0
+                        .insert(std::borrow::Cow::Borrowed(file_name), patch);
                 }
+                PatchKind::EditAnimSet(edit_anim) => {
+                    let file_name = edit_anim.file_name;
+                    if let Some(anim) = anim_data.0.get_mut(file_name) {
+                        bail!(edit_anim.patch.into_apply(anim).with_context(|_| {
+                            FailedParseEditAsdsfPatchSnafu {
+                                path: edit_anim.file_name,
+                            }
+                        }));
+                    }
+                }
+                PatchKind::TxtProjectHeader(_) | PatchKind::SubTxtHeader(_) => {}
             };
         }
     }
@@ -141,7 +185,8 @@ pub(crate) fn apply_asdsf_patches(
     bail!(write_alt_asdsf_file(
         output_path,
         alt_adsf,
-        txt_project_header_patches
+        txt_project_header_patches,
+        sub_txt_header_patch_map,
     ));
 
     errors
@@ -168,6 +213,26 @@ fn parse_anim_data_patch<'a>(
                 }
             })?,
         ),
+        ParserType::SubTxtHeader => {
+            PatchKind::SubTxtHeader(parse_lines_diff_patch(asdsf_patch, priority).with_context(
+                |_| FailedDiffLinesPatchSnafu {
+                    kind: AnimPatchErrKind::Asdsf,
+                    sub_kind: AnimPatchErrSubKind::SubTxtHeader,
+                    path,
+                },
+            )?)
+        }
+        ParserType::AddAnimSet(file_name) => {
+            let patch = skyrim_anim_parser::asdsf::normal::de::anim_set_data
+                .parse(asdsf_patch)
+                .map_err(|err| serde_hkx::errors::readable::ReadableError::from_parse(err))
+                .with_context(|_| FailedParseAsdsfPatchSnafu { path: path.clone() })?;
+            PatchKind::AddAnimSet {
+                patch,
+                priority,
+                file_name,
+            }
+        }
         ParserType::EditAnimSet(file_name) => {
             let patch = parse_anim_set_diff_patch(asdsf_patch, priority)
                 .with_context(|_| FailedParseEditAsdsfPatchSnafu { path: path.clone() })?;
@@ -200,20 +265,16 @@ fn write_alt_asdsf_file(
     path: impl AsRef<Path>,
     alt_asdsf: AltAsdsf,
     patches: DiffLines,
+    sub_txt_header_patch_map: SubHeaderDiffMap,
 ) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let serialized = if patches.is_empty() {
-        serialize_alt_asdsf(&alt_asdsf)
-    } else {
-        serialize_alt_asdsf_with_patches(alt_asdsf, patches).with_context(|_| {
-            FailedDiffLinesPatchSnafu {
-                kind: AnimPatchErrKind::Asdsf,
-                sub_kind: AnimPatchErrSubKind::TxtProjectHeader,
-                path,
-            }
-        })?
-    };
+    let serialized = serialize_alt_asdsf(alt_asdsf, patches, sub_txt_header_patch_map)
+        .with_context(|_| FailedSerializeAsdsfSnafu {
+            kind: AnimPatchErrKind::Asdsf,
+            sub_kind: AnimPatchErrSubKind::TxtProjectHeader,
+            path,
+        })?;
 
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);

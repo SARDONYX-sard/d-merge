@@ -1,15 +1,22 @@
 //! Parses an adsf path and returns target and id as &str references.
 //!
-//! rule:
+//! # Rules
+//!
 //! txt projects:
 //! - format: <any>/Nemesis_Engine/mod/<id>/animationsetdatasinglefile/$header$/$header$.txt
 //!   (e.g. D:/mod/Test/animationsetdatasinglefile/$header$/$header$.txt)
 //!
-//! replace anim_set_data path:
+//! edit anim_set_data header path:
+//! - format: <any>/Nemesis_Engine/mod/<id>/animationsetdatasinglefile/<project data>/$header$.txt
+//!   (e.g. D:/GAME/Test mod name/Nemesis_Engine/mod/id/animationsetdatasinglefile/DefaultMaleData~DefaultMale/$header$.txt)
+//!
+//! add anim_set_data path:
+//! - format: <any>/Nemesis_Engine/mod/<id>/animationsetdatasinglefile/<project data>/<mod_code>$<anim set file stem>.txt
+//!   (e.g., D:/Nemesis_Engine/mod/tkuc/animationsetdatasinglefile/DefaultFemaleData~DefaultFemale/tkuc$PlayerFNIS1Start.txt")
+//!
+//! edit anim_set_data path:
 //! - format: <any>/Nemesis_Engine/mod/<id>/animationsetdatasinglefile/<project data>/<anim set file stem>.txt
 //!   (e.g. D:/GAME/Test mod name/Nemesis_Engine/mod/id/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt)
-//!
-//! Parses an adsf path and returns target, id, and parser type.
 use crate::behaviors::priority_ids::get_nemesis_id;
 use std::path::{Path, PathBuf};
 
@@ -21,8 +28,16 @@ pub enum ParserType<'a> {
     /// e.g. `DefaultMaleData~DefaultMale`
     TxtProjectHeader,
 
-    /// AnimSetData file name (e.g., `_MTSolo.txt`)
+    /// Indicates the special `<target>/$header$.txt`override
+    ///
+    /// e.g. `DefaultMaleData~DefaultMale`
+    SubTxtHeader,
+
+    /// Edit: AnimSetData file name (e.g., `_MTSolo.txt`)
     EditAnimSet(&'a str),
+
+    /// Add: AnimSetData file name (e.g., `_MTSolo.txt`)
+    AddAnimSet(&'a str),
 }
 
 /// Represents the parsed result of an animation patch path.
@@ -82,10 +97,21 @@ pub fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, 
             path: path.to_path_buf(),
         }
     })?;
-    let is_header_file = file_name.eq_ignore_ascii_case("$header$.txt");
 
-    let parser_type = if is_header_file {
-        ParserType::TxtProjectHeader
+    let parser_type = if file_name.eq_ignore_ascii_case("$header$.txt") {
+        if target.eq_ignore_ascii_case("$header$") {
+            ParserType::TxtProjectHeader
+        } else {
+            ParserType::SubTxtHeader
+        }
+    } else if let Some((_, file_name)) = file_name.split_once('$') {
+        if file_name.is_empty() {
+            return Err(ParseError::InvalidAddAnimSetFileName {
+                path: path.to_path_buf(),
+            });
+        }
+
+        ParserType::AddAnimSet(file_name)
     } else {
         ParserType::EditAnimSet(file_name)
     };
@@ -125,6 +151,13 @@ Expected format: D:/mod/<id>/animationsetdatasinglefile/<target>~1/...",
         path.display()
     ))]
     TooShortPathFormat { path: PathBuf },
+
+    /// Invalid add anim set file name '{}'. Expected format: `<mod_code>$<file>.txt`
+    #[snafu(display(
+    "Invalid add anim set file name '{}'. Expected format: <mod_code>$<file>.txt",
+    path.display()
+))]
+    InvalidAddAnimSetFileName { path: PathBuf },
 }
 
 #[cfg(test)]

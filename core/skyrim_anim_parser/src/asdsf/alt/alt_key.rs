@@ -19,8 +19,11 @@ pub fn to_normal_txt_project_name(s: &str, out: &mut String) -> Option<()> {
 ///
 /// # Returns
 ///
-/// * `Some(())` if the conversion succeeded and the path format was valid
-/// * `None` if the
+/// * `Some(())` if the path matches the expected format and the conversion succeeds
+/// * `None` if the path is invalid, including (but not limited to):
+///   - The path does not end with `.txt`
+///   - The path contains fewer than two components
+///   - The path contains more than two components (i.e. nested directories)
 pub fn to_alt_txt_project_name(path: &str, out: &mut String) -> Option<()> {
     let path = path.strip_suffix(".txt")?;
     let mut parts = path.split('\\');

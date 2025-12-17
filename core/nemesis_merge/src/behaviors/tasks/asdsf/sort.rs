@@ -6,8 +6,13 @@ use super::{AsdsfPatch, PatchKind};
 #[derive(Hash, Eq, PartialEq)]
 enum PatchKey<'a> {
     TxtProjectHeader,
+    SubTxtHeader,
+
     // (target, id, file_name)
     EditAnim(&'a str, &'a str, &'a str),
+
+    // (target, id, file_name)
+    AddAnim(&'a str, &'a str, &'a str),
 }
 
 pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AsdsfPatch<'a>>) -> Vec<AsdsfPatch<'a>> {
@@ -20,7 +25,11 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AsdsfPatch<'a>>) -> V
                     PatchKind::EditAnimSet(edit) => {
                         PatchKey::EditAnim(patch.target, patch.id, edit.file_name)
                     }
+                    PatchKind::AddAnimSet { file_name, .. } => {
+                        PatchKey::AddAnim(patch.target, patch.id, file_name)
+                    }
                     PatchKind::TxtProjectHeader(_) => PatchKey::TxtProjectHeader,
+                    PatchKind::SubTxtHeader(_) => PatchKey::SubTxtHeader,
                 };
 
                 match map.entry(key) {

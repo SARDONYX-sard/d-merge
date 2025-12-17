@@ -122,8 +122,17 @@ pub enum Error {
 
     /// Failed to diff line patch error
     #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
-    FailedSerialize {
+    FailedSerializeAdsf {
         source: skyrim_anim_parser::adsf::alt::ser::SerializeError,
+        kind: AnimPatchErrKind,
+        sub_kind: AnimPatchErrSubKind,
+        path: PathBuf,
+    },
+
+    /// Failed to diff line patch error
+    #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
+    FailedSerializeAsdsf {
+        source: skyrim_anim_parser::asdsf::alt::ser::SerializeError,
         kind: AnimPatchErrKind,
         sub_kind: AnimPatchErrSubKind,
         path: PathBuf,
@@ -149,6 +158,13 @@ pub enum Error {
     #[snafu(display("[animationdatasinglefile edit(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseEditAdsfPatch {
         source: skyrim_anim_parser::adsf::patch::de::error::Error,
+        path: PathBuf,
+    },
+
+    /// Failed to parse asdsf patch
+    #[snafu(display("[animationsetdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]
+    FailedParseAsdsfPatch {
+        source: ReadableError,
         path: PathBuf,
     },
 
@@ -265,12 +281,16 @@ pub enum AnimPatchErrSubKind {
 
     /// kind: asdsf
     TxtProjectHeader,
+
+    /// kind: asdsf
+    SubTxtHeader,
 }
 
 impl AnimPatchErrSubKind {
     const fn as_str(&self) -> &'static str {
         match self {
             Self::ProjectNamesHeader => "project names header",
+            Self::SubTxtHeader => "sub txt names header",
             Self::AnimDataHeader => "anim header",
             Self::TxtProjectHeader => "txt project header",
         }

@@ -23,33 +23,46 @@ pub fn serialize_alt_adsf(
 ) -> Result<String, SerializeError> {
     let mut output = String::new();
 
-    let (mut project_names, anim_list): (Vec<_>, Vec<_>) = alt_adsf
+    let mut project_names: Vec<_> = alt_adsf
         .0
-        .into_par_iter()
-        .map(|(k, v)| (to_adsf_key(k), v))
-        .unzip();
+        .par_iter()
+        .map(|(k, _)| to_adsf_key(k.clone()))
+        .collect();
 
     if let Some(patches) = project_names_patches {
         patches.into_apply(&mut project_names)?;
     }
 
-    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
-    // Serialize clip animation blocks
-    // TODO: clip id unique check
-    // Hints:
-    // - It did not crash even if the number of `anim_data` and `motion_data` did not match.
-    let mut clip_id_map = HashMap::new();
-
     // Serialize project names
     output.push_str(&format!("{}\r\n", project_names.len()));
-    for name in project_names {
-        let name = to_adsf_key(name.as_ref().into());
+    for name in &project_names {
         output.push_str(name.as_ref());
         output.push_str("\r\n");
     }
 
-    // Serialize animation data
-    for anim_data in &anim_list {
+    // Serialize in the order of project_names.
+    // NOTE: Any additions to the project headers will be reflected.
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
+    let mut clip_id_map = HashMap::new(); // TODO: clip id unique check - It did not crash even if the number of `anim_data` and `motion_data` did not match.
+
+    // NOTE: Since we reverted to the vanilla style name for serialization,
+    // we must mode the key to reference alt_adsf. This is the procedure for that.
+    let mut counter: HashMap<String, usize> = HashMap::new();
+    for name in project_names {
+        let name_str = name.as_ref();
+        let base = name_str.strip_suffix(".txt").unwrap_or(name_str);
+        let count = counter.entry(base.to_string()).or_insert(1);
+        let name = if *count == 1 {
+            format!("{base}~1")
+        } else {
+            format!("{base}~{count}")
+        };
+
+        let anim_data = alt_adsf
+            .0
+            .get(name.as_str())
+            .ok_or_else(|| SerializeError::MissingAnimData { name })?;
+
         output.push_str(&serialize_anim_data(
             anim_data,
             &mut clip_id_manager,
@@ -168,6 +181,9 @@ pub enum SerializeError {
     DiffLine {
         source: crate::diff_line::error::Error,
     },
+
+    /// Missing project name: `{name}`
+    MissingAnimData { name: String },
 }
 
 #[cfg(test)]
