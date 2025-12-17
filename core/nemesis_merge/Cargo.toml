@@ -14,14 +14,14 @@ rust-version.workspace = true
 
 [dependencies]
 bitflags = "2.10.0"
-dashmap = { workspace = true, features = ["rayon"] }
+dashmap = { workspace = true, features = ["rayon", "serde"] }
 glob = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 rmp-serde = { workspace = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = [
   "extra_fmt",
@@ -37,7 +37,7 @@ winnow = { workspace = true }
 
 # workspace members
 auto_charset = { workspace = true }
-json_patch = { workspace = true, features = ["rayon"] }
+json_patch = { workspace = true, features = ["rayon", "serde"] }
 nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
@@ -54,17 +54,14 @@ workspace = true
 default = ["debug"]
 
 # Output patch json, json just before hkx
-debug = ["serde", "tracing", "dashmap/serde"]
+debug = ["tracing"]
 
-# tracing = ["dep:tracing", "json_patch/tracing", "serde_hkx/tracing"]
 tracing = [
   "dep:tracing",
   "dep:tracing-subscriber",
   "json_patch/tracing",
   "serde_hkx_features/dedup_tracing",
 ]
-
-serde = ["dep:serde", "json_patch/serde"]
 
 # Enables TypeScript-compatible serialization for the `Status` enum.
 # This feature modifies the `Status` enum to use Serde's externally tagged representation
@@ -75,4 +72,7 @@ serde = ["dep:serde", "json_patch/serde"]
 #   { "type": "Error", "message": "Something went wrong" }
 #
 # Disable this feature if you prefer the default Rust/Serde enum format.
-ts_serde = ["serde"]
+ts_serde = []
+
+# Enable the hkx auto-conversion feature to resolve the mysterious mutex error randomly occurring in MO2.
+unstable_conversion = []

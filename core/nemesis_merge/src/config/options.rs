@@ -92,9 +92,8 @@ impl fmt::Debug for Config {
 /// These options exist to handle cases where game mods or other tools produce
 /// invalid or inconsistent data. Enabling these may allow parsing to succeed
 /// in otherwise broken scenarios, at the risk of hiding real errors.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
-#[derive(Debug, Copy, Clone, Default)]
 pub struct HackOptions {
     /// Enables compatibility hacks for invalid fields in the `BSRagdollContactListenerModifier` class.
     ///
@@ -124,9 +123,8 @@ impl From<HackOptions> for nemesis_xml::hack::HackOptions {
 }
 
 /// A group of flags to enable debug output of intermediate files.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
-#[derive(Debug, Clone)]
 pub struct DebugOptions {
     /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
@@ -179,15 +177,14 @@ impl DebugOptions {
 ///  ```txt
 ///  SkyrimSE | SkyrimLE
 ///  ```
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum OutPutTarget {
     /// Amd64
     #[default]
-    #[cfg_attr(feature = "serde", serde(rename = "SkyrimSE"))]
+    #[serde(rename = "SkyrimSE")]
     SkyrimSe,
 
     /// Win32
-    #[cfg_attr(feature = "serde", serde(rename = "SkyrimLE"))]
+    #[serde(rename = "SkyrimLE")]
     SkyrimLe,
 }

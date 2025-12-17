@@ -17,20 +17,13 @@ use rayon::prelude::*;
 ///
 /// This is useful when you want to manage both *single-value patches*
 /// and *multi-value patches* in the same context.
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HkxPatchMaps<'a> {
     /// Stores one value per path (highest priority wins).
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
-    )]
+    #[serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))]
     pub one: OnePatchMap<'a>,
     /// Stores multiple values per path.
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))
-    )]
+    #[serde(bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))]
     pub seq: SeqPatchMap<'a>,
 }
 
@@ -157,7 +150,6 @@ impl<'a> SeqPatchMap<'a> {
 // as an array (`["#0001", "hkbProjectData", "[0:10]"]`), which is not
 // valid for JSON object keys.
 
-#[cfg(feature = "serde")]
 impl<'a> serde::Serialize for OnePatchMap<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -174,7 +166,6 @@ impl<'a> serde::Serialize for OnePatchMap<'a> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -215,7 +206,6 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'a> serde::Serialize for SeqPatchMap<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -232,7 +222,6 @@ impl<'a> serde::Serialize for SeqPatchMap<'a> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
