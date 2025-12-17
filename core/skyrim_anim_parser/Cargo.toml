@@ -25,6 +25,7 @@ winnow = { workspace = true }
 
 # workspace members
 json_patch = { workspace = true, features = ["rayon"] }
+skyrim_crc = { workspace = true }
 
 [dev-dependencies]
 diff = { workspace = true }

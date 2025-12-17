@@ -6843,6 +6843,7 @@ dependencies = [
  "serde_hkx",
  "serde_json",
  "simd-json",
+ "skyrim_crc",
  "snafu",
  "tracing",
  "winnow 0.7.14",

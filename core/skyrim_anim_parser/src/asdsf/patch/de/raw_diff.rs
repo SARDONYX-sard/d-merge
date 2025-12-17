@@ -13,7 +13,7 @@ use crate::asdsf::patch::de::deserializer::ArrayType;
 use crate::asdsf::patch::de::error::Result;
 use crate::asdsf::patch::de::{attacks_to_borrowed_value, DiffPatchAnimSetData};
 use crate::common_parser::lines::{
-    lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to,
+    lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str,
 };
 
 /// A raw Nemesis diff block captured during parsing.
@@ -320,9 +320,9 @@ fn anim_infos<'a>(input: &mut &'a str) -> ModalResult<Vec<AnimInfo<'a>>> {
     repeat(1..,winnow::seq! {
         AnimInfo {
             _: multispace0,
-            hashed_path: verify_line_parses_to::<u32>.context(Expected(Description("hashed_path: u32"))),
+            hashed_path: u32_or_crc32_macro_line.context(Expected(Description("hashed_path: u32 | $crc32[<path>]$"))),
             _: multispace0,
-            hashed_file_name: verify_line_parses_to::<u32>.context(Expected(Description("hashed_file_name: u32"))),
+            hashed_file_name: u32_or_crc32_macro_line.context(Expected(Description("hashed_file_name: u32 | $crc32[<path>]$"))),
             _: multispace0,
             ascii_extension: verify_line_parses_to::<u32>.context(Expected(Description("ascii_extension: u32"))),
             _: multispace0,
@@ -375,4 +375,43 @@ fn attack_trigger_line<'i>(input: &mut &'i str) -> winnow::ModalResult<&'i str> 
     .parse_next(input)?;
 
     till_line_ending.parse_next(input)
+}
+
+fn u32_or_crc32_macro_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
+    alt((
+        verify_line_parses_to::<u32>,
+        crc32_macro.map(|path| {
+            let crc = skyrim_crc::calc_crc32_from_bytes(path.as_bytes());
+            #[cfg(feature = "tracing")]
+            tracing::info!("path to crc32 hash: {path} => {crc}");
+
+            Str::Owned(format!("{crc}"))
+        }),
+    ))
+    .parse_next(input)
+}
+
+/// # Errors
+/// If not found `$crc32[` `]`
+fn crc32_macro<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    winnow::combinator::delimited(
+        Caseless("$crc32["),
+        winnow::token::take_until(1.., "]$"),
+        "]$",
+    )
+    .context(Expected(Description("crc32(e.g. `$crc32[sampleName]$`)")))
+    .parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_crc32_macro() {
+        let path = crc32_macro.parse_next(&mut "$crc32[some/path\\path]$");
+        assert_eq!(path, Ok("some/path\\path"));
+        let event_name = crc32_macro.parse_next(&mut "$crc32[some/path\\path]$remain");
+        assert_eq!(event_name, Ok("some/path\\path"));
+    }
 }

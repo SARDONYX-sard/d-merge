@@ -405,8 +405,8 @@ MC 1HM AttackRight01
 2000000003
 7891816
 
-4000000004
-2000000004
+$crc32[meshes\\actors\\dragon\\animations]$
+$crc32[ground_bite]$
 7891816
 
 4000000005
@@ -472,8 +472,8 @@ MC 1HM AttackRight01
                                     "ascii_extension": "7891816"
                                 },
                                 {
-                                    "hashed_path": "4000000004",
-                                    "hashed_file_name": "2000000004",
+                                    "hashed_path": "3692944883", // crc32 macro replaced
+                                    "hashed_file_name": "3191128947", // crc32 macro replaced
                                     "ascii_extension": "7891816"
                                 },
                                 {
