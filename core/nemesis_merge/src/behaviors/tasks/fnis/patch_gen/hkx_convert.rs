@@ -213,7 +213,7 @@ struct ConversionBytes {
 /// - Has a pointer size that cannot be determined.
 #[must_use]
 pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
-    // separate hkx / cofig
+    // separate hkx / config
     let (hkx_jobs, config_jobs): (Vec<_>, Vec<_>) =
         jobs.into_par_iter().partition_map(|job| match job {
             AnimIoJob::Hkx(hkx_job) => rayon::iter::Either::Left(hkx_job),
@@ -284,6 +284,11 @@ fn read_hkx_bytes(
         }
     };
 
+    let current_format = check_hkx_header(&bytes, &actual_input, output_target).ok()?;
+    if current_format == output_target {
+        return None; // no conversion needed
+    }
+
     Some(Ok(ConversionBytes {
         input_path: actual_input.into_owned(),
         output_path: job.output_path.clone(),
@@ -302,11 +307,6 @@ fn convert_hkx_bytes(
     if bytes.is_empty() {
         // Optional skipped file
         return Ok(());
-    }
-
-    let current_format = check_hkx_header(bytes, input_path, output_target)?;
-    if current_format == output_target {
-        return Ok(()); // no conversion needed
     }
 
     let class_map: ClassMap = serde_hkx::from_bytes(bytes).map_err(|e| Error::HkxDeError {
