@@ -1,5 +1,5 @@
 use winnow::{
-    ascii::Caseless,
+    ascii::{line_ending, multispace0, Caseless},
     combinator::{alt, delimited, terminated},
     error::{StrContext, StrContextValue},
     token::take_until,
@@ -18,7 +18,7 @@ pub(crate) enum CommentKind<'a> {
 ///
 /// # Errors
 /// Parse failed.
-pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
+pub(crate) fn open_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
     let kind_parser = {
         let mod_code_parser = {
             let id_parser = delimited('~', take_until(0.., '~'), '~');
@@ -28,31 +28,43 @@ pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'
                 Caseless("OPEN"),
             )
         };
-
-        let mod_code_parser = delimited_multispace0(mod_code_parser);
-        // let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
-        // let close_parser = delimited_multispace0(Caseless("CLOSE"));
-
-        alt((
-            mod_code_parser.map(CommentKind::ModCode),
-            // original_parser.value(CommentKind::Original),
-            // close_parser.value(CommentKind::Close),
-            // take_until(0.., "-->").map(CommentKind::Unknown),
-        ))
+        delimited_multispace0(mod_code_parser).map(CommentKind::ModCode)
     };
     let comment_parser = delimited("<!--", kind_parser, "-->");
 
     delimited_multispace0(comment_parser)
+        .context(StrContext::Label("Open diff comment"))
         .context(StrContext::Expected(StrContextValue::Description(
-            "Comment(e.g. `<!-- MOD_CODE ~id~ OPEN -->`, `<!-- ORIGINAL -->`, `<!-- CLOSE -->`)",
+            "<!-- MOD_CODE ~id~ OPEN -->",
         )))
         .parse_next(input)
+}
+
+/// `ORIGINAL`
+///
+/// # Errors
+/// Parse failed.
+pub(crate) fn take_till_original<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
+
+    terminated(
+        take_until_ext(
+            0..,
+            delimited("<!--", original_parser.value(CommentKind::Original), "-->"),
+        )
+        .take(),
+        (Caseless("<!-- ORIGINAL -->"), multispace0),
+    )
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Comment(e.g. `<!-- ORIGINAL -->`)",
+    )))
+    .parse_next(input)
 }
 
 /// ORIGINAL or CLOSE
 /// # Errors
 /// Parse failed.
-pub(crate) fn close_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
+pub(crate) fn original_or_close_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
     let kind_parser = {
         let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
 
@@ -79,6 +91,13 @@ pub(crate) fn close_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     delimited_multispace0(Caseless("CLOSE")).parse_next(input)
 }
 
+pub(crate) fn close_comment_line(input: &mut &str) -> ModalResult<()> {
+    delimited("<!--", close_parser, "-->").parse_next(input)?;
+    line_ending.parse_next(input)?;
+    Ok(())
+}
+
+/// take until `<!-- CLOSE -->` & multispace0 (trim close comment.)
 pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
@@ -87,7 +106,7 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
             0..,
             delimited("<!--", close_parser.value(CommentKind::Close), "-->"),
         ),
-        Caseless("<!-- CLOSE -->"),
+        (Caseless("<!-- CLOSE -->"), multispace0),
     )
     .context(StrContext::Expected(StrContextValue::Description(
         "Comment(e.g. `<!-- CLOSE -->`)",
@@ -139,22 +158,22 @@ mod tests {
     #[test]
     fn test_comment_kind() {
         assert_eq!(
-            comment_kind.parse("<!-- MOD_CODE ~hi!~ OPEN -->"),
+            open_comment.parse("<!-- MOD_CODE ~hi!~ OPEN -->"),
             Ok(CommentKind::ModCode("hi!"))
         );
 
         assert_eq!(
-            close_comment.parse("<!-- ORIGINAL -->"),
+            original_or_close_comment.parse("<!-- ORIGINAL -->"),
             Ok(CommentKind::Original)
         );
 
         assert_eq!(
-            close_comment.parse("<!-- CLOSE -->"),
+            original_or_close_comment.parse("<!-- CLOSE -->"),
             Ok(CommentKind::Close)
         );
 
         assert_eq!(
-            close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),
+            original_or_close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),
             Ok(CommentKind::Unknown("memSizeAndFlags SERIALIZE_IGNORED"))
         );
     }

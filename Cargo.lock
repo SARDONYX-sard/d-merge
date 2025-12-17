@@ -6832,7 +6832,6 @@ name = "skyrim_anim_parser"
 version = "0.1.0"
 dependencies = [
  "bitvec",
- "dashmap",
  "diff 0.8.6",
  "indexmap 2.12.0",
  "json_patch",

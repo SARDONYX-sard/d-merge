@@ -19,7 +19,7 @@ pub fn apply_one_field<'v>(
     json: &mut BorrowedValue<'v>,
     path: JsonPath<'v>,
     patch: ValueWithPriority<'v>,
-) -> Result<()> {
+) -> Result<(), JsonPatchError> {
     let JsonPatch { action, value } = patch.patch;
 
     match action {

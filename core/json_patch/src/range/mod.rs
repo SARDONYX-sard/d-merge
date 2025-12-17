@@ -7,7 +7,7 @@ use core::fmt;
 
 /// Represents either an index or a range in a patch operation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum Range {
+pub enum Range {
     /// `[index]`
     Index(usize),
     /// `[start..end]`

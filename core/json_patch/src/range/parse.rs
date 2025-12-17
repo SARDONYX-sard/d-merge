@@ -9,12 +9,12 @@ use winnow::{
 
 /// Parses a string segment to determine if it represents an index or a range.
 ///
-/// e.g., `1:3`, `3:`, `:3`, `:`, `*`
+/// e.g., `[1:3]`, `[3:]`, `[:3]`, `[:]`, `[*]`
 ///
 /// # Errors
 /// Returns `PatchError::InvalidOperation` if the segment does not conform to the
 /// expected format or contains invalid numeric values.
-pub(crate) fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
+pub fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
     let input = &mut segment;
 
     _parse_range
