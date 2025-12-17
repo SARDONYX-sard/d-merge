@@ -9,7 +9,7 @@ use crate::behaviors::tasks::hkx::generate::write_patched_json;
 use crate::errors::{
     AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
     FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
-    FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeSnafu,
+    FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
 };
 use crate::results::partition_results;
 use crate::{Config, PatchMaps};
@@ -148,28 +148,33 @@ pub(crate) fn apply_adsf_patches(
             continue;
         }
 
-        if let Some(anim_data) = alt_adsf.0.get_mut(adsf_patch.target) {
-            match adsf_patch.patch {
-                PatchKind::ProjectNamesHeader(_) => {}
-                PatchKind::AnimDataHeader(diff) => diff.into_apply(&mut anim_data.header),
-                PatchKind::AddAnim(clip_anim_data_block) => {
-                    anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
+        use indexmap::map::Entry;
+        let anim_data = match alt_adsf
+            .0
+            .entry(std::borrow::Cow::Borrowed(adsf_patch.target))
+        {
+            Entry::Occupied(e) => e.into_mut(),
+            Entry::Vacant(e) => e.insert(skyrim_anim_parser::adsf::alt::AltAnimData::default()),
+        };
+        match adsf_patch.patch {
+            PatchKind::ProjectNamesHeader(_) => {}
+            PatchKind::AnimDataHeader(diff) => diff.into_apply(&mut anim_data.header),
+            PatchKind::AddAnim(clip_anim_data_block) => {
+                anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
+            }
+            PatchKind::EditAnim(edit_anim) => {
+                if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.name_clip) {
+                    edit_anim.patch.into_apply(anim);
                 }
-                PatchKind::EditAnim(edit_anim) => {
-                    if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.name_clip) {
-                        edit_anim.patch.into_apply(anim);
-                    }
+            }
+            PatchKind::AddMotion(clip_motion_block) => {
+                anim_data.add_clip_motion_blocks.push(clip_motion_block);
+            }
+            PatchKind::EditMotion(edit_motion) => {
+                if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id) {
+                    edit_motion.patch.into_apply(motion);
                 }
-                PatchKind::AddMotion(clip_motion_block) => {
-                    anim_data.add_clip_motion_blocks.push(clip_motion_block);
-                }
-                PatchKind::EditMotion(edit_motion) => {
-                    if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id)
-                    {
-                        edit_motion.patch.into_apply(motion);
-                    }
-                }
-            };
+            }
         }
     }
 
@@ -281,7 +286,7 @@ fn write_alt_adsf_file(
     let path = path.as_ref();
 
     let serialized = serialize_alt_adsf(alt_adsf, patches.is_empty().then_some(patches))
-        .with_context(|_| FailedSerializeSnafu {
+        .with_context(|_| FailedSerializeAdsfSnafu {
             kind: AnimPatchErrKind::Adsf,
             sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
             path,

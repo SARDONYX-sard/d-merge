@@ -1,39 +1,47 @@
+use std::borrow::Cow;
+
 use rayon::prelude::*;
 
-use crate::{
-    asdsf::{
-        alt::{alt_key::to_normal_txt_project_name, AltAsdsf, AltTxtProjects},
-        normal::ser::{write_anim_set, write_file_names},
-    },
-    diff_line::DiffLines,
+use crate::asdsf::{
+    alt::{alt_key::to_normal_txt_project_name, AltAsdsf},
+    normal::ser::write_anim_set,
 };
+use crate::diff_line::DiffLines;
 
 const NEW_LINE: &str = "\r\n";
+
+/// Patch for the txt array inside Root txt (e.g., `DefaultmaleData~Defaultmale`).
+/// Resolves conflicts during key enumeration immediately before serialization.
+///
+/// e.g., - key: `DefaultMaleData~DefaultMale`, - value: diff lines
+pub type SubHeaderDiffMap<'a> = std::collections::HashMap<&'a str, DiffLines<'a>>;
 
 /// Converts an `AltAsdsf` struct back into the original `animationsetdatasinglefile.txt` text format with `\r\n` line endings.
 ///
 /// # Errors
-/// Failed to apply patches.
-pub fn serialize_alt_asdsf_with_patches(
+/// - Failed to apply patches.
+pub fn serialize_alt_asdsf(
     alt_asdsf: AltAsdsf<'_>,
     patches: DiffLines,
-) -> Result<String, crate::diff_line::error::Error> {
+    mut sub_txt_header_patch_map: SubHeaderDiffMap<'_>,
+) -> Result<String, SerializeError> {
     let mut out = String::new();
 
-    let (mut txt_projects, anim_set_lists): (Vec<_>, Vec<_>) = alt_asdsf
+    let mut txt_projects: Vec<_> = alt_asdsf
         .txt_projects
         .0
-        .into_par_iter()
-        .map(|(k, v)| {
+        .par_iter()
+        .map(|(k, _)| {
             let mut out = String::new();
-            if to_normal_txt_project_name(&k, &mut out).is_none() {
+            if to_normal_txt_project_name(k, &mut out).is_none() {
                 // This should not occur as long as we are using vanilla's asdsf.
                 #[cfg(feature = "tracing")]
                 tracing::error!("Failed to convert path: {k}");
             }
-            (k, v)
+            std::borrow::Cow::Owned(out)
         })
-        .unzip();
+        .collect();
+
     patches.into_apply(&mut txt_projects)?;
 
     out.push_str(&txt_projects.len().to_string());
@@ -43,9 +51,32 @@ pub fn serialize_alt_asdsf_with_patches(
         out.push_str(NEW_LINE);
     }
 
-    for anim_set_list in &anim_set_lists {
-        write_file_names(&mut out, anim_set_list);
-        for (_, anim_set) in &anim_set_list.0 {
+    for vanilla_name in txt_projects {
+        let mut name = String::new();
+        if super::alt_key::to_alt_txt_project_name(vanilla_name.as_ref(), &mut name).is_none() {
+            return Err(SerializeError::InvalidVanillaTxtProjectPath {
+                name: vanilla_name.to_string(),
+            });
+        };
+        let Some(anim_set_list) = alt_asdsf.txt_projects.0.get(name.as_str()) else {
+            return Err(SerializeError::MissingTxtProjectHeader { name });
+        };
+
+        // sub header seq patch
+        let mut sub_txt_headers: Vec<_> =
+            anim_set_list.0.par_iter().map(|(k, _)| k.clone()).collect();
+        if let Some(sub_header_diff) = sub_txt_header_patch_map.remove(name.as_str()) {
+            sub_header_diff.into_apply(&mut sub_txt_headers)?;
+        }
+        write_file_names(&mut out, &sub_txt_headers);
+
+        for sub_txt_header in sub_txt_headers {
+            let Some(anim_set) = anim_set_list.0.get(sub_txt_header.as_ref()) else {
+                return Err(SerializeError::MissingSubTxtHeader {
+                    name,
+                    sub_txt_name: sub_txt_header.to_string(),
+                });
+            };
             write_anim_set(&mut out, anim_set);
         }
     }
@@ -53,32 +84,57 @@ pub fn serialize_alt_asdsf_with_patches(
     Ok(out)
 }
 
-/// Converts an `AltAsdsf` struct back into the original `animationsetdatasinglefile.txt` text format with `\r\n` line endings.
-pub fn serialize_alt_asdsf(data: &AltAsdsf<'_>) -> String {
-    let mut out = String::new();
-
-    write_projects(&mut out, &data.txt_projects);
-
-    for (_, anim_set_list) in &data.txt_projects.0 {
-        write_file_names(&mut out, anim_set_list);
-        for (_, anim_set) in &anim_set_list.0 {
-            write_anim_set(&mut out, anim_set);
-        }
+fn write_file_names(out: &mut String, sub_txt_headers: &[Cow<'_, str>]) {
+    let file_names_len = sub_txt_headers.len();
+    if file_names_len == 0 {
+        return;
     }
 
-    out
-}
-
-fn write_projects(out: &mut String, projects: &AltTxtProjects) {
-    out.push_str(&projects.0.len().to_string());
+    out.push_str(&file_names_len.to_string());
     out.push_str(NEW_LINE);
-    for (project_name, _) in &projects.0 {
-        if to_normal_txt_project_name(project_name, out).is_none() {
-            #[cfg(feature = "tracing")]
-            tracing::error!("Failed to convert path: {project_name}");
-        }
+
+    for name in sub_txt_headers {
+        out.push_str(name);
         out.push_str(NEW_LINE);
     }
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum SerializeError {
+    #[snafu(transparent)]
+    DiffLine {
+        source: crate::diff_line::error::Error,
+    },
+
+    /// Expected: `{name}.txt`. but  got none.
+    MissingTxtProjectHeader { name: String },
+
+    /// Expected: `{name}/{sub_txt_name}.txt`. but  got none.
+    MissingSubTxtHeader { name: String, sub_txt_name: String },
+
+    /// Failed to convert a vanilla-style txt project path into an alternative
+    /// `~`-separated identifier.
+    ///
+    /// Expected format:
+    /// `<folder>\<file>.txt`
+    ///
+    /// Examples:
+    /// - `DefaultMaleData\DefaultMale.txt`
+    ///
+    /// Actual path:
+    /// `{path}`
+    #[snafu(display(
+        r#"Failed to convert a vanilla-style txt project path into an alternative `~`-separated identifier.
+
+Expected format:
+`<folder>\<file>.txt`
+
+Examples:
+- `DefaultMaleData\DefaultMale.txt`
+
+Actual path: `{name}`"#
+    ))]
+    InvalidVanillaTxtProjectPath { name: String },
 }
 
 #[cfg(test)]
@@ -104,7 +160,8 @@ mod tests {
         let alt_asdsf = asdsf.try_into().unwrap_or_else(|e| panic!("{e}"));
 
         // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();
-        let actual = serialize_alt_asdsf(&alt_asdsf);
+        let actual =
+            serialize_alt_asdsf(alt_asdsf, DiffLines::DEFAULT, SubHeaderDiffMap::new()).unwrap();
 
         // std::fs::create_dir_all("../../dummy").unwrap();
         // std::fs::write("../../dummy/adsf.txt", &actual).unwrap();

@@ -98,9 +98,10 @@ impl AnimData<'_> {
 /// This structure contains metadata related to the animation data, such as
 /// the number of lines remaining, asset count, and project assets.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnimDataHeader<'a> {
     /// An integer value related to the animation (meaning may vary based on context).
+    /// Details are unknown, but all adsf values are 1.
     ///
     /// - type: [`i32`]
     pub lead_int: Str<'a>,
@@ -110,6 +111,17 @@ pub struct AnimDataHeader<'a> {
 
     /// Indicates whether motion data is available.
     pub has_motion_data: bool,
+}
+
+impl Default for AnimDataHeader<'_> {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            lead_int: std::borrow::Cow::Borrowed("1"), // Details are unknown, but all adsf values are 1.
+            project_assets: Default::default(),
+            has_motion_data: Default::default(),
+        }
+    }
 }
 
 impl AnimDataHeader<'_> {

@@ -84,7 +84,11 @@ fn file_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     Ok(file_names.unwrap_or_default())
 }
 
-fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
+/// Parse one anim set data.(start "V3")
+///
+/// # Errors
+/// If got unexpected str.
+pub fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
     let version = one_line
         .verify(|line: &str| line == "V3")
         .context(Expected(Description("version == V3")))
