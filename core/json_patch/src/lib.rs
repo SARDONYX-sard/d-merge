@@ -14,7 +14,6 @@ pub mod ptr_mut;
 pub(crate) mod range;
 pub(crate) mod vec_utils;
 
-pub use self::range::parse::parse_range;
 pub use self::apply::error::{JsonPatchError, Result};
 pub use self::apply::{
     one_op::apply_one_field,
@@ -23,3 +22,4 @@ pub use self::apply::{
 pub use self::json_path::JsonPath;
 pub use self::operation::Op;
 pub use self::patch_types::{Action, JsonPatch, ValueWithPriority};
+pub use self::range::parse::parse_range;

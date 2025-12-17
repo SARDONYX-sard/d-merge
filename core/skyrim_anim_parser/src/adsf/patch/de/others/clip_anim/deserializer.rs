@@ -3,7 +3,9 @@ use crate::adsf::patch::de::others::clip_anim::{
     current_state::{CurrentState, PartialRotations},
     ClipAnimDiffPatch, DiffTriggerNames, LineKind,
 };
-use crate::common_parser::comment::{original_or_close_comment, open_comment, take_till_close, CommentKind};
+use crate::common_parser::comment::{
+    open_comment, original_or_close_comment, take_till_close, CommentKind,
+};
 use crate::common_parser::delete_line::delete_this_line;
 use crate::common_parser::lines::{one_line, verify_line_parses_to};
 use json_patch::Op;
