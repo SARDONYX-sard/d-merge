@@ -354,6 +354,7 @@ TurnRight[mirrored]
 18
 1
 0
+0
 2
 clipStart:6.65767
 <!-- MOD_CODE ~test~ OPEN -->
@@ -388,6 +389,7 @@ TurnRight[mirrored]
 <!-- CLOSE -->
 18
 1
+0
 0
 0
 <!-- MOD_CODE ~test~ OPEN -->
