@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-17
+### :sparkles: New Features
+- [`f8a23e8`](https://github.com/SARDONYX-sard/d-merge/commit/f8a23e8b01e7148797e49f904aae5c3f4b0fa7e1) - **FNIS**: add a feature that automatically converts added animations to hkx files compatible with the target *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`00918d9`](https://github.com/SARDONYX-sard/d-merge/commit/00918d9abf14b70bb4d6c4b6db5b47339e8645ae) - skip tag file(unsupported yet) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8480f85`](https://github.com/SARDONYX-sard/d-merge/commit/8480f85cf77cc49dc16b7298e21de66a3740e397) - **FNIS**: add behavior conversion *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`eed98c3`](https://github.com/SARDONYX-sard/d-merge/commit/eed98c317e1070924d8d75d9bb82c3419cf905ae) - **FNIS**: implement a feature to convert alt anim to OAR *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f1c3504`](https://github.com/SARDONYX-sard/d-merge/commit/f1c350404dc657efe9258a683843b772c4a73011) - **FNIS**: change to warn behavior path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4a713f5`](https://github.com/SARDONYX-sard/d-merge/commit/4a713f5b2cc191924eba1fc1d968f8afffdc68a7) - **FNIS**: no io parallel *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`57ccf09`](https://github.com/SARDONYX-sard/d-merge/commit/57ccf09a76b35124f8119a043350aa1509db0a06) - **FNIS**: use async *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7854821`](https://github.com/SARDONYX-sard/d-merge/commit/785482117a619707a3574cefcd94ea5ed0018f45) - **egui**: more transparent *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c75ae88`](https://github.com/SARDONYX-sard/d-merge/commit/c75ae8886b1af702475c2e9aa45d18875a481537) - implement new asdsf nemesis patch deserializer *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9d0a761`](https://github.com/SARDONYX-sard/d-merge/commit/9d0a761f5aec9b8281699446214050771716fe83) - **asdsf**: support `$crc32[]$` macro *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`24aa4b2`](https://github.com/SARDONYX-sard/d-merge/commit/24aa4b2d77de03a779124b5f2f93cc3add5c8a2e) - **FNIS**: fix ptr size check *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`990cfd5`](https://github.com/SARDONYX-sard/d-merge/commit/990cfd528bfec6ffbc471a362ff728ca6c623bb2) - fix parent dir path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`3d49720`](https://github.com/SARDONYX-sard/d-merge/commit/3d49720a93211206d20cfa360b901723ca0c7e6b) - **FNIS**: fix create_dir_all *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6d99af1`](https://github.com/SARDONYX-sard/d-merge/commit/6d99af12951cf1f25e4008b2941fd3de37bfe2d6) - **FNIS**: fix header check *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f94a079`](https://github.com/SARDONYX-sard/d-merge/commit/f94a079da26a76e96c08751cf92547a09ef02f6b) - **FNIS alt anim**: forgot copy *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`3a7d75a`](https://github.com/SARDONYX-sard/d-merge/commit/3a7d75a67b63aa4db5f17e36afe1d2a5ca5cd263) - **FNIS**: add create parent dir *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`caee30d`](https://github.com/SARDONYX-sard/d-merge/commit/caee30dfc6e1cbd3fd6a49e624859bb4b0b74a6a) - **schema**: fix schema *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`07fc7a3`](https://github.com/SARDONYX-sard/d-merge/commit/07fc7a32874dbac8eeea46e03b03ef2f9b67ffa7) - **FNIS**: add `default` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7228ae7`](https://github.com/SARDONYX-sard/d-merge/commit/7228ae7a67f23f39e5870bec9ac43af18f8b018e) - **FNIS**: fix config json *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9488c0c`](https://github.com/SARDONYX-sard/d-merge/commit/9488c0cb3fdf263315f797e753dbab40aa31fd57) - **FNIS**: fix path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`cf06863`](https://github.com/SARDONYX-sard/d-merge/commit/cf06863db5ce31e41110391d39d1a2dda58edf1d) - **FNIS**: try to fix conversion error *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9aa29b5`](https://github.com/SARDONYX-sard/d-merge/commit/9aa29b594f9ca755e92e7826b60e8ac2cc0b9b8f) - **egui**: fix the behavior of floating bottom buttons *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`58fe746`](https://github.com/SARDONYX-sard/d-merge/commit/58fe7468ce5ef6f95044022e039863e24165c2ab) - **frontend-vim**: fix broken CDN link *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`37996d2`](https://github.com/SARDONYX-sard/d-merge/commit/37996d2908dba687aa062273e18d496fd7b74447) - **asdsf**: fix path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a758e4c`](https://github.com/SARDONYX-sard/d-merge/commit/a758e4cb59b291652a51111f15924f9cc2a754d6) - **fnis**: add skip code *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`abb304b`](https://github.com/SARDONYX-sard/d-merge/commit/abb304bb9a1a401e92225ddddffffd9ce5bef2bd) - **asdsf**: fix patch handling and serialization for anim sets *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`cdd74df`](https://github.com/SARDONYX-sard/d-merge/commit/cdd74dfd6cca74e4606e69b72377f7c3e7b5a57f) - stop redundant alloc *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`846b565`](https://github.com/SARDONYX-sard/d-merge/commit/846b565f8fe0e592cbdd590b6273890013f8f284) - use `serde_hkx` low level api *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`df65204`](https://github.com/SARDONYX-sard/d-merge/commit/df652045e5c26b43875368e9735ec7b16ff1c607) - remove redundant scope *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`70d324c`](https://github.com/SARDONYX-sard/d-merge/commit/70d324caf801f7417125348f907a9478779ceedc) - **FNIS**: separate process *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4dda3fc`](https://github.com/SARDONYX-sard/d-merge/commit/4dda3fc7a98e7a867f76faee9e5d7f536aa7a7c6) - remove redundant comment *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`48e61aa`](https://github.com/SARDONYX-sard/d-merge/commit/48e61aaf5e7cc4781cf26a824dc10d1db4444f0b) - **dependencies**: remove redundant features in `Cargo.toml` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1fb793f`](https://github.com/SARDONYX-sard/d-merge/commit/1fb793f4916228c017df85264c66e457f0f29f16) - **FNIS**: change `unstable conversion` feature *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :white_check_mark: Tests
+- [`4121211`](https://github.com/SARDONYX-sard/d-merge/commit/4121211d57b69b766497e6a3f6c81c8218c64da1) - **adsf**: add missing line *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`c625052`](https://github.com/SARDONYX-sard/d-merge/commit/c6250520b563f38122778c11cb38c3a10e614e9e) - **bug-report**: add % *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`dc628d0`](https://github.com/SARDONYX-sard/d-merge/commit/dc628d0ece528471faadbf071b512c46b0c1c5ce) - **FNIS**: add info log *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`81520a4`](https://github.com/SARDONYX-sard/d-merge/commit/81520a448cbc81cc332f58c63a5ec44efcf5f5a4) - use `par_extend` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.2.6] - 2025-11-12
 ### :sparkles: New Features
 - [`5f38d2f`](https://github.com/SARDONYX-sard/d-merge/commit/5f38d2f1844adf86938400b93d01a5102bc1970d) - **egui**: add issue report button *(commit by @SARDONYX-sard)*
@@ -168,3 +219,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.2...0.2.3
 [0.2.4]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.3...0.2.4
 [0.2.5]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.4...0.2.5
+[0.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.6...0.3.0
