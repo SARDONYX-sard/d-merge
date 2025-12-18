@@ -199,4 +199,6 @@ Please ensure that your usage and redistribution of this software complies with 
 
 - [monaco-react](https://github.com/suren-atoyan/monaco-react/releases): If we don't properly override the available Monaco Editor version, the build will fail.
 
+  Using monaco-editor versions like 0.52.0 causes monaco-vim to become unresponsive. Pin 0.49.0
+
 - Due to a bug in turbopack at the time of Next.js 16 that prevents it from loading alias JSON files, use relative paths.
