@@ -44,9 +44,7 @@
     "version": "napi version"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.4.1",
-    "npm-run-all2": "^8.0.4",
+    "@napi-rs/cli": "3.5.0",
     "typescript": "5.9.3"
-  },
-  "optionalDependencies": {}
+  }
 }
