@@ -22,8 +22,8 @@
     "**/dummy/mods/**/*.txt": "xml"
   },
   "files.exclude": {
-    ".swc": true,
-    "**/node_modules": true // optional
+    ".swc": true
+    // "**/node_modules": true // optional
   },
   "files.watcherExclude": {
     "**/.git/objects/**": true,
