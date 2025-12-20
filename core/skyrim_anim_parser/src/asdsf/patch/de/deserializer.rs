@@ -7,13 +7,10 @@ use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line};
 
 use json_patch::{JsonPath, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
-use simd_json::borrowed::Object;
-use simd_json::BorrowedValue;
 use std::collections::HashMap;
 use winnow::combinator::opt;
 use winnow::{
     ascii::multispace0,
-    combinator::alt,
     error::{ContextError, ErrMode},
     Parser,
 };
@@ -218,32 +215,32 @@ impl<'de> PatchDeserializer<'de> {
         Ok(len)
     }
 
-    fn parse_num_bool(&mut self) -> Result<BorrowedValue<'de>> {
+    fn parse_num_bool(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        self.parse_next(num_bool_line.map(|boolean| if boolean { "1" } else { "0" }.into()))
+        self.parse_next(num_bool_line)?;
+        Ok(())
     }
 
     /// Parse 1 line(but ignore new line)
-    fn parse_str_line(&mut self) -> Result<BorrowedValue<'de>> {
+    fn parse_str_line(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        let s = self.parse_next(alt((one_line.map(BorrowedValue::String),)))?;
+        let _s = self.parse_next(one_line)?;
         #[cfg(feature = "tracing")]
-        tracing::debug!(?self.path, ?s);
+        tracing::debug!(?self.path, ?_s);
 
-        Ok(s)
+        Ok(())
     }
 
-    fn parse_line_to<T>(&mut self) -> Result<BorrowedValue<'de>>
+    fn parse_line_to<T>(&mut self) -> Result<()>
     where
         T: core::str::FromStr + core::fmt::Debug + Copy,
-        BorrowedValue<'de>: From<T>,
     {
         self.maybe_capture_diff()?;
-        let value = self.parse_next(parse_one_line::<T>)?;
+        let _value = self.parse_next(parse_one_line::<T>)?;
         #[cfg(feature = "tracing")]
-        tracing::debug!(?self.path, ?value);
+        tracing::debug!(?self.path, ?_value);
 
-        Ok(value.into())
+        Ok(())
     }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -263,56 +260,52 @@ impl<'de> PatchDeserializer<'de> {
         Ok(())
     }
 
-    fn parse_condition(&mut self) -> Result<BorrowedValue<'de>> {
-        let mut obj = Object::new();
+    fn parse_condition(&mut self) -> Result<()> {
         self.path.push("name".into());
-        obj.insert("name".into(), self.parse_str_line()?);
+        self.parse_str_line()?;
         self.path.pop();
 
         self.path.push("value_a".into());
-        obj.insert("value_a".into(), self.parse_line_to::<i32>()?);
+        self.parse_line_to::<i32>()?;
         self.path.pop();
 
         self.path.push("value_b".into());
-        obj.insert("value_b".into(), self.parse_line_to::<i32>()?);
+        self.parse_line_to::<i32>()?;
         self.path.pop();
 
-        Ok(BorrowedValue::Object(Box::new(obj)))
+        Ok(())
     }
 
-    fn parse_attack(&mut self) -> Result<BorrowedValue<'de>> {
-        let mut obj = Object::new();
-
+    fn parse_attack(&mut self) -> Result<()> {
         self.path.push("attack_trigger".into());
-        obj.insert("attack_trigger".into(), self.parse_str_line()?);
+        self.parse_str_line()?;
         self.path.pop();
 
         self.path.push("is_contextual".into());
-        obj.insert("is_contextual".into(), self.parse_num_bool()?);
+        self.parse_num_bool()?;
         self.path.pop();
 
         self.path.push("clip_names".into());
         self.parse_array(ArrayType::ClipName)?;
         self.path.pop();
 
-        Ok(BorrowedValue::Object(Box::new(obj)))
+        Ok(())
     }
 
-    fn parse_anim_info(&mut self) -> Result<BorrowedValue<'de>> {
-        let mut obj = Object::new();
+    fn parse_anim_info(&mut self) -> Result<()> {
         self.path.push("hashed_path".into());
-        obj.insert("hashed_path".into(), self.parse_line_to::<u32>()?);
+        self.parse_line_to::<u32>()?;
         self.path.pop();
 
         self.path.push("hashed_file_name".into());
-        obj.insert("hashed_file_name".into(), self.parse_line_to::<u32>()?);
+        self.parse_line_to::<u32>()?;
         self.path.pop();
 
         self.path.push("ascii_extension".into());
-        obj.insert("ascii_extension".into(), self.parse_line_to::<u32>()?);
+        self.parse_line_to::<u32>()?;
         self.path.pop();
 
-        Ok(BorrowedValue::Object(Box::new(obj)))
+        Ok(())
     }
 }
 
