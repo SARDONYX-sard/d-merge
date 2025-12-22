@@ -191,13 +191,13 @@ impl<'a> Hkanno<'a> {
 
         *annotation_tracks = self
             .annotation_tracks
-            .into_iter()
+            .into_par_iter()
             .map(|track| havok_classes::hkaAnnotationTrack {
                 __ptr: None,
                 m_trackName: StringPtr::new(track.track_name),
                 m_annotations: track
                     .annotations
-                    .into_iter()
+                    .into_par_iter()
                     .map(|ann| havok_classes::hkaAnnotationTrackAnnotation {
                         __ptr: None,
                         m_time: ann.time,
