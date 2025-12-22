@@ -424,7 +424,7 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
 
     Ok(Hkanno {
         ptr,
-        num_original_frames: num_original_frames as i32,
+        num_original_frames: num_original_frames.ceil() as i32, // Rather than adding 1, it's likely rounding up.
         duration,
         annotation_tracks: tracks,
     })
