@@ -21,7 +21,7 @@ napi-build = "2.2.3"
 
 [dependencies]
 napi = { version = "3.5.2", features = ["async"] } # Node.js FFI
-napi-derive = { version = "3.3.3" }                # Node.js FFI
+napi-derive = { version = "3.4.1" }                # Node.js FFI
 once_cell = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
