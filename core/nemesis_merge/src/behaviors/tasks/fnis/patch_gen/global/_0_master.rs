@@ -33,7 +33,7 @@ pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "#FNIS_aa_global_auto_gen2
 ///
 /// # Note
 /// The classes generated here are used in `character/behaviors/0_master.xml`
-/// and are generated for alternative animations(FNIS_aa).
+/// and are generated for Alternate Animations(FNIS_aa).
 ///
 /// However, they are actually also reused in PairedAndKillMoves, so they must be generated.
 ///

@@ -2,7 +2,7 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::alternative::AltAnimConfigJob;
+use crate::behaviors::tasks::fnis::patch_gen::alternative::to_oar::AltAnimConfigJob;
 use crate::config::{Config, OutPutTarget};
 use crate::errors::Error;
 

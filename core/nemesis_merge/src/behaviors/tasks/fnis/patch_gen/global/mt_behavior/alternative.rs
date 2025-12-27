@@ -31,7 +31,7 @@ pub(crate) const FNIS_BA_BLEND_TRANSITION_5232: &str = "#FNIS_aa_global_auto_gen
 /// These are classes that are generated only once per file.
 ///
 /// # Note
-/// Generated for alternative animations(FNIS_aa).
+/// Generated for Alternate Animations(FNIS_aa).
 /// However, they are actually also reused in Offset Arm Animations, so they must be generated.
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt`

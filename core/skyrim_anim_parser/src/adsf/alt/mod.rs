@@ -5,7 +5,7 @@ use crate::common_parser::lines::Str;
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
-/// Represents the alternative animation data structure.
+/// Represents the Alternate Animation data structure.
 ///
 /// Unlike [`Adsf`], which stores project names as strings with `.txt` extensions,
 /// this structure uses a map keyed by project names without the `.txt` suffix.

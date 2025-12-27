@@ -101,7 +101,7 @@ pub fn generate_patch<'a>(
                 #[cfg(feature = "unstable_conversion")]
                 {
                     let (jobs, errs) =
-                        super::alternative::alt_anim_to_oar(owned_data, alt_animation, config);
+                        super::alternative::to_oar::alt_anim_to_oar(owned_data, alt_animation, config);
                     if !errs.is_empty() {
                         return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR {
                             errors: errs,
@@ -250,7 +250,7 @@ pub enum FnisPatchGenerationError {
 
     #[cfg(feature = "unstable_conversion")]
     #[snafu(display(
-        "Failed to convert alternative animation to OAR format. See inner errors for details."
+        "Failed to convert Alternate Animation to OAR format. See inner errors for details."
     ))]
     FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
 
