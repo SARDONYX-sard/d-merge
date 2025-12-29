@@ -24,7 +24,32 @@ impl TemplateKey<'static> {
         })
     }
 }
+
 impl<'a> TemplateKey<'a> {
+    /// new valid template key.
+    /// - UTF-8 path
+    /// - starts_with `meshes`
+    /// - extension: `bin` or `xml`
+    ///
+    /// Otherwise [`Option::None`]
+    pub fn new(template_name: Cow<'a, str>) -> Option<Self> {
+        fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
+            s.len() >= prefix.len()
+                && s.get(..prefix.len())
+                    .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
+        }
+        fn ends_with_ignore_ascii(s: &str, suffix: &str) -> bool {
+            s.len() >= suffix.len()
+                && s.get(s.len() - suffix.len()..)
+                    .is_some_and(|p| p.eq_ignore_ascii_case(suffix))
+        }
+
+        (starts_with_ignore_ascii(&template_name, "meshes")
+            && (ends_with_ignore_ascii(&template_name, "bin")
+                || ends_with_ignore_ascii(&template_name, "xml")))
+        .then_some(Self { template_name })
+    }
+
     /// # Safety
     /// valid template path(from `meshes`)
     pub const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {

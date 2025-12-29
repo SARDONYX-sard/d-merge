@@ -16,7 +16,9 @@ pub fn collect_templates(
     template_names
         .into_par_iter()
         .map(|template_key| {
-            // Intended sample: `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.bin`
+            // Intended sample:
+            // - `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.bin`
+            // - `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.xml`
             let template_path = template_root.join(template_key.as_meshes_inner_path());
 
             if !template_path.exists() || !template_path.is_file() {

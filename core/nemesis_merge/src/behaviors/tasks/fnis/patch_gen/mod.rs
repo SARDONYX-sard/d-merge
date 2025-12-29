@@ -171,7 +171,7 @@ pub fn collect_borrowed_patches<'a>(
                 if !behavior_graph_data_map.0.contains_key(&master_template_key) {
                     behavior_graph_data_map.0.insert(
                         master_template_key.clone(),
-                        owned_data.behavior_entry.master_behavior_graph_index,
+                        Cow::Borrowed(owned_data.behavior_entry.master_behavior_graph_index),
                     );
                 }
 
