@@ -54,12 +54,12 @@ pub(crate) fn generate_hkx_files(
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
                 if let Some(pair) = variable_class_map.0.get(&key) {
-                    let master_behavior_graph_index = pair.value();
+                    let master_behavior_graph_index = pair;
 
                     // HACK: It assumes no duplicates exist, it might be better to give `iState_NPCSneaking` special treatment within the dedup function itself.
                     if !key.has_duplicate_event_names() {
                         // To unique eventID & variableID maps from hkbBehaviorGraphStringData class
-                        dedup_event_variables(&mut class_map, master_behavior_graph_index)
+                        dedup_event_variables(&mut class_map, master_behavior_graph_index.clone())
                             .with_context(|_| DedupEventVariableSnafu {
                                 path: output_path.clone(),
                             })?;
@@ -69,7 +69,7 @@ pub(crate) fn generate_hkx_files(
                     class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.
 
                     if let Some((event_map, var_map)) =
-                        create_maps(&class_map, master_behavior_graph_index)
+                        create_maps(&class_map, &master_behavior_graph_index)
                     {
                         event_id_map = Some(event_map);
                         variable_id_map = Some(var_map);

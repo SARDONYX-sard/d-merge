@@ -51,11 +51,11 @@ tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.20"
 winnow = { version = "0.7.14", features = ["simd"] }
 
-diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a0e78a0", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a0e78a0", default-features = false, features = [ "ignore_duplicates" ] }
-havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a0e78a0", default-features = false }
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a0e78a0", default-features = false }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a0e78a0", default-features = false }
+diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "edf4402", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "edf4402", default-features = false, features = [ "ignore_duplicates" ] }
+havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "edf4402", default-features = false }
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "edf4402", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "edf4402", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1"                                  # Color diff assertion
