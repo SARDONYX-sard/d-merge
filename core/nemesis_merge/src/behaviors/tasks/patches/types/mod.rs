@@ -2,7 +2,7 @@ mod patch_map;
 
 use dashmap::DashMap;
 use indexmap::IndexMap;
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 pub use self::patch_map::HkxPatchMaps;
 use crate::behaviors::tasks::{
@@ -101,7 +101,7 @@ impl<'a> BehaviorPatchesMap<'a> {
 /// - key: template_name
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, &'static str>);
+pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, Cow<'static, str>>);
 impl BehaviorGraphDataMap<'_> {
     /// Create `Self`
     #[inline]

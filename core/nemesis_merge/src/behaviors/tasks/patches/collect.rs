@@ -2,7 +2,10 @@ use json_patch::ValueWithPriority;
 use nemesis_xml::patch::parse_nemesis_patch;
 use rayon::prelude::*;
 use snafu::{OptionExt as _, ResultExt as _};
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 use tokio::fs;
 
 use super::paths::{
@@ -14,7 +17,6 @@ use crate::behaviors::tasks::{
     adsf::types::OwnedAdsfPatchMap,
     asdsf::types::OwnedAsdsfPatchMap,
     patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
-    templates::key::{MasterIndex, TemplateKey},
 };
 use crate::config::{ReportType, StatusReportCounter};
 use crate::errors::{
@@ -141,21 +143,32 @@ pub fn collect_borrowed_patches<'a>(
             // Since we could not make a destructing assignment, we have to write it this way.
             let priority = *priority;
 
-            let (json_patches, _) = parse_nemesis_patch(xml, config.hack_options.map(Into::into))
-                .with_context(|_| NemesisXmlErrSnafu { path })?;
+            let (json_patches, parsed_var_index) =
+                parse_nemesis_patch(xml, config.hack_options.map(Into::into))
+                    .with_context(|_| NemesisXmlErrSnafu { path })?;
 
-            let (template_file_stem, is_1st_person) = parse_nemesis_path(path)?; // Store variable class for nemesis variable to replace
-            let key = TemplateKey::from_nemesis_file(template_file_stem, is_1st_person)
-                .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
+            let key = {
+                let nemesis_path = parse_nemesis_path(path)?;
 
-            if let Some(master_pair_index) =
-                MasterIndex::from_nemesis_file(template_file_stem, is_1st_person)
-            {
-                variable_class_map
-                    .0
-                    .entry(key.clone())
-                    .or_insert(master_pair_index.master_behavior_graph_index);
-            }
+                let key = nemesis_path
+                    .to_template_key()
+                    .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
+
+                // Store variable class for nemesis variable to replace
+                if let Some(master_behavior_graph_index) = nemesis_path.get_variable_index() {
+                    variable_class_map
+                        .0
+                        .entry(key.clone())
+                        .or_insert(Cow::Borrowed(master_behavior_graph_index));
+                } else if let Some(parsed_var_index) = parsed_var_index {
+                    variable_class_map
+                        .0
+                        .entry(key.clone())
+                        .or_insert(Cow::Owned(parsed_var_index.to_string()));
+                }
+
+                key
+            };
 
             json_patches.into_par_iter().for_each(|(json_path, value)| {
                 // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
