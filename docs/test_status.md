@@ -81,8 +81,9 @@ SkyrimSE
 | ✅     | Precision Creatures                 | 2.4              | Need `Precision Creatures d_merge_patch`           |
 | ✅     | Project Impact SE                   | 2.72             |                                                    |
 | ✅     | SCAR - Skyrim Combos AI Revolution  | 1.06b            | With SCAR AE Support(v1.6.1)                       |
-| ✅     | True Directional Movement -SE, AE   | 2.2.5            |                                                    |
+| ✅     | SkyParkour v3                       | 3.2.1            |                                                    |
 | ✅     | TkDodgeUltimateCombat Nemesis patch | Nemesis0.84-beta |                                                    |
+| ✅     | True Directional Movement -SE, AE   | 2.2.5            |                                                    |
 
 ### Notes
 
