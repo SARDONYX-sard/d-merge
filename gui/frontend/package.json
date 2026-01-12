@@ -35,7 +35,7 @@
     "monaco-vim": "^0.4.4",
     "next": "^16.0.10",
     "notistack": "3.0.2",
-    "react-i18next": "16.5.0",
+    "react-i18next": "16.5.2",
     "zod": "^3.25.67"
   },
   "devDependencies": {
