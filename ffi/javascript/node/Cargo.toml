@@ -20,7 +20,7 @@ crate-type = ["cdylib"]
 napi-build = "2.2.3"
 
 [dependencies]
-napi = { version = "3.5.2", features = ["async"] } # Node.js FFI
+napi = { version = "3.8.2", features = ["async"] } # Node.js FFI
 napi-derive = { version = "3.3.3" }                # Node.js FFI
 once_cell = { workspace = true }
 rayon = { workspace = true }
