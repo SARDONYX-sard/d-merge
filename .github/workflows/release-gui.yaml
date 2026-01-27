@@ -75,15 +75,23 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          git fetch origin main:main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin
           git checkout main
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git stash push -m "temp changes" || true
           git pull origin main
-          git stash pop || true
+
+          # Stage only CHANGELOG.md
           git add CHANGELOG.md
-          git commit -m 'docs: update `CHANGELOG.md` for `${{ github.ref_name }}`' ; if ($LASTEXITCODE -ne 0) { echo "No changes to commit" }
+
+          # Drop Others.
+          git restore .
+          git clean -fd
+
+          git commit -m "docs: update CHANGELOG.md for ${{ github.ref_name }}" `
+            || echo "No changes to commit"
+
           git push origin main
 
       - name: Compress outputs(MacOS/Linux)
