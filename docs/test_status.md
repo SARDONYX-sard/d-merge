@@ -104,18 +104,6 @@ SkyrimSE
 
 - (LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.
 
-| Status | Mod Name                                  | Version | Used syntax |
-| ------ | ----------------------------------------- | ------- | ----------- |
-| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
-| ✅     | Flying Mod 2.0s                           | 1.1     | b           |
-| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
-| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b           |
-| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa       |
-| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
-| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
-| ✅     | Ride Sharing SE                           | 0.4b    | b           |
-| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
-
 Tag Legend
 
 - **b** : Basic animation
@@ -127,6 +115,18 @@ Tag Legend
 - **km** : KillMove animation
 - **ch** : Chair animation
 - **AAPrefix** : AltAnim syntax(Not supported yet)
+
+| Status | Mod Name                                  | Version | Used syntax |
+| ------ | ----------------------------------------- | ------- | ----------- |
+| ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
+| ✅     | Flying Mod 2.0s                           | 1.1     | b           |
+| ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
+| ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b           |
+| ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa       |
+| ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
+| ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
+| ✅     | Ride Sharing SE                           | 0.4b    | b           |
+| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
 
 ### Detailed Notes
 
@@ -141,4 +141,7 @@ Tag Legend
 
 - **XP32 Maximum Skeleton Special Extended**
   - AltAnim syntax not supported
-  - Planned for conversion to OAR
+  - ~~Planned for conversion to OAR~~(When converting to OAR, I encountered an issue where vfs temporarily stopped functioning in MO2, and I don't know how to resolve it.)
+
+  - We recommend using the following instead of this Alt Anim feature.
+    [Immersive Equipment Displays](https://www.nexusmods.com/skyrimspecialedition/mods/62001)
