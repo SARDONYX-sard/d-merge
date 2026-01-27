@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-27
+### :sparkles: New Features
+- [`9d9da8a`](https://github.com/SARDONYX-sard/d-merge/commit/9d9da8a69ac3d200dfedd55a08514f6d12882c71) - **hkanno**: supports class inheritance *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ec13590`](https://github.com/SARDONYX-sard/d-merge/commit/ec135902c767e48662d768952a6de746163d263a) - **merge**: support `Nemesis_EngineExt` path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`9d116eb`](https://github.com/SARDONYX-sard/d-merge/commit/9d116ebd90307bb90548d9491e9e4f053124794f) - **hkanno**: round up num_original_frames instead of adding 1 *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`bbc4c97`](https://github.com/SARDONYX-sard/d-merge/commit/bbc4c970ba2b619fbbe27db78dad00d99fa9d022) - **egui**: fix priority ordering *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`302df2b`](https://github.com/SARDONYX-sard/d-merge/commit/302df2b6eafa14b59d2847dcf935307687b02cf1) - **asdsf**: stop redundant value taken *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9f4ff70`](https://github.com/SARDONYX-sard/d-merge/commit/9f4ff70a8e95ba7d6e48b7810df5db41722d1a38) - **hkanno**: optimize annotation track processing with parallel iteration *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
 ## [0.3.0] - 2025-12-17
 ### :sparkles: New Features
 - [`f8a23e8`](https://github.com/SARDONYX-sard/d-merge/commit/f8a23e8b01e7148797e49f904aae5c3f4b0fa7e1) - **FNIS**: add a feature that automatically converts added animations to hkx files compatible with the target *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
