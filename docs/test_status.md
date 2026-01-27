@@ -64,28 +64,36 @@ SkyrimSE
 
 - Nemesis patch with DLL dependencies. This likely won't run in LE.
 
-| Status | Mod Name                            | Version          | Note                                               |
-| ------ | ----------------------------------- | ---------------- | -------------------------------------------------- |
-| ✅     | ADXP MCO 1.6.0.6 Bug Fixes          | 2.0.6            |                                                    |
-| ✅     | Animated Interactions               | 1.7.3            |                                                    |
-| ✅     | Attack - MCO_DXP -SE                | 1.6.06           | Using MCO Universal Support                        |
-| ✅     | DMCO_stable                         | 0.9.6            | AE requires separate DLL overwrites and additions. |
-| ✅     | Elden Counter MCO-ADXP              | 1.6              | With dTry Plugin Updates                           |
-| ✅     | ModernStaggerLock SE/AE             | 1.7              |                                                    |
-| ✅     | NPC Block Loop Fix                  | 1.0              |                                                    |
-| ✅     | Paraglider -SE                      | 1.5              | Test using NG dll                                  |
-| ✅     | Payload Interpreter                 | 1.1              |                                                    |
-| ✅     | POISE - Stagger Overhaul SE         | 1.02             |                                                    |
-| ✅     | Poisebreaker -SE                    | 0.7              |                                                    |
-| ✅     | Precision                           | 2.0.4            |                                                    |
-| ✅     | Precision Creatures                 | 2.4              | Need `Precision Creatures d_merge_patch`           |
-| ✅     | Project Impact SE                   | 2.72             |                                                    |
-| ✅     | SCAR - Skyrim Combos AI Revolution  | 1.06b            | With SCAR AE Support(v1.6.1)                       |
-| ✅     | SkyParkour v3                       | 3.2.1            |                                                    |
-| ✅     | TkDodgeUltimateCombat Nemesis patch | Nemesis0.84-beta |                                                    |
-| ✅     | True Directional Movement -SE, AE   | 2.2.5            |                                                    |
+| Status | Mod Name                                     | Version          | Note                                               |
+| ------ | -------------------------------------------- | ---------------- | -------------------------------------------------- |
+| ✅     | ADXP MCO 1.6.0.6 Bug Fixes                   | 2.0.6            |                                                    |
+| ✅     | Animated Interactions                        | 1.7.3            |                                                    |
+| ✅     | Attack - MCO_DXP -SE                         | 1.6.06           | Using MCO Universal Support                        |
+| ✅     | DMCO_stable                                  | 0.9.6            | AE requires separate DLL overwrites and additions. |
+| ✅     | Elden Counter MCO-ADXP                       | 1.6              | With dTry Plugin Updates                           |
+| ⚠️     | HorsePower - Modernized Horse Riding -SE, AE | 1.0.1            | For the full text, please refer to the note below. |
+| ✅     | ModernStaggerLock SE/AE                      | 1.7              |                                                    |
+| ✅     | NPC Block Loop Fix                           | 1.0              |                                                    |
+| ✅     | Paraglider -SE                               | 1.5              | Test using NG dll                                  |
+| ✅     | Payload Interpreter                          | 1.1              |                                                    |
+| ✅     | POISE - Stagger Overhaul SE                  | 1.02             |                                                    |
+| ✅     | Poisebreaker -SE                             | 0.7              |                                                    |
+| ✅     | Precision                                    | 2.0.4            |                                                    |
+| ✅     | Precision Creatures                          | 2.4              | Need `Precision Creatures d_merge_patch`           |
+| ✅     | Project Impact SE                            | 2.72             |                                                    |
+| ✅     | SCAR - Skyrim Combos AI Revolution           | 1.06b            | With SCAR AE Support(v1.6.1)                       |
+| ✅     | SkyParkour v3                                | 3.2.1            |                                                    |
+| ✅     | TkDodgeUltimateCombat Nemesis patch          | Nemesis0.84-beta | For the full text, please refer to the note below. |
+| ✅     | True Directional Movement -SE, AE            | 2.2.5            |                                                    |
 
 ### Notes
+
+- **HorsePower - Modernized Horse Riding -SE, AE**
+  - The patch below is incorrect. So remove it .
+    That location is simply an enumeration list where a .txt file should exist; nothing other than a .txt file should ever be present there.
+    `Nemesis_Engine\mod\hpmhr\animationsetdatasinglefile\HorseProjectData~HorseProject\horseproject.txt`
+  - Turning and jumping have been confirmed to be possible.
+  - It might be because I'm using TDM, Poisebreaker, and MCO, but attacks and stagger didn't work.
 
 - **TkDodgeUltimateCombat Nemesis patch**
   - Tested with TK Dodge SE (v3.18) + TK Dodge RE (v0.55-rc3)
