@@ -1262,7 +1262,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_egui"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "eframe",
  "egui",
@@ -1319,7 +1319,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_node"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "mod_info",
  "napi",
@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_python"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "mod_info",
  "nemesis_merge",
