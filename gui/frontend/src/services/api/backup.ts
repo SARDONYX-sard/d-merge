@@ -1,3 +1,4 @@
+import { NOTIFY } from '@/lib/notify';
 import { CACHE_KEYS, type Cache, STORAGE } from '@/lib/storage';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
@@ -9,10 +10,16 @@ const SETTINGS_FILE_NAME = 'settings';
 
 export const BACKUP = {
   /** @throws Error | JsonParseError */
-  async import(): Promise<Cache | undefined> {
+  async import(parserMode: 'egui' | 'tauri'): Promise<Cache | undefined> {
     const settings = await readFileWithDialog(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
     if (settings === null) {
       return undefined;
+    }
+
+    if (parserMode === 'tauri') {
+      return this.fromStr(settings);
+    } else if (parserMode === 'egui') {
+      return convertEguiSettings(parseEguiSettings(settings) ?? {});
     }
 
     const eguiSettings = parseEguiSettings(settings);
@@ -30,6 +37,7 @@ export const BACKUP = {
 
       // Validate
       if (typeof json === 'object' && !Array.isArray(json) && json !== null) {
+        const invalidKeys: string[] = [];
         for (const key of Object.keys(json)) {
           // NOTE: The import path selected immediately before should remain selectable the next time, so do not overwrite it.
           if (key === PRIVATE_CACHE_OBJ.importSettingsPath) {
@@ -38,9 +46,15 @@ export const BACKUP = {
 
           const isInvalidKey = !CACHE_KEYS.some((cacheKey) => cacheKey === key);
           if (isInvalidKey) {
+            invalidKeys.push(key);
             delete json[key];
           }
         }
+
+        if (invalidKeys.length > 0) {
+          NOTIFY.warn(`The following keys are not recognized and have been ignored: ${invalidKeys.join(', ')}`);
+        }
+
         return json;
       }
     }

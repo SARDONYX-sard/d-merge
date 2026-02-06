@@ -1,6 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { z } from 'zod';
-import { electronApi, isElectron } from './electron';
 
 /**
  * Get skyrim directory
@@ -16,11 +15,7 @@ export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
     }
   }
 
-  if (isElectron()) {
-    return await electronApi.getSkyrimDir(runtime);
-  }
-
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 export type FetchedModInfo = {
@@ -66,11 +61,7 @@ export async function loadModsInfo(skyrimDataDir: string) {
     return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir });
   }
 
-  if (isElectron()) {
-    return await electronApi.loadModsInfo(skyrimDataDir);
-  }
-
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 /** must be same as `GuiOption` serde */
@@ -141,11 +132,7 @@ export async function patch(output: string, patches: PatchMaps, options: PatchOp
     return await invoke('patch', { output, patches, options });
   }
 
-  if (isElectron()) {
-    return await electronApi.patch(output, patches, options);
-  }
-
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 /**
@@ -157,11 +144,7 @@ export async function cancelPatch() {
     return await invoke('cancel_patch');
   }
 
-  if (isElectron()) {
-    return await electronApi.cancelPatch();
-  }
-
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 /**
@@ -173,9 +156,5 @@ export async function preventAutoCloseWindow(isEnabled: boolean) {
     return await invoke('set_vfs_mode', { value: isEnabled });
   }
 
-  if (isElectron()) {
-    return await electronApi.setVfsMode(isEnabled);
-  }
-
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }

@@ -5,17 +5,6 @@ import { type ActiveModItem, ModListSchema } from '@/services/api/egui/backup';
 import type { ModInfo } from '@/services/api/patch';
 
 /**
- * Convert ModInfo[] into a ModItem[] for storage.
- */
-const toActiveList = (mods: ModInfo[]): ActiveModItem[] =>
-  mods.map(({ id, enabled, priority, mod_type }) => ({
-    id,
-    enabled,
-    priority,
-    mod_type,
-  }));
-
-/**
  * Synchronize and sort ModInfo list with cached ModList.
  * This hook guarantees that:
  * - The active mod list is stored in both React state and schemaStorage
@@ -66,6 +55,17 @@ export const useModInfoState = (isVfsMode: boolean) => {
     setModInfoList,
   } as const;
 };
+
+/**
+ * Convert ModInfo[] into a ModItem[] for storage.
+ */
+const toActiveList = (mods: ModInfo[]): ActiveModItem[] =>
+  mods.map(({ id, enabled, priority, mod_type }) => ({
+    id,
+    enabled,
+    priority,
+    mod_type,
+  }));
 
 /**
  * Sorts modInfoList according to activeModList priorities,

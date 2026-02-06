@@ -26,7 +26,9 @@ type ContextType = {
   skyrimDataDir: string;
   setSkyrimDataDir: Dispatch<SetStateAction<string>>;
 
+  /** The mod info displayed in the grid for the patch target for the user */
   modInfoList: ModInfo[];
+  /** Sets the mod information list used for patching */
   setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
   setFetchedModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
 

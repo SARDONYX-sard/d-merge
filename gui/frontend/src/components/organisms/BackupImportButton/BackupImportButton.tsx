@@ -9,14 +9,18 @@ import { NOTIFY } from '@/lib/notify';
 import { type Cache, STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 
-export const BackupImportButton = () => {
+type Props = {
+  parserMode: 'egui' | 'tauri';
+};
+
+export const BackupImportButton = ({ parserMode }: Props) => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<Cache>({});
   const [open, setOpen] = useState(false);
 
   const handleClick = () => {
     NOTIFY.asyncTry(async () => {
-      const newSettings = await BACKUP.import();
+      const newSettings = await BACKUP.import(parserMode);
       if (newSettings) {
         setSettings(newSettings);
         setOpen(true);
@@ -35,9 +39,11 @@ export const BackupImportButton = () => {
     window.location.reload(); // To enable
   };
 
+  const namePostfix = parserMode === 'egui' ? '(egui)' : '';
+
   return (
     <BackupButton
-      buttonName={t('backup.import.button_name')}
+      buttonName={`      ${t('backup.import.button_name')}${namePostfix}`}
       cacheItems={settings}
       inDialogClick={handleDialogClick}
       onClick={handleClick}

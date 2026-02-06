@@ -17,7 +17,9 @@ const RESOURCES = {
   'ja-JP': {
     translation: dictJaJp,
   },
-  custom: { translation: NOTIFY.try(() => JSON.parse(STORAGE.get('custom-translation-dict') ?? '{}')) },
+  custom: {
+    translation: NOTIFY.try(() => JSON.parse(STORAGE.get('custom-translation-dict') ?? '{}')),
+  },
 } as const satisfies Resource;
 
 /** The actual item to be set in the library. This must be a Key that exists in `RESOURCES`. */

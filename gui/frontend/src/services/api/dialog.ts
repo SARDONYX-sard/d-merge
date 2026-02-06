@@ -1,6 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { type OpenDialogOptions, open, SaveDialogOptions, save as tauriSave } from '@tauri-apps/plugin-dialog';
-import { electronApi, isElectron as isElectron } from './electron';
+import { type OpenDialogOptions, open, type SaveDialogOptions, save as tauriSave } from '@tauri-apps/plugin-dialog';
 
 type OpenOptions = {
   /**
@@ -25,14 +24,11 @@ export async function openPath(path: string, options: OpenOptions = {}): Promise
       return await open({ defaultPath: path, ...dialogOptions });
     }
 
-    if (isElectron()) {
-      return await electronApi.open({ defaultPath: path, ...dialogOptions });
-    }
-
-    throw new Error('Unsupported platform: Neither Tauri nor Electron');
+    throw new Error('Unsupported platform: Non Tauri');
   })();
 
-  typeof res === 'string' && setPath?.(res);
+  if (typeof res === 'string') setPath?.(res);
+
   return res;
 }
 
@@ -44,9 +40,7 @@ export async function openPath(path: string, options: OpenOptions = {}): Promise
 export async function save(options: SaveDialogOptions) {
   if (isTauri()) {
     return await tauriSave(options);
-  } else if (isElectron()) {
-    return await electronApi.save(options);
-  } else {
-    throw new Error('Unsupported platform: Neither Tauri nor Electron');
   }
+
+  throw new Error('Unsupported platform: Non Tauri');
 }

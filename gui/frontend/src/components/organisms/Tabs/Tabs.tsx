@@ -68,7 +68,8 @@ export const Tabs = () => {
         </TabPanel>
 
         <TabPanel value='backup'>
-          <BackupImportButton />
+          <BackupImportButton parserMode='tauri' />
+          <BackupImportButton parserMode='egui' />
           <BackupExportButton />
         </TabPanel>
       </TabContext>

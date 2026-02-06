@@ -1,13 +1,13 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter, useRouterState } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 /**
- * usePageRedirect
+ * usePageRedirect (TanStack Router)
  *
  * Handles:
  * - One-time redirect to lastPath
@@ -16,9 +16,15 @@ import { schemaStorage } from '@/lib/storage/schemaStorage';
  */
 export const usePageRedirect = <T extends Readonly<[string, ...string[]]>>(validPaths: T) => {
   const router = useRouter();
-  const pathname = usePathname();
+
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+
   const pathSchema = z.enum(validPaths);
+
   const [lastPath, setLastPath] = schemaStorage.use(PUB_CACHE_OBJ.lastPath, pathSchema);
+
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const normalizePath = (path: string): (typeof validPaths)[number] => {
@@ -33,7 +39,7 @@ export const usePageRedirect = <T extends Readonly<[string, ...string[]]>>(valid
 
   const currentPath = normalizePath(pathname);
 
-  // --- Redirect once per session if needed ---
+  // --- Redirect once per session ---
   useEffect(() => {
     if (!lastPath) return;
 
@@ -42,21 +48,29 @@ export const usePageRedirect = <T extends Readonly<[string, ...string[]]>>(valid
     if (lastPath === '/' || pathname.endsWith(lastPath)) return;
 
     sessionStorage.setItem('hasRedirected', 'true');
-    router.replace(lastPath);
+
+    router.navigate({
+      to: lastPath,
+      replace: true,
+    });
   }, [lastPath, pathname, router]);
 
-  // --- Keep lastPath and selected index synced ---
+  // --- Sync lastPath & selectedIndex ---
   useEffect(() => {
     const index = validPaths.indexOf(currentPath);
     setSelectedIndex(index >= 0 ? index : 0);
     setLastPath(currentPath);
-  }, [currentPath, setLastPath]);
+  }, [currentPath, validPaths, setLastPath]);
 
   const navigateTo = (index: number) => {
     const target = validPaths[index];
     if (!target) return;
+
     setSelectedIndex(index);
-    router.push(target);
+
+    router.navigate({
+      to: target,
+    });
   };
 
   return {

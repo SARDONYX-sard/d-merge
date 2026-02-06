@@ -1,6 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { listen as tauriListen } from '@tauri-apps/api/event';
-import { electronApi, isElectron } from './electron';
+import { listen as tauriListen, type UnlistenFn } from '@tauri-apps/api/event';
 
 /**
  * Cross-platform event listener for Tauri and Electron.
@@ -29,20 +28,12 @@ import { electronApi, isElectron } from './electron';
  * unlisten();
  * ```
  */
-export async function listen<T>(eventName: string, eventHandler: (payload: T) => void) {
-  let unlisten: (() => void) | null = null;
-
+export async function listen<T>(eventName: string, eventHandler: (payload: T) => void): Promise<UnlistenFn> {
   if (isTauri()) {
-    unlisten = await tauriListen<T>(eventName, (event) => {
+    return await tauriListen<T>(eventName, (event) => {
       eventHandler(event.payload);
     });
-  } else if (isElectron()) {
-    unlisten = await electronApi.listen<T>(eventName, (payload) => {
-      eventHandler(payload);
-    });
   } else {
-    throw new Error('Unsupported platform for status listener: Neither Tauri nor Electron');
+    throw new Error('Unsupported platform: Non Tauri');
   }
-
-  return unlisten;
 }

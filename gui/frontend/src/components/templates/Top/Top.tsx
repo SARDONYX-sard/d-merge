@@ -4,8 +4,8 @@ import LayersIcon from '@mui/icons-material/Layers';
 import NotesIcon from '@mui/icons-material/Notes';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TransformIcon from '@mui/icons-material/Transform';
-import { Box, Card, CardActionArea, CardContent, Grid, SxProps, Theme, Typography } from '@mui/material';
-import { useRouter } from 'next/navigation';
+import { Box, Card, CardActionArea, CardContent, Grid, type SxProps, type Theme, Typography } from '@mui/material';
+import { useRouter } from '@tanstack/react-router';
 import { useInjectJs } from '@/components/hooks/useInjectJs';
 import { useTranslation } from '@/components/hooks/useTranslation';
 
@@ -51,7 +51,14 @@ export const WelcomePage = () => {
                   },
                 })}
               >
-                <CardActionArea onClick={() => router.push(`/${page.path}`)} sx={{ height: '100%' }}>
+                <CardActionArea
+                  onClick={() =>
+                    router.navigate({
+                      to: `/${page.path}`,
+                    })
+                  }
+                  sx={{ height: '100%' }}
+                >
                   <CardContent
                     sx={{
                       textAlign: 'center',
@@ -59,7 +66,9 @@ export const WelcomePage = () => {
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      '&:hover': { color: 'var(--mui-palette-primary-main)' },
+                      '&:hover': {
+                        color: 'var(--mui-palette-primary-main)',
+                      },
                     }}
                   >
                     {page.icon}

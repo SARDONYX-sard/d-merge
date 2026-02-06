@@ -39,9 +39,15 @@ export const useModsGrid = () => {
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
     (RowId, _detail) => {
-      // NOTE: When the value is less than or equal to 0, there is no data and the selection is all cleared during data dir input.
-      // To prevent this, skip judgment is performed.
+      // NOTE: If the length is 0, a bug occurs where everything is cleared during the first Drag & Drop move unless the previous items are saved.
+      // Here, we prevent that.
       if (modInfoList.length <= 0) {
+        setModInfoList((prevModList: ModInfo[]) => {
+          return prevModList.map((mod) => ({
+            ...mod,
+            enabled: RowId.ids.has(mod.id),
+          }));
+        });
         return;
       }
 

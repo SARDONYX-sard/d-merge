@@ -8,7 +8,6 @@ import { GlobalProvider } from '@/components/providers';
 import { LANG } from '@/lib/i18n';
 import { LOG } from '@/services/api/log';
 import { showWindow } from '@/services/api/window';
-import '@/services/api/global_events';
 
 LANG.init();
 LOG.changeLevel(LOG.get());

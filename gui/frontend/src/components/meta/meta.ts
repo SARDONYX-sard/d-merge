@@ -1,7 +1,6 @@
-import type { Metadata } from 'next';
 import packageJson from '../../../../../package.json';
 
-export const metadata: Metadata = {
+export const metadata = {
   title: packageJson.name,
   description: packageJson.description,
 };
