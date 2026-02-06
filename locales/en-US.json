@@ -156,6 +156,23 @@
       "locked_due_to_sorting_help": "Editing is disabled during sorting. Click to unlock."
     }
   },
+  "hkanno": {
+    "toolbar": {
+      "save": "Save",
+      "revert": "Revert",
+      "show_preview": "Show Preview",
+      "hide_preview": "Hide Preview"
+    },
+    "editor": {
+      "annotation": "Annotation",
+      "drop_instruction": "Drop HKX or XML files here",
+      "dropping_message": "Drag and drop the file or click `Open File`."
+    },
+    "preview": {
+      "title": "Preview",
+      "error_title": "Preview (Error)"
+    }
+  },
   "select_button": "Select",
   "tabs": {
     "backup": "Backup",

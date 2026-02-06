@@ -156,6 +156,23 @@
       "locked_due_to_sorting_help": "ソート中のため編集できません。クリックで解除できます。"
     }
   },
+  "hkanno": {
+    "toolbar": {
+      "save": "保存",
+      "revert": "元に戻す",
+      "show_preview": "プレビューを表示",
+      "hide_preview": "プレビューを非表示"
+    },
+    "editor": {
+      "annotation": "hkanno v2",
+      "drop_instruction": "HKX または XML ファイルをここにドロップします",
+      "dropping_message": "ファイルをドラッグ アンド ドロップするか、「選択」をクリックします。"
+    },
+    "preview": {
+      "title": "XMLプレビュー",
+      "error_title": "プレビュー (エラー)"
+    }
+  },
   "select_button": "選択",
   "tabs": {
     "backup": "バックアップ",
