@@ -29,6 +29,7 @@ export const ClosableTabs: React.FC<Props> = ({ tabs, active, setActive, setTabs
       {tabs.map((tab, index) => (
         <Tab
           key={tab.id}
+          sx={{ textTransform: 'none' }}
           label={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <span>{tab.inputPath.split(/[\\/]/).pop()}</span>
