@@ -10,11 +10,14 @@ import { useColumns } from './useColumns';
 import { useFetchModInfo } from './useFetchModInfo';
 import { useGridStatePersistence } from './useGridStatePersistence';
 
-const reorderAndReindex = <T extends { priority: number }>(array: T[], oldIndex: number, newIndex: number): T[] => {
-  return arrayMove(array, oldIndex, newIndex).map((item, idx) => ({
-    ...item,
-    priority: idx + 1,
-  }));
+const reorderAndReindex = (array: ModInfo[], oldIndex: number, newIndex: number): ModInfo[] => {
+  return arrayMove(array, oldIndex, newIndex).map((item, idx) => {
+    return {
+      ...item,
+      enabled: item.enabled,
+      priority: idx + 1,
+    };
+  });
 };
 
 type DragEndHandler = Exclude<DndContextProps['onDragEnd'], undefined>;
@@ -26,12 +29,14 @@ export const useModsGrid = () => {
   const columns = useColumns();
   const apiRef = useGridApiRef();
 
+  // NOTE: Due to a design flaw, obtaining the prev value from the function arguments causes a bug.
+  // Therefore, always overwrite it using `modInfoList`.
   const handleDragEnd = useCallback<DragEndHandler>(
     ({ active, over }) => {
       if (over) {
         const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
         const newIndex = modInfoList.findIndex((row) => row.id === over.id);
-        setModInfoList((prevRows) => reorderAndReindex(prevRows, oldIndex, newIndex));
+        setModInfoList(reorderAndReindex(modInfoList, oldIndex, newIndex));
       }
     },
     [modInfoList, setModInfoList],
@@ -39,36 +44,23 @@ export const useModsGrid = () => {
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
     (RowId, _detail) => {
-      // NOTE: If the length is 0, a bug occurs where everything is cleared during the first Drag & Drop move unless the previous items are saved.
-      // Here, we prevent that.
-      if (modInfoList.length <= 0) {
-        setModInfoList((prevModList: ModInfo[]) => {
-          return prevModList.map((mod) => ({
-            ...mod,
-            enabled: RowId.ids.has(mod.id),
-          }));
-        });
-        return;
-      }
-
       // HACK: For some reason, the check status becomes apparent one turn after checking, so it forces a “check all” at the zero stage.
       if (selectedIds.size === 0 && _detail.reason === 'multipleRowsSelection') {
-        setModInfoList((prevModList: ModInfo[]) => {
-          return prevModList.map((mod) => ({
+        setModInfoList(
+          modInfoList.map((mod) => ({
             ...mod,
             enabled: true,
-          }));
-        });
-
+          })),
+        );
         return;
       }
 
-      setModInfoList((prevModList: ModInfo[]) => {
-        return prevModList.map((mod) => ({
+      setModInfoList(
+        modInfoList.map((mod) => ({
           ...mod,
           enabled: RowId.ids.has(mod.id),
-        }));
-      });
+        })),
+      );
     },
     [modInfoList],
   );
