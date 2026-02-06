@@ -4,7 +4,6 @@ import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
-import { isElectron } from '@/services/api/electron';
 import { listen } from '@/services/api/event';
 import { exists, readFile } from '@/services/api/fs';
 import { preventAutoCloseWindow } from '@/services/api/patch';
@@ -15,7 +14,7 @@ export const useBackup = () => {
   useAutoExportBackup();
 };
 
-const isDesktopApp = () => isTauri() || isElectron();
+const isDesktopApp = () => isTauri();
 
 const useAutoImportBackup = () => {
   const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
@@ -34,13 +33,13 @@ const useAutoImportBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
-      if (!(await exists(settingsPath))) {
-        return;
-      }
-
-      NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
-
       try {
+        if (!(await exists(settingsPath))) {
+          return;
+        }
+
+        NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
+
         const newSettings = await BACKUP.fromStr(await readFile(settingsPath));
         if (newSettings) {
           newSettings['last-path'] = '/';
@@ -61,27 +60,34 @@ const useAutoExportBackup = () => {
   const settingsPath = `${skyrimDataDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlisten: (() => void) | null;
 
+    /**
+     * Register close listener for auto backup.
+     */
     const registerCloseListener = async () => {
-      const unlistenFn = await listen('tauri://close-requested', async () => {
-        if (!(isDesktopApp() && isVfsMode) || skyrimDataDir === '') {
-          preventAutoCloseWindow(false);
-          return;
-        }
-        preventAutoCloseWindow(true);
+      try {
+        const unlistenFn = await listen('tauri://close-requested', async () => {
+          if (!(isDesktopApp() && isVfsMode) || skyrimDataDir === '') {
+            await preventAutoCloseWindow(false);
+            return;
+          }
+          await preventAutoCloseWindow(true);
 
-        try {
-          NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
-          await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
-        } catch (e) {
-          NOTIFY.error(`${e}`);
-        } finally {
-          destroyCurrentWindow();
-        }
-      });
+          try {
+            NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
+            await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
+          } catch (e) {
+            NOTIFY.error(`${e}`);
+          } finally {
+            await destroyCurrentWindow();
+          }
+        });
 
-      unlisten = unlistenFn;
+        unlisten = unlistenFn;
+      } catch (e) {
+        NOTIFY.error(`Failed to register close listener for auto backup. Error: ${e}`);
+      }
     };
 
     registerCloseListener();

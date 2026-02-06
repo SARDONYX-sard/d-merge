@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { STORAGE } from '@/lib/storage';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-import { electronApi, isElectron } from '@/services/api/electron';
 import { openPath } from '@/services/api/shell';
 
 const logList = ['trace', 'debug', 'info', 'warn', 'error'] as const;
@@ -43,12 +42,10 @@ export const LOG = {
    */
   async changeLevel(logLevel?: LogLevel) {
     if (isTauri()) {
-      await invoke('change_log_level', { logLevel });
-    } else if (isElectron()) {
-      await electronApi.changeLogLevel(logLevel);
-    } else {
-      throw new Error('Unsupported platform: Neither Tauri nor Electron');
+      return await invoke<undefined>('change_log_level', { logLevel });
     }
+
+    console.error('Unsupported platform: Non Tauri');
   },
 
   normalize,
@@ -67,17 +64,14 @@ export const LOG = {
 async function getLogDir(): Promise<string> {
   if (isTauri()) {
     return await tauriAppLogDir();
-  } else if (isElectron()) {
-    return await electronApi.getAppLogDir();
   }
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 async function getAppName(): Promise<string> {
   if (isTauri()) {
     return await app.getName();
-  } else if (isElectron()) {
-    return await electronApi.getAppName();
   }
-  throw new Error('Unsupported platform: Neither Tauri nor Electron');
+  throw new Error('Unsupported platform: Non Tauri');
 }

@@ -10,7 +10,7 @@ import { NOTIFY_CONFIG } from '@/lib/notify/config';
  * - https://github.com/iamhosseindhv/notistack/issues/477#issuecomment-1885706867
  * @export
  */
-export default function NotifyProvider() {
+export function NotifyProvider() {
   const { anchorOrigin, maxSnack } = NOTIFY_CONFIG.getOrDefault();
 
   return (

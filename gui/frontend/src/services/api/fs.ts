@@ -6,7 +6,6 @@ import type { CacheKey } from '@/lib/storage';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
 
 import { openPath } from './dialog';
-import { electronApi, isElectron } from './electron';
 
 /**
  * Reads the entire contents of a file into a string.
@@ -46,10 +45,6 @@ export async function exists(filePath: string): Promise<boolean> {
     return await tauriExists(filePath);
   }
 
-  if (isElectron()) {
-    return await electronApi.exists(filePath);
-  }
-
   return false;
 }
 
@@ -64,11 +59,9 @@ export async function exists(filePath: string): Promise<boolean> {
 export async function readFile(filePath: string): Promise<string> {
   if (isTauri()) {
     return await readTextFile(filePath);
-  } else if (isElectron()) {
-    return await electronApi.readFile(filePath);
-  } else {
-    throw new Error('Unsupported platform: Neither Tauri nor Electron');
   }
+
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 /**
@@ -84,9 +77,7 @@ export async function readFile(filePath: string): Promise<string> {
 export async function writeFile(path: string, content: string) {
   if (isTauri()) {
     return await invoke('write_file', { path, content });
-  } else if (isElectron()) {
-    return await electronApi.writeFile(path, content);
-  } else {
-    throw new Error('Unsupported platform: Neither Tauri nor Electron');
   }
+
+  throw new Error('Unsupported platform: Non Tauri');
 }
