@@ -23,7 +23,7 @@
     "@mui/lab": "7.0.1-beta.20",
     "@mui/material": "7.3.6",
     "@mui/x-data-grid": "8.23.0",
-    "@mui/x-tree-view": "8.22.0",
+    "@mui/x-tree-view": "8.27.0",
     "@tanstack/react-router": "^1.158.1",
     "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/plugin-dialog": "^2.4.2",
