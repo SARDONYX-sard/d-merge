@@ -48,7 +48,7 @@ export const useFetchModInfo = () => {
 
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
-        const fetched = await loadModsInfo(deferredDir);
+        const fetched = await loadModsInfo(deferredDir, isVfsMode);
         if (fetched.length > 0) {
           setFetchedModInfoList((prev) => mergeModInfoList(prev, fetched));
         }

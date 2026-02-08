@@ -6,7 +6,6 @@ import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 import { listen } from '@/services/api/event';
 import { exists, readFile } from '@/services/api/fs';
-import { preventAutoCloseWindow } from '@/services/api/patch';
 import { destroyCurrentWindow } from '@/services/api/window';
 
 export const useBackup = () => {
@@ -14,15 +13,13 @@ export const useBackup = () => {
   useAutoExportBackup();
 };
 
-const isDesktopApp = () => isTauri();
-
 const useAutoImportBackup = () => {
   const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
   const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
 
   useEffect(() => {
     const doImport = async () => {
-      if (!(isDesktopApp() && autoDetectEnabled) || modInfoDir === '') {
+      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
         return;
       }
 
@@ -67,13 +64,11 @@ const useAutoExportBackup = () => {
      */
     const registerCloseListener = async () => {
       try {
-        const unlistenFn = await listen('tauri://close-requested', async () => {
-          if (!(isDesktopApp() && isVfsMode) || skyrimDataDir === '') {
-            await preventAutoCloseWindow(false);
-            return;
-          }
-          await preventAutoCloseWindow(true);
+        if (!isTauri()) {
+          return;
+        }
 
+        const unlistenFn = await listen('tauri://close-requested', async () => {
           try {
             NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
             await BACKUP.exportRaw(settingsPath, STORAGE.getAll());

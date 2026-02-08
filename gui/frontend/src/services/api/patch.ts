@@ -56,9 +56,9 @@ export type PatchMaps = {
  * Load mods `info.ini`
  * @throws Error
  */
-export async function loadModsInfo(skyrimDataDir: string) {
+export async function loadModsInfo(skyrimDataDir: string, isVfsMode: boolean) {
   if (isTauri()) {
-    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir });
+    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir, isVfsMode });
   }
 
   throw new Error('Unsupported platform: Non Tauri');
@@ -142,18 +142,6 @@ export async function patch(output: string, patches: PatchMaps, options: PatchOp
 export async function cancelPatch() {
   if (isTauri()) {
     return await invoke('cancel_patch');
-  }
-
-  throw new Error('Unsupported platform: Non Tauri');
-}
-
-/**
- * If enabled, close window manually.
- * @throws Error
- */
-export async function preventAutoCloseWindow(isEnabled: boolean) {
-  if (isTauri()) {
-    return await invoke('set_vfs_mode', { value: isEnabled });
   }
 
   throw new Error('Unsupported platform: Non Tauri');

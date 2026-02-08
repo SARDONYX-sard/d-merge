@@ -5,16 +5,7 @@ pub(crate) mod log;
 pub(crate) mod patch;
 pub(crate) mod updater;
 
-use std::sync::atomic::AtomicBool;
 use tauri::{Emitter as _, Window};
-
-pub static IS_VFS_MODE: AtomicBool = AtomicBool::new(false);
-#[tauri::command]
-pub(crate) fn set_vfs_mode(value: bool) {
-    use std::sync::atomic::Ordering;
-
-    IS_VFS_MODE.store(value, Ordering::Release);
-}
 
 /// Create closure that reports.
 pub(super) fn sender<S>(window: Window, event: &'static str) -> impl Fn(S) + Clone
