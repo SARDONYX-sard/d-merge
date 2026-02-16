@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bitflags = "2.10.0"
+bitflags = "2.11.0"
 dashmap = { workspace = true, features = ["rayon", "serde"] }
 glob = { workspace = true }
 indexmap = { workspace = true }
