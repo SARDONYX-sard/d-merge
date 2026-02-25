@@ -39,11 +39,11 @@ export const BackupImportButton = ({ parserMode }: Props) => {
     window.location.reload(); // To enable
   };
 
-  const namePostfix = parserMode === 'egui' ? '(egui)' : '';
+  const namePrefix = parserMode === 'egui' ? '(egui)' : '';
 
   return (
     <BackupButton
-      buttonName={`      ${t('backup.import.button_name')}${namePostfix}`}
+      buttonName={`${namePrefix}${t('backup.import.button_name')}`}
       cacheItems={settings}
       inDialogClick={handleDialogClick}
       onClick={handleClick}

@@ -2,9 +2,9 @@ import { NOTIFY } from '@/lib/notify';
 import { CACHE_KEYS, type Cache, STORAGE } from '@/lib/storage';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
-import { save } from './dialog';
-import { convertEguiSettings, parseEguiSettings } from './egui/backup';
-import { readFileWithDialog, writeFile } from './fs';
+import { save } from '../dialog';
+import { readFileWithDialog, writeFile } from '../fs';
+import { convertEguiSettings, convertToEguiSettings, parseEguiSettings } from './egui_support';
 
 const SETTINGS_FILE_NAME = 'settings';
 
@@ -61,7 +61,7 @@ export const BACKUP = {
   },
 
   /** @throws SaveError */
-  async export(settings: Cache) {
+  async export(settings: Cache, parserMode: 'egui' | 'tauri' = 'tauri'): Promise<string | null> {
     const cachedPath = STORAGE.get(PRIVATE_CACHE_OBJ.exportSettingsPath);
     const path = await save({
       defaultPath: cachedPath ?? 'settings.json',
@@ -69,7 +69,7 @@ export const BACKUP = {
     });
 
     if (typeof path === 'string') {
-      await this.exportRaw(path, settings);
+      await this.exportRaw(path, settings, parserMode);
       return path;
     }
     return null;
@@ -78,9 +78,16 @@ export const BACKUP = {
   /**
    * Write to path.
    * - `path`: e.g. `<output_dir>/d_merge_settings.json`
-   * @throws SaveError
+   * @throws
+   * - If `mode` is 'egui', throws if settings cannot be converted to egui format.
+   * - SaveError
    */
-  async exportRaw(path: string, settings: Cache) {
-    await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
+  async exportRaw(path: string, settings: Cache, mode: 'tauri' | 'egui' = 'tauri') {
+    if (mode === 'egui') {
+      const eguiSettings = convertToEguiSettings(settings);
+      await writeFile(path, `${JSON.stringify(eguiSettings, null, 2)}\n`);
+    } else {
+      await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
+    }
   },
 } as const;
