@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-02-25
+### :sparkles: New Features
+- [`20efd33`](https://github.com/SARDONYX-sard/d-merge/commit/20efd33b92eff0c3cd30ed57d4fed01c8154699a) - **front-hkanno**: add textTransform style to Tab component *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`5cf010e`](https://github.com/SARDONYX-sard/d-merge/commit/5cf010e4c33be33ee38d95bd2f18b9a052a5a81e) - **frontend**: implement apply button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8059b49`](https://github.com/SARDONYX-sard/d-merge/commit/8059b49e506fd6ac316b16cdeb350cf49d362456) - **frontend**: add export egui button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`19dd183`](https://github.com/SARDONYX-sard/d-merge/commit/19dd183574020fe1a763f81a6731fa626c568638) - **tauri**: add tracing log from frontend *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`9e15a71`](https://github.com/SARDONYX-sard/d-merge/commit/9e15a71a62da9f2eb8eb2092db01ee9318023102) - **front-patch**: Temporarily fixes a bug where values are overwritten by previous ones *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1750bc8`](https://github.com/SARDONYX-sard/d-merge/commit/1750bc80945cea3dcbe6bdf50e160c0e5af10d77) - remove VFS mode handling and refactor related functions *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`155736b`](https://github.com/SARDONYX-sard/d-merge/commit/155736b6e0a3c427b5beffac36e0f6b31a3067e5) - fix mod grid ord clear bug *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a84e020`](https://github.com/SARDONYX-sard/d-merge/commit/a84e0201c084476b2a5751121241af9290949c2f) - comment out unusable sort apply button and improve sorting logic in ModsGrid *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`9217544`](https://github.com/SARDONYX-sard/d-merge/commit/9217544dda8ee13e9272af992d680f496e604ed3) - **hkanno**: separate components *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`e622b50`](https://github.com/SARDONYX-sard/d-merge/commit/e622b50b15dbd6d83333e2761f662bb5a0c7e474) - **Top**: simplify GridCard component and improve layout structure *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`755ee9d`](https://github.com/SARDONYX-sard/d-merge/commit/755ee9d1b0af9efc63bd484a984d8300f1f065af) - **frontend**: move files *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.3.1] - 2026-01-27
 ### :sparkles: New Features
 - [`9d9da8a`](https://github.com/SARDONYX-sard/d-merge/commit/9d9da8a69ac3d200dfedd55a08514f6d12882c71) - **hkanno**: supports class inheritance *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -233,3 +252,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.4]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.3...0.2.4
 [0.2.5]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.4...0.2.5
 [0.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.6...0.3.0
+[0.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.1...0.3.2
