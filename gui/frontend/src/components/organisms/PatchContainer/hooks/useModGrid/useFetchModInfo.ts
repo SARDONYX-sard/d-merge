@@ -60,7 +60,7 @@ export const useFetchModInfo = () => {
         }
       });
     });
-  }, [deferredDir, isVfsMode]);
+  }, [deferredDir, isVfsMode, setModList, setVfsModList]);
 
   return { loading };
 };

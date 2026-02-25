@@ -32,13 +32,15 @@ export const useSortClearButton = () => {
     apiRefCurrent?.setSortModel([]);
   };
 
-  const SortClearButton = lockedDnd ? (
+  if (!lockedDnd) {
+    return null;
+  }
+
+  return (
     <Tooltip title={t('patch.toolbar.locked_due_to_sorting_help')}>
       <ToolbarButton aria-label='Clear sorting to unlock' color='primary' onClick={handleClearSort}>
         <LockOpenIcon fontSize='small' />
       </ToolbarButton>
     </Tooltip>
-  ) : null;
-
-  return SortClearButton;
+  );
 };

@@ -27,7 +27,7 @@ import {
 import React from 'react';
 
 import { CustomDensitySelector } from './CustomDensity';
-import { useSortApplyButton } from './useSortApplyButton';
+// import { useSortApplyButton } from './useSortApplyButton';
 import { useSortClearButton } from './useSortClearButton';
 
 type OwnerState = {
@@ -63,13 +63,13 @@ export const CustomToolbar = () => {
   const apiRef = useGridApiContext();
   const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
   const exportMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
-  const sortApplyButton = useSortApplyButton();
+  // const sortApplyButton = useSortApplyButton();
   const SortClearButton = useSortClearButton();
 
   return (
     <Toolbar>
       {SortClearButton}
-      {sortApplyButton}
+      {/* {sortApplyButton} */}
 
       <Tooltip title={apiRef.current.getLocaleText('toolbarColumns')}>
         <ColumnsPanelTrigger render={<ToolbarButton />}>

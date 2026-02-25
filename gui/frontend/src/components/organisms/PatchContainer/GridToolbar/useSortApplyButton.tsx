@@ -7,6 +7,7 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import type { ModItem } from '@/services/api/patch';
 
+// FIXME: The issue where the internal valid state changes one step behind has not been identified, so it is currently unusable.
 export const useSortApplyButton = () => {
   const { current: apiRefCurrent } = useGridApiContext();
   const { lockedDnd, isVfsMode, setModList, setVfsModList } = usePatchContext();
@@ -41,7 +42,9 @@ export const useSortApplyButton = () => {
     setOpen(false);
   };
 
-  if (!lockedDnd) return null;
+  if (!lockedDnd) {
+    return null;
+  }
 
   return (
     <>
