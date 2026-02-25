@@ -3,10 +3,9 @@
 import type { Dispatch, FC, ReactNode, SetStateAction } from 'react';
 import { createContext, useContext, useState } from 'react';
 import { useStorageState } from '@/components/hooks/useStorageState';
-import { useModInfoState } from '@/components/organisms/PatchContainer/hooks/useModInfoState';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { boolSchema, stringSchema } from '@/lib/zod/schema-utils';
-import { type ModInfo, type PatchOptions, patchOptionsSchema } from '@/services/api/patch';
+import { type ModItem, ModListSchema, type PatchOptions, patchOptionsSchema } from '@/services/api/patch';
 
 type ContextType = {
   output: string;
@@ -18,6 +17,7 @@ type ContextType = {
   patchOptions: PatchOptions;
   setPatchOptions: Dispatch<SetStateAction<PatchOptions>>;
 
+  /////////////////////////////////////////////////////////////////////
   /** For Vfs(MO2 etc.)mode */
   vfsSkyrimDataDir: string;
   setVfsSkyrimDataDir: Dispatch<SetStateAction<string>>;
@@ -26,11 +26,16 @@ type ContextType = {
   skyrimDataDir: string;
   setSkyrimDataDir: Dispatch<SetStateAction<string>>;
 
-  /** The mod info displayed in the grid for the patch target for the user */
-  modInfoList: ModInfo[];
-  /** Sets the mod information list used for patching */
-  setModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
-  setFetchedModInfoList: Dispatch<SetStateAction<ModInfo[]>>;
+  /////////////////////////////////////////////////////////////////////
+  /** VFS Mode: Separate list state for VFS(MO2 etc.) mode */
+  vfsModList: ModItem[];
+  /** VFS Mode: Sets the mod info list for VFS(MO2 etc.) mode. */
+  setVfsModList: Dispatch<SetStateAction<ModItem[]>>;
+
+  /** Normal Mode: Separate list state for Manual mode **/
+  modList: ModItem[];
+  /** Normal Mode: Sets the mod info list for Manual mode. */
+  setModList: Dispatch<SetStateAction<ModItem[]>>;
 
   /////////////////////////////////////////////////////////////////////
   // No cached
@@ -51,10 +56,11 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
     PRIVATE_CACHE_OBJ.patchVfsSkyrimDataDir,
     stringSchema,
   );
-
   const [skyrimDataDir, setSkyrimDataDir] = useStorageState(PRIVATE_CACHE_OBJ.patchSkyrimDataDir, stringSchema);
 
-  const { modInfoList, setModInfoList, setFetchedModInfoList } = useModInfoState(isVfsMode);
+  const [modList, setModList] = useStorageState(PRIVATE_CACHE_OBJ.patchModList, ModListSchema.catch([]));
+  const [vfsModList, setVfsModList] = useStorageState(PRIVATE_CACHE_OBJ.patchVfsModList, ModListSchema.catch([]));
+
   const [lockedDnd, setLockedDnd] = useState(false);
 
   const context = {
@@ -73,9 +79,10 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
     skyrimDataDir,
     setSkyrimDataDir,
 
-    modInfoList,
-    setModInfoList,
-    setFetchedModInfoList,
+    vfsModList,
+    setVfsModList,
+    modList,
+    setModList,
 
     lockedDnd,
     setLockedDnd,

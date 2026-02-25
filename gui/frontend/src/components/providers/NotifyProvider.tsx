@@ -55,6 +55,8 @@ const ThemeResponsiveSnackbar = memo(
       boxShadow: theme.shadows[8],
       display: 'flex',
       maxWidth: '65vw',
+      maxHeight: '90vh',
+      overflowY: 'auto',
       whiteSpace: 'pre', // ref: https://github.com/iamhosseindhv/notistack/issues/32
       willChange: 'transform',
     });

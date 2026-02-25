@@ -22,11 +22,11 @@ fn main() {
             crate::cmd::hkanno::preview_hkanno,
             crate::cmd::hkanno::save_hkanno,
             crate::cmd::log::change_log_level,
+            crate::cmd::log::log,
             crate::cmd::patch::cancel_patch,
             crate::cmd::patch::get_skyrim_data_dir,
             crate::cmd::patch::load_mods_info,
             crate::cmd::patch::patch,
-            crate::cmd::set_vfs_mode,
             crate::cmd::updater::fetch_versions,
             crate::cmd::updater::update_to_version,
         ])
@@ -52,16 +52,8 @@ fn tauri_plugin_window_state_init<R: tauri::Runtime>() -> tauri::plugin::TauriPl
 ///
 /// Since the window cannot be closed, it is necessary to call `getCurrentWindow().destroy()` in js to close the Window.
 /// To prevent exit application by X button.
-fn prevent_close_window<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tauri::WindowEvent) {
+fn prevent_close_window<R: tauri::Runtime>(_: &tauri::Window<R>, event: &tauri::WindowEvent) {
     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-        if cmd::IS_VFS_MODE.load(std::sync::atomic::Ordering::Acquire) {
-            // The closing process is not done here, as the front end is responsible for saving and closing the settings.
-            api.prevent_close();
-            return;
-        }
-
-        if let Err(err) = window.close() {
-            tracing::error!("{err}");
-        }
+        api.prevent_close();
     }
 }

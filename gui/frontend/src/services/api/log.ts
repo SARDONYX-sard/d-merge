@@ -59,6 +59,35 @@ export const LOG = {
   set(level: LogLevel) {
     STORAGE.set(PUB_CACHE_OBJ.logLevel, JSON.stringify(level));
   },
+
+  log(level: LogLevel, message: string) {
+    if (isTauri()) {
+      invoke('log', { level, message });
+      return;
+    }
+
+    console.log(`[${level.toUpperCase()}] ${message}`);
+  },
+
+  trace(message: string) {
+    this.log('trace', message);
+  },
+
+  debug(message: string) {
+    this.log('debug', message);
+  },
+
+  info(message: string) {
+    this.log('info', message);
+  },
+
+  warn(message: string) {
+    this.log('warn', message);
+  },
+
+  error(message: string) {
+    this.log('error', message);
+  },
 } as const;
 
 async function getLogDir(): Promise<string> {

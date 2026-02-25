@@ -5,17 +5,15 @@ import { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internals';
 import { useCallback, useMemo } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { ModInfo } from '@/services/api/patch';
-import { useColumns } from './useColumns';
-import { useFetchModInfo } from './useFetchModInfo';
+import type { ModItem } from '@/services/api/patch';
 import { useGridStatePersistence } from './useGridStatePersistence';
 
-const reorderAndReindex = (array: ModInfo[], oldIndex: number, newIndex: number): ModInfo[] => {
+const reorderAndReindex = (array: ModItem[], oldIndex: number, newIndex: number): ModItem[] => {
   return arrayMove(array, oldIndex, newIndex).map((item, idx) => {
     return {
       ...item,
       enabled: item.enabled,
-      priority: idx + 1,
+      priority: idx,
     };
   });
 };
@@ -24,62 +22,54 @@ type DragEndHandler = Exclude<DndContextProps['onDragEnd'], undefined>;
 type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'], undefined>;
 
 export const useModsGrid = () => {
-  const { modInfoList, setModInfoList, lockedDnd } = usePatchContext();
-  const { loading } = useFetchModInfo();
-  const columns = useColumns();
+  const { isVfsMode, vfsModList, setVfsModList, modList, setModList, lockedDnd } = usePatchContext();
   const apiRef = useGridApiRef();
 
   // NOTE: Due to a design flaw, obtaining the prev value from the function arguments causes a bug.
   // Therefore, always overwrite it using `modInfoList`.
   const handleDragEnd = useCallback<DragEndHandler>(
     ({ active, over }) => {
-      if (over) {
-        const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
-        const newIndex = modInfoList.findIndex((row) => row.id === over.id);
-        setModInfoList(reorderAndReindex(modInfoList, oldIndex, newIndex));
-      }
+      const setModInfoList = isVfsMode ? setVfsModList : setModList;
+      setModInfoList((prev) => {
+        const oldIndex = prev.findIndex((row) => row.id === active.id);
+        const newIndex = prev.findIndex((row) => row.id === over?.id);
+
+        if (oldIndex === -1 || newIndex === -1) return prev;
+
+        return reorderAndReindex(prev, oldIndex, newIndex);
+      });
     },
-    [modInfoList, setModInfoList],
+    [isVfsMode, vfsModList, setVfsModList, modList, setModList],
   );
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
-    (RowId, _detail) => {
-      // HACK: For some reason, the check status becomes apparent one turn after checking, so it forces a “check all” at the zero stage.
-      if (selectedIds.size === 0 && _detail.reason === 'multipleRowsSelection') {
-        setModInfoList(
-          modInfoList.map((mod) => ({
-            ...mod,
-            enabled: true,
-          })),
-        );
-        return;
-      }
+    (newSelectionModel) => {
+      const setModInfoList = isVfsMode ? setVfsModList : setModList;
 
-      setModInfoList(
-        modInfoList.map((mod) => ({
+      const newSelectedIds = new Set(newSelectionModel.ids);
+
+      setModInfoList((prev) =>
+        prev.map((mod) => ({
           ...mod,
-          enabled: RowId.ids.has(mod.id),
+          enabled: newSelectedIds.has(mod.id),
         })),
       );
     },
-    [modInfoList],
+    [isVfsMode, setVfsModList, setModList],
   );
 
   const selectedIds = useMemo(
-    () => new Set(modInfoList.filter((mod) => mod.enabled).map((mod) => mod.id)),
-    [modInfoList],
+    () => new Set((isVfsMode ? vfsModList : modList).filter((mod) => mod.enabled).map((mod) => mod.id)),
+    [isVfsMode, vfsModList, modList],
   );
 
   useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
 
   return {
     apiRef,
-    columns,
-    loading,
     handleDragEnd,
     handleRowSelectionModelChange,
     selectedIds,
-    modInfoList,
     lockedDnd,
   };
 };

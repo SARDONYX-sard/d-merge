@@ -1,4 +1,4 @@
-use crate::cmd::{bail, IS_VFS_MODE};
+use crate::cmd::bail;
 use crate::error::NotFoundSkyrimDataDirSnafu;
 use mod_info::ModInfo;
 use skyrim_data_dir::Runtime;
@@ -11,9 +11,8 @@ use std::path::PathBuf;
 /// - Steam VFS: `D:/Steam/steamapps/common/Skyrim Special Edition/Data`
 /// - MO2: `D:/GAME/ModOrganizer Skyrim SE/mods/*`
 #[tauri::command]
-pub(crate) fn load_mods_info(glob: &str) -> Result<Vec<ModInfo>, String> {
-    let is_vfs = IS_VFS_MODE.load(std::sync::atomic::Ordering::Acquire);
-    let info = mod_info::get_all(glob, is_vfs).or_else(|err| bail!(err))?;
+pub(crate) fn load_mods_info(glob: &str, is_vfs_mode: bool) -> Result<Vec<ModInfo>, String> {
+    let info = mod_info::get_all(glob, is_vfs_mode).or_else(|err| bail!(err))?;
     Ok(info)
 }
 

@@ -2,7 +2,8 @@ import { useEffect, useTransition } from 'react';
 import { useDebounce } from '@/components/hooks/useDebounce';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { NOTIFY } from '@/lib/notify';
-import { type FetchedModInfo, loadModsInfo, ModInfo } from '@/services/api/patch';
+import { loadModsInfo } from '@/services/api/patch';
+import { mergeModInfoList } from '@/services/api/patch/mod_item';
 
 /**
  * Custom hook that handles fetching and updating mod info for the Patch page.
@@ -37,10 +38,10 @@ import { type FetchedModInfo, loadModsInfo, ModInfo } from '@/services/api/patch
  * ```
  */
 export const useFetchModInfo = () => {
-  const { isVfsMode, vfsSkyrimDataDir, skyrimDataDir, setFetchedModInfoList } = usePatchContext();
-  const [loading, startTransition] = useTransition();
+  const { isVfsMode, vfsSkyrimDataDir, skyrimDataDir, setModList, setVfsModList } = usePatchContext();
 
   // Prevent excessive API calls while typing/changing directories.
+  const [loading, startTransition] = useTransition();
   const deferredDir = useDebounce(isVfsMode ? vfsSkyrimDataDir : skyrimDataDir, 450).trim();
 
   useEffect(() => {
@@ -48,53 +49,18 @@ export const useFetchModInfo = () => {
 
     startTransition(() => {
       NOTIFY.asyncTry(async () => {
-        const fetched = await loadModsInfo(deferredDir);
+        const fetched = await loadModsInfo(deferredDir, isVfsMode);
+
         if (fetched.length > 0) {
-          setFetchedModInfoList((prev) => mergeModInfoList(prev, fetched));
+          if (isVfsMode) {
+            setVfsModList((prev) => mergeModInfoList(prev, fetched));
+          } else {
+            setModList((prev) => mergeModInfoList(prev, fetched));
+          }
         }
       });
     });
-  }, [deferredDir, isVfsMode]);
+  }, [deferredDir, isVfsMode, setModList, setVfsModList]);
 
   return { loading };
-};
-
-/**
- * Merge fetched list into previous ModInfo[] by `id`.
- * - Preserve `enabled` and `priority` from prev when id matches.
- * - Keep latest name/author/site/auto/modType from fetched.
- * - If priority missing in prev, assign index+1 (fetched order).
- */
-const mergeModInfoList = (prev: ModInfo[], fetched: FetchedModInfo[]): ModInfo[] => {
-  const prevMap = new Map<string, ModInfo>();
-  for (const p of prev) {
-    prevMap.set(p.id, p);
-  }
-
-  let newIndex = fetched.length;
-
-  const result = fetched.map((f) => {
-    const existing = prevMap.get(f.id);
-
-    const merged: ModInfo = {
-      id: f.id,
-      name: f.name,
-      author: f.author,
-      site: f.site,
-      auto: f.auto,
-      mod_type: f.mod_type,
-      enabled: existing?.enabled ?? false,
-      priority: existing?.priority ?? newIndex,
-    };
-    if (existing === undefined) {
-      newIndex += 1;
-    }
-
-    return merged;
-  });
-
-  console.log('sort');
-  result.sort((a, b) => a.priority - b.priority);
-
-  return result;
 };

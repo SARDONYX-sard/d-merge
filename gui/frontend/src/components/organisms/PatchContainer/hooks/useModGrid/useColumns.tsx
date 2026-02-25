@@ -2,7 +2,7 @@ import { Button, Tooltip } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
 import type { MouseEventHandler } from 'react';
 import { useTranslation } from '@/components/hooks/useTranslation';
-import type { ModInfo } from '@/services/api/patch';
+import type { ModItem } from '@/services/api/patch';
 import { openUrl } from '@/services/api/shell';
 
 export const useColumns = () => {
@@ -46,8 +46,12 @@ export const useColumns = () => {
       flex: 0.3,
       align: 'center',
       headerAlign: 'center',
+      renderCell: (params) => {
+        const { priority } = params.row;
+        return <span>{priority + 1}</span>;
+      },
     },
-  ] as const satisfies GridColDef<ModInfo>[];
+  ] as const satisfies GridColDef<ModItem>[];
 
   return columns;
 };

@@ -18,25 +18,30 @@ export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
   throw new Error('Unsupported platform: Non Tauri');
 }
 
-export type FetchedModInfo = {
+export const ModItemSchema = z.object({
   /**
    * Mod-specific dir name.
    * - Nemesis/FNIS(vfs): e.g. `aaaa`
    * - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
    * - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
    */
-  id: string;
-  name: string;
-  author: string;
-  site: string;
-  auto: string;
-  mod_type: 'nemesis' | 'fnis';
-};
+  id: z.string(),
+  name: z.string(),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  author: z.string().optional().catch(''),
+  site: z.string(),
+  mod_type: z.enum(['nemesis', 'fnis']),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  auto: z.string().optional().catch(''),
 
-export type ModInfo = FetchedModInfo & {
-  enabled: boolean;
-  priority: number;
-};
+  enabled: z.boolean(),
+  priority: z.number(),
+});
+export const ModListSchema = z.array(ModItemSchema);
+
+/*** cached mod info */
+export type ModItem = z.infer<typeof ModItemSchema>;
+export type FetchedModInfo = Readonly<Omit<ModItem, 'enabled' | 'priority'>>;
 
 export type PatchMaps = {
   /** Nemesis patch path
@@ -56,9 +61,9 @@ export type PatchMaps = {
  * Load mods `info.ini`
  * @throws Error
  */
-export async function loadModsInfo(skyrimDataDir: string) {
+export async function loadModsInfo(skyrimDataDir: string, isVfsMode: boolean) {
   if (isTauri()) {
-    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir });
+    return await invoke<FetchedModInfo[]>('load_mods_info', { glob: skyrimDataDir, isVfsMode });
   }
 
   throw new Error('Unsupported platform: Non Tauri');
@@ -142,18 +147,6 @@ export async function patch(output: string, patches: PatchMaps, options: PatchOp
 export async function cancelPatch() {
   if (isTauri()) {
     return await invoke('cancel_patch');
-  }
-
-  throw new Error('Unsupported platform: Non Tauri');
-}
-
-/**
- * If enabled, close window manually.
- * @throws Error
- */
-export async function preventAutoCloseWindow(isEnabled: boolean) {
-  if (isTauri()) {
-    return await invoke('set_vfs_mode', { value: isEnabled });
   }
 
   throw new Error('Unsupported platform: Non Tauri');

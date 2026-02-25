@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hkannoFromText, NULL_STR } from './hkanno';
+import { hkannoFromText, NULL_STR } from '.';
 
 describe('hkannoFromText', () => {
   it('parses multiple tracks correctly with trackName', () => {
