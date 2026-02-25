@@ -24,6 +24,7 @@ const baseDir = path.resolve(__dirname, '..');
 const paths = {
   packageJson: path.join(baseDir, 'package.json'),
   cargoToml: path.join(baseDir, 'Cargo.toml'),
+  cargoLock: path.join(baseDir, 'Cargo.lock'),
   issueTemplate: path.join(baseDir, '.github', 'ISSUE_TEMPLATE', 'bug-report.yaml'),
 };
 
@@ -112,6 +113,7 @@ function bumpVersion(current, type) {
 function updateFiles(version) {
   updateJsonVersion(paths.packageJson, version);
   updateCargoToml(paths.cargoToml, version);
+  updateCargoLock();
 }
 
 /**
@@ -137,6 +139,13 @@ function updateCargoToml(filePath, version) {
     `[workspace.package]\nversion = "${version}"`,
   );
   fs.writeFileSync(filePath, replaced);
+}
+
+/**
+ * Updates the version inside a Cargo.lock file.
+ */
+function updateCargoLock() {
+  execSync('cargo update', { stdio: 'inherit' });
 }
 
 /**
