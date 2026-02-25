@@ -2,9 +2,9 @@ import type { MouseEventHandler } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { patch } from '@/services/api/patch';
 import { toPatches } from '@/services/api/patch/mod_item';
-import { type Status, statusListener } from '@/services/api/patch_listener';
+import { type Status, statusListener } from '@/services/api/patch/patch_listener';
 
-type Params = {
+type Props = {
   start: () => void;
   setLoading: (b: boolean) => void;
   onStatus: (s: Status, unlisten: (() => void) | null) => void;
@@ -15,7 +15,7 @@ type Params = {
  * Handles the patch process lifecycle including backend event listening,
  * status updates, loading state, timer, and notifications.
  */
-export function usePatchHandler({ start, setLoading, onStatus, onError }: Params) {
+export function usePatchHandler({ start, setLoading, onStatus, onError }: Props) {
   const { output, isVfsMode, patchOptions, vfsSkyrimDataDir, modList, vfsModList } = usePatchContext();
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { NOTIFY } from '@/lib/notify';
-import type { Status } from '@/services/api/patch_listener';
+import type { Status } from '@/services/api/patch/patch_listener';
 
 export const usePatchStatus = (stop: () => string, setLoading: (v: boolean) => void) => {
   const { t } = useTranslation();

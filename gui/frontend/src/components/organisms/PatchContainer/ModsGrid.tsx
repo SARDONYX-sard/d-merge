@@ -8,16 +8,9 @@ import { useModsGrid } from './hooks/useModGrid';
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
-  const { isVfsMode,  modList, vfsModList } = usePatchContext();
-  const {
-    apiRef,
-    columns,
-    loading,
-    handleDragEnd,
-    handleRowSelectionModelChange,
-    selectedIds,
-    lockedDnd,
-  } = useModsGrid();
+  const { isVfsMode, modList, vfsModList } = usePatchContext();
+  const { apiRef, columns, loading, handleDragEnd, handleRowSelectionModelChange, selectedIds, lockedDnd } =
+    useModsGrid();
 
   return (
     <DraggableDataGrid

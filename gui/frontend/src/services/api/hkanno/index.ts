@@ -1,24 +1,23 @@
 import { invoke } from '@tauri-apps/api/core';
 import z from 'zod';
-import { OutFormat } from './serde_hkx';
+import { OutFormat } from '../serde_hkx';
 
 /** `hkStringPtr`, `hkCString` XML null representation */
 export const NULL_STR = '\u2400';
 
 // Annotation
-export const AnnotationSchema = z.object({
+const AnnotationSchema = z.object({
   time: z.number(),
   text: z.string().nullable(),
 });
-export type Annotation = z.infer<typeof AnnotationSchema>;
 
 // AnnotationTrack
-export const AnnotationTrackSchema = z.object({
+const AnnotationTrackSchema = z.object({
   /** Track name, corresponds to hkaAnnotationTrack.trackName */
   track_name: z.string().nullable(),
   annotations: z.array(AnnotationSchema),
 });
-export type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
+type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
 
 // Hkanno
 export const HkannoSchema = z.object({
