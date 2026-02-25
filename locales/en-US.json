@@ -1,6 +1,7 @@
 {
   "general": {
     "all_clear_button": "All Clear",
+    "apply_button": "Apply",
     "cancel_button": "Cancel",
     "conversion_complete_message": "Conversion Complete."
   },
@@ -153,7 +154,11 @@
     },
     "output_target_help": "Select the target game version for the output hkx.",
     "toolbar": {
-      "locked_due_to_sorting_help": "Editing is disabled during sorting. Click to unlock."
+      "apply_current_sort_order": "Apply current sort order",
+      "confirm_apply_message": " items will have their priority overwritten by the current sorting. This cannot be undone.",
+      "confirm_apply_title": "Apply current sorting?",
+      "locked_due_to_sorting_help": "Editing is disabled during sorting. Click to unlock.",
+      "no_changes_detected": "No priority changes detected."
     }
   },
   "hkanno": {
