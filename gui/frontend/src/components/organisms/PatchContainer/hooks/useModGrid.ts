@@ -5,17 +5,17 @@ import { DataGridPropsWithoutDefaultValue } from '@mui/x-data-grid/internals';
 import { useCallback, useMemo } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
-import { ModInfo } from '@/services/api/patch';
+import type { ModItem } from '@/services/api/patch';
 import { useColumns } from './useColumns';
 import { useFetchModInfo } from './useFetchModInfo';
 import { useGridStatePersistence } from './useGridStatePersistence';
 
-const reorderAndReindex = (array: ModInfo[], oldIndex: number, newIndex: number): ModInfo[] => {
+const reorderAndReindex = (array: ModItem[], oldIndex: number, newIndex: number): ModItem[] => {
   return arrayMove(array, oldIndex, newIndex).map((item, idx) => {
     return {
       ...item,
       enabled: item.enabled,
-      priority: idx + 1,
+      priority: idx,
     };
   });
 };
@@ -24,7 +24,7 @@ type DragEndHandler = Exclude<DndContextProps['onDragEnd'], undefined>;
 type OnRowChange = Exclude<DataGridPropsWithoutDefaultValue['onRowSelectionModelChange'], undefined>;
 
 export const useModsGrid = () => {
-  const { modInfoList, setModInfoList, lockedDnd } = usePatchContext();
+  const { isVfsMode, vfsModList, setVfsModList, modList, setModList, lockedDnd } = usePatchContext();
   const { loading } = useFetchModInfo();
   const columns = useColumns();
   const apiRef = useGridApiRef();
@@ -34,16 +34,26 @@ export const useModsGrid = () => {
   const handleDragEnd = useCallback<DragEndHandler>(
     ({ active, over }) => {
       if (over) {
+        const modInfoList = isVfsMode ? vfsModList : modList;
+
         const oldIndex = modInfoList.findIndex((row) => row.id === active.id);
         const newIndex = modInfoList.findIndex((row) => row.id === over.id);
-        setModInfoList(reorderAndReindex(modInfoList, oldIndex, newIndex));
+        const newModInfoList = reorderAndReindex(modInfoList, oldIndex, newIndex);
+        if (isVfsMode) {
+          setVfsModList(newModInfoList);
+        } else {
+          setModList(newModInfoList);
+        }
       }
     },
-    [modInfoList, setModInfoList],
+    [isVfsMode, vfsModList, setVfsModList, modList, setModList],
   );
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
     (RowId, _detail) => {
+      const modInfoList = isVfsMode ? vfsModList : modList;
+      const setModInfoList = isVfsMode ? setVfsModList : setModList;
+
       // HACK: For some reason, the check status becomes apparent one turn after checking, so it forces a “check all” at the zero stage.
       if (selectedIds.size === 0 && _detail.reason === 'multipleRowsSelection') {
         setModInfoList(
@@ -62,12 +72,12 @@ export const useModsGrid = () => {
         })),
       );
     },
-    [modInfoList],
+    [isVfsMode, vfsModList, setVfsModList, modList, setModList],
   );
 
   const selectedIds = useMemo(
-    () => new Set(modInfoList.filter((mod) => mod.enabled).map((mod) => mod.id)),
-    [modInfoList],
+    () => new Set((isVfsMode ? vfsModList : modList).filter((mod) => mod.enabled).map((mod) => mod.id)),
+    [isVfsMode, vfsModList, modList],
   );
 
   useGridStatePersistence(apiRef, PUB_CACHE_OBJ.modsGridState);
@@ -79,7 +89,6 @@ export const useModsGrid = () => {
     handleDragEnd,
     handleRowSelectionModelChange,
     selectedIds,
-    modInfoList,
     lockedDnd,
   };
 };

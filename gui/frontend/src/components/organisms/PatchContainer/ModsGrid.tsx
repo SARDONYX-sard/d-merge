@@ -1,12 +1,14 @@
 import type { ComponentPropsWithRef, FC } from 'react';
 import { memo } from 'react';
 import { DraggableDataGrid } from '@/components/molecules/DraggableGrid/DraggableDataGrid';
+import { usePatchContext } from '@/components/providers/PatchProvider';
 import { CustomToolbar } from './GridToolbar';
 import { useModsGrid } from './hooks/useModGrid';
 
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
+  const { isVfsMode,  modList, vfsModList } = usePatchContext();
   const {
     apiRef,
     columns,
@@ -14,7 +16,6 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
     handleDragEnd,
     handleRowSelectionModelChange,
     selectedIds,
-    modInfoList,
     lockedDnd,
   } = useModsGrid();
 
@@ -39,7 +40,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         type: 'include',
       }}
       draggable={!lockedDnd}
-      rows={modInfoList}
+      rows={isVfsMode ? vfsModList : modList}
       showToolbar={true}
       slots={{ toolbar: CustomToolbar }}
       {...props}

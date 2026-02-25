@@ -18,25 +18,28 @@ export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
   throw new Error('Unsupported platform: Non Tauri');
 }
 
-export type FetchedModInfo = {
+export const ModItemSchema = z.object({
   /**
    * Mod-specific dir name.
    * - Nemesis/FNIS(vfs): e.g. `aaaa`
    * - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
    * - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
    */
-  id: string;
-  name: string;
-  author: string;
-  site: string;
-  auto: string;
-  mod_type: 'nemesis' | 'fnis';
-};
+  id: z.string(),
+  name: z.string(),
+  author: z.string(),
+  site: z.string(),
+  mod_type: z.enum(['nemesis', 'fnis']),
+  auto: z.string(),
 
-export type ModInfo = FetchedModInfo & {
-  enabled: boolean;
-  priority: number;
-};
+  enabled: z.boolean(),
+  priority: z.number(),
+});
+export const ModListSchema = z.array(ModItemSchema);
+
+/*** cached mod info */
+export type ModItem = z.infer<typeof ModItemSchema>;
+export type FetchedModInfo = Readonly<Omit<ModItem, 'enabled' | 'priority'>>;
 
 export type PatchMaps = {
   /** Nemesis patch path

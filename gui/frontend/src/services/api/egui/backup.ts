@@ -2,20 +2,7 @@ import { z } from 'zod';
 import { OBJECT } from '@/lib/object-utils';
 import type { Cache } from '@/lib/storage';
 import { logLevelSchema } from '@/services/api/log';
-
-export const ModItemSchema = z.object({
-  enabled: z.boolean(),
-  /**
-   * - vfs: e.g. `aaaa`
-   * - manual: e.g. `path/to/aaaaa`
-   */
-  id: z.string(),
-  priority: z.number(),
-  mod_type: z.enum(['nemesis', 'fnis']),
-});
-/*** cached mod info */
-export type ActiveModItem = z.infer<typeof ModItemSchema>;
-export const ModListSchema = z.array(ModItemSchema);
+import { ModListSchema } from '@/services/api/patch';
 
 const EguiSettingsSchema = z.object({
   mode: z.enum(['vfs', 'manual']).optional(),
