@@ -1,5 +1,6 @@
 import type { OptionsObject, SnackbarMessage } from 'notistack';
 import { enqueueSnackbar } from 'notistack';
+import { LOG } from '@/services/api/log';
 
 /**
  * Wrapper to simplify refactoring of libraries such as snackbar and toast
@@ -7,18 +8,22 @@ import { enqueueSnackbar } from 'notistack';
 export const NOTIFY = {
   /** Show as `info` message. */
   info(message: SnackbarMessage, options?: OptionsObject<'info'>) {
+    LOG.log('info', `${message}`);
     return enqueueSnackbar(message, { variant: 'info', ...options });
   },
   /** Show as `success` message. */
   success(message: SnackbarMessage, options?: OptionsObject<'success'>) {
+    LOG.log('info', `${message}`);
     return enqueueSnackbar(message, { variant: 'success', ...options });
   },
   /** Show as `warning` message. */
   warn(message: SnackbarMessage, options?: OptionsObject<'warning'>) {
+    LOG.log('warn', `${message}`);
     return enqueueSnackbar(message, { variant: 'warning', ...options });
   },
   /** Show as `error` message. */
   error(message: SnackbarMessage, options?: OptionsObject<'error'>) {
+    LOG.log('error', `${message}`);
     return enqueueSnackbar(message, { variant: 'error', ...options });
   },
 

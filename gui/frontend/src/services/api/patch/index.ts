@@ -27,10 +27,12 @@ export const ModItemSchema = z.object({
    */
   id: z.string(),
   name: z.string(),
-  author: z.string(),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  author: z.string().optional().catch(''),
   site: z.string(),
   mod_type: z.enum(['nemesis', 'fnis']),
-  auto: z.string(),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  auto: z.string().optional().catch(''),
 
   enabled: z.boolean(),
   priority: z.number(),

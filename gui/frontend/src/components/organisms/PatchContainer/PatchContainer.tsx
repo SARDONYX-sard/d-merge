@@ -1,7 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useState } from 'react';
 
-import { useBackup } from '@/components/hooks/useBackup';
 import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { InputField } from '@/components/molecules/InputField/InputField';
@@ -18,7 +17,6 @@ export const PatchContainer = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const { text: elapsedText, start, stop } = useTimer();
-  useBackup();
 
   const { status, statusText, handleStatus } = usePatchStatus(stop, setLoading);
   const inputFieldsProps = usePatchInputs();

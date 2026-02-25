@@ -6,6 +6,7 @@ import { STORAGE } from '@/lib/storage';
 import { BACKUP } from '@/services/api/backup';
 import { listen } from '@/services/api/event';
 import { exists, readFile } from '@/services/api/fs';
+import { LOG } from '@/services/api/log';
 import { destroyCurrentWindow } from '@/services/api/window';
 
 export const useBackup = () => {
@@ -14,12 +15,12 @@ export const useBackup = () => {
 };
 
 const useAutoImportBackup = () => {
-  const { isVfsMode: autoDetectEnabled, skyrimDataDir: modInfoDir } = usePatchContext();
-  const settingsPath = `${modInfoDir}/.d_merge/settings.json` as const;
+  const { output, skyrimDataDir: modInfoDir } = usePatchContext();
+  const settingsPath = `${output}/.d_merge/tauri_settings.json` as const;
 
   useEffect(() => {
     const doImport = async () => {
-      if (!(isTauri() && autoDetectEnabled) || modInfoDir === '') {
+      if (!isTauri() || modInfoDir === '') {
         return;
       }
 
@@ -32,10 +33,10 @@ const useAutoImportBackup = () => {
 
       try {
         if (!(await exists(settingsPath))) {
+          LOG.log('info', `No backup found at ${settingsPath}. Skipping auto import.`);
           return;
         }
-
-        NOTIFY.info(`Backups are being automatically loaded from ${settingsPath}...`);
+        LOG.log('info', `Backups are being automatically loaded from ${settingsPath}...`);
 
         const newSettings = await BACKUP.fromStr(await readFile(settingsPath));
         if (newSettings) {
@@ -49,12 +50,12 @@ const useAutoImportBackup = () => {
     };
 
     doImport();
-  }, [autoDetectEnabled, modInfoDir, settingsPath]);
+  }, [output, modInfoDir, settingsPath]);
 };
 
 const useAutoExportBackup = () => {
-  const { isVfsMode, skyrimDataDir } = usePatchContext();
-  const settingsPath = `${skyrimDataDir}/.d_merge/settings.json` as const;
+  const { output, skyrimDataDir } = usePatchContext();
+  const settingsPath = `${output}/.d_merge/tauri_settings.json` as const;
 
   useEffect(() => {
     let unlisten: (() => void) | null;
@@ -70,7 +71,7 @@ const useAutoExportBackup = () => {
 
         const unlistenFn = await listen('tauri://close-requested', async () => {
           try {
-            NOTIFY.info(`Backups are being automatically written to ${settingsPath}...`);
+            LOG.log('info', `Backups are being automatically written to ${settingsPath}...`);
             await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
           } catch (e) {
             NOTIFY.error(`${e}`);
@@ -90,5 +91,5 @@ const useAutoExportBackup = () => {
     return () => {
       unlisten?.();
     };
-  }, [isVfsMode, skyrimDataDir, settingsPath]);
+  }, [output, skyrimDataDir, settingsPath]);
 };

@@ -2,6 +2,7 @@ import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 import type { ZodCatch, ZodType } from 'zod';
 import type { CacheKeyWithHide } from '@/lib/storage';
 import { stringToJsonSchema } from '@/lib/zod/json-validation';
+import { LOG } from '../../../services/api/log';
 
 /**
  * A custom React hook that syncs state with `localStorage`.
@@ -45,5 +46,14 @@ export type StateTuple<T extends ZodType<U>, U = unknown> = [T['_output'], Dispa
 
 /** Helper function to retrieve the cache value and parse it with Zod schema, applying fallback with catch and default */
 const getCacheValue = <T extends ZodType<U>, U = unknown>(key: CacheKeyWithHide, schema: ZodCatch<T>): T['_output'] => {
-  return stringToJsonSchema.catch(null).pipe(schema).parse(localStorage.getItem(key));
+  const raw = localStorage.getItem(key);
+
+  const result = stringToJsonSchema.catch(null).pipe(schema).safeParse(raw);
+
+  if (!result.success) {
+    LOG.warn(`[cache] fallback used: ${key}`);
+    return schema.parse(null);
+  }
+
+  return result.data;
 };
