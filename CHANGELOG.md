@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-02-27
+### :bug: Bug Fixes
+- [`f51cff6`](https://github.com/SARDONYX-sard/d-merge/commit/f51cff6e22a92e8e29e5720fc4e4d2635ac2331c) - **tauri**: fix patch grid patching *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.3.2] - 2026-02-25
 ### :sparkles: New Features
 - [`20efd33`](https://github.com/SARDONYX-sard/d-merge/commit/20efd33b92eff0c3cd30ed57d4fed01c8154699a) - **front-hkanno**: add textTransform style to Tab component *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -253,3 +258,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.5]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.4...0.2.5
 [0.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.6...0.3.0
 [0.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.1...0.3.2
+[0.3.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.2...0.3.3
