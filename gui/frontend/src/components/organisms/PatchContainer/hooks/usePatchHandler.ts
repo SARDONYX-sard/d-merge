@@ -1,4 +1,4 @@
-import type { MouseEventHandler } from 'react';
+import { type MouseEventHandler, useCallback } from 'react';
 import { usePatchContext } from '@/components/providers/PatchProvider';
 import { patch } from '@/services/api/patch';
 import { toPatches } from '@/services/api/patch/mod_item';
@@ -16,20 +16,36 @@ type Props = {
  * status updates, loading state, timer, and notifications.
  */
 export function usePatchHandler({ start, setLoading, onStatus, onError }: Props) {
-  const { output, isVfsMode, patchOptions, vfsSkyrimDataDir, modList, vfsModList } = usePatchContext();
+  const { isVfsMode, vfsSkyrimDataDir, skyrimDataDir, output, patchOptions, modList, vfsModList } = usePatchContext();
 
-  const handleClick: MouseEventHandler<HTMLButtonElement> = async () => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = useCallback(async () => {
     start();
 
     await statusListener(
       'd_merge://progress/patch', // event name emitted from Tauri backend
       async () => {
         const patchMaps = toPatches(vfsSkyrimDataDir, isVfsMode, isVfsMode ? vfsModList : modList);
-        await patch(output, patchMaps, patchOptions);
+        const config = {
+          ...patchOptions,
+          skyrimDataDirGlob: isVfsMode ? vfsSkyrimDataDir : skyrimDataDir,
+        };
+        await patch(output, patchMaps, config);
       },
       { setLoading, onStatus, onError },
     );
-  };
+  }, [
+    output,
+    patchOptions,
+    vfsSkyrimDataDir,
+    skyrimDataDir,
+    isVfsMode,
+    modList,
+    vfsModList,
+    start,
+    setLoading,
+    onStatus,
+    onError,
+  ]);
 
   return { handleClick };
 }

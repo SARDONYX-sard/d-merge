@@ -10,10 +10,18 @@ import { useFetchModInfo } from './hooks/useModGrid/useFetchModInfo';
 type Props = Partial<ComponentPropsWithRef<typeof DraggableDataGrid>>;
 
 export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
-  const { isVfsMode, modList, vfsModList } = usePatchContext();
+  const { isVfsMode, modList, vfsModList, fetchIsEmpty } = usePatchContext();
   const { loading } = useFetchModInfo();
   const columns = useColumns();
   const { apiRef, handleDragEnd, handleRowSelectionModelChange, selectedIds, lockedDnd } = useModsGrid();
+
+  const rows = (() => {
+    // Apply dummy to preserve check state.
+    if (fetchIsEmpty) {
+      return [];
+    }
+    return isVfsMode ? vfsModList : modList;
+  })();
 
   return (
     <DraggableDataGrid
@@ -36,7 +44,7 @@ export const ModsGrid: FC<Props> = memo(function ModsGrid({ ...props }) {
         type: 'include',
       }}
       draggable={!lockedDnd}
-      rows={isVfsMode ? vfsModList : modList}
+      rows={rows}
       showToolbar={true}
       slots={{ toolbar: CustomToolbar }}
       {...props}

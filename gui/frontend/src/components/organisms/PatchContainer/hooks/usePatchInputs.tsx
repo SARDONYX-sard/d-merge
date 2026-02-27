@@ -1,5 +1,5 @@
 import OutputIcon from '@mui/icons-material/Output';
-import { Checkbox, type SxProps, Tooltip } from '@mui/material';
+import { type SxProps, Tooltip } from '@mui/material';
 import { type ComponentPropsWithRef, useCallback, useEffect } from 'react';
 
 import { useTranslation } from '@/components/hooks/useTranslation';
@@ -19,8 +19,8 @@ export const usePatchInputs = () => {
     setOutput,
 
     isVfsMode,
-    setIsVfsMode,
     patchOptions,
+    setPatchOptions,
 
     vfsSkyrimDataDir,
     setVfsSkyrimDataDir,
@@ -55,15 +55,9 @@ export const usePatchInputs = () => {
   }, [isVfsMode, patchOptions.outputTarget, setVfsSkyrimDataDir, t]);
 
   const inputHandlers = {
-    onClick: async () => {
-      return await NOTIFY.asyncTry(
-        async () => await openPath(stripGlob(dataDir), { setPath: setDataDir, directory: true }),
-      );
-    },
+    onClick: async () =>
+      await NOTIFY.asyncTry(async () => await openPath(stripGlob(dataDir), { setPath: setDataDir, directory: true })),
     onIconClick: async () => await NOTIFY.asyncTry(async () => await open(stripGlob(dataDir))),
-    onCheckboxToggle: () => {
-      setIsVfsMode((prev) => !prev);
-    },
   };
 
   const outputHandlers = {
@@ -82,17 +76,15 @@ export const usePatchInputs = () => {
           <OutputIcon onClick={inputHandlers.onIconClick} />
         </Tooltip>
       ),
-      endIcon: (
-        <Tooltip placement='top' title={t('patch.autoDetectSkyrimData_tooltip')}>
-          <Checkbox checked={isVfsMode} onChange={inputHandlers.onCheckboxToggle} />
-        </Tooltip>
-      ),
       disabled: isVfsMode,
       label: `${patchOptions.outputTarget} ${t('patch.input_directory')}`,
       onClick: inputHandlers.onClick,
       path: dataDir,
       placeholder,
       setPath: setDataDir,
+      onChange: (_event) => {
+        setPatchOptions((prev) => ({ ...prev, skyrimDataDirGlob: isVfsMode ? vfsSkyrimDataDir : skyrimDataDir }));
+      },
     },
     {
       icon: (

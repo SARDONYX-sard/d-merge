@@ -11,6 +11,7 @@ import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
 import { NOTIFY } from '@/lib/notify';
 
 import { usePatchStatus } from './hooks/usePatchStatus';
+import { PatchModeRadio } from './PatchModeRadio';
 import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
 
 export const PatchContainer = () => {
@@ -36,6 +37,7 @@ export const PatchContainer = () => {
   return (
     <>
       <Box>
+        <PatchModeRadio />
         {inputFieldsProps.map((inputProps) => (
           <InputField key={inputProps.label} {...inputProps} />
         ))}
@@ -46,7 +48,7 @@ export const PatchContainer = () => {
           backgroundColor: '#160b0b60',
           marginTop: '10px',
           width: '95vw',
-          maxHeight: '65vh',
+          maxHeight: '61vh',
         }}
       />
       {status && (

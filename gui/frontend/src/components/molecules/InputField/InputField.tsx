@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import { type ComponentPropsWithRef, type ReactNode, useId } from 'react';
+import type { ChangeEventHandler, ComponentPropsWithRef, ReactNode } from 'react';
+import { useId } from 'react';
 
 import { Button } from '@/components/molecules/Button';
 
@@ -11,9 +12,10 @@ type Props = {
   path: string;
   setPath: (path: string) => void;
   placeholder?: string;
+  onChange?: ChangeEventHandler<HTMLInputElement | HTMLTextAreaElement, Element>;
 } & ComponentPropsWithRef<typeof Button>;
 
-export function InputField({ label, icon, endIcon, path, setPath, placeholder, disabled, ...props }: Props) {
+export function InputField({ label, icon, endIcon, path, setPath, placeholder, disabled, onChange, ...props }: Props) {
   const id = useId();
 
   return (
@@ -24,7 +26,10 @@ export function InputField({ label, icon, endIcon, path, setPath, placeholder, d
           disabled={disabled}
           id={id}
           label={label}
-          onChange={({ target }) => setPath(target.value)}
+          onChange={(event) => {
+            setPath(event.target.value);
+            onChange?.(event);
+          }}
           placeholder={placeholder}
           sx={{ width: '100%', paddingRight: '10px' }}
           value={path}

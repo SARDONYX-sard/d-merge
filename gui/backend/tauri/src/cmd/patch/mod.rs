@@ -16,20 +16,28 @@ use std::path::{Path, PathBuf};
 use tauri::{async_runtime::JoinHandle, Manager, Window};
 use tokio::sync::Mutex;
 
+const PATCH_STATUS_EVENT_NAME: &str = "d_merge://progress/patch";
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
-fn sender<S>(window: Window, event: &'static str) -> Box<dyn Fn(S) + Send + Sync>
+fn sender<S>(window: Window) -> Box<dyn Fn(S) + Send + Sync>
 where
     S: serde::Serialize + Clone + Send + Sync + 'static,
 {
     Box::new(move |payload: S| {
-        if let Err(err) = tauri::Emitter::emit(&window, event, payload) {
-            tracing::error!("{}", err);
-        };
+        emit_status(&window, payload);
     })
 }
 
-#[derive(Default, serde::Serialize, serde::Deserialize)]
+fn emit_status<S>(window: &Window, payload: S)
+where
+    S: serde::Serialize + Clone + Send + Sync + 'static,
+{
+    if let Err(err) = tauri::Emitter::emit(window, PATCH_STATUS_EVENT_NAME, payload) {
+        tracing::error!("{}", err);
+    };
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GuiPatchOptions {
     hack_options: Option<HackOptions>,
@@ -42,7 +50,7 @@ pub(crate) struct GuiPatchOptions {
     ///
     /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
     /// entries will not be detected and the process will fail.
-    pub skyrim_data_dir_glob: Option<String>,
+    skyrim_data_dir_glob: Option<String>,
 }
 
 #[tauri::command]
@@ -52,6 +60,8 @@ pub(crate) async fn patch(
     patches: PatchMaps,
     options: GuiPatchOptions,
 ) -> Result<(), String> {
+    tracing::info!("Starting patch with options: {options:#?}");
+
     cancel_patch_inner().await?; // Abort previous task if exists
 
     if options.auto_remove_meshes {
@@ -60,6 +70,7 @@ pub(crate) async fn patch(
         tokio::join!(remove_if_exists(meshes_path), remove_if_exists(debug_path),);
     }
 
+    let cloned_window = window.clone();
     let handle = tauri::async_runtime::spawn({
         let resource_dir = {
             let app = window.app_handle();
@@ -70,10 +81,9 @@ pub(crate) async fn patch(
         };
 
         async move {
-            let status_report = match options.use_progress_reporter {
-                true => Some(sender::<Status>(window, "d_merge://progress/patch")),
-                false => None,
-            };
+            let status_report = options
+                .use_progress_reporter
+                .then_some(sender::<Status>(cloned_window));
 
             let config = Config {
                 output_dir: output,
@@ -85,7 +95,10 @@ pub(crate) async fn patch(
                 skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             };
 
-            let _ = time!("[patch]", behavior_gen(patches, config).await);
+            match time!("[patch]", behavior_gen(patches, config).await) {
+                Ok(()) => emit_status(&window, Status::Done),
+                Err(err) => emit_status(&window, Status::Error(err)),
+            }
         }
     });
 

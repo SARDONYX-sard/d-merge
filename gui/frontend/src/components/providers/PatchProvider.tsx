@@ -43,6 +43,9 @@ type ContextType = {
   /** When sorting, locked drag & drop */
   lockedDnd: boolean;
   setLockedDnd: Dispatch<SetStateAction<boolean>>;
+
+  fetchIsEmpty: boolean;
+  setFetchIsEmpty: Dispatch<SetStateAction<boolean>>;
 };
 const Context = createContext<ContextType | undefined>(undefined);
 
@@ -62,6 +65,7 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [vfsModList, setVfsModList] = useStorageState(PRIVATE_CACHE_OBJ.patchVfsModList, ModListSchema.catch([]));
 
   const [lockedDnd, setLockedDnd] = useState(false);
+  const [fetchIsEmpty, setFetchIsEmpty] = useState(false);
 
   const context = {
     output,
@@ -86,6 +90,9 @@ export const PatchProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     lockedDnd,
     setLockedDnd,
+
+    fetchIsEmpty,
+    setFetchIsEmpty,
   } as const satisfies ContextType;
 
   return <Context value={context}>{children}</Context>;
