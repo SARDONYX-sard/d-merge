@@ -34,9 +34,10 @@
   "i18n-ally.keystyle": "nested",
   "i18n-ally.localesPaths": ["locales", "gui/frontend/src/lib/i18n"],
   "json.schemas": [
+    // https://github.com/SARDONYX-forks/d-merge-serde-hkx/blob/main/crates/havok_types/src/pointer.rs
     {
-      "fileMatch": ["/dummy/convert/input/*.json"],
-      "url": "/dummy/convert/schema.json"
+      "fileMatch": ["/dummy/convert/input/*.json", "/dummy/behavior_gen/output/.d_merge/.debug/meshes/**/*.json"],
+      "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
   "rust-analyzer.cargo.targetDir": true,
