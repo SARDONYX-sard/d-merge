@@ -21,7 +21,7 @@ pub type SubHeaderDiffMap<'a> = std::collections::HashMap<&'a str, DiffLines<'a>
 /// # Errors
 /// - Failed to apply patches.
 pub fn serialize_alt_asdsf(
-    alt_asdsf: AltAsdsf<'_>,
+    mut alt_asdsf: AltAsdsf<'_>,
     patches: DiffLines,
     mut sub_txt_header_patch_map: SubHeaderDiffMap<'_>,
 ) -> Result<String, SerializeError> {
@@ -58,8 +58,21 @@ pub fn serialize_alt_asdsf(
                 name: vanilla_name.to_string(),
             });
         };
-        let Some(anim_set_list) = alt_asdsf.txt_projects.0.get(name.as_str()) else {
-            return Err(SerializeError::MissingTxtProjectHeader { name });
+        let anim_set_list = if let Some(list) = alt_asdsf.txt_projects.0.get(name.as_str()) {
+            list
+        } else {
+            #[cfg(feature = "tracing")]
+            tracing::error!("Missing txt project header: {name}.txt. Added txt project header.");
+
+            alt_asdsf
+                .txt_projects
+                .0
+                .insert(name.clone().into(), Default::default());
+
+            match alt_asdsf.txt_projects.0.get(name.as_str()) {
+                Some(anim_set_list) => anim_set_list,
+                None => return Err(SerializeError::MissingTxtProjectHeader { name }),
+            }
         };
 
         // sub header seq patch

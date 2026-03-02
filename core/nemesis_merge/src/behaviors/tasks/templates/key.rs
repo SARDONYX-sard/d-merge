@@ -14,11 +14,28 @@ pub struct TemplateKey<'a> {
 
 impl TemplateKey<'static> {
     /// From nemesis file stem. e.g. `0_master` -> `meshes/actors/character/behaviors/0_master.bin`
+    ///
+    /// # Note
+    /// If the search fails using get(`O(1)`), it falls back to an ASCII Ignore(`O(n)`) search.
     pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
-        let template_name = match is_1st_person {
-            true => NEMESIS_1ST_PERSON_MAP.get(template_file_stem)?,
-            false => NEMESIS_3RD_PERSON_MAP.get(template_file_stem)?,
+        let map = if is_1st_person {
+            &NEMESIS_1ST_PERSON_MAP
+        } else {
+            &NEMESIS_3RD_PERSON_MAP
         };
+
+        // Lookup by hash
+        if let Some(template_name) = map.get(template_file_stem) {
+            return Some(Self {
+                template_name: Cow::Borrowed(template_name),
+            });
+        }
+
+        // Fallback search by ASCII ignore(For Nemesis_Engine\mod\pscd\MagicBehavior)
+        let template_name = map
+            .into_iter()
+            .find_map(|(k, v)| k.eq_ignore_ascii_case(template_file_stem).then_some(*v))?;
+
         Some(Self {
             template_name: Cow::Borrowed(template_name),
         })
