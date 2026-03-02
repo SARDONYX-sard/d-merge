@@ -1,40 +1,27 @@
 mod mod_info_loader;
 
+use crate::cmd::{bail, time};
+use crate::error::NotFoundResourceDirSnafu;
 pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
-use tauri::path::BaseDirectory;
-
-use crate::cmd::{bail, time};
-use crate::error::NotFoundResourceDirSnafu;
 use nemesis_merge::{
     behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
-use tauri::{async_runtime::JoinHandle, Manager, Window};
+use tauri::{async_runtime::JoinHandle, path::BaseDirectory, AppHandle, Emitter as _, Manager};
 use tokio::sync::Mutex;
 
 const PATCH_STATUS_EVENT_NAME: &str = "d_merge://progress/patch";
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
-fn sender<S>(window: Window) -> Box<dyn Fn(S) + Send + Sync>
-where
-    S: serde::Serialize + Clone + Send + Sync + 'static,
-{
-    Box::new(move |payload: S| {
-        emit_status(&window, payload);
-    })
-}
-
-fn emit_status<S>(window: &Window, payload: S)
-where
-    S: serde::Serialize + Clone + Send + Sync + 'static,
-{
-    if let Err(err) = tauri::Emitter::emit(window, PATCH_STATUS_EVENT_NAME, payload) {
-        tracing::error!("{}", err);
-    };
+/// Emits a patch status event to the frontend.
+fn emit_status(app: &AppHandle, payload: Status) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit(PATCH_STATUS_EVENT_NAME, payload);
+    }
 }
 
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -53,9 +40,10 @@ pub(crate) struct GuiPatchOptions {
     skyrim_data_dir_glob: Option<String>,
 }
 
+// TODO: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
 #[tauri::command]
 pub(crate) async fn patch(
-    window: Window,
+    app: AppHandle,
     output: PathBuf,
     patches: PatchMaps,
     options: GuiPatchOptions,
@@ -70,35 +58,33 @@ pub(crate) async fn patch(
         tokio::join!(remove_if_exists(meshes_path), remove_if_exists(debug_path),);
     }
 
-    let cloned_window = window.clone();
-    let handle = tauri::async_runtime::spawn({
-        let resource_dir = {
-            let app = window.app_handle();
-            app.path()
-                .resolve("assets/templates", BaseDirectory::Resource)
-                .context(NotFoundResourceDirSnafu)
-                .or_else(|err| bail!(err))?
+    let resource_dir = app
+        .path()
+        .resolve("assets/templates", BaseDirectory::Resource)
+        .context(NotFoundResourceDirSnafu)
+        .or_else(|err| bail!(err))?;
+
+    let app_handle = app.clone();
+    let handle = tauri::async_runtime::spawn(async move {
+        let status_report = options.use_progress_reporter.then(|| {
+            let cloned_app_handle = app.clone();
+            Box::new(move |payload: Status| emit_status(&cloned_app_handle, payload))
+                as Box<dyn Fn(Status) + Send + Sync>
+        });
+
+        let config = Config {
+            output_dir: output,
+            resource_dir,
+            status_report,
+            hack_options: options.hack_options,
+            debug: options.debug,
+            output_target: options.output_target,
+            skyrim_data_dir_glob: options.skyrim_data_dir_glob,
         };
 
-        async move {
-            let status_report = options
-                .use_progress_reporter
-                .then_some(sender::<Status>(cloned_window));
-
-            let config = Config {
-                output_dir: output,
-                resource_dir,
-                status_report,
-                hack_options: options.hack_options,
-                debug: options.debug,
-                output_target: options.output_target,
-                skyrim_data_dir_glob: options.skyrim_data_dir_glob,
-            };
-
-            match time!("[patch]", behavior_gen(patches, config).await) {
-                Ok(()) => emit_status(&window, Status::Done),
-                Err(err) => emit_status(&window, Status::Error(err)),
-            }
+        match time!("[patch]", behavior_gen(patches, config).await) {
+            Ok(()) => emit_status(&app_handle, Status::Done),
+            Err(err) => emit_status(&app_handle, Status::Error(err)),
         }
     });
 
