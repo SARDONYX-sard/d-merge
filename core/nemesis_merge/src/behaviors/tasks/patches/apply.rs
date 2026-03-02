@@ -135,7 +135,7 @@ fn write_debug_json_patch(
         std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
     }
 
-    let json = simd_json::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
+    let json = sonic_rs::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
         path: output_path.clone(),
     })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;

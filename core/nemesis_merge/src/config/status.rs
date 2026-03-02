@@ -83,14 +83,14 @@ mod tests {
     #[test]
     fn serialize_status() {
         let status = Status::Error("Error message".to_string());
-        let serialized = simd_json::to_string(&status).unwrap();
+        let serialized = sonic_rs::to_string(&status).unwrap();
         assert_eq!(serialized, r#"{"type":"Error","content":"Error message"}"#);
 
         let status = Status::ReadingPatches {
             index: 0,
             total: 100,
         };
-        let serialized = simd_json::to_string(&status).unwrap();
+        let serialized = sonic_rs::to_string(&status).unwrap();
         assert_eq!(
             serialized,
             r#"{"type":"ReadingPatches","content":{"index":0,"total":100}}"#

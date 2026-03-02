@@ -388,7 +388,7 @@ mod tests {
         // -------------------------------
         // Write outputs
         // -------------------------------
-        let json = simd_json::to_string_pretty(&new_root).unwrap();
+        let json = sonic_rs::to_string_pretty(&new_root).unwrap();
         fs::write("../../dummy/behaviors_table.json", json).unwrap();
 
         if !errors.is_empty() {
@@ -489,7 +489,7 @@ mod tests {
                 }
             });
 
-        let json = simd_json::to_string_pretty(&results).unwrap();
+        let json = sonic_rs::to_string_pretty(&results).unwrap();
         fs::write("../../dummy/extracted_indexes.json", json).unwrap();
 
         if !errors.is_empty() {

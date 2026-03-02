@@ -28,7 +28,7 @@ pub fn prepare_namespace_json(namespace: &str, override_config: &FnisToOarConfig
         author: override_config.author.as_deref().unwrap_or_default(),
     };
 
-    match simd_json::to_string_pretty(&config) {
+    match sonic_rs::to_string_pretty(&config) {
         Ok(json) => json,
         Err(err) => {
             #[cfg(feature = "tracing")]
@@ -85,7 +85,7 @@ pub fn prepare_anim_config_json(
             .unwrap_or_default(),
     };
 
-    match simd_json::to_string_pretty(&config) {
+    match sonic_rs::to_string_pretty(&config) {
         Ok(json) => json,
         Err(err) => {
             #[cfg(feature = "tracing")]

@@ -212,11 +212,19 @@ pub enum Error {
     },
 
     /// (De)Serialize json error
+    #[snafu(display("[simd_json serde error] {}:\n {source}", path.display()))]
+    SimdJsonError {
+        /// input path
+        path: PathBuf,
+        source: simd_json::Error,
+    },
+
+    /// (De)Serialize json error
     #[snafu(display("[Json serde error] {}:\n {source}", path.display()))]
     JsonError {
         /// input path
         path: PathBuf,
-        source: simd_json::Error,
+        source: sonic_rs::Error,
     },
 
     /// Path must be utf-8.
