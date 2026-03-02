@@ -190,14 +190,14 @@ pub enum Error {
     },
 
     /// serde_hkx serialize error.
-    #[snafu(display("{}:\n {source}", path.display()))]
+    #[snafu(display("[serde_hkx Ser Error] {}:\n {source}", path.display()))]
     HkxSerError {
         path: PathBuf,
         source: serde_hkx::errors::ser::Error,
     },
 
     /// serde_hkx Deserialize error.
-    #[snafu(display("{}:\n {source}", path.display()))]
+    #[snafu(display("[serde_hkx De Error] {}:\n {source}", path.display()))]
     HkxDeError {
         path: PathBuf,
         source: serde_hkx::errors::de::Error,
@@ -212,7 +212,7 @@ pub enum Error {
     },
 
     /// (De)Serialize json error
-    #[snafu(display("{}:\n {source}", path.display()))]
+    #[snafu(display("[Json serde error] {}:\n {source}", path.display()))]
     JsonError {
         /// input path
         path: PathBuf,
