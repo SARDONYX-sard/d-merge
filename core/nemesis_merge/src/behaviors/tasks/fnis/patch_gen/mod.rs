@@ -1,12 +1,9 @@
-#[cfg(feature = "unstable_conversion")]
 mod alternative;
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod global;
-#[cfg(feature = "unstable_conversion")]
-mod hkx_convert;
 mod kill_move;
 mod offset_arm;
 mod pair;
@@ -23,14 +20,13 @@ use winnow::Parser;
 use crate::behaviors::tasks::adsf::AdsfPatch;
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::parse_fnis_list;
+use crate::behaviors::tasks::fnis::patch_gen::alternative::gen_old_patch::one_syntax::AltAnimMap;
 use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::{generate_patch, OneListPatch};
 use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
     BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::new_global_master_patch;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
-#[cfg(feature = "unstable_conversion")]
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::patches::types::{
     BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
 };
@@ -51,8 +47,7 @@ struct LocalAgg<'a> {
     adsf_patches: Vec<AdsfPatch<'a>>,
     furniture_groups: Vec<String>,
 
-    #[cfg(feature = "unstable_conversion")]
-    conversion_jobs: Vec<AnimIoJob>,
+    alt_animation_patches: AltAnimMap<'a>,
 }
 
 impl<'a> LocalAgg<'a> {
@@ -62,8 +57,7 @@ impl<'a> LocalAgg<'a> {
             behavior_graph_data_map: BehaviorGraphDataMap::new(),
             adsf_patches: Vec::new(),
             furniture_groups: Vec::new(),
-            #[cfg(feature = "unstable_conversion")]
-            conversion_jobs: Vec::new(),
+            alt_animation_patches: AltAnimMap::new(),
         }
     }
 
@@ -75,8 +69,8 @@ impl<'a> LocalAgg<'a> {
             .par_extend(other.behavior_graph_data_map.0);
         self.adsf_patches.par_extend(other.adsf_patches);
         self.furniture_groups.par_extend(other.furniture_groups);
-        #[cfg(feature = "unstable_conversion")]
-        self.conversion_jobs.par_extend(other.conversion_jobs);
+        self.alt_animation_patches
+            .merge(other.alt_animation_patches);
 
         self
     }
@@ -98,37 +92,34 @@ pub fn collect_borrowed_patches<'a>(
         mods_patches.len(),
     );
 
-    #[cfg_attr(not(feature = "unstable_conversion"), allow(unused_mut))]
-    let (patches, mut errors): (Vec<_>, Vec<_>) =
-        mods_patches.par_iter().partition_map(|owned_data| {
-            match parse_fnis_list
-                .parse(&owned_data.list_content)
-                .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
-                .with_context(|_| FailedParseFnisModListSnafu {
-                    path: owned_data.to_list_path(),
-                })
-                .and_then(|list| {
-                    #[cfg(feature = "tracing")]
-                    tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
+    let (patches, errors): (Vec<_>, Vec<_>) = mods_patches.par_iter().partition_map(|owned_data| {
+        match parse_fnis_list
+            .parse(&owned_data.list_content)
+            .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
+            .with_context(|_| FailedParseFnisModListSnafu {
+                path: owned_data.to_list_path(),
+            })
+            .and_then(|list| {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
 
-                    generate_patch(owned_data, list, config)
-                        .map_err(|e| Error::FnisPatchGenerationError { source: e })
-                }) {
-                Ok(patches) => Either::Left((owned_data, patches)),
-                Err(err) => {
-                    reporter.increment();
-                    Either::Right(err)
-                }
+                generate_patch(owned_data, list)
+                    .map_err(|e| Error::FnisPatchGenerationError { source: e })
+            }) {
+            Ok(patches) => Either::Left((owned_data, patches)),
+            Err(err) => {
+                reporter.increment();
+                Either::Right(err)
             }
-        });
+        }
+    });
 
     let LocalAgg {
         borrowed_patches,
         behavior_graph_data_map,
         adsf_patches,
         furniture_groups,
-        #[cfg(feature = "unstable_conversion")]
-        conversion_jobs,
+        alt_animation_patches,
     } = patches
         .into_par_iter()
         .fold(LocalAgg::new, |mut acc, (owned_data, patches)| {
@@ -141,8 +132,7 @@ pub fn collect_borrowed_patches<'a>(
                 one_mt_behavior_patches,
                 seq_mt_behavior_patches,
                 furniture_group_root_indexes,
-                #[cfg(feature = "unstable_conversion")]
-                mut conversion_jobs,
+                alt_animation_patches,
             } = patches;
 
             let borrowed_patches = &mut acc.borrowed_patches;
@@ -208,21 +198,9 @@ pub fn collect_borrowed_patches<'a>(
             }
 
             // Push One Mod animations
-
-            #[cfg(feature = "unstable_conversion")]
-            if let Some(job) = hkx_convert::prepare_behavior_conversion_job(owned_data, config) {
-                conversion_jobs.push(job);
-            }
             if !animations.is_empty() {
                 let mut animations: Vec<_> = animations.into_iter().collect();
                 animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
-
-                #[cfg(feature = "unstable_conversion")]
-                conversion_jobs.par_extend(hkx_convert::prepare_conversion_jobs(
-                    &animations,
-                    owned_data,
-                    config,
-                ));
 
                 new_push_anim_seq_patch(
                     &animations,
@@ -261,22 +239,25 @@ pub fn collect_borrowed_patches<'a>(
             acc.adsf_patches.par_extend(adsf_patches);
             acc.furniture_groups
                 .par_extend(furniture_group_root_indexes);
-            #[cfg(feature = "unstable_conversion")]
-            acc.conversion_jobs.par_extend(conversion_jobs);
+            acc.alt_animation_patches.merge(alt_animation_patches);
             acc
         })
         .reduce(LocalAgg::new, |a, b| a.merge(b));
 
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
-        borrowed_patches
+        let global_master_patches = new_global_master_patch(0);
+        let fnis_aa_patches = alternative::gen_old_patch::finalize_selectors(alt_animation_patches);
+
+        let map = &mut borrowed_patches
             .0
             .entry(THREAD_PERSON_0_MASTER_KEY)
             .or_default()
             .one
-            .0
-            // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
-            .par_extend(new_global_master_patch(0));
+            .0;
+        // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
+        map.par_extend(global_master_patches);
+        map.par_extend(fnis_aa_patches);
     }
 
     if borrowed_patches
@@ -295,13 +276,6 @@ pub fn collect_borrowed_patches<'a>(
             entry.seq.insert(path, patch);
         }
     }
-
-    // FIXME?: Unknown causes errors due to mutexes in MO2
-    #[cfg(feature = "unstable_conversion")]
-    errors.par_extend(hkx_convert::run_conversion_jobs(
-        conversion_jobs,
-        config.output_target,
-    ));
 
     (
         PatchCollection {

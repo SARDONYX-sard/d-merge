@@ -16,16 +16,57 @@ use crate::behaviors::tasks::fnis::patch_gen::alternative::generated_group_table
 };
 use crate::errors::Error;
 
-pub struct ClipBuildResult<'a> {
+/// key = clip_info.alt_group_file (e.g., `Animations\\fff_3_Jump.hkx`)
+///
+/// clip_info should be the key, but as f32 cannot implement Eq or Hash, it is being temporarily placed here.
+#[derive(Debug)]
+pub struct AltAnimMap<'a> {
+    pub map: HashMap<&'static str, AltAnimPatch<'a>>,
+}
+
+impl<'a> AltAnimMap<'a> {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        use std::collections::hash_map::Entry;
+
+        for (key, other_patch) in other.map {
+            match self.map.entry(key) {
+                Entry::Occupied(mut occ) => {
+                    occ.get_mut().merge(other_patch);
+                }
+                Entry::Vacant(v) => {
+                    v.insert(other_patch);
+                }
+            }
+        }
+    }
+}
+
+/// A temporary structure to hold the `hkbManualSelector.generators` for insertion into 0_master.hkx via a single replace operation
+#[derive(Debug)]
+pub struct AltAnimPatch<'a> {
     /// - It is necessary to register with `hkbManualSelectorGenerator.generators`.
     pub clip_generator_indexes: Vec<String>,
 
     /// `hkbClipGenerator`/`hkbClipTriggerArray` patches
     pub one_patches: Vec<(Vec<Cow<'a, str>>, ValueWithPriority<'a>)>,
 
-    pub owned_data: &'a OwnedFnisInjection,
-
+    /// The clip_info should be the key, but since f32 cannot implement Eq or Hash, it is placed in the value instead. In other words, merging is unnecessary.
     pub clip_info: &'static ClipInfo,
+}
+
+impl<'a> AltAnimPatch<'a> {
+    pub fn merge(&mut self, other: Self) {
+        self.clip_generator_indexes
+            .extend(other.clip_generator_indexes);
+        self.one_patches.extend(other.one_patches);
+        // No need to merge clip_info. It was simply that clip_info could not be used as a key.
+    }
 }
 
 ///Generate patches for FNIS Alternate Animation:
@@ -36,11 +77,11 @@ pub struct ClipBuildResult<'a> {
 /// Therefore, Selector generation and generator registration occur immediately before
 /// integrating the FNIS patches into the Nemesis patch.
 pub fn new_alt_patches<'a>(
-    alt_animation: &'a AlternativeAnimation<'a>,
+    alt_animation: &AlternativeAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
-    priority: usize,
-) -> (HashMap<&'a str, ClipBuildResult<'a>>, Vec<Error>) {
+) -> (AltAnimMap<'a>, Vec<Error>) {
     let prefix = alt_animation.prefix;
+    let priority = owned_data.priority;
     let mut errors = vec![];
 
     // anim_name -> triggers
@@ -51,7 +92,7 @@ pub fn new_alt_patches<'a>(
         .collect();
 
     // key = alt_group_file (anim_name)
-    let mut map: HashMap<&str, ClipBuildResult> = HashMap::new();
+    let mut alt_map = AltAnimMap::new();
 
     for set in &alt_animation.set {
         let slots = set.slots;
@@ -83,12 +124,14 @@ pub fn new_alt_patches<'a>(
                     continue;
                 }
 
-                let entry = map.entry(animation).or_insert_with(|| ClipBuildResult {
-                    clip_generator_indexes: Vec::new(),
-                    one_patches: Vec::new(),
-                    owned_data,
-                    clip_info,
-                });
+                let entry = alt_map
+                    .map
+                    .entry(animation)
+                    .or_insert_with(|| AltAnimPatch {
+                        clip_generator_indexes: Vec::new(),
+                        one_patches: Vec::new(),
+                        clip_info,
+                    });
 
                 // ---- TriggerArray ----
                 let trigger_array_ptr = if let Some(triggers) = trigger_map.get(animation) {
@@ -119,11 +162,11 @@ pub fn new_alt_patches<'a>(
         }
     }
 
-    (map, errors)
+    (alt_map, errors)
 }
 
 #[must_use]
-pub fn make_alt_clip_generator_patch<'a>(
+pub(super) fn make_alt_clip_generator_patch<'a>(
     class_index: &str,
     animation_name: &str,
     trigger_array: Option<&str>, // Some("#xxxx") or None

@@ -39,7 +39,6 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry
 /// This is derived by considering the information necessary to generate the Borrowed Nemesis patch after parsing the list.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
-    #[cfg(feature = "unstable_conversion")]
     /// # Format
     /// `<skyrim_data_dir>/meshes/<base_dir>/<fnis_namespace>/animations`
     ///
@@ -47,21 +46,7 @@ pub struct OwnedFnisInjection {
     /// `D:/STEAM/steamapps/common/Skyrim Special Edition/Data/meshes/actors/character/FNISZoo/animations`
     ///
     /// # Where is it used?
-    /// The base directory used for converting FNIS animation files to the target HKX format (LE/SE).
-    ///
-    /// This path defines the starting point for automatic FNIS → HKX conversion.
-    ///
-    /// Conversion flow:
-    ///
-    /// ```text
-    /// (this path)
-    ///    ↓ join
-    /// <FNIS file path>
-    ///    ↓ canonicalize
-    /// <absolute HKX source path>
-    ///    ↓ convert
-    /// <output_dir>/meshes/<...>/converted.hkx
-    /// ```
+    /// Used to verify the presence of hkx within FNIS Alternate Animation
     pub animations_mod_dir: PathBuf,
 
     /// Information required for patch generation, such as actor names(e.g. `character`, `dragon`, `dog`)
@@ -123,8 +108,6 @@ pub struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
-    #[cfg(feature = "unstable_conversion")]
-    pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
 impl OwnedFnisInjection {
@@ -140,53 +123,6 @@ impl OwnedFnisInjection {
             let behavior_object = self.behavior_entry.behavior_object;
             format!("meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt")
         }.into()
-    }
-
-    #[cfg(feature = "unstable_conversion")]
-    /// Return information for conversion
-    ///
-    /// Returns (
-    ///  input_path: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`,
-    ///  inner path for output: `meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`
-    /// )
-    pub fn to_behavior_path(&self) -> Result<(PathBuf, PathBuf), FnisError> {
-        let animations_mod_dir = &self.animations_mod_dir;
-        let behavior_entry = self.behavior_entry;
-        let master_path = Path::new(behavior_entry.master_behavior);
-        let namespace = &self.namespace;
-
-        // e.g. `behaviors wolf/`
-        let master_behavior_dir = master_path
-            .parent()
-            .and_then(|p| p.file_name())
-            .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
-                sub_dir: master_path.to_path_buf(),
-            })?;
-
-        let file_name = if behavior_entry.is_humanoid() {
-            format!("FNIS_{namespace}_Behavior.hkx")
-        } else {
-            // e.g. wolf
-            let creature_object_name = behavior_entry.behavior_object;
-            format!("FNIS_{namespace}_{creature_object_name}_Behavior.hkx",)
-        };
-
-        // e.g. ../meshes/actors/canine
-        let parent_dir = animations_mod_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .ok_or_else(|| FnisError::BehaviorParentMissing {
-                animations_mod_dir: animations_mod_dir.clone(),
-            })?;
-
-        // e.g., `behavior/FNIS_{namespace}_Behavior.hkx`
-        let behavior_path = Path::new(master_behavior_dir).join(&file_name);
-
-        let inner_path = Path::new("meshes")
-            .join(behavior_entry.base_dir)
-            .join(&behavior_path);
-
-        Ok((parent_dir.join(behavior_path), inner_path))
     }
 
     /// Increments the index and returns the full `name` attribute
@@ -257,15 +193,7 @@ where
     let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
-    #[cfg(feature = "unstable_conversion")]
-    let alt_anim_config = if list_content.contains("AAprefix") {
-        load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
-    } else {
-        None
-    };
-
     Ok(OwnedFnisInjection {
-        #[cfg(feature = "unstable_conversion")]
         animations_mod_dir,
         behavior_entry,
         namespace: namespace.to_string(),
@@ -274,35 +202,7 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
-        #[cfg(feature = "unstable_conversion")]
-        alt_anim_config,
     })
-}
-
-#[cfg(feature = "unstable_conversion")]
-fn load_to_oar_file(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> Option<Vec<u8>> {
-    let override_config_path = {
-        let filename = if behavior_entry.is_humanoid() {
-            format!("FNIS_{namespace}_toOAR.json")
-        } else {
-            format!(
-                "FNIS_{namespace}_{}_toOAR.json",
-                behavior_entry.behavior_object // e.g, "dog", "horse"
-            )
-        };
-        animations_mod_dir.join(filename)
-    };
-    std::fs::read(&override_config_path)
-        .map_err(|e| {
-            #[cfg(feature = "tracing")]
-            tracing::info!(%e, ?override_config_path);
-            e
-        })
-        .ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.

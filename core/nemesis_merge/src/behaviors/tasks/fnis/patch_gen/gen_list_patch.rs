@@ -18,12 +18,13 @@ use crate::behaviors::tasks::fnis::list_parser::{
     patterns::sequenced::SequencedAnimation,
     FNISList, SyntaxPattern,
 };
-use crate::behaviors::tasks::fnis::patch_gen::anim_var::new_push_anim_vars_patch;
-use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
-#[cfg(feature = "unstable_conversion")]
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::fnis::patch_gen::{
-    kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
+    alternative::gen_old_patch::one_syntax::{new_alt_patches, AltAnimMap},
+    anim_var::new_push_anim_vars_patch,
+    furniture::one_group::new_furniture_one_group_patches,
+    kill_move::new_kill_patches,
+    offset_arm::new_offset_arm_patches,
+    pair::new_pair_patches,
 };
 
 /// A patch with borrowed references to a single FNIS_*_List.txt file.
@@ -54,9 +55,14 @@ pub struct OneListPatch<'a> {
     /// That txt file actually has the key first, followed by a sequence of values.
     /// This is an array of those key(target)-value pairs.
     pub adsf_patches: Vec<AdsfPatch<'a>>,
+
     /// Add/Replace one field/class patches to master file(e.g. `0_master.xml`).
+    ///
+    /// All Add/Replace patches generated here are assumed to be unique. Therefore, they will be added in bulk later using extend.
     pub one_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
     /// Add/Replace/Remove array field patches to master file(e.g. `0_master.xml`).
+    ///
+    /// Later, insert operations will be performed based on priority.
     pub seq_master_patches: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
 
     /// Add/Replace one field/class patches to master file(e.g. `mt_behavior.xml`).
@@ -68,15 +74,13 @@ pub struct OneListPatch<'a> {
     /// Therefore, it is placed here to be pushed when the furniture root is generated.
     pub furniture_group_root_indexes: Vec<String>,
 
-    #[cfg(feature = "unstable_conversion")]
-    pub conversion_jobs: Vec<AnimIoJob>,
+    pub alt_animation_patches: AltAnimMap<'a>,
 }
 
 /// Generate from one list file.
 pub fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
-    config: &crate::Config,
 ) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     // TODO: Support AsciiCaseIgnore
     let mut all_anim_files = HashSet::new();
@@ -89,8 +93,7 @@ pub fn generate_patch<'a>(
     let mut one_mt_behavior_patches = vec![];
     let mut seq_mt_behavior_patches = vec![];
     let mut furniture_group_root_indexes = vec![];
-    #[cfg(feature = "unstable_conversion")]
-    let mut conversion_jobs = vec![];
+    let mut alt_animation_patches = AltAnimMap::new();
 
     for pattern in list.patterns {
         match pattern {
@@ -98,28 +101,11 @@ pub fn generate_patch<'a>(
                 seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
             }
             SyntaxPattern::AltAnim(alt_animation) => {
-                #[cfg(feature = "unstable_conversion")]
-                {
-                    let (jobs, errs) =
-                        super::alternative::to_oar::alt_anim_to_oar(owned_data, alt_animation, config);
-                    if !errs.is_empty() {
-                        return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR {
-                            errors: errs,
-                        });
-                    }
-                    conversion_jobs.par_extend(jobs);
+                let (new_patches, errors) = new_alt_patches(&alt_animation, owned_data);
+                if !errors.is_empty() {
+                    return Err(FnisPatchGenerationError::FailedAlternateAnimation { errors });
                 }
-
-                #[cfg(not(feature = "unstable_conversion"))]
-                {
-                    // To avoid lint warning
-                    let _ = alt_animation;
-                    let _ = config;
-
-                    return Err(FnisPatchGenerationError::UnsupportedAlternateAnimation {
-                        path: owned_data.to_list_path(),
-                    });
-                }
+                alt_animation_patches.merge(new_patches);
             }
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
@@ -221,7 +207,7 @@ pub fn generate_patch<'a>(
                     all_anim_files.insert(*anim_file);
                 }
                 // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
-                all_events.insert(Cow::Borrowed(anim_event));
+                all_events.insert(Cow::Borrowed(*anim_event));
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
         };
@@ -236,8 +222,7 @@ pub fn generate_patch<'a>(
         one_mt_behavior_patches,
         seq_mt_behavior_patches,
         furniture_group_root_indexes,
-        #[cfg(feature = "unstable_conversion")]
-        conversion_jobs,
+        alt_animation_patches,
     })
 }
 
@@ -248,16 +233,11 @@ pub enum FnisPatchGenerationError {
     #[snafu(display("The addition of pairs and kill moves animation applies only to 3rd person humanoids; creatures are not supported.: {}", path.display()))]
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 
-    #[cfg(feature = "unstable_conversion")]
     #[snafu(display(
-        "Failed to convert Alternate Animation to OAR format. See inner errors for details."
+        "Failed to convert Alternate Animation. {}", errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")
     ))]
-    FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
+    FailedAlternateAnimation { errors: Vec<crate::errors::Error> },
 
-    #[cfg(not(feature = "unstable_conversion"))]
-    /// Alternate animation is not supported yet.
-    #[snafu(display("Alternate Animation is not supported yet: {}", path.display()))]
-    UnsupportedAlternateAnimation { path: PathBuf },
 
     /// Chair animation is not supported yet
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
