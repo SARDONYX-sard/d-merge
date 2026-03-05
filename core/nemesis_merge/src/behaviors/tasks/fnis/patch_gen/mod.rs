@@ -247,17 +247,29 @@ pub fn collect_borrowed_patches<'a>(
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if borrowed_patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
         let global_master_patches = new_global_master_patch(0);
-        let fnis_aa_patches = alternative::gen_old_patch::finalize_selectors(alt_animation_patches);
+        let (fnis_aa_one, fnis_aa_seq) =
+            alternative::gen_old_patch::finalize_selectors(alt_animation_patches);
 
-        let map = &mut borrowed_patches
+        {
+            let map = &mut borrowed_patches
+                .0
+                .entry(THREAD_PERSON_0_MASTER_KEY)
+                .or_default()
+                .one
+                .0;
+            // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
+            map.par_extend(global_master_patches);
+            map.par_extend(fnis_aa_one);
+        }
+
+        let seq = &mut borrowed_patches
             .0
             .entry(THREAD_PERSON_0_MASTER_KEY)
             .or_default()
-            .one
-            .0;
-        // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
-        map.par_extend(global_master_patches);
-        map.par_extend(fnis_aa_patches);
+            .seq;
+        for (path, patch) in fnis_aa_seq {
+            seq.insert(path, patch);
+        }
     }
 
     if borrowed_patches

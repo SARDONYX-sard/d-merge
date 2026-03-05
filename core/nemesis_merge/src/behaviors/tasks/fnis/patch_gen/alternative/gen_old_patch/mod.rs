@@ -31,8 +31,14 @@ use rayon::prelude::*;
 ///
 /// # Image
 /// `hkbClipGenerator`(#0010) => `hkbManualSelectorGenerator`(#0010) -> `hkbClipGenerator`(#GenIndex)
-pub fn finalize_selectors<'a>(stage_map: AltAnimMap<'a>) -> JsonPatchPairs<'a> {
-    let mut patches = Vec::new();
+///
+/// # Returns
+/// (one field patch, sequence field patch)
+pub fn finalize_selectors<'a>(
+    stage_map: AltAnimMap<'a>,
+) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
+    let mut one_patches = Vec::new();
+    let mut seq_patches = Vec::new();
 
     for patch in stage_map.map.into_values() {
         let clip_info = patch.clip_info;
@@ -41,7 +47,7 @@ pub fn finalize_selectors<'a>(stage_map: AltAnimMap<'a>) -> JsonPatchPairs<'a> {
 
         // Add vanilla's `hkbClipGenerator` to the new index and place it in the selector.
         let vanilla_clip_index = format!("#FNIS_aa_global_vanilla{group_name}");
-        patches.push(make_alt_clip_generator_patch(
+        one_patches.push(make_alt_clip_generator_patch(
             &vanilla_clip_index,
             clip_info.raw.animation_name,
             Some(clip_info.raw.triggers),
@@ -59,7 +65,7 @@ pub fn finalize_selectors<'a>(stage_map: AltAnimMap<'a>) -> JsonPatchPairs<'a> {
 
         // `hkbClipGenerator` index -> `hkbManualSelectorGenerator`
         let selector_index = format!("#FNIS_aa_global_selector{group_name}");
-        patches.extend(make_manual_selector_generator_patch(
+        one_patches.extend(make_manual_selector_generator_patch(
             clip_info.raw.ptr,
             &format!("#FNIS_aa{group_name}"),
             &selector_index,
@@ -68,12 +74,12 @@ pub fn finalize_selectors<'a>(stage_map: AltAnimMap<'a>) -> JsonPatchPairs<'a> {
             priority,
         ));
 
-        patches.extend(patch.one_patches); // append ClipGenerator / TriggerArray mod patches
+        one_patches.extend(patch.one_patches); // append ClipGenerator / TriggerArray mod patches
     }
 
-    patches.extend(new_push_anim_vars_patch(&anim_vars::ANIM_VAR_NAMES));
+    seq_patches.extend(new_push_anim_vars_patch(&anim_vars::ANIM_VAR_NAMES));
 
-    patches
+    (one_patches, seq_patches)
 }
 
 /// Replace `hkbClipGenerator` to `hkbManualSelectorGenerator`.
@@ -142,6 +148,9 @@ fn make_manual_selector_generator_patch<'a>(
 }
 
 /// This variable likely needs to be registered below to `0_master.xml`.
+///
+/// - Kind: Seq patch
+///
 /// - `hkbBehaviorGraphStringData.variableNames`
 /// - `hkbVariableValueSet.wordVariableValues`
 /// - `hkbBehaviorGraphData.variableInfos`(as [i32])
