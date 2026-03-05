@@ -238,7 +238,6 @@ pub enum FnisPatchGenerationError {
     ))]
     FailedAlternateAnimation { errors: Vec<crate::errors::Error> },
 
-
     /// Chair animation is not supported yet
     #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
     UnsupportedChairAnimation { path: PathBuf },

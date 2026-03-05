@@ -178,13 +178,14 @@ fn normalize_anim_path(s: &str) -> String {
 }
 
 fn build_alt_animation_map() -> FilterTable {
-    use super::generated_group_table::ALT_GROUPS;
+    use super::generated_group_table::CHARACTER_CLIPS;
 
     let mut map = FilterTable::new();
     let mut duplicates = Vec::new();
 
-    for (group_key, group) in ALT_GROUPS.entries() {
-        for &anim in group.animations {
+    for (group_key, &clips) in CHARACTER_CLIPS.entries() {
+        for clip in clips {
+            let anim = clip.alt_group_file;
             if let Some(prev_group) = map.insert(anim, group_key) {
                 duplicates.push((anim.to_string(), prev_group, group_key.to_string()));
             }
@@ -229,7 +230,7 @@ fn regroup_by_group_key(input: Output) -> BTreeMap<String, Output> {
 
 #[test]
 fn main() {
-    // ===== 設定 =====
+    // ===== config =====
     let input_root = Path::new("../../resource/xml/templates");
     let output_path = Path::new("../../dummy/clip_generators.json");
     // =================

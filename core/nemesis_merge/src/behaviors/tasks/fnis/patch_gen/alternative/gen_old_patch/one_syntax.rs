@@ -11,7 +11,7 @@ use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use crate::behaviors::tasks::fnis::list_parser::{
     combinator::Trigger, patterns::alt_anim::AlternativeAnimation,
 };
-use crate::behaviors::tasks::fnis::patch_gen::alternative::generated_group_table::{
+use crate::behaviors::tasks::fnis::patch_gen::alternative::gen_clip_table::generated_group_table::{
     ClipInfo, CHARACTER_CLIPS,
 };
 use crate::errors::Error;
