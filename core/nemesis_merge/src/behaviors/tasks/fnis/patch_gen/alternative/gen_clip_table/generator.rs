@@ -199,6 +199,7 @@ fn build_alt_animation_map() -> FilterTable {
         let dup_json =
             simd_json::to_string_pretty(&duplicates).expect("failed to serialize duplicates");
 
+        std::fs::create_dir_all("../../dummy").unwrap();
         std::fs::write(Path::new("../../dummy/alt_map_duplicates.json"), dup_json)
             .expect("failed to write alt_map_duplicates.json");
     }

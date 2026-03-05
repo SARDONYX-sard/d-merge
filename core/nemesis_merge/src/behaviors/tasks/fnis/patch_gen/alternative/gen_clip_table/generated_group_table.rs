@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub struct ClipInfo {
     /// FNIS AA group key (e.g. "_jump")
