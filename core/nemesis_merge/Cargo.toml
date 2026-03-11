@@ -43,6 +43,7 @@ skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
 [dev-dependencies]
 havok_classes = { workspace = true }
+havok_types = { workspace = true }
 pretty_assertions = { workspace = true }
 quick_tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
@@ -73,6 +74,3 @@ tracing = [
 #
 # Disable this feature if you prefer the default Rust/Serde enum format.
 ts_serde = []
-
-# Enable the hkx auto-conversion feature to resolve the mysterious mutex error randomly occurring in MO2.
-unstable_conversion = []

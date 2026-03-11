@@ -4209,6 +4209,7 @@ dependencies = [
  "dashmap",
  "glob",
  "havok_classes",
+ "havok_types",
  "indexmap 2.13.0",
  "json_patch",
  "jwalk",
