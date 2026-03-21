@@ -118,10 +118,25 @@ mod tests {
     #[ignore = "local only"]
     #[test]
     fn test_gen_behaviors() {
-        let paths = crate::behaviors::tasks::fnis::collect::collect_paths(
-            "../../dummy/templates/bins/**/behaviors/*.bin",
-        )
-        .unwrap();
+        /// Collect case-insensitive paths using glob.
+        /// Safe to call from the single-threaded stage.
+        ///
+        /// # Errors
+        /// If invalid glob pattern.
+        fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, glob::PatternError> {
+            Ok(glob::glob_with(
+                pattern,
+                glob::MatchOptions {
+                    case_sensitive: false, // To support Linux
+                    require_literal_separator: false,
+                    require_literal_leading_dot: false,
+                },
+            )?
+            .filter_map(Result::ok)
+            .collect())
+        }
+
+        let paths = collect_paths("../../dummy/templates/bins/**/behaviors/*.bin").unwrap();
         std::fs::write("./behaviors.log", format!("{paths:#?}")).unwrap();
     }
 
