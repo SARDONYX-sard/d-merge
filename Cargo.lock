@@ -1292,8 +1292,6 @@ dependencies = [
  "nemesis_merge",
  "node_expr",
  "once_cell",
- "pretty_assertions",
- "quick_tracing",
  "rayon",
  "self_update",
  "serde",
@@ -1307,7 +1305,6 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tauri-plugin-window-state",
- "temp-dir",
  "tokio",
  "tracing",
  "tracing_rotation",
@@ -3606,6 +3603,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jwalk_glob"
+version = "0.3.3"
+dependencies = [
+ "jwalk",
+ "tracing",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3995,7 +4000,7 @@ dependencies = [
 name = "mod_info"
 version = "0.1.0"
 dependencies = [
- "glob",
+ "jwalk_glob",
  "pretty_assertions",
  "rayon",
  "serde",
@@ -4207,11 +4212,11 @@ dependencies = [
  "auto_charset",
  "bitflags 2.11.0",
  "dashmap",
- "glob",
  "havok_classes",
  "indexmap 2.13.0",
  "json_patch",
  "jwalk",
+ "jwalk_glob",
  "nemesis_xml",
  "phf 0.13.1",
  "pretty_assertions",

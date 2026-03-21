@@ -41,17 +41,11 @@ tracing = { workspace = true }
 
 # workspace members
 mod_info = { workspace = true }
-nemesis_merge = { workspace = true, features = ["ts_serde"] }
+nemesis_merge = { workspace = true, features = ["ts_serde", "tracing"] }
 node_expr = { workspace = true }
 serde_hkx_for_gui = { workspace = true }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
-
-[dev-dependencies]
-temp-dir = "0.1.16"
-pretty_assertions = { workspace = true }
-quick_tracing = { workspace = true }
-tokio = { workspace = true, features = ["macros"] }
 
 [features]
 default = []
@@ -60,11 +54,6 @@ default = []
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
-
-# Enable patch log
-tracing = ["nemesis_merge/tracing"]
-
-debug = ["tracing", "nemesis_merge/debug"]
 
 [lints]
 workspace = true

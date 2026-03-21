@@ -118,10 +118,7 @@ mod tests {
     #[ignore = "local only"]
     #[test]
     fn test_gen_behaviors() {
-        let paths = crate::behaviors::tasks::fnis::collect::collect_paths(
-            "../../dummy/templates/bins/**/behaviors/*.bin",
-        )
-        .unwrap();
+        let paths = jwalk_glob::glob_files("../../dummy/templates/bins/**/behaviors/*.bin");
         std::fs::write("./behaviors.log", format!("{paths:#?}")).unwrap();
     }
 

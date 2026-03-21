@@ -23,18 +23,18 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.8
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           prefix-key: cargo-${{ matrix.platform }}-ffi-node
       - name: Sync node version and setup cache
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v6.3.0
         with:
           node-version: "lts/*"
           cache: "npm"
@@ -46,7 +46,7 @@ jobs:
           npm run build
 
       - name: Upload FFI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: d_merge_ffi_node_${{ matrix.platform }}
           path: |

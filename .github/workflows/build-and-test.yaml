@@ -26,7 +26,7 @@ jobs:
         platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
       - name: Setup environment
@@ -40,7 +40,7 @@ jobs:
         run: rustup component add rustfmt;cargo fmt --all -- --check
 
       - name: Install Python 3.14(To avoid lint error)
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
       - name: Lint Check
@@ -52,7 +52,7 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
       - name: Setup environment
@@ -69,7 +69,7 @@ jobs:
         run: cargo nextest run --workspace --exclude d_merge --exclude d_merge_egui --exclude d_merge_node --exclude d_merge_python
 
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.0
         if: runner.os == 'Linux'
         with:
           name: d_merge-debug-files
@@ -82,7 +82,7 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
       - name: Setup environment
@@ -103,7 +103,7 @@ jobs:
           build_profile: ${{ env.BUILD_PROFILE }}
 
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: ${{ env.APP_NAME }}-${{ runner.os }}
           # to include .keep file
@@ -116,9 +116,10 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
+        features: ["", "unstable_conversion"]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
       - name: Setup environment
@@ -126,12 +127,11 @@ jobs:
         with:
           platform: ${{ matrix.platform }}
           build_profile: release
-          cache_key_suffix: "egui"
+          cache_key_suffix: "egui-${{ matrix.features }}"
           install_front_deps: false
 
       - name: Build GUI
-        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
-
+        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }} ${{ matrix.features != '' && format('--features {0}', matrix.features) || '' }}
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
         with:
@@ -139,9 +139,9 @@ jobs:
           build_profile: ${{ env.BUILD_PROFILE }}
 
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.0
         with:
-          name: ${{ env.APP_NAME }}-${{ runner.os }}-egui
+          name: ${{ env.APP_NAME }}-${{ runner.os }}-egui${{ matrix.features != '' && format('-{0}', matrix.features) || '' }}
           include-hidden-files: true # to include .keep file
           path: |
             ./build/

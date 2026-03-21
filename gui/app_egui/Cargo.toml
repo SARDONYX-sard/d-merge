@@ -36,7 +36,7 @@ tracing = { workspace = true }
 # workspace members
 gh_issue_link = { workspace = true }
 mod_info = { workspace = true }
-nemesis_merge = { workspace = true }
+nemesis_merge = { workspace = true, features = ["tracing"] }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
 
@@ -45,6 +45,11 @@ rfd = { version = "0.17.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rfd = { version = "0.15.4", features = ["xdg-portal"] }
+
+[features]
+default = []
+
+unstable_conversion = ["nemesis_merge/unstable_conversion"]
 
 [lints]
 workspace = true
