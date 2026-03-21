@@ -1,4 +1,3 @@
-mod glob;
 pub mod owned;
 
 use crate::behaviors::tasks::fnis::collect::owned::{collect_fnis_injection, OwnedFnisInjection};
@@ -7,7 +6,6 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
 };
 use crate::errors::Error;
 use crate::PriorityMap;
-use std::path::PathBuf;
 use std::sync::LazyLock;
 
 static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
@@ -20,64 +18,6 @@ static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
         .collect()
 });
 
-/// Expands `skyrim_data_dir` into concrete directory paths.
-///
-/// Supports:
-/// - Literal paths: `C:/Skyrim/Data`
-/// - Trailing glob: `mods/*`
-/// - Mid-path glob: `mods/*/Data`
-/// - Partial name: `mods/FNIS*/Data`
-/// - Recursive: `mods/**/Data`
-fn expand_data_dirs(skyrim_data_dir: &str) -> Vec<PathBuf> {
-    let has_glob = skyrim_data_dir.contains(['*', '?', '[']);
-    if !has_glob {
-        return vec![PathBuf::from(skyrim_data_dir)];
-    }
-
-    // Split into literal root (before first glob component) and the full pattern.
-    let path = std::path::Path::new(skyrim_data_dir);
-    let mut root = PathBuf::new();
-    let mut found_glob = false;
-    for component in path.components() {
-        let s = component.as_os_str().to_str().unwrap_or("");
-        if !found_glob && !s.contains(['*', '?', '[']) {
-            root.push(component);
-        } else {
-            found_glob = true;
-        }
-    }
-
-    // Determine max walk depth from pattern components after root.
-    // `**` can match arbitrary depth, so use usize::MAX in that case.
-    let pat_after_root = std::path::Path::new(skyrim_data_dir)
-        .strip_prefix(&root)
-        .unwrap_or_else(|_| std::path::Path::new(skyrim_data_dir));
-    let has_recursive = pat_after_root.components().any(|c| c.as_os_str() == "**");
-    let pat_depth = pat_after_root.components().count();
-    let max_depth = if has_recursive { usize::MAX } else { pat_depth };
-
-    // The pattern to match against paths relative to root's parent,
-    // since jwalk includes root itself at depth 0.
-    jwalk::WalkDir::new(&root)
-        .max_depth(max_depth)
-        .into_iter()
-        .filter_map(|r| {
-            r.map_err(|_e| {
-                #[cfg(feature = "tracing")]
-                tracing::warn!(error = %_e, "Failed to read entry while expanding data dirs");
-            })
-            .ok()
-        })
-        .filter(move |e| {
-            if !e.file_type.is_dir() || e.depth == 0 {
-                return false;
-            }
-            self::glob::match_glob_path(skyrim_data_dir, &e.path())
-        })
-        .map(|e| e.path())
-        .collect()
-}
-
 pub async fn collect_all_fnis_injections(
     skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
@@ -89,9 +29,9 @@ pub async fn collect_all_fnis_injections(
         "Starting FNIS injection collection"
     );
 
-    // In manual mode, you need to search everything in the `MO2/mods/` directory as if it were the meshes directory.
+    // In manual mode, you need to search everything in the `MO2/mods/*` directory as if it were the meshes directory.
     // That is why `data_dirs` is defined as a Vec.
-    let data_dirs = expand_data_dirs(skyrim_data_dir);
+    let data_dirs = jwalk_glob::glob_dirs(skyrim_data_dir);
 
     #[cfg(feature = "tracing")]
     tracing::debug!(count = data_dirs.len(), "Expanded skyrim_data_dir");

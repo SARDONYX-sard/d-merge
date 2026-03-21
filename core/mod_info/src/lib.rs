@@ -60,7 +60,7 @@ pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Erro
 fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let nemesis_pattern = format!("{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini");
 
-    let mods = collect_paths(&nemesis_pattern)?
+    let mods = jwalk_glob::glob_files(&nemesis_pattern)
         .par_iter()
         .filter_map(|path| {
             if !path.exists() {
@@ -92,23 +92,6 @@ fn extract_nemesis_id_from_path(path: &Path) -> Option<&str> {
         .and_then(|os_str| os_str.to_str())
 }
 
-/// Collect case insensitive paths
-///
-/// # Errors
-/// If invalid glob pattern.
-pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, Error> {
-    Ok(glob::glob_with(
-        pattern,
-        glob::MatchOptions {
-            case_sensitive: false, // To support Linux
-            require_literal_separator: false,
-            require_literal_leading_dot: false,
-        },
-    )?
-    .filter_map(Result::ok)
-    .collect())
-}
-
 /// FNIS: `<skyrim_data_dir>/meshes/actors/character/animations/*/FNIS_*_List.txt`
 ///
 /// # Errors
@@ -116,8 +99,8 @@ pub fn collect_paths(pattern: &str) -> Result<Vec<PathBuf>, Error> {
 fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
     use std::collections::HashSet;
 
-    fn _get_all_fnis(fnis_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
-        let mods = collect_paths(fnis_pattern)?
+    fn collect_from_fnis_list(fnis_list_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
+        let mods = jwalk_glob::glob_files(fnis_list_pattern)
             .par_iter()
             .filter_map(|path| {
                 if !path.exists() {
@@ -143,12 +126,13 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
         Ok(mods)
     }
 
-    let fnis_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
     // TkDodgeSE lacks FNIS_*_List.txt and consists solely of animations, making acquisition difficult.
     // It would be easier to distribute the FNIS patch separately as a Nemesis patch.
-
-    let mut mods: Vec<_> = _get_all_fnis(&fnis_pattern)?.into_par_iter().collect();
-    mods.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    let fnis_list_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
+    let mut mods: Vec<_> = collect_from_fnis_list(&fnis_list_pattern)?
+        .into_par_iter()
+        .collect();
+    mods.par_sort_unstable_by(|a, b| a.name.cmp(&b.name));
 
     Ok(mods)
 }
@@ -262,12 +246,19 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::path::Path;
 
+    #[ignore = "Requires actual Skyrim Data directory with Nemesis mods"]
     #[test]
-    fn get_mod_info() -> Result<(), Error> {
+    fn get_mod_info() {
         let pattern = "D:/GAME/ModOrganizer Skyrim SE/mods/*";
-        let info = get_all(pattern, false)?;
-        println!("{info:#?}");
-        Ok(())
+        let info = get_all(pattern, false).unwrap();
+
+        dbg!(info.len());
+        std::fs::create_dir_all("../../dummy").unwrap();
+        std::fs::write(
+            "../../dummy/debug/get_all_mods_info.log",
+            format!("{info:#?}"),
+        )
+        .unwrap();
     }
 
     #[test]

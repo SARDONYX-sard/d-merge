@@ -1,0 +1,23 @@
+[package]
+name = "jwalk_glob"
+version.workspace = true
+description = "Glob pattern matching for jwalk. To avoid MO2 vfs error when using glob crate."
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["glob", "filesystem"]
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+jwalk = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[features]
+tracing = ["dep:tracing"]
+
+[lints]
+workspace = true

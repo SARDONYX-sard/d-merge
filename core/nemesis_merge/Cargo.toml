@@ -15,7 +15,6 @@ rust-version.workspace = true
 [dependencies]
 bitflags = "2.11.0"
 dashmap = { workspace = true, features = ["rayon", "serde"] }
-glob = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
@@ -38,6 +37,7 @@ winnow = { workspace = true }
 # workspace members
 auto_charset = { workspace = true }
 json_patch = { workspace = true, features = ["rayon", "serde"] }
+jwalk_glob = { workspace = true }
 nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
@@ -51,15 +51,13 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 workspace = true
 
 [features]
-default = ["debug"]
-
-# Output patch json, json just before hkx
-debug = ["tracing"]
+default = ["tracing"]
 
 tracing = [
   "dep:tracing",
   "dep:tracing-subscriber",
   "json_patch/tracing",
+  "jwalk_glob/tracing",
   "serde_hkx_features/dedup_tracing",
 ]
 
