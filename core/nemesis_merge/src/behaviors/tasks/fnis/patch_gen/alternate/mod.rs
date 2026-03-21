@@ -1,4 +1,4 @@
-//! # FNIS Alternative to OAR
+//! # FNIS alternate to OAR
 //!
 //! ```txt
 //! <skyrim data dir>/
@@ -27,6 +27,7 @@
 //!                              ├── 1hm_unequip.HKX            <- HKX animation file.
 //!                              └── config.json                <- OAR config file.
 //! ```
+pub mod bdi;
 mod generated_group_table;
 mod oar_json;
 
@@ -34,14 +35,14 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::behaviors::tasks::fnis::patch_gen::alternative::oar_json::{
+use crate::behaviors::tasks::fnis::patch_gen::alternate::oar_json::{
     prepare_anim_config_json, FnisToOarConfig,
 };
 use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, ConversionJob};
 use crate::errors::Error;
 use crate::{
     behaviors::tasks::fnis::{
-        collect::owned::OwnedFnisInjection, list_parser::patterns::alt_anim::AlternativeAnimation,
+        collect::owned::OwnedFnisInjection, list_parser::patterns::alt_anim::AlternateAnimation,
     },
     Config,
 };
@@ -56,7 +57,7 @@ pub struct AltAnimConfigJob {
 
 pub fn alt_anim_to_oar(
     owned_data: &OwnedFnisInjection,
-    alt_anim: AlternativeAnimation<'_>,
+    alt_anim: AlternateAnimation<'_>,
     config: &Config,
 ) -> (Vec<AnimIoJob>, Vec<Error>) {
     let namespace = &owned_data.namespace;
@@ -81,7 +82,7 @@ pub fn alt_anim_to_oar(
                 };
                 errors.push(Error::Custom {
                     msg: format!(
-                        "Failed to parse FNIS alternative animation override config file '{}': {err}. Using default settings.",
+                        "Failed to parse FNIS alternate animation override config file '{}': {err}. Using default settings.",
                         override_config_path.display(),
                     ),
                 });
@@ -157,7 +158,7 @@ pub fn alt_anim_to_oar(
                     AnimIoJob::Hkx(ConversionJob {
                         input_path,
                         output_path: output_dir.join(animation_path),
-                        is_optional: true,
+                        is_fnis_aa: true,
                     })
                 })
                 .collect();

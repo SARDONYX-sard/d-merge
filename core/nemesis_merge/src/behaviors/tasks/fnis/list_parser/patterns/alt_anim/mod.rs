@@ -10,17 +10,15 @@ use crate::behaviors::tasks::fnis::list_parser::patterns::alt_anim::one_line::{
     AnimTrigger,
 };
 
-/// Alterative Animation
+/// FNIS Alternate Animation
 #[derive(Debug, PartialEq)]
-pub struct AlternativeAnimation<'a> {
+pub struct AlternateAnimation<'a> {
     pub prefix: &'a str,
     pub set: Vec<AASet<'a>>,
     pub trigger: Vec<AnimTrigger<'a>>,
 }
 
-pub fn parse_alternative_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<AlternativeAnimation<'a>> {
+pub fn parse_alternate_animation<'a>(input: &mut &'a str) -> ModalResult<AlternateAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Alterative Animation"))
         .context(StrContext::Expected(StrContextValue::Description("")))
@@ -29,12 +27,12 @@ pub fn parse_alternative_animation<'a>(
 
 fn parse_furniture_animations_inner<'a>(
     input: &mut &'a str,
-) -> ModalResult<AlternativeAnimation<'a>> {
+) -> ModalResult<AlternateAnimation<'a>> {
     let prefix = parse_alt_anim_prefix_line.parse_next(input)?;
     let set = repeat(1.., parse_alt_anim_set_line).parse_next(input)?;
     let trigger = repeat(1.., parse_alt_anim_trigger_line).parse_next(input)?;
 
-    Ok(AlternativeAnimation {
+    Ok(AlternateAnimation {
         prefix,
         set,
         trigger,
@@ -51,7 +49,7 @@ mod tests {
     #[test]
     fn test_parse_fnis_animation_valid() {
         let parsed = must_parse(
-            parse_alternative_animation,
+            parse_alternate_animation,
             r"AAprefix fsm
 AAset _mt 9
 AAset _boweqp 1
@@ -62,7 +60,7 @@ T test2.hkx Test2_Event -0.100 Test2_trigger -0.00 Test2_trigger2 3.00
 ",
         );
 
-        let expected = AlternativeAnimation {
+        let expected = AlternateAnimation {
             prefix: "fsm",
             set: vec![
                 AASet {

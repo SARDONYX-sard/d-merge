@@ -34,7 +34,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
             "FNISCreatureVersion",
             "FNISZoo",
             "P1FlyingRing",
-            // "XPMSE",
+            "XPMSE",
             "backgrab",
             "backgrabnosneak",
             "backstabnosneak",

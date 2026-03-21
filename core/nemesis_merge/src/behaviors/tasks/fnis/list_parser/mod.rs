@@ -19,7 +19,7 @@ use crate::behaviors::tasks::fnis::list_parser::combinator::{
     version::{parse_version_line, Version},
 };
 use crate::behaviors::tasks::fnis::list_parser::patterns::{
-    alt_anim::{parse_alternative_animation, AlternativeAnimation},
+    alt_anim::{parse_alternate_animation, AlternateAnimation},
     chair::{parse_fnis_chair_animation, FNISChairAnimation},
     furniture::{parse_furniture_animation, FurnitureAnimation},
     pair_and_kill::{parse_paired_animation, FNISPairedAndKillAnimation},
@@ -28,7 +28,7 @@ use crate::behaviors::tasks::fnis::list_parser::patterns::{
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum SyntaxPattern<'a> {
-    AltAnim(AlternativeAnimation<'a>),
+    AltAnim(AlternateAnimation<'a>),
     AnimObject(FNISAnimation<'a>),
     Basic(FNISAnimation<'a>),
     Chair(FNISChairAnimation<'a>),
@@ -102,7 +102,7 @@ Example of correct usage:
                 .map(SyntaxPattern::PairAndKillMove)
                 .parse_next(input)?,
 
-            FNISAnimType::Alternate => parse_alternative_animation
+            FNISAnimType::Alternate => parse_alternate_animation
                 .map(SyntaxPattern::AltAnim)
                 .parse_next(input)?,
 

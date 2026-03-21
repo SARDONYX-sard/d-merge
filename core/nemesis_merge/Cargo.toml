@@ -51,7 +51,7 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 workspace = true
 
 [features]
-default = ["tracing"]
+default = ["tracing", "unstable_conversion"]
 
 tracing = [
   "dep:tracing",

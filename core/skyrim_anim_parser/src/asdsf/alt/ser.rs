@@ -125,7 +125,7 @@ pub enum SerializeError {
     /// Expected: `{name}/{sub_txt_name}.txt`. but  got none.
     MissingSubTxtHeader { name: String, sub_txt_name: String },
 
-    /// Failed to convert a vanilla-style txt project path into an alternative
+    /// Failed to convert a vanilla-style txt project path into an alternate
     /// `~`-separated identifier.
     ///
     /// Expected format:
@@ -137,7 +137,7 @@ pub enum SerializeError {
     /// Actual path:
     /// `{path}`
     #[snafu(display(
-        r#"Failed to convert a vanilla-style txt project path into an alternative `~`-separated identifier.
+        r#"Failed to convert a vanilla-style txt project path into an alternate `~`-separated identifier.
 
 Expected format:
 `<folder>\<file>.txt`

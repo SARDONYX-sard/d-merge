@@ -27,7 +27,7 @@ pub struct AltAsdsf<'a> {
     pub txt_projects: AltTxtProjects<'a>,
 }
 
-/// Alternative representation of `TxtProjects` for the Nemesis patch.
+/// alternate representation of `TxtProjects` for the Nemesis patch.
 ///
 /// - key: project data file names. This is the same as the path fragment specified in the Nemesis patch, but without the txt extension and with `\` replaced by `~`.
 ///

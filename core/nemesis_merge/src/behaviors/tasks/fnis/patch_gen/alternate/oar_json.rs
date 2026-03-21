@@ -61,6 +61,27 @@ pub struct ConditionsConfig<'a> {
     pub conditions: &'a [Object<'a>],
 }
 
+/// Builds `FNISaa_<group> == slot + 1` as a `simd_json::borrowed::Object`.
+///
+/// FNIS slot index is 0-based internally, but the graph variable value is 1-based.
+///
+/// - group_name: `_1hm_eqp`
+fn fnis_aa_condition<'a>(group_name: &'a str, slot: u64) -> simd_json::borrowed::Object<'a> {
+    simd_json::derived::ValueTryIntoObject::try_into_object(simd_json::json_typed!(borrowed, {
+        "condition": "CompareValues",
+        "requiredVersion": "1.0.0.0",
+        "Value A": {
+            "graphVariable": format!("FNISaa{group_name}"), // e.g., "FNISaa_1hm_eqp"
+            "graphVariableType": "Int"
+        },
+        "Comparison": "==",
+        "Value B": {
+            "value": (slot + 1) as f64, // 0 is vanilla. So we start at 1.
+        }
+    }))
+    .unwrap_or_default()
+}
+
 /// For the each `animations/OpenAnimationReplacer/<namespace>/<group name>_<slot>/config.json` for OAR, based on override config.
 ///
 /// # Note
@@ -71,29 +92,34 @@ pub fn prepare_anim_config_json(
     slot: u64,
     slot_config: Option<&SlotConfig<'_>>,
 ) -> String {
+    let user_conditions = slot_config
+        .map(|s| s.conditions.as_slice())
+        .unwrap_or_default();
+
+    // Always prepend the FNISaa condition, then append user-defined conditions.
+    let conditions: Vec<simd_json::borrowed::Object> =
+        core::iter::once(fnis_aa_condition(group_name, slot))
+            .chain(user_conditions.iter().cloned())
+            .collect();
+
     let config = ConditionsConfig {
-        name: Cow::Borrowed(group_config_dir), // NOTE: The caller side has already applied the override_config.
+        name: Cow::Borrowed(group_config_dir),
         description: Cow::Borrowed(
             slot_config
-                .and_then(|slot| slot.description.as_deref())
+                .and_then(|s| s.description.as_deref())
                 .unwrap_or_default(),
         ),
-        priority: slot_config.and_then(|slot| slot.priority).unwrap_or(0) as i32,
+        priority: slot_config.and_then(|s| s.priority).unwrap_or(800_000_000) as i32,
         override_animations_folder: None,
-        conditions: slot_config
-            .map(|slot| slot.conditions.as_slice())
-            .unwrap_or_default(),
+        conditions: &conditions,
     };
 
     match sonic_rs::to_string_pretty(&config) {
         Ok(json) => json,
-        Err(err) => {
+        Err(e) => {
             #[cfg(feature = "tracing")]
             tracing::error!(
-                "(Originally unreachable)Failed to serialize animation config JSON for group '{}', slot {}: {}",
-                group_name,
-                slot,
-                err
+                "Failed to serialize animation config JSON for group '{group_name}' slot {slot}: {e}"
             );
             String::new()
         }
