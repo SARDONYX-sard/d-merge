@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Setup environment
@@ -52,7 +52,7 @@ jobs:
           Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.zip'
 
       - name: Release Portable Version(Windows)
-        uses: ncipollo/release-action@v1.16.0
+        uses: ncipollo/release-action@v1.21.0
         if: runner.os == 'Windows'
         with:
           allowUpdates: true
@@ -91,7 +91,7 @@ jobs:
           tar -czf ./${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
 
       - name: Release Portable Version
-        uses: ncipollo/release-action@v1.16.0
+        uses: ncipollo/release-action@v1.21.0
         if: runner.os != 'Windows'
         with:
           allowUpdates: true
@@ -109,7 +109,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Setup environment
@@ -133,7 +133,7 @@ jobs:
         run: |
           Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}_egui-${{ runner.os }}-v${{ github.ref_name }}.zip'
       - name: Release egui Version(Windows)
-        uses: ncipollo/release-action@v1.16.0
+        uses: ncipollo/release-action@v1.21.0
         if: runner.os == 'Windows'
         with:
           allowUpdates: true
@@ -148,7 +148,7 @@ jobs:
           tar -czf ./${{ env.APP_NAME }}_egui-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
 
       - name: Release Portable Version(MacOS/Linux)
-        uses: ncipollo/release-action@v1.16.0
+        uses: ncipollo/release-action@v1.21.0
         if: runner.os != 'Windows'
         with:
           allowUpdates: true
