@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-22
+### :sparkles: New Features
+- [`cbd3cad`](https://github.com/SARDONYX-sard/d-merge/commit/cbd3cad9ad2d6be55ae402d3d4369c7fa617df42) - support for `NemesisBase` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a0ee8e5`](https://github.com/SARDONYX-sard/d-merge/commit/a0ee8e5711f81266b7ed8911efcff252d652dd23) - add err prefix *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`610fd40`](https://github.com/SARDONYX-sard/d-merge/commit/610fd40de7b8e4ddfa30ed07ea7b628367008a8c) - use `sonic_rs` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`aa80b1f`](https://github.com/SARDONYX-sard/d-merge/commit/aa80b1f34cc7ef7df205b9dc9990ed39b78f88ba) - **fnis_aa**: add bdi *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`790e5b9`](https://github.com/SARDONYX-sard/d-merge/commit/790e5b96b61c84fb637b2051aa44918c5066a2de) - **fnis_aa**: update dependencies and add AAConfig generation for FNIS alternate animations *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c1d6a45`](https://github.com/SARDONYX-sard/d-merge/commit/c1d6a452d3a833a5a9ca6d274edec6311cc6297e) - **fnis_aa**: change to 1based OAR GUI display *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`92fc589`](https://github.com/SARDONYX-sard/d-merge/commit/92fc589a967e0ecacc6b3545654383cda2a92b7b) - **cli**: implement cli *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`972afeb`](https://github.com/SARDONYX-sard/d-merge/commit/972afeb6b4d5a7ade3758b05c638780805a9ac59) - **cli**: implement cli *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`52ddc2e`](https://github.com/SARDONYX-sard/d-merge/commit/52ddc2e4a4afb7a2976464b21acc4058415f3781) - **fnis_aa**: change to enum *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`cb8d47b`](https://github.com/SARDONYX-sard/d-merge/commit/cb8d47be306845f343f43b6b9a82d8fed0c12b39) - **glob**: use `jwalk_glob` instead of `glob` crate(To avoid mo2 vfs lock err) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`3a0f0ce`](https://github.com/SARDONYX-sard/d-merge/commit/3a0f0cefc1cef09243ddb5761c736bfbc09e9a61) - replace Window with AppHandle for emitting patch status events *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`48610c4`](https://github.com/SARDONYX-sard/d-merge/commit/48610c42255bc2ce29793d6d397b90aead6fd995) - **owned_fnis**: use jwalk + manual glob parser *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`204c3ab`](https://github.com/SARDONYX-sard/d-merge/commit/204c3abd346077ff7a081c089c83967096b5d857) - remove `unstable_conversion` feature *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`62ab941`](https://github.com/SARDONYX-sard/d-merge/commit/62ab941f8ef78bf9009a22c9121f6a819faac368) - **fnis**: separate fnis list parser *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`a0949ec`](https://github.com/SARDONYX-sard/d-merge/commit/a0949ecc87e13c5c9138a6faf4b5598512481dd3) - **vscode**: update JSON schema configuration for input and output paths *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [0.3.3] - 2026-02-27
 ### :bug: Bug Fixes
 - [`f51cff6`](https://github.com/SARDONYX-sard/d-merge/commit/f51cff6e22a92e8e29e5720fc4e4d2635ac2331c) - **tauri**: fix patch grid patching *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -259,3 +284,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.2.6...0.3.0
 [0.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.1...0.3.2
 [0.3.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.2...0.3.3
+[1.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.3...1.0.0
