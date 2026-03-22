@@ -6,8 +6,8 @@ use rayon::prelude::*;
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::list_parser::combinator::flags::FNISAnimFlags;
-use crate::behaviors::tasks::fnis::list_parser::patterns::furniture::FurnitureAnimation;
+use fnis_list::combinator::flags::FNISAnimFlags;
+use fnis_list::patterns::furniture::FurnitureAnimation;
 use crate::behaviors::tasks::fnis::patch_gen::furniture::one_anim::{
     new_furniture_one_anim_patches, FurniturePhase,
 };

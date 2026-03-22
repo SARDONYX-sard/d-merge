@@ -8,9 +8,9 @@ use winnow::combinator::seq;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments;
 
-pub fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<'a>> {
+pub(crate) fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<'a>> {
     seq!(Translation {
         _: Caseless("MD"),
         _: space1,
@@ -44,7 +44,7 @@ fn f32_parser<'a>(input: &mut &'a str) -> ModalResult<Cow<'a, str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn test_parse_md_data_valid() {

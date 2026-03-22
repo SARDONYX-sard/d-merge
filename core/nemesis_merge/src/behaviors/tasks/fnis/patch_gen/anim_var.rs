@@ -1,10 +1,8 @@
+use fnis_list::combinator::anim_var::{AnimVar, Value};
 use json_patch::{json_path, Action, JsonPatch, ValueWithPriority};
 use rayon::prelude::*;
 
-use crate::behaviors::tasks::fnis::{
-    collect::owned::OwnedFnisInjection,
-    list_parser::combinator::anim_var::{AnimVar, Value},
-};
+use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 
 /// This variable likely needs to be registered below to `0_master.xml`.
 /// - `hkbBehaviorGraphStringData.variableNames`

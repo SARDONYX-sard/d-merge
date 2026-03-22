@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::list_parser::{
+use fnis_list::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };

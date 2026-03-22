@@ -13,7 +13,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bitflags = "2.11.0"
 dashmap = { workspace = true, features = ["rayon", "serde"] }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
@@ -37,6 +36,7 @@ winnow = { workspace = true }
 
 # workspace members
 auto_charset = { workspace = true }
+fnis_list = { workspace = true }
 json_patch = { workspace = true, features = ["rayon", "serde"] }
 jwalk_glob = { workspace = true }
 nemesis_xml = { workspace = true }

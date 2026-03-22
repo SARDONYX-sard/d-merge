@@ -1,8 +1,8 @@
 //! `FNIS_<mod name>_List.txt` parser
 //!
 //! See `FNIS for Modders_V6.2.pdf` by fore
-pub(crate) mod combinator;
-pub(crate) mod patterns;
+pub mod combinator;
+pub mod patterns;
 #[cfg(test)]
 mod test_helpers;
 
@@ -11,14 +11,14 @@ use winnow::combinator::{alt, fail, opt};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::anim_var::parse_anim_var_line;
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
+use self::combinator::anim_var::parse_anim_var_line;
+use self::combinator::comment::skip_ws_and_comments;
+use self::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},
     fnis_animation::{parse_fnis_animation, FNISAnimation},
     version::{parse_version_line, Version},
 };
-use crate::behaviors::tasks::fnis::list_parser::patterns::{
+use self::patterns::{
     alt_anim::{parse_alternate_animation, AlternateAnimation},
     chair::{parse_fnis_chair_animation, FNISChairAnimation},
     furniture::{parse_furniture_animation, FurnitureAnimation},
@@ -27,7 +27,7 @@ use crate::behaviors::tasks::fnis::list_parser::patterns::{
 };
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum SyntaxPattern<'a> {
+pub enum SyntaxPattern<'a> {
     AltAnim(AlternateAnimation<'a>),
     AnimObject(FNISAnimation<'a>),
     Basic(FNISAnimation<'a>),
@@ -42,14 +42,18 @@ pub(crate) enum SyntaxPattern<'a> {
 
 /// One mod FNIS_<mod namespace>_List.txt
 #[derive(Debug, PartialEq)]
-pub(crate) struct FNISList<'a> {
+pub struct FNISList<'a> {
     /// Mod version
     pub version: Option<Version>,
 
     /// sequenced animations
-    pub(crate) patterns: Vec<SyntaxPattern<'a>>,
+    pub patterns: Vec<SyntaxPattern<'a>>,
 }
 
+/// Parse 1 FNIS_*_List.txt file.
+///
+/// # Errors
+/// Return an error if it violates the FNIS PDF specifications.
 pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
     skip_ws_and_comments.parse_next(input)?;
 
@@ -119,8 +123,8 @@ Example of correct usage:
 
 #[cfg(test)]
 mod tests {
+    use self::test_helpers::must_parse;
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::must_parse;
 
     #[test]
     #[ignore]

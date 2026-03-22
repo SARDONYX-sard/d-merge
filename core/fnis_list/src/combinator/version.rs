@@ -5,7 +5,7 @@ use winnow::combinator::{opt, preceded, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
@@ -14,7 +14,7 @@ pub struct Version {
 }
 
 /// Version line parsing: `Version V<n>.<m>`
-pub fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
+pub(crate) fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
     seq! {
         Version {
             _: Caseless("Version"),
@@ -37,7 +37,7 @@ pub fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn test_parse_version_line_ok() {

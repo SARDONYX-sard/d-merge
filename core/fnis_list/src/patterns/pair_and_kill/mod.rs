@@ -6,10 +6,8 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::patterns::pair_and_kill::flags::{
-    parse_anim_flags, FNISPairAndKillMoveAnimFlagSet,
-};
+use crate::combinator::comment::skip_ws_and_comments;
+use crate::patterns::pair_and_kill::flags::{parse_anim_flags, FNISPairAndKillMoveAnimFlagSet};
 
 #[derive(Debug, PartialEq)]
 pub struct FNISPairedAndKillAnimation<'a> {
@@ -45,7 +43,7 @@ pub enum ActorRole {
     Passive,
 }
 
-pub fn parse_paired_animation<'a>(
+pub(crate) fn parse_paired_animation<'a>(
     input: &mut &'a str,
 ) -> ModalResult<FNISPairedAndKillAnimation<'a>> {
     seq!(FNISPairedAndKillAnimation {
@@ -88,7 +86,7 @@ fn parse_anim_object_numbered<'a>(input: &mut &'a str) -> ModalResult<AnimObject
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::{flags::FNISAnimFlags, Trigger},
         test_helpers::must_parse,
     };

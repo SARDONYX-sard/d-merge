@@ -12,10 +12,10 @@ use winnow::combinator::{alt, fail, opt, preceded};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::flags::{
-    parse_trigger_options, FNISAnimFlags,
+use crate::combinator::{
+    flags::{parse_trigger_options, FNISAnimFlags},
+    Trigger,
 };
-use crate::behaviors::tasks::fnis::list_parser::combinator::Trigger;
 
 /// Combination of simple bitflags and parameterized flags.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -145,7 +145,7 @@ fn parse_trigger_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn parse_simple_flags() {

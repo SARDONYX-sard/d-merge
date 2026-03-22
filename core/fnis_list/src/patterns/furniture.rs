@@ -4,9 +4,7 @@ use winnow::combinator::fail;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::{
-    parse_fnis_animation, FNISAnimation,
-};
+use crate::combinator::fnis_animation::{parse_fnis_animation, FNISAnimation};
 
 /// Furniture animation
 #[derive(Debug, PartialEq)]
@@ -15,7 +13,9 @@ pub struct FurnitureAnimation<'a> {
     pub animations: Vec<FNISAnimation<'a>>,
 }
 
-pub fn parse_furniture_animation<'a>(input: &mut &'a str) -> ModalResult<FurnitureAnimation<'a>> {
+pub(crate) fn parse_furniture_animation<'a>(
+    input: &mut &'a str,
+) -> ModalResult<FurnitureAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Furniture Animation"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -36,9 +36,7 @@ fu -a Kneel_Enter Kneel_Enter.hkx
 fn parse_furniture_animations_inner<'a>(
     input: &mut &'a str,
 ) -> ModalResult<FurnitureAnimation<'a>> {
-    use crate::behaviors::tasks::fnis::list_parser::combinator::{
-        anim_types::FNISAnimType::*, flags::FNISAnimFlags,
-    };
+    use crate::combinator::{anim_types::FNISAnimType::*, flags::FNISAnimFlags};
 
     let seq_start_anim = parse_fnis_animation
         .verify(|anim| {
@@ -88,7 +86,7 @@ fn parse_furniture_animations_inner<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::{
             anim_types::FNISAnimType,
             flags::{FNISAnimFlagSet, FNISAnimFlags},

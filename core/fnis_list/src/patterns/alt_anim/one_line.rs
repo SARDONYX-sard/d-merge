@@ -6,10 +6,8 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
-    take_till_fnis_ignores, take_till_space, Trigger,
-};
+use crate::combinator::comment::skip_ws_and_comments;
+use crate::combinator::{take_till_fnis_ignores, take_till_space, Trigger};
 
 /// AlterativeAnimation set
 ///
@@ -30,7 +28,7 @@ pub struct AnimTrigger<'a> {
 }
 
 /// Parse `AAprefix <3_character_mod_abbreviation>`
-pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let (prefix,) = seq! {
         _: space0,
         _: Caseless("AAprefix"),
@@ -47,7 +45,7 @@ pub fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult<&'a st
 }
 
 /// Parse `AAset <animation_group> <number>`
-pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AASet<'a>> {
+pub(crate) fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AASet<'a>> {
     let (anim_group, slots_count) = seq! {
         _: space0,
         _: Caseless("AAset"),
@@ -69,7 +67,7 @@ pub fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AASet<'a>
 }
 
 /// Parse `T <alternate_animation> <trigger1> <time1> ...`
-pub fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResult<AnimTrigger<'a>> {
+pub(crate) fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResult<AnimTrigger<'a>> {
     fn parse_trigger<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
         seq! {
             Trigger {
@@ -105,7 +103,7 @@ pub fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResult<AnimT
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::Trigger,
         test_helpers::{must_fail, must_parse},
     };

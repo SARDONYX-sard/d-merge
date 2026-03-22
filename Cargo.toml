@@ -13,8 +13,10 @@ rust-version = "1.91"
 members = [
   "cli",
   "core/auto_charset",
+  "core/fnis_list",
   "core/gh_issue_link",
-  "core/json_patch", "core/jwalk_glob",
+  "core/json_patch",
+  "core/jwalk_glob",
   "core/mod_info",
   "core/nemesis_merge",
   "core/nemesis_xml",
@@ -64,6 +66,7 @@ quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
 auto_charset = { path= "./core/auto_charset" }
+fnis_list = { path= "./core/fnis_list" }
 gh_issue_link = { path= "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }
 jwalk_glob = { path = "./core/jwalk_glob" }
@@ -76,6 +79,7 @@ skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 skyrim_crc = { path = "./core/skyrim_crc" }
 skyrim_data_dir = { path = "./core/skyrim_data_dir" }
 tracing_rotation = { path= "./core/tracing_rotation" }
+
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.
 [profile.release]

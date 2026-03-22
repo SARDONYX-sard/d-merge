@@ -8,7 +8,6 @@
 //! are **based on and quoted from** _Fore's_ **"FNIS for Modders_V6.2.pdf"(© Fore)**,
 //! which is part of the FNIS (Fores New Idles in Skyrim) modding documentation.
 pub mod collect;
-mod list_parser;
 pub mod patch_gen;
 
 mod behavior_table_gen;

@@ -4,9 +4,7 @@ use winnow::combinator::fail;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::{
-    parse_fnis_animation, FNISAnimation,
-};
+use crate::combinator::fnis_animation::{parse_fnis_animation, FNISAnimation};
 
 /// sequenced animations
 #[derive(Debug, PartialEq)]
@@ -15,8 +13,8 @@ pub struct SequencedAnimation<'a> {
     pub animations: Vec<FNISAnimation<'a>>,
 }
 
-pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SequencedAnimation<'a>> {
-    use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType::{
+pub(crate) fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SequencedAnimation<'a>> {
+    use crate::combinator::anim_types::FNISAnimType::{
         Sequenced, SequencedContinued, SequencedOptimized,
     };
 
@@ -56,7 +54,7 @@ pub fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SequencedAnim
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::{
             anim_types::FNISAnimType,
             flags::{FNISAnimFlagSet, FNISAnimFlags},
@@ -129,7 +127,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_list() {
-        use crate::behaviors::tasks::fnis::list_parser::combinator::version::parse_version_line;
+        use crate::combinator::version::parse_version_line;
 
         let list = std::fs::read_to_string("../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt").unwrap();
         let ret = must_parse(

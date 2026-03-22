@@ -48,7 +48,7 @@ pub enum FNISAnimType {
     AnimVar,
 }
 
-pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
+pub(crate) fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
     alt((
         Caseless("fuo").value(FNISAnimType::FurnitureOptimized),
         Caseless("ofa").value(FNISAnimType::OffsetArm),
@@ -75,7 +75,7 @@ pub fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn test_parse_anim_type_valid() {

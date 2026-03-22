@@ -6,7 +6,7 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::Trigger;
+use crate::combinator::Trigger;
 
 /// Combination of simple bitflags and parameterized flags.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -84,7 +84,7 @@ enum ParsedFlag<'a> {
 }
 
 /// Parse a list of animation flags separated by commas.
-pub fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a>> {
+pub(crate) fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a>> {
     preceded("-", __parse_anim_flags)
     .context(StrContext::Label("FNISAnimFlags"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -157,7 +157,7 @@ fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>>
     .parse_next(input)
 }
 
-pub fn parse_trigger_options<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
+pub(crate) fn parse_trigger_options<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>> {
     seq! {Trigger {
         _: Caseless("T"),
         event: take_till(1.., '/'),
@@ -170,7 +170,7 @@ pub fn parse_trigger_options<'a>(input: &mut &'a str) -> ModalResult<Trigger<'a>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn parse_single_simple_flag() {

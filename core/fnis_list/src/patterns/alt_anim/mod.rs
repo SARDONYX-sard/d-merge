@@ -5,7 +5,7 @@ use winnow::combinator::repeat;
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::patterns::alt_anim::one_line::{
+use crate::patterns::alt_anim::one_line::{
     parse_alt_anim_prefix_line, parse_alt_anim_set_line, parse_alt_anim_trigger_line, AASet,
     AnimTrigger,
 };
@@ -18,7 +18,9 @@ pub struct AlternateAnimation<'a> {
     pub trigger: Vec<AnimTrigger<'a>>,
 }
 
-pub fn parse_alternate_animation<'a>(input: &mut &'a str) -> ModalResult<AlternateAnimation<'a>> {
+pub(crate) fn parse_alternate_animation<'a>(
+    input: &mut &'a str,
+) -> ModalResult<AlternateAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Alterative Animation"))
         .context(StrContext::Expected(StrContextValue::Description("")))
@@ -42,9 +44,7 @@ fn parse_furniture_animations_inner<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
-        combinator::Trigger, test_helpers::must_parse,
-    };
+    use crate::{combinator::Trigger, test_helpers::must_parse};
 
     #[test]
     fn test_parse_fnis_animation_valid() {

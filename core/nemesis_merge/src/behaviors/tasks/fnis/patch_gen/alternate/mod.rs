@@ -85,20 +85,19 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupName;
-use crate::behaviors::tasks::fnis::patch_gen::alternate::oar_json::{
-    prepare_anim_config_json, FnisToOarConfig,
-};
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimKind;
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, ConversionJob};
-use crate::errors::Error;
-use crate::{
-    behaviors::tasks::fnis::{
-        collect::owned::OwnedFnisInjection, list_parser::patterns::alt_anim::AlternateAnimation,
-    },
-    Config,
-};
+use fnis_list::patterns::alt_anim::AlternateAnimation;
 use rayon::prelude::*;
+
+use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
+use crate::behaviors::tasks::fnis::patch_gen::{
+    alternate::{
+        group_names::AAGroupName,
+        oar_json::{prepare_anim_config_json, FnisToOarConfig},
+    },
+    hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
+};
+use crate::errors::Error;
+use crate::Config;
 
 /// Just write file
 #[derive(Debug)]

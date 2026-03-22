@@ -30,12 +30,12 @@ pub mod version;
 use winnow::{token::take_till, ModalResult, Parser as _};
 
 /// take till space, tab
-pub fn take_till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn take_till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     take_till(1.., [' ', '\t']).parse_next(input)
 }
 
 /// take till comment start(`'`), space, tab, or line_ending
-pub fn take_till_fnis_ignores<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn take_till_fnis_ignores<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     take_till(1.., [' ', '\t', '\r', '\n', '\'']).parse_next(input)
 }
 

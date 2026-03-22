@@ -6,11 +6,9 @@ use winnow::combinator::{opt, repeat, separated, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::anim_var::{
-    parse_anim_var_line, AnimVar,
-};
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
+use crate::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},
+    anim_var::{parse_anim_var_line, AnimVar},
     comment::skip_ws_and_comments,
     flags::{parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags},
     motion::parse_md_data,
@@ -39,7 +37,7 @@ pub struct FNISAnimation<'a> {
     pub rotations: Vec<RotationData<'a>>,
 }
 
-pub fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimation<'a>> {
+pub(crate) fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISAnimation<'a>> {
     seq!(FNISAnimation {
             // 1 line
             _: space0,
@@ -96,7 +94,7 @@ fn parse_anim_objects<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::flags::FNISAnimFlags,
         test_helpers::{must_fail, must_parse},
     };

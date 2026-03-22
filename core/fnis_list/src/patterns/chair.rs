@@ -6,11 +6,11 @@ use winnow::error::{StrContext, StrContextValue};
 use winnow::token::take_till;
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::anim_types::FNISAnimType;
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::combinator::fnis_animation::parse_fnis_animation;
-use crate::behaviors::tasks::fnis::list_parser::combinator::{
-    flags::FNISAnimFlags, fnis_animation::FNISAnimation,
+use crate::combinator::{
+    anim_types::FNISAnimType,
+    comment::skip_ws_and_comments,
+    flags::FNISAnimFlags,
+    fnis_animation::{parse_fnis_animation, FNISAnimation},
 };
 
 #[derive(Debug, PartialEq)]
@@ -23,7 +23,9 @@ pub struct FNISChairAnimation<'a> {
     pub sequenced: Vec<&'a str>,
 }
 
-pub fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISChairAnimation<'a>> {
+pub(crate) fn parse_fnis_chair_animation<'a>(
+    input: &mut &'a str,
+) -> ModalResult<FNISChairAnimation<'a>> {
     seq!(FNISChairAnimation{
             _: space0,
             start: parse_fnis_animation.verify(|anim| {
@@ -69,7 +71,7 @@ fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::{
+    use crate::{
         combinator::{anim_types::FNISAnimType, flags::FNISAnimFlagSet},
         test_helpers::must_parse,
     };

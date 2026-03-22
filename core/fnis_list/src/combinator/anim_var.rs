@@ -23,8 +23,7 @@ use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
-use crate::behaviors::tasks::fnis::list_parser::combinator::take_till_space;
+use crate::combinator::{comment::skip_ws_and_comments, take_till_space};
 
 /// Value stored in AnimVar
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -49,7 +48,7 @@ pub struct AnimVar<'a> {
 /// ```text
 /// AnimVar <Name> [ BOOL | INT32 | REAL ] <numeric_value>
 /// ```
-pub fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> {
+pub(crate) fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVar<'a>> {
     seq! {
         AnimVar {
             _: Caseless("AnimVar"),
@@ -105,7 +104,7 @@ fn parse_value<'a>(input: &mut &'a str) -> ModalResult<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn test_parse_bool_valid_0() {

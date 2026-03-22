@@ -12,7 +12,7 @@ use winnow::combinator::{alt, seq};
 use winnow::error::{StrContext, StrContextValue};
 use winnow::{ModalResult, Parser};
 
-use crate::behaviors::tasks::fnis::list_parser::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments;
 
 /// Rotation data for an animation with a common `time` and specific format data.
 #[derive(Debug, PartialEq)]
@@ -95,7 +95,7 @@ pub enum RotationFormat<'a> {
 /// Parse `RD ...` line into a structured `RotationData`
 /// - `RD <time: f32> <quat_1: f32> <quat_2: f32> <quat_3: f32> <quat_4: f32>`
 /// - `RD <time: f32> <delta_z_angle: f32>`
-pub fn parse_rd_data<'a>(input: &mut &'a str) -> ModalResult<RotationData<'a>> {
+pub(crate) fn parse_rd_data<'a>(input: &mut &'a str) -> ModalResult<RotationData<'a>> {
     seq! {
         _: Caseless("RD"),
         _: space1,
@@ -143,7 +143,7 @@ fn parse_rd_data2<'a>(input: &mut &'a str) -> ModalResult<RotationFormat<'a>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behaviors::tasks::fnis::list_parser::test_helpers::{must_fail, must_parse};
+    use crate::test_helpers::{must_fail, must_parse};
 
     #[test]
     fn parse_format1_rotation() {
