@@ -1,20 +1,25 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt"
 use std::borrow::Cow;
 
+use fnis_list::{
+    combinator::{flags::FNISAnimFlags, Trigger},
+    patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+};
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::{
-    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
-    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
-    FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
-};
-use crate::behaviors::tasks::fnis::patch_gen::{new_push_events_seq_patch, JsonPatchPairs};
-use fnis_list::{
-    combinator::{flags::FNISAnimFlags, Trigger},
-    patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+use crate::behaviors::tasks::fnis::{
+    collect::owned::OwnedFnisInjection,
+    patch_gen::{
+        global::_0_master::{
+            FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
+            FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529,
+            FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+            FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
+        },
+        new_push_events_seq_patch, JsonPatchPairs,
+    },
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.

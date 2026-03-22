@@ -1,5 +1,6 @@
-use crate::errors::Error;
 use rayon::{iter::Either, prelude::*};
+
+use crate::errors::Error;
 
 #[inline]
 pub fn filter_results<T>(results: Vec<Result<T, Error>>) -> Result<(), Vec<Error>>

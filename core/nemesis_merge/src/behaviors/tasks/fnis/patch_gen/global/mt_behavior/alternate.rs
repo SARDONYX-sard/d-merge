@@ -1,8 +1,9 @@
 //! For `character/behaviors/mt_behavior.xml` 1 file patch
 
-use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
+
+use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 
 /// FNIS XML(name="#5218") - `HeadTrackingOn`
 pub(crate) const FNIS_AA_MT_AUTO_GEN_5218: &str = "#FNIS_aa_global_auto_gen5218";

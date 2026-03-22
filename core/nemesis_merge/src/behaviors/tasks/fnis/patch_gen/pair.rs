@@ -1,26 +1,29 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt"
 use std::borrow::Cow;
 
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
-use rayon::prelude::*;
-use simd_json::json_typed;
-
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 use fnis_list::{
     combinator::{flags::FNISAnimFlags, Trigger},
     patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
 };
-use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::{
-    FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
-    FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
-};
-use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::{
-    kill_move::{
-        calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
-        new_event_property_array, new_synchronized_clip_generator,
+use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use rayon::prelude::*;
+use simd_json::json_typed;
+
+use crate::behaviors::tasks::fnis::{
+    collect::owned::OwnedFnisInjection,
+    patch_gen::{
+        global::_0_master::{
+            FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
+            FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529,
+            FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+        },
+        kill_move::{
+            calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
+            new_event_property_array, new_push_transitions_seq_patch,
+            new_synchronized_clip_generator,
+        },
+        JsonPatchPairs,
     },
-    JsonPatchPairs,
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.

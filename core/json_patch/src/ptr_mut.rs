@@ -1,5 +1,6 @@
-use crate::range::{parse::parse_range, Range};
 use simd_json::BorrowedValue;
+
+use crate::range::{parse::parse_range, Range};
 
 /// A trait that provides a mutable reference to a `BorrowedValue`
 /// given a sequence of strings (representing the path or pointer).
@@ -46,9 +47,11 @@ impl PointerMut for BorrowedValue<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use simd_json::json_typed;
     use std::borrow::Cow;
+
+    use simd_json::json_typed;
+
+    use super::*;
 
     // Test: Nested JSON and Array Search and Mutation
     #[test]

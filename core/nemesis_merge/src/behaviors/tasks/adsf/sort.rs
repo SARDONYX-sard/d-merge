@@ -1,5 +1,6 @@
-use rayon::prelude::*;
 use std::collections::HashMap;
+
+use rayon::prelude::*;
 
 use super::{AdsfPatch, PatchKind};
 

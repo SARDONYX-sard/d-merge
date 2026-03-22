@@ -1,22 +1,8 @@
 pub mod class_table;
 mod current_state;
 
-use self::{
-    class_table::{find_class_info, FieldInfo},
-    current_state::{CurrentJsonPatch, CurrentState},
-};
-use crate::hack::{do_hack_cast_ragdoll_event, HackOptions};
-use crate::helpers::{
-    comment::{close_comment, comment_kind, take_till_close, CommentKind},
-    delimited_multispace0,
-    ptr::pointer,
-    tag::{class_start_tag, end_tag, field_start_tag, start_tag},
-    variable::{event_id, variable_id},
-};
-use crate::{
-    error::{Error, Result},
-    helpers::tag::PointerType,
-};
+use std::{collections::HashMap, mem};
+
 use json_patch::{Action, JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
 use serde_hkx::{
@@ -24,12 +10,27 @@ use serde_hkx::{
     xml::de::parser::type_kind::{boolean, real, string},
 };
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
-use std::{collections::HashMap, mem};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
     error::{ContextError, ErrMode},
     Parser,
+};
+
+use self::{
+    class_table::{find_class_info, FieldInfo},
+    current_state::{CurrentJsonPatch, CurrentState},
+};
+use crate::{
+    error::{Error, Result},
+    hack::{do_hack_cast_ragdoll_event, HackOptions},
+    helpers::{
+        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        delimited_multispace0,
+        ptr::pointer,
+        tag::{class_start_tag, end_tag, field_start_tag, start_tag, PointerType},
+        variable::{event_id, variable_id},
+    },
 };
 
 pub type PatchesMap<'a> = HashMap<JsonPath<'a>, JsonPatch<'a>>;
@@ -695,9 +696,10 @@ impl<'de> PatchDeserializer<'de> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use json_patch::json_path;
     use simd_json::json_typed;
+
+    use super::*;
 
     #[test]
     fn replace_field() {

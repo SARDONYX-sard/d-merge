@@ -1,29 +1,34 @@
-use json_patch::ValueWithPriority;
-use nemesis_xml::patch::parse_nemesis_patch;
-use rayon::prelude::*;
-use snafu::{OptionExt as _, ResultExt as _};
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
 };
+
+use json_patch::ValueWithPriority;
+use nemesis_xml::patch::parse_nemesis_patch;
+use rayon::prelude::*;
+use snafu::{OptionExt as _, ResultExt as _};
 use tokio::fs;
 
 use super::paths::{
     collect::{collect_nemesis_paths, Category},
     parse::parse_nemesis_path,
 };
-use crate::behaviors::priority_ids::{get_nemesis_id, types::PriorityMap};
-use crate::behaviors::tasks::{
-    adsf::types::OwnedAdsfPatchMap,
-    asdsf::types::OwnedAsdsfPatchMap,
-    patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+use crate::{
+    behaviors::{
+        priority_ids::{get_nemesis_id, types::PriorityMap},
+        tasks::{
+            adsf::types::OwnedAdsfPatchMap,
+            asdsf::types::OwnedAsdsfPatchMap,
+            patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+        },
+    },
+    config::{ReportType, StatusReportCounter},
+    errors::{
+        Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
+    },
+    results::filter_results,
+    Config,
 };
-use crate::config::{ReportType, StatusReportCounter};
-use crate::errors::{
-    Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
-};
-use crate::results::filter_results;
-use crate::Config;
 
 struct OwnedPath {
     category: Category,

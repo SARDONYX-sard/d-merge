@@ -2,11 +2,13 @@ use std::borrow::Cow;
 
 use rayon::prelude::*;
 
-use crate::asdsf::{
-    alt::{alt_key::to_normal_txt_project_name, AltAsdsf},
-    normal::ser::write_anim_set,
+use crate::{
+    asdsf::{
+        alt::{alt_key::to_normal_txt_project_name, AltAsdsf},
+        normal::ser::write_anim_set,
+    },
+    diff_line::DiffLines,
 };
-use crate::diff_line::DiffLines;
 
 const NEW_LINE: &str = "\r\n";
 

@@ -2,18 +2,15 @@ mod anim_infos;
 mod attacks;
 pub(crate) mod patch_map;
 
-pub use self::anim_infos::*;
-pub use self::attacks::*;
-
-use crate::asdsf::normal::AnimSetData;
-use crate::asdsf::patch::de::error::Error;
-use crate::common_parser::lines::Str;
-use json_patch::JsonPatchError;
-use json_patch::{apply_seq_array_directly, ValueWithPriority};
+use json_patch::{apply_seq_array_directly, JsonPatchError, ValueWithPriority};
 use rayon::prelude::*;
-use simd_json::base::ValueTryAsArrayMut;
-use simd_json::borrowed::Value;
-use simd_json::serde::from_borrowed_value;
+use simd_json::{base::ValueTryAsArrayMut, borrowed::Value, serde::from_borrowed_value};
+
+pub use self::{anim_infos::*, attacks::*};
+use crate::{
+    asdsf::{normal::AnimSetData, patch::de::error::Error},
+    common_parser::lines::Str,
+};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]

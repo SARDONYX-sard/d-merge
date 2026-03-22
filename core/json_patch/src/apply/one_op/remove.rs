@@ -1,8 +1,11 @@
-use crate::apply::error::{JsonPatchError, Result};
-use crate::JsonPath;
-use simd_json::borrowed::Value;
-use simd_json::ValueBuilder;
 use std::borrow::Cow;
+
+use simd_json::{borrowed::Value, ValueBuilder};
+
+use crate::{
+    apply::error::{JsonPatchError, Result},
+    JsonPath,
+};
 
 /// Remove one value.
 ///
@@ -64,9 +67,10 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
 
 #[cfg(test)]
 mod tests {
+    use simd_json::json_typed;
+
     use super::*;
     use crate::json_path;
-    use simd_json::json_typed;
 
     #[test]
     fn remove_object_key() {

@@ -1,6 +1,8 @@
-use crate::behaviors::tasks::templates::collect::borrowed::template_xml_to_value;
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
+
+use crate::behaviors::tasks::templates::collect::borrowed::template_xml_to_value;
 
 /// Create `.bin` from `.xml` template.
 /// - `paths`: `meshes` parent dir.
@@ -125,9 +127,10 @@ mod tests {
     #[ignore = "local only"]
     #[test]
     fn test_gen_behaviors_table() {
+        use std::{fs, path::Path};
+
         use havok_classes::Classes;
         use rayon::prelude::*;
-        use std::{fs, path::Path};
 
         // -------------------------------
         // Input structures (from json)
@@ -397,11 +400,13 @@ mod tests {
     #[ignore = "local only"]
     #[test]
     fn test_extract_indexes() {
-        use crate::behaviors::tasks::templates::key::NEMESIS_3RD_PERSON_MAP;
+        use std::{collections::BTreeMap, fs, path::Path};
+
         use havok_classes::Classes;
         use rayon::prelude::*;
         use serde::{Deserialize, Serialize};
-        use std::{collections::BTreeMap, fs, path::Path};
+
+        use crate::behaviors::tasks::templates::key::NEMESIS_3RD_PERSON_MAP;
 
         #[derive(Debug, Serialize, Deserialize)]
         struct Extracted {

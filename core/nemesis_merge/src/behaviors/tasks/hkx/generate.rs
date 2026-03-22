@@ -1,13 +1,9 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-use crate::{
-    behaviors::tasks::{
-        patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
-    },
-    config::{ReportType, StatusReportCounter},
-    errors::{DedupEventVariableSnafu, Error, FailedIoSnafu, HkxSerSnafu, Result, SimdJsonSnafu},
-    results::filter_results,
-    Config, OutPutTarget,
+use std::{
+    fs,
+    path::{Path, PathBuf},
 };
+
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
 use serde_hkx_features::{
@@ -16,9 +12,15 @@ use serde_hkx_features::{
 };
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
-use std::{
-    fs,
-    path::{Path, PathBuf},
+
+use crate::{
+    behaviors::tasks::{
+        patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
+    },
+    config::{ReportType, StatusReportCounter},
+    errors::{DedupEventVariableSnafu, Error, FailedIoSnafu, HkxSerSnafu, Result, SimdJsonSnafu},
+    results::filter_results,
+    Config, OutPutTarget,
 };
 
 pub(crate) fn generate_hkx_files(

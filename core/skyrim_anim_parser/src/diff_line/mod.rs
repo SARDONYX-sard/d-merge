@@ -2,13 +2,13 @@ mod current_state;
 pub mod deserializer;
 pub mod error;
 
-use self::error::Error;
-use json_patch::apply_seq_array_directly;
-use json_patch::ValueWithPriority;
-use rayon::prelude::*;
-use simd_json::borrowed::Value;
-use simd_json::serde::from_borrowed_value;
 use std::borrow::Cow;
+
+use json_patch::{apply_seq_array_directly, ValueWithPriority};
+use rayon::prelude::*;
+use simd_json::{borrowed::Value, serde::from_borrowed_value};
+
+use self::error::Error;
 
 /// Reusable code for analyzing line difference patches in projects txt and anim header files
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

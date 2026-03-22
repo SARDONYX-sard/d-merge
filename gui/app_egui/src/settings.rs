@@ -1,9 +1,10 @@
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt as _;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt as _;
 
 use crate::{
     app::ModManagerApp,

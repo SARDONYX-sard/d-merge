@@ -1,8 +1,9 @@
-use crate::apply::error::{JsonPatchError, Result};
-use crate::JsonPath;
-use simd_json::borrowed::Value;
-use simd_json::derived::ValueTryAsScalar as _;
-use simd_json::StaticNode;
+use simd_json::{borrowed::Value, derived::ValueTryAsScalar as _, StaticNode};
+
+use crate::{
+    apply::error::{JsonPatchError, Result},
+    JsonPath,
+};
 
 /// Adds a new key (for objects) or a new index (for arrays) if they don't exist.
 ///
@@ -109,10 +110,12 @@ pub(crate) fn apply_add<'value>(
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
+    use simd_json::{json_typed, value::StaticNode};
+
     use super::*;
     use crate::json_path;
-    use simd_json::{json_typed, value::StaticNode};
-    use std::borrow::Cow;
 
     #[test]
     fn add_to_object() {

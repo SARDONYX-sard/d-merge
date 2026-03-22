@@ -1,9 +1,10 @@
-use crate::cmd::bail;
-use crate::error::NotFoundSkyrimDataDirSnafu;
+use std::path::PathBuf;
+
 use mod_info::ModInfo;
 use skyrim_data_dir::Runtime;
 use snafu::ResultExt as _;
-use std::path::PathBuf;
+
+use crate::{cmd::bail, error::NotFoundSkyrimDataDirSnafu};
 
 /// Mod info readers
 ///

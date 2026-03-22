@@ -6,24 +6,28 @@ pub mod patterns;
 #[cfg(test)]
 mod test_helpers;
 
-use winnow::ascii::Caseless;
-use winnow::combinator::{alt, fail, opt};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
-
-use self::combinator::anim_var::parse_anim_var_line;
-use self::combinator::comment::skip_ws_and_comments;
-use self::combinator::{
-    anim_types::{parse_anim_type, FNISAnimType},
-    fnis_animation::{parse_fnis_animation, FNISAnimation},
-    version::{parse_version_line, Version},
+use winnow::{
+    ascii::Caseless,
+    combinator::{alt, fail, opt},
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
 };
-use self::patterns::{
-    alt_anim::{parse_alternate_animation, AlternateAnimation},
-    chair::{parse_fnis_chair_animation, FNISChairAnimation},
-    furniture::{parse_furniture_animation, FurnitureAnimation},
-    pair_and_kill::{parse_paired_animation, FNISPairedAndKillAnimation},
-    sequenced::{parse_seq_animation, SequencedAnimation},
+
+use self::{
+    combinator::{
+        anim_types::{parse_anim_type, FNISAnimType},
+        anim_var::parse_anim_var_line,
+        comment::skip_ws_and_comments,
+        fnis_animation::{parse_fnis_animation, FNISAnimation},
+        version::{parse_version_line, Version},
+    },
+    patterns::{
+        alt_anim::{parse_alternate_animation, AlternateAnimation},
+        chair::{parse_fnis_chair_animation, FNISChairAnimation},
+        furniture::{parse_furniture_animation, FurnitureAnimation},
+        pair_and_kill::{parse_paired_animation, FNISPairedAndKillAnimation},
+        sequenced::{parse_seq_animation, SequencedAnimation},
+    },
 };
 
 #[derive(Debug, PartialEq)]

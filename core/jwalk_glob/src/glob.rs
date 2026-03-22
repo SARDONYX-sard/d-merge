@@ -78,8 +78,9 @@ fn match_glob_components(pat: &[&str], path: &[&str]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::Path;
+
+    use super::*;
 
     // ── match_segment ────────────────────────────────────────────────────────
 

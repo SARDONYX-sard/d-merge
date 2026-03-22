@@ -12,12 +12,14 @@
 pub mod types;
 
 use serde_hkx::errors::readable::ReadableError;
-use winnow::ascii::Caseless;
-use winnow::combinator::repeat;
-use winnow::error::StrContext::*;
-use winnow::error::StrContextValue::*;
-use winnow::token::any;
-use winnow::{combinator::alt, prelude::*, seq, token::take_while};
+use winnow::{
+    ascii::Caseless,
+    combinator::{alt, repeat},
+    error::{StrContext::*, StrContextValue::*},
+    prelude::*,
+    seq,
+    token::{any, take_while},
+};
 
 /// Parses a string path to extract the mod ID in the format:
 /// `.../Nemesis_Engine/mod/<mod_code>/...`
@@ -48,8 +50,10 @@ where
     Error: winnow::error::ParserError<Input>,
     ParseNext: Parser<Input, Output, Error>,
 {
-    use winnow::combinator::{not, peek, repeat, trace};
-    use winnow::token::any;
+    use winnow::{
+        combinator::{not, peek, repeat, trace},
+        token::any,
+    };
 
     trace(
         "take_until_ext",

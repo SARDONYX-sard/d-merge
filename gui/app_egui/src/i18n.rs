@@ -1,5 +1,6 @@
-use indexmap::IndexMap;
 use std::borrow::Cow;
+
+use indexmap::IndexMap;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -201,8 +202,7 @@ impl I18nMap {
     /// Try to load `./.d_merge/translation.json`.
     /// If not exists or failed to parse, fallback to `default_map()`.
     pub fn load_translation() -> Self {
-        use std::fs;
-        use std::path::Path;
+        use std::{fs, path::Path};
 
         let i18n_file = Self::FILE;
 
@@ -232,8 +232,7 @@ impl I18nMap {
     ///
     /// If already exits, then skip.
     pub fn save_translation() {
-        use std::fs;
-        use std::path::Path;
+        use std::{fs, path::Path};
 
         let i18n_file = Self::FILE;
 

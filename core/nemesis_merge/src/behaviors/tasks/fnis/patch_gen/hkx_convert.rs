@@ -1,10 +1,14 @@
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::alternate::AltAnimConfigJob;
-use crate::config::{Config, OutPutTarget};
-use crate::errors::Error;
+use rayon::prelude::*;
+
+use crate::{
+    behaviors::tasks::fnis::{
+        collect::owned::OwnedFnisInjection, patch_gen::alternate::AltAnimConfigJob,
+    },
+    config::{Config, OutPutTarget},
+    errors::Error,
+};
 
 #[derive(Debug)]
 pub enum AnimIoJob {

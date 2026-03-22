@@ -1,12 +1,14 @@
 pub mod error;
 
-use crate::error::{Error, Result};
+use std::{
+    fs::{self, DirEntry, File},
+    path::Path,
+    str::FromStr as _,
+    time::SystemTime,
+};
+
 use chrono::Local;
 use once_cell::sync::OnceCell;
-use std::fs::{self, DirEntry, File};
-use std::path::Path;
-use std::str::FromStr as _;
-use std::time::SystemTime;
 use tracing_subscriber::{
     filter::LevelFilter,
     fmt,
@@ -14,6 +16,8 @@ use tracing_subscriber::{
     reload::{self, Handle},
     Registry,
 };
+
+use crate::error::{Error, Result};
 
 /// Global variable to allow dynamic level changes in logger.
 static RELOAD_HANDLE: OnceCell<Handle<LevelFilter, Registry>> = OnceCell::new();
@@ -120,8 +124,9 @@ fn create_rotate_log(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[test]
     fn should_rotate_log() -> Result<()> {

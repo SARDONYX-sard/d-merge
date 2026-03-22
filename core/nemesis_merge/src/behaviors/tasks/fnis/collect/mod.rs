@@ -1,12 +1,17 @@
 pub mod owned;
 
-use crate::behaviors::tasks::fnis::collect::owned::{collect_fnis_injection, OwnedFnisInjection};
-use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
-    BehaviorEntry, AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
-};
-use crate::errors::Error;
-use crate::PriorityMap;
 use std::sync::LazyLock;
+
+use crate::{
+    behaviors::tasks::fnis::{
+        collect::owned::{collect_fnis_injection, OwnedFnisInjection},
+        patch_gen::generated_behaviors::{
+            BehaviorEntry, AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
+        },
+    },
+    errors::Error,
+    PriorityMap,
+};
 
 static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
     HUMANOID
@@ -133,8 +138,9 @@ pub async fn collect_all_fnis_injections(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rayon::prelude::*;
+
+    use super::*;
 
     #[tokio::test]
     #[ignore = "local only"]

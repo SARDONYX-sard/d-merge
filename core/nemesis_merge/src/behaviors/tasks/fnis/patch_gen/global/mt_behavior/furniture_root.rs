@@ -1,7 +1,8 @@
 //! For `character/behaviors/mt_behavior.xml` 1 file patch
 //! - `FNIS Furniture Begin (ROOT)`
-use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+
+use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 
 /// FNIS XML(name="#5200") - `hkbStateMachineStateInfo`
 const FNIS_FU_MT_5200: &str = "#FNIS_fu_global_auto_gen5200";

@@ -1,6 +1,8 @@
 //! Common test helpers
-use winnow::error::{ContextError, ErrMode};
-use winnow::Parser;
+use winnow::{
+    error::{ContextError, ErrMode},
+    Parser,
+};
 
 /// Must successfully parse or panic
 pub fn must_parse<'a, O>(

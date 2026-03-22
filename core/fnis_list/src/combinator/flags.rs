@@ -1,10 +1,12 @@
 //! Animation flags parsing: simple flags and parameterized flags
 
-use winnow::ascii::{alphanumeric1, float, space0, Caseless};
-use winnow::combinator::{alt, opt, preceded, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::token::take_till;
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{alphanumeric1, float, space0, Caseless},
+    combinator::{alt, opt, preceded, seq},
+    error::{StrContext, StrContextValue},
+    token::take_till,
+    ModalResult, Parser,
+};
 
 use crate::combinator::Trigger;
 

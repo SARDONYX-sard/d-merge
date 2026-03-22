@@ -3,10 +3,12 @@
 use std::borrow::Cow;
 
 use skyrim_anim_parser::adsf::normal::Translation;
-use winnow::ascii::{float, space1, Caseless};
-use winnow::combinator::seq;
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{float, space1, Caseless},
+    combinator::seq,
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::comment::skip_ws_and_comments;
 

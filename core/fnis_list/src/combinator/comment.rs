@@ -1,8 +1,10 @@
 //! Line comments parsing (`' comment`)
 
-use winnow::ascii::{line_ending, space1, till_line_ending};
-use winnow::combinator::{alt, preceded, repeat};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{line_ending, space1, till_line_ending},
+    combinator::{alt, preceded, repeat},
+    ModalResult, Parser,
+};
 
 /// Skip any amount of spaces, newlines, and `' comment` lines.
 /// This is like `multispace0`, but also removes comments.

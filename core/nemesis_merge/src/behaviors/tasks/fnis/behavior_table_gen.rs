@@ -79,9 +79,7 @@ pub static {name}: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {{
     #[test]
     #[ignore = "local only"]
     fn generate_const_behavior_table() -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs::File;
-        use std::io::Write as _;
-        use std::path::Path;
+        use std::{fs::File, io::Write as _, path::Path};
 
         let mut data = std::fs::read_to_string("../../dummy/debug/behaviors_table.json")?;
         let root: Root = simd_json::from_slice(unsafe { data.as_bytes_mut() })?;

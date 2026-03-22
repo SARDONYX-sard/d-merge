@@ -2,27 +2,29 @@
 mod priority_ids;
 pub(crate) mod tasks;
 
-pub use crate::behaviors::priority_ids::types::{PatchMaps, PriorityMap};
-use crate::behaviors::tasks::fnis;
+use rayon::prelude::*;
 pub use tasks::templates::gen_bin::create_bin_templates;
-
 pub(crate) use tasks::{
     adsf::path_parser::ParseError as AsdfPathParseError,
     asdsf::path_parser::ParseError as AsdsfPathParseError,
 };
 
-use crate::behaviors::tasks::adsf::apply_adsf_patches;
-use crate::behaviors::tasks::asdsf::apply_asdsf_patches;
-use crate::behaviors::tasks::hkx::generate::generate_hkx_files;
-use crate::behaviors::tasks::patches::types::OwnedPatches;
-use crate::behaviors::tasks::patches::{
-    apply::apply_patches,
-    collect::{collect_borrowed_patches, collect_owned_patches},
-    types::{OwnedPatchMap, PatchCollection},
+pub use crate::behaviors::priority_ids::types::{PatchMaps, PriorityMap};
+use crate::{
+    behaviors::tasks::{
+        adsf::apply_adsf_patches,
+        asdsf::apply_asdsf_patches,
+        fnis,
+        hkx::generate::generate_hkx_files,
+        patches::{
+            apply::apply_patches,
+            collect::{collect_borrowed_patches, collect_owned_patches},
+            types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+        },
+    },
+    config::{Config, Status},
+    errors::{writer::write_errors, BehaviorGenerationError, Error, Result},
 };
-use crate::config::{Config, Status};
-use crate::errors::{writer::write_errors, BehaviorGenerationError, Error, Result};
-use rayon::prelude::*;
 
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)
 ///

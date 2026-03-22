@@ -13,6 +13,7 @@
     "dev": "tauri dev",
     "dev:front": "npm --workspace gui/frontend run dev:front",
     "fmt": "biome format --write ./ && prettier --cache --write \"**/*.{yaml,yml}\" --ignore-path ./.gitignore && cargo fmt --all",
+    "fmt:back": "cargo +nightly fmt --all",
     "lint": "biome lint ./ && cargo clippy --workspace",
     "lint:fix": "npm run fmt && biome check --write ./ && cargo clippy --workspace --fix --allow-staged --allow-dirty",
     "tauri": "tauri",

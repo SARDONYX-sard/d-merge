@@ -1,9 +1,12 @@
 pub mod ser;
 
-use crate::adsf::normal::{Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock};
-use crate::common_parser::lines::Str;
 use indexmap::IndexMap;
 use rayon::prelude::*;
+
+use crate::{
+    adsf::normal::{Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock},
+    common_parser::lines::Str,
+};
 
 /// Represents the alternate animation data structure.
 ///

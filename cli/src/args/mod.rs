@@ -1,8 +1,9 @@
 mod examples;
 
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand};
 use nemesis_merge::OutPutTarget;
-use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, after_long_help = examples::PATCH_EXAMPLES )]

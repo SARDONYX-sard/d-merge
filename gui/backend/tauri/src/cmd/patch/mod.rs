@@ -1,7 +1,7 @@
 mod mod_info_loader;
 
-use crate::cmd::{bail, time};
-use crate::error::NotFoundResourceDirSnafu;
+use std::path::{Path, PathBuf};
+
 pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
@@ -10,9 +10,13 @@ use nemesis_merge::{
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
-use std::path::{Path, PathBuf};
 use tauri::{async_runtime::JoinHandle, path::BaseDirectory, AppHandle, Emitter as _, Manager};
 use tokio::sync::Mutex;
+
+use crate::{
+    cmd::{bail, time},
+    error::NotFoundResourceDirSnafu,
+};
 
 const PATCH_STATUS_EVENT_NAME: &str = "d_merge://progress/patch";
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));

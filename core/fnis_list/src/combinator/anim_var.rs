@@ -18,10 +18,12 @@
 //! AnimVar Counter INT32 42
 //! AnimVar Speed REAL 2.5
 //! ```
-use winnow::ascii::{dec_int, float, space1, Caseless};
-use winnow::combinator::{alt, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{dec_int, float, space1, Caseless},
+    combinator::{alt, seq},
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::{comment::skip_ws_and_comments, take_till_space};
 

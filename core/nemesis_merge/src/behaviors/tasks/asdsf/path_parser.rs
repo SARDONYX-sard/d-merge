@@ -17,8 +17,9 @@
 //! edit anim_set_data path:
 //! - format: <any>/Nemesis_Engine/mod/<id>/animationsetdatasinglefile/<project data>/<anim set file stem>.txt
 //!   (e.g. D:/GAME/Test mod name/Nemesis_Engine/mod/id/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt)
-use crate::behaviors::priority_ids::get_nemesis_id;
 use std::path::{Path, PathBuf};
+
+use crate::behaviors::priority_ids::get_nemesis_id;
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]

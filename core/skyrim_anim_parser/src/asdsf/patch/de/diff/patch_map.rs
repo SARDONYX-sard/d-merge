@@ -1,6 +1,7 @@
+use std::collections::{hash_map::Entry, HashMap};
+
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
-use std::collections::{hash_map::Entry, HashMap};
 
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.

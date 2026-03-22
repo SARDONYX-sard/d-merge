@@ -1,7 +1,10 @@
-use crate::apply::error::{JsonPatchError, Result};
-use crate::ptr_mut::PointerMut as _;
-use crate::JsonPath;
 use simd_json::borrowed::Value;
+
+use crate::{
+    apply::error::{JsonPatchError, Result},
+    ptr_mut::PointerMut as _,
+    JsonPath,
+};
 
 /// Replace one value.
 ///
@@ -22,9 +25,10 @@ pub(crate) fn apply_replace<'a>(
 
 #[cfg(test)]
 mod tests {
+    use simd_json::json_typed;
+
     use super::*;
     use crate::json_path;
-    use simd_json::json_typed;
 
     #[test]
     fn replace_existing_key_in_object() {

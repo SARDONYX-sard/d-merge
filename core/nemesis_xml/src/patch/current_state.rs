@@ -1,7 +1,9 @@
-use super::class_table::FieldInfo;
+use std::{borrow::Cow, mem, ops::Range};
+
 use json_patch::Op;
 use simd_json::BorrowedValue;
-use std::{borrow::Cow, mem, ops::Range};
+
+use super::class_table::FieldInfo;
 
 type Patches<'xml> = Vec<CurrentJsonPatch<'xml>>;
 

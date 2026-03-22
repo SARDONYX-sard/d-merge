@@ -1,13 +1,19 @@
-use crate::ptr_mut::PointerMut as _;
-use crate::range::split_range::split_range_at_len;
-use crate::vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _};
-use crate::{Action, JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority};
 use core::ops::Range;
+use std::{
+    borrow::Cow,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use simd_json::borrowed::Value;
-use std::borrow::Cow;
-use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::{
+    ptr_mut::PointerMut as _,
+    range::split_range::split_range_at_len,
+    vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _},
+    Action, JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority,
+};
 
 const MARK_AS_REMOVED_STR: &str = "##Mark_As_Removed##"; // Separate inner str for test
 const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed(MARK_AS_REMOVED_STR));

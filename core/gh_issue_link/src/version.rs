@@ -94,9 +94,11 @@ pub fn get_file_version<P>(path: P) -> Result<Version, VersionError>
 where
     P: AsRef<Path>,
 {
-    use std::ffi::{c_void, OsStr};
-    use std::os::windows::ffi::OsStrExt as _;
-    use std::ptr;
+    use std::{
+        ffi::{c_void, OsStr},
+        os::windows::ffi::OsStrExt as _,
+        ptr,
+    };
 
     #[link(name = "version")]
     extern "system" {

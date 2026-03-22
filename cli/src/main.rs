@@ -3,13 +3,14 @@ mod config;
 mod ini_parser;
 mod mod_info_cmd;
 
+use clap::Parser;
+use nemesis_merge::{behavior_gen, PatchMaps};
+
 use crate::{
     args::{Cli, Command, InfoCommand},
     config::build_config,
     ini_parser::parse_ids_ini,
 };
-use clap::Parser;
-use nemesis_merge::{behavior_gen, PatchMaps};
 
 #[tokio::main]
 async fn main() {

@@ -1,8 +1,10 @@
 pub mod error;
 
-use crate::error::{Error, Result};
-use rayon::prelude::*;
 use std::{fs, path::Path};
+
+use rayon::prelude::*;
+
+use crate::error::{Error, Result};
 
 /// Represents a node in the directory structure.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

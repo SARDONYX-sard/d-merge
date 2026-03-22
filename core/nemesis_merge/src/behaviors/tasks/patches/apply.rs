@@ -1,4 +1,11 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
+use std::path::Path;
+
+use json_patch::{apply_one_field, apply_seq_by_priority};
+use rayon::prelude::*;
+use simd_json::borrowed::Value;
+use snafu::ResultExt;
+
 use crate::{
     behaviors::tasks::{
         patches::types::{BehaviorPatchesMap, HkxPatchMaps},
@@ -9,11 +16,6 @@ use crate::{
     results::filter_results,
     Config,
 };
-use json_patch::{apply_one_field, apply_seq_by_priority};
-use rayon::prelude::*;
-use simd_json::borrowed::Value;
-use snafu::ResultExt;
-use std::path::Path;
 
 /// Apply to hkx with merged json patch.
 ///
@@ -121,8 +123,9 @@ fn write_debug_json_patch(
     key: &TemplateKey,
     patches: &HkxPatchMaps,
 ) -> Result<(), Error> {
-    use crate::errors::FailedIoSnafu;
     use snafu::ResultExt as _;
+
+    use crate::errors::FailedIoSnafu;
 
     let mut output_path = output_dir
         .join(".d_merge")

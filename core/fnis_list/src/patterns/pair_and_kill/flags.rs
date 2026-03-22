@@ -7,10 +7,12 @@
 //!   - `T<event>/<time>` → stored in `triggers`
 //!   - `T2_<event>/<time>` → stored in `triggers2` (event string keeps the `2_` prefix)
 
-use winnow::ascii::{float, space0, Caseless};
-use winnow::combinator::{alt, fail, opt, preceded};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{float, space0, Caseless},
+    combinator::{alt, fail, opt, preceded},
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::{
     flags::{parse_trigger_options, FNISAnimFlags},

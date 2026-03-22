@@ -1,14 +1,20 @@
 //! Why separate modules?
 //! Patches need to be parsed fairly loosely; modders may not put in line breaks.
-use crate::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
-use crate::{adsf::normal::de::from_word_and_space, common_parser::lines::Str};
 use core::str::FromStr;
+
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq, ModalResult, Parser,
+};
+
+use crate::{
+    adsf::normal::{
+        de::from_word_and_space, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
+    },
+    common_parser::lines::Str,
 };
 
 /// Parse 1 line.

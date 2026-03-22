@@ -1,7 +1,6 @@
 //! Start a log file watcher thread.
 //!
 //! This continuously updates `log_lines` with the latest contents of the log file.
-use snafu::ResultExt as _;
 use std::{
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Read as _, Seek as _, SeekFrom},
@@ -10,6 +9,8 @@ use std::{
     thread,
     time::Duration,
 };
+
+use snafu::ResultExt as _;
 
 /// Maximum number of log entries to retain (older entries are automatically discarded)
 const MAX_LOG_LINES: usize = 10_000;

@@ -1,8 +1,10 @@
 //! - FNIS Sequenced Animation: s|so [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
-use winnow::combinator::fail;
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    combinator::fail,
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::fnis_animation::{parse_fnis_animation, FNISAnimation};
 

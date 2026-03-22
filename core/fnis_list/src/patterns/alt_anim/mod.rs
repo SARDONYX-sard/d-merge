@@ -1,9 +1,11 @@
 //! - FNIS Alterative Animation
 pub mod one_line;
 
-use winnow::combinator::repeat;
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    combinator::repeat,
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::patterns::alt_anim::one_line::{
     parse_alt_anim_prefix_line, parse_alt_anim_set_line, parse_alt_anim_trigger_line, AASet,

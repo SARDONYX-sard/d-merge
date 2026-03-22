@@ -1,5 +1,6 @@
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
 
 /// Generate an output path based on the roots_path and input_path.
 ///

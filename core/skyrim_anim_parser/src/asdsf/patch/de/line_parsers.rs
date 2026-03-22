@@ -1,6 +1,9 @@
-use winnow::ascii::{line_ending, till_line_ending};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{combinator::opt, Parser as _};
+use winnow::{
+    ascii::{line_ending, till_line_ending},
+    combinator::opt,
+    error::{StrContext, StrContextValue},
+    Parser as _,
+};
 
 use crate::common_parser::comment::take_till_original;
 

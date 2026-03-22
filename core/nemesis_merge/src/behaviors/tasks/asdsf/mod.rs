@@ -2,31 +2,37 @@ pub mod path_parser;
 mod sort;
 pub mod types;
 
-use self::path_parser::{parse_asdsf_path, ParsedAsdsfPatchPath, ParserType};
-use self::sort::dedup_patches_by_priority_parallel;
-use self::types::OwnedAsdsfPatchMap;
-use crate::behaviors::priority_ids::types::PriorityMap;
-use crate::behaviors::tasks::hkx::generate::write_patched_json;
-use crate::errors::{
-    AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
-    FailedParseAdsfTemplateSnafu, FailedParseAsdsfPatchSnafu, FailedParseEditAsdsfPatchSnafu,
-    FailedSerializeAsdsfSnafu,
-};
-use crate::results::partition_results;
-use crate::Config;
+use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
-use skyrim_anim_parser::asdsf::alt::{
-    ser::{serialize_alt_asdsf, SubHeaderDiffMap},
-    AltAsdsf,
+use skyrim_anim_parser::{
+    asdsf::{
+        alt::{
+            ser::{serialize_alt_asdsf, SubHeaderDiffMap},
+            AltAsdsf,
+        },
+        patch::de::{deserializer::parse_anim_set_diff_patch, DiffPatchAnimSetData},
+    },
+    diff_line::{deserializer::parse_lines_diff_patch, DiffLines},
 };
-use skyrim_anim_parser::asdsf::patch::de::{
-    deserializer::parse_anim_set_diff_patch, DiffPatchAnimSetData,
-};
-use skyrim_anim_parser::diff_line::{deserializer::parse_lines_diff_patch, DiffLines};
 use snafu::ResultExt as _;
-use std::path::{Path, PathBuf};
 use winnow::Parser;
+
+use self::{
+    path_parser::{parse_asdsf_path, ParsedAsdsfPatchPath, ParserType},
+    sort::dedup_patches_by_priority_parallel,
+    types::OwnedAsdsfPatchMap,
+};
+use crate::{
+    behaviors::{priority_ids::types::PriorityMap, tasks::hkx::generate::write_patched_json},
+    errors::{
+        AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
+        FailedParseAdsfTemplateSnafu, FailedParseAsdsfPatchSnafu, FailedParseEditAsdsfPatchSnafu,
+        FailedSerializeAsdsfSnafu,
+    },
+    results::partition_results,
+    Config,
+};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub struct AsdsfPatch<'a> {

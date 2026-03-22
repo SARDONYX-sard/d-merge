@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use rayon::prelude::*;
+
 use crate::{
     adsf::{
         alt::{to_adsf_key, AltAdsf, AltAnimData},
@@ -11,7 +13,6 @@ use crate::{
     },
     diff_line::DiffLines,
 };
-use rayon::prelude::*;
 
 /// Serializes to `animationdatasinglefile.txt` string.
 ///

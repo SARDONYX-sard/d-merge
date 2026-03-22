@@ -1,4 +1,3 @@
-use super::delimited_multispace0;
 use winnow::{
     ascii::Caseless,
     combinator::{alt, delimited, terminated},
@@ -6,6 +5,8 @@ use winnow::{
     token::take_until,
     ModalResult, Parser,
 };
+
+use super::delimited_multispace0;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CommentKind<'a> {
@@ -98,8 +99,10 @@ where
     Error: winnow::error::ParserError<Input>,
     ParseNext: Parser<Input, Output, Error>,
 {
-    use winnow::combinator::{not, peek, repeat, trace};
-    use winnow::token::any;
+    use winnow::{
+        combinator::{not, peek, repeat, trace},
+        token::any,
+    };
 
     trace(
         "take_until_ext",

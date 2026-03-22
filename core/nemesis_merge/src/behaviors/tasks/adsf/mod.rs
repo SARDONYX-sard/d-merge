@@ -2,32 +2,41 @@ pub mod path_parser;
 mod sort;
 pub mod types;
 
-use self::path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType};
-use self::sort::dedup_patches_by_priority_parallel;
-use self::types::OwnedAdsfPatchMap;
-use crate::behaviors::tasks::hkx::generate::write_patched_json;
-use crate::errors::{
-    AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
-    FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
-    FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
-};
-use crate::results::partition_results;
-use crate::{Config, PatchMaps};
-use rayon::prelude::*;
-use skyrim_anim_parser::adsf::alt::{ser::serialize_alt_adsf, AltAdsf};
-use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
-pub use skyrim_anim_parser::adsf::patch::de::add::{
-    parse_clip_anim_block_patch, parse_clip_motion_block_patch,
-};
-use skyrim_anim_parser::adsf::patch::de::anim_header::deserializer::parse_anim_header_diff_patch;
-use skyrim_anim_parser::adsf::patch::de::anim_header::AnimHeaderDiffPatch;
-pub use skyrim_anim_parser::adsf::patch::de::others::{
-    clip_anim::{deserializer::parse_clip_anim_diff_patch, ClipAnimDiffPatch},
-    clip_motion::{deserializer::parse_clip_motion_diff_patch, ClipMotionDiffPatch},
-};
-use skyrim_anim_parser::diff_line::{deserializer::parse_lines_diff_patch, DiffLines};
-use snafu::ResultExt as _;
 use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
+pub use skyrim_anim_parser::adsf::patch::de::{
+    add::{parse_clip_anim_block_patch, parse_clip_motion_block_patch},
+    others::{
+        clip_anim::{deserializer::parse_clip_anim_diff_patch, ClipAnimDiffPatch},
+        clip_motion::{deserializer::parse_clip_motion_diff_patch, ClipMotionDiffPatch},
+    },
+};
+use skyrim_anim_parser::{
+    adsf::{
+        alt::{ser::serialize_alt_adsf, AltAdsf},
+        normal::{ClipAnimDataBlock, ClipMotionBlock},
+        patch::de::anim_header::{deserializer::parse_anim_header_diff_patch, AnimHeaderDiffPatch},
+    },
+    diff_line::{deserializer::parse_lines_diff_patch, DiffLines},
+};
+use snafu::ResultExt as _;
+
+use self::{
+    path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType},
+    sort::dedup_patches_by_priority_parallel,
+    types::OwnedAdsfPatchMap,
+};
+use crate::{
+    behaviors::tasks::hkx::generate::write_patched_json,
+    errors::{
+        AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
+        FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
+        FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
+    },
+    results::partition_results,
+    Config, PatchMaps,
+};
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
 pub(crate) struct AdsfPatch<'a> {

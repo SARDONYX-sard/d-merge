@@ -1,13 +1,15 @@
-use crate::{
-    adsf::normal::de::from_word_and_space,
-    common_parser::{
-        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
-        lines::{one_line, verify_line_parses_to},
-    },
+use json_patch::Op;
+use serde_hkx::errors::readable::ReadableError;
+use winnow::{
+    ascii::{line_ending, multispace0, till_line_ending},
+    combinator::{eof, opt},
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    Parser,
 };
+
 use crate::{
     adsf::{
-        normal::{Rotation, Translation},
+        normal::{de::from_word_and_space, Rotation, Translation},
         patch::de::{
             error::{Error, Result},
             others::clip_motion::{
@@ -16,15 +18,11 @@ use crate::{
             },
         },
     },
-    common_parser::delete_line::delete_this_line,
-};
-use json_patch::Op;
-use serde_hkx::errors::readable::ReadableError;
-use winnow::{
-    ascii::{line_ending, multispace0, till_line_ending},
-    combinator::{eof, opt},
-    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    Parser,
+    common_parser::{
+        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        delete_line::delete_this_line,
+        lines::{one_line, verify_line_parses_to},
+    },
 };
 
 /// Parse animationdatasinglefile.txt clip motion block patch.

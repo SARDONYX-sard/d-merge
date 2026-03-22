@@ -35,9 +35,10 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::behaviors::priority_ids::take_until_ext;
-use crate::behaviors::tasks::patches::paths::NemesisPath;
-use crate::errors::{Error, NonUtf8PathSnafu};
+use crate::{
+    behaviors::{priority_ids::take_until_ext, tasks::patches::paths::NemesisPath},
+    errors::{Error, NonUtf8PathSnafu},
+};
 
 /// Parse nemesis patch path and return structured information.
 pub fn parse_nemesis_path(path: &Path) -> Result<NemesisPath<'_>, Error> {
@@ -109,8 +110,9 @@ fn parse_ext<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::Path;
+
+    use super::*;
 
     fn parse(path: &str) -> NemesisPath<'_> {
         parse_nemesis_path(Path::new(path)).unwrap_or_else(|e| panic!("{e}"))

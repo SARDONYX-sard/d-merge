@@ -1,10 +1,3 @@
-use crate::common_parser::comment::{
-    open_comment, original_or_close_comment, take_till_close, CommentKind,
-};
-use crate::common_parser::lines::one_line;
-use crate::diff_line::current_state::CurrentState;
-use crate::diff_line::error::{Error, Result};
-use crate::diff_line::DiffLines;
 use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -12,6 +5,18 @@ use winnow::{
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
+};
+
+use crate::{
+    common_parser::{
+        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        lines::one_line,
+    },
+    diff_line::{
+        current_state::CurrentState,
+        error::{Error, Result},
+        DiffLines,
+    },
 };
 
 /// Parse multi line diff patch.

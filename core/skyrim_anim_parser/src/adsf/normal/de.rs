@@ -3,13 +3,8 @@
 //! This module provides structures and parsers for reading animation data
 //! from a file formatted in a specific way. The primary structure is [`Adsf`],
 //! which contains a list of projects and their corresponding animation data.
-use super::{
-    Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
-};
-use crate::common_parser::lines::{
-    lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
-};
 use core::str::FromStr;
+
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, space1, till_line_ending},
@@ -18,6 +13,13 @@ use winnow::{
     seq,
     token::take_till,
     ModalResult, Parser,
+};
+
+use super::{
+    Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
+};
+use crate::common_parser::lines::{
+    lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

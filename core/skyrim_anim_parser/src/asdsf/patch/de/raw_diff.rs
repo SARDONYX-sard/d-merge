@@ -3,17 +3,23 @@ use core::ops::Range;
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 use serde_hkx::errors::readable::ReadableError;
-use winnow::ascii::{line_ending, multispace0, till_line_ending, Caseless};
-use winnow::combinator::{alt, repeat};
-use winnow::error::{StrContext::*, StrContextValue::*};
-use winnow::{ModalResult, Parser as _};
+use winnow::{
+    ascii::{line_ending, multispace0, till_line_ending, Caseless},
+    combinator::{alt, repeat},
+    error::{StrContext::*, StrContextValue::*},
+    ModalResult, Parser as _,
+};
 
-use crate::asdsf::normal::{AnimInfo, Attack, Condition};
-use crate::asdsf::patch::de::deserializer::ArrayType;
-use crate::asdsf::patch::de::error::Result;
-use crate::asdsf::patch::de::{attacks_to_borrowed_value, DiffPatchAnimSetData};
-use crate::common_parser::lines::{
-    lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str,
+use crate::{
+    asdsf::{
+        normal::{AnimInfo, Attack, Condition},
+        patch::de::{
+            attacks_to_borrowed_value, deserializer::ArrayType, error::Result, DiffPatchAnimSetData,
+        },
+    },
+    common_parser::lines::{
+        lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str,
+    },
 };
 
 /// A raw Nemesis diff block captured during parsing.

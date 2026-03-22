@@ -1,21 +1,23 @@
 //! To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt"
 use std::borrow::Cow;
 
+use fnis_list::{combinator::flags::FNISAnimFlags, patterns::furniture::FurnitureAnimation};
 use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use fnis_list::combinator::flags::FNISAnimFlags;
-use fnis_list::patterns::furniture::FurnitureAnimation;
-use crate::behaviors::tasks::fnis::patch_gen::furniture::one_anim::{
-    new_furniture_one_anim_patches, FurniturePhase,
+use crate::behaviors::tasks::fnis::{
+    collect::owned::OwnedFnisInjection,
+    patch_gen::{
+        furniture::one_anim::{new_furniture_one_anim_patches, FurniturePhase},
+        global::mt_behavior::{
+            FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
+            FNIS_BA_BLEND_TRANSITION_5232, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
+        },
+        kill_move::calculate_hash,
+        JsonPatchPairs,
+    },
 };
-use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
-    FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
-    FNIS_BA_BLEND_TRANSITION_5232, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
-};
-use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
 
 /// This patch treats a single piece of furniture as consisting of at least 4 animations.
 ///

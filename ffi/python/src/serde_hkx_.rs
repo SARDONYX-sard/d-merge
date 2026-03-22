@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use serde_hkx_for_gui::status::{Payload as RustPayload, Status as RustStatus};
-use serde_hkx_for_gui::DirEntry as RustDirEntry;
+use serde_hkx_for_gui::{
+    status::{Payload as RustPayload, Status as RustStatus},
+    DirEntry as RustDirEntry,
+};
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
 #[pyo3::pyclass]

@@ -72,13 +72,13 @@
 //! This makes the format easy to diff, version control, or reserialize back into
 //! the Havok binary format for modding, debugging, or data analysis purposes.
 
+use std::{borrow::Cow, fmt, path::Path};
+
 use havok_classes::Classes;
 use rayon::prelude::*;
 use serde_hkx_features::ClassMap;
-use snafu::ResultExt as _;
-use std::{borrow::Cow, fmt, path::Path};
-
 pub use serde_hkx_features::OutFormat;
+use snafu::ResultExt as _;
 
 /// # hkanno module
 ///
@@ -526,8 +526,9 @@ pub enum HkannoError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{borrow::Cow, path::Path};
+
+    use super::*;
 
     #[test]
     fn test_hkanno_to_string_format() {

@@ -98,8 +98,9 @@ fn is_asdsf_patch_file(txt_path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::Path;
+
+    use super::*;
 
     #[test]
     fn test_is_nemesis_patch_file() {

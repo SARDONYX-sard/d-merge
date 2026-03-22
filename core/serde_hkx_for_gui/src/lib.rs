@@ -4,15 +4,16 @@ mod par_walk_dir;
 pub mod path;
 pub mod status;
 
+use core::str::FromStr as _;
+use std::path::Path;
+
+use futures::{future::join_all, stream::FuturesUnordered};
 pub use par_walk_dir::{load_dir_node, DirEntry};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde_hkx_features::OutFormat;
 
 use self::status::{Payload, Status};
 use crate::{hash::hash_djb2, path::infer::generate_output_path};
-use core::str::FromStr as _;
-use futures::{future::join_all, stream::FuturesUnordered};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use serde_hkx_features::OutFormat;
-use std::path::Path;
 
 /// Converts between HKX and XML (or other supported formats) asynchronously.
 ///

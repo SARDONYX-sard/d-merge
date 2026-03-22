@@ -1,16 +1,17 @@
 //! Parses animation data from asdsf(animationsetdatasinglefile.txt)
+use serde_hkx::errors::readable::ReadableError;
+use winnow::{
+    combinator::opt,
+    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    seq, ModalResult, Parser,
+};
+
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
 use crate::{
     asdsf::normal::{AnimSetList, TxtProjects},
     common_parser::lines::{
         lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to, Str,
     },
-};
-use serde_hkx::errors::readable::ReadableError;
-use winnow::{
-    combinator::opt,
-    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    seq, ModalResult, Parser,
 };
 
 /// Parses the animation data structure from the input.

@@ -1,26 +1,29 @@
-use std::borrow::Cow;
-use std::collections::HashSet;
-use std::path::PathBuf;
+use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use dashmap::DashSet;
+use fnis_list::{
+    combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation, Trigger},
+    patterns::{
+        pair_and_kill::{FNISPairedAndKillAnimation, FNISPairedType},
+        sequenced::SequencedAnimation,
+    },
+    FNISList, SyntaxPattern,
+};
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
-use crate::behaviors::tasks::adsf::{AdsfPatch, PatchKind};
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::anim_var::new_push_anim_vars_patch;
-use crate::behaviors::tasks::fnis::patch_gen::furniture::one_group::new_furniture_one_group_patches;
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
-use crate::behaviors::tasks::fnis::patch_gen::{
-    kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
-};
-use fnis_list::combinator::flags::FNISAnimFlags;
-use fnis_list::patterns::pair_and_kill::{FNISPairedAndKillAnimation, FNISPairedType};
-use fnis_list::{
-    combinator::{fnis_animation::FNISAnimation, Trigger},
-    patterns::sequenced::SequencedAnimation,
-    FNISList, SyntaxPattern,
+use crate::behaviors::tasks::{
+    adsf::{AdsfPatch, PatchKind},
+    fnis::{
+        collect::owned::OwnedFnisInjection,
+        patch_gen::{
+            anim_var::new_push_anim_vars_patch,
+            furniture::one_group::new_furniture_one_group_patches, hkx_convert::AnimIoJob,
+            kill_move::new_kill_patches, offset_arm::new_offset_arm_patches,
+            pair::new_pair_patches,
+        },
+    },
 };
 
 /// A patch with borrowed references to a single FNIS_*_List.txt file.

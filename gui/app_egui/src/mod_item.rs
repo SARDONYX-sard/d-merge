@@ -1,8 +1,8 @@
+use std::collections::HashMap;
+
 use mod_info::{ModInfo, ModType};
 use nemesis_merge::PatchMaps;
 use rayon::{iter::Either, prelude::*};
-
-use std::collections::HashMap;
 
 /// Represents a single mod entry.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)] // Need hash to dnd

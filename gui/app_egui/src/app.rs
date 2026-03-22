@@ -1,15 +1,17 @@
+use std::{
+    path::{Path, PathBuf},
+    sync::{atomic::AtomicBool, Arc, Mutex},
+};
+
+use eframe::{egui, App, Frame};
+use egui::{Checkbox, Separator};
+use rayon::prelude::*;
+
 use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
     mod_item::{inherit_reorder_cast, to_patches, ModItem, SortColumn},
-};
-use eframe::{egui, App, Frame};
-use egui::{Checkbox, Separator};
-use rayon::prelude::*;
-use std::{
-    path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

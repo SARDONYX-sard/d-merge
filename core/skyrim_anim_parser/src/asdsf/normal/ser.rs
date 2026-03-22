@@ -112,9 +112,8 @@ fn write_anim_infos(out: &mut String, infos: &[AnimInfo]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::asdsf::normal::de::parse_asdsf;
-
     use super::*;
+    use crate::asdsf::normal::de::parse_asdsf;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
         if input.contains("\r\n") {

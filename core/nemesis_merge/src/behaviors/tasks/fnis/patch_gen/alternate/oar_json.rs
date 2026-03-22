@@ -1,9 +1,9 @@
 //! - Specifically for the 'config.json' namespace.
 //! - Represents the configuration for each animation root specified in a `config.json` file.
+use std::{borrow::Cow, collections::HashMap};
+
 use serde::{Deserialize, Serialize};
 use simd_json::borrowed::Object;
-use std::borrow::Cow;
-use std::collections::HashMap;
 
 /// Represents the configuration structure for the 'config.json' namespace.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -174,10 +174,12 @@ pub struct GroupConfig<'a> {
 
 /// JSON keys can only be strings; if we put a number in, it will fail 100% of the time, so change the processing.
 mod num_key_map {
-    use serde::de::{self, MapAccess, Visitor};
-    use serde::Deserializer;
-    use std::collections::HashMap;
-    use std::fmt;
+    use std::{collections::HashMap, fmt};
+
+    use serde::{
+        de::{self, MapAccess, Visitor},
+        Deserializer,
+    };
 
     pub fn deserialize<'de, D>(
         deserializer: D,

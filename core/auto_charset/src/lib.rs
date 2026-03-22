@@ -1,5 +1,6 @@
-use chardetng::EncodingDetector;
 use std::io::{self, ErrorKind};
+
+use chardetng::EncodingDetector;
 
 /// Converts an arbitrary byte slice to a UTF-8 `String` using automatic encoding detection.
 ///

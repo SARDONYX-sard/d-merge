@@ -142,8 +142,10 @@ where
     Error: winnow::error::ParserError<Input>,
     ParseNext: Parser<Input, Output, Error>,
 {
-    use winnow::combinator::{not, peek, repeat, trace};
-    use winnow::token::any;
+    use winnow::{
+        combinator::{not, peek, repeat, trace},
+        token::any,
+    };
 
     trace(
         "take_until_ext",

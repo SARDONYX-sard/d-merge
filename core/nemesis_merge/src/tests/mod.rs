@@ -5,9 +5,13 @@ mod status;
 #[ignore = "local test"]
 #[cfg(feature = "tracing")]
 async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::tests::{global_logger::global_logger, status::*};
-    use crate::{behavior_gen, PatchMaps};
     use rayon::prelude::*;
+
+    use crate::{
+        behavior_gen,
+        tests::{global_logger::global_logger, status::*},
+        PatchMaps,
+    };
 
     global_logger("../../dummy/merge_test.log", tracing::Level::TRACE)?;
 

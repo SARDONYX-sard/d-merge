@@ -1,5 +1,4 @@
-use std::io;
-use std::path::Path;
+use std::{io, path::Path};
 
 const OWNER_NAME: &str = "SARDONYX-sard";
 const REPO_NAME: &str = "d-merge";

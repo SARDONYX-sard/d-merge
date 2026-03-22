@@ -1,19 +1,19 @@
 //! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt"
 use std::borrow::Cow;
 
+use fnis_list::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation};
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::{
-    self, FNIS_BA_BLEND_TRANSITION_5231,
+use crate::behaviors::tasks::fnis::{
+    collect::owned::OwnedFnisInjection,
+    patch_gen::{
+        global::mt_behavior::{self, FNIS_BA_BLEND_TRANSITION_5231},
+        kill_move::{calculate_hash, new_push_transitions_seq_patch},
+        new_push_events_seq_patch, JsonPatchPairs,
+    },
 };
-use crate::behaviors::tasks::fnis::patch_gen::kill_move::new_push_transitions_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
-use fnis_list::combinator::flags::FNISAnimFlags;
-use fnis_list::combinator::fnis_animation::FNISAnimation;
 
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.

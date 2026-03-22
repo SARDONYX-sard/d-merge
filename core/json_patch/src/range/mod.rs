@@ -2,8 +2,9 @@ pub mod error;
 pub(crate) mod parse;
 pub mod split_range;
 
-use self::error::RangeError;
 use core::fmt;
+
+use self::error::RangeError;
 
 /// Represents either an index or a range in a patch operation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

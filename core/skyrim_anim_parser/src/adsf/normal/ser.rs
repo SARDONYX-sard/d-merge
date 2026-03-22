@@ -1,7 +1,8 @@
+use std::borrow::Cow;
+
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
-use std::borrow::Cow;
 
 /// Serializes the animation data structure into a string.
 ///

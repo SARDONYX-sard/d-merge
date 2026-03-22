@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use nemesis_merge::{errors::Error, PriorityMap};
 use rayon::prelude::*;
-use std::path::Path;
 
 pub(crate) fn parse_ids_ini(path: &Path, start_idx: usize) -> Result<PriorityMap, Error> {
     let raw = std::fs::read_to_string(path).map_err(|e| Error::FailedIo {

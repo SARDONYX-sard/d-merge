@@ -3,8 +3,10 @@ use std::sync::Arc;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 use rayon::prelude::*;
-use serde_hkx_for_gui::status::{Payload as RustPayload, Status as RustStatus};
-use serde_hkx_for_gui::DirEntry as RustDirEntry;
+use serde_hkx_for_gui::{
+    status::{Payload as RustPayload, Status as RustStatus},
+    DirEntry as RustDirEntry,
+};
 
 /// Represents a node in the directory structure.
 #[napi_derive::napi(object)]

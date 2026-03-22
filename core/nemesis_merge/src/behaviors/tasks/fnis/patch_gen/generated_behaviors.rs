@@ -1,6 +1,7 @@
 // This is an automatically generated template. Do not edit it.
-use crate::behaviors::tasks::templates::key::TemplateKey;
 use std::borrow::Cow;
+
+use crate::behaviors::tasks::templates::key::TemplateKey;
 
 /// `meshes/<base_dir>/<default_behavior/master_behavior>`
 ///

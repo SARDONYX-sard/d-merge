@@ -1,13 +1,3 @@
-use crate::adsf::patch::de::error::{Error, Result};
-use crate::adsf::patch::de::others::clip_anim::{
-    current_state::{CurrentState, PartialRotations},
-    ClipAnimDiffPatch, DiffTriggerNames, LineKind,
-};
-use crate::common_parser::comment::{
-    open_comment, original_or_close_comment, take_till_close, CommentKind,
-};
-use crate::common_parser::delete_line::delete_this_line;
-use crate::common_parser::lines::{one_line, verify_line_parses_to};
 use json_patch::Op;
 use serde_hkx::errors::readable::ReadableError;
 use winnow::{
@@ -15,6 +5,21 @@ use winnow::{
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
+};
+
+use crate::{
+    adsf::patch::de::{
+        error::{Error, Result},
+        others::clip_anim::{
+            current_state::{CurrentState, PartialRotations},
+            ClipAnimDiffPatch, DiffTriggerNames, LineKind,
+        },
+    },
+    common_parser::{
+        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        delete_line::delete_this_line,
+        lines::{one_line, verify_line_parses_to},
+    },
 };
 
 /// Parse animationdatasinglefile.txt clip animation block patch.

@@ -2,15 +2,16 @@
 //!
 //! Computes per-mod base slot values from load order and produces
 //! `aa_config.json` consumed by the fnis_aa SKSE plugin at runtime.
-use std::borrow::Cow;
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use indexmap::IndexMap;
 use serde::Serialize;
 
 use super::group_names::AAGroupName;
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, AnimKind, ConversionJob};
-use crate::errors::Error;
+use crate::{
+    behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
+    errors::Error,
+};
 
 // =============================================================================
 // Data model

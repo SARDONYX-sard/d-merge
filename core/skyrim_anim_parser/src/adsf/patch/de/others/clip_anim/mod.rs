@@ -1,8 +1,9 @@
 mod current_state;
 pub mod deserializer;
 
-use json_patch::Op;
 use std::{borrow::Cow, ops::Range};
+
+use json_patch::Op;
 
 use crate::adsf::normal::ClipAnimDataBlock;
 

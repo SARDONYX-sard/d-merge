@@ -1,7 +1,11 @@
-use crate::adsf::normal::{Rotation, Translation};
-use crate::adsf::patch::de::{error::Error, others::clip_motion::LineKind};
-use json_patch::Op;
 use std::{borrow::Cow, ops::Range, slice::Iter};
+
+use json_patch::Op;
+
+use crate::adsf::{
+    normal::{Rotation, Translation},
+    patch::de::{error::Error, others::clip_motion::LineKind},
+};
 
 #[derive(Debug)]
 pub struct CurrentState<'input> {

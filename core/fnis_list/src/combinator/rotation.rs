@@ -7,10 +7,12 @@
 //! - `RD <time: f32> <delta_z_angle: f32>`
 
 use skyrim_anim_parser::adsf::normal::Rotation;
-use winnow::ascii::{float, space1, Caseless};
-use winnow::combinator::{alt, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{float, space1, Caseless},
+    combinator::{alt, seq},
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::comment::skip_ws_and_comments;
 

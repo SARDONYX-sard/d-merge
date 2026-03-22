@@ -8,17 +8,22 @@
 //! `-L`: End of the Furniture syntax sequence (Last).
 use std::borrow::Cow;
 
+use fnis_list::combinator::{
+    flags::{AnimVar, FNISAnimFlags},
+    fnis_animation::FNISAnimation,
+    Trigger,
+};
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
 use simd_json::{borrowed::Value, json_typed};
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5231;
-use crate::behaviors::tasks::fnis::patch_gen::new_push_events_seq_patch;
-use crate::behaviors::tasks::fnis::patch_gen::{kill_move::calculate_hash, JsonPatchPairs};
-use fnis_list::combinator::flags::{AnimVar, FNISAnimFlags};
-use fnis_list::combinator::fnis_animation::FNISAnimation;
-use fnis_list::combinator::Trigger;
+use crate::behaviors::tasks::fnis::{
+    collect::owned::OwnedFnisInjection,
+    patch_gen::{
+        global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5231, kill_move::calculate_hash,
+        new_push_events_seq_patch, JsonPatchPairs,
+    },
+};
 
 /// Represents the phase of a Furniture animation sequence as defined in FNIS.
 ///

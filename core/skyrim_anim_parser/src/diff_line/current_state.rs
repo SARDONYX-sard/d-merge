@@ -1,7 +1,8 @@
-use crate::common_parser::lines::Str;
-use crate::diff_line::error::Error;
-use json_patch::Op;
 use std::{borrow::Cow, ops::Range};
+
+use json_patch::Op;
+
+use crate::{common_parser::lines::Str, diff_line::error::Error};
 
 #[derive(Debug)]
 pub struct CurrentState<'input> {

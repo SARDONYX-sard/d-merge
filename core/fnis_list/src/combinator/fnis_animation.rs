@@ -1,10 +1,12 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use skyrim_anim_parser::adsf::normal::Translation;
-use winnow::ascii::{space0, space1};
-use winnow::combinator::{opt, repeat, separated, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{space0, space1},
+    combinator::{opt, repeat, separated, seq},
+    error::{StrContext, StrContextValue},
+    ModalResult, Parser,
+};
 
 use crate::combinator::{
     anim_types::{parse_anim_type, FNISAnimType},

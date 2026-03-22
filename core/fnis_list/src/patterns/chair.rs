@@ -1,10 +1,12 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
-use winnow::ascii::{space0, space1};
-use winnow::combinator::{repeat, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::token::take_till;
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{space0, space1},
+    combinator::{repeat, seq},
+    error::{StrContext, StrContextValue},
+    token::take_till,
+    ModalResult, Parser,
+};
 
 use crate::combinator::{
     anim_types::FNISAnimType,

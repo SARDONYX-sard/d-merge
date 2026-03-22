@@ -1,9 +1,13 @@
 pub mod error;
 
-use crate::error::Error;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
 use rayon::prelude::*;
-use std::fs;
-use std::path::{Path, PathBuf};
+
+use crate::error::Error;
 
 /// Collect both Nemesis and FNIS mods into a single vector.
 ///
@@ -242,9 +246,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
     use std::path::Path;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[ignore = "Requires actual Skyrim Data directory with Nemesis mods"]
     #[test]

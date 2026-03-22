@@ -1,5 +1,6 @@
-use crate::{asdsf::patch::de::patch_map::OnePatchMap, common_parser::lines::Str};
 use json_patch::ValueWithPriority;
+
+use crate::{asdsf::patch::de::patch_map::OnePatchMap, common_parser::lines::Str};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]

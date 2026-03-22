@@ -1,18 +1,27 @@
-use super::error::{Error, Result};
-use super::line_parsers::{take_raw_diff, version_v3};
-use crate::asdsf::patch::de::raw_diff::{Op, RawDiff};
-use crate::asdsf::patch::de::DiffPatchAnimSetData;
-use crate::common_parser::comment::close_comment_line;
-use crate::common_parser::lines::{num_bool_line, one_line, parse_one_line};
+use std::collections::HashMap;
 
 use json_patch::{JsonPath, ValueWithPriority};
 use serde_hkx::errors::readable::ReadableError;
-use std::collections::HashMap;
-use winnow::combinator::opt;
 use winnow::{
     ascii::multispace0,
+    combinator::opt,
     error::{ContextError, ErrMode},
     Parser,
+};
+
+use super::{
+    error::{Error, Result},
+    line_parsers::{take_raw_diff, version_v3},
+};
+use crate::{
+    asdsf::patch::de::{
+        raw_diff::{Op, RawDiff},
+        DiffPatchAnimSetData,
+    },
+    common_parser::{
+        comment::close_comment_line,
+        lines::{num_bool_line, one_line, parse_one_line},
+    },
 };
 
 pub type PatchesMap<'a> = HashMap<JsonPath<'a>, ValueWithPriority<'a>>;
@@ -311,11 +320,12 @@ impl<'de> PatchDeserializer<'de> {
 
 #[cfg(test)]
 mod tests {
+    use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
+
     use super::*;
     use crate::asdsf::patch::de::{
         patch_map::SeqPatchMap, AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff,
     };
-    use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 
     // V3                             <- version
     // 0                              <- triggers_len

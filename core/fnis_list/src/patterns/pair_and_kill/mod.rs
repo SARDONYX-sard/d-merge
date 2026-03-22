@@ -1,13 +1,17 @@
 mod flags;
 
-use winnow::ascii::{space0, space1, Caseless};
-use winnow::combinator::{alt, opt, repeat, seq};
-use winnow::error::{StrContext, StrContextValue};
-use winnow::token::take_till;
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::{space0, space1, Caseless},
+    combinator::{alt, opt, repeat, seq},
+    error::{StrContext, StrContextValue},
+    token::take_till,
+    ModalResult, Parser,
+};
 
-use crate::combinator::comment::skip_ws_and_comments;
-use crate::patterns::pair_and_kill::flags::{parse_anim_flags, FNISPairAndKillMoveAnimFlagSet};
+use crate::{
+    combinator::comment::skip_ws_and_comments,
+    patterns::pair_and_kill::flags::{parse_anim_flags, FNISPairAndKillMoveAnimFlagSet},
+};
 
 #[derive(Debug, PartialEq)]
 pub struct FNISPairedAndKillAnimation<'a> {

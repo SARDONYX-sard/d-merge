@@ -1,5 +1,6 @@
-use crate::errors::{Error, Result};
 use rayon::prelude::*;
+
+use crate::errors::{Error, Result};
 
 fn errors_to_string(errors: &[Error]) -> String {
     let err_len = errors.len();
@@ -27,9 +28,10 @@ pub(crate) async fn write_errors(options: &crate::Config, errors: &[Error]) -> R
 
     // #[cfg(not(feature = "tracing"))]
     {
-        use crate::errors::FailedIoSnafu;
         use snafu::ResultExt as _;
         use tokio::fs;
+
+        use crate::errors::FailedIoSnafu;
 
         let mut error_output = options.output_dir.join(".d_merge");
         let _ = fs::create_dir_all(&error_output).await;

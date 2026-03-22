@@ -1,8 +1,9 @@
-pub use crate::operation::Op;
-use crate::JsonPatchError;
+use std::ops::Range;
 
 use simd_json::BorrowedValue;
-use std::ops::Range;
+
+pub use crate::operation::Op;
+use crate::JsonPatchError;
 
 /// A JSON patch along with its associated priority.
 ///

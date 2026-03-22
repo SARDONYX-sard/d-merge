@@ -1,6 +1,7 @@
-use crate::error::{NotFoundLogDirSnafu, Result};
 use snafu::ResultExt as _;
 use tauri::Manager as _;
+
+use crate::error::{NotFoundLogDirSnafu, Result};
 
 /// Initializes logger.
 ///

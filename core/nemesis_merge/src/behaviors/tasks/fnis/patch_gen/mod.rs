@@ -11,33 +11,32 @@ mod pair;
 
 use std::borrow::Cow;
 
+use fnis_list::parse_fnis_list;
 use json_patch::{json_path, Action, JsonPatch, JsonPath, Op, ValueWithPriority};
-use rayon::iter::Either;
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 use simd_json::json_typed;
 use snafu::ResultExt;
 use winnow::Parser;
 
-use crate::behaviors::tasks::adsf::AdsfPatch;
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use fnis_list::parse_fnis_list;
-use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::{generate_patch, OneListPatch};
-use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
-    BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON,
-};
-use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::new_global_master_patch;
-use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
-use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
-use crate::behaviors::tasks::patches::types::{
-    BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
-};
-use crate::behaviors::tasks::templates::key::{
-    THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY,
-};
-use crate::config::{Config, ReportType, StatusReportCounter};
-use crate::errors::{Error, FailedParseFnisModListSnafu};
-
 pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
+use crate::{
+    behaviors::tasks::{
+        adsf::AdsfPatch,
+        fnis::{
+            collect::owned::OwnedFnisInjection,
+            patch_gen::{
+                gen_list_patch::{generate_patch, OneListPatch},
+                generated_behaviors::{BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON},
+                global::{_0_master::new_global_master_patch, mt_behavior::new_mt_global_patch},
+                hkx_convert::AnimIoJob,
+            },
+        },
+        patches::types::{BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection},
+        templates::key::{THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY},
+    },
+    config::{Config, ReportType, StatusReportCounter},
+    errors::{Error, FailedParseFnisModListSnafu},
+};
 
 pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 

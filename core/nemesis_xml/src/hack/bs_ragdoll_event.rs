@@ -1,6 +1,8 @@
-use winnow::ascii::Caseless;
-use winnow::combinator::{alt, delimited};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ascii::Caseless,
+    combinator::{alt, delimited},
+    ModalResult, Parser,
+};
 
 use crate::helpers::tag::{field_start_close_tag, field_start_open_tag};
 

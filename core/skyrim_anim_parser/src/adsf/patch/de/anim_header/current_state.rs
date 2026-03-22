@@ -1,7 +1,8 @@
-use crate::adsf::patch::de::anim_header::LineKind;
-use crate::adsf::patch::de::error::Error;
-use json_patch::Op;
 use std::{borrow::Cow, slice::Iter};
+
+use json_patch::Op;
+
+use crate::adsf::patch::de::{anim_header::LineKind, error::Error};
 
 #[derive(Debug)]
 pub struct CurrentState<'input> {

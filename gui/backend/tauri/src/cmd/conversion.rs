@@ -1,7 +1,8 @@
-use super::sender;
 use rayon::prelude::*;
 use serde_hkx_for_gui::DirEntry;
 use tauri::Window;
+
+use super::sender;
 
 /// Convert hkx <-> xml
 /// -

@@ -1,6 +1,7 @@
-use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
+
+use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 
 /// FNIS XML(name="#2526") - `HeadTrackingOff`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2526: &str = "#FNIS_aa_global_auto_gen2526";

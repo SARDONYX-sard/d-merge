@@ -1,10 +1,16 @@
-use crate::behaviors::tasks::templates::key::TemplateKey;
-use crate::behaviors::tasks::templates::types::{BorrowedTemplateMap, OwnedTemplateMap};
-use crate::errors::{Error, HkxDeSnafu, Result, SimdJsonSnafu, TemplateSnafu};
+use std::path::Path;
+
 use rayon::{iter::Either, prelude::*};
 use simd_json::{serde::to_borrowed_value, BorrowedValue};
 use snafu::ResultExt as _;
-use std::path::Path;
+
+use crate::{
+    behaviors::tasks::templates::{
+        key::TemplateKey,
+        types::{BorrowedTemplateMap, OwnedTemplateMap},
+    },
+    errors::{Error, HkxDeSnafu, Result, SimdJsonSnafu, TemplateSnafu},
+};
 
 /// Return  Map<name, (inner_path, value)>
 pub fn collect_templates(templates: &OwnedTemplateMap) -> (BorrowedTemplateMap<'_>, Vec<Error>) {

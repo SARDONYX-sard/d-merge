@@ -1,5 +1,6 @@
-use rayon::{iter::Either, prelude::*};
 use std::{collections::HashSet, path::Path};
+
+use rayon::{iter::Either, prelude::*};
 
 use crate::{
     behaviors::tasks::templates::{key::TemplateKey, types::OwnedTemplateMap},

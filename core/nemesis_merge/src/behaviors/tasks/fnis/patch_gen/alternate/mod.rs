@@ -81,23 +81,28 @@ mod generated_group_table;
 pub(crate) mod group_names;
 mod oar_json;
 
-use std::borrow::Cow;
-use std::path::Path;
-use std::path::PathBuf;
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use fnis_list::patterns::alt_anim::AlternateAnimation;
 use rayon::prelude::*;
 
-use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::{
-    alternate::{
-        group_names::AAGroupName,
-        oar_json::{prepare_anim_config_json, FnisToOarConfig},
+use crate::{
+    behaviors::tasks::fnis::{
+        collect::owned::OwnedFnisInjection,
+        patch_gen::{
+            alternate::{
+                group_names::AAGroupName,
+                oar_json::{prepare_anim_config_json, FnisToOarConfig},
+            },
+            hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
+        },
     },
-    hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
+    errors::Error,
+    Config,
 };
-use crate::errors::Error;
-use crate::Config;
 
 /// Just write file
 #[derive(Debug)]

@@ -1,5 +1,6 @@
-use crate::args::PatchArgs;
 use nemesis_merge::{Config, DebugOptions, HackOptions, Status};
+
+use crate::args::PatchArgs;
 
 pub(crate) fn build_config(args: &PatchArgs) -> Config {
     Config {

@@ -3,9 +3,9 @@ mod windows;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod unix {
+    use std::{io, path::PathBuf};
+
     use super::Runtime;
-    use std::io;
-    use std::path::PathBuf;
 
     /// Get the skyrim data directory.
     ///
