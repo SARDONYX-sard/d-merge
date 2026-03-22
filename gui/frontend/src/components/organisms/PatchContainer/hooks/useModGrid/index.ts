@@ -43,8 +43,20 @@ export const useModsGrid = () => {
   );
 
   const handleRowSelectionModelChange = useCallback<OnRowChange>(
-    (newSelectionModel) => {
+    (newSelectionModel, _detail) => {
       const setModInfoList = isVfsMode ? setVfsModList : setModList;
+
+      // HACK: For some reason, the check status becomes apparent one turn after checking, so it forces a “check all” at the zero stage.
+      if (selectedIds.size === 0 && _detail.reason === 'multipleRowsSelection') {
+        setModInfoList((prevModList) => {
+          return prevModList.map((mod) => ({
+            ...mod,
+            enabled: true,
+          }));
+        });
+
+        return;
+      }
 
       const newSelectedIds = new Set(newSelectionModel.ids);
 
