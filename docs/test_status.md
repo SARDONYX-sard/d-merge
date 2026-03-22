@@ -114,7 +114,7 @@ Tag Legend
 - **pa** : Paired animation
 - **km** : KillMove animation
 - **ch** : Chair animation
-- **AAPrefix** : AltAnim syntax(Not supported yet)
+- **AAPrefix** : AltAnim — translates FNIS AA layout to OAR sub-directories. Requires [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109), [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146), and [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)
 
 | Status | Mod Name                                  | Version | Used syntax |
 | ------ | ----------------------------------------- | ------- | ----------- |
@@ -126,7 +126,7 @@ Tag Legend
 | ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
 | ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
 | ✅     | Ride Sharing SE                           | 0.4b    | b           |
-| ❌     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
+| ✅     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
 
 ### Detailed Notes
 
@@ -140,8 +140,8 @@ Tag Legend
   - Actual killmove behavior not fully tested
 
 - **XP32 Maximum Skeleton Special Extended**
-  - AltAnim syntax not supported
-  - ~~Planned for conversion to OAR~~(When converting to OAR, I encountered an issue where vfs temporarily stopped functioning in MO2, and I don't know how to resolve it.)
-
-  - We recommend using the following instead of this Alt Anim feature.
-    [Immersive Equipment Displays](https://www.nexusmods.com/skyrimspecialedition/mods/62001)
+  - AltAnim converted to OAR via [`alt_anim_to_oar](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
+  - Requires:
+    - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
+    - [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146)
+    - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)

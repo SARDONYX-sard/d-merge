@@ -135,7 +135,7 @@ D:/MO2/mods/
 | ⚠️     | Furniture Animations            | fu, fuo         | Implemented. But we couldn't find any mods that could be tested.               |
 | ⚠️     | Paired Animations and KillMoves | pa, km          | KillMove: only animation checked, not tested in actual kill. Paired: untested. |
 | ❌     | Chair Animations                | ch              | Couldn't find any mods that could be tested.                                   |
-| ❌     | Alternate Animations            | AAprefix        | Debating whether to convert it to OAR.                                         |
+| ✅     | Alternate Animations            | AAprefix        | Automatically convert to OAR. Need: OAR, BehaviorDataInjector, and fnis_aa.    |
 
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
 
@@ -164,12 +164,19 @@ This project includes multiple crates with different licenses. The overall licen
 ### License Tree
 
 ```txt
-gui (GPL-3.0)
+cli/gui (GPL-3.0)
 ├── nemesis_merge (GPL-3.0)
+│   ├── auto_charset (MIT OR Apache-2.0)
+│   ├── fnis_list (GPL-3.0)
+│   ├── gh_issue_link (MIT OR Apache-2.0)
 │   ├── json_patch (MIT OR Apache-2.0)
+│   ├── jwalk_glob (MIT OR Apache-2.0)
 │   ├── nemesis_xml (MIT OR Apache-2.0)
+│   ├── serde_hkx_for_gui (MIT OR Apache-2.0)
 │   ├── skyrim_anim_parser (GPL-3.0)
-│   └── skyrim_crc (MIT OR Apache-2.0)
+│   ├── skyrim_crc (MIT OR Apache-2.0)
+│   └── skyrim_data_dir (MIT OR Apache-2.0)
+│
 ├── node_expr (MIT OR Apache-2.0)
 ├── mod_info (MIT OR Apache-2.0)
 ├── serde_hkx_for_gui (MIT OR Apache-2.0)
