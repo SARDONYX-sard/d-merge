@@ -2,7 +2,7 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
-use crate::behaviors::tasks::fnis::patch_gen::alternative::AltAnimConfigJob;
+use crate::behaviors::tasks::fnis::patch_gen::alternate::AltAnimConfigJob;
 use crate::config::{Config, OutPutTarget};
 use crate::errors::Error;
 
@@ -20,10 +20,23 @@ pub struct ConversionJob {
     /// Path to the target converted HKX file
     pub output_path: PathBuf,
 
-    /// Is this job optional? If true, missing input files will be skipped without error.
-    ///
-    /// This is required for FNIS AltAnim to OAR and should be set to true.
-    pub is_optional: bool,
+    /// FNIS_AA is set to true because output is required regardless of the conversion state.
+    pub kind: AnimKind,
+}
+
+#[derive(Debug)]
+pub enum AnimKind {
+    /// Standard animation conversion — no FNIS metadata needed.
+    Standard,
+    /// FNIS alternate animation — carries metadata for aa_config.json generation.
+    FnisAA {
+        /// e.g. "xpe"
+        prefix: String,
+        /// e.g. "_1hmeqp"
+        group_name: String,
+        /// total slots in this group (for base computation)
+        slot_count: u64,
+    },
 }
 
 /// Prepare a list of conversion jobs from animation filenames and `OwnedFnisInjection` metadata.
@@ -58,7 +71,7 @@ pub fn prepare_conversion_jobs(
             AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                is_optional: false,
+                kind: AnimKind::Standard,
             })
         })
         .collect()
@@ -76,7 +89,7 @@ pub fn prepare_behavior_conversion_job(
             Some(AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                is_optional: false,
+                kind: AnimKind::Standard,
             }))
         }
         Err(_err) => {
@@ -213,6 +226,9 @@ struct ConversionBytes {
 /// - Has a pointer size that cannot be determined.
 #[must_use]
 pub fn run_conversion_jobs(jobs: Vec<AnimIoJob>, output_target: OutPutTarget) -> Vec<Error> {
+    #[cfg(feature = "tracing")]
+    tracing::debug!("jobs to run: {:#?}", jobs);
+
     // separate hkx / config
     let (hkx_jobs, config_jobs): (Vec<_>, Vec<_>) =
         jobs.into_par_iter().partition_map(|job| match job {
@@ -259,12 +275,17 @@ fn read_hkx_bytes(
 ) -> Option<Result<ConversionBytes, Error>> {
     use std::borrow::Cow;
 
-    let actual_input = if job.input_path.exists() {
+    let actual_input = if !job.input_path.exists() && matches!(job.kind, AnimKind::FnisAA { .. }) {
+        #[cfg(feature = "tracing")]
+        tracing::warn!(
+            path = %job.input_path.display(),
+            "Input file does not exist, but since this is for FNIS AltAnim to OAR conversion, it will be skipped without error."
+        );
+        return None;
+    } else if job.input_path.exists() {
         Cow::Borrowed(&job.input_path)
     } else if let Some(found) = find_case_insensitive(&job.input_path) {
         Cow::Owned(found)
-    } else if job.is_optional {
-        return None;
     } else {
         return Some(Err(Error::FNISHkxIoError {
             path: job.input_path.clone(),
@@ -285,7 +306,7 @@ fn read_hkx_bytes(
     };
 
     let current_format = check_hkx_header(&bytes, &actual_input, output_target).ok()?;
-    if current_format == output_target {
+    if matches!(job.kind, AnimKind::Standard) && current_format == output_target {
         return None; // no conversion needed
     }
 

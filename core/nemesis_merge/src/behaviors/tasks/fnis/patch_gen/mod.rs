@@ -1,5 +1,5 @@
 #[cfg(feature = "unstable_conversion")]
-mod alternative;
+mod alternate;
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
@@ -293,6 +293,25 @@ pub fn collect_borrowed_patches<'a>(
         entry.one.0.par_extend(one);
         for (path, patch) in seq {
             entry.seq.insert(path, patch);
+        }
+    }
+
+    #[cfg(feature = "unstable_conversion")]
+    {
+        if conversion_jobs
+            .iter()
+            .any(|job| matches!(job, AnimIoJob::Config(_)))
+        {
+            if let Err(e) = alternate::aa_config::generate_aa_config_from_jobs(
+                &conversion_jobs,
+                &config.output_dir,
+            ) {
+                errors.push(e);
+            }
+
+            if let Err(e) = alternate::bdi::generate_bdi_config(&config.output_dir) {
+                errors.push(e);
+            }
         }
     }
 
