@@ -1,0 +1,29 @@
+[package]
+name = "d_merge_cli"
+version.workspace = true
+description = "High-Speed Patcher for FNIS/Nemesis Patch"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords = ["patch"]
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
+rayon = { workspace = true }
+sonic-rs = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+tracing = { workspace = true }
+
+# workspace members
+mod_info = { workspace = true }
+nemesis_merge = { workspace = true, features = ["tracing"] }
+skyrim_data_dir = { workspace = true, features = ["serde"] }
+tracing_rotation = { workspace = true }
+
+[lints]
+workspace = true
