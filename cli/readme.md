@@ -30,122 +30,160 @@ info mods  →  (write ini)  →  patch
 
 ---
 
-## Quick start (Python)
+## Quick start (cli + PowerShell)
 
-### VFS mode
+```powershell
+<#
+.SYNOPSIS
+    Generate Nemesis/FNIS behavior patches for Skyrim SE/LE.
+.DESCRIPTION
+    Supports both VFS mode (Mod Organizer 2) and manual mode.
+    Set $VFS = $true for MO2 VFS, $false = manual mode (MO2).
+    VFS mode:    glob points to Skyrim data dir (resolved from registry)
+    Manual mode: glob points to MO2 mods directory
+#>
+$ErrorActionPreference = "Stop"
+# ============================================================
+# Encoding (set once, never revert)
+# ============================================================
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
 
-```python
-import subprocess
-import json
-from pathlib import Path
+# ============================================================
+# Configuration
+# ============================================================
+$VFS          = $false   # $true = VFS mode (Steam), $false = manual mode (MO2)
 
-BIN          = "d_merge_cli"
-GLOB         = "D:/GAME/ModOrganizer Skyrim SE/mods/*"
-OUTPUT_DIR   = "./output"
-RESOURCE_DIR = "./assets/templates"
+$MANUAL_GLOB  = "D:/GAME/ModOrganizer Skyrim SE/mods/*" # Manual mode : ids returned as full paths
 
+$OUTPUT_DIR   = "./output"
+$RESOURCE_DIR = "./assets/templates"
+$BIN          = "./d_merge_cli"
 
-def run(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [BIN, *args],
-        capture_output=capture,
-        text=True,
-        check=True,
+# ============================================================
+# Functions
+# ============================================================
+
+function Invoke-Cli {
+    param(
+        [string[]]$Arguments,
+        [bool]$Capture = $true
     )
+    if ($Capture) {
+        $stdout = & $BIN @Arguments | Out-String
+    } else {
+        & $BIN @Arguments
+        $stdout = $null
+    }
 
+    if ($LASTEXITCODE -ne 0) {
+        throw "d_merge_cli failed: $($Arguments -join ' ')"
+    }
 
-# 1. Resolve Skyrim SE data directory from registry
-skyrim_data = Path(run(
-    "info", "skyrim-dir", "--runtime", "SkyrimSE",
-    capture=True,
-).stdout.strip())
-print(f"Skyrim data dir: {skyrim_data}")
+    if ($Capture) { $stdout.Trim() }
+}
 
-# 2. List mods through VFS — ids are mod codes only (e.g. "colisc")
-mods_json = run(
-    "info", "mods", "--glob", GLOB, "--vfs",
-    capture=True,
-).stdout
-mods: list[dict] = json.loads(mods_json)
-print(f"Found {len(mods)} mods")
-
-# 3. The ID formats for VFS and manual are different. Since VFS can only accept mod_code, we'll construct it here.
-#    Nemesis: <skyrim_data>\Nemesis_Engine\mod\<id>
-#    FNIS:    namespace only — path resolution is handled internally
-nemesis_base = skyrim_data / "Nemesis_Engine" / "mod"
-
-nemesis_paths = [
-    str(nemesis_base / m["id"])
-    for m in mods if m["mod_type"] == "nemesis"
-]
-fnis_ids = [m["id"] for m in mods if m["mod_type"] == "fnis"]
-
-nemesis_ini = Path("nemesis_ids.ini")
-fnis_ini    = Path("fnis_ids.ini")
-nemesis_ini.write_text("; Auto-generated\n" + "\n".join(nemesis_paths) + "\n")
-fnis_ini.write_text("; Auto-generated\n"    + "\n".join(fnis_ids)      + "\n")
-
-# 4. Generate behavior patches
-run(
-    "patch",
-    "--nemesis-ini",  str(nemesis_ini),
-    "--fnis-ini",     str(fnis_ini),
-    "--output-dir",   OUTPUT_DIR,
-    "--resource-dir", RESOURCE_DIR,
-    "--skyrim-data-glob", skyrim_data, # If you're using the fnis mod, you must always have this installed or you won't be able to explore.
-)
-print(f"Done — behaviors written to {OUTPUT_DIR}")
-```
-
-### Manual mode
-
-```python
-import subprocess
-import json
-from pathlib import Path
-
-BIN          = "d_merge_cli"
-GLOB         = "D:/MO2/mods/*"
-OUTPUT_DIR   = "./output"
-RESOURCE_DIR = "./assets/templates"
-
-
-def run(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [BIN, *args],
-        capture_output=capture,
-        text=True,
-        check=True,
+function Write-File {
+    param(
+        [string]$Path,
+        [string]$Content
     )
+    $enc = New-Object System.Text.UTF8Encoding $false  # UTF-8 without BOM
+    [System.IO.File]::WriteAllText($Path, $Content.Replace("`r`n", "`n"), $enc)
+}
 
+function Get-Mods {
+    param(
+        [string]$Glob,
+        [bool]$Vfs
+    )
+    $cliArgs = @("info", "mods", "--glob", $Glob)
+    if ($Vfs) { $cliArgs += "--vfs" }
 
-# 1. List mods — ids are already full paths in manual mode
-mods_json = run(
-    "info", "mods", "--glob", GLOB,
-    capture=True,
-).stdout
-mods: list[dict] = json.loads(mods_json)
-print(f"Found {len(mods)} mods")
+    $json_str = Invoke-Cli $cliArgs
+    Write-File "./mods.json" $json_str
+    Write-Host "  wrote mods.json"
 
-# 2. Write ini files directly (no path assembly needed)
-nemesis_ids = [m["id"] for m in mods if m["mod_type"] == "nemesis"]
-fnis_ids    = [m["id"] for m in mods if m["mod_type"] == "fnis"]
+    $json_str | ConvertFrom-Json
+}
 
-nemesis_ini = Path("nemesis_ids.ini")
-fnis_ini    = Path("fnis_ids.ini")
-nemesis_ini.write_text("; Auto-generated\n" + "\n".join(nemesis_ids) + "\n")
-fnis_ini.write_text("; Auto-generated\n"    + "\n".join(fnis_ids)    + "\n")
+function Write-IniFile {
+    param(
+        [string]$Path,
+        [string[]]$Lines
+    )
+    $content = "; Auto-generated`n" + ($Lines -join "`n") + "`n"
+    Write-File $Path $content
+    Write-Host "  wrote $Path ($($Lines.Count) entries)"
+}
 
-# 3. Generate behavior patches
-run(
-    "patch",
-    "--nemesis-ini",  str(nemesis_ini),
-    "--fnis-ini",     str(fnis_ini),
-    "--output-dir",   OUTPUT_DIR,
-    "--resource-dir", RESOURCE_DIR,
-    "--skyrim-data-glob", GLOB, # If you're using the fnis mod, you must always have this installed or you won't be able to explore.
-)
-print(f"Done — behaviors written to {OUTPUT_DIR}")
+function Invoke-Patch {
+    param([string]$SkyrimDataGlob)
+
+    & $BIN patch `
+        --nemesis-ini           nemesis_ids.ini `
+        --fnis-ini              fnis_ids.ini `
+        --output-dir            $OUTPUT_DIR `
+        --resource-dir          $RESOURCE_DIR `
+        --skyrim-data-dir-glob  $SkyrimDataGlob
+
+    if ($LASTEXITCODE -ne 0) { throw "patch failed" }
+}
+
+function Wait-ForConfirmation {
+    param([string]$Message = "Edit the ini files if needed, then press any key to continue...")
+    Write-Host ""
+    Write-Host $Message -ForegroundColor Yellow
+    Write-Host "  nemesis_ids.ini" -ForegroundColor Gray
+    Write-Host "  fnis_ids.ini" -ForegroundColor Gray
+    Write-Host ""
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Write-Host ""
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+function Main {
+    if ($VFS) {
+        $skyrim_data = Invoke-Cli @("info", "skyrim-dir", "--runtime", "SkyrimSE")
+        Write-Host "Skyrim data dir: $skyrim_data"
+
+        $mods = Get-Mods -Glob $skyrim_data -Vfs $true
+        Write-Host "Found $($mods.Count) mods (VFS mode)"
+
+        $nemesis_base  = Join-Path $skyrim_data "Nemesis_Engine\mod"
+        $nemesis_paths = $mods | Where-Object { $_.mod_type -eq "nemesis" } |
+            ForEach-Object { Join-Path $nemesis_base $_.id }
+        $fnis_ids      = $mods | Where-Object { $_.mod_type -eq "fnis" } |
+            ForEach-Object { $_.id }
+
+        Write-IniFile "nemesis_ids.ini" $nemesis_paths
+        Write-IniFile "fnis_ids.ini"    $fnis_ids
+        Wait-ForConfirmation
+        Invoke-Patch -SkyrimDataGlob $skyrim_data
+    }
+    else {
+        $mods = Get-Mods -Glob $MANUAL_GLOB -Vfs $false
+        Write-Host "Found $($mods.Count) mods (manual mode)"
+
+        $nemesis_ids = $mods | Where-Object { $_.mod_type -eq "nemesis" } |
+            ForEach-Object { $_.id }
+        $fnis_ids    = $mods | Where-Object { $_.mod_type -eq "fnis" } |
+            ForEach-Object { $_.id }
+
+        Write-IniFile "nemesis_ids.ini" $nemesis_ids
+        Write-IniFile "fnis_ids.ini"    $fnis_ids
+        Wait-ForConfirmation
+        Invoke-Patch -SkyrimDataGlob $MANUAL_GLOB
+    }
+
+    Write-Host "Done — behaviors written to $OUTPUT_DIR"
+}
+
+Main
 ```
 
 ---
@@ -175,7 +213,7 @@ D:\STEAM\steamapps\common\Skyrim Special Edition\Data\Nemesis_Engine\mod\draw
 FNIS specifies the namespace located directly under the `animations` directory
 within the `meshes` directory. Path resolution is handled internally.
 
-Use the `--skyrim-data-glob` option to specify the search range during patching
+Use the `--skyrim-data-dir-glob` option to specify the search range during patching
 
 ```ini
 ; FNIS mod IDs (namespaces)
