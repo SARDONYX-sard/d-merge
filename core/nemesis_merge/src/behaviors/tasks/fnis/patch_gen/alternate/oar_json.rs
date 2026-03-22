@@ -165,7 +165,7 @@ pub struct FnisToOarConfig<'a> {
 /// Configuration for a single FNIS group.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct GroupConfig<'a> {
-    /// Slot index -> Slot configuration
+    /// 1based Slot index -> Slot configuration
     #[serde(default, borrow, flatten)]
     #[serde(deserialize_with = "num_key_map::deserialize")]
     #[serde(bound(deserialize = "HashMap<u64, SlotConfig<'a>>: serde::Deserialize<'de>"))]

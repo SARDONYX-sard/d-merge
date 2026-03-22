@@ -20,7 +20,7 @@ use crate::errors::Error;
 const SCHEMA_URI: &str =
     "https://raw.githubusercontent.com/SARDONYX-sard/fnis_aa/main/tools/schemars/aa_config.schema.json";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AAGroup {
     /// FNIS group name, e.g. `_1hmeqp`.
@@ -51,7 +51,7 @@ pub struct AAGroup {
     pub slot_count: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AAMod {
     /// 3-character mod prefix used by FNIS, e.g. `xpe` for XPMSE.
@@ -233,9 +233,7 @@ fn compute_crc(mods: &[AAMod]) -> u32 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     for aa_mod in mods {
         for group in &aa_mod.groups {
-            aa_mod.mod_id.hash(&mut hasher);
-            group.group_id.hash(&mut hasher);
-            group.base.hash(&mut hasher);
+            group.hash(&mut hasher);
         }
     }
     hasher.finish() as u32
@@ -419,6 +417,7 @@ mod tests {
         compute_bases(&mut mods_a);
         compute_bases(&mut mods_b);
 
+        assert_ne!(&mods_a, &mods_b);
         assert_ne!(compute_crc(&mods_a), compute_crc(&mods_b));
     }
 

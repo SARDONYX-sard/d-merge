@@ -1,32 +1,80 @@
-//! # FNIS alternate to OAR
+//! # FNIS Alternate Animation to OAR
+//!
+//! Translates the FNIS alternate animation directory convention into the
+//! [OpenAnimationReplacer](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
+//! (OAR) sub-directory format, and generates the supporting config files that
+//! wire everything together at runtime.
+//!
+//! ## Requirements
+//!
+//! The output of this module requires the following Skyrim SE mods to be installed:
+//!
+//! - [OpenAnimationReplacer](https://www.nexusmods.com/skyrimspecialedition/mods/92109) — plays the correct animation slot based on OAR conditions
+//! - [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146) — injects `FNISaa_*` variables into the Havok behavior graph
+//! - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa) — overrides `FNIS_aa2` Papyrus natives to read slot layout from `config.json`
+//!
+//! ## Directory transformation XPMSSE(namespace = XPMSE)
+//!
+//! ### Before (FNIS layout)
 //!
 //! ```txt
-//! <skyrim data dir>/
-//! └── meshes/
-//!     └── actors/
-//!         └── character/                                      <- defaultmale, defaultfemale humanoid animations
-//!             └── animations/
-//!                 └── <fnis_mod_namespace>/                   <- this is `animations_mod_dir`
-//!                     ├── FNIS_<namespace>_toOAR.json         <- FNIS alt anim to OAR override config file.(optional)
-//!                     ├── xpe0_1hm_equip.hkx                  <- HKX animation file.
-//!                     └── xpe0_1hm_unequip.HKX                <- HKX animation file.
+//! Skyrim Special Edition/Data/
+//! └── meshes/actors/character/animations/
+//!     └── XPMSE/
+//!         ├── FNIS_XPMSE_toOAR.json        <- optional rename/condition overrides
+//!         ├── xpe0_1hm_equip.hkx           <- prefix + slot + animation name
+//!         └── xpe0_1hm_unequip.hkx
 //! ```
 //!
-//! To
+//! ### After (OAR layout + generated config files)
 //!
 //! ```txt
-//! <skyrim data dir>/
-//! └── meshes/
-//!     └── actors/
-//!         └── character/                                      <- defaultmale, defaultfemale humanoid animations
-//!             └── animations/
-//!                 └── OpenAnimationReplacer/
-//!                     └── <fnis_mod_namespace>/               <- (Can rename FNIS_<namespace>_toOAR.json)
-//!                         └── _1hm_eqp_0                      <- FNIS group name + Index. (Can rename FNIS_<namespace>_toOAR.json)
-//!                              ├── 1hm_equip.hkx              <- HKX animation file.
-//!                              ├── 1hm_unequip.HKX            <- HKX animation file.
-//!                              └── config.json                <- OAR config file.
+//! Skyrim Special Edition/Data/
+//! ├── meshes/actors/character/animations/
+//! │   └── OpenAnimationReplacer/
+//! │       └── XPMSE/
+//! │           ├── config.json              <- namespace-level OAR priority config
+//! │           └── _1hmeqp_1/               <- group name + slot index(1 based. 0 is vanilla)
+//! │               ├── 1hm_equip.hkx        <- prefix and slot stripped from filename
+//! │               ├── 1hm_unequip.hkx
+//! │               └── config.json          <- slot-level OAR condition (FNISaa_1hmeqp == 1)
+//! │
+//! └── SKSE/Plugins/
+//!     ├── BehaviorDataInjector/
+//!     │   └── FNIS_AA_to_OAR_BDI.json      <- declares FNISaa_* kInt variables in
+//!     │                                        the Havok behavior graph
+//!     └── fnis_aa/
+//!         └── config.json                  <- mod/group/base slot layout consumed
+//!                                             by fnis_aa.dll at runtime
 //! ```
+//!
+//! ## Runtime flow
+//!
+//! ```txt
+//! XPMSE MCM sets a style for an actor
+//!         ↓
+//! FNIS_aa.SetAnimGroupEX(actor, "_1hmeqp", base, styleIndex)
+//!         ↓  intercepted by fnis_aa.dll, reads base from fnis_aa/config.json
+//! actor.SetAnimationVariableInt("FNISaa_1hmeqp", base + styleIndex)
+//!         ↓
+//! OAR evaluates the condition in each slot directory:
+//!   _1hmeqp_1/config.json  ->  FNISaa_1hmeqp == 1  ->  skip
+//!   _1hmeqp_2/config.json  ->  FNISaa_1hmeqp == 2  ->  match -> plays Back style
+//! ```
+//!
+//! Havok Behavior graph variables are stored per-actor instance, so Player and
+//! NPCs each carry their own value for `FNISaa_<group>`. This means the MCM can
+//! assign different styles to the player and to NPCs independently, even though
+//! both read from the same variable name.
+//!
+//! ## Entry points
+//!
+//! - [`alt_anim_to_oar`] — processes one [`OwnedFnisInjection`] and returns the
+//!   full list of [`AnimIoJob`]s (HKX copies + config writes) for that mod.
+//! - [`bdi::generate_bdi_config`] — writes `FNIS_AA_to_OAR_BDI.json` once for
+//!   the entire session.
+//! - [`aa_config::generate_aa_config_from_jobs`] — call once after all
+//!   [`alt_anim_to_oar`] jobs have been collected to write `fnis_aa/config.json`.
 pub(crate) mod aa_config;
 pub(crate) mod bdi;
 mod generated_group_table;
@@ -134,7 +182,7 @@ pub fn alt_anim_to_oar(
 
             let group_config_dir = slot_config
                 .and_then(|slot| slot.rename_to.as_deref().map(Cow::Borrowed))
-                .unwrap_or_else(|| Cow::Owned(format!("{group_name}_{slot}")));
+                .unwrap_or_else(|| Cow::Owned(format!("{group_name}_{}", slot + 1))); // Make the OAR GUI appearance consistent with 1based as well
 
             let output_dir = output_dir.join(group_config_dir.as_ref());
 
