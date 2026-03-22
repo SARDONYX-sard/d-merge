@@ -59,6 +59,10 @@ pub(crate) struct ModsArgs {
     #[arg(long, value_name = "GLOB")]
     pub glob: String,
 
+    /// Output json file path. If not provided, stdout.
+    #[arg(long, value_name = "FILE")]
+    pub output: Option<PathBuf>,
+
     /// Treat paths as virtual filesystem (MO2 VFS)
     #[arg(long, default_value_t = false)]
     pub vfs: bool,

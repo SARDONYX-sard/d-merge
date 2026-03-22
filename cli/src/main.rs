@@ -66,7 +66,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 mod_info_cmd::run_skyrim_dir(args.runtime)?;
             }
             InfoCommand::Mods(args) => {
-                mod_info_cmd::run_mods(&args.glob, args.vfs)?;
+                mod_info_cmd::run_mods(&args.glob, args.vfs, args.output.as_deref())?;
             }
         },
     }
