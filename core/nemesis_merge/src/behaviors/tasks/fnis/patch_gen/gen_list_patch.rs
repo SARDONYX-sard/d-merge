@@ -232,7 +232,7 @@ pub enum FnisPatchGenerationError {
     UnsupportedPairAndKillMoveForCreature { path: PathBuf },
 
     #[snafu(display(
-        "Failed to convert alternate animation to OAR format. See inner errors for details."
+        "Failed to convert alternate animation to OAR: {}", errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")
     ))]
     FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
 

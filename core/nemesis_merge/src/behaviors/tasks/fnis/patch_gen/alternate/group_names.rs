@@ -1,7 +1,5 @@
 //! Group name enum
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 /// FNIS alternate-animation group identifier.
 ///
 /// Each variant represents one animation group recognised by FNIS and maps to
@@ -19,11 +17,32 @@
 /// | `MagIdle`      | `_magidle`       | 7          |
 /// | `SneakIdle`    | `_sneakidle`     | 8          |
 /// | `StaffIdle`    | `_staffidle`     | 9          |
+/// | `Mt`           | `_mt`            | 10         |
+/// | `MtX`          | `_mtx`           | 11         |
+/// | `MtTurn`       | `_mtturn`        | 12         |
+/// | `OneHmMt`      | `_1hmmt`         | 13         |
+/// | `TwoHmMt`      | `_2hmmt`         | 14         |
+/// | `BowMt`        | `_bowmt`         | 15         |
 /// | `MagMt`        | `_magmt`         | 16         |
 /// | `MagCastMt`    | `_magcastmt`     | 17         |
+/// | `SneakMt`      | `_sneakmt`       | 18         |
 /// | `OneHmAtk`     | `_1hmatk`        | 19         |
+/// | `OneHmAtkPow`  | `_1hmatkpow`     | 20         |
+/// | `OneHmBlock`   | `_1hmblock`      | 21         |
+/// | `OneHmStag`    | `_1hmstag`       | 22         |
+/// | `TwoHmAtk`     | `_2hmatk`        | 23         |
+/// | `TwoHmAtkPow`  | `_2hmatkpow`     | 24         |
+/// | `TwoHmBlock`   | `_2hmblock`      | 25         |
+/// | `TwoHmStag`    | `_2hmstag`       | 26         |
+/// | `TwoHwAtk`     | `_2hwatk`        | 27         |
+/// | `TwoHwAtkPow`  | `_2hwatkpow`     | 28         |
+/// | `TwoHwBlock`   | `_2hwblock`      | 29         |
+/// | `TwoHwStag`    | `_2hwstag`       | 30         |
+/// | `BowAtk`       | `_bowatk`        | 31         |
+/// | `BowBlock`     | `_bowblock`      | 32         |
 /// | `H2HAtk`       | `_h2hatk`        | 33         |
 /// | `H2HAtkPow`    | `_h2hatkpow`     | 34         |
+/// | `H2HStag`      | `_h2hstag`       | 35         |
 /// | `MagAtk`       | `_magatk`        | 36         |
 /// | `OneHmEqp`     | `_1hmeqp`        | 37         |
 /// | `TwoHwEqp`     | `_2hweqp`        | 38         |
@@ -42,7 +61,12 @@
 /// | `Jump`         | `_jump`          | 51         |
 /// | `Sprint`       | `_sprint`        | 52         |
 /// | `Shield`       | `_shield`        | 53         |
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AAGroupName {
+    // -------------------------------------------------------------------------
+    // Idle
+    // -------------------------------------------------------------------------
     #[serde(rename = "_mtidle")]
     MtIdle,
     #[serde(rename = "_1hmidle")]
@@ -63,18 +87,72 @@ pub enum AAGroupName {
     SneakIdle,
     #[serde(rename = "_staffidle")]
     StaffIdle,
+
+    // -------------------------------------------------------------------------
+    // Movement
+    // -------------------------------------------------------------------------
+    #[serde(rename = "_mt")]
+    Mt,
+    #[serde(rename = "_mtx")]
+    MtX,
+    #[serde(rename = "_mtturn")]
+    MtTurn,
+    #[serde(rename = "_1hmmt")]
+    OneHmMt,
+    #[serde(rename = "_2hmmt")]
+    TwoHmMt,
+    #[serde(rename = "_bowmt")]
+    BowMt,
     #[serde(rename = "_magmt")]
     MagMt,
     #[serde(rename = "_magcastmt")]
     MagCastMt,
+    #[serde(rename = "_sneakmt")]
+    SneakMt,
+
+    // -------------------------------------------------------------------------
+    // Attack
+    // -------------------------------------------------------------------------
     #[serde(rename = "_1hmatk")]
     OneHmAtk,
+    #[serde(rename = "_1hmatkpow")]
+    OneHmAtkPow,
+    #[serde(rename = "_1hmblock")]
+    OneHmBlock,
+    #[serde(rename = "_1hmstag")]
+    OneHmStag,
+    #[serde(rename = "_2hmatk")]
+    TwoHmAtk,
+    #[serde(rename = "_2hmatkpow")]
+    TwoHmAtkPow,
+    #[serde(rename = "_2hmblock")]
+    TwoHmBlock,
+    #[serde(rename = "_2hmstag")]
+    TwoHmStag,
+    #[serde(rename = "_2hwatk")]
+    TwoHwAtk,
+    #[serde(rename = "_2hwatkpow")]
+    TwoHwAtkPow,
+    #[serde(rename = "_2hwblock")]
+    TwoHwBlock,
+    #[serde(rename = "_2hwstag")]
+    TwoHwStag,
+    #[serde(rename = "_bowatk")]
+    BowAtk,
+    #[serde(rename = "_bowblock")]
+    BowBlock,
     #[serde(rename = "_h2hatk")]
     H2HAtk,
     #[serde(rename = "_h2hatkpow")]
     H2HAtkPow,
+    #[serde(rename = "_h2hstag")]
+    H2HStag,
     #[serde(rename = "_magatk")]
     MagAtk,
+
+    // -------------------------------------------------------------------------
+    // Equip
+    // -------------------------------------------------------------------------
     #[serde(rename = "_1hmeqp")]
     OneHmEqp,
     #[serde(rename = "_2hweqp")]
@@ -97,6 +175,10 @@ pub enum AAGroupName {
     MagEqp,
     #[serde(rename = "_stfeqp")]
     StfEqp,
+
+    // -------------------------------------------------------------------------
+    // Misc
+    // -------------------------------------------------------------------------
     #[serde(rename = "_shout")]
     Shout,
     #[serde(rename = "_magcon")]
@@ -112,7 +194,18 @@ pub enum AAGroupName {
 }
 
 impl AAGroupName {
-    /// Returns the integer constant matching `FNIS_aa.<group>()` in Papyrus.
+    /// Returns the integer constant for this group.
+    ///
+    /// Matches the `id` field in `generated_group_table::ALT_GROUPS` and
+    /// the `FNIS_aa.<group>()` Papyrus constants where applicable.
+    ///
+    /// # Example
+    /// ```
+    /// assert_eq!(AAGroupName::MtIdle.group_id(),  0);
+    /// assert_eq!(AAGroupName::Mt.group_id(),      10);
+    /// assert_eq!(AAGroupName::OneHmEqp.group_id(), 37);
+    /// assert_eq!(AAGroupName::Shield.group_id(),  53);
+    /// ```
     #[inline]
     pub const fn group_id(self) -> u64 {
         match self {
@@ -126,11 +219,32 @@ impl AAGroupName {
             Self::MagIdle => 7,
             Self::SneakIdle => 8,
             Self::StaffIdle => 9,
+            Self::Mt => 10,
+            Self::MtX => 11,
+            Self::MtTurn => 12,
+            Self::OneHmMt => 13,
+            Self::TwoHmMt => 14,
+            Self::BowMt => 15,
             Self::MagMt => 16,
             Self::MagCastMt => 17,
+            Self::SneakMt => 18,
             Self::OneHmAtk => 19,
+            Self::OneHmAtkPow => 20,
+            Self::OneHmBlock => 21,
+            Self::OneHmStag => 22,
+            Self::TwoHmAtk => 23,
+            Self::TwoHmAtkPow => 24,
+            Self::TwoHmBlock => 25,
+            Self::TwoHmStag => 26,
+            Self::TwoHwAtk => 27,
+            Self::TwoHwAtkPow => 28,
+            Self::TwoHwBlock => 29,
+            Self::TwoHwStag => 30,
+            Self::BowAtk => 31,
+            Self::BowBlock => 32,
             Self::H2HAtk => 33,
             Self::H2HAtkPow => 34,
+            Self::H2HStag => 35,
             Self::MagAtk => 36,
             Self::OneHmEqp => 37,
             Self::TwoHwEqp => 38,
@@ -166,11 +280,32 @@ impl AAGroupName {
             Self::MagIdle => "_magidle",
             Self::SneakIdle => "_sneakidle",
             Self::StaffIdle => "_staffidle",
+            Self::Mt => "_mt",
+            Self::MtX => "_mtx",
+            Self::MtTurn => "_mtturn",
+            Self::OneHmMt => "_1hmmt",
+            Self::TwoHmMt => "_2hmmt",
+            Self::BowMt => "_bowmt",
             Self::MagMt => "_magmt",
             Self::MagCastMt => "_magcastmt",
+            Self::SneakMt => "_sneakmt",
             Self::OneHmAtk => "_1hmatk",
+            Self::OneHmAtkPow => "_1hmatkpow",
+            Self::OneHmBlock => "_1hmblock",
+            Self::OneHmStag => "_1hmstag",
+            Self::TwoHmAtk => "_2hmatk",
+            Self::TwoHmAtkPow => "_2hmatkpow",
+            Self::TwoHmBlock => "_2hmblock",
+            Self::TwoHmStag => "_2hmstag",
+            Self::TwoHwAtk => "_2hwatk",
+            Self::TwoHwAtkPow => "_2hwatkpow",
+            Self::TwoHwBlock => "_2hwblock",
+            Self::TwoHwStag => "_2hwstag",
+            Self::BowAtk => "_bowatk",
+            Self::BowBlock => "_bowblock",
             Self::H2HAtk => "_h2hatk",
             Self::H2HAtkPow => "_h2hatkpow",
+            Self::H2HStag => "_h2hstag",
             Self::MagAtk => "_magatk",
             Self::OneHmEqp => "_1hmeqp",
             Self::TwoHwEqp => "_2hweqp",
@@ -223,11 +358,32 @@ impl std::str::FromStr for AAGroupName {
             s if s.eq_ignore_ascii_case("_magidle") => Ok(Self::MagIdle),
             s if s.eq_ignore_ascii_case("_sneakidle") => Ok(Self::SneakIdle),
             s if s.eq_ignore_ascii_case("_staffidle") => Ok(Self::StaffIdle),
+            s if s.eq_ignore_ascii_case("_mt") => Ok(Self::Mt),
+            s if s.eq_ignore_ascii_case("_mtx") => Ok(Self::MtX),
+            s if s.eq_ignore_ascii_case("_mtturn") => Ok(Self::MtTurn),
+            s if s.eq_ignore_ascii_case("_1hmmt") => Ok(Self::OneHmMt),
+            s if s.eq_ignore_ascii_case("_2hmmt") => Ok(Self::TwoHmMt),
+            s if s.eq_ignore_ascii_case("_bowmt") => Ok(Self::BowMt),
             s if s.eq_ignore_ascii_case("_magmt") => Ok(Self::MagMt),
             s if s.eq_ignore_ascii_case("_magcastmt") => Ok(Self::MagCastMt),
+            s if s.eq_ignore_ascii_case("_sneakmt") => Ok(Self::SneakMt),
             s if s.eq_ignore_ascii_case("_1hmatk") => Ok(Self::OneHmAtk),
+            s if s.eq_ignore_ascii_case("_1hmatkpow") => Ok(Self::OneHmAtkPow),
+            s if s.eq_ignore_ascii_case("_1hmblock") => Ok(Self::OneHmBlock),
+            s if s.eq_ignore_ascii_case("_1hmstag") => Ok(Self::OneHmStag),
+            s if s.eq_ignore_ascii_case("_2hmatk") => Ok(Self::TwoHmAtk),
+            s if s.eq_ignore_ascii_case("_2hmatkpow") => Ok(Self::TwoHmAtkPow),
+            s if s.eq_ignore_ascii_case("_2hmblock") => Ok(Self::TwoHmBlock),
+            s if s.eq_ignore_ascii_case("_2hmstag") => Ok(Self::TwoHmStag),
+            s if s.eq_ignore_ascii_case("_2hwatk") => Ok(Self::TwoHwAtk),
+            s if s.eq_ignore_ascii_case("_2hwatkpow") => Ok(Self::TwoHwAtkPow),
+            s if s.eq_ignore_ascii_case("_2hwblock") => Ok(Self::TwoHwBlock),
+            s if s.eq_ignore_ascii_case("_2hwstag") => Ok(Self::TwoHwStag),
+            s if s.eq_ignore_ascii_case("_bowatk") => Ok(Self::BowAtk),
+            s if s.eq_ignore_ascii_case("_bowblock") => Ok(Self::BowBlock),
             s if s.eq_ignore_ascii_case("_h2hatk") => Ok(Self::H2HAtk),
             s if s.eq_ignore_ascii_case("_h2hatkpow") => Ok(Self::H2HAtkPow),
+            s if s.eq_ignore_ascii_case("_h2hstag") => Ok(Self::H2HStag),
             s if s.eq_ignore_ascii_case("_magatk") => Ok(Self::MagAtk),
             s if s.eq_ignore_ascii_case("_1hmeqp") => Ok(Self::OneHmEqp),
             s if s.eq_ignore_ascii_case("_2hweqp") => Ok(Self::TwoHwEqp),
