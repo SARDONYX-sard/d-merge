@@ -302,8 +302,14 @@ pub fn collect_borrowed_patches<'a>(
             .iter()
             .any(|job| matches!(job, AnimIoJob::Config(_)))
         {
-            if let Err(e) = alternate::bdi::generate_bdi_config(&DEFAULT_FEMALE, &config.output_dir)
-            {
+            if let Err(e) = alternate::aa_config::generate_aa_config_from_jobs(
+                &conversion_jobs,
+                &config.output_dir,
+            ) {
+                errors.push(e);
+            }
+
+            if let Err(e) = alternate::bdi::generate_bdi_config(&config.output_dir) {
                 errors.push(e);
             }
         }

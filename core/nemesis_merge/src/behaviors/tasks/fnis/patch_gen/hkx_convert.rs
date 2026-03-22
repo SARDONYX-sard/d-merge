@@ -21,7 +21,22 @@ pub struct ConversionJob {
     pub output_path: PathBuf,
 
     /// FNIS_AA is set to true because output is required regardless of the conversion state.
-    pub is_fnis_aa: bool,
+    pub kind: AnimKind,
+}
+
+#[derive(Debug)]
+pub enum AnimKind {
+    /// Standard animation conversion — no FNIS metadata needed.
+    Standard,
+    /// FNIS alternate animation — carries metadata for aa_config.json generation.
+    FnisAA {
+        /// e.g. "xpe"
+        prefix: String,
+        /// e.g. "_1hmeqp"
+        group_name: String,
+        /// total slots in this group (for base computation)
+        slot_count: u64,
+    },
 }
 
 /// Prepare a list of conversion jobs from animation filenames and `OwnedFnisInjection` metadata.
@@ -56,7 +71,7 @@ pub fn prepare_conversion_jobs(
             AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                is_fnis_aa: false,
+                kind: AnimKind::Standard,
             })
         })
         .collect()
@@ -74,7 +89,7 @@ pub fn prepare_behavior_conversion_job(
             Some(AnimIoJob::Hkx(ConversionJob {
                 input_path,
                 output_path,
-                is_fnis_aa: false,
+                kind: AnimKind::Standard,
             }))
         }
         Err(_err) => {
@@ -260,7 +275,7 @@ fn read_hkx_bytes(
 ) -> Option<Result<ConversionBytes, Error>> {
     use std::borrow::Cow;
 
-    let actual_input = if !job.input_path.exists() && job.is_fnis_aa {
+    let actual_input = if !job.input_path.exists() && matches!(job.kind, AnimKind::FnisAA { .. }) {
         #[cfg(feature = "tracing")]
         tracing::warn!(
             path = %job.input_path.display(),
@@ -291,7 +306,7 @@ fn read_hkx_bytes(
     };
 
     let current_format = check_hkx_header(&bytes, &actual_input, output_target).ok()?;
-    if !job.is_fnis_aa && current_format == output_target {
+    if matches!(job.kind, AnimKind::Standard) && current_format == output_target {
         return None; // no conversion needed
     }
 

@@ -27,7 +27,8 @@
 //!                              ├── 1hm_unequip.HKX            <- HKX animation file.
 //!                              └── config.json                <- OAR config file.
 //! ```
-pub mod bdi;
+pub(crate) mod aa_config;
+pub(crate) mod bdi;
 mod generated_group_table;
 mod oar_json;
 
@@ -38,6 +39,7 @@ use std::path::PathBuf;
 use crate::behaviors::tasks::fnis::patch_gen::alternate::oar_json::{
     prepare_anim_config_json, FnisToOarConfig,
 };
+use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimKind;
 use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, ConversionJob};
 use crate::errors::Error;
 use crate::{
@@ -158,7 +160,11 @@ pub fn alt_anim_to_oar(
                     AnimIoJob::Hkx(ConversionJob {
                         input_path,
                         output_path: output_dir.join(animation_path),
-                        is_fnis_aa: true,
+                        kind: AnimKind::FnisAA {
+                            prefix: prefix.to_string(),
+                            group_name: group_name.to_string(),
+                            slot_count: slots,
+                        },
                     })
                 })
                 .collect();
