@@ -145,3 +145,37 @@ jobs:
           include-hidden-files: true # to include .keep file
           path: |
             ./build/
+
+  cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          submodules: true
+      - name: Setup environment
+        uses: ./.github/actions/setup-deps
+        with:
+          platform: ${{ matrix.platform }}
+          build_profile: release
+          cache_key_suffix: "cli"
+          install_front_deps: false
+
+      - name: Build GUI
+        run: cargo build -p d_merge_cli --profile ${{ env.BUILD_PROFILE }}
+      - name: Move exe -> ./build
+        uses: ./.github/actions/setup-release
+        with:
+          app_name: d_merge_cli
+          build_profile: ${{ env.BUILD_PROFILE }}
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: ${{ env.APP_NAME }}-${{ runner.os }}-cli
+          include-hidden-files: true # to include .keep file
+          path: |
+            ./build/
