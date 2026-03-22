@@ -33,7 +33,7 @@ pub enum AnimKind {
         /// e.g. "xpe"
         prefix: String,
         /// e.g. "_1hmeqp"
-        group_name: String,
+        group_name: super::alternate::group_names::AAGroupName,
         /// total slots in this group (for base computation)
         slot_count: u64,
     },

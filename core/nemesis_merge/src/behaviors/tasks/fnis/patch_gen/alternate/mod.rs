@@ -78,12 +78,14 @@
 pub(crate) mod aa_config;
 pub(crate) mod bdi;
 mod generated_group_table;
+pub(crate) mod group_names;
 mod oar_json;
 
 use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 
+use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupName;
 use crate::behaviors::tasks::fnis::patch_gen::alternate::oar_json::{
     prepare_anim_config_json, FnisToOarConfig,
 };
@@ -169,9 +171,18 @@ pub fn alt_anim_to_oar(
         let group_name = set.group;
         let group_config = override_config.groups.get(group_name);
 
+        // Validate group name early; unknown names are skipped rather than
+        // propagating a String that silently fails later in aa_config.
+        let Ok(group_aa_name) = group_name.parse::<AAGroupName>() else {
+            errors.push(Error::Custom {
+                msg: format!("Unknown FNIS AA group name: {group_name}"),
+            });
+            continue;
+        };
+
         let Some(group) = generated_group_table::ALT_GROUPS.get(group_name) else {
             errors.push(Error::Custom {
-                msg: "Not found alt groups table.".to_string(),
+                msg: format!("Not found alt groups table. {group_name}"),
             });
             continue;
         };
@@ -210,7 +221,7 @@ pub fn alt_anim_to_oar(
                         output_path: output_dir.join(animation_path),
                         kind: AnimKind::FnisAA {
                             prefix: prefix.to_string(),
-                            group_name: group_name.to_string(),
+                            group_name: group_aa_name,
                             slot_count: slots,
                         },
                     })

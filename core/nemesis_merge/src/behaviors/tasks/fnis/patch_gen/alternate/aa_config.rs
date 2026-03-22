@@ -8,6 +8,7 @@ use std::path::Path;
 use indexmap::IndexMap;
 use serde::Serialize;
 
+use super::group_names::AAGroupName;
 use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, AnimKind, ConversionJob};
 use crate::errors::Error;
 
@@ -16,23 +17,17 @@ use crate::errors::Error;
 // =============================================================================
 
 /// JSON schema URI embedded in every generated `config.json`.
-#[cfg(feature = "schema")]
 const SCHEMA_URI: &str =
-    "https://raw.githubusercontent.com/SARDONYX-sard/fnis_aa/main/tools/schemars/aa_config.schema.json";
+    "https://raw.githubusercontent.com/SARDONYX-sard/d-merge/refs/heads/main/tools/schemas/aa_config.schema.json";
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AAGroup {
-    /// FNIS group name, e.g. `_1hmeqp`.
+    /// FNIS group identifier.
     ///
-    /// Used as the suffix of `FNISaa_<name>` animation variables on the actor.
-    pub name: String,
-
-    /// Integer ID matching the `FNIS_aa.<group>()` Papyrus constants (0-53).
-    ///
-    /// e.g. `_1hmeqp` → `37`, `_dageqp` → `43`.
-    #[cfg_attr(feature = "schema", validate(range(min = 0, max = 53)))]
-    pub group_id: u64,
+    /// Serializes to the FNIS wire string (e.g. `"_1hmeqp"`).
+    /// The corresponding `group_id` integer is derived via [`AAGroupName::group_id`].
+    pub name: AAGroupName,
 
     /// First slot index occupied by this mod for this group.
     ///
@@ -94,7 +89,7 @@ pub struct AAMod {
 ///       "name": "XPMSE",
 ///       "mod_id": 0,
 ///       "groups": [
-///         { "name": "_1hmeqp", "group_id": 37, "base": 1, "slot_count": 5 }
+///         { "name": "_1hmeqp", "base": 1, "slot_count": 5 }
 ///       ]
 ///     }
 ///   ]
@@ -108,7 +103,6 @@ pub struct AAConfig {
     /// Always set to the canonical schema URI. Enables schema validation in
     /// editors such as VS Code.
     #[serde(rename = "$schema")]
-    #[cfg(feature = "schema")]
     pub schema: Cow<'static, str>,
 
     /// CRC fingerprint of the current slot layout.
@@ -137,73 +131,11 @@ impl AAConfig {
     /// embedded in the output JSON as `$schema`.
     pub fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
         Self {
-            #[cfg(feature = "schema")]
             schema: Cow::Borrowed(SCHEMA_URI),
             crc: compute_crc(&mods),
             fnis_version: fnis_version.into(),
             mods,
         }
-    }
-}
-
-/// Generates the JSON schema for [`AAConfig`] and writes it to
-/// `schema/aa_config.schema.json`.
-///
-/// # Usage
-/// ```shell
-/// cargo test write_schema --features schema
-/// ```
-#[cfg(feature = "schema")]
-#[test]
-fn write_schema() {
-    let schema = schemars::schema_for!(AAConfig);
-    let json = sonic_rs::to_string_pretty(&schema).unwrap();
-    std::fs::create_dir_all("schema").unwrap();
-    std::fs::write("schema/aa_config.schema.json", json).unwrap();
-}
-
-// =============================================================================
-// Group ID constants
-// Matches FNIS_aa.<group>() integer constants.
-// =============================================================================
-
-fn group_id_from_name(name: &str) -> Option<u64> {
-    // NOTE: This must strictly match the constants in the FNIS_aa.psc file within the FNIS script.
-    match name {
-        "_mtidle" => Some(0),
-        "_1hmidle" => Some(1),
-        "_2hmidle" => Some(2),
-        "_2hwidle" => Some(3),
-        "_bowidle" => Some(4),
-        "_cbowidle" => Some(5),
-        "_h2hidle" => Some(6),
-        "_magidle" => Some(7),
-        "_sneakidle" => Some(8),
-        "_staffidle" => Some(9),
-        "_magmt" => Some(16),
-        "_magcastmt" => Some(17),
-        "_1hmatk" => Some(19),
-        "_h2hatk" => Some(33),
-        "_h2hatkpow" => Some(34),
-        "_magatk" => Some(36),
-        "_1hmeqp" => Some(37),
-        "_2hweqp" => Some(38),
-        "_2hmeqp" => Some(39),
-        "_axeeqp" => Some(40),
-        "_boweqp" => Some(41),
-        "_cboweqp" => Some(42),
-        "_dageqp" => Some(43),
-        "_h2heqp" => Some(44),
-        "_maceqp" => Some(45),
-        "_mageqp" => Some(46),
-        "_stfeqp" => Some(47),
-        "_shout" => Some(48),
-        "_magcon" => Some(49),
-        "_dw" => Some(50),
-        "_jump" => Some(51),
-        "_sprint" => Some(52),
-        "_shield" => Some(53),
-        _ => None,
     }
 }
 
@@ -219,7 +151,7 @@ fn compute_bases(mods: &mut [AAMod]) {
     for (mod_id, aa_mod) in mods.iter_mut().enumerate() {
         aa_mod.mod_id = mod_id as u64;
         for group in aa_mod.groups.iter_mut() {
-            let slot = next_slot.entry(group.group_id).or_insert(1);
+            let slot = next_slot.entry(group.name.group_id()).or_insert(1);
             group.base = *slot;
             *slot += group.slot_count;
         }
@@ -276,8 +208,6 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<(), Error> {
 /// Call this once after all `alt_anim_to_oar` jobs have been collected.
 /// Load order is preserved via `IndexMap` to ensure a stable CRC.
 ///
-/// Unknown group names are silently skipped.
-///
 /// # Output path
 /// `SKSE/Plugins/fnis_aa/config.json`
 pub fn generate_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<(), Error> {
@@ -298,11 +228,6 @@ pub fn generate_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Re
             continue;
         };
 
-        // Unknown groups produce no valid group_id — skip rather than panic.
-        let Some(group_id) = group_id_from_name(group_name) else {
-            continue;
-        };
-
         let aa_mod = aa_mods.entry(prefix.clone()).or_insert_with(|| AAMod {
             prefix: prefix.clone(),
             name: prefix.clone(),
@@ -314,8 +239,7 @@ pub fn generate_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Re
         // files reference it.
         if !aa_mod.groups.iter().any(|g| g.name == *group_name) {
             aa_mod.groups.push(AAGroup {
-                name: group_name.clone(),
-                group_id,
+                name: *group_name,
                 base: 0, // assigned later by compute_bases()
                 slot_count: *slot_count,
             });
@@ -337,7 +261,7 @@ mod tests {
 
     fn make_fnis_job(
         prefix: &str,
-        group_name: &str,
+        group_name: AAGroupName,
         slot_index: u64,
         slot_count: u64,
     ) -> AnimIoJob {
@@ -346,7 +270,7 @@ mod tests {
             output_path: PathBuf::from("out/1hm_equip.hkx"),
             kind: AnimKind::FnisAA {
                 prefix: prefix.to_string(),
-                group_name: group_name.to_string(),
+                group_name,
                 slot_count,
             },
         })
@@ -368,18 +292,11 @@ mod tests {
     }
 
     #[test]
-    fn skips_unknown_group_names() {
-        let jobs = vec![make_fnis_job("xpe", "_unknown_group", 0, 1)];
-        let config = collect_aa_mods(&jobs);
-        assert!(config.is_empty());
-    }
-
-    #[test]
     fn deduplicates_groups_within_mod() {
         // Same group, two animation files → one group entry.
         let jobs = vec![
-            make_fnis_job("xpe", "_1hmeqp", 0, 5),
-            make_fnis_job("xpe", "_1hmeqp", 1, 5),
+            make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5),
+            make_fnis_job("xpe", AAGroupName::OneHmEqp, 1, 5),
         ];
         let config = collect_aa_mods(&jobs);
         assert_eq!(config["xpe"].groups.len(), 1);
@@ -387,7 +304,7 @@ mod tests {
 
     #[test]
     fn base_starts_at_one() {
-        let jobs = vec![make_fnis_job("xpe", "_1hmeqp", 0, 5)];
+        let jobs = vec![make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5)];
         let mut mods: Vec<AAMod> = collect_aa_mods(&jobs).into_values().collect();
         compute_bases(&mut mods);
         assert_eq!(mods[0].groups[0].base, 1);
@@ -398,8 +315,8 @@ mod tests {
         // XPMSE: _1hmeqp slot_count=5  → base=1, occupies slots 1-5
         // TestMod: _1hmeqp slot_count=3 → base=6
         let jobs = vec![
-            make_fnis_job("xpe", "_1hmeqp", 0, 5),
-            make_fnis_job("tst", "_1hmeqp", 0, 3),
+            make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5),
+            make_fnis_job("tst", AAGroupName::OneHmEqp, 0, 3),
         ];
         let mut mods: Vec<AAMod> = collect_aa_mods(&jobs).into_values().collect();
         compute_bases(&mut mods);
@@ -409,8 +326,8 @@ mod tests {
 
     #[test]
     fn crc_changes_on_slot_count_change() {
-        let jobs_a = vec![make_fnis_job("xpe", "_1hmeqp", 0, 5)];
-        let jobs_b = vec![make_fnis_job("xpe", "_1hmeqp", 0, 3)];
+        let jobs_a = vec![make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5)];
+        let jobs_b = vec![make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 3)];
 
         let mut mods_a: Vec<AAMod> = collect_aa_mods(&jobs_a).into_values().collect();
         let mut mods_b: Vec<AAMod> = collect_aa_mods(&jobs_b).into_values().collect();
@@ -424,9 +341,9 @@ mod tests {
     #[test]
     fn write_aa_config_smoke() {
         let jobs = vec![
-            make_fnis_job("xpe", "_1hmeqp", 0, 5),
-            make_fnis_job("xpe", "_dageqp", 0, 6),
-            make_fnis_job("xpe", "_sprint", 0, 1),
+            make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5),
+            make_fnis_job("xpe", AAGroupName::DagEqp, 0, 6),
+            make_fnis_job("xpe", AAGroupName::Sprint, 0, 1),
         ];
         let output_dir = Path::new("../../dummy/debug");
         generate_aa_config_from_jobs(&jobs, output_dir).unwrap();
@@ -448,9 +365,6 @@ mod tests {
             else {
                 continue;
             };
-            let Some(group_id) = group_id_from_name(group_name) else {
-                continue;
-            };
             let aa_mod = aa_mods.entry(prefix.clone()).or_insert_with(|| AAMod {
                 prefix: prefix.clone(),
                 name: prefix.clone(),
@@ -459,8 +373,7 @@ mod tests {
             });
             if !aa_mod.groups.iter().any(|g| g.name == *group_name) {
                 aa_mod.groups.push(AAGroup {
-                    name: group_name.clone(),
-                    group_id,
+                    name: *group_name,
                     base: 0,
                     slot_count: *slot_count,
                 });
