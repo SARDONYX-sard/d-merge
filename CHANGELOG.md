@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-03-22
+### :bug: Bug Fixes
+- [`aeacbe1`](https://github.com/SARDONYX-sard/d-merge/commit/aeacbe16cf2977cba28b2631734f6076c4ee8ce4) - **fnis_aa**: add forgotten group_names *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`14640ac`](https://github.com/SARDONYX-sard/d-merge/commit/14640aca2f30f27635311a2cf3212665241d96cd) - **bdi**: replace static FNIS_AA_GROUPS with generated_group_table and optimize entry creation *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.0.0] - 2026-03-22
 ### :sparkles: New Features
 - [`cbd3cad`](https://github.com/SARDONYX-sard/d-merge/commit/cbd3cad9ad2d6be55ae402d3d4369c7fa617df42) - support for `NemesisBase` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -285,3 +293,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.1...0.3.2
 [0.3.3]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.2...0.3.3
 [1.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/0.3.3...1.0.0
+[1.0.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.0...1.0.1
