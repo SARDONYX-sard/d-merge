@@ -13,7 +13,9 @@ const RESET: &str = "\x1b[0m";
 const CLEAR_LINE: &str = "\r\x1b[2K"; // Delete the entire line and move to the beginning of the line.
 
 pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
-    Box::new(|status| {
+    let start = std::time::Instant::now();
+
+    Box::new(move |status| {
         use std::io::{stdout, Write};
         match &status {
             Status::ReadingPatches { .. } => {
@@ -33,9 +35,12 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
                 stdout().flush().ok();
             }
             Status::Done => {
-                println!("{CLEAR_LINE}{GREEN_BOLD}{status}{RESET}");
+                let elapsed = start.elapsed();
+                tracing::info!("Time: {elapsed:.2?}");
+                println!("{CLEAR_LINE}{GREEN_BOLD}{status}{RESET} Time: {elapsed:.2?}");
             }
             Status::Error(_) => {
+                tracing::info!("Time: {:.2?}", start.elapsed());
                 println!("{CLEAR_LINE}{RED_BOLD}{status}{RESET}");
             }
         }

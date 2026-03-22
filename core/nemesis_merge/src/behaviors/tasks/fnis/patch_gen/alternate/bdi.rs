@@ -4,7 +4,6 @@
 //! docs: https://github.com/max-su-2019/BehaviorDataInjector/blob/master/doc/How%20to%20create%20BDI%20config%20files.md
 use std::path::Path;
 
-use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::errors::Error;
@@ -24,43 +23,6 @@ struct BdiEntry {
     value: i32,
 }
 
-/// FNIS alt anim variable names without `FNISaa_` prefix and without `_crc` suffix.
-/// Corresponds to ALT_GROUPS keys that have a matching `FNISaa_*` variable.
-static FNIS_AA_GROUPS: [&str; 32] = [
-    "mtidle",
-    "1hmidle",
-    "2hmidle",
-    "2hwidle",
-    "bowidle",
-    "cbowidle",
-    "h2hidle",
-    "magidle",
-    "sneakidle",
-    "staffidle",
-    "magmt",
-    "magcastmt",
-    "sneakmt",
-    "1hmatk",
-    "h2hatk",
-    "h2hatkpow",
-    "1hmeqp",
-    "2hweqp",
-    "2hmeqp",
-    "axeeqp",
-    "boweqp",
-    "cboweqp",
-    "dageqp",
-    "h2heqp",
-    "maceqp",
-    "mageqp",
-    "stfeqp",
-    "magcon",
-    "dw",
-    "jump",
-    "sprint",
-    "shield",
-];
-
 /// Generates the BDI config JSON for a given behavior entry.
 ///
 /// Injects `FNISaa_*` and `FNISaa_*_crc` int variables into the behavior graph
@@ -69,20 +31,20 @@ static FNIS_AA_GROUPS: [&str; 32] = [
 /// # Output path
 /// `SKSE/Plugins/BehaviorDataInjector/FNIS_AA_to_OAR_BDI.json`
 pub fn generate_bdi_config(output_dir: &Path) -> Result<(), crate::errors::Error> {
-    let mut entries: Vec<BdiEntry> = FNIS_AA_GROUPS
-        .par_iter()
+    let mut entries: Vec<BdiEntry> = super::generated_group_table::ALT_GROUPS
+        .keys()
         .flat_map(|group| {
             [
                 BdiEntry {
                     project_path: "actors\\Character",
                     ty: "kInt",
-                    name: format!("FNISaa_{group}"),
+                    name: format!("FNISaa{group}"),
                     value: 0,
                 },
                 BdiEntry {
                     project_path: "actors\\Character", // Important: back slash path sep
                     ty: "kInt",
-                    name: format!("FNISaa_{group}_crc"),
+                    name: format!("FNISaa{group}_crc"),
                     value: 0,
                 },
             ]
