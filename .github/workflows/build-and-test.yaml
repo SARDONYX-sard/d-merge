@@ -116,7 +116,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
-        features: ["", "unstable_conversion"]
+        features: [""]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6.0.2

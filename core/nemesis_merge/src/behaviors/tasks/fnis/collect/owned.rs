@@ -39,7 +39,6 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry
 /// This is derived by considering the information necessary to generate the Borrowed Nemesis patch after parsing the list.
 #[derive(Debug)]
 pub struct OwnedFnisInjection {
-    #[cfg(feature = "unstable_conversion")]
     /// # Format
     /// `<skyrim_data_dir>/meshes/<base_dir>/<fnis_namespace>/animations`
     ///
@@ -123,7 +122,6 @@ pub struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
-    #[cfg(feature = "unstable_conversion")]
     pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
@@ -142,7 +140,6 @@ impl OwnedFnisInjection {
         }.into()
     }
 
-    #[cfg(feature = "unstable_conversion")]
     /// Return information for conversion
     ///
     /// Returns (
@@ -257,7 +254,6 @@ where
     let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
-    #[cfg(feature = "unstable_conversion")]
     let alt_anim_config = if list_content.contains("AAprefix") {
         load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
     } else {
@@ -265,7 +261,6 @@ where
     };
 
     Ok(OwnedFnisInjection {
-        #[cfg(feature = "unstable_conversion")]
         animations_mod_dir,
         behavior_entry,
         namespace: namespace.to_string(),
@@ -274,12 +269,10 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
-        #[cfg(feature = "unstable_conversion")]
         alt_anim_config,
     })
 }
 
-#[cfg(feature = "unstable_conversion")]
 fn load_to_oar_file(
     animations_mod_dir: &Path,
     behavior_entry: &'static BehaviorEntry,

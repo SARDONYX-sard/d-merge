@@ -49,7 +49,5 @@ rfd = { version = "0.15.4", features = ["xdg-portal"] }
 [features]
 default = []
 
-unstable_conversion = ["nemesis_merge/unstable_conversion"]
-
 [lints]
 workspace = true

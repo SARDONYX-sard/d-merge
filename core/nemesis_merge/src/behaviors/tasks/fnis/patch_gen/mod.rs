@@ -1,11 +1,9 @@
-#[cfg(feature = "unstable_conversion")]
 mod alternate;
 mod anim_var;
 mod furniture;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod global;
-#[cfg(feature = "unstable_conversion")]
 mod hkx_convert;
 mod kill_move;
 mod offset_arm;
@@ -29,7 +27,6 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::{
 };
 use crate::behaviors::tasks::fnis::patch_gen::global::_0_master::new_global_master_patch;
 use crate::behaviors::tasks::fnis::patch_gen::global::mt_behavior::new_mt_global_patch;
-#[cfg(feature = "unstable_conversion")]
 use crate::behaviors::tasks::fnis::patch_gen::hkx_convert::AnimIoJob;
 use crate::behaviors::tasks::patches::types::{
     BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection,
@@ -51,7 +48,6 @@ struct LocalAgg<'a> {
     adsf_patches: Vec<AdsfPatch<'a>>,
     furniture_groups: Vec<String>,
 
-    #[cfg(feature = "unstable_conversion")]
     conversion_jobs: Vec<AnimIoJob>,
 }
 
@@ -62,7 +58,6 @@ impl<'a> LocalAgg<'a> {
             behavior_graph_data_map: BehaviorGraphDataMap::new(),
             adsf_patches: Vec::new(),
             furniture_groups: Vec::new(),
-            #[cfg(feature = "unstable_conversion")]
             conversion_jobs: Vec::new(),
         }
     }
@@ -75,7 +70,6 @@ impl<'a> LocalAgg<'a> {
             .par_extend(other.behavior_graph_data_map.0);
         self.adsf_patches.par_extend(other.adsf_patches);
         self.furniture_groups.par_extend(other.furniture_groups);
-        #[cfg(feature = "unstable_conversion")]
         self.conversion_jobs.par_extend(other.conversion_jobs);
 
         self
@@ -98,7 +92,6 @@ pub fn collect_borrowed_patches<'a>(
         mods_patches.len(),
     );
 
-    #[cfg_attr(not(feature = "unstable_conversion"), allow(unused_mut))]
     let (patches, mut errors): (Vec<_>, Vec<_>) =
         mods_patches.par_iter().partition_map(|owned_data| {
             match parse_fnis_list
@@ -127,7 +120,6 @@ pub fn collect_borrowed_patches<'a>(
         behavior_graph_data_map,
         adsf_patches,
         furniture_groups,
-        #[cfg(feature = "unstable_conversion")]
         conversion_jobs,
     } = patches
         .into_par_iter()
@@ -141,7 +133,6 @@ pub fn collect_borrowed_patches<'a>(
                 one_mt_behavior_patches,
                 seq_mt_behavior_patches,
                 furniture_group_root_indexes,
-                #[cfg(feature = "unstable_conversion")]
                 mut conversion_jobs,
             } = patches;
 
@@ -209,7 +200,6 @@ pub fn collect_borrowed_patches<'a>(
 
             // Push One Mod animations
 
-            #[cfg(feature = "unstable_conversion")]
             if let Some(job) = hkx_convert::prepare_behavior_conversion_job(owned_data, config) {
                 conversion_jobs.push(job);
             }
@@ -217,7 +207,6 @@ pub fn collect_borrowed_patches<'a>(
                 let mut animations: Vec<_> = animations.into_iter().collect();
                 animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
-                #[cfg(feature = "unstable_conversion")]
                 conversion_jobs.par_extend(hkx_convert::prepare_conversion_jobs(
                     &animations,
                     owned_data,
@@ -261,7 +250,6 @@ pub fn collect_borrowed_patches<'a>(
             acc.adsf_patches.par_extend(adsf_patches);
             acc.furniture_groups
                 .par_extend(furniture_group_root_indexes);
-            #[cfg(feature = "unstable_conversion")]
             acc.conversion_jobs.par_extend(conversion_jobs);
             acc
         })
@@ -296,7 +284,6 @@ pub fn collect_borrowed_patches<'a>(
         }
     }
 
-    #[cfg(feature = "unstable_conversion")]
     {
         if conversion_jobs
             .iter()
@@ -316,7 +303,6 @@ pub fn collect_borrowed_patches<'a>(
     }
 
     // FIXME?: Unknown causes errors due to mutexes in MO2
-    #[cfg(feature = "unstable_conversion")]
     errors.par_extend(hkx_convert::run_conversion_jobs(
         conversion_jobs,
         config.output_target,

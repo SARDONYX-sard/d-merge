@@ -1,14 +1,15 @@
 name: FFI Node.js
 
 on:
-  push:
-    branches: ["main"]
-    paths-ignore:
-      - "**/*.md"
-  pull_request:
-    branches: ["*"]
-    paths-ignore:
-      - "**/*.md"
+  # TODO: We will consider optimizing it if there is demand
+  # push:
+  #   branches: ["main"]
+  #   paths-ignore:
+  #     - "**/*.md"
+  # pull_request:
+  #   branches: ["*"]
+  #   paths-ignore:
+  #     - "**/*.md"
   workflow_dispatch:
 
 permissions:
