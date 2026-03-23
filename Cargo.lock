@@ -1438,7 +1438,7 @@ dependencies = [
  "egui_extras",
  "egui_virtual_list",
  "gh_issue_link",
- "ico 0.4.0",
+ "ico",
  "indexmap 2.13.0",
  "mod_info",
  "nemesis_merge",
@@ -3363,16 +3363,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "ico"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc50b891e4acf8fe0e71ef88ec43ad82ee07b3810ad09de10f1d01f072ed4b98"
-dependencies = [
- "byteorder",
- "png 0.17.16",
 ]
 
 [[package]]
@@ -7736,7 +7726,7 @@ checksum = "d4a24476afd977c5d5d169f72425868613d82747916dd29e0a357c84c4bd6d29"
 dependencies = [
  "base64 0.22.1",
  "brotli",
- "ico 0.5.0",
+ "ico",
  "json-patch",
  "plist",
  "png 0.17.16",
