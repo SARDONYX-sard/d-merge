@@ -1,11 +1,7 @@
 //! - FNIS Alterative Animation
 pub mod one_line;
 
-use winnow::{
-    combinator::repeat,
-    error::{StrContext, StrContextValue},
-    ModalResult, Parser,
-};
+use winnow::{combinator::repeat, error::StrContext, ModalResult, Parser};
 
 use crate::patterns::alt_anim::one_line::{
     parse_alt_anim_prefix_line, parse_alt_anim_set_line, parse_alt_anim_trigger_line, AASet,
@@ -25,7 +21,6 @@ pub(crate) fn parse_alternate_animation<'a>(
 ) -> ModalResult<AlternateAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Alterative Animation"))
-        .context(StrContext::Expected(StrContextValue::Description("")))
         .parse_next(input)
 }
 
@@ -34,7 +29,7 @@ fn parse_furniture_animations_inner<'a>(
 ) -> ModalResult<AlternateAnimation<'a>> {
     let prefix = parse_alt_anim_prefix_line.parse_next(input)?;
     let set = repeat(1.., parse_alt_anim_set_line).parse_next(input)?;
-    let trigger = repeat(1.., parse_alt_anim_trigger_line).parse_next(input)?;
+    let trigger = repeat(0.., parse_alt_anim_trigger_line).parse_next(input)?;
 
     Ok(AlternateAnimation {
         prefix,
