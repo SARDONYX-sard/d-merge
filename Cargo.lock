@@ -1389,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_cli"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "clap",
  "mod_info",
@@ -1430,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_egui"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "eframe",
  "egui",
@@ -1458,7 +1458,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_node"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "mod_info",
  "napi",
@@ -1476,7 +1476,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_python"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "fnis_list"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "bitflags 2.11.0",
  "skyrim_anim_parser",
@@ -3600,9 +3600,9 @@ checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
 name = "iri-string"
-version = "0.7.10"
+version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91338f0783edbd6195decb37bae672fd3b165faffb89bf7b9e6942f8b1a731a"
+checksum = "d8e7418f59cc01c88316161279a7f665217ae316b388e58a0d10e29f54f1e5eb"
 dependencies = [
  "memchr",
  "serde",
@@ -3834,7 +3834,7 @@ dependencies = [
 
 [[package]]
 name = "jwalk_glob"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "jwalk",
  "tracing",
