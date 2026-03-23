@@ -139,15 +139,3 @@ export async function patch(output: string, patches: PatchMaps, options: PatchOp
 
   throw new Error('Unsupported platform: Non Tauri');
 }
-
-/**
- * Cancel patch
- * @throws Error
- */
-export async function cancelPatch() {
-  if (isTauri()) {
-    return await invoke('cancel_patch');
-  }
-
-  throw new Error('Unsupported platform: Non Tauri');
-}

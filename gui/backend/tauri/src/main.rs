@@ -23,7 +23,6 @@ fn main() {
             crate::cmd::hkanno::save_hkanno,
             crate::cmd::log::change_log_level,
             crate::cmd::log::log,
-            crate::cmd::patch::cancel_patch,
             crate::cmd::patch::get_skyrim_data_dir,
             crate::cmd::patch::load_mods_info,
             crate::cmd::patch::patch,
