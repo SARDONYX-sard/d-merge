@@ -121,6 +121,7 @@ Tag Legend
 | ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
 | ✅     | Flying Mod 2.0s                           | 1.1     | b           |
 | ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
+| ✅     | FNIS Sexy Move SE                         | 7.2     | AAPrefix    |
 | ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b           |
 | ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa       |
 | ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
@@ -139,9 +140,10 @@ Tag Legend
   - Animation plays correctly
   - Actual killmove behavior not fully tested
 
-- **XP32 Maximum Skeleton Special Extended**
+- **XP32 Maximum Skeleton Special Extended**, **FNIS Sexy Move SE**
   - AltAnim converted to OAR via [`alt_anim_to_oar](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
   - Requires:
     - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
     - [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146)
     - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)
+    - [FNIS(need scripts & esp)](https://www.nexusmods.com/skyrimspecialedition/mods/3038)
