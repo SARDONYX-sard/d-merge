@@ -1,12 +1,12 @@
 mod mod_info_loader;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
 use nemesis_merge::{
-    behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
+    behavior_gen, cache_remover, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
 };
 use snafu::ResultExt as _;
 use tauri::{path::BaseDirectory, AppHandle, Emitter as _, Manager};
@@ -31,6 +31,7 @@ pub(crate) struct GuiPatchOptions {
     hack_options: Option<HackOptions>,
     debug: DebugOptions,
     output_target: OutPutTarget,
+    /// Delete the meshes in the output destination each time the patch is run.
     auto_remove_meshes: bool,
     use_progress_reporter: bool,
 
@@ -51,10 +52,18 @@ pub(crate) async fn patch(
 ) -> Result<(), String> {
     tracing::info!("Starting patch with options: {options:#?}");
 
-    if options.auto_remove_meshes {
-        let meshes_path = output.join("meshes");
-        let debug_path = output.join(".d_merge").join(".debug");
-        tokio::join!(remove_if_exists(meshes_path), remove_if_exists(debug_path));
+    {
+        let is_dangerous_remove = options
+            .skyrim_data_dir_glob
+            .as_deref()
+            .is_some_and(|d| cache_remover::is_dangerous_remove(&output, d));
+        if is_dangerous_remove {
+            tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
+        } else {
+            if options.auto_remove_meshes {
+                cache_remover::remove_meshes_dir_all(&output);
+            }
+        }
     }
 
     let resource_dir = app
@@ -85,21 +94,6 @@ pub(crate) async fn patch(
     }
 
     Ok(())
-}
-
-/// Removes a directory if it exists, with debug logging.
-async fn remove_if_exists<P>(path: P)
-where
-    P: AsRef<Path>,
-{
-    let path = path.as_ref();
-    if path.exists() {
-        tracing::debug!("Starting removal of `{}`", path.display());
-        match tokio::fs::remove_dir_all(path).await {
-            Ok(_) => tracing::debug!("Successfully removed at `{}`", path.display()),
-            Err(e) => tracing::error!("Failed to remove at `{}`: {e}", path.display()),
-        }
-    }
 }
 
 #[cfg(test)]

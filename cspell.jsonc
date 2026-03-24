@@ -71,6 +71,7 @@
     "rustflags",
     "serde",
     "simd",
+    "SKSE",
     "Skyrim",
     "Softworks",
     "steamapps",
@@ -85,6 +86,6 @@
     "usvfs",
     "viewports",
     "weapequip",
-    "xorout",
+    "xorout"
   ]
 }

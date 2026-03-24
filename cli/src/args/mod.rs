@@ -82,7 +82,7 @@ pub(crate) struct PatchArgs {
 
     /// Glob pattern to locate Skyrim mod directories (required when --fnis-ini is set)
     ///
-    /// Example: "D:/GAME/ModOrganizer Skyrim SE/mods/*"
+    /// Example: "D:/STEAM/steamapps/common/Skyrim Special Edition/Data\", "D:/GAME/ModOrganizer Skyrim SE/mods/*"
     #[arg(long, value_name = "GLOB")]
     pub skyrim_data_dir_glob: Option<String>,
 
@@ -105,6 +105,11 @@ pub(crate) struct PatchArgs {
     /// Disable the color status reporter
     #[arg(long, default_value_t = false)]
     pub no_status: bool,
+
+    #[arg(long, default_value_t = false)]
+    /// Delete the meshes in the output destination each time the patch is run.
+    /// If the Skyrim Data directory is specified as the output directory, this step will be skipped.
+    pub auto_remove_meshes: bool,
 }
 
 #[derive(Debug, Clone, Copy)]

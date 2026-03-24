@@ -1,4 +1,5 @@
 mod behaviors;
+pub mod cache_remover;
 mod config;
 pub mod errors;
 mod results;

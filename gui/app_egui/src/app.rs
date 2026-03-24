@@ -1051,14 +1051,7 @@ impl ModManagerApp {
         let output_dir = &self.output_dir;
         let skyrim_data_directory = self.current_skyrim_data_dir();
 
-        let is_dangerous_remove = Path::new(output_dir)
-            .canonicalize()
-            .unwrap_or_else(|_| Path::new(output_dir).to_path_buf())
-            == Path::new(skyrim_data_directory)
-                .canonicalize()
-                .unwrap_or_else(|_| Path::new(skyrim_data_directory).to_path_buf());
-
-        if is_dangerous_remove {
+        if nemesis_merge::cache_remover::is_dangerous_remove(output_dir, skyrim_data_directory) {
             tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
         } else {
             self.set_notification(format!(
@@ -1066,7 +1059,7 @@ impl ModManagerApp {
                 self.t(I18nKey::RemovingMeshesMessage)
             ));
 
-            crate::cache_remover::remove_meshes_dir_all(output_dir);
+            nemesis_merge::cache_remover::remove_meshes_dir_all(output_dir);
         }
     }
 }

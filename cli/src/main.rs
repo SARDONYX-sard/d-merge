@@ -4,7 +4,7 @@ mod ini_parser;
 mod mod_info_cmd;
 
 use clap::Parser;
-use nemesis_merge::{behavior_gen, PatchMaps};
+use nemesis_merge::{behavior_gen, cache_remover, PatchMaps};
 
 use crate::{
     args::{Cli, Command, InfoCommand},
@@ -38,6 +38,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             // --fnis-ini requires --skyrim-data-dir-glob
             if args.fnis_ini.is_some() && args.skyrim_data_dir_glob.is_none() {
                 return Err("--fnis-ini requires --skyrim-data-dir-glob to be set".into());
+            }
+
+            {
+                let is_dangerous_remove = args
+                    .skyrim_data_dir_glob
+                    .as_deref()
+                    .is_some_and(|d| cache_remover::is_dangerous_remove(&args.output_dir, d));
+                if is_dangerous_remove {
+                    tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
+                } else {
+                    if args.auto_remove_meshes {
+                        cache_remover::remove_meshes_dir_all(&args.output_dir);
+                    }
+                }
             }
 
             let nemesis_entries = match &args.nemesis_ini {
