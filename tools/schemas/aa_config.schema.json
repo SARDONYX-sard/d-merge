@@ -37,7 +37,7 @@
       "type": "object",
       "properties": {
         "base": {
-          "description": "First slot index occupied by this mod for this group.\n\nSlot 0 is always reserved for vanilla. Custom slots start at 1 and are\nassigned contiguously in mod load order:\n```text\nslot 0        vanilla\nslot 1..N     mod A  (base=1, slot_count=N)\nslot N+1..M   mod B  (base=N+1, slot_count=M-N)\n```",
+          "description": "First slot index occupied by this mod for this group.\n\nbase 0 is always reserved for vanilla. Custom slots start at 1 and are\nassigned contiguously in mod load order:\n```text\nslot 0..N     mod A  (base=1, slot_count=N)\nslot N+1..M   mod B  (base=N+1, slot_count=M-N)\n```",
           "type": "integer",
           "format": "uint64",
           "minimum": 0
@@ -45,18 +45,11 @@
         "name": {
           "description": "FNIS group identifier.\n\nSerializes to the FNIS wire string (e.g. `\"_1hmeqp\"`).\nThe corresponding `group_id` integer is derived via [`AAGroupName::group_id`].",
           "$ref": "#/$defs/AAGroupName"
-        },
-        "slot_count": {
-          "description": "Number of animation styles registered by this mod for this group.\n\nDetermines how many slots this mod occupies starting from `base`.",
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
         }
       },
       "required": [
         "name",
-        "base",
-        "slot_count"
+        "base"
       ]
     },
     "AAGroupName": {

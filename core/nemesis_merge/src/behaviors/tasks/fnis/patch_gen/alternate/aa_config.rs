@@ -58,6 +58,7 @@ pub struct AAGroup {
     /// ```
     pub base: u64,
 
+    #[serde(skip)]
     /// Number of animation styles registered by this mod for this group.
     ///
     /// Determines how many slots this mod occupies starting from `base`.
