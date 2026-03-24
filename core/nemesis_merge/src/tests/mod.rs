@@ -13,7 +13,13 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
         PatchMaps,
     };
 
-    global_logger("../../dummy/merge_test.log", tracing::Level::TRACE)?;
+    std::fs::remove_dir_all("../../dummy/behavior_gen/output")?; // remove prev output
+
+    std::fs::create_dir_all("../../dummy/behavior_gen/")?;
+    global_logger(
+        "../../dummy/behavior_gen/merge_test.log",
+        tracing::Level::TRACE,
+    )?;
 
     let patches = {
         use crate::behaviors::PriorityMap;
@@ -38,6 +44,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
             "FNISCreatureVersion",
             "FNISZoo",
             "P1FlyingRing",
+            "FNISSexyMove",
             "XPMSE",
             "backgrab",
             "backgrabnosneak",

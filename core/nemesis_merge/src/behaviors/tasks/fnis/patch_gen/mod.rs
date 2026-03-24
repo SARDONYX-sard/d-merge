@@ -4,7 +4,7 @@ mod furniture;
 mod gen_list_patch;
 pub mod generated_behaviors;
 mod global;
-mod hkx_convert;
+mod io_jobs;
 mod kill_move;
 mod offset_arm;
 mod pair;
@@ -28,7 +28,7 @@ use crate::{
                 gen_list_patch::{generate_patch, OneListPatch},
                 generated_behaviors::{BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON},
                 global::{_0_master::new_global_master_patch, mt_behavior::new_mt_global_patch},
-                hkx_convert::AnimIoJob,
+                io_jobs::AnimIoJob,
             },
         },
         patches::types::{BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection},
@@ -199,14 +199,14 @@ pub fn collect_borrowed_patches<'a>(
 
             // Push One Mod animations
 
-            if let Some(job) = hkx_convert::prepare_behavior_conversion_job(owned_data, config) {
+            if let Some(job) = io_jobs::hkx::prepare_behavior_conversion_job(owned_data, config) {
                 conversion_jobs.push(job);
             }
             if !animations.is_empty() {
                 let mut animations: Vec<_> = animations.into_iter().collect();
                 animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
-                conversion_jobs.par_extend(hkx_convert::prepare_conversion_jobs(
+                conversion_jobs.par_extend(io_jobs::hkx::prepare_conversion_jobs(
                     &animations,
                     owned_data,
                     config,
@@ -283,28 +283,32 @@ pub fn collect_borrowed_patches<'a>(
         }
     }
 
+    // fnis_aa/config.json / BDI.json
+    let aa_base_map = if conversion_jobs
+        .iter()
+        .any(|job| matches!(job, AnimIoJob::FnisAANamespaceConfig(_)))
     {
-        if conversion_jobs
-            .iter()
-            .any(|job| matches!(job, AnimIoJob::Config(_)))
+        match alternate::aa_config::build_aa_config_from_jobs(&conversion_jobs, &config.output_dir) // Write fnis_aa/config.json
         {
-            if let Err(e) = alternate::aa_config::generate_aa_config_from_jobs(
-                &conversion_jobs,
-                &config.output_dir,
-            ) {
-                errors.push(e);
+            Ok(aa_base_map) => {
+                if let Err(e) = alternate::bdi::generate_bdi_config(&config.output_dir) {
+                    errors.push(e);
+                }
+                Some(aa_base_map)
             }
-
-            if let Err(e) = alternate::bdi::generate_bdi_config(&config.output_dir) {
+            Err(e) => {
                 errors.push(e);
+                None
             }
         }
-    }
+    } else {
+        None
+    };
 
-    // FIXME?: Unknown causes errors due to mutexes in MO2
-    errors.par_extend(hkx_convert::run_conversion_jobs(
+    errors.par_extend(io_jobs::run_conversion_jobs(
         conversion_jobs,
         config.output_target,
+        aa_base_map.as_ref(),
     ));
 
     (
