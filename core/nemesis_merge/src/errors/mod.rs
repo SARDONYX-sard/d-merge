@@ -28,15 +28,11 @@ pub enum Error {
     },
 
     #[snafu(display(
-        "While attempting to automatically convert FNIS HKX for target {target:?}, \
-        failed to read/write file {}: {source}.",
+            "FNIS I/O processing (read/write to config.json or hkx files) failed. This is likely due to a busy condition or lack of permission.:\n
+    path = {}, err = {source}\n",
         path.display()
     ))]
-    FNISHkxIoError {
-        path: PathBuf,
-        target: crate::OutPutTarget,
-        source: io::Error,
-    },
+    FNISHkxIoError { path: PathBuf, source: io::Error },
 
     #[snafu(display(
         "While attempting to automatically convert FNIS HKX for target {target:?}, \

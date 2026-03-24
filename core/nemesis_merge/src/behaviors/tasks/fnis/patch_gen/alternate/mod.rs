@@ -79,7 +79,8 @@ pub(crate) mod aa_config;
 pub(crate) mod bdi;
 mod generated_group_table;
 pub(crate) mod group_names;
-mod oar_json;
+pub(crate) mod oar_json;
+pub(crate) mod override_config;
 
 use std::{
     borrow::Cow,
@@ -89,16 +90,14 @@ use std::{
 use fnis_list::patterns::alt_anim::AlternateAnimation;
 use rayon::prelude::*;
 
+use self::{
+    group_names::AAGroupName,
+    override_config::{FnisToOarConfig, SlotConfig},
+};
 use crate::{
     behaviors::tasks::fnis::{
         collect::owned::OwnedFnisInjection,
-        patch_gen::{
-            alternate::{
-                group_names::AAGroupName,
-                oar_json::{prepare_anim_config_json, FnisToOarConfig},
-            },
-            hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
-        },
+        patch_gen::io_jobs::{AnimIoJob, AnimKind, ConversionJob},
     },
     errors::Error,
     Config,
@@ -106,14 +105,34 @@ use crate::{
 
 /// Just write file
 #[derive(Debug)]
-pub struct AltAnimConfigJob {
+pub struct FnisAANamespaceConfigJob {
     pub output_path: PathBuf,
     pub config: String,
 }
 
-pub fn alt_anim_to_oar(
-    owned_data: &OwnedFnisInjection,
-    alt_anim: AlternateAnimation<'_>,
+/// Deferred slot-level config job; `base` is resolved at write time from the
+/// computed `AAConfig` base map.
+///
+/// e.g., `_1hmeqp_1`
+#[derive(Debug)]
+pub struct FnisAASlotConfigJob {
+    pub output_path: PathBuf,
+    /// The FNIS group enum, used to look up the computed base.
+    pub group_name: AAGroupName,
+    /// Mod prefix, used as the key to look up `mod_id` / `base` in `AAConfig`.
+    pub prefix: String,
+    /// 0-based slot index within this mod's group.
+    pub slot: u64,
+
+    /// Optional user-defined per-slot overrides (rename, priority, conditions).
+    pub slot_config: Option<SlotConfig>, // owned copy
+    /// The directory name shown in OAR GUI (already resolved by caller).
+    pub group_config_dir: String,
+}
+
+pub fn alt_anim_to_oar<'a>(
+    owned_data: &'a OwnedFnisInjection,
+    alt_anim: AlternateAnimation<'a>,
     config: &Config,
 ) -> (Vec<AnimIoJob>, Vec<Error>) {
     let namespace = &owned_data.namespace;
@@ -121,32 +140,21 @@ pub fn alt_anim_to_oar(
 
     let mut errors = vec![];
 
-    let override_config: FnisToOarConfig = match owned_data.alt_anim_config.as_deref() {
-        Some(data) => match sonic_rs::from_slice::<FnisToOarConfig>(data) {
-            Ok(cfg) => cfg,
+    let override_config = owned_data.alt_anim_config.as_deref().and_then(|data|
+        match sonic_rs::from_slice::<FnisToOarConfig>(data) {
+            Ok(cfg) => Some(cfg),
             Err(err) => {
-                let override_config_path = {
-                    let filename = if owned_data.behavior_entry.is_humanoid() {
-                        format!("FNIS_{namespace}_toOAR.json")
-                    } else {
-                        format!(
-                            "FNIS_{namespace}_{}_toOAR.json",
-                            owned_data.behavior_entry.behavior_object // e.g, "dog", "horse"
-                        )
-                    };
-                    owned_data.animations_mod_dir.join(filename)
-                };
+                let override_config_path = owned_data.to_fnis_aa_override_config_path();
                 errors.push(Error::Custom {
                     msg: format!(
                         "Failed to parse FNIS alternate animation override config file '{}': {err}. Using default settings.",
                         override_config_path.display(),
                     ),
                 });
-                FnisToOarConfig::default()
+                None
             }
-        },
-        None => FnisToOarConfig::default(),
-    };
+        }
+    );
     #[cfg(feature = "tracing")]
     tracing::debug!("Using FNIS to OAR override config: {override_config:#?}");
 
@@ -159,24 +167,30 @@ pub fn alt_anim_to_oar(
         output_dir.push(base_dir);
         output_dir.push("animations");
         output_dir.push("OpenAnimationReplacer");
-        output_dir.push(override_config.name.as_deref().unwrap_or(namespace));
+        output_dir.push(
+            override_config
+                .as_ref()
+                .and_then(|c| c.name.as_deref())
+                .unwrap_or(namespace),
+        );
         output_dir
     };
 
     let mut ret_jobs = vec![];
-    let config_job = AltAnimConfigJob {
+    ret_jobs.push(AnimIoJob::FnisAANamespaceConfig(FnisAANamespaceConfigJob {
         output_path: output_dir.join("config.json"),
         config: oar_json::prepare_namespace_json(namespace, &override_config),
-    };
-    ret_jobs.push(AnimIoJob::Config(config_job));
+    }));
 
     for set in &alt_anim.set {
-        let slots = set.slots;
+        let registered_slots_count = set.slots;
         let group_name = set.group;
-        let group_config = override_config.groups.get(group_name);
 
-        // Validate group name early; unknown names are skipped rather than
-        // propagating a String that silently fails later in aa_config.
+        let group_config = override_config
+            .as_ref()
+            .and_then(|c| c.groups.get(group_name));
+
+        // Validate group
         let Ok(group_aa_name) = group_name.parse::<AAGroupName>() else {
             errors.push(Error::Custom {
                 msg: format!("Unknown FNIS AA group name: {group_name}"),
@@ -184,64 +198,122 @@ pub fn alt_anim_to_oar(
             continue;
         };
 
-        let Some(group) = generated_group_table::ALT_GROUPS.get(group_name) else {
+        let Some(group) = generated_group_table::ALT_GROUPS.get(group_aa_name.as_fnis_str()) else {
+            // Should be unreachable.
             errors.push(Error::Custom {
                 msg: format!("Not found alt groups table. {group_name}"),
             });
             continue;
         };
 
-        let group_jobs = (0..slots).into_par_iter().flat_map(|slot| {
-            // each FNIS alt group output directory.(can rename by override config)
-            let slot_config = group_config.and_then(|group_cfg| group_cfg.slots.get(&slot));
+        let group_jobs = (0..registered_slots_count)
+            .into_par_iter()
+            .flat_map(|slot| {
+                // each FNIS alt group output directory.(can rename by override config)
+                let slot_config = group_config.and_then(|group_cfg| group_cfg.slots.get(&slot));
 
-            let group_config_dir = slot_config
-                .and_then(|slot| slot.rename_to.as_deref().map(Cow::Borrowed))
-                .unwrap_or_else(|| Cow::Owned(format!("{group_name}_{}", slot + 1))); // Make the OAR GUI appearance consistent with 1based as well
+                let group_config_dir = match slot_config.and_then(|s| s.rename_to.as_deref()) {
+                    Some(name) => Cow::Borrowed(name),
+                    // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
+                    None => Cow::Owned(format!("{prefix}_{group_name}_{}", slot + 1)),
+                };
 
-            let output_dir = output_dir.join(group_config_dir.as_ref());
+                let slot_output_dir = output_dir.join(group_config_dir.as_ref());
 
-            let mut jobs: Vec<_> = group
-                .animations
-                .par_iter()
-                .map(|animation| {
-                    let animation_path = Path::new(animation);
-                    let input_path = if let (Some(parent), Some(file_name)) = (
-                        animation_path.parent(),
-                        animation_path.file_name().and_then(|s| s.to_str()),
-                    ) {
-                        owned_data
-                            .animations_mod_dir
-                            .join(parent)
-                            .join(format!("{prefix}{slot}_{file_name}"))
-                    } else {
-                        owned_data
-                            .animations_mod_dir
-                            .join(format!("{prefix}{slot}_{animation}"))
-                    };
+                // hkx jobs
+                let mut jobs: Vec<_> = group
+                    .animations
+                    .par_iter()
+                    .map(|animation| {
+                        let (input_path, output_inner, is_male_subdir) =
+                            resolve_animation_path(owned_data, prefix, slot, animation);
 
-                    AnimIoJob::Hkx(ConversionJob {
-                        input_path,
-                        output_path: output_dir.join(animation_path),
-                        kind: AnimKind::FnisAA {
-                            prefix: prefix.to_string(),
-                            group_name: group_aa_name,
-                            slot_count: slots,
-                        },
+                        AnimIoJob::Hkx(ConversionJob {
+                            input_path,
+                            output_path: slot_output_dir.join(output_inner),
+                            kind: AnimKind::FnisAA {
+                                prefix: prefix.to_string(),
+                                group_name: group_aa_name,
+                                slot_count: registered_slots_count,
+                                is_male_subdir,
+                            },
+                        })
                     })
-                })
-                .collect();
+                    .collect();
 
-            jobs.push(AnimIoJob::Config(AltAnimConfigJob {
-                output_path: output_dir.join("config.json"),
-                config: prepare_anim_config_json(&group_config_dir, group_name, slot, slot_config),
-            }));
+                // config job
+                jobs.push(AnimIoJob::FnisAASlotConfig(FnisAASlotConfigJob {
+                    output_path: slot_output_dir.join("config.json"),
+                    group_name: group_aa_name,
+                    prefix: prefix.to_string(),
+                    slot,
+                    slot_config: slot_config.cloned(),
+                    group_config_dir: group_config_dir.to_string(),
+                }));
 
-            jobs
-        });
+                jobs
+            });
 
         ret_jobs.par_extend(group_jobs);
     }
 
     (ret_jobs, errors)
+}
+
+/// Returns `(input_path, output_relative_path, is_male_subdir)`.
+///
+/// When the source animation lives under a `male/` subdirectory, a mirrored
+/// `female/` copy is also emitted so both genders play the replacement.
+fn resolve_animation_path(
+    owned_data: &OwnedFnisInjection,
+    prefix: &str,
+    slot: u64,
+    animation: &str,
+) -> (PathBuf, PathBuf, bool) {
+    let animation_path = Path::new(animation);
+
+    // NOTE: Based on what I can see in FNISSexyMove,
+    // male/mt_runforward.hkx was listed as namespace/DF1_mt_runforward.hkx.
+    // "dlc01" or "male"
+    let Some(file_name) = animation_path.file_name().and_then(|s| s.to_str()) else {
+        return (
+            owned_data
+                .animations_mod_dir
+                .join(format!("{prefix}{slot}_{animation}")),
+            animation_path.to_path_buf(),
+            false,
+        );
+    };
+
+    let parent = animation_path.parent().unwrap_or_else(|| Path::new(""));
+    let is_male_subdir = parent
+        .file_name()
+        .is_some_and(|s| s.eq_ignore_ascii_case("male"));
+
+    if is_male_subdir {
+        (
+            owned_data
+                .animations_mod_dir
+                .join(format!("{prefix}{slot}_{file_name}")),
+            animation_path.to_path_buf(), // `male/` from output
+            true,
+        )
+    } else if parent.as_os_str().is_empty() {
+        (
+            owned_data
+                .animations_mod_dir
+                .join(format!("{prefix}{slot}_{file_name}")),
+            PathBuf::from(file_name),
+            false,
+        )
+    } else {
+        (
+            owned_data
+                .animations_mod_dir
+                .join(parent)
+                .join(format!("{prefix}{slot}_{file_name}")),
+            animation_path.to_path_buf(),
+            false,
+        )
+    }
 }

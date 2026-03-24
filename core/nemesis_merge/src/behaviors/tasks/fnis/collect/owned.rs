@@ -187,6 +187,19 @@ impl OwnedFnisInjection {
         Ok((parent_dir.join(behavior_path), inner_path))
     }
 
+    /// Return FNIS Alternate Animation to OAR config path
+    ///
+    /// # Returns
+    /// - humanoid: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`,
+    /// - creature: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`
+    pub fn to_fnis_aa_override_config_path(&self) -> PathBuf {
+        override_config_path(
+            &self.animations_mod_dir,
+            self.behavior_entry,
+            &self.namespace,
+        )
+    }
+
     /// Increments the index and returns the full `name` attribute
     /// string in Nemesis format: `#<mod_code>$<index>`.
     ///
@@ -274,22 +287,28 @@ where
     })
 }
 
+fn override_config_path(
+    animations_mod_dir: &Path,
+    behavior_entry: &'static BehaviorEntry,
+    namespace: &str,
+) -> PathBuf {
+    let filename = if behavior_entry.is_humanoid() {
+        format!("FNIS_{namespace}_toOAR.json")
+    } else {
+        format!(
+            "FNIS_{namespace}_{}_toOAR.json",
+            behavior_entry.behavior_object // e.g, "dog", "horse"
+        )
+    };
+    animations_mod_dir.join(filename)
+}
+
 fn load_to_oar_file(
     animations_mod_dir: &Path,
     behavior_entry: &'static BehaviorEntry,
     namespace: &str,
 ) -> Option<Vec<u8>> {
-    let override_config_path = {
-        let filename = if behavior_entry.is_humanoid() {
-            format!("FNIS_{namespace}_toOAR.json")
-        } else {
-            format!(
-                "FNIS_{namespace}_{}_toOAR.json",
-                behavior_entry.behavior_object // e.g, "dog", "horse"
-            )
-        };
-        animations_mod_dir.join(filename)
-    };
+    let override_config_path = override_config_path(animations_mod_dir, behavior_entry, namespace);
     std::fs::read(&override_config_path)
         .map_err(|e| {
             #[cfg(feature = "tracing")]

@@ -9,9 +9,27 @@ use serde::Serialize;
 
 use super::group_names::AAGroupName;
 use crate::{
-    behaviors::tasks::fnis::patch_gen::hkx_convert::{AnimIoJob, AnimKind, ConversionJob},
+    behaviors::tasks::fnis::patch_gen::io_jobs::{AnimIoJob, AnimKind, ConversionJob},
     errors::Error,
 };
+
+/// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
+pub type BaseMap = std::collections::HashMap<(String, u64), u64>;
+
+/// Builds the base lookup map from a finalized [`AAConfig`].
+///
+/// Key: `(prefix, group_id)` — matches the fields in [`FnisAAConfigJob`].
+fn build_base_map(config: &AAConfig) -> BaseMap {
+    config
+        .mods
+        .iter()
+        .flat_map(|m| {
+            m.groups
+                .iter()
+                .map(|g| ((m.prefix.clone(), g.name.group_id()), g.base))
+        })
+        .collect()
+}
 
 // =============================================================================
 // Data model
@@ -32,11 +50,10 @@ pub struct AAGroup {
 
     /// First slot index occupied by this mod for this group.
     ///
-    /// Slot 0 is always reserved for vanilla. Custom slots start at 1 and are
+    /// base 0 is always reserved for vanilla. Custom slots start at 1 and are
     /// assigned contiguously in mod load order:
     /// ```text
-    /// slot 0        vanilla
-    /// slot 1..N     mod A  (base=1, slot_count=N)
+    /// slot 0..N     mod A  (base=1, slot_count=N)
     /// slot N+1..M   mod B  (base=N+1, slot_count=M-N)
     /// ```
     pub base: u64,
@@ -44,6 +61,8 @@ pub struct AAGroup {
     /// Number of animation styles registered by this mod for this group.
     ///
     /// Determines how many slots this mod occupies starting from `base`.
+    ///
+    /// It is used to calculate the base of mods with a lower priority than this one.
     pub slot_count: u64,
 }
 
@@ -176,7 +195,7 @@ fn compute_crc(mods: &[AAMod]) -> u32 {
 // Output
 // =============================================================================
 
-fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<(), Error> {
+fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error> {
     let mut mods = mods;
     compute_bases(&mut mods);
     let config = AAConfig::new("V07.06.00.0", mods);
@@ -197,7 +216,7 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<(), Error> {
         source: e,
     })?;
 
-    Ok(())
+    Ok(build_base_map(&config))
 }
 
 // =============================================================================
@@ -211,7 +230,7 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<(), Error> {
 ///
 /// # Output path
 /// `SKSE/Plugins/fnis_aa/config.json`
-pub fn generate_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<(), Error> {
+pub fn build_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
     let mut aa_mods: IndexMap<String, AAMod> = IndexMap::new();
 
@@ -222,6 +241,7 @@ pub fn generate_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Re
                     prefix,
                     group_name,
                     slot_count,
+                    ..
                 },
             ..
         }) = job
@@ -273,6 +293,7 @@ mod tests {
                 prefix: prefix.to_string(),
                 group_name,
                 slot_count,
+                is_male_subdir: false,
             },
         })
     }
@@ -347,7 +368,7 @@ mod tests {
             make_fnis_job("xpe", AAGroupName::Sprint, 0, 1),
         ];
         let output_dir = Path::new("../../dummy/debug");
-        generate_aa_config_from_jobs(&jobs, output_dir).unwrap();
+        build_aa_config_from_jobs(&jobs, output_dir).unwrap();
     }
 
     // Helper used by tests to inspect intermediate state without file I/O.
@@ -360,6 +381,7 @@ mod tests {
                         prefix,
                         group_name,
                         slot_count,
+                        is_male_subdir: false,
                     },
                 ..
             }) = job

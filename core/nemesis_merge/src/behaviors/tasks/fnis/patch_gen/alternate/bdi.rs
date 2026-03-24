@@ -2,6 +2,13 @@
 //! to register variables that serve as an index for FNIS general animations.
 //!
 //! docs: https://github.com/max-su-2019/BehaviorDataInjector/blob/master/doc/How%20to%20create%20BDI%20config%20files.md
+//!
+//!
+//! # Example
+//!
+//! ```txt
+//! DGV FNISaa_1hmeqp i
+//! ```
 use std::path::Path;
 
 use serde::Serialize;

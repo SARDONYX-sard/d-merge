@@ -19,7 +19,7 @@ use crate::behaviors::tasks::{
         collect::owned::OwnedFnisInjection,
         patch_gen::{
             anim_var::new_push_anim_vars_patch,
-            furniture::one_group::new_furniture_one_group_patches, hkx_convert::AnimIoJob,
+            furniture::one_group::new_furniture_one_group_patches, io_jobs::AnimIoJob,
             kill_move::new_kill_patches, offset_arm::new_offset_arm_patches,
             pair::new_pair_patches,
         },
