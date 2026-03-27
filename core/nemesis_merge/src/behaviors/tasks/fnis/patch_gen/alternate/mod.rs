@@ -76,8 +76,7 @@
 //! - [`aa_config::generate_aa_config_from_jobs`] — call once after all
 //!   [`alt_anim_to_oar`] jobs have been collected to write `fnis_aa/config.json`.
 pub(crate) mod aa_config;
-pub(crate) mod bdi;
-mod generated_group_table;
+pub(crate) mod generated_group_table;
 pub(crate) mod group_names;
 pub(crate) mod oar_json;
 pub(crate) mod override_config;
