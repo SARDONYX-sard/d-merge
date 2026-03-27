@@ -27,7 +27,12 @@ use crate::{
             patch_gen::{
                 gen_list_patch::{generate_patch, OneListPatch},
                 generated_behaviors::{BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON},
-                global::{_0_master::new_global_master_patch, mt_behavior::new_mt_global_patch},
+                global::{
+                    _0_master::{
+                        alternate::new_push_alt_anim_values_seq_patch, new_global_master_patch,
+                    },
+                    mt_behavior::new_mt_global_patch,
+                },
                 io_jobs::AnimIoJob,
             },
         },
@@ -260,9 +265,9 @@ pub fn collect_borrowed_patches<'a>(
             .0
             .entry(THREAD_PERSON_0_MASTER_KEY)
             .or_default()
+            // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
             .one
             .0
-            // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
             .par_extend(new_global_master_patch(0));
     }
 
@@ -291,8 +296,14 @@ pub fn collect_borrowed_patches<'a>(
         match alternate::aa_config::build_aa_config_from_jobs(&conversion_jobs, &config.output_dir) // Write fnis_aa/config.json
         {
             Ok(aa_base_map) => {
-                if let Err(e) = alternate::bdi::generate_bdi_config(&config.output_dir) {
-                    errors.push(e);
+                let seq = new_push_alt_anim_values_seq_patch(0);
+
+                for (path, patch) in seq {
+                    let entry =         borrowed_patches
+                    .0
+                    .entry(THREAD_PERSON_0_MASTER_KEY)
+                    .or_default();
+                    entry.seq.insert(path, patch);
                 }
                 Some(aa_base_map)
             }
@@ -304,6 +315,8 @@ pub fn collect_borrowed_patches<'a>(
     } else {
         None
     };
+    #[cfg(feature = "tracing")]
+    tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
     errors.par_extend(io_jobs::run_conversion_jobs(
         conversion_jobs,
