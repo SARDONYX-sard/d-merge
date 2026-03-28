@@ -1,4 +1,6 @@
 //! Per-slot OAR config writes with deferred base resolution.
+use std::sync::Arc;
+
 use rayon::prelude::*;
 
 use crate::{
@@ -14,7 +16,7 @@ pub fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) -> Vec<Er
     jobs.into_par_iter()
         .filter_map(|job| {
             let base = base_map
-                .and_then(|m| m.get(&(job.prefix.clone(), job.group_name.group_id())))
+                .and_then(|m| m.get(&(Arc::clone(&job.prefix), job.group_name.group_id())))
                 .copied()
                 .unwrap_or(1); // fallback: base=1 (should not happen if caller built map correctly)
 
@@ -23,7 +25,7 @@ pub fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) -> Vec<Er
                 job.group_name,
                 job.slot,
                 base,
-                job.slot_config.as_ref(),
+                job.slot_config.as_deref(),
             );
             super::write_file(&job.output_path, config.as_bytes()).err()
         })

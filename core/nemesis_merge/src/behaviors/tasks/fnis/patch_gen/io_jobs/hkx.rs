@@ -1,5 +1,8 @@
 //! HKX read → convert → write pipeline.
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use rayon::prelude::*;
 
@@ -31,7 +34,7 @@ pub enum AnimKind {
     /// FNIS alternate animation — carries metadata for `aa_config.json`.
     FnisAA {
         /// e.g. `"xpe"`
-        prefix: String,
+        prefix: Arc<str>,
         /// e.g. `_1hmeqp`
         group_name: AAGroupName,
         /// Total slots registered by this mod for this group.

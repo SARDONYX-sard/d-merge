@@ -82,8 +82,8 @@ pub(crate) mod oar_json;
 pub(crate) mod override_config;
 
 use std::{
-    borrow::Cow,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use fnis_list::patterns::alt_anim::AlternateAnimation;
@@ -119,12 +119,12 @@ pub struct FnisAASlotConfigJob {
     /// The FNIS group enum, used to look up the computed base.
     pub group_name: AAGroupName,
     /// Mod prefix, used as the key to look up `mod_id` / `base` in `AAConfig`.
-    pub prefix: String,
+    pub prefix: Arc<str>,
     /// 0-based slot index within this mod's group.
     pub slot: u64,
 
     /// Optional user-defined per-slot overrides (rename, priority, conditions).
-    pub slot_config: Option<SlotConfig>, // owned copy
+    pub slot_config: Option<Arc<SlotConfig>>, // owned copy
     /// The directory name shown in OAR GUI (already resolved by caller).
     pub group_config_dir: String,
 }
@@ -135,7 +135,9 @@ pub fn alt_anim_to_oar<'a>(
     config: &Config,
 ) -> (Vec<AnimIoJob>, Vec<Error>) {
     let namespace = &owned_data.namespace;
-    let prefix = alt_anim.prefix;
+    // NOTE: The lifetime is not an issue.
+    // Arc<str> clones a byte array within the heap and reuses it.
+    let prefix = Arc::from(alt_anim.prefix);
 
     let mut errors = vec![];
 
@@ -209,15 +211,18 @@ pub fn alt_anim_to_oar<'a>(
             .into_par_iter()
             .flat_map(|slot| {
                 // each FNIS alt group output directory.(can rename by override config)
-                let slot_config = group_config.and_then(|group_cfg| group_cfg.slots.get(&slot));
+                let slot_config =
+                    group_config.and_then(|group_cfg| group_cfg.slots.get(&slot).map(Arc::clone));
 
-                let group_config_dir = match slot_config.and_then(|s| s.rename_to.as_deref()) {
-                    Some(name) => Cow::Borrowed(name),
-                    // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
-                    None => Cow::Owned(format!("{prefix}_{group_name}_{}", slot + 1)),
-                };
+                // NOTE: group_config_dir will ultimately own the directory. It’s fine to clone it here.
+                let group_config_dir =
+                    match slot_config.as_deref().and_then(|s| s.rename_to.as_deref()) {
+                        Some(name) => name.to_string(),
+                        // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
+                        None => format!("{prefix}_{group_name}_{}", slot + 1),
+                    };
 
-                let slot_output_dir = output_dir.join(group_config_dir.as_ref());
+                let slot_output_dir = output_dir.join(&group_config_dir);
 
                 // hkx jobs
                 let mut jobs: Vec<_> = group
@@ -225,13 +230,13 @@ pub fn alt_anim_to_oar<'a>(
                     .par_iter()
                     .map(|animation| {
                         let (input_path, output_inner, is_male_subdir) =
-                            resolve_animation_path(owned_data, prefix, slot, animation);
+                            resolve_animation_path(owned_data, &prefix, slot, animation);
 
                         AnimIoJob::Hkx(ConversionJob {
                             input_path,
                             output_path: slot_output_dir.join(output_inner),
                             kind: AnimKind::FnisAA {
-                                prefix: prefix.to_string(),
+                                prefix: Arc::clone(&prefix),
                                 group_name: group_aa_name,
                                 slot_count: registered_slots_count,
                                 is_male_subdir,
@@ -244,10 +249,10 @@ pub fn alt_anim_to_oar<'a>(
                 jobs.push(AnimIoJob::FnisAASlotConfig(FnisAASlotConfigJob {
                     output_path: slot_output_dir.join("config.json"),
                     group_name: group_aa_name,
-                    prefix: prefix.to_string(),
+                    prefix: Arc::clone(&prefix),
                     slot,
-                    slot_config: slot_config.cloned(),
-                    group_config_dir: group_config_dir.to_string(),
+                    slot_config,
+                    group_config_dir,
                 }));
 
                 jobs

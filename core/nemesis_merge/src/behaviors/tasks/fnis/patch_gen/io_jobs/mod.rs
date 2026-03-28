@@ -4,15 +4,16 @@ pub mod config;
 pub mod fnis_aa;
 pub mod hkx;
 
+use std::sync::Arc;
+
 use rayon::prelude::*;
 
+pub use self::hkx::{AnimKind, ConversionJob};
 use crate::{
     behaviors::tasks::fnis::patch_gen::alternate::{FnisAANamespaceConfigJob, FnisAASlotConfigJob},
     config::OutPutTarget,
     errors::Error,
 };
-
-pub use hkx::{AnimKind, ConversionJob};
 
 #[derive(Debug)]
 pub enum AnimIoJob {
@@ -158,7 +159,7 @@ fn mirror_male_to_female(job: &ConversionJob) -> Option<ConversionJob> {
         input_path: job.input_path.clone(),
         output_path: female_output,
         kind: AnimKind::FnisAA {
-            prefix: prefix.clone(),
+            prefix: Arc::clone(prefix),
             group_name: *group_name,
             slot_count: *slot_count,
             is_male_subdir: false, // prevent infinite mirroring

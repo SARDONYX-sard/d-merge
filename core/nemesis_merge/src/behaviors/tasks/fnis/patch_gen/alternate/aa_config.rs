@@ -2,7 +2,7 @@
 //!
 //! Computes per-mod base slot values from load order and produces
 //! `aa_config.json` consumed by the fnis_aa SKSE plugin at runtime.
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, path::Path, sync::Arc};
 
 use indexmap::IndexMap;
 use serde::Serialize;
@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
-pub type BaseMap = std::collections::HashMap<(String, u64), u64>;
+pub type BaseMap = std::collections::HashMap<(Arc<str>, u64), u64>;
 
 /// Builds the base lookup map from a finalized [`AAConfig`].
 ///
@@ -26,7 +26,7 @@ fn build_base_map(config: &AAConfig) -> BaseMap {
         .flat_map(|m| {
             m.groups
                 .iter()
-                .map(|g| ((m.prefix.clone(), g.name.group_id()), g.base))
+                .map(|g| ((Arc::clone(&m.prefix), g.name.group_id()), g.base))
         })
         .collect()
 }
@@ -73,12 +73,12 @@ pub struct AAMod {
     /// 3-character mod prefix used by FNIS, e.g. `xpe` for XPMSE.
     ///
     /// Used as the key in `FNIS_aa2::GetAAprefixList()`.
-    pub prefix: String,
+    pub prefix: Arc<str>,
 
     /// Full mod name, e.g. `XPMSE`.
     ///
     /// Used for logging and debug output only.
-    pub name: String,
+    pub name: Arc<str>,
 
     /// Index of this mod in load order, assigned by d_merge.
     ///
@@ -233,7 +233,7 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error
 /// `SKSE/Plugins/fnis_aa/config.json`
 pub fn build_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
-    let mut aa_mods: IndexMap<String, AAMod> = IndexMap::new();
+    let mut aa_mods = IndexMap::new();
 
     for job in jobs {
         let AnimIoJob::Hkx(ConversionJob {
@@ -250,9 +250,9 @@ pub fn build_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Resul
             continue;
         };
 
-        let aa_mod = aa_mods.entry(prefix.clone()).or_insert_with(|| AAMod {
-            prefix: prefix.clone(),
-            name: prefix.clone(),
+        let aa_mod = aa_mods.entry(Arc::clone(prefix)).or_insert_with(|| AAMod {
+            prefix: Arc::clone(prefix),
+            name: Arc::clone(prefix),
             mod_id: 0, // assigned later by compute_bases()
             groups: vec![],
         });
@@ -291,7 +291,7 @@ mod tests {
             input_path: PathBuf::from(format!("{prefix}{slot_index}_1hm_equip.hkx")),
             output_path: PathBuf::from("out/1hm_equip.hkx"),
             kind: AnimKind::FnisAA {
-                prefix: prefix.to_string(),
+                prefix: Arc::from(prefix),
                 group_name,
                 slot_count,
                 is_male_subdir: false,
@@ -373,8 +373,8 @@ mod tests {
     }
 
     // Helper used by tests to inspect intermediate state without file I/O.
-    fn collect_aa_mods(jobs: &[AnimIoJob]) -> IndexMap<String, AAMod> {
-        let mut aa_mods: IndexMap<String, AAMod> = IndexMap::new();
+    fn collect_aa_mods(jobs: &[AnimIoJob]) -> IndexMap<Arc<str>, AAMod> {
+        let mut aa_mods = IndexMap::new();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
                 kind:
@@ -389,9 +389,9 @@ mod tests {
             else {
                 continue;
             };
-            let aa_mod = aa_mods.entry(prefix.clone()).or_insert_with(|| AAMod {
-                prefix: prefix.clone(),
-                name: prefix.clone(),
+            let aa_mod = aa_mods.entry(Arc::clone(prefix)).or_insert_with(|| AAMod {
+                prefix: Arc::clone(prefix),
+                name: Arc::clone(prefix),
                 mod_id: 0,
                 groups: vec![],
             });

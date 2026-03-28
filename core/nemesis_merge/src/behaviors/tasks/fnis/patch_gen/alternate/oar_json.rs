@@ -5,9 +5,8 @@ use std::borrow::Cow;
 use serde::Serialize;
 use simd_json::owned::Object;
 
-use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupName;
-
 use super::override_config::{FnisToOarConfig, SlotConfig};
+use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupName;
 
 /// Represents the configuration structure for the 'config.json' namespace.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
