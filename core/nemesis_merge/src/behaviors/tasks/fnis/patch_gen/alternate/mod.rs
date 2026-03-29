@@ -10,7 +10,6 @@
 //! The output of this module requires the following Skyrim SE mods to be installed:
 //!
 //! - [OpenAnimationReplacer](https://www.nexusmods.com/skyrimspecialedition/mods/92109) — plays the correct animation slot based on OAR conditions
-//! - [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146) — injects `FNISaa_*` variables into the Havok behavior graph
 //! - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa) — overrides `FNIS_aa2` Papyrus natives to read slot layout from `config.json`
 //!
 //! ## Directory transformation XPMSSE(namespace = XPMSE)
@@ -34,18 +33,14 @@
 //! │   └── OpenAnimationReplacer/
 //! │       └── XPMSE/
 //! │           ├── config.json              <- namespace-level OAR priority config
-//! │           └── _1hmeqp_1/               <- group name + slot index(1 based. 0 is vanilla)
+//! │           └── xpe_1hmeqp_1/            <- group name + slot index(0 based)
 //! │               ├── 1hm_equip.hkx        <- prefix and slot stripped from filename
 //! │               ├── 1hm_unequip.hkx
 //! │               └── config.json          <- slot-level OAR condition (FNISaa_1hmeqp == 1)
 //! │
 //! └── SKSE/Plugins/
-//!     ├── BehaviorDataInjector/
-//!     │   └── FNIS_AA_to_OAR_BDI.json      <- declares FNISaa_* kInt variables in
-//!     │                                        the Havok behavior graph
 //!     └── fnis_aa/
-//!         └── config.json                  <- mod/group/base slot layout consumed
-//!                                             by fnis_aa.dll at runtime
+//!         └── config.json                  <- mod/group/base slot layout consumed by fnis_aa.dll at runtime
 //! ```
 //!
 //! ## Runtime flow
@@ -58,23 +53,9 @@
 //! actor.SetAnimationVariableInt("FNISaa_1hmeqp", base + styleIndex)
 //!         ↓
 //! OAR evaluates the condition in each slot directory:
-//!   _1hmeqp_1/config.json  ->  FNISaa_1hmeqp == 1  ->  skip
-//!   _1hmeqp_2/config.json  ->  FNISaa_1hmeqp == 2  ->  match -> plays Back style
+//!   xpe_1hmeqp_1/config.json  ->  FNISaa_1hmeqp == 1  ->  skip
+//!   xpe_1hmeqp_2/config.json  ->  FNISaa_1hmeqp == 2  ->  match -> plays Back style
 //! ```
-//!
-//! Havok Behavior graph variables are stored per-actor instance, so Player and
-//! NPCs each carry their own value for `FNISaa_<group>`. This means the MCM can
-//! assign different styles to the player and to NPCs independently, even though
-//! both read from the same variable name.
-//!
-//! ## Entry points
-//!
-//! - [`alt_anim_to_oar`] — processes one [`OwnedFnisInjection`] and returns the
-//!   full list of [`AnimIoJob`]s (HKX copies + config writes) for that mod.
-//! - [`bdi::generate_bdi_config`] — writes `FNIS_AA_to_OAR_BDI.json` once for
-//!   the entire session.
-//! - [`aa_config::generate_aa_config_from_jobs`] — call once after all
-//!   [`alt_anim_to_oar`] jobs have been collected to write `fnis_aa/config.json`.
 pub(crate) mod aa_config;
 pub(crate) mod generated_group_table;
 pub(crate) mod group_names;
@@ -219,7 +200,7 @@ pub fn alt_anim_to_oar<'a>(
                     match slot_config.as_deref().and_then(|s| s.rename_to.as_deref()) {
                         Some(name) => name.to_string(),
                         // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
-                        None => format!("{prefix}_{group_name}_{}", slot + 1),
+                        None => format!("{prefix}{group_name}_{}", slot + 1),
                     };
 
                 let slot_output_dir = output_dir.join(&group_config_dir);
