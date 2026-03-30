@@ -34,6 +34,7 @@ use crate::{
                     mt_behavior::new_mt_global_patch,
                 },
                 io_jobs::AnimIoJob,
+                kill_move::calculate_hash,
             },
         },
         patches::types::{BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection},
@@ -354,6 +355,8 @@ fn new_injectable_mod_root_behavior<'a>(
     let new_root_state_info_index = owned_data.next_class_name_attribute();
     let master_index = owned_data.behavior_entry.master_behavior_index;
 
+    let root_state_name = format!("FNIS_State{new_root_state_info_index}");
+
     let one_state_info = (
         vec![
             Cow::Owned(new_root_state_info_index.clone()),
@@ -370,8 +373,8 @@ fn new_injectable_mod_root_behavior<'a>(
                         "exitNotifyEvents": "#0000",
                         "transitions": "#0000",
                         "generator": new_generator_index,
-                        "name": format!("FNIS_State{priority}"),
-                        "stateId": 1000 + priority, // FIXME?
+                        "name": root_state_name,
+                        "stateId": calculate_hash(root_state_name.as_str()), // FNIS: 1000 + n
                         "probability": 1.0,
                         "enable": true
                 }),
