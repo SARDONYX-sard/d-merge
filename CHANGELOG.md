@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-02
+### :sparkles: New Features
+- [`6460dfc`](https://github.com/SARDONYX-sard/d-merge/commit/6460dfceba17a12fe5230f8c787701994f1c869e) - skip serde `slot_count` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ac07a0b`](https://github.com/SARDONYX-sard/d-merge/commit/ac07a0bc15704e40fb2e62c535bd7170bb5ff9fd) - add cache mover & checker *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1daaef6`](https://github.com/SARDONYX-sard/d-merge/commit/1daaef6e4784ce2a6777be5b92234f1bb87cc62a) - **fnis_aa**: inject aa variables *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c6a6c01`](https://github.com/SARDONYX-sard/d-merge/commit/c6a6c01b686ed056e07c2f2ca499abd66abbda8b) - **fnis_aa**: change name format *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`52120cf`](https://github.com/SARDONYX-sard/d-merge/commit/52120cffd6432962328f6150e9360e785ab2f6ab) - generate dummy `FNIS.esp` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7d32138`](https://github.com/SARDONYX-sard/d-merge/commit/7d32138c70d4c412002b64fe2c25dc5cc6ddd7e1) - perform only length checks without deduplication *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`a65d3b4`](https://github.com/SARDONYX-sard/d-merge/commit/a65d3b4f5a679ded21f28468d98f4c8b98d814cb) - **fnis**: fix `stateId` duplication *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`b9bb982`](https://github.com/SARDONYX-sard/d-merge/commit/b9bb98293faf8b45ade01d636a1983e05fe908dd) - **fnis_aa**: use Arc instead of clone *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.0.3] - 2026-03-24
 ### :bug: Bug Fixes
 - [`d148bcf`](https://github.com/SARDONYX-sard/d-merge/commit/d148bcf6ace5564cc450661caf0511edb47895a0) - **fnis_aa**: fix fnis to OAR config.json value B *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -307,3 +323,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.0...1.0.1
 [1.0.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.1...1.0.2
 [1.0.3]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.2...1.0.3
+[1.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.3...1.1.0
