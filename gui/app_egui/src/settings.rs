@@ -27,6 +27,8 @@ pub struct AppSettings {
     auto_remove_meshes: bool,
     /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
     enable_debug_output: bool,
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    pub generate_fnis_esp: bool,
     pub log_level: crate::app::LogLevel,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
@@ -51,6 +53,7 @@ impl Default for AppSettings {
         Self {
             auto_remove_meshes: false, // If an incorrect output directory(e.g. skyrim data dir) is specified, it is dangerous, so false.
             enable_debug_output: false,
+            generate_fnis_esp: false,
             filter_text: String::new(),
             font_path: None,
             log_level: crate::app::LogLevel::Debug,
@@ -86,6 +89,7 @@ impl From<ModManagerApp> for AppSettings {
 
             auto_remove_meshes: app.auto_remove_meshes,
             enable_debug_output: app.enable_debug_output,
+            generate_fnis_esp: app.generate_fnis_esp,
             filter_text: app.filter_text,
             font_path: app.font_path,
             log_level: app.log_level,
@@ -119,6 +123,7 @@ impl From<AppSettings> for ModManagerApp {
             output_dir: settings.output_dir,
             enable_debug_output: settings.enable_debug_output,
             auto_remove_meshes: settings.auto_remove_meshes,
+            generate_fnis_esp: settings.generate_fnis_esp,
             filter_text: settings.filter_text,
             sort_column: settings.sort_column,
             sort_asc: settings.sort_asc,

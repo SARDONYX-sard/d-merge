@@ -92,6 +92,7 @@ impl<'a> TemplateKey<'a> {
     ///
     /// # Note
     /// Vanilla Skyrim is configured this way. Removing duplicates causes NPCs to become immobile when casting spells.
+    #[allow(unused)]
     pub fn has_duplicate_event_names(&self) -> bool {
         matches!(
             self.as_str(),

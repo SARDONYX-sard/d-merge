@@ -57,6 +57,9 @@ pub struct Config {
     ///   they share the same namespace and may cause unintended conflicts such as
     ///   duplicate animation registrations and bugs.
     pub skyrim_data_dir_glob: Option<String>,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    pub generate_fnis_esp: bool,
 }
 
 impl Config {

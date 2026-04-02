@@ -90,6 +90,10 @@ export type PatchOptions = {
    * entries will not be detected and the process will fail.
    **/
   skyrimDataDirGlob?: string;
+  /**
+   * If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+   */
+  generateFnisEsp: boolean;
 };
 
 export const patchOptionsSchema = z
@@ -106,6 +110,7 @@ export const patchOptionsSchema = z
     autoRemoveMeshes: z.boolean(),
     useProgressReporter: z.boolean(),
     skyrimDataDirGlob: z.optional(z.string()),
+    generateFnisEsp: z.optional(z.boolean()).catch(false),
   })
   .catch({
     hackOptions: {
@@ -119,6 +124,7 @@ export const patchOptionsSchema = z
     outputTarget: 'SkyrimSE',
     autoRemoveMeshes: true,
     useProgressReporter: true,
+    generateFnisEsp: false,
   } as const satisfies PatchOptions);
 
 /**

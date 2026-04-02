@@ -1,5 +1,6 @@
 mod alternate;
 mod anim_var;
+mod dummy_esp;
 mod furniture;
 mod gen_list_patch;
 pub mod generated_behaviors;
@@ -318,6 +319,12 @@ pub fn collect_borrowed_patches<'a>(
     };
     #[cfg(feature = "tracing")]
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
+
+    if config.generate_fnis_esp {
+        if let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir) {
+            errors.push(Error::FNISGenerateEspError { source: e });
+        };
+    }
 
     errors.par_extend(io_jobs::run_conversion_jobs(
         conversion_jobs,

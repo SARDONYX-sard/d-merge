@@ -116,6 +116,10 @@ pub struct Config {
     /// entries will not be detected and the process will fail.
     #[pyo3(get, set)]
     pub skyrim_data_dir_glob: Option<String>,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    #[pyo3(get, set)]
+    pub generate_fnis_esp: Option<bool>,
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pymethods]
@@ -133,6 +137,7 @@ impl Config {
         output_merged_json: bool,
         output_merged_xml: bool,
         skyrim_data_dir_glob: Option<String>,
+        generate_fnis_esp: Option<bool>,
     ) -> Self {
         Config {
             resource_dir,
@@ -146,6 +151,7 @@ impl Config {
                 output_merged_xml,
             },
             skyrim_data_dir_glob,
+            generate_fnis_esp,
         }
     }
 }
@@ -183,6 +189,7 @@ impl Config {
             },
             status_report,
             skyrim_data_dir_glob: self.skyrim_data_dir_glob,
+            generate_fnis_esp: self.generate_fnis_esp.unwrap_or(false),
         })
     }
 }

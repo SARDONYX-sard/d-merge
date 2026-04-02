@@ -76,6 +76,8 @@ pub struct ModManagerApp {
     /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
     pub enable_debug_output: bool,
     pub auto_remove_meshes: bool,
+    /// If true, generates a FNIS.esp(dummy ESP) file.
+    pub generate_fnis_esp: bool,
     pub filter_text: String,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
@@ -115,6 +117,7 @@ impl Default for ModManagerApp {
             target_runtime: skyrim_data_dir::Runtime::Se,
             enable_debug_output: false,
             auto_remove_meshes: true,
+            generate_fnis_esp: false,
 
             vfs_skyrim_data_dir: String::new(),
             vfs_mod_list: vec![],
@@ -270,6 +273,11 @@ impl ModManagerApp {
                 let auto_remove_meshes_hover = self.t(I18nKey::AutoRemoveMeshesHover).to_string();
                 ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label)
                     .on_hover_text(auto_remove_meshes_hover);
+
+                let generate_fnis_esp_label = self.t(I18nKey::GenerateFnisEspLabel).to_string();
+                let generate_fnis_esp_hover = self.t(I18nKey::GenerateFnisEspHover).to_string();
+                ui.checkbox(&mut self.generate_fnis_esp, generate_fnis_esp_label)
+                    .on_hover_text(generate_fnis_esp_hover);
 
                 ui.add_space(30.0);
 
@@ -1042,6 +1050,7 @@ impl ModManagerApp {
                     output_merged_xml: false,
                 },
                 skyrim_data_dir_glob: Some(self.current_skyrim_data_dir().to_string()),
+                generate_fnis_esp: self.generate_fnis_esp,
             },
         ));
     }
