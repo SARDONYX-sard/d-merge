@@ -66,19 +66,18 @@ pub(crate) fn generate_hkx_files(
 
                     // Deduplication is prone to unexpected index misalignments, and there is no guarantee that this will not occur.
                     // Furthermore, since values with the same name are synchronized, there are no drawbacks other than wasted resources.
-
-                    // // HACK: It assumes no duplicates exist, it might be better to give `iState_NPCSneaking` special treatment within the dedup function itself.
-                    // To unique eventID & variableID maps from hkbBehaviorGraphStringData class
-                    // if !key.has_duplicate_event_names() {
-                    //     use serde_hkx_features::id_maker::dedup_event_variables;
-                    //     dedup_event_variables(&mut class_map, master_behavior_graph_index.clone())
-                    //         .with_context(|_| crate::errors::DedupEventVariableSnafu {
-                    //             path: output_path.clone(),
-                    //         })?;
-                    // }
+                    //
+                    // It checks whether the number of values associated with an event matches the number of default values associated with a value name.
+                    // This is done to prevent crashes before they occur.
+                    use serde_hkx_features::id_maker::check_len_from_map;
+                    check_len_from_map(&class_map, &master_behavior_graph_index).with_context(
+                        |_| crate::errors::DedupEventVariableSnafu {
+                            path: output_path.clone(),
+                        },
+                    )?;
 
                     // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
-                    class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.
+                    class_map.sort_for_bytes(); // NOTE: If we don't sort hkx by dependency order, a T/A pose will occur.
 
                     if let Some((event_map, var_map)) =
                         create_maps(&class_map, &master_behavior_graph_index)
@@ -87,7 +86,7 @@ pub(crate) fn generate_hkx_files(
                         variable_id_map = Some(var_map);
                     };
                 } else {
-                    class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.
+                    class_map.sort_for_bytes(); // NOTE: To avoid T/A pose.
                 }
 
                 // NOTE: View the debug output after removing duplicates. Otherwise, duplicate eventNames will appear.

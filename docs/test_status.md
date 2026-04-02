@@ -88,6 +88,10 @@ SkyrimSE
 
 ### Notes
 
+- **Attack - MCO_DXP**
+  Sometimes the movement animation while guarding doesn't work; this is likely because Attack_MCO.esp has been overwritten internally.
+  Place Attack_MCO.esp in the appropriate location and increase its priority.
+
 - **HorsePower - Modernized Horse Riding -SE, AE**
   - The patch below is incorrect. So remove it .
     That location is simply an enumeration list where a .txt file should exist; nothing other than a .txt file should ever be present there.
