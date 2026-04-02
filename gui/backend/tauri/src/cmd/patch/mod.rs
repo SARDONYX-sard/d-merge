@@ -40,6 +40,9 @@ pub(crate) struct GuiPatchOptions {
     /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
     /// entries will not be detected and the process will fail.
     skyrim_data_dir_glob: Option<String>,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    pub generate_fnis_esp: bool,
 }
 
 // NOTE: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
@@ -86,6 +89,7 @@ pub(crate) async fn patch(
         debug: options.debug,
         output_target: options.output_target,
         skyrim_data_dir_glob: options.skyrim_data_dir_glob,
+        generate_fnis_esp: options.generate_fnis_esp,
     };
 
     match time!("[patch]", behavior_gen(patches, config).await) {

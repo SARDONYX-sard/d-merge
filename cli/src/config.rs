@@ -15,6 +15,7 @@ pub(crate) fn build_config(args: &PatchArgs) -> Config {
         },
         output_target: args.output_target.into(),
         skyrim_data_dir_glob: args.skyrim_data_dir_glob.clone(),
+        generate_fnis_esp: args.generate_fnis_esp,
     }
 }
 

@@ -57,8 +57,7 @@ where
                     .join("fnis_aa")
                     .join("config.json"),
             );
-            // NOTE: Internally, BDI config use the same value. So there’s probably no need to delete it.
-            // SKSE/Plugins/BehaviorDataInjector/FNIS_AA_to_OAR_BDI.json
+            let _ = fs::remove_file(output_dir.join("FNIS.esp"));
         },
     );
 

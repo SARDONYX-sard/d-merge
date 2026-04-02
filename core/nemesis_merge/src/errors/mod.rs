@@ -68,6 +68,9 @@ pub enum Error {
         source: serde_hkx_features::error::Error,
     },
 
+    #[snafu(display("Failed to generate FNIS.esp file: (cause: {source})"))]
+    FNISGenerateEspError { source: std::io::Error },
+
     #[snafu(transparent)]
     FnisPatchGenerationError {
         source: crate::behaviors::tasks::fnis::patch_gen::FnisPatchGenerationError,

@@ -62,6 +62,7 @@ pub(crate) fn fastest_config() -> Config {
         },
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
+        ..Default::default()
     }
 }
 
@@ -81,5 +82,6 @@ pub(crate) fn slow_debug_config() -> Config {
         },
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
+        ..Default::default()
     }
 }

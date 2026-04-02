@@ -23,6 +23,8 @@ pub enum I18nKey {
     ErrorReadingModInfo,
     ExecuteButton,
     ExecutionModeLabel,
+    GenerateFnisEspLabel,
+    GenerateFnisEspHover,
     IssueReportButton,
     IssueReportHover,
     LockButton,
@@ -81,6 +83,8 @@ impl I18nKey {
             Self::DebugOutputHover => "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)",
             Self::ErrorReadingModInfo => "Error: reading mod info",
             Self::ExecuteButton      => "Execute",
+            Self::GenerateFnisEspLabel => "Gen FNIS.esp",
+            Self::GenerateFnisEspHover => "Generates a dummy FNIS.esp file. (Use this when you want to use a mod that requires FNIS.esp but do not want to use the original FNIS.esp from FNIS SE.)",
             Self::ExecutionModeLabel => "Execution mode:",
             Self::IssueReportButton => "Report Issue",
             Self::IssueReportHover => "Report a bug on GitHub.\n This will auto-fill version info and some hardware.\n GitHub account required.",
@@ -163,6 +167,8 @@ impl I18nMap {
         map.0.insert(ErrorReadingModInfo, Cow::Borrowed(ErrorReadingModInfo.default_eng()));
         map.0.insert(ExecuteButton, Cow::Borrowed(ExecuteButton.default_eng()));
         map.0.insert(ExecutionModeLabel, Cow::Borrowed(ExecutionModeLabel.default_eng()));
+        map.0.insert(GenerateFnisEspLabel, Cow::Borrowed(GenerateFnisEspLabel.default_eng()));
+        map.0.insert(GenerateFnisEspHover, Cow::Borrowed(GenerateFnisEspHover.default_eng()));
         map.0.insert(IssueReportButton, Cow::Borrowed(IssueReportButton.default_eng()));
         map.0.insert(IssueReportHover, Cow::Borrowed(IssueReportHover.default_eng()));
         map.0.insert(LockButton, Cow::Borrowed(LockButton.default_eng()));

@@ -6,10 +6,7 @@ use std::{
 
 use rayon::prelude::*;
 use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
-use serde_hkx_features::{
-    id_maker::{create_maps, dedup_event_variables},
-    ClassMap,
-};
+use serde_hkx_features::{id_maker::create_maps, ClassMap};
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 
@@ -18,7 +15,7 @@ use crate::{
         patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
     },
     config::{ReportType, StatusReportCounter},
-    errors::{DedupEventVariableSnafu, Error, FailedIoSnafu, HkxSerSnafu, Result, SimdJsonSnafu},
+    errors::{Error, FailedIoSnafu, HkxSerSnafu, Result, SimdJsonSnafu},
     results::filter_results,
     Config, OutPutTarget,
 };
@@ -67,14 +64,18 @@ pub(crate) fn generate_hkx_files(
                 if let Some(pair) = variable_class_map.0.get(&key) {
                     let master_behavior_graph_index = pair;
 
-                    // HACK: It assumes no duplicates exist, it might be better to give `iState_NPCSneaking` special treatment within the dedup function itself.
-                    if !key.has_duplicate_event_names() {
-                        // To unique eventID & variableID maps from hkbBehaviorGraphStringData class
-                        dedup_event_variables(&mut class_map, master_behavior_graph_index.clone())
-                            .with_context(|_| DedupEventVariableSnafu {
-                                path: output_path.clone(),
-                            })?;
-                    }
+                    // Deduplication is prone to unexpected index misalignments, and there is no guarantee that this will not occur.
+                    // Furthermore, since values with the same name are synchronized, there are no drawbacks other than wasted resources.
+
+                    // // HACK: It assumes no duplicates exist, it might be better to give `iState_NPCSneaking` special treatment within the dedup function itself.
+                    // To unique eventID & variableID maps from hkbBehaviorGraphStringData class
+                    // if !key.has_duplicate_event_names() {
+                    //     use serde_hkx_features::id_maker::dedup_event_variables;
+                    //     dedup_event_variables(&mut class_map, master_behavior_graph_index.clone())
+                    //         .with_context(|_| crate::errors::DedupEventVariableSnafu {
+                    //             path: output_path.clone(),
+                    //         })?;
+                    // }
 
                     // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
                     class_map.sort_for_bytes(); // NOTE: T-pause if we don't sort before `to_bytes`.

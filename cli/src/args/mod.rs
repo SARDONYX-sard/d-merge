@@ -110,6 +110,10 @@ pub(crate) struct PatchArgs {
     /// Delete the meshes in the output destination each time the patch is run.
     /// If the Skyrim Data directory is specified as the output directory, this step will be skipped.
     pub auto_remove_meshes: bool,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    #[arg(long, default_value_t = false)]
+    pub generate_fnis_esp: bool,
 }
 
 #[derive(Debug, Clone, Copy)]

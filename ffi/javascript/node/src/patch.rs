@@ -98,6 +98,9 @@ pub struct Config {
     /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
     /// entries will not be detected and the process will fail.
     pub skyrim_data_dir_glob: Option<String>,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    pub generate_fnis_esp: bool,
 }
 
 impl Config {
@@ -133,6 +136,7 @@ impl Config {
             },
             status_report,
             skyrim_data_dir_glob: self.skyrim_data_dir_glob,
+            generate_fnis_esp: self.generate_fnis_esp,
         })
     }
 }
