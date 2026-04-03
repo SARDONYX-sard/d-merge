@@ -297,12 +297,31 @@ fn new_adsf_patch<'a>(
         return vec![];
     };
 
+    let namespace = &owned_data.namespace;
+
+    // HACK:
+    // Animation event name registered in behavior graph:
+    //
+    // Correct                          Wrong
+    // ─────────────────────────────    ──────────────────────────
+    // FNISFlyer_FNISfl_BackUp2_fm      FNISfl_BackUp2_fm
+    //
+    // - FNIS_*_List.txt entry: `+ FNISfl_BackUp2 FNISfl_BackUp2.hkx`
+    // - At least for FNISFlyer, FNIS prepends `<namespace>_` at behavior
+    //   generation time (confirmed from FNIS-generated behavior output)
+    //   Whether this applies to other mods is not yet verified.
+    let anim_event = if namespace == "FNISFlyer" {
+        Cow::Owned(format!("{namespace}_{anim_event}"))
+    } else {
+        Cow::Borrowed(anim_event)
+    };
+
     // To link them, `translation` and `rotation` must always use the same ID.
     // use Nemesis variable(`ALltAdsf` is implemented to automatically assign IDs during serialization, so it's fine.)
     let clip_id: Cow<'a, str> = Cow::Owned(owned_data.next_adsf_id());
 
     let anim_block = PatchKind::AddAnim(ClipAnimDataBlock {
-        name: Cow::Borrowed(anim_event),
+        name: anim_event,
         clip_id: clip_id.clone(),
         play_back_speed: Cow::Borrowed("1"),
         crop_start_local_time: Cow::Borrowed("0"),
@@ -337,7 +356,6 @@ fn new_adsf_patch<'a>(
         })
     };
 
-    let namespace = &owned_data.namespace;
     let anim_data_target = owned_data.behavior_entry.anim_data_key;
     if owned_data.behavior_entry.is_3rd_person_character() {
         vec![
