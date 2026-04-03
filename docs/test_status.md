@@ -136,9 +136,10 @@ Tag Legend
 ### Detailed Notes
 
 - **FNIS Flyer SE**
-  - Animation is possible
-  - Movement is completely impossible
-  - Cause unknown
+  - ~~Movement is completely impossible~~
+     -> On the patcher side: The handling of anim_events is unique; you cannot move them unless the event name is in the format `<namespace>_<event_name>`.
+
+  While both movement and animation are now possible, they seem to conflict with `True Directional Movement`, resulting in movement that does not follow the intended direction.
 
 - **Low-blow human-human killmoves**
   - Animation plays correctly
