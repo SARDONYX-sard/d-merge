@@ -17,7 +17,7 @@ use crate::behaviors::tasks::fnis::{
             new_event_property_array, new_npc_synchronized_clip_generator,
             new_player_synchronized_clip_generator, new_push_transitions_seq_patch,
         },
-        JsonPatchPairs,
+        new_push_events_seq_patch, JsonPatchPairs,
     },
 };
 
@@ -42,7 +42,7 @@ pub fn new_pair_patches<'a>(
     let anim_file = format!(
         "Animations\\{namespace}\\{}",
         paired_and_kill_animation.anim_file
-    ); // Animations\\$Fkm$
+    ); // Animations\\$Fpa$
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
@@ -50,6 +50,12 @@ pub fn new_pair_patches<'a>(
     let player_root_state_name = format!("Player_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
     let npc_root_state_name = format!("NPC_FNISpa{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
 
+    seq_patches.extend(new_push_events_seq_patch(
+        &[player_event.into(), (&npc_event).into()],
+        owned_data.behavior_entry.master_string_data_index,
+        owned_data.behavior_entry.master_behavior_graph_index,
+        priority,
+    ));
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
         "#0111",
