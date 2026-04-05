@@ -138,7 +138,7 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
         }));
     }
 
-    let current_format = match check_header(&header, &actual_input, output_target) {
+    let current_format = match check_header(header, &actual_input, output_target) {
         Ok(f) => f,
         Err(e) => return Some(Err(e)),
     };
@@ -196,21 +196,10 @@ fn convert(
 }
 
 fn check_header(
-    bytes: &[u8],
+    header: [u8; 17],
     input_path: &Path,
     output_format: OutPutTarget,
 ) -> Result<OutPutTarget, Error> {
-    if bytes.len() < 17 {
-        return Err(Error::FNISHkxInvalidHeader {
-            input_path: PathBuf::new(),
-            target: output_format,
-            actual: bytes.len() as u8,
-        });
-    }
-
-    let mut header = [0_u8; 17];
-    header.copy_from_slice(&bytes[0..17]);
-
     const TAG_MAGIC: [u8; 8] = [0x1E, 0x0D, 0xB0, 0xCA, 0xCE, 0xFA, 0x11, 0xD0];
     if header[0..8] == TAG_MAGIC {
         #[cfg(feature = "tracing")]
