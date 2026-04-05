@@ -381,13 +381,13 @@ pub fn new_pair_patches<'a>(
             .collect();
 
         //  156: NPCPairedStop
-        //  616: NPCKillMoveEnd
-        // 1070: NPCPairEnd (159: PairEnd)
-        triggers.par_extend([156, 616, 1070].par_iter().map(|&id| {
+        //  159: PairEnd
+        // 1070: NPCPairEnd
+        triggers.par_extend([156, 1070].par_iter().map(|&id| {
             json_typed!(borrowed, {
                 "localTime": duration, // $-D$
                 "event": {
-                    "id": id,
+                    "id": id, // The details are unclear, but 159 was not used—only 1070 was being used.
                     "payload": "#0000"
                 },
                 "relativeToEndOfClip": false,
@@ -535,7 +535,7 @@ pub fn new_pair_patches<'a>(
                     "maxSimultaneousTransitions": 32,
                     "startStateMode": "START_STATE_MODE_DEFAULT",
                     "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [&class_indexes[7]],
+                    "states": [&class_indexes[17]],
                     "wildcardTransitions": "#0000"
                 }),
             },
