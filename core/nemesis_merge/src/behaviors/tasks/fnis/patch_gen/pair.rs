@@ -1,9 +1,8 @@
-//! NOTE: To learn the additional method, "FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt"
 use std::borrow::Cow;
 
 use fnis_list::{
     combinator::{flags::FNISAnimFlags, Trigger},
-    patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+    patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
@@ -12,11 +11,7 @@ use simd_json::json_typed;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        global::_0_master::{
-            FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
-            FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529,
-            FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
-        },
+        global::_0_master::{FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532},
         kill_move::{
             calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
             new_event_property_array, new_npc_synchronized_clip_generator,
@@ -77,16 +72,15 @@ pub fn new_pair_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map = dashmap::DashMap::new();
-    one_patches.par_extend(
-        paired_and_kill_animation
-            .anim_objects
-            .par_iter()
-            .enumerate()
-            .map(|(index, AnimObject { name, role: _ })| {
+    let (active_indexes, passive_indexes, patches) = paired_and_kill_animation
+        .anim_objects
+        .par_iter()
+        .fold(
+            || (Vec::new(), Vec::new(), Vec::new()),
+            |mut acc, AnimObject { name, role }| {
                 let new_anim_object_index = owned_data.next_class_name_attribute();
-                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
-                let one_anim_obj = (
+
+                acc.2.push((
                     vec![
                         Cow::Owned(new_anim_object_index.clone()),
                         Cow::Borrowed("hkbStringEventPayload"),
@@ -101,10 +95,26 @@ pub fn new_pair_patches<'a>(
                         },
                         priority,
                     },
-                );
-                one_anim_obj
-            }),
-    );
+                ));
+
+                match role {
+                    ActorRole::Active => acc.0.push(new_anim_object_index),
+                    ActorRole::Passive => acc.1.push(new_anim_object_index),
+                }
+
+                acc
+            },
+        )
+        .reduce(
+            || (Vec::new(), Vec::new(), Vec::new()),
+            |mut a, b| {
+                a.0.extend(b.0);
+                a.1.extend(b.1);
+                a.2.extend(b.2);
+                a
+            },
+        );
+    one_patches.par_extend(patches);
 
     // $RI
     one_patches.push({
@@ -133,8 +143,8 @@ pub fn new_pair_patches<'a>(
                         "exitNotifyEvents": exit_notify_events,
                         "transitions": "#0000",
                         "generator": &class_indexes[1],
-                        "name": player_root_state_name,
-                        "stateId": calculate_hash(&player_root_state_name),
+                        "name": player_root_state_name, // Player_FNISpa$1/1$
+                        "stateId": calculate_hash(&player_root_state_name), // $171/2$
                         "probability": 1.0,
                         "enable": true
                     }),
@@ -173,7 +183,7 @@ pub fn new_pair_patches<'a>(
                     "maxSimultaneousTransitions": 32,
                     "startStateMode": "START_STATE_MODE_DEFAULT",
                     "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [ class_indexes[3] ],
+                    "states": [class_indexes[3]],
                     "wildcardTransitions": "#0000"
                 }),
             },
@@ -192,12 +202,14 @@ pub fn new_pair_patches<'a>(
                 action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[2],
-                    "bindings": [{
-                        "memberPath": "isActive",
-                        "variableIndex": 51,
-                        "bitIndex": -1,
-                        "bindingType": "BINDING_TYPE_VARIABLE"
-                    }],
+                    "bindings": [
+                        {
+                            "memberPath": "isActive",
+                            "variableIndex": 51,
+                            "bitIndex": -1,
+                            "bindingType": "BINDING_TYPE_VARIABLE"
+                        }
+                    ],
                     "indexOfBindingToEnable": -1
                 }),
             },
@@ -243,7 +255,7 @@ pub fn new_pair_patches<'a>(
                 action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[4],
-                    "variableBindingSet": class_indexes[5],
+                    "variableBindingSet": &class_indexes[5],
                     "userData": 0,
                     "name": format!("Player_FNISpa{class_index_0_id}_DisablePitch_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": [{
@@ -261,7 +273,7 @@ pub fn new_pair_patches<'a>(
                     "maxSimultaneousTransitions": 32,
                     "startStateMode": "START_STATE_MODE_DEFAULT",
                     "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [ class_indexes[6] ],
+                    "states": [&class_indexes[6]],
                     "wildcardTransitions": "#0000"
                 }),
             },
@@ -279,12 +291,14 @@ pub fn new_pair_patches<'a>(
                 action: Action::Pure { op: Op::Add },
                 value: json_typed!(borrowed, {
                     "__ptr": class_indexes[5],
-                    "bindings": [{
-                        "memberPath": "isActive",
-                        "variableIndex": 58,
-                        "bitIndex": -1,
-                        "bindingType": "BINDING_TYPE_VARIABLE"
-                    }],
+                    "bindings": [
+                        {
+                            "memberPath": "isActive",
+                            "variableIndex": 58,
+                            "bitIndex": -1,
+                            "bindingType": "BINDING_TYPE_VARIABLE"
+                        }
+                    ],
                     "indexOfBindingToEnable": -1
                 }),
             },
@@ -293,58 +307,19 @@ pub fn new_pair_patches<'a>(
     ));
 
     // #$RI+6$  hkbStateMachineStateInfo
-    one_patches.push({
-        // $-o|#%RI+7%|h|null|#2526$
-        let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
-            class_indexes[7].as_str()
-        } else if flags.contains(FNISAnimFlags::HeadTracking) {
-            "#0000"
-        } else {
-            FNIS_AA_GLOBAL_AUTO_GEN_2526
-        };
-        // $-h,o|#2528|h|null|o|#2529|#2527$
-        let exit_notify_events =
-            if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-                FNIS_AA_GLOBAL_AUTO_GEN_2528
-            } else if flags.contains(FNISAnimFlags::HeadTracking) {
-                "#0000"
-            } else if flags.contains(FNISAnimFlags::AnimObjects) {
-                FNIS_AA_GLOBAL_AUTO_GEN_2529
-            } else {
-                FNIS_AA_GLOBAL_AUTO_GEN_2527
-            };
-
-        (
-            vec![
-                Cow::Owned(class_indexes[6].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[6],
-                        "variableBindingSet": "#0000",
-                        "listeners": [],
-                        "enterNotifyEvents": enter_notify_events,
-                        "exitNotifyEvents": exit_notify_events,
-                        "transitions": "#0000",
-                        "generator": &class_indexes[8],
-                        "name": npc_event,
-                        "stateId": 0,
-                        "probability": 1.0,
-                        "enable": true
-                    }),
-                },
-                priority,
-            },
-        )
-    });
+    one_patches.push(make_event_state_info_patch(
+        &class_indexes[6],
+        flags,
+        &class_indexes[7],
+        &class_indexes[8],
+        priority,
+        &npc_event, // FNISpa_$1/1$
+    ));
 
     // #$RI+7$  hkbStateMachineEventPropertyArray
     one_patches.push({
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
-        new_event_property_array(flags, anim_obj_class_index, &class_indexes[7], priority)
+        // "payload": "#$:AnimObj+&ao1$"
+        new_event_property_array(flags, &active_indexes, &class_indexes[7], priority)
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
@@ -370,7 +345,7 @@ pub fn new_pair_patches<'a>(
                     "userData": 0,
                     "name": format!("Paired_FNISpa{class_index_0_id}"),
                     "animationName": anim_file,
-                    "triggers": class_indexes[10],
+                    "triggers": &class_indexes[10],
                     "cropStartAmountLocalTime": 0.0,
                     "cropEndAmountLocalTime": 0.0,
                     "startTime": 0.0,
@@ -601,8 +576,7 @@ pub fn new_pair_patches<'a>(
     ));
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
-        new_event_property_array(flags, anim_obj_class_index, &class_indexes[18], priority)
+        new_event_property_array(flags, &passive_indexes, &class_indexes[18], priority)
     });
     // $RI+19
     one_patches.push(new_player_synchronized_clip_generator(

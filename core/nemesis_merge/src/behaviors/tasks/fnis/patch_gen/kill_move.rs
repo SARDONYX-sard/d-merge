@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use fnis_list::{
     combinator::{flags::FNISAnimFlags, Trigger},
-    patterns::pair_and_kill::{AnimObject, FNISPairedAndKillAnimation},
+    patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
 use rayon::prelude::*;
@@ -77,17 +77,15 @@ pub fn new_kill_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map = dashmap::DashMap::new();
-    one_patches.par_extend(
-        paired_and_kill_animation
-            .anim_objects
-            .par_iter()
-            .enumerate()
-            .map(|(index, AnimObject { name, role: _ })| {
+    let (active_indexes, passive_indexes, patches) = paired_and_kill_animation
+        .anim_objects
+        .par_iter()
+        .fold(
+            || (Vec::new(), Vec::new(), Vec::new()),
+            |mut acc, AnimObject { name, role }| {
                 let new_anim_object_index = owned_data.next_class_name_attribute();
-                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
 
-                let one_anim_obj = (
+                acc.2.push((
                     vec![
                         Cow::Owned(new_anim_object_index.clone()),
                         Cow::Borrowed("hkbStringEventPayload"),
@@ -102,10 +100,26 @@ pub fn new_kill_patches<'a>(
                         },
                         priority,
                     },
-                );
-                one_anim_obj
-            }),
-    );
+                ));
+
+                match role {
+                    ActorRole::Active => acc.0.push(new_anim_object_index),
+                    ActorRole::Passive => acc.1.push(new_anim_object_index),
+                }
+
+                acc
+            },
+        )
+        .reduce(
+            || (Vec::new(), Vec::new(), Vec::new()),
+            |mut a, b| {
+                a.0.extend(b.0);
+                a.1.extend(b.1);
+                a.2.extend(b.2);
+                a
+            },
+        );
+    one_patches.par_extend(patches);
 
     one_patches.push(make_player_root_state_info_patch(
         &class_indexes[0],
@@ -289,8 +303,7 @@ pub fn new_kill_patches<'a>(
 
     one_patches.push({
         // "payload": "#$:AnimObj+&ao1$"
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&0).map(|v| v.clone());
-        new_event_property_array(flags, anim_obj_class_index, &class_indexes[8], priority)
+        new_event_property_array(flags, &active_indexes, &class_indexes[8], priority)
     });
     one_patches.push(new_npc_synchronized_clip_generator(
         &class_indexes[9],
@@ -589,6 +602,7 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+    // $RI+21
     one_patches.push(make_event_state_info_patch(
         &class_indexes[21],
         flags,
@@ -597,10 +611,10 @@ pub fn new_kill_patches<'a>(
         priority,
         player_event,
     ));
+    // $RI+22
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
-        new_event_property_array(flags, anim_obj_class_index, &class_indexes[22], priority)
+        new_event_property_array(flags, &passive_indexes, &class_indexes[22], priority)
     });
     // $RI+23
     one_patches.push(new_player_synchronized_clip_generator(
@@ -915,29 +929,27 @@ pub fn new_npc_synchronized_clip_generator<'a>(
 #[must_use]
 pub fn new_event_property_array<'a>(
     flags: FNISAnimFlags,
-    anim_object_index: Option<String>,
+    anim_object_indexes: &[String],
     class_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
-    let mut events = if flags.contains(FNISAnimFlags::HeadTracking) {
-        vec![]
-    } else {
-        vec![
-            json_typed!(borrowed, {
-                "id": 366, // HeadTrackingOff
-                "payload": "#0000"
-            });
-            3
-        ]
+    let mut events = vec![];
+
+    if !flags.contains(FNISAnimFlags::HeadTracking) {
+        events.push(json_typed!(borrowed, {
+            "id": 366, // HeadTrackingOff
+            "payload": "#0000"
+        }));
     };
 
-    if let Some(anim_object_index) = anim_object_index {
+    // $^ao1$ , $^ao2$
+    for anim_object_index in anim_object_indexes {
         // 937: AnimObjLoad
         // 936: AnimObjDraw
         events.extend([937, 936].iter().map(|id| {
             json_typed!(borrowed, {
-                    "id": id,
-                    "payload": anim_object_index
+                "id": id,
+                "payload": anim_object_index
             })
         }));
     }
