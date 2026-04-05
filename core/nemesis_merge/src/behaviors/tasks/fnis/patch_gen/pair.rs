@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use fnis_list::{
-    combinator::{flags::FNISAnimFlags, Trigger},
+    combinator::Trigger,
     patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
 use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
@@ -11,7 +11,6 @@ use simd_json::json_typed;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        global::_0_master::{FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532},
         kill_move::{
             calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
             new_event_property_array, new_npc_synchronized_clip_generator,
@@ -56,17 +55,18 @@ pub fn new_pair_patches<'a>(
         owned_data.behavior_entry.master_behavior_graph_index,
         priority,
     ));
+
     seq_patches.push(new_push_transitions_seq_patch(
-        "#0789",
+        "#0725", // By Search Keyword: `FNIS Begin Paired`
         "#0111",
         [player_event, npc_event.as_str()],
         [&player_root_state_name, &npc_root_state_name],
         priority,
     ));
 
-    // Push and register the Root `hkbStateMachineStateInfo` for both Player and NPC.
+    // Push and register the Root `hkbStateMachineStateInfo`(`MT_PairedAnimationsBehavior`) for both Player and NPC.
     seq_patches.push((
-        json_path!["#0788", "hkbStateMachine", "states"],
+        json_path!["#0784", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::SeqPush,
@@ -123,42 +123,13 @@ pub fn new_pair_patches<'a>(
     one_patches.par_extend(patches);
 
     // $RI
-    one_patches.push({
-        let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-            true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
-            false => "#0000",
-        };
-        let exit_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-            true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
-            false => "#0000",
-        };
-
-        (
-            vec![
-                Cow::Owned(class_indexes[0].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[0],
-                        "variableBindingSet": "#0000",
-                        "listeners": [],
-                        "enterNotifyEvents": enter_notify_events,
-                        "exitNotifyEvents": exit_notify_events,
-                        "transitions": "#0000",
-                        "generator": &class_indexes[1],
-                        "name": player_root_state_name, // Player_FNISpa$1/1$
-                        "stateId": calculate_hash(&player_root_state_name), // $171/2$
-                        "probability": 1.0,
-                        "enable": true
-                    }),
-                },
-                priority,
-            },
-        )
-    });
+    one_patches.push(make_player_root_state_info_patch(
+        &class_indexes[0],
+        &class_indexes[1],
+        flags,
+        priority,
+        player_root_state_name,
+    ));
 
     // RI+1
     one_patches.push((
@@ -286,6 +257,7 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
+
     // #$RI+5$  hkbVariableBindingSet
     one_patches.push((
         vec![
@@ -319,7 +291,7 @@ pub fn new_pair_patches<'a>(
         &class_indexes[7],
         &class_indexes[8],
         priority,
-        &npc_event, // FNISpa_$1/1$
+        &npc_event, // macro: FNISpa_$1/1$ -> `pa_{event}`
     ));
 
     // #$RI+7$  hkbStateMachineEventPropertyArray
@@ -420,6 +392,8 @@ pub fn new_pair_patches<'a>(
         )
     });
 
+    // $RI+11
+    // NOTE: kill move player root patch same as paired NPC.
     one_patches.push(make_player_root_state_info_patch(
         &class_indexes[11],
         &class_indexes[12],
@@ -427,6 +401,8 @@ pub fn new_pair_patches<'a>(
         priority,
         npc_root_state_name,
     ));
+
+    // $RI+12
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[12].clone()),
@@ -572,6 +548,8 @@ pub fn new_pair_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+17 hkbStateMachineStateInfo
     one_patches.push(make_event_state_info_patch(
         &class_indexes[17],
         flags,
@@ -580,10 +558,13 @@ pub fn new_pair_patches<'a>(
         priority,
         &npc_event, // FNISpa_$1/1$
     ));
+
+    // $RI+18
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
         new_event_property_array(flags, &passive_indexes, &class_indexes[18], priority)
     });
+
     // $RI+19
     one_patches.push(new_player_synchronized_clip_generator(
         &class_indexes[19],

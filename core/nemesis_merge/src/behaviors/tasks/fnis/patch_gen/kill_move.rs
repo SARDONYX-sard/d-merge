@@ -121,6 +121,7 @@ pub fn new_kill_patches<'a>(
         );
     one_patches.par_extend(patches);
 
+    // $RI
     one_patches.push(make_player_root_state_info_patch(
         &class_indexes[0],
         &class_indexes[1],
@@ -129,6 +130,7 @@ pub fn new_kill_patches<'a>(
         player_root_state_name,
     ));
 
+    // $RI+1
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[1].clone()),
@@ -149,6 +151,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+2
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[2].clone()),
@@ -184,6 +188,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+3
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[3].clone()),
@@ -208,6 +214,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+4
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[4].clone()),
@@ -233,6 +241,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+5
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[5].clone()),
@@ -268,6 +278,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+6
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[6].clone()),
@@ -292,6 +304,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+7
     one_patches.push(make_event_state_info_patch(
         &class_indexes[7],
         flags,
@@ -301,10 +315,13 @@ pub fn new_kill_patches<'a>(
         &npc_event, // pa_$Ekm$
     ));
 
+    // $RI+8
     one_patches.push({
         // "payload": "#$:AnimObj+&ao1$"
         new_event_property_array(flags, &active_indexes, &class_indexes[8], priority)
     });
+
+    // $RI+9
     one_patches.push(new_npc_synchronized_clip_generator(
         &class_indexes[9],
         npc_event.as_str(),
@@ -312,6 +329,7 @@ pub fn new_kill_patches<'a>(
         priority,
     ));
 
+    // $RI+10
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[10].clone()),
@@ -341,6 +359,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+11
     one_patches.push({
         // "id": 615, // NPCKillMoveStart
         let mut triggers =
@@ -379,6 +399,8 @@ pub fn new_kill_patches<'a>(
             },
         )
     });
+
+    // $RI+12
     one_patches.push(make_npc_root_state_info_patch(
         &class_indexes[12],
         &class_indexes[13],
@@ -386,6 +408,8 @@ pub fn new_kill_patches<'a>(
         priority,
         npc_root_state_name,
     ));
+
+    // $RI+13
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[13].clone()),
@@ -406,6 +430,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+14
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[14].clone()),
@@ -435,6 +461,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+15
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[15].clone()),
@@ -459,6 +487,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+16
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[16].clone()),
@@ -494,6 +524,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+17
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[17].clone()),
@@ -518,6 +550,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+18
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[18].clone()),
@@ -543,6 +577,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+19
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[19].clone()),
@@ -578,6 +614,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+20
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[20].clone()),
@@ -602,6 +640,7 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
     // $RI+21
     one_patches.push(make_event_state_info_patch(
         &class_indexes[21],
@@ -611,11 +650,13 @@ pub fn new_kill_patches<'a>(
         priority,
         player_event,
     ));
+
     // $RI+22
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
         new_event_property_array(flags, &passive_indexes, &class_indexes[22], priority)
     });
+
     // $RI+23
     one_patches.push(new_player_synchronized_clip_generator(
         &class_indexes[23],
@@ -623,6 +664,8 @@ pub fn new_kill_patches<'a>(
         &class_indexes[24],
         priority,
     ));
+
+    // $RI+24
     one_patches.push((
         vec![
             Cow::Owned(class_indexes[24].clone()),
@@ -652,6 +695,8 @@ pub fn new_kill_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+25
     one_patches.push({
         // Syntaxes starting with `T2`, such as `T2_KillActor/5.867`, are processed here.
         let mut triggers =
@@ -746,6 +791,8 @@ pub fn make_player_root_state_info_patch<'a>(
     )
 }
 
+/// New `hkbStateMachineStateInfo` patch
+///
 /// - `state_name`:  e.g. `pa_{event_name}`, `pa_$Ekm` -> `pa_back`
 ///
 /// # Note
