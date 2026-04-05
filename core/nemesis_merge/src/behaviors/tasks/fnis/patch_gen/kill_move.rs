@@ -292,7 +292,7 @@ pub fn new_kill_patches<'a>(
         let anim_obj_class_index = class_index_to_anim_object_map.get(&0).map(|v| v.clone());
         new_event_property_array(flags, anim_obj_class_index, &class_indexes[8], priority)
     });
-    one_patches.push(new_synchronized_clip_generator(
+    one_patches.push(new_npc_synchronized_clip_generator(
         &class_indexes[9],
         npc_event.as_str(),
         &class_indexes[10],
@@ -602,32 +602,12 @@ pub fn new_kill_patches<'a>(
         let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
         new_event_property_array(flags, anim_obj_class_index, &class_indexes[22], priority)
     });
-    one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[23].clone()),
-            Cow::Borrowed("BSSynchronizedClipGenerator"),
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[23],
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": player_event,
-                    "pClipGenerator": &class_indexes[24],
-                    "SyncAnimPrefix": "2_",
-                    "bSyncClipIgnoreMarkPlacement": false,
-                    "fGetToMarkTime": 0.0,
-                    "fMarkErrorThreshold": 0.1,
-                    "bLeadCharacter": true,
-                    "bReorientSupportChar": true,
-                    "bApplyMotionFromRoot": false,
-                    "sAnimationBindingIndex": -1
-                }),
-            },
-            priority,
-        },
+    // $RI+23
+    one_patches.push(new_player_synchronized_clip_generator(
+        &class_indexes[23],
+        player_event,
+        &class_indexes[24],
+        priority,
     ));
     one_patches.push((
         vec![
@@ -860,7 +840,43 @@ pub fn make_npc_root_state_info_patch<'a>(
 }
 
 #[must_use]
-pub fn new_synchronized_clip_generator<'a>(
+pub fn new_player_synchronized_clip_generator<'a>(
+    class_index: &String,
+    event: &str,
+    generator_index: &str,
+    priority: usize,
+) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
+    (
+        vec![
+            Cow::Owned(class_index.clone()),
+            Cow::Borrowed("BSSynchronizedClipGenerator"),
+        ],
+        ValueWithPriority {
+            patch: JsonPatch {
+                action: Action::Pure { op: Op::Add },
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": class_index,
+                    "variableBindingSet": "#0000",
+                    "userData": 0,
+                    "name": event, // $Epa$
+                    "pClipGenerator": generator_index,
+                    "SyncAnimPrefix": "2_", // <- Important.
+                    "bSyncClipIgnoreMarkPlacement": false,
+                    "fGetToMarkTime": 0.0,
+                    "fMarkErrorThreshold": 0.1,
+                    "bLeadCharacter": false,
+                    "bReorientSupportChar": true,
+                    "bApplyMotionFromRoot": false,
+                    "sAnimationBindingIndex": -1
+                }),
+            },
+            priority,
+        },
+    )
+}
+
+#[must_use]
+pub fn new_npc_synchronized_clip_generator<'a>(
     class_index: &String,
     event: &str,
     generator_index: &str,

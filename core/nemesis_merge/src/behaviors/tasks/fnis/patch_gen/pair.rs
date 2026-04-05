@@ -19,8 +19,8 @@ use crate::behaviors::tasks::fnis::{
         },
         kill_move::{
             calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
-            new_event_property_array, new_push_transitions_seq_patch,
-            new_synchronized_clip_generator,
+            new_event_property_array, new_npc_synchronized_clip_generator,
+            new_player_synchronized_clip_generator, new_push_transitions_seq_patch,
         },
         JsonPatchPairs,
     },
@@ -42,7 +42,7 @@ pub fn new_pair_patches<'a>(
     let flags = paired_and_kill_animation.flag_set.flags;
 
     let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("FNISpa_{class_index_0_id}");
+    let npc_event = format!("pa_{class_index_0_id}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{namespace}\\{}",
@@ -348,9 +348,9 @@ pub fn new_pair_patches<'a>(
     });
 
     // #$RI+8$  BSSynchronizedClipGenerator
-    one_patches.push(new_synchronized_clip_generator(
+    one_patches.push(new_npc_synchronized_clip_generator(
         &class_indexes[8],
-        namespace,
+        npc_event.as_str(),
         &class_indexes[9],
         priority,
     ));
@@ -604,32 +604,12 @@ pub fn new_pair_patches<'a>(
         let anim_obj_class_index = class_index_to_anim_object_map.get(&1).map(|v| v.clone());
         new_event_property_array(flags, anim_obj_class_index, &class_indexes[18], priority)
     });
-    one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[19].clone()),
-            Cow::Borrowed("BSSynchronizedClipGenerator"),
-        ],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[19],
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": player_event, // $Epa$
-                    "pClipGenerator": &class_indexes[20],
-                    "SyncAnimPrefix": "2_",
-                    "bSyncClipIgnoreMarkPlacement": false,
-                    "fGetToMarkTime": 0.0,
-                    "fMarkErrorThreshold": 0.1,
-                    "bLeadCharacter": true,
-                    "bReorientSupportChar": true,
-                    "bApplyMotionFromRoot": false,
-                    "sAnimationBindingIndex": -1
-                }),
-            },
-            priority,
-        },
+    // $RI+19
+    one_patches.push(new_player_synchronized_clip_generator(
+        &class_indexes[19],
+        player_event,
+        &class_indexes[20],
+        priority,
     ));
     one_patches.push((
         vec![
