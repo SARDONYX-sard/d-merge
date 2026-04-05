@@ -26,6 +26,7 @@ pub struct RotationData<'a> {
 }
 
 impl<'a> RotationData<'a> {
+    #[inline]
     pub fn into_rotation(self) -> Rotation<'a> {
         use std::borrow::Cow;
 
@@ -53,8 +54,8 @@ impl<'a> RotationData<'a> {
                         x: Cow::Borrowed("0"),
                         y: Cow::Borrowed("0"),
                         z: Cow::Borrowed("0.000000"),
-                        // NOTE: After setting the w element to 0.0, for some reason the
-                        //       character's sliding and other movements stopped working.
+                        // NOTE: This is a quaternion. For zero rotation, the identity quaternion is (0, 0, 0, 1),
+                        //       so w must be 1.0.
                         w: Cow::Borrowed("1.000000"),
                     };
                 }

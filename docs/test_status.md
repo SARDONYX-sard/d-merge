@@ -153,7 +153,7 @@ Tag Legend
   - Actual killmove behavior not fully tested
 
 - **XP32 Maximum Skeleton Special Extended**, **FNIS Sexy Move SE**
-  - AltAnim converted to OAR via [`alt_anim_to_oar](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
+  - AltAnim converted to OAR via [source code](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
   - Requires:
     - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
     - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)
