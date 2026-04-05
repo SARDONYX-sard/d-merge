@@ -168,10 +168,10 @@ pub fn new_pair_patches<'a>(
                     "variableBindingSet": class_indexes[2],
                     "userData": 0,
                     "name": format!("Player_FNISpa{class_index_0_id}_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": [{
+                    "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
-                    }],
+                    },
                     "startStateChooser": "#0000",
                     "startStateId": 0,
                     "returnToPreviousStateEventId": -1,
@@ -258,10 +258,10 @@ pub fn new_pair_patches<'a>(
                     "variableBindingSet": &class_indexes[5],
                     "userData": 0,
                     "name": format!("Player_FNISpa{class_index_0_id}_DisablePitch_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": [{
+                    "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000",
-                    }],
+                    },
                     "startStateChooser": "#0000",
                     "startStateId": 0,
                     "returnToPreviousStateEventId": -1,
