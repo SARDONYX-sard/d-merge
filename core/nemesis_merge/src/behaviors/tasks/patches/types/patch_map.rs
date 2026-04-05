@@ -69,7 +69,7 @@ impl<'a> OnePatchMap<'a> {
 
             if new_priority > existing_priority {
                 tracing::info!(
-                    "Conflict Path {key:?}: priority {new_priority} ➔ {existing_priority} (overwritten)",
+                    "Conflict Path {key:?}: priority {new_priority} -> {existing_priority} (overwritten)",
                 );
                 *existing = new_value;
             }
