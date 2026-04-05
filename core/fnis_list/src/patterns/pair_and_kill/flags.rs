@@ -9,7 +9,7 @@
 
 use winnow::{
     ascii::{float, space0, Caseless},
-    combinator::{alt, fail, opt, preceded},
+    combinator::{alt, fail, opt, peek, preceded, terminated},
     error::{StrContext, StrContextValue},
     ModalResult, Parser,
 };
@@ -104,7 +104,7 @@ fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISPairAndKillMov
 fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     alt((
         // This is because `Support for FNIS users SSE` uses `ac`, which is not listed in the `FNIS for Modders_V6.2pdf` along with `o, h, k, bsa`.
-        parse_anim_flag_simple.map(ParsedFlag::Simple),
+        parse_anim_flag_simple_strict.map(ParsedFlag::Simple),
         parse_anim_flag_param,
     ))
     .parse_next(input)
@@ -116,6 +116,33 @@ fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>>
         parse_trigger_flag,
     ))
     .parse_next(input)
+}
+
+/// Parse a simple animation flag, ensuring it does not accidentally
+/// consume the prefix of a longer parameterized flag.
+///
+/// # Why this is necessary
+/// Some simple flags (e.g. `Tn`, `ac`, `h`) are valid prefixes of other
+/// flag forms. For example:
+///
+/// - `Tn` is a valid simple flag
+/// - `Tnpcsoundplay.npckillchop/2.555` is a trigger flag
+///
+/// Without enforcing a delimiter (such as `,`, whitespace, or end-of-input),
+/// the parser would incorrectly match `Tn` as a simple flag and leave the
+/// remaining string (`pcsoundplay...`) to be parsed separately, causing
+/// a failure.
+///
+/// To prevent this, we require that a simple flag is followed by a valid
+/// boundary character. This ensures that longer constructs like trigger
+/// flags are parsed correctly and avoids prefix ambiguity.
+///
+/// # Examples
+/// - `Tn,`   -> parsed as simple flag
+/// - `Tn `   -> parsed as simple flag
+/// - `Tn...` -> NOT parsed as simple flag (falls through to other parsers)
+fn parse_anim_flag_simple_strict(input: &mut &str) -> ModalResult<FNISAnimFlags> {
+    terminated(parse_anim_flag_simple, peek(alt((',', ' ')))).parse_next(input)
 }
 
 /// Parse trigger flags (`T...` or `T2_...`).
