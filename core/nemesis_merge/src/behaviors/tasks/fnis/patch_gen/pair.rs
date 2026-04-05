@@ -29,7 +29,7 @@ pub fn new_pair_patches<'a>(
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
 
     let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
-    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
+    let class_index_11_id = calculate_hash(&class_indexes[11]); // Must be 1 file unique
 
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
@@ -47,7 +47,7 @@ pub fn new_pair_patches<'a>(
     let mut seq_patches = vec![];
 
     let player_root_state_name = format!("Player_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
-    let npc_root_state_name = format!("NPC_FNISpa{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
+    let npc_root_state_name = format!("NPC_FNISpa{class_index_11_id}"); // NOTE: must be unique in 0_master.xml
 
     seq_patches.extend(new_push_events_seq_patch(
         &[player_event.into(), (&npc_event).into()],
@@ -70,7 +70,7 @@ pub fn new_pair_patches<'a>(
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0], class_indexes[12]]),
+                value: json_typed!(borrowed, [class_indexes[0], class_indexes[11]]),
             },
             priority,
         },

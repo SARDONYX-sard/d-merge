@@ -742,6 +742,7 @@ pub fn new_kill_patches<'a>(
     (one_patches, seq_patches)
 }
 
+/// New `hkbStateMachineStateInfo` patch.
 /// - `state_name`:  e.g. `Player_FNIS_km{class_index_0_id}`, `Player_FNISpa$1/1$`
 ///
 /// # Note
