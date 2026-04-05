@@ -97,7 +97,7 @@ struct ConversionBytes {
 }
 
 fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<ConversionBytes, Error>> {
-    use std::borrow::Cow;
+    use std::{borrow::Cow, fs::File, io::Read, path::Path};
 
     let actual_input: Cow<Path> = if !job.input_path.exists() {
         if matches!(job.kind, AnimKind::FnisAA { .. }) {
@@ -119,6 +119,35 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
         Cow::Borrowed(&job.input_path)
     };
 
+    // --- Step 1: Read only 17 bytes (header) ---
+    let mut file = match File::open(actual_input.as_ref()) {
+        Ok(f) => f,
+        Err(e) => {
+            return Some(Err(Error::FNISHkxIoError {
+                path: actual_input.into_owned(),
+                source: e,
+            }));
+        }
+    };
+
+    let mut header = [0_u8; 17];
+    if let Err(e) = file.read_exact(&mut header) {
+        return Some(Err(Error::FNISHkxIoError {
+            path: actual_input.into_owned(),
+            source: e,
+        }));
+    }
+
+    let current_format = match check_header(&header, &actual_input, output_target) {
+        Ok(f) => f,
+        Err(e) => return Some(Err(e)),
+    };
+
+    if matches!(job.kind, AnimKind::Standard) && current_format == output_target {
+        return None; // If no conversion needed -> skip without full read
+    }
+
+    // --- Step 2: Read full file only if needed ---
     let bytes = match std::fs::read(actual_input.as_ref()) {
         Ok(b) => b,
         Err(e) => {
@@ -128,11 +157,6 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
             }));
         }
     };
-
-    let current_format = check_header(&bytes, &actual_input, output_target).ok()?;
-    if matches!(job.kind, AnimKind::Standard) && current_format == output_target {
-        return None; // already correct format
-    }
 
     Some(Ok(ConversionBytes {
         input_path: actual_input.into_owned(),
