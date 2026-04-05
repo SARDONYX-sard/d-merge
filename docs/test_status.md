@@ -31,25 +31,26 @@ SkyrimSE
 
 - Mods containing only `Nemesis_Engine`. These will likely work if you output hkx files for LE.
 
-| Status | Mod Name                                       | Version | Note                                       |
-| ------ | ---------------------------------------------- | ------- | ------------------------------------------ |
-| ✅     | Draugr Dagger Animation Fix                    | 1.0     |                                            |
-| ✅     | Draugr MCO-DXP                                 | 1.4     |                                            |
-| ✅     | Faster Draw                                    | 1.31    |                                            |
-| ✅     | FlinchingSSE                                   | 1.4     |                                            |
-| ⚠️     | Jump Behavior Overhaul SE                      | 1.5     | Can patch it, but it freezes upon landing. |
-| ✅     | Slow Sprint Bug Fix                            | 1.0     |                                            |
-| ✅     | Smooth Crouch Transition                       | 1.3     |                                            |
-| ✅     | SprintSwim                                     | 1.6     |                                            |
-| ✅     | Thu'um - Animated Shouts                       | 1.0     |                                            |
-| ✅     | UnblockableAttacks                             | 1.0     |                                            |
-| ✅     | Vanguard NPC                                   | 2.2     |                                            |
-| ✅     | Weapon Styles - DrawSheathe Animations for IED | 2.1     |                                            |
+| Status | Mod Name                                       | Version | Note                                                                       |
+| ------ | ---------------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| ✅     | Draugr Dagger Animation Fix                    | 1.0     |                                                                            |
+| ✅     | Draugr MCO-DXP                                 | 1.4     |                                                                            |
+| ✅     | Faster Draw                                    | 1.31    |                                                                            |
+| ✅     | FlinchingSSE                                   | 1.4     |                                                                            |
+| ⚠️     | Jump Behavior Overhaul SE                      | 1.5     | If we apply the TDM + CGO patch haphazardly, we'll get stuck upon landing. |
+| ✅     | Slow Sprint Bug Fix                            | 1.0     |                                                                            |
+| ✅     | Smooth Crouch Transition                       | 1.3     |                                                                            |
+| ✅     | SprintSwim                                     | 1.6     |                                                                            |
+| ✅     | Thu'um - Animated Shouts                       | 1.0     |                                                                            |
+| ✅     | UnblockableAttacks                             | 1.0     |                                                                            |
+| ✅     | Vanguard NPC                                   | 2.2     |                                                                            |
+| ✅     | Weapon Styles - DrawSheathe Animations for IED | 2.1     |                                                                            |
 
 ## Nemesis(+ esp, scripts)
 
 | Status | Mod Name                         | Version   | Note                                                                                             |
 | ------ | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| ✅     | BFCO - Attack Behavior Framework | 3.3.13    |                                                                                                  |
 | ✅     | Crouch Sliding                   | 1.0       | `SprintSlide.esp` must be placed after RecoverySystem (`RecoveryMechanic.esp`) or it won't work. |
 | ✅     | Eating Animations And Sounds SE  | 1.9.4     |                                                                                                  |
 | ✅     | EVGAT Framework                  | 2.0beta   |                                                                                                  |
@@ -57,8 +58,14 @@ SkyrimSE
 | ✅     | MaxsuBlockOverhaul MBO           | 0.21alpha |                                                                                                  |
 | ✅     | Recovery System                  | 1.01      |                                                                                                  |
 | ✅     | SBE True Prone System            | 1.00      |                                                                                                  |
+| ✅     | Troll MCO-DXPk                   | 2.0.1     | Please note the following precautions at the bottom.                                             |
 | ✅     | UnderwaterCombat                 | 1.02      |                                                                                                  |
-| ✅     | BFCO - Attack Behavior Framework | 3.3.13    |                                                                                                  |
+
+- **Troll MCO-DXP**
+  If the output from FNISZoo or d_merge (which automatically converts it to SE) overwrites the following hkx path, animations will not run at all.
+  Please ensure that troll.hkx in Troll MCO-DXP is not overwritten.
+
+  `Meshes\Actors\Troll\characters\troll.hkx`
 
 ## Nemesis + SKSE plugin
 
@@ -106,7 +113,7 @@ SkyrimSE
 
 ## FNIS
 
-- (LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.
+- ~~(LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.~~((The FNIS mod's hkx files will be automatically converted to the SE version of hkx starting with v1.0.0))
 
 Tag Legend
 
@@ -137,7 +144,7 @@ Tag Legend
 
 - **FNIS Flyer SE**
   - ~~Movement is completely impossible~~
-     -> On the patcher side: The handling of anim_events is unique; you cannot move them unless the event name is in the format `<namespace>_<event_name>`.
+    -> On the patcher side: The handling of anim*events is unique; you cannot move them unless the event name is in the format `<namespace>*<event_name>`.
 
   While both movement and animation are now possible, they seem to conflict with `True Directional Movement`, resulting in movement that does not follow the intended direction.
 
@@ -149,6 +156,4 @@ Tag Legend
   - AltAnim converted to OAR via [`alt_anim_to_oar](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
   - Requires:
     - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
-    - [BehaviorDataInjector](https://www.nexusmods.com/skyrimspecialedition/mods/78146)
     - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)
-    - [FNIS(need scripts & esp)](https://www.nexusmods.com/skyrimspecialedition/mods/3038)
