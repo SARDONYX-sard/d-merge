@@ -36,7 +36,7 @@ pub fn new_pair_patches<'a>(
     let flags = paired_and_kill_animation.flag_set.flags;
 
     let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("pa_{class_index_0_id}");
+    let npc_event = format!("pa_{player_event}");
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file = format!(
         "Animations\\{namespace}\\{}",
