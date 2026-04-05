@@ -1,7 +1,7 @@
 //! Pair and KillMove animation flags parsing.
 //!
 //! Supported flags:
-//! - Simple flags: `bsa`, `h`, `k`, `o`
+//! - Simple flags: `ac0`, `ac1`, `ac`, `bsa`, `md`, `st`, `Tn`, `a`, `h`, `k`, `o`
 //! - Duration: `D<time>` (mandatory, e.g. `D1.5`)
 //! - Triggers:
 //!   - `T<event>/<time>` → stored in `triggers`
@@ -15,7 +15,7 @@ use winnow::{
 };
 
 use crate::combinator::{
-    flags::{parse_trigger_options, FNISAnimFlags},
+    flags::{parse_anim_flag_simple, parse_trigger_options, FNISAnimFlags},
     Trigger,
 };
 
@@ -57,12 +57,11 @@ pub fn parse_anim_flags<'a>(
     input: &mut &'a str,
 ) -> ModalResult<FNISPairAndKillMoveAnimFlagSet<'a>> {
     preceded("-", __parse_anim_flags)
-        .context(StrContext::Label("FNISPairAndKillMoveAnimFlags"))
+        .context(StrContext::Label("FNIS Paired & KillMove Animation Flags"))
         .context(StrContext::Expected(StrContextValue::Description(
-            "One of: bsa, h, o, D<time: f32> (e.g. `D1.5`), \
-             T<trigger>/<time> (e.g. `TJump/2.0`), \
-             T2_<trigger>/<time> (e.g. `T2_killactor/3.333`), \
-             <AnimObject>/<1 or 2>",
+            "One of: ac0, ac1, ac, bsa, md, st, Tn, a, h, k, o, \
+            D<time: f32> (e.g. `D1.5`), \
+            T<trigger>/<time> (e.g. `TJump/2.0`), T2_<trigger>/<time> (e.g. `T2_killactor/3.333`)",
         )))
         .parse_next(input)
 }
@@ -104,18 +103,9 @@ fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISPairAndKillMov
 /// Parse a single animation flag (simple or parameterized).
 fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     alt((
+        // This is because `Support for FNIS users SSE` uses `ac`, which is not listed in the `FNIS for Modders_V6.2pdf` along with `o, h, k, bsa`.
         parse_anim_flag_simple.map(ParsedFlag::Simple),
         parse_anim_flag_param,
-    ))
-    .parse_next(input)
-}
-
-fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
-    alt((
-        "bsa".value(FNISAnimFlags::BSA),
-        "h".value(FNISAnimFlags::HeadTracking),
-        "k".value(FNISAnimFlags::Known),
-        "o".value(FNISAnimFlags::AnimObjects),
     ))
     .parse_next(input)
 }
@@ -130,8 +120,8 @@ fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>>
 
 /// Parse trigger flags (`T...` or `T2_...`).
 ///
-/// - `TJump/2.0` → `ParsedFlag::Trigger`
-/// - `T2_killactor/3.333` → `ParsedFlag::Trigger2` (event includes `"2_"`)
+/// - `TJump/2.0` -> `ParsedFlag::Trigger`
+/// - `T2_killactor/3.333` -> `ParsedFlag::Trigger2` (event includes `"2_"`)
 fn parse_trigger_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     parse_trigger_options
         .map(|trig: Trigger<'a>| {

@@ -125,7 +125,7 @@ fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     .parse_next(input)
 }
 
-fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
+pub(crate) fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
     alt((
         "ac0".value(FNISAnimFlags::AnimatedCameraReset),
         "ac1".value(FNISAnimFlags::AnimatedCameraSet),
