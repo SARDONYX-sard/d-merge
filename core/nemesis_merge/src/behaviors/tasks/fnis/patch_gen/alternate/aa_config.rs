@@ -138,6 +138,9 @@ pub struct AAConfig {
     /// e.g. `V07.06.00.0`
     pub fnis_version: Cow<'static, str>,
 
+    /// FNIS version string returned by `fnis.pex`.
+    pub fnis_creature_version: Cow<'static, str>,
+
     /// All mods registered in load order.
     ///
     /// Load order determines `mod_id` assignment and therefore `base` values.
@@ -151,10 +154,12 @@ impl AAConfig {
     /// When the `schema` feature is enabled, the canonical schema URI is
     /// embedded in the output JSON as `$schema`.
     pub fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
+        let fnis_version = fnis_version.into();
         Self {
             schema: Cow::Borrowed(SCHEMA_URI),
             crc: compute_crc(&mods),
-            fnis_version: fnis_version.into(),
+            fnis_version: fnis_version.clone(),
+            fnis_creature_version: fnis_version,
             mods,
         }
     }
