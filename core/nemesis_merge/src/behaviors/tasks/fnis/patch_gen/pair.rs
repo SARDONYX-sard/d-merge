@@ -66,7 +66,7 @@ pub fn new_pair_patches<'a>(
 
     // Push and register the Root `hkbStateMachineStateInfo`(`MT_PairedAnimationsBehavior`) for both Player and NPC.
     seq_patches.push((
-        json_path!["#0784", "hkbStateMachine", "states"],
+        json_path!["#0724", "hkbStateMachine", "states"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::SeqPush,
