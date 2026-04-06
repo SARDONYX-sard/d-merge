@@ -33,7 +33,7 @@
 //! │   └── OpenAnimationReplacer/
 //! │       └── XPMSE/
 //! │           ├── config.json              <- namespace-level OAR priority config
-//! │           └── xpe_1hmeqp_1/            <- group name + slot index(0 based)
+//! │           └── xpe_1hmeqp_1/            <- group name + slot index(1..registered_slots_count)
 //! │               ├── 1hm_equip.hkx        <- prefix and slot stripped from filename
 //! │               ├── 1hm_unequip.hkx
 //! │               └── config.json          <- slot-level OAR condition (FNISaa_1hmeqp == 1)
@@ -200,7 +200,7 @@ pub fn alt_anim_to_oar<'a>(
                     match slot_config.as_deref().and_then(|s| s.rename_to.as_deref()) {
                         Some(name) => name.to_string(),
                         // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
-                        None => format!("{prefix}{group_name}_{}", slot + 1),
+                        None => format!("{prefix}{group_name}_{}", slot + 1), // Honestly, there’s no need to start from 1 (for compatibility reasons, I’ll keep the rules I established in the past).
                     };
 
                 let slot_output_dir = output_dir.join(&group_config_dir);
