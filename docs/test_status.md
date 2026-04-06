@@ -37,7 +37,7 @@ SkyrimSE
 | ✅     | Draugr MCO-DXP                                 | 1.4     |                                                                            |
 | ✅     | Faster Draw                                    | 1.31    |                                                                            |
 | ✅     | FlinchingSSE                                   | 1.4     |                                                                            |
-| ⚠️     | Jump Behavior Overhaul SE                      | 1.5     | If we apply the TDM + CGO patch haphazardly, we'll get stuck upon landing. |
+| ✅     | Jump Behavior Overhaul SE                      | 1.5     | If we apply the TDM + CGO patch haphazardly, we'll get stuck upon landing. |
 | ✅     | Slow Sprint Bug Fix                            | 1.0     |                                                                            |
 | ✅     | Smooth Crouch Transition                       | 1.3     |                                                                            |
 | ✅     | SprintSwim                                     | 1.6     |                                                                            |
