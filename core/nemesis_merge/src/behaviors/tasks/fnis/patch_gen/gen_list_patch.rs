@@ -205,7 +205,8 @@ pub fn generate_patch<'a>(
                     all_anim_files.insert(*anim_file);
                 }
                 // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
-                all_events.insert(Cow::Borrowed(anim_event));
+                all_events.insert(anim_event_hack(&owned_data.namespace, anim_event));
+
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
         };
@@ -279,6 +280,25 @@ fn collect_seq_patch<'a>(
     (files, events, adsf_patches)
 }
 
+/// HACK:
+/// Animation event name registered in behavior graph:
+///
+/// | Correct                       | Wrong               |
+/// |-------------------------------|---------------------|
+/// | `FNISFlyer_FNISfl_BackUp2_fm` | `FNISfl_BackUp2_fm` |
+///
+/// - FNIS_*_List.txt entry: `+ FNISfl_BackUp2 FNISfl_BackUp2.hkx`
+/// - At least for FNISFlyer, FNIS prepends `<namespace>_` at behavior
+///   generation time (confirmed from FNIS-generated behavior output)
+///   Whether this applies to other mods is not yet verified.
+fn anim_event_hack<'a>(namespace: &str, anim_event: &'a str) -> Cow<'a, str> {
+    if namespace == "FNISFlyer" {
+        Cow::Owned(format!("{namespace}_{anim_event}"))
+    } else {
+        Cow::Borrowed(anim_event)
+    }
+}
+
 fn new_adsf_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     fnis_animation: FNISAnimation<'a>,
@@ -298,23 +318,7 @@ fn new_adsf_patch<'a>(
     };
 
     let namespace = &owned_data.namespace;
-
-    // HACK:
-    // Animation event name registered in behavior graph:
-    //
-    // Correct                          Wrong
-    // ─────────────────────────────    ──────────────────────────
-    // FNISFlyer_FNISfl_BackUp2_fm      FNISfl_BackUp2_fm
-    //
-    // - FNIS_*_List.txt entry: `+ FNISfl_BackUp2 FNISfl_BackUp2.hkx`
-    // - At least for FNISFlyer, FNIS prepends `<namespace>_` at behavior
-    //   generation time (confirmed from FNIS-generated behavior output)
-    //   Whether this applies to other mods is not yet verified.
-    let anim_event = if namespace == "FNISFlyer" {
-        Cow::Owned(format!("{namespace}_{anim_event}"))
-    } else {
-        Cow::Borrowed(anim_event)
-    };
+    let anim_event = anim_event_hack(namespace, anim_event);
 
     // To link them, `translation` and `rotation` must always use the same ID.
     // use Nemesis variable(`ALltAdsf` is implemented to automatically assign IDs during serialization, so it's fine.)
