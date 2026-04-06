@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-06
+### :sparkles: New Features
+- [`72c8e96`](https://github.com/SARDONYX-sard/d-merge/commit/72c8e9637c55e10c9adfa01e9785c5dd28cec6b7) - add `fnis_creature_version` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`0c2ca03`](https://github.com/SARDONYX-sard/d-merge/commit/0c2ca03fcaa98ca646538e60a372839ba4531ae5) - testing FNISFlyer's special prefix processing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`11ce828`](https://github.com/SARDONYX-sard/d-merge/commit/11ce8286e13e31a1c0e6652c14c37a1285d44e95) - **fnis_list**: fix flags parsing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`60bcf67`](https://github.com/SARDONYX-sard/d-merge/commit/60bcf673cd2e26231f5df052c24b96245dfa20e7) - **fnis_list**: fix flags parsing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`26c1caa`](https://github.com/SARDONYX-sard/d-merge/commit/26c1caacb9ee3be2a7d2ed436a2f93717725e3ed) - **fnis**: fix null ptr json *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`44be64c`](https://github.com/SARDONYX-sard/d-merge/commit/44be64c8efdcafaac3ae1e2cb101bfaa019b3c63) - **fnis**: fix pair sync event name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4ecfb59`](https://github.com/SARDONYX-sard/d-merge/commit/4ecfb59fdff872f4c4381b4dfa9920f9a083987e) - **fnis**: fix anim object patches gen *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`53edbac`](https://github.com/SARDONYX-sard/d-merge/commit/53edbacf19f2650d80df4f2c6c5de7ae48493aac) - **fnis_paired**: fix wrong ptr *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c3cf915`](https://github.com/SARDONYX-sard/d-merge/commit/c3cf915581203e701a200ae522fefd40f57f7128) - **fnis_paired**: fix wrong type `eventToSendWhenStateOrTransitionChanges` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`5dcd3b9`](https://github.com/SARDONYX-sard/d-merge/commit/5dcd3b9bd3a0e834a4d44b18a148646beca2a7af) - **fnis_paired**: add forgotten event push *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ee183b4`](https://github.com/SARDONYX-sard/d-merge/commit/ee183b43e44099f9c9d85e0713ae8d402fcababe) - **fnis_paired**: fix pushed target index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1d0cce2`](https://github.com/SARDONYX-sard/d-merge/commit/1d0cce26c7b8a3029b917acbffb0632d48381e86) - **fnis_paired**: fix pushed target index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4e69070`](https://github.com/SARDONYX-sard/d-merge/commit/4e6907096743d35501d4e1be19e47c73e8f56d0f) - **fnis_paired**: fix pushed root target index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`55373a3`](https://github.com/SARDONYX-sard/d-merge/commit/55373a31dfea82e8635a137edfee11008a564415) - **fnis**: fix fnis pair NPC event name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`34cf31a`](https://github.com/SARDONYX-sard/d-merge/commit/34cf31ab4f1ac8af70236436e652f0240abc5336) - **fnis**: change redundant reader *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`b8121da`](https://github.com/SARDONYX-sard/d-merge/commit/b8121da4cca028fc3b520d40467358437df291c5) - **fnis**: change redundant copy *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`409aafe`](https://github.com/SARDONYX-sard/d-merge/commit/409aafe3a07be9bbbbe04c9861767db3c206bc67) - **fnis**: change to fn event hack *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`7aabfcf`](https://github.com/SARDONYX-sard/d-merge/commit/7aabfcfb00d0eb17875d874912b63561acbbfb88) - change docs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c594e44`](https://github.com/SARDONYX-sard/d-merge/commit/c594e4434caaf99e820fe9ffea4ad6725a8260d5) - **log**: change to `->` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.1.0] - 2026-04-02
 ### :sparkles: New Features
 - [`6460dfc`](https://github.com/SARDONYX-sard/d-merge/commit/6460dfceba17a12fe5230f8c787701994f1c869e) - skip serde `slot_count` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -324,3 +355,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.1...1.0.2
 [1.0.3]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.2...1.0.3
 [1.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.3...1.1.0
+[1.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.1.0...1.2.0
