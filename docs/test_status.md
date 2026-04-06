@@ -138,6 +138,7 @@ Tag Legend
 | ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
 | ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
 | ✅     | Ride Sharing SE                           | 0.4b    | b           |
+| ⚠️     | Support for FNIS users SSE(Rigmor Addon)  | 1.0.0   | pa          |
 | ✅     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
 
 ### Detailed Notes
@@ -151,6 +152,10 @@ Tag Legend
 - **Low-blow human-human killmoves**
   - Animation plays correctly
   - Actual killmove behavior not fully tested
+
+- **Support for FNIS users SSE(Rigmor Addon)**
+  - Animation plays correctly
+  - Actual paired animation not fully tested
 
 - **XP32 Maximum Skeleton Special Extended**, **FNIS Sexy Move SE**
   - AltAnim converted to OAR via [source code](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
