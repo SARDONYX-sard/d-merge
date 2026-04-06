@@ -156,6 +156,11 @@ Tag Legend
 - **Support for FNIS users SSE(Rigmor Addon)**
   - Animation plays correctly
   - Actual paired animation not fully tested
+  - Delete the following files, hide them in MO2, or overwrite them with the output from d_merge. (These files are output files generated after running FNIS.)
+    - `meshes/actors/character/behavior/0_master.hkx`
+    - `meshes/actors/character/characters/defaultmale.hkx`
+    - `meshes/actors/character/characters female/defaultfemale.hkx`
+    - `meshes/animationsetdatasinglefile.txt`
 
 - **XP32 Maximum Skeleton Special Extended**, **FNIS Sexy Move SE**
   - AltAnim converted to OAR via [source code](../core/nemesis_merge/src/behaviors/tasks/fnis/patch_gen/alternate/mod.rs)
