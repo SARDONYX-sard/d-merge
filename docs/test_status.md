@@ -113,7 +113,7 @@ SkyrimSE
 
 ## FNIS
 
-- ~~(LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.~~((The FNIS mod's hkx files will be automatically converted to the SE version of hkx starting with v1.0.0))
+- ~~(LE Mod): When using LE Mods on SE, always convert hkx files to amd64(SE) hkx format beforehand. Otherwise character will stay in A/T-pose.~~(FNIS mod HKX files have been automatically converted to SE/LE-compatible HKX since d_merge v1.0.0.)
 
 Tag Legend
 
