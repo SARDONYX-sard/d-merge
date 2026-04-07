@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import { useState } from 'react';
 import { usePatchStatus } from './hooks/usePatchStatus';
-import { PatchModeRadio } from './PatchModeRadio';
+import { PatchModeOptionHeader } from './PatchModeOptionHeader';
 import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
 import { useTimer } from '@/components/hooks/useTimer';
 import { useTranslation } from '@/components/hooks/useTranslation';
@@ -26,7 +26,11 @@ export const PatchContainer = () => {
     onStatus: handleStatus,
     onError: (err) => {
       setLoading(false);
-      NOTIFY.error(`${err} (${stop()})`);
+      if (err instanceof Error) {
+        NOTIFY.error(`${err.message} (${stop()})`);
+        return;
+      }
+      NOTIFY.error(`Patch failed: (${stop()})`);
     },
   });
 
@@ -35,7 +39,7 @@ export const PatchContainer = () => {
   return (
     <>
       <Box>
-        <PatchModeRadio />
+        <PatchModeOptionHeader />
         {inputFieldsProps.map((inputProps) => (
           <InputField key={inputProps.label} {...inputProps} />
         ))}

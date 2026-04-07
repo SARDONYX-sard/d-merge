@@ -23,31 +23,30 @@ const EguiModItemSchema = z.object({
 });
 const EguiModListSchema = z.array(EguiModItemSchema);
 
-const EguiSettingsSchema = z
-  .object({
-    mode: z.enum(['vfs', 'manual']).optional(),
-    target_runtime: z.enum(['SE', 'LE', 'VR']).optional(),
-    template_dir: z.string().optional(),
-    output_dir: z.string().optional(),
-    auto_remove_meshes: z.boolean().optional(),
-    enable_debug_output: z.boolean().optional(),
-    log_level: logLevelSchema.optional(),
-    filter_text: z.string().optional(),
-    font_path: z.string().nullable().optional(),
-    sort_asc: z.boolean().optional(),
-    sort_column: z.string().optional(),
-    transparent: z.boolean().optional(),
-    window_height: z.number().optional(),
-    window_maximized: z.boolean().optional(),
-    window_pos_x: z.number().optional(),
-    window_pos_y: z.number().optional(),
-    window_width: z.number().optional(),
-    vfs_skyrim_data_dir: z.string().optional(),
-    vfs_mod_list: EguiModListSchema.optional(),
-    skyrim_data_dir: z.string().optional(),
-    mod_list: EguiModListSchema.optional(),
-  })
-  .passthrough();
+const EguiSettingsSchema = z.looseObject({
+  mode: z.enum(['vfs', 'manual']).optional(),
+  target_runtime: z.enum(['SE', 'LE', 'VR']).optional(),
+  template_dir: z.string().optional(),
+  output_dir: z.string().optional(),
+  auto_remove_meshes: z.boolean().optional(),
+  enable_debug_output: z.boolean().optional(),
+  generate_fnis_esp: z.boolean().optional(),
+  log_level: logLevelSchema.optional(),
+  filter_text: z.string().optional(),
+  font_path: z.string().nullable().optional(),
+  sort_asc: z.boolean().optional(),
+  sort_column: z.string().optional(),
+  transparent: z.boolean().optional(),
+  window_height: z.number().optional(),
+  window_maximized: z.boolean().optional(),
+  window_pos_x: z.number().optional(),
+  window_pos_y: z.number().optional(),
+  window_width: z.number().optional(),
+  vfs_skyrim_data_dir: z.string().optional(),
+  vfs_mod_list: EguiModListSchema.optional(),
+  skyrim_data_dir: z.string().optional(),
+  mod_list: EguiModListSchema.optional(),
+});
 
 type EguiSettings = z.infer<typeof EguiSettingsSchema>;
 
@@ -72,13 +71,15 @@ export function convertEguiSettings(settings: EguiSettings): Cache {
     'patch-options': JSON.stringify({
       hackOptions: { castRagdollEvent: true },
       debug: {
-        outputPatchJson: settings.enable_debug_output,
-        outputMergedJson: settings.enable_debug_output,
-        outputMergedXml: settings.enable_debug_output,
+        outputPatchJson: settings.enable_debug_output ?? false,
+        outputMergedJson: settings.enable_debug_output ?? false,
+        outputMergedXml: settings.enable_debug_output ?? false,
       },
       outputTarget: settings.target_runtime === 'SE' ? 'SkyrimSE' : 'SkyrimLE',
-      autoRemoveMeshes: settings.auto_remove_meshes,
-    }),
+      autoRemoveMeshes: settings.auto_remove_meshes ?? false,
+      generateFnisEsp: settings.generate_fnis_esp ?? false,
+      useProgressReporter: true,
+    } as const satisfies PatchOptions),
     'patch-output': settings.output_dir ? JSON.stringify(settings.output_dir) : undefined,
     'log-level': settings.log_level ? JSON.stringify(settings.log_level) : undefined,
 
@@ -164,6 +165,7 @@ const TauriToEguiSchema = TauriCacheForEguiSchema.transform((cache): EguiSetting
       patchOptions?.debug.outputMergedJson ||
       patchOptions?.debug.outputMergedXml ||
       patchOptions?.debug.outputPatchJson,
+    generate_fnis_esp: patchOptions?.generateFnisEsp ?? false,
 
     output_dir: cache[PRIVATE_CACHE_OBJ.patchOutput],
     log_level: cache[PUB_CACHE_OBJ.logLevel],
@@ -173,7 +175,7 @@ const TauriToEguiSchema = TauriCacheForEguiSchema.transform((cache): EguiSetting
 
     skyrim_data_dir: cache[PRIVATE_CACHE_OBJ.patchSkyrimDataDir],
     mod_list: cache[PRIVATE_CACHE_OBJ.patchModList],
-  };
+  } as const satisfies EguiSettings;
 });
 
 /**
