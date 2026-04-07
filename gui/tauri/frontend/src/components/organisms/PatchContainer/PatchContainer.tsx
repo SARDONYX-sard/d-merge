@@ -1,16 +1,16 @@
-import { Box, Typography } from "@mui/material";
-import { useState } from "react";
-import { usePatchStatus } from "./hooks/usePatchStatus";
-import { PatchModeOptionHeader } from "./PatchModeOptionHeader";
-import { PatchOptionsDialog } from "./PatchOptionsButtonDialog";
-import { useTimer } from "@/components/hooks/useTimer";
-import { useTranslation } from "@/components/hooks/useTranslation";
-import { InputField } from "@/components/molecules/InputField/InputField";
-import { BottomActionBar } from "@/components/organisms/BottomActionBar";
-import { usePatchHandler } from "@/components/organisms/PatchContainer/hooks/usePatchHandler";
-import { usePatchInputs } from "@/components/organisms/PatchContainer/hooks/usePatchInputs";
-import { ModsGrid } from "@/components/organisms/PatchContainer/ModsGrid";
-import { NOTIFY } from "@/lib/notify";
+import { Box, Typography } from '@mui/material';
+import { useState } from 'react';
+import { usePatchStatus } from './hooks/usePatchStatus';
+import { PatchModeOptionHeader } from './PatchModeOptionHeader';
+import { PatchOptionsDialog } from './PatchOptionsButtonDialog';
+import { useTimer } from '@/components/hooks/useTimer';
+import { useTranslation } from '@/components/hooks/useTranslation';
+import { InputField } from '@/components/molecules/InputField/InputField';
+import { BottomActionBar } from '@/components/organisms/BottomActionBar';
+import { usePatchHandler } from '@/components/organisms/PatchContainer/hooks/usePatchHandler';
+import { usePatchInputs } from '@/components/organisms/PatchContainer/hooks/usePatchInputs';
+import { ModsGrid } from '@/components/organisms/PatchContainer/ModsGrid';
+import { NOTIFY } from '@/lib/notify';
 
 export const PatchContainer = () => {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export const PatchContainer = () => {
     onStatus: handleStatus,
     onError: (err) => {
       setLoading(false);
-      if (typeof err === "string") {
+      if (typeof err === 'string') {
         NOTIFY.error(`${err} (${stop()})`);
         return;
       }
@@ -39,7 +39,7 @@ export const PatchContainer = () => {
     },
   });
 
-  const loadingText = `${t("patch.patching_button")} (${elapsedText})`;
+  const loadingText = `${t('patch.patching_button')} (${elapsedText})`;
 
   return (
     <>
@@ -52,24 +52,19 @@ export const PatchContainer = () => {
 
       <ModsGrid
         sx={{
-          backgroundColor: "#160b0b60",
-          marginTop: "10px",
-          width: "95vw",
-          maxHeight: "61vh",
+          backgroundColor: '#160b0b60',
+          marginTop: '10px',
+          width: '95vw',
+          maxHeight: '61vh',
         }}
       />
       {status && (
-        <Typography sx={{ mt: 1, mb: 0, textAlign: "right" }} variant="body2">
+        <Typography sx={{ mt: 1, mb: 0, textAlign: 'right' }} variant='body2'>
           Status: {statusText}
         </Typography>
       )}
 
-      <BottomActionBar
-        buttonText={t("patch.button")}
-        loading={loading}
-        loadingText={loadingText}
-        onClick={handleClick}
-      >
+      <BottomActionBar buttonText={t('patch.button')} loading={loading} loadingText={loadingText} onClick={handleClick}>
         <PatchOptionsDialog />
       </BottomActionBar>
     </>

@@ -1,21 +1,21 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
-import { z } from "zod";
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { z } from 'zod';
 
 /**
  * Get skyrim directory
  * @throws Error
  */
-export async function getSkyrimDir(runtime: PatchOptions["outputTarget"]) {
+export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
   if (isTauri()) {
     switch (runtime) {
-      case "SkyrimLE":
-        return await invoke<string>("get_skyrim_data_dir", { runtime: "LE" });
+      case 'SkyrimLE':
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'LE' });
       default:
-        return await invoke<string>("get_skyrim_data_dir", { runtime: "SE" });
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'SE' });
     }
   }
 
-  throw new Error("Unsupported platform: Non Tauri");
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 export const ModItemSchema = z.object({
@@ -28,11 +28,11 @@ export const ModItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   /** NOTE: egui doesn't have this field, so it may be empty string. */
-  author: z.string().optional().catch(""),
+  author: z.string().optional().catch(''),
   site: z.string(),
-  mod_type: z.enum(["nemesis", "fnis"]),
+  mod_type: z.enum(['nemesis', 'fnis']),
   /** NOTE: egui doesn't have this field, so it may be empty string. */
-  auto: z.string().optional().catch(""),
+  auto: z.string().optional().catch(''),
 
   enabled: z.boolean(),
   priority: z.number(),
@@ -41,7 +41,7 @@ export const ModListSchema = z.array(ModItemSchema);
 
 /*** cached mod info */
 export type ModItem = z.infer<typeof ModItemSchema>;
-export type FetchedModInfo = Readonly<Omit<ModItem, "enabled" | "priority">>;
+export type FetchedModInfo = Readonly<Omit<ModItem, 'enabled' | 'priority'>>;
 
 export type PatchMaps = {
   /** Nemesis patch path
@@ -63,13 +63,13 @@ export type PatchMaps = {
  */
 export async function loadModsInfo(skyrimDataDir: string, isVfsMode: boolean) {
   if (isTauri()) {
-    return await invoke<FetchedModInfo[]>("load_mods_info", {
+    return await invoke<FetchedModInfo[]>('load_mods_info', {
       glob: skyrimDataDir,
       isVfsMode,
     });
   }
 
-  throw new Error("Unsupported platform: Non Tauri");
+  throw new Error('Unsupported platform: Non Tauri');
 }
 
 /** must be same as `GuiOption` serde */
@@ -82,7 +82,7 @@ export type PatchOptions = {
     outputMergedJson: boolean;
     outputMergedXml: boolean;
   };
-  outputTarget: "SkyrimSE" | "SkyrimLE";
+  outputTarget: 'SkyrimSE' | 'SkyrimLE';
   /** Delete the meshes in the output destination each time the patch is run. */
   autoRemoveMeshes: boolean;
   /** Report progress status +2s */
@@ -109,7 +109,7 @@ export const patchOptionsSchema = z
       outputMergedJson: z.boolean(),
       outputMergedXml: z.boolean(),
     }),
-    outputTarget: z.union([z.literal("SkyrimSE"), z.literal("SkyrimLE")]),
+    outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
     autoRemoveMeshes: z.boolean(),
     useProgressReporter: z.boolean(),
     skyrimDataDirGlob: z.optional(z.string()),
@@ -124,7 +124,7 @@ export const patchOptionsSchema = z
       outputPatchJson: true,
       outputMergedXml: false,
     },
-    outputTarget: "SkyrimSE",
+    outputTarget: 'SkyrimSE',
     autoRemoveMeshes: true,
     useProgressReporter: true,
     generateFnisEsp: false,
@@ -143,8 +143,8 @@ export const patchOptionsSchema = z
  */
 export async function patch(output: string, patches: PatchMaps, options: PatchOptions) {
   if (isTauri()) {
-    return await invoke("patch", { output, patches, options });
+    return await invoke('patch', { output, patches, options });
   }
 
-  throw new Error("Unsupported platform: Non Tauri");
+  throw new Error('Unsupported platform: Non Tauri');
 }

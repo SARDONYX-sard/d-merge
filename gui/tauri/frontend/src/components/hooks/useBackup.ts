@@ -15,8 +15,8 @@ export const useBackup = () => {
 };
 
 const useAutoImportBackup = () => {
-  const { output, skyrimDataDir: modInfoDir } = usePatchContext();
-  const settingsPath = `${output}/.d_merge/tauri_settings.json` as const;
+  const { skyrimDataDir: modInfoDir } = usePatchContext();
+  const settingsPath = `./.d_merge/tauri_settings.json` as const;
 
   useEffect(() => {
     const doImport = async () => {
@@ -50,12 +50,12 @@ const useAutoImportBackup = () => {
     };
 
     doImport();
-  }, [output, modInfoDir, settingsPath]);
+  }, [modInfoDir, settingsPath]);
 };
 
 const useAutoExportBackup = () => {
-  const { output, skyrimDataDir } = usePatchContext();
-  const settingsPath = `${output}/.d_merge/tauri_settings.json` as const;
+  const { skyrimDataDir } = usePatchContext();
+  const settingsPath = './.d_merge/tauri_settings.json' as const;
 
   useEffect(() => {
     let unlisten: (() => void) | null;
@@ -91,5 +91,5 @@ const useAutoExportBackup = () => {
     return () => {
       unlisten?.();
     };
-  }, [output, skyrimDataDir, settingsPath]);
+  }, [skyrimDataDir, settingsPath]);
 };
