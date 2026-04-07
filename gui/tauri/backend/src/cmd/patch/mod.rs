@@ -42,7 +42,7 @@ pub(crate) struct GuiPatchOptions {
     skyrim_data_dir_glob: Option<String>,
 
     /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
-    pub generate_fnis_esp: bool,
+    pub generate_fnis_esp: Option<bool>,
 }
 
 // NOTE: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
@@ -89,7 +89,7 @@ pub(crate) async fn patch(
         debug: options.debug,
         output_target: options.output_target,
         skyrim_data_dir_glob: options.skyrim_data_dir_glob,
-        generate_fnis_esp: options.generate_fnis_esp,
+        generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
     };
 
     match time!("[patch]", behavior_gen(patches, config).await) {
