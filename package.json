@@ -5,6 +5,9 @@
   "description": "patch",
   "homepage": "https://github.com/SARDONYX-sard/d-merge",
   "license": "GPL3.0",
+  "workspaces": [
+    "gui/tauri/frontend"
+  ],
   "type": "module",
   "scripts": {
     "build": "rimraf ./gui/tauri/frontend/out && tauri build --no-bundle -- --profile release-no-lto",
@@ -16,8 +19,8 @@
     "fmt:front": "vp fmt --ignore-path ./.gitignore",
     "fmt:back": "cargo +nightly fmt --all",
     "fmt": "npm run fmt:front && npm run fmt:back",
-    "lint": "biome lint ./ && cargo clippy --workspace",
-    "lint:fix": "npm run fmt && biome check --write ./ && cargo clippy --workspace --fix --allow-staged --allow-dirty",
+    "lint": "vp lint ./ && cargo clippy --workspace",
+    "lint:fix": "npm run fmt && vp check ./ --fix && cargo clippy --workspace --fix --allow-staged --allow-dirty",
     "tauri": "tauri",
     "test": "npm --workspace gui/tauri/frontend run test"
   },
@@ -30,9 +33,6 @@
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest",
     "why-is-node-running": "^3.2.2"
   },
-  "workspaces": [
-    "gui/tauri/frontend"
-  ],
   "overrides": {
     "monaco-editor": "0.49.0",
     "react": "^19.2.4",

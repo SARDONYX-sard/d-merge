@@ -62,7 +62,7 @@ const usePreviewXml = (updateBaseLine: (left: string, right: string) => void) =>
         setError(String(e));
         setPreviewXml('');
       }
-    })();
+    })().catch((e) => console.error('Failed to generate preview', e));
   }, [tab, state.showPreview]);
 
   return { previewXml, error };

@@ -11,14 +11,14 @@ import { showWindow } from '@/services/api/window';
 import type { ReactNode } from 'react';
 
 LANG.init();
-LOG.changeLevel(LOG.get());
+await LOG.changeLevel(LOG.get());
 
 type Props = Readonly<{
   children: ReactNode;
 }>;
 
 const ClientLayout = ({ children }: Props) => {
-  showWindow();
+  void showWindow();
 
   return (
     <GlobalProvider>

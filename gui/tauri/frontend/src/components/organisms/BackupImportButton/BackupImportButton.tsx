@@ -19,7 +19,7 @@ export const BackupImportButton = ({ parserMode }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleClick = () => {
-    NOTIFY.asyncTry(async () => {
+    void NOTIFY.asyncTry(async () => {
       const newSettings = await BACKUP.import(parserMode);
       if (newSettings) {
         setSettings(newSettings);

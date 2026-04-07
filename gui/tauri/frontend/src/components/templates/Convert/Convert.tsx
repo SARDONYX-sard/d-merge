@@ -82,7 +82,9 @@ const useConvertExec = () => {
       setLoading(true);
       await convert(inputs, output, fmt, roots);
     } catch (e) {
-      NOTIFY.error(`${e}`);
+      if (e instanceof Error) {
+        NOTIFY.error(e.message);
+      }
     } finally {
       unlisten();
       setLoading(false);

@@ -42,8 +42,8 @@ export const Settings = () => {
 };
 
 const TabsMenu = () => {
-  const handleHelpClick: MouseEventHandler<HTMLButtonElement> = (_event) => {
-    openUrl(HELP_INFO.homepage); // jump by backend api
+  const handleHelpClick: MouseEventHandler<HTMLButtonElement> = async (_event) => {
+    await openUrl(HELP_INFO.homepage); // jump by backend api
   };
 
   return (

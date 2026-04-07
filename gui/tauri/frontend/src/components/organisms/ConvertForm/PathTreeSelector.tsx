@@ -89,7 +89,7 @@ export const PathTreeSelector = memo(function PathTreeSelector() {
         ...prev,
         tree: loadedTree,
       }));
-    })();
+    })().catch((e) => console.error('Failed to load tree directory', e));
   }, [treeDirInput, selectedTree.tree.length, setSelectedTree]);
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

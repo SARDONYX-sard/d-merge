@@ -17,8 +17,8 @@ export const BackupExportButton = ({ parserMode }: Props) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
-  const handleClick: DialogClickHandler = (checkedKeys) => {
-    NOTIFY.asyncTry(async () => {
+  const handleClick: DialogClickHandler = async (checkedKeys) => {
+    await NOTIFY.asyncTry(async () => {
       if (await BACKUP.export(STORAGE.getByKeys(checkedKeys), parserMode)) {
         NOTIFY.success(t('backup.export.success_message'));
         setOpen(false);

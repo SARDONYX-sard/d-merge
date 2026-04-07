@@ -94,7 +94,15 @@ export async function statusListener(
     if (onError) {
       onError(err);
     } else {
-      NOTIFY.error(error ?? `${err}`);
+      if (error) {
+        NOTIFY.error(error);
+        return;
+      }
+
+      if (err instanceof Error) {
+        NOTIFY.error(err.message);
+        return;
+      }
     }
   }
 }

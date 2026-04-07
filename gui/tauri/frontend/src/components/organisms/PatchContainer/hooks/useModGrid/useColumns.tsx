@@ -25,9 +25,9 @@ export const useColumns = () => {
       flex: 1.2,
       renderCell: (params) => {
         const { site } = params.row;
-        const handleMappingClick: MouseEventHandler<HTMLButtonElement> = (event) => {
+        const handleMappingClick: MouseEventHandler<HTMLButtonElement> = async (event) => {
           event.preventDefault();
-          openUrl(site);
+          await openUrl(site);
         };
         return site === '' ? (
           <></>

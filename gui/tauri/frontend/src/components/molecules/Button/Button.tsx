@@ -14,6 +14,7 @@ export function Button({ sx, ...props }: Props) {
   const { t } = useTranslation();
 
   return (
+    // oxlint-disable-next-line typescript/no-misused-spread
     <Button_ startIcon={<FolderOpenIcon />} sx={{ ...defaultStyle, ...sx }} type='button' variant='outlined' {...props}>
       {t('select_button')}
     </Button_>

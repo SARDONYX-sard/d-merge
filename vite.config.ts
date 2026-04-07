@@ -17,7 +17,7 @@ export default defineConfig({
     printWidth: 120,
     semi: true,
     singleQuote: true,
-    sortPackageJson: false,
+    sortPackageJson: true,
     ignorePatterns: ['routeTree.gen.ts', 'cspell.jsonc', 'CHANGELOG.md'],
   },
 });

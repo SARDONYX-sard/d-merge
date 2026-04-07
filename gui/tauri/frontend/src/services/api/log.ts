@@ -62,7 +62,7 @@ export const LOG = {
 
   log(level: LogLevel, message: string) {
     if (isTauri()) {
-      invoke('log', { level, message });
+      invoke('log', { level, message }).catch((e) => console.error('Failed to send log message to backend:', e));
       return;
     }
 

@@ -1,5 +1,5 @@
 import { enqueueSnackbar } from 'notistack';
-import { LOG } from '@/services/api/log';
+import { LOG, LogLevel } from '@/services/api/log';
 
 import type { OptionsObject, SnackbarMessage } from 'notistack';
 
@@ -9,22 +9,22 @@ import type { OptionsObject, SnackbarMessage } from 'notistack';
 export const NOTIFY = {
   /** Show as `info` message. */
   info(message: SnackbarMessage, options?: OptionsObject<'info'>) {
-    LOG.log('info', `${message}`);
+    logString('info', message);
     return enqueueSnackbar(message, { variant: 'info', ...options });
   },
   /** Show as `success` message. */
   success(message: SnackbarMessage, options?: OptionsObject<'success'>) {
-    LOG.log('info', `${message}`);
+    logString('info', message);
     return enqueueSnackbar(message, { variant: 'success', ...options });
   },
   /** Show as `warning` message. */
   warn(message: SnackbarMessage, options?: OptionsObject<'warning'>) {
-    LOG.log('warn', `${message}`);
+    logString('warn', message);
     return enqueueSnackbar(message, { variant: 'warning', ...options });
   },
   /** Show as `error` message. */
   error(message: SnackbarMessage, options?: OptionsObject<'error'>) {
-    LOG.log('error', `${message}`);
+    logString('error', message);
     return enqueueSnackbar(message, { variant: 'error', ...options });
   },
 
@@ -40,10 +40,20 @@ export const NOTIFY = {
   },
 
   /** Try to execute async function, and then catch & notify if error. */
-  async asyncTry<Args extends any[], R>(tryFn: (...args: Args) => Promise<R>, ...args: Args): Promise<R | undefined> {
-    return tryFn(...args).catch((e) => {
-      NOTIFY.error(`${e}`);
-      return undefined;
-    });
+  async asyncTry<Args extends any[], R>(tryFn: (...args: Args) => Promise<R>, ...args: Args) {
+    tryFn(...args)
+      .catch((e) => {
+        NOTIFY.error(`${e}`);
+        return undefined;
+      })
+      .catch((e) => console.error('Unexpected error in NOTIFY.asyncTry:', e));
   },
 } as const;
+
+const logString = (logLevel: LogLevel, message: SnackbarMessage) => {
+  let messageStr = null;
+  if (typeof message === 'string') messageStr = message;
+  if (typeof message === 'number') messageStr = String(message);
+
+  if (messageStr !== null) LOG.log(logLevel, messageStr);
+};

@@ -17,7 +17,7 @@ export const ImportLangButton = () => {
   );
 
   const handleClick = useCallback(() => {
-    NOTIFY.asyncTry(async () => {
+    void NOTIFY.asyncTry(async () => {
       const contents = await importLang();
       if (contents) {
         JSON.parse(contents); // Parse test
