@@ -163,7 +163,7 @@ function commitAndTag(oldVer, newVer) {
     execSync(`git tag ${tagArgs} ${newVer} -m "v${newVer}"`);
     log(`Git commit and tag created for v${newVer}`);
   } catch (e) {
-    throw new Error(`Git operation failed: ${e}`);
+    if (e instanceof Error) throw new Error(`Git operation failed: ${e}`);
   }
 }
 

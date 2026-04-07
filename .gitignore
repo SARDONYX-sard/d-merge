@@ -28,6 +28,6 @@ dist/
 # Rust build cache
 **/target
 
-/assets/templates/*
+/resource/*
 
 **/.d_merge/

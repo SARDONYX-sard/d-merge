@@ -1,29 +1,22 @@
 {
-  "[css]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
   "[javascript][javascriptreact][typescript][typescriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome"
+    "editor.defaultFormatter": "oxc.oxc-vscode"
   },
-  "[json][jsonc]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[yaml]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "[css][json][jsonc][toml][yaml]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
   },
   "editor.codeActionsOnSave": {
-    "quickfix.biome": "explicit",
-    "source.fixAll.sortJSON": "never",
-    "source.organizeImports.biome": "explicit"
+    "source.fixAll.oxc": "explicit",
+    "source.fixAll.sortJSON": "never"
   },
   "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
   "evenBetterToml.formatter.alignComments": true,
   "files.associations": {
     "**/dummy/mods/**/*.txt": "xml"
   },
   "files.exclude": {
     ".swc": true
-    // "**/node_modules": true // optional
   },
   "files.watcherExclude": {
     "**/.git/objects/**": true,
@@ -32,17 +25,16 @@
     "**/target/**": true
   },
   "i18n-ally.keystyle": "nested",
-  "i18n-ally.localesPaths": ["locales", "gui/frontend/src/lib/i18n"],
+  "i18n-ally.sourceLanguage": "en",
   "json.schemas": [
-    // https://github.com/SARDONYX-forks/d-merge-serde-hkx/blob/main/crates/havok_types/src/pointer.rs
     {
       "fileMatch": ["/dummy/convert/input/*.json", "/dummy/behavior_gen/output/.d_merge/.debug/meshes/**/*.json"],
       "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
+  "oxc.fmt.configPath": "./vite.config.ts",
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
-  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"],
-  "i18n-ally.sourceLanguage": "en"
+  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"]
 }

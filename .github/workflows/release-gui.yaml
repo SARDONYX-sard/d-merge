@@ -2,7 +2,7 @@ name: Release GUI
 on:
   push:
     tags:
-      - "*"
+      - '*'
 
 env:
   APP_NAME: d_merge
@@ -57,7 +57,7 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./*.zip
-          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
           body: ${{ steps.changelog.outputs.changes }}
           tag: ${{ github.ref_name }}
 
@@ -96,7 +96,7 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./*.tar.gz
-          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
           tag: ${{ github.ref_name }}
 
   release_egui:
@@ -138,7 +138,7 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./*.zip
-          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
           tag: ${{ github.ref_name }}
 
       - name: Compress outputs(MacOS/Linux)
@@ -153,5 +153,5 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./*.tar.gz
-          name: "${{ env.APP_NAME }} v${{ github.ref_name }}"
+          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
           tag: ${{ github.ref_name }}

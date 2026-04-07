@@ -1,0 +1,150 @@
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { z } from 'zod';
+
+/**
+ * Get skyrim directory
+ * @throws Error
+ */
+export async function getSkyrimDir(runtime: PatchOptions['outputTarget']) {
+  if (isTauri()) {
+    switch (runtime) {
+      case 'SkyrimLE':
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'LE' });
+      default:
+        return await invoke<string>('get_skyrim_data_dir', { runtime: 'SE' });
+    }
+  }
+
+  throw new Error('Unsupported platform: Non Tauri');
+}
+
+export const ModItemSchema = z.object({
+  /**
+   * Mod-specific dir name.
+   * - Nemesis/FNIS(vfs): e.g. `aaaa`
+   * - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+   * - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
+   */
+  id: z.string(),
+  name: z.string(),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  author: z.string().optional().catch(''),
+  site: z.string(),
+  mod_type: z.enum(['nemesis', 'fnis']),
+  /** NOTE: egui doesn't have this field, so it may be empty string. */
+  auto: z.string().optional().catch(''),
+
+  enabled: z.boolean(),
+  priority: z.number(),
+});
+export const ModListSchema = z.array(ModItemSchema);
+
+/*** cached mod info */
+export type ModItem = z.infer<typeof ModItemSchema>;
+export type FetchedModInfo = Readonly<Omit<ModItem, 'enabled' | 'priority'>>;
+
+export type PatchMaps = {
+  /** Nemesis patch path
+   * - key: path until mod_code (e.g.: `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
+   * - value: priority
+   */
+  nemesis_entries: Record<string, number>;
+
+  /** FNIS patch path
+   * - key: path until namespace (e.g.: `<skyrim_data_dir>/meshes/actors/character/animations/FNISFlyer`)
+   * - value: priority
+   */
+  fnis_entries: Record<string, number>;
+};
+
+/**
+ * Load mods `info.ini`
+ * @throws Error
+ */
+export async function loadModsInfo(skyrimDataDir: string, isVfsMode: boolean) {
+  if (isTauri()) {
+    return await invoke<FetchedModInfo[]>('load_mods_info', {
+      glob: skyrimDataDir,
+      isVfsMode,
+    });
+  }
+
+  throw new Error('Unsupported platform: Non Tauri');
+}
+
+/** must be same as `GuiOption` serde */
+export type PatchOptions = {
+  hackOptions: {
+    castRagdollEvent: boolean;
+  };
+  debug: {
+    outputPatchJson: boolean;
+    outputMergedJson: boolean;
+    outputMergedXml: boolean;
+  };
+  outputTarget: 'SkyrimSE' | 'SkyrimLE';
+  /** Delete the meshes in the output destination each time the patch is run. */
+  autoRemoveMeshes: boolean;
+  /** Report progress status +2s */
+  useProgressReporter: boolean;
+  /** Skyrim data directories glob (required **only when using FNIS**).
+   *
+   * This must include all directories containing `animations/<namespace>`, otherwise FNIS
+   * entries will not be detected and the process will fail.
+   **/
+  skyrimDataDirGlob?: string;
+  /**
+   * If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+   */
+  generateFnisEsp?: boolean;
+};
+
+export const patchOptionsSchema = z
+  .object({
+    hackOptions: z.object({
+      castRagdollEvent: z.boolean(),
+    }),
+    debug: z.object({
+      outputPatchJson: z.boolean(),
+      outputMergedJson: z.boolean(),
+      outputMergedXml: z.boolean(),
+    }),
+    outputTarget: z.union([z.literal('SkyrimSE'), z.literal('SkyrimLE')]),
+    autoRemoveMeshes: z.boolean(),
+    useProgressReporter: z.boolean(),
+    skyrimDataDirGlob: z.optional(z.string()),
+    generateFnisEsp: z.optional(z.boolean()),
+  })
+  .catch({
+    hackOptions: {
+      castRagdollEvent: true,
+    },
+    debug: {
+      outputMergedJson: true,
+      outputPatchJson: true,
+      outputMergedXml: false,
+    },
+    outputTarget: 'SkyrimSE',
+    autoRemoveMeshes: true,
+    useProgressReporter: true,
+    generateFnisEsp: false,
+  } as const satisfies PatchOptions);
+
+/**
+ * Patch mods to hkx files.
+ * @example
+ * ```ts
+ * const ids = *['C:/Nemesis_Engine/mod/aaa', 'C:/Nemesis_Engine/mod/bbb']
+ * const output = 'C:/output/path';
+ * const patchOptions = { ... }; // See `PatchOptions`
+ * await patch(output, ids);
+ * ```
+ * @throws Error
+ */
+export async function patch(output: string, patches: PatchMaps, options: PatchOptions) {
+  if (isTauri()) {
+    return await invoke('patch', { output, patches, options });
+  }
+
+  throw new Error('Unsupported platform: Non Tauri');
+}
