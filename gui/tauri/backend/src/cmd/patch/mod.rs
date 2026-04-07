@@ -6,10 +6,12 @@ pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
 use nemesis_merge::{
-    behavior_gen, cache_remover, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
+    behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
 };
+use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
 use tauri::{path::BaseDirectory, AppHandle, Emitter as _, Manager};
+use tokio::{sync::Mutex, task::JoinHandle};
 
 use crate::{
     cmd::{bail, time},
@@ -17,6 +19,7 @@ use crate::{
 };
 
 const PATCH_STATUS_EVENT_NAME: &str = "d_merge://progress/patch";
+static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 
 /// Emits a patch status event to the frontend.
 fn emit_status(app: &AppHandle, payload: Status) {
@@ -45,7 +48,7 @@ pub(crate) struct GuiPatchOptions {
     pub generate_fnis_esp: Option<bool>,
 }
 
-// NOTE: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
+// TODO: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
 #[tauri::command]
 pub(crate) async fn patch(
     app: AppHandle,
@@ -55,7 +58,11 @@ pub(crate) async fn patch(
 ) -> Result<(), String> {
     tracing::info!("Starting patch with options: {options:#?}");
 
+    cancel_patch_inner().await?; // Abort previous task if exists
+
     {
+        use nemesis_merge::cache_remover;
+
         let is_dangerous_remove = options
             .skyrim_data_dir_glob
             .as_deref()
@@ -75,26 +82,46 @@ pub(crate) async fn patch(
         .context(NotFoundResourceDirSnafu)
         .or_else(|err| bail!(err))?;
 
-    let status_report = options.use_progress_reporter.then(|| {
-        let cloned_app_handle = app.clone();
-        Box::new(move |payload: Status| emit_status(&cloned_app_handle, payload))
-            as Box<dyn Fn(Status) + Send + Sync>
+    let app_handle = app.clone();
+    let handle = tokio::spawn(async move {
+        let status_report = options.use_progress_reporter.then(|| {
+            let cloned_app_handle = app.clone();
+            Box::new(move |payload: Status| emit_status(&cloned_app_handle, payload))
+                as Box<dyn Fn(Status) + Send + Sync>
+        });
+
+        let config = Config {
+            output_dir: output,
+            resource_dir,
+            status_report,
+            hack_options: options.hack_options,
+            debug: options.debug,
+            output_target: options.output_target,
+            skyrim_data_dir_glob: options.skyrim_data_dir_glob,
+            generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
+        };
+
+        match time!("[patch]", behavior_gen(patches, config).await) {
+            Ok(()) => emit_status(&app_handle, Status::Done),
+            Err(err) => emit_status(&app_handle, Status::Error(err)),
+        }
     });
 
-    let config = Config {
-        output_dir: output,
-        resource_dir,
-        status_report,
-        hack_options: options.hack_options,
-        debug: options.debug,
-        output_target: options.output_target,
-        skyrim_data_dir_glob: options.skyrim_data_dir_glob,
-        generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
+    PATCH_TASK.lock().await.replace(handle);
+    Ok(())
+}
+
+async fn cancel_patch_inner() -> Result<(), String> {
+    let handle = {
+        let mut guard = PATCH_TASK.lock().await;
+        guard.take()
     };
 
-    match time!("[patch]", behavior_gen(patches, config).await) {
-        Ok(()) => emit_status(&app, Status::Done),
-        Err(err) => emit_status(&app, Status::Error(err)),
+    if let Some(handle) = handle {
+        handle.abort();
+        if let Err(err) = handle.await {
+            tracing::error!("patch task panicked: {err}");
+        }
     }
 
     Ok(())
