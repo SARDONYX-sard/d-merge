@@ -26,10 +26,9 @@ members = [
   "core/skyrim_crc",
   "core/skyrim_data_dir",
   "core/tracing_rotation",
-  "ffi/javascript/node",
   "ffi/python",
-  "gui/app_egui",
-  "gui/backend/tauri",
+  "gui/egui",
+  "gui/tauri/backend",
 ]
 resolver = "2"
 
@@ -49,36 +48,38 @@ serde_repr = "0.1.20" # C like Serialize enum into numbers.(Using progress repor
 simd-json = "0.17.0"
 snafu = "0.8.9"
 sonic-rs = "0.5.6"
-tokio = { version = "1.48.0", features = [ "fs", "rt-multi-thread" ] } # Async runtime
+tokio = { version = "1.48.0", features = ["fs", "rt-multi-thread"] } # Async runtime
 tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.20"
 winnow = { version = "0.7.14", features = ["simd"] }
 
 diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false, features = [ "ignore_duplicates" ] }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false, features = [
+  "ignore_duplicates",
+] }
 havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
 serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
 serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
 
 # dev-dependencies
-pretty_assertions = "1.4.1"                                  # Color diff assertion
+pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-auto_charset = { path= "./core/auto_charset" }
-fnis_list = { path= "./core/fnis_list" }
-gh_issue_link = { path= "./core/gh_issue_link" }
+auto_charset = { path = "./core/auto_charset" }
+fnis_list = { path = "./core/fnis_list" }
+gh_issue_link = { path = "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }
 jwalk_glob = { path = "./core/jwalk_glob" }
 mod_info = { path = "./core/mod_info" }
 nemesis_merge = { path = "./core/nemesis_merge" }
 nemesis_xml = { path = "./core/nemesis_xml" }
 node_expr = { path = "./core/node_expr" }
-serde_hkx_for_gui = { path= "./core/serde_hkx_for_gui" }
+serde_hkx_for_gui = { path = "./core/serde_hkx_for_gui" }
 skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 skyrim_crc = { path = "./core/skyrim_crc" }
 skyrim_data_dir = { path = "./core/skyrim_data_dir" }
-tracing_rotation = { path= "./core/tracing_rotation" }
+tracing_rotation = { path = "./core/tracing_rotation" }
 
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.

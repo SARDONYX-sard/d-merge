@@ -1,0 +1,43 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { useEffect, useState } from 'react';
+
+export const useTauriDragDrop = (openFiles: (paths: string[]) => Promise<void>) => {
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const dragEvent = async () => {
+      const webview = getCurrentWebview();
+      unlisten = await webview.onDragDropEvent(async (event) => {
+        switch (event.payload.type) {
+          case 'over':
+            setDragging(true);
+            break;
+          case 'drop':
+            setDragging(false);
+            const paths = event.payload.paths;
+            if (paths.length) {
+              await openFiles(paths);
+            }
+            break;
+          case 'leave':
+            setDragging(false);
+          default:
+            break;
+        }
+      });
+    };
+
+    dragEvent().catch((e) => console.error('Failed to set up drag and drop listener', e));
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  return {
+    dragging,
+    setDragging,
+  };
+};

@@ -2,13 +2,13 @@ name: Build & Test
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
     paths-ignore:
-      - "**/*.md"
+      - '**/*.md'
   pull_request:
-    branches: ["*"]
+    branches: ['*']
     paths-ignore:
-      - "**/*.md"
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
       - name: Install Python 3.14(To avoid lint error)
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: '3.14'
       - name: Lint Check
         run: rustup component add clippy;cargo clippy --workspace -- -D warnings
 
@@ -116,7 +116,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
-        features: [""]
+        features: ['']
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6.0.2
@@ -127,7 +127,7 @@ jobs:
         with:
           platform: ${{ matrix.platform }}
           build_profile: release
-          cache_key_suffix: "egui-${{ matrix.features }}"
+          cache_key_suffix: 'egui-${{ matrix.features }}'
           install_front_deps: false
 
       - name: Build GUI
@@ -161,7 +161,7 @@ jobs:
         with:
           platform: ${{ matrix.platform }}
           build_profile: release
-          cache_key_suffix: "cli"
+          cache_key_suffix: 'cli'
           install_front_deps: false
 
       - name: Build GUI

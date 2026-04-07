@@ -21,5 +21,5 @@ snafu = { workspace = true }
 workspace = true
 
 [features]
-default = ["serde"]   # for debug
+default = ["serde"] # for debug
 serde = ["dep:serde"]

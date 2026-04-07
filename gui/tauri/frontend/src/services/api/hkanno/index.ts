@@ -1,0 +1,135 @@
+import { invoke } from '@tauri-apps/api/core';
+import z from 'zod';
+import { OutFormat } from '../serde_hkx';
+
+/** `hkStringPtr`, `hkCString` XML null representation */
+export const NULL_STR = '\u2400';
+
+// Annotation
+const AnnotationSchema = z.object({
+  time: z.number(),
+  text: z.string().nullable(),
+});
+
+// AnnotationTrack
+const AnnotationTrackSchema = z.object({
+  /** Track name, corresponds to hkaAnnotationTrack.trackName */
+  track_name: z.string().nullable(),
+  annotations: z.array(AnnotationSchema),
+});
+type AnnotationTrack = z.infer<typeof AnnotationTrackSchema>;
+
+// Hkanno
+export const HkannoSchema = z.object({
+  /** XML index e.g. `#0003` */
+  ptr: z.string(),
+  num_original_frames: z.number(),
+  duration: z.number(),
+  annotation_tracks: z.array(AnnotationTrackSchema),
+});
+export type Hkanno = z.infer<typeof HkannoSchema>;
+
+/**
+ * Loads a .hkx or .xml file and parses it as an Hkanno structure.
+ *
+ * @throws If failed to load hkanno.
+ */
+export async function loadHkanno(path: string): Promise<Hkanno> {
+  return await invoke<Hkanno>('load_hkanno', { input: path });
+}
+
+/**
+ * Saves updated Hkanno data back into an .hkx or .xml file.
+ *
+ * @param input   Original .hkx/.xml path
+ * @param output  Output path to write updated file
+ * @param format  Output format
+ * @param hkanno  The modified Hkanno structure
+ *
+ * @throws If failed to save hkanno to file.
+ */
+export async function saveHkanno(input: string, output: string, format: OutFormat, hkanno: Hkanno): Promise<void> {
+  await invoke('save_hkanno', { input, output, hkanno, format });
+}
+
+/**
+ * Previews a .hkx or .xml file after updating it with an Hkanno structure.
+ *
+ * @param path Path to the .hkx or .xml file.
+ * @param hkanno Hkanno structure to apply updates.
+ * @returns The updated file content as a string (XML).
+ * @throws If failed to read file or update hkanno.
+ */
+export const previewHkanno = async (path: string, hkanno: Hkanno): Promise<string> => {
+  return await invoke<string>('preview_hkanno', { input: path, hkanno });
+};
+
+/** Parse hkanno v2 text into AnnotationTrack[] including track names */
+export const hkannoFromText = (text: string): AnnotationTrack[] => {
+  const lines = text.split('\n');
+  const annotation_tracks: AnnotationTrack[] = [];
+  let currentTrack: AnnotationTrack | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Start of a new track (flexible spacing around colon)
+    if (/^trackName\s*:/i.test(trimmed)) {
+      if (currentTrack) {
+        annotation_tracks.push(currentTrack);
+      }
+      const track_name = trimmed.split(':')[1].trim();
+      currentTrack = { annotations: [], track_name: track_name == NULL_STR ? null : track_name };
+      continue;
+    }
+
+    // Comment lines (#) are ignored except numAnnotations (optional)
+    if (trimmed.startsWith('#')) continue;
+
+    // Annotation line: <time> <text>
+    if (!currentTrack) {
+      // If text starts before any trackName, create dummy track
+      currentTrack = { annotations: [], track_name: null };
+    }
+
+    const [t, ...txt] = trimmed.split(/\s/); // tab or space
+    const time = parseFloat(t);
+    const annText = txt.join(' ').trim();
+    currentTrack.annotations.push({
+      time,
+      text: annText === NULL_STR ? null : annText,
+    });
+  }
+
+  if (currentTrack) annotation_tracks.push(currentTrack);
+
+  return annotation_tracks;
+};
+
+/** Convert Hkanno object to editable text (frontend-side mirror) */
+export function hkannoToText(h: Hkanno): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`# numOriginalFrames: ${h.num_original_frames}`);
+  lines.push(`# duration: ${h.duration}`);
+  lines.push(`# numAnnotationTracks: ${h.annotation_tracks.length}`);
+
+  for (const track of h.annotation_tracks) {
+    lines.push(''); // Separate tracks with blank lines
+
+    // Output trackName even if annotations are empty
+    lines.push(`trackName: ${track.track_name?.trim() ?? NULL_STR}`);
+
+    // Optional: numAnnotations comment
+    lines.push(`# numAnnotations: ${track.annotations.length}`);
+
+    for (const ann of track.annotations) {
+      const text = ann.text?.trim() ?? NULL_STR;
+      lines.push(`${ann.time.toFixed(6)} ${text}`);
+    }
+  }
+
+  return lines.join('\n');
+}
