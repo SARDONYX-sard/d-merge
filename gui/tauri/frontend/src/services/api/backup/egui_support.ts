@@ -69,7 +69,10 @@ export function convertEguiSettings(settings: EguiSettings): Cache {
   const output = {
     'patch-is-vfs-mode': JSON.stringify(settings.mode === 'vfs'),
     'patch-options': JSON.stringify({
-      hackOptions: { castRagdollEvent: true },
+      hackOptions: {
+        castRagdollEvent: true,
+        boneWeightOutsideHkparam: true,
+      },
       debug: {
         outputPatchJson: settings.enable_debug_output ?? false,
         outputMergedJson: settings.enable_debug_output ?? false,

@@ -104,6 +104,14 @@ pub struct HackOptions {
     /// - Substitutes `event` with `contactEvent`
     /// - Substitutes `anotherBoneIndex` with `bones`
     pub cast_ragdoll_event: bool,
+    /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
+    /// appears *outside* the closing `</hkparam>` tag instead of inside it.
+    ///
+    /// Such patches contain a raw space-separated float list between MOD_CODE and CLOSE
+    /// at the class field level, which is structurally invalid in normal Nemesis XML.
+    ///
+    /// For `Precision Creatures` patch.
+    pub bone_weight_outside_hkparam: bool,
 }
 
 impl HackOptions {
@@ -112,6 +120,7 @@ impl HackOptions {
     pub const fn enable_all() -> Self {
         Self {
             cast_ragdoll_event: true,
+            bone_weight_outside_hkparam: true,
         }
     }
 }
@@ -121,6 +130,7 @@ impl From<HackOptions> for nemesis_xml::hack::HackOptions {
     fn from(value: HackOptions) -> Self {
         Self {
             cast_ragdoll_event: value.cast_ragdoll_event,
+            bone_weight_outside_hkparam: value.bone_weight_outside_hkparam,
         }
     }
 }

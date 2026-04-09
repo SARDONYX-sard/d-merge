@@ -29,6 +29,16 @@ pub struct HackOptions {
     /// - Substitutes `anotherBoneIndex` with `bones`
     #[pyo3(get, set)]
     pub cast_ragdoll_event: bool,
+
+    /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
+    /// appears *outside* the closing `</hkparam>` tag instead of inside it.
+    ///
+    /// Such patches contain a raw space-separated float list between MOD_CODE and CLOSE
+    /// at the class field level, which is structurally invalid in normal Nemesis XML.
+    ///
+    /// For `Precision Creatures` patch.
+    #[pyo3(get, set)]
+    pub bone_weight_outside_hkparam: bool,
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
@@ -133,6 +143,7 @@ impl Config {
         output_dir: String,
         output_target: OutPutTarget,
         cast_ragdoll_event: Option<bool>,
+        bone_weight_outside_hkparam: Option<bool>,
         output_patch_json: bool,
         output_merged_json: bool,
         output_merged_xml: bool,
@@ -143,8 +154,10 @@ impl Config {
             resource_dir,
             output_dir,
             output_target,
-            hack_options: cast_ragdoll_event
-                .map(|cast_ragdoll_event| HackOptions { cast_ragdoll_event }),
+            hack_options: Some(HackOptions {
+                cast_ragdoll_event: cast_ragdoll_event.unwrap_or_default(),
+                bone_weight_outside_hkparam: bone_weight_outside_hkparam.unwrap_or_default(),
+            }),
             debug: DebugOptions {
                 output_patch_json,
                 output_merged_json,
@@ -181,6 +194,7 @@ impl Config {
             },
             hack_options: self.hack_options.map(|h| RustHackOptions {
                 cast_ragdoll_event: h.cast_ragdoll_event,
+                bone_weight_outside_hkparam: h.bone_weight_outside_hkparam,
             }),
             debug: RustDebugOptions {
                 output_patch_json: self.debug.output_patch_json,

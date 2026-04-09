@@ -76,6 +76,7 @@ export async function loadModsInfo(skyrimDataDir: string, isVfsMode: boolean) {
 export type PatchOptions = {
   hackOptions: {
     castRagdollEvent: boolean;
+    boneWeightOutsideHkparam: boolean;
   };
   debug: {
     outputPatchJson: boolean;
@@ -103,6 +104,7 @@ export const patchOptionsSchema = z
   .object({
     hackOptions: z.object({
       castRagdollEvent: z.boolean(),
+      boneWeightOutsideHkparam: z.boolean(),
     }),
     debug: z.object({
       outputPatchJson: z.boolean(),
@@ -118,6 +120,7 @@ export const patchOptionsSchema = z
   .catch({
     hackOptions: {
       castRagdollEvent: true,
+      boneWeightOutsideHkparam: true,
     },
     debug: {
       outputMergedJson: true,
