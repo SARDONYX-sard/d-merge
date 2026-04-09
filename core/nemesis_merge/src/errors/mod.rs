@@ -211,9 +211,17 @@ pub enum Error {
         source: rmp_serde::decode::Error,
     },
 
+    /// Deserialize template error
+    #[snafu(display("[hkx template Parsing Error(XML)]{}:\n{source}", path.display()))]
+    TemplateXmlError {
+        /// input path
+        path: PathBuf,
+        source: simd_json::Error,
+    },
+
     /// (De)Serialize json error
-    #[snafu(display("[simd_json serde error] {}:\n {source}", path.display()))]
-    SimdJsonError {
+    #[snafu(display("[json -> ClassMap Error] {}:\n {source}", path.display()))]
+    JsonToClassMapError {
         /// input path
         path: PathBuf,
         source: simd_json::Error,

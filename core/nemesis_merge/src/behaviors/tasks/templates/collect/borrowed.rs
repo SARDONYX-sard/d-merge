@@ -9,7 +9,7 @@ use crate::{
         key::TemplateKey,
         types::{BorrowedTemplateMap, OwnedTemplateMap},
     },
-    errors::{Error, HkxDeSnafu, Result, SimdJsonSnafu, TemplateSnafu},
+    errors::{Error, HkxDeSnafu, Result, TemplateSnafu, TemplateXmlSnafu},
 };
 
 /// Return  Map<name, (inner_path, value)>
@@ -55,7 +55,7 @@ pub(crate) fn template_xml_to_value(bytes: &[u8], path: &Path) -> Result<Borrowe
     })?;
     let ast: serde_hkx_features::ClassMap =
         serde_hkx::from_str(template_xml).with_context(|_| HkxDeSnafu { path })?;
-    let value = to_borrowed_value(ast).with_context(|_| SimdJsonSnafu { path })?;
+    let value = to_borrowed_value(ast).with_context(|_| TemplateXmlSnafu { path })?;
     Ok(value)
 }
 

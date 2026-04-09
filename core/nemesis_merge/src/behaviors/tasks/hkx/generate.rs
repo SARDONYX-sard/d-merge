@@ -15,7 +15,7 @@ use crate::{
         patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
     },
     config::{ReportType, StatusReportCounter},
-    errors::{Error, FailedIoSnafu, HkxSerSnafu, Result, SimdJsonSnafu},
+    errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonToClassMapSnafu, Result},
     results::filter_results,
     Config, OutPutTarget,
 };
@@ -53,7 +53,7 @@ pub(crate) fn generate_hkx_files(
                 }
 
                 let mut class_map: ClassMap =
-                    from_borrowed_value(template_json).with_context(|_| SimdJsonSnafu {
+                    from_borrowed_value(template_json).with_context(|_| JsonToClassMapSnafu {
                         path: output_path.clone(),
                     })?;
 
