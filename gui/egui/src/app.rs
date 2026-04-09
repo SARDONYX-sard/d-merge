@@ -1043,11 +1043,12 @@ impl ModManagerApp {
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {
                     cast_ragdoll_event: true,
+                    bone_weight_outside_hkparam: true,
                 }),
                 debug: nemesis_merge::DebugOptions {
                     output_patch_json: is_debug_mode,
                     output_merged_json: is_debug_mode,
-                    output_merged_xml: false,
+                    output_merged_xml: is_debug_mode,
                 },
                 skyrim_data_dir_glob: Some(self.current_skyrim_data_dir().to_string()),
                 generate_fnis_esp: self.generate_fnis_esp,

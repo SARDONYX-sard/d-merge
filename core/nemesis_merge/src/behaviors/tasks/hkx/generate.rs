@@ -47,12 +47,10 @@ pub(crate) fn generate_hkx_files(
             let hkx_bytes = {
                 // The error occurring with the following `from_borrowed_value` indicates that the intended JSON
                 // format has not been achieved, suggesting an issue lies with the tool itself.
-
-                // if config.debug.output_merged_json {
-                //     let mut debug_path = debug_file_path(&config.output_dir, inner_path);
-                //     debug_path.set_extension("pre_convert.json");
-                //     write_patched_json(&debug_path, &template_json)?;
-                // }
+                if config.debug.output_merged_json {
+                    let debug_path = debug_file_path(&config.output_dir, inner_path);
+                    write_patched_json(&debug_path, &template_json)?;
+                }
 
                 let mut class_map: ClassMap =
                     from_borrowed_value(template_json).with_context(|_| SimdJsonSnafu {
@@ -90,10 +88,6 @@ pub(crate) fn generate_hkx_files(
                 }
 
                 // NOTE: View the debug output after removing duplicates. Otherwise, duplicate eventNames will appear.
-                if config.debug.output_merged_json {
-                    let debug_path = debug_file_path(&config.output_dir, inner_path);
-                    write_patched_json(&debug_path, &class_map)?;
-                }
                 if config.debug.output_merged_xml {
                     let debug_path = debug_file_path(&config.output_dir, inner_path);
                     write_patched_xml(&debug_path, &class_map)?;

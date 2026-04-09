@@ -185,6 +185,12 @@ impl<'de> PatchDeserializer<'de> {
         let mut obj = Object::new();
         obj.insert("__ptr".into(), ptr_index.into());
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
+            if self.hack_options.bone_weight_outside_hkparam
+                && self.try_hack_bone_weight_seq_push()?
+            {
+                continue;
+            }
+
             let (field_name, value) = self.field()?;
             if should_take_in_this {
                 obj.insert(field_name.into(), value);
@@ -567,6 +573,44 @@ impl<'de> PatchDeserializer<'de> {
 
         self.current.seq_range = None;
         Ok(BorrowedValue::Array(Box::new(vec)))
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// Peeks for the pattern:
+    /// ```xml
+    /// <hkparam name="boneWeights" numelements="0"></hkparam>
+    /// <!-- MOD_CODE ~id~ OPEN -->
+    /// <float list>
+    /// </hkparam>
+    /// <!-- CLOSE -->
+    /// ```
+    ///
+    /// If the pattern matches, consumes all of it and inserts a SeqPush patch.
+    /// Returns `true` if the pattern was handled.
+    fn try_hack_bone_weight_seq_push(&mut self) -> Result<bool> {
+        use super::hack::bone_weight::{bone_weight_then_mod_code, parse_floats_till_end_hkparam};
+
+        // Peek: does `<hkparam name="boneWeights" numelements="0"></hkparam>` follow?
+        if self.parse_peek(bone_weight_then_mod_code).is_err() {
+            return Ok(false);
+        }
+
+        self.parse_next(bone_weight_then_mod_code)?;
+        let floats = self.parse_next(parse_floats_till_end_hkparam)?;
+
+        let mut patch_path = self.current.path.clone();
+        patch_path.push("boneWeights".into());
+
+        self.output_patches.insert(
+            patch_path,
+            JsonPatch {
+                action: Action::SeqPush,
+                value: BorrowedValue::Array(Box::new(floats)),
+            },
+        );
+
+        Ok(true)
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -979,6 +1023,7 @@ mod tests {
             nemesis_xml,
             Some(HackOptions {
                 cast_ragdoll_event: true,
+                ..Default::default()
             }),
         )
         .unwrap_or_else(|e| panic!("{e}"));
@@ -1000,6 +1045,40 @@ mod tests {
             },
         );
         assert_eq!(actual, hash_map);
+    }
+
+    #[test]
+    fn hack_bone_weight_outside_hkparam() {
+        let nemesis_xml = r###"
+    <hkobject name="#0119" class="hkbBoneWeightArray" signature="0xcd902b77">
+        <hkparam name="variableBindingSet">null</hkparam>
+        <hkparam name="boneWeights" numelements="0"></hkparam>
+<!-- MOD_CODE ~colisc~ OPEN -->
+        0.000000 0.100000 0.200000
+        0.300000 0.400000 0.500000
+        </hkparam>
+<!-- CLOSE -->
+    </hkobject>
+    "###;
+
+        let (actual, _) = parse_nemesis_patch(
+            nemesis_xml,
+            Some(HackOptions {
+                bone_weight_outside_hkparam: true,
+                ..Default::default()
+            }),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+
+        let mut expected = HashMap::new();
+        expected.insert(
+            json_path!["#0119", "hkbBoneWeightArray", "boneWeights"],
+            JsonPatch {
+                action: Action::SeqPush,
+                value: json_typed!(borrowed, [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]),
+            },
+        );
+        assert_eq!(actual, expected);
     }
 
     #[cfg_attr(

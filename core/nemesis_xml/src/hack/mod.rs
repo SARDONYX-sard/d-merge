@@ -21,6 +21,7 @@
 //! ## Safety and Limitations
 //! Enabling hacks may allow invalid data to pass silently. Use only when working with trusted
 //! or known input formats, and prefer strict parsing in validation or toolchain scenarios.
+pub(crate) mod bone_weight;
 mod bs_ragdoll_event;
 
 pub use bs_ragdoll_event::do_hack_cast_ragdoll_event;
@@ -37,7 +38,17 @@ pub struct HackOptions {
     /// This option activates targeted fixes for common field naming mistakes in patches:
     /// - Substitutes `event` with `contactEvent`
     /// - Substitutes `anotherBoneIndex` with `bones`
+    ///
+    /// For `Elden Counter` patch.
     pub cast_ragdoll_event: bool,
+    /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
+    /// appears *outside* the closing `</hkparam>` tag instead of inside it.
+    ///
+    /// Such patches contain a raw space-separated float list between MOD_CODE and CLOSE
+    /// at the class field level, which is structurally invalid in normal Nemesis XML.
+    ///
+    /// For `Precision Creatures` patch.
+    pub bone_weight_outside_hkparam: bool,
 }
 
 impl HackOptions {
@@ -46,6 +57,7 @@ impl HackOptions {
     pub const fn enable_all() -> Self {
         Self {
             cast_ragdoll_event: true,
+            bone_weight_outside_hkparam: true,
         }
     }
 }
