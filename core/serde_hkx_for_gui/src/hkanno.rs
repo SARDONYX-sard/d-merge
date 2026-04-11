@@ -231,17 +231,57 @@ impl<'a> Hkanno<'a> {
     /// - Serialization of the updated data fails.
     pub fn update_hkx_bytes(
         self,
-        bytes: Vec<u8>,
+        bytes: &[u8],
         output_format: Format,
         input: &Path,
     ) -> Result<Vec<u8>, HkannoError> {
-        serde_hkx_features::convert::process_serde_with(bytes, input, output_format, |class_map| {
-            self.into_static()
-                .write_to_classmap(class_map)
-                .map_err(|e| serde_hkx_features::error::Error::IoError {
-                    source: std::io::Error::other(e),
+        serde_hkx_features::convert::process_serde_with(
+            bytes,
+            input,
+            |mut classes| {
+                self.clone()
+                    .into_static()
+                    .write_to_classmap(&mut classes)
+                    .map_err(|e| serde_hkx_features::error::Error::IoError {
+                        source: std::io::Error::other(e),
+                    })?;
+
+                match output_format {
+                    Format::Amd64 | Format::Win32 | Format::Xml => {
+                        serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
+                    }
+                    Format::Json | Format::Toml => {
+                        let mut classes =
+                            serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
+                        serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
+                    }
+                }
+                .with_context(|_| serde_hkx_features::error::SerSnafu {
+                    input: input.to_path_buf(),
                 })
-        })
+            },
+            |mut classes| {
+                self.clone().write_to_classmap(&mut classes).map_err(|e| {
+                    serde_hkx_features::error::Error::IoError {
+                        source: std::io::Error::other(e),
+                    }
+                })?;
+
+                match output_format {
+                    Format::Amd64 | Format::Win32 | Format::Xml => {
+                        serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
+                    }
+                    Format::Json | Format::Toml => {
+                        let mut classes =
+                            serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
+                        serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
+                    }
+                }
+                .with_context(|_| serde_hkx_features::error::SerSnafu {
+                    input: input.to_path_buf(),
+                })
+            },
+        )
         .context(SerdeHkxFeatureSnafu)
     }
 }
@@ -476,65 +516,23 @@ const fn is_hka_animation_derived(class: &Classes<'_>) -> bool {
 /// }
 #[inline]
 pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, HkannoError> {
-    let input_fmt = {
-        let Some(input_ext) = input.extension() else {
-            return Err(serde_hkx_features::error::Error::MissingExtension {
-                path: input.to_path_buf(),
-            })
-            .context(SerdeHkxFeatureSnafu);
-        };
-        Format::from_extension(input_ext)
-            .map_err(
-                |_| serde_hkx_features::error::Error::UnsupportedExtensionPath {
-                    path: input.to_path_buf(),
-                },
-            )
-            .context(SerdeHkxFeatureSnafu)?
-    };
-
-    // Deserialize
-    let classes = match input_fmt {
-        Format::Amd64 | Format::Win32 => serde_hkx::from_bytes(bytes)
-            .map_err(|e| serde_hkx_features::serde::de::DeError::Hkx {
-                location: snafu::location!(),
-                source: e,
-            })
-            .with_context(|_| serde_hkx_features::error::DeSnafu {
-                input: input.to_path_buf(),
-            })
-            .context(SerdeHkxFeatureSnafu)?,
-        Format::Xml => {
-            let string = auto_charset::decode_to_utf8(bytes.to_vec())
-                .map_err(|e| serde_hkx_features::error::Error::IoError { source: e })
-                .context(SerdeHkxFeatureSnafu)?;
-            let classes = serde_hkx::from_str(&string)
-                .map_err(|e| serde_hkx_features::serde::de::DeError::Xml {
-                    location: snafu::location!(),
-                    source: e,
-                })
-                .with_context(|_| serde_hkx_features::error::DeSnafu {
-                    input: input.to_path_buf(),
-                })
-                .context(SerdeHkxFeatureSnafu)?;
-            return parse_hkanno_borrowed(classes).map(|anno| anno.into_static());
-        }
-
-        Format::Json => {
-            use serde_hkx_features::types_wrapper::ClassPtrMap;
-
-            let classes = sonic_rs::from_slice::<ClassPtrMap>(bytes)
+    serde_hkx_features::convert::process_serde_with(
+        bytes,
+        input,
+        |classes| {
+            parse_hkanno_borrowed(classes)
                 .map_err(|e| serde_hkx_features::error::Error::IoError {
                     source: std::io::Error::other(e),
                 })
-                .context(SerdeHkxFeatureSnafu)?;
-            classes.into_class_map()
-        }
-        Format::Toml => Err(serde_hkx_features::error::Error::UnsupportedExtensionPath {
-            path: input.to_path_buf(),
-        })
-        .context(SerdeHkxFeatureSnafu)?,
-    };
-    parse_hkanno_borrowed(classes)
+                .map(|ano| ano.into_static())
+        },
+        |classes| {
+            parse_hkanno_borrowed(classes).map_err(|e| serde_hkx_features::error::Error::IoError {
+                source: std::io::Error::other(e),
+            })
+        },
+    )
+    .context(SerdeHkxFeatureSnafu)
 }
 
 /// Custom error type for hkanno parsing operations.

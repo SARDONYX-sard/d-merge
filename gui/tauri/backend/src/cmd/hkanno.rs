@@ -30,7 +30,7 @@ pub(crate) async fn save_hkanno(
         Format::from_str(format).map_err(|_| format!("Invalid output format: {format}"))?;
 
     let updated = hkanno
-        .update_hkx_bytes(bytes, format, input)
+        .update_hkx_bytes(&bytes, format, input)
         .map_err(|e| format!("Failed to update hkx: {e}"))?;
 
     fs::write(&output, updated)
@@ -47,7 +47,7 @@ pub(crate) async fn preview_hkanno(input: &Path, hkanno: Hkanno<'_>) -> Result<S
         .map_err(|e| format!("Failed to read file({}: {e}", input.display()))?;
 
     let updated = hkanno
-        .update_hkx_bytes(bytes, Format::Xml, input)
+        .update_hkx_bytes(&bytes, Format::Xml, input)
         .map_err(|e| format!("Failed to update hkx: {e}"))?;
 
     String::from_utf8(updated).map_err(|e| format!("Failed to utf-8: {e}"))

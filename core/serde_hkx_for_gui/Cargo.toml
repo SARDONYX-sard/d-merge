@@ -13,13 +13,10 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-auto_charset = { workspace = true }
 futures = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_hkx = { workspace = true }
 serde_repr = { workspace = true }
-sonic-rs = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
