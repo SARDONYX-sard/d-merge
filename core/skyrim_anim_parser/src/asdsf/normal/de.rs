@@ -1,10 +1,10 @@
 //! Parses animation data from asdsf(animationsetdatasinglefile.txt)
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq, ModalResult, Parser,
 };
+use winnow_ext::ReadableError;
 
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
 use crate::{

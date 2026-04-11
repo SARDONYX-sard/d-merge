@@ -231,7 +231,7 @@ fn parse_anim_data_patch<'a>(
         ParserType::AddAnimSet(file_name) => {
             let patch = skyrim_anim_parser::asdsf::normal::de::anim_set_data
                 .parse(asdsf_patch)
-                .map_err(|err| serde_hkx::errors::readable::ReadableError::from_parse(err))
+                .map_err(|err| winnow_ext::ReadableError::from_parse(err))
                 .with_context(|_| FailedParseAsdsfPatchSnafu { path: path.clone() })?;
             PatchKind::AddAnimSet {
                 patch,

@@ -12,9 +12,7 @@ pub enum Error {
 
     /// Human readable XML parsing error
     #[snafu(transparent)]
-    ReadableError {
-        source: serde_hkx::errors::readable::ReadableError,
-    },
+    ReadableError { source: winnow_ext::ReadableError },
 
     //////////////////////////////////////////////////////////////////////
     /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.

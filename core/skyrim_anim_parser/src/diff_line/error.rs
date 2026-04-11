@@ -24,9 +24,7 @@ pub enum Error {
 
     /// Human readable XML parsing error
     #[snafu(transparent)]
-    Readable {
-        source: serde_hkx::errors::readable::ReadableError,
-    },
+    Readable { source: winnow_ext::ReadableError },
 
     //////////////////////////////////////////////////////////////////////
     // merge

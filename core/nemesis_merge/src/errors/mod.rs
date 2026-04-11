@@ -3,7 +3,7 @@ pub mod writer;
 
 use std::{io, path::PathBuf};
 
-use serde_hkx::errors::readable::ReadableError;
+use winnow_ext::ReadableError;
 
 /// `nemesis_merge` Error
 #[derive(Debug, snafu::Snafu)]

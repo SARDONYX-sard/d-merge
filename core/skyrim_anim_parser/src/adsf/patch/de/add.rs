@@ -2,13 +2,13 @@
 //! Patches need to be parsed fairly loosely; modders may not put in line breaks.
 use core::str::FromStr;
 
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq, ModalResult, Parser,
 };
+use winnow_ext::ReadableError;
 
 use crate::{
     adsf::normal::{

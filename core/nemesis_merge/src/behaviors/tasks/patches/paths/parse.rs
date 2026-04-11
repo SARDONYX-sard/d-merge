@@ -24,7 +24,6 @@
 
 use std::path::Path;
 
-use serde_hkx::errors::readable::ReadableError;
 use snafu::OptionExt;
 use winnow::{
     ascii::Caseless,
@@ -34,9 +33,10 @@ use winnow::{
     token::{any, take_while},
     ModalResult, Parser,
 };
+use winnow_ext::{take_until_ext, ReadableError};
 
 use crate::{
-    behaviors::{priority_ids::take_until_ext, tasks::patches::paths::NemesisPath},
+    behaviors::tasks::patches::paths::NemesisPath,
     errors::{Error, NonUtf8PathSnafu},
 };
 

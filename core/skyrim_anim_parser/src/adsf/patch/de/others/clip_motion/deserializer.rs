@@ -1,11 +1,11 @@
 use json_patch::Op;
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
 };
+use winnow_ext::ReadableError;
 
 use crate::{
     adsf::{

@@ -4,8 +4,6 @@
 // This is based on the logic of Pandora-Behaviour-Engine-Plus.
 
 use winnow::{
-    ascii::Caseless,
-    combinator::alt,
     error::{StrContext, StrContextValue},
     ModalResult, Parser as _,
 };
@@ -49,27 +47,44 @@ pub enum FNISAnimType {
 }
 
 pub(crate) fn parse_anim_type(input: &mut &str) -> ModalResult<FNISAnimType> {
-    alt((
-        Caseless("fuo").value(FNISAnimType::FurnitureOptimized),
-        Caseless("ofa").value(FNISAnimType::OffsetArm),
-        // 2 char
-        Caseless("aa").value(FNISAnimType::Alternate),
-        Caseless("ch").value(FNISAnimType::Chair),
-        Caseless("fu").value(FNISAnimType::Furniture),
-        Caseless("km").value(FNISAnimType::KillMove),
-        Caseless("pa").value(FNISAnimType::Paired),
-        Caseless("so").value(FNISAnimType::SequencedOptimized),
-        // 1 char
-        Caseless("+").value(FNISAnimType::SequencedContinued),
-        Caseless("b").value(FNISAnimType::Basic),
-        Caseless("o").value(FNISAnimType::AnimObject),
-        Caseless("s").value(FNISAnimType::Sequenced),
-    ))
-    .context(StrContext::Label("AnimType"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "One of: b, s, so, fu, fuo, +, ofa, o, pa, km, aa, ch",
-    )))
-    .parse_next(input)
+    winnow::token::take_while(1..=3, |c: char| c.is_alphabetic() || c == '+')
+        .verify_map(match_caseless)
+        .context(StrContext::Label("AnimType"))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "One of: b, s, so, fu, fuo, +, ofa, o, pa, km, aa, ch",
+        )))
+        .parse_next(input)
+}
+
+// winnow(v1.0.0) alt tuple 8 limit. So we use `match`
+const fn match_caseless(s: &str) -> Option<FNISAnimType> {
+    Some(if s.eq_ignore_ascii_case("fuo") {
+        FNISAnimType::FurnitureOptimized
+    } else if s.eq_ignore_ascii_case("ofa") {
+        FNISAnimType::OffsetArm
+    } else if s.eq_ignore_ascii_case("aa") {
+        FNISAnimType::Alternate
+    } else if s.eq_ignore_ascii_case("ch") {
+        FNISAnimType::Chair
+    } else if s.eq_ignore_ascii_case("fu") {
+        FNISAnimType::Furniture
+    } else if s.eq_ignore_ascii_case("km") {
+        FNISAnimType::KillMove
+    } else if s.eq_ignore_ascii_case("pa") {
+        FNISAnimType::Paired
+    } else if s.eq_ignore_ascii_case("so") {
+        FNISAnimType::SequencedOptimized
+    } else if s.eq_ignore_ascii_case("+") {
+        FNISAnimType::SequencedContinued
+    } else if s.eq_ignore_ascii_case("b") {
+        FNISAnimType::Basic
+    } else if s.eq_ignore_ascii_case("o") {
+        FNISAnimType::AnimObject
+    } else if s.eq_ignore_ascii_case("s") {
+        FNISAnimType::Sequenced
+    } else {
+        return None;
+    })
 }
 
 #[cfg(test)]

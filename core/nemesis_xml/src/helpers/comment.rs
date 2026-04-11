@@ -83,31 +83,10 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
     terminated(
-        take_until_ext(0.., Caseless("<!-- CLOSE -->")),
+        winnow_ext::take_until_ext(0.., Caseless("<!-- CLOSE -->")),
         Caseless("<!-- CLOSE -->"),
     )
     .parse_next(input)
-}
-
-/// take_until implementation using only winnow
-fn take_until_ext<Input, Output, Error, ParseNext>(
-    occurrences: impl Into<winnow::stream::Range>,
-    parser: ParseNext,
-) -> impl Parser<Input, Input::Slice, Error>
-where
-    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
-    Error: winnow::error::ParserError<Input>,
-    ParseNext: Parser<Input, Output, Error>,
-{
-    use winnow::{
-        combinator::{not, peek, repeat, trace},
-        token::any,
-    };
-
-    trace(
-        "take_until_ext",
-        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
-    )
 }
 
 #[cfg(test)]

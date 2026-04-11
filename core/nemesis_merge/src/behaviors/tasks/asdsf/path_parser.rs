@@ -130,9 +130,7 @@ pub fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, 
 #[allow(clippy::enum_variant_names)]
 pub enum ParseError {
     #[snafu(transparent)]
-    MissingID {
-        source: serde_hkx::errors::readable::ReadableError,
-    },
+    MissingID { source: winnow_ext::ReadableError },
 
     #[snafu(display("Non-UTF-8 path: {}", path.display()))]
     NonUtf8Path { path: PathBuf },

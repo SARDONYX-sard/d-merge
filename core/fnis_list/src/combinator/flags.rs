@@ -126,20 +126,22 @@ fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
 }
 
 pub(crate) fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
-    alt((
-        "ac0".value(FNISAnimFlags::AnimatedCameraReset),
-        "ac1".value(FNISAnimFlags::AnimatedCameraSet),
-        "bsa".value(FNISAnimFlags::BSA),
-        "ac".value(FNISAnimFlags::AnimatedCamera),
-        "md".value(FNISAnimFlags::MotionDriven),
-        "st".value(FNISAnimFlags::Sticky),
-        "Tn".value(FNISAnimFlags::TransitionNext),
-        "a".value(FNISAnimFlags::Acyclic),
-        "h".value(FNISAnimFlags::HeadTracking),
-        "k".value(FNISAnimFlags::Known),
-        "o".value(FNISAnimFlags::AnimObjects),
-    ))
-    .parse_next(input)
+    winnow::token::take_while(1..=3, |c: char| c.is_ascii_alphanumeric())
+        .verify_map(|token| match token {
+            "ac0" => Some(FNISAnimFlags::AnimatedCameraReset),
+            "ac1" => Some(FNISAnimFlags::AnimatedCameraSet),
+            "bsa" => Some(FNISAnimFlags::BSA),
+            "ac" => Some(FNISAnimFlags::AnimatedCamera),
+            "md" => Some(FNISAnimFlags::MotionDriven),
+            "st" => Some(FNISAnimFlags::Sticky),
+            "Tn" => Some(FNISAnimFlags::TransitionNext),
+            "a" => Some(FNISAnimFlags::Acyclic),
+            "h" => Some(FNISAnimFlags::HeadTracking),
+            "k" => Some(FNISAnimFlags::Known),
+            "o" => Some(FNISAnimFlags::AnimObjects),
+            _ => None,
+        })
+        .parse_next(input)
 }
 
 fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {

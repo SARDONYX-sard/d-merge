@@ -12,7 +12,6 @@ rust-version = "1.91"
 [workspace]
 members = [
   "cli",
-  "core/auto_charset",
   "core/fnis_list",
   "core/gh_issue_link",
   "core/json_patch",
@@ -36,37 +35,38 @@ resolver = "2"
 dashmap = { version = "6.1.0" }
 educe = { version = "0.6.0" }
 futures = { version = "0.3.32" }
-indexmap = { version = "2.13.1", features = ["rayon"] }
+indexmap = { version = "2.14.0", features = ["rayon"] }
 jwalk = { version = "0.8.1" }
 once_cell = "1.21.4"
 phf = "0.13.1"
 rayon = "1.11.0"
 rmp-serde = "1.3.1" # message pack binary serde
 serde = { version = "1.0.228", features = ["derive"] } # Implement (De)Serialize
-serde_json = "1.0.145" # gui: To avoid generate_context error.
+serde_json = "1.0.149" # gui: To avoid generate_context error.
 serde_repr = "0.1.20" # C like Serialize enum into numbers.(Using progress reporting)
 simd-json = "0.17.0"
 snafu = "0.9.0"
 sonic-rs = "0.5.8"
-tokio = { version = "1.51.0", features = ["fs", "rt-multi-thread"] } # Async runtime
+tokio = { version = "1.51.1", features = ["fs", "rt-multi-thread"] } # Async runtime
 tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.23"
-winnow = { version = "0.7.14", features = ["simd"] }
+winnow = { version = "1.0.1", features = ["simd"] }
 
-diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false, features = [
+auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
+diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false, features = [
   "ignore_duplicates",
 ] }
-havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "f81baa5", default-features = false }
+havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
+winnow_ext = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "807f62a", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-auto_charset = { path = "./core/auto_charset" }
 fnis_list = { path = "./core/fnis_list" }
 gh_issue_link = { path = "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }

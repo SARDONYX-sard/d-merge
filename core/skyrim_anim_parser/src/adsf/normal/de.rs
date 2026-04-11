@@ -5,7 +5,6 @@
 //! which contains a list of projects and their corresponding animation data.
 use core::str::FromStr;
 
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, space1, till_line_ending},
     combinator::opt,
@@ -14,6 +13,7 @@ use winnow::{
     token::take_till,
     ModalResult, Parser,
 };
+use winnow_ext::ReadableError;
 
 use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,

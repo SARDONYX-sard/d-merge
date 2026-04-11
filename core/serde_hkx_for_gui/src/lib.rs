@@ -10,7 +10,7 @@ use std::path::Path;
 use futures::{future::join_all, stream::FuturesUnordered};
 pub use par_walk_dir::{load_dir_node, DirEntry};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use serde_hkx_features::OutFormat;
+use serde_hkx_features::Format;
 
 use self::status::{Payload, Status};
 use crate::{hash::hash_djb2, path::infer::generate_output_path};
@@ -45,7 +45,7 @@ pub async fn convert(
     roots: Option<Vec<String>>,
     status_sender: impl Fn(Payload) + Clone + Send + 'static,
 ) -> Result<(), ConvertError> {
-    let format = OutFormat::from_str(format).map_err(|_| ConvertError::FormatParse {
+    let format = Format::from_str(format).map_err(|_| ConvertError::FormatParse {
         invalid: format.to_string(),
     })?;
     let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });

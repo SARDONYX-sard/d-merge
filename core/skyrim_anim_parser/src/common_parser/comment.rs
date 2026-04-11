@@ -5,6 +5,7 @@ use winnow::{
     token::take_until,
     ModalResult, Parser,
 };
+use winnow_ext::take_until_ext;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CommentKind<'a> {
@@ -130,27 +131,6 @@ where
         let o2 = parser.parse_next(input)?;
         multispace0.parse_next(input).map(|_| o2)
     })
-}
-
-/// take_until implementation using only winnow
-pub fn take_until_ext<Input, Output, Error, ParseNext>(
-    occurrences: impl Into<winnow::stream::Range>,
-    parser: ParseNext,
-) -> impl Parser<Input, Input::Slice, Error>
-where
-    Input: winnow::stream::StreamIsPartial + winnow::stream::Stream,
-    Error: winnow::error::ParserError<Input>,
-    ParseNext: Parser<Input, Output, Error>,
-{
-    use winnow::{
-        combinator::{not, peek, repeat, trace},
-        token::any,
-    };
-
-    trace(
-        "take_until_ext",
-        repeat::<_, _, (), _, _>(occurrences, (peek(not(parser)), any)).take(),
-    )
 }
 
 #[cfg(test)]

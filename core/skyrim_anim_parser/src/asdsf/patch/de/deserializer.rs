@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use json_patch::{JsonPath, ValueWithPriority};
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
     combinator::opt,
     error::{ContextError, ErrMode},
     Parser,
 };
+use winnow_ext::ReadableError;
 
 use super::{
     error::{Error, Result},

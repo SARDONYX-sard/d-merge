@@ -5,10 +5,7 @@ use std::{collections::HashMap, mem};
 
 use json_patch::{Action, JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
-use serde_hkx::{
-    errors::readable::ReadableError,
-    xml::de::parser::type_kind::{boolean, real, string},
-};
+use serde_hkx::xml::de::parser::type_kind::{boolean, real, string};
 use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
 use winnow::{
     ascii::{dec_int, dec_uint, multispace0},
@@ -16,6 +13,7 @@ use winnow::{
     error::{ContextError, ErrMode},
     Parser,
 };
+use winnow_ext::ReadableError;
 
 use self::{
     class_table::{find_class_info, FieldInfo},

@@ -1,11 +1,11 @@
 use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::multispace0,
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     Parser,
 };
+use winnow_ext::ReadableError;
 
 use crate::{
     common_parser::{

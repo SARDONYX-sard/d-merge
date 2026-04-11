@@ -2,13 +2,13 @@ use core::ops::Range;
 
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
-use serde_hkx::errors::readable::ReadableError;
 use winnow::{
     ascii::{line_ending, multispace0, till_line_ending, Caseless},
     combinator::{alt, repeat},
     error::{StrContext::*, StrContextValue::*},
     ModalResult, Parser as _,
 };
+use winnow_ext::ReadableError;
 
 use crate::{
     asdsf::{

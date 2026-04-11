@@ -102,7 +102,7 @@ pub fn collect_borrowed_patches<'a>(
         mods_patches.par_iter().partition_map(|owned_data| {
             match parse_fnis_list
                 .parse(&owned_data.list_content)
-                .map_err(|e| serde_hkx::errors::readable::ReadableError::from_parse(e))
+                .map_err(|e| winnow_ext::ReadableError::from_parse(e))
                 .with_context(|_| FailedParseFnisModListSnafu {
                     path: owned_data.to_list_path(),
                 })
