@@ -35,7 +35,7 @@
     "monaco-editor": "0.49.0",
     "monaco-vim": "^0.4.4",
     "notistack": "3.0.2",
-    "react": "^19.2.4",
+    "react": "^19.2.5",
     "react-dom": "^19.2.4",
     "react-i18next": "17.0.2",
     "zod": "^4.3.6"
