@@ -2,19 +2,19 @@
 
 use skyrim_anim_parser::adsf::normal::Translation;
 use winnow::{
+    ModalResult, Parser,
     ascii::{space0, space1},
     combinator::{opt, repeat, separated, seq},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use crate::combinator::{
-    anim_types::{parse_anim_type, FNISAnimType},
-    anim_var::{parse_anim_var_line, AnimVar},
+    anim_types::{FNISAnimType, parse_anim_type},
+    anim_var::{AnimVar, parse_anim_var_line},
     comment::skip_ws_and_comments,
-    flags::{parse_anim_flags, FNISAnimFlagSet, FNISAnimFlags},
+    flags::{FNISAnimFlagSet, FNISAnimFlags, parse_anim_flags},
     motion::parse_md_data,
-    rotation::{parse_rd_data, RotationData},
+    rotation::{RotationData, parse_rd_data},
     take_till_fnis_ignores, take_till_space,
 };
 

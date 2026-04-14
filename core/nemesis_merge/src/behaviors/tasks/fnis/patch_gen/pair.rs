@@ -4,19 +4,20 @@ use fnis_list::{
     combinator::Trigger,
     patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
+        JsonPatchPairs,
         kill_move::{
             calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
             new_event_property_array, new_npc_synchronized_clip_generator,
             new_player_synchronized_clip_generator, new_push_transitions_seq_patch,
         },
-        new_push_events_seq_patch, JsonPatchPairs,
+        new_push_events_seq_patch,
     },
 };
 

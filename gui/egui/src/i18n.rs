@@ -69,10 +69,14 @@ impl I18nKey {
     pub const fn default_eng(&self) -> &'static str {
         match self {
             Self::AutoDetectButton => "Auto Detect",
-            Self::AutoDetectHover => "Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once.",
+            Self::AutoDetectHover => {
+                "Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once."
+            }
             Self::AutoRemoveMeshes => "Auto remove `meshes`",
-            Self::AutoRemoveMeshesHover => "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.\nNote: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods.",
-            Self::CancelButton       => "Cancel",
+            Self::AutoRemoveMeshesHover => {
+                "Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.\nNote: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods."
+            }
+            Self::CancelButton => "Cancel",
             Self::ClearButton => "Clear",
             Self::ColumnId => "ID",
             Self::ColumnName => "Name",
@@ -80,34 +84,50 @@ impl I18nKey {
             Self::ColumnPriority => "Priority",
             Self::ColumnSite => "Site",
             Self::DebugOutput => "Debug output",
-            Self::DebugOutputHover => "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)",
+            Self::DebugOutputHover => {
+                "Output d merge patches & merged json files.\n(To `<Output dir>/.d_merge/.debug/patches`)"
+            }
             Self::ErrorReadingModInfo => "Error: reading mod info",
-            Self::ExecuteButton      => "Execute",
+            Self::ExecuteButton => "Execute",
             Self::GenerateFnisEspLabel => "Gen FNIS.esp",
-            Self::GenerateFnisEspHover => "Generates a dummy FNIS.esp file. (Use this when you want to use a mod that requires FNIS.esp but do not want to use the original FNIS.esp from FNIS SE.)",
+            Self::GenerateFnisEspHover => {
+                "Generates a dummy FNIS.esp file. (Use this when you want to use a mod that requires FNIS.esp but do not want to use the original FNIS.esp from FNIS SE.)"
+            }
             Self::ExecutionModeLabel => "Execution mode:",
             Self::IssueReportButton => "Report Issue",
-            Self::IssueReportHover => "Report a bug on GitHub.\n This will auto-fill version info and some hardware.\n GitHub account required.",
+            Self::IssueReportHover => {
+                "Report a bug on GitHub.\n This will auto-fill version info and some hardware.\n GitHub account required."
+            }
             Self::LockButton => "🔒Locked",
-            Self::LockButtonHover => "Row reordering is locked unless sorting by Priority ascending.\nClick to unlock.",
+            Self::LockButtonHover => {
+                "Row reordering is locked unless sorting by Priority ascending.\nClick to unlock."
+            }
             Self::LogButton => "Log",
             Self::LogDir => "Log Dir",
             Self::LogLevelLabel => "Log Level",
             Self::ManualMode => "Manual mode",
-            Self::ManualModeHover => "When using it completely manually.\n(The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)",
+            Self::ManualModeHover => {
+                "When using it completely manually.\n(The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)"
+            }
             Self::ModsListTitle => "Mods",
             Self::NotificationClearButton => "Clear Notify",
-            Self::NotifyErrPlatformNotSupported => "Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.",
-            Self::NotifyErrWindowsRegistryNotFound => "Error: Could not find path in the Windows registry. \nIf you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually.",
+            Self::NotifyErrPlatformNotSupported => {
+                "Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually."
+            }
+            Self::NotifyErrWindowsRegistryNotFound => {
+                "Error: Could not find path in the Windows registry. \nIf you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually."
+            }
             Self::NotifyInfoUpdatingModList => "Updating Mod list…",
             Self::SelectButton => "Select",
-            Self::OutputDirLabel =>"Output dir:",
+            Self::OutputDirLabel => "Output dir:",
             Self::PatchButton => "Patch",
             Self::RemovingMeshesMessage => "Removing the `<output_dir>/meshes` directory...",
             Self::RuntimeTargetLabel => "Output format",
-            Self::RuntimeTargetHover => "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.",
+            Self::RuntimeTargetHover => {
+                "Output format for hkx. LE: win32, SE, VR: amd64\nNOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry."
+            }
             Self::SearchLabel => "Search:",
-            Self::SkyrimDataDirLabel =>  "Skyrim Data dir:",
+            Self::SkyrimDataDirLabel => "Skyrim Data dir:",
             Self::StatusGeneratingFnisPatches => "[1/6] Generating FNIS patches...",
             Self::StatusReadingPatches => "[2/6] Reading templates and patches...",
             Self::StatusParsingPatches => "[3/6] Parsing patches...",

@@ -2,12 +2,12 @@ use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use dashmap::DashSet;
 use fnis_list::{
-    combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation, Trigger},
+    FNISList, SyntaxPattern,
+    combinator::{Trigger, flags::FNISAnimFlags, fnis_animation::FNISAnimation},
     patterns::{
         pair_and_kill::{FNISPairedAndKillAnimation, FNISPairedType},
         sequenced::SequencedAnimation,
     },
-    FNISList, SyntaxPattern,
 };
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;

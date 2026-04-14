@@ -5,19 +5,19 @@ use std::{
 };
 
 use rayon::prelude::*;
-use serde_hkx::{bytes::serde::hkx_header::HkxHeader, EventIdMap, HavokSort as _, VariableIdMap};
-use serde_hkx_features::{id_maker::create_maps, ClassMap};
+use serde_hkx::{EventIdMap, HavokSort as _, VariableIdMap, bytes::serde::hkx_header::HkxHeader};
+use serde_hkx_features::{ClassMap, id_maker::create_maps};
 use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 
 use crate::{
+    Config, OutPutTarget,
     behaviors::tasks::{
         patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
     },
     config::{ReportType, StatusReportCounter},
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonToClassMapSnafu, Result},
     results::filter_results,
-    Config, OutPutTarget,
 };
 
 pub(crate) fn generate_hkx_files(

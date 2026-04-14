@@ -10,11 +10,11 @@ use std::{
 use chrono::Local;
 use once_cell::sync::OnceCell;
 use tracing_subscriber::{
+    Registry,
     filter::LevelFilter,
     fmt,
     prelude::*,
     reload::{self, Handle},
-    Registry,
 };
 
 use crate::error::{Error, Result};

@@ -50,8 +50,8 @@ mod num_key_map {
     use std::{collections::HashMap, fmt, sync::Arc};
 
     use serde::{
-        de::{self, MapAccess, Visitor},
         Deserializer,
+        de::{self, MapAccess, Visitor},
     };
 
     pub fn deserialize<'de, D>(

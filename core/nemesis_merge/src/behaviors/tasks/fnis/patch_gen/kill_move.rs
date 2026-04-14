@@ -2,23 +2,24 @@
 use std::borrow::Cow;
 
 use fnis_list::{
-    combinator::{flags::FNISAnimFlags, Trigger},
+    combinator::{Trigger, flags::FNISAnimFlags},
     patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
+        JsonPatchPairs,
         global::_0_master::{
             FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
             FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529,
             FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
             FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
         },
-        new_push_events_seq_patch, JsonPatchPairs,
+        new_push_events_seq_patch,
     },
 };
 

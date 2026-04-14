@@ -3,9 +3,10 @@ mod status;
 #[tokio::test]
 #[ignore = "local test"]
 async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
+    use rayon::prelude::*;
+
     use self::status::*;
     use crate::{PatchMaps, PriorityMap, behavior_gen};
-    use rayon::prelude::*;
 
     std::fs::remove_dir_all("../../dummy/behavior_gen/output")?; // remove prev output
 

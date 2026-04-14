@@ -133,7 +133,7 @@ impl<'a> Hkanno<'a> {
     /// If missing/multiple `hkaSplineCompressedAnimation`.
     pub fn write_to_classmap(self, class_map: &mut ClassMap<'a>) -> Result<(), HkannoError> {
         use havok_classes::Classes;
-        use havok_types::{StringPtr, I32};
+        use havok_types::{I32, StringPtr};
 
         let mut animations: Vec<_> = class_map
             .par_iter_mut()
@@ -146,7 +146,7 @@ impl<'a> Hkanno<'a> {
                 _ => {
                     return Err(HkannoError::MultipleHkaAnimationFound {
                         count: animations.len(),
-                    })
+                    });
                 }
             }
         };
@@ -377,7 +377,7 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
             _ => {
                 return Err(HkannoError::MultipleHkaAnimationFound {
                     count: animation_classes.len(),
-                })
+                });
             }
         }
     };

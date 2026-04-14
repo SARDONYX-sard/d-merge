@@ -141,7 +141,7 @@ impl core::str::FromStr for Runtime {
             invalid => {
                 return Err(format!(
                     "Expected `SkyrimSE` or `SkyrimLE`. But got {invalid}"
-                ))
+                ));
             }
         })
     }

@@ -4,11 +4,11 @@ use rayon::prelude::*;
 
 use crate::{
     adsf::{
-        alt::{to_adsf_key, AltAdsf, AltAnimData},
+        alt::{AltAdsf, AltAnimData, to_adsf_key},
         clip_id_manager::ClipIdManager,
         normal::{
-            ser::{serialize_clip_anim_block, serialize_clip_motion_block},
             AnimDataHeader,
+            ser::{serialize_clip_anim_block, serialize_clip_motion_block},
         },
     },
     diff_line::DiffLines,

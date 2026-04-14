@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use rayon::{iter::Either, prelude::*};
-use simd_json::{serde::to_borrowed_value, BorrowedValue};
+use simd_json::{BorrowedValue, serde::to_borrowed_value};
 use snafu::ResultExt as _;
 
 use crate::{
@@ -35,7 +35,7 @@ pub fn collect_templates(templates: &OwnedTemplateMap) -> (BorrowedTemplateMap<'
                     other => {
                         return Err(Error::UnsupportedTemplatePath {
                             path: other.to_path_buf(),
-                        })
+                        });
                     }
                 }?;
 

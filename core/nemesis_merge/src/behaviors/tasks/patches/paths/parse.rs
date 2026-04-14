@@ -26,14 +26,14 @@ use std::path::Path;
 
 use snafu::OptionExt;
 use winnow::{
+    ModalResult, Parser,
     ascii::Caseless,
     combinator::{alt, opt, repeat},
     error::{StrContext, StrContextValue},
     seq,
     token::{any, take_while},
-    ModalResult, Parser,
 };
-use winnow_ext::{take_until_ext, ReadableError};
+use winnow_ext::{ReadableError, take_until_ext};
 
 use crate::{
     behaviors::tasks::patches::paths::NemesisPath,
@@ -144,7 +144,9 @@ mod tests {
 
     #[test]
     fn engine_ext_basic() {
-        let p = parse("Nemesis_EngineExt/mod/test/meshes/actors/character/behaviors/character assets/skeleton.bin/#test.txt");
+        let p = parse(
+            "Nemesis_EngineExt/mod/test/meshes/actors/character/behaviors/character assets/skeleton.bin/#test.txt",
+        );
         assert_eq!(
             p,
             NemesisPath::EngineExt {

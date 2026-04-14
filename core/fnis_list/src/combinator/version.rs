@@ -1,10 +1,10 @@
 //! Version line parsing: `Version V<n>.<m>`
 
 use winnow::{
-    ascii::{digit1, space0, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, digit1, space0},
     combinator::{opt, preceded, seq},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use crate::combinator::comment::skip_ws_and_comments;

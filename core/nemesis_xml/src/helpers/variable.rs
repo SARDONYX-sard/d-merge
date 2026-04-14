@@ -58,11 +58,11 @@
 //! ```
 
 use winnow::{
+    ModalResult, Parser,
     ascii::Caseless,
     combinator::separated_pair,
     error::{StrContext::*, StrContextValue::*},
     token::take_until,
-    ModalResult, Parser,
 };
 
 /// # Errors

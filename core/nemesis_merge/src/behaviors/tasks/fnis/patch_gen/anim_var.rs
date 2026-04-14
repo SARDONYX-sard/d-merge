@@ -1,5 +1,5 @@
 use fnis_list::combinator::anim_var::{AnimVar, Value};
-use json_patch::{json_path, Action, JsonPatch, ValueWithPriority};
+use json_patch::{Action, JsonPatch, ValueWithPriority, json_path};
 use rayon::prelude::*;
 
 use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;

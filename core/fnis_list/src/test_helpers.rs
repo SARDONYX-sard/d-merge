@@ -1,7 +1,7 @@
 //! Common test helpers
 use winnow::{
-    error::{ContextError, ErrMode},
     Parser,
+    error::{ContextError, ErrMode},
 };
 
 /// Must successfully parse or panic

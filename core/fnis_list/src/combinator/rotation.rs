@@ -8,10 +8,10 @@
 
 use skyrim_anim_parser::adsf::normal::Rotation;
 use winnow::{
-    ascii::{float, space1, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, float, space1},
     combinator::{alt, seq},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use crate::combinator::comment::skip_ws_and_comments;

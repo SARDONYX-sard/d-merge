@@ -1,6 +1,6 @@
 use std::{fmt, path::PathBuf};
 
-use crate::{config::StatusReporterFn, Status};
+use crate::{Status, config::StatusReporterFn};
 
 /// A configuration structure used to specify various directories and a status report callback.
 ///

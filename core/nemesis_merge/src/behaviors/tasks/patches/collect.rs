@@ -10,10 +10,11 @@ use snafu::{OptionExt as _, ResultExt as _};
 use tokio::fs;
 
 use super::paths::{
-    collect::{collect_nemesis_paths, Category},
+    collect::{Category, collect_nemesis_paths},
     parse::parse_nemesis_path,
 };
 use crate::{
+    Config,
     behaviors::{
         priority_ids::{get_nemesis_id, types::PriorityMap},
         tasks::{
@@ -27,7 +28,6 @@ use crate::{
         Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
     },
     results::filter_results,
-    Config,
 };
 
 struct OwnedPath {

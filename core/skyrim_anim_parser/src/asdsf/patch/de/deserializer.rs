@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use json_patch::{JsonPath, ValueWithPriority};
 use winnow::{
+    Parser,
     ascii::multispace0,
     combinator::opt,
     error::{ContextError, ErrMode},
-    Parser,
 };
 use winnow_ext::ReadableError;
 
@@ -15,8 +15,8 @@ use super::{
 };
 use crate::{
     asdsf::patch::de::{
-        raw_diff::{Op, RawDiff},
         DiffPatchAnimSetData,
+        raw_diff::{Op, RawDiff},
     },
     common_parser::{
         comment::close_comment_line,
@@ -324,7 +324,7 @@ mod tests {
 
     use super::*;
     use crate::asdsf::patch::de::{
-        patch_map::SeqPatchMap, AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff,
+        AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff, patch_map::SeqPatchMap,
     };
 
     // V3                             <- version

@@ -1,9 +1,9 @@
 use simd_json::BorrowedValue;
 use winnow::{
+    ModalResult, Parser,
     combinator::alt,
     error::{StrContext, StrContextValue},
     token::take_till,
-    ModalResult, Parser,
 };
 
 /// Parse `#0000`, `#0500`

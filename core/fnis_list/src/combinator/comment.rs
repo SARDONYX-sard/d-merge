@@ -1,9 +1,9 @@
 //! Line comments parsing (`' comment`)
 
 use winnow::{
+    ModalResult, Parser,
     ascii::{line_ending, space1, till_line_ending},
     combinator::{alt, preceded, repeat},
-    ModalResult, Parser,
 };
 
 /// Skip any amount of spaces, newlines, and `' comment` lines.

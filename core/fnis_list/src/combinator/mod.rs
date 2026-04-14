@@ -27,7 +27,7 @@ pub mod motion;
 pub mod rotation;
 pub mod version;
 
-use winnow::{token::take_till, ModalResult, Parser as _};
+use winnow::{ModalResult, Parser as _, token::take_till};
 
 /// take till space, tab
 pub(crate) fn take_till_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {

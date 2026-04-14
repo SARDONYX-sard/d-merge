@@ -23,7 +23,7 @@ use crate::{
         },
     },
     config::{Config, Status},
-    errors::{writer::write_errors, BehaviorGenerationError, Error, Result},
+    errors::{BehaviorGenerationError, Error, Result, writer::write_errors},
 };
 
 /// - `resource_dir`: Path of the template from which the patch was applied.(e.g. `../templates/` => `../templates/meshes`)

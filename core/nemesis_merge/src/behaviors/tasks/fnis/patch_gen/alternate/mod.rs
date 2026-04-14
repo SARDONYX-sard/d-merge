@@ -75,12 +75,12 @@ use self::{
     override_config::{FnisToOarConfig, SlotConfig},
 };
 use crate::{
+    Config,
     behaviors::tasks::fnis::{
         collect::owned::OwnedFnisInjection,
         patch_gen::io_jobs::{AnimIoJob, AnimKind, ConversionJob},
     },
     errors::Error,
-    Config,
 };
 
 /// Just write file

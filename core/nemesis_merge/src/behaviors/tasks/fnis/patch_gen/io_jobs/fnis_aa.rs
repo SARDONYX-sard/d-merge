@@ -5,7 +5,7 @@ use rayon::prelude::*;
 
 use crate::{
     behaviors::tasks::fnis::patch_gen::alternate::{
-        aa_config::BaseMap, oar_json::new_fnis_aa_slot_config_json, FnisAASlotConfigJob,
+        FnisAASlotConfigJob, aa_config::BaseMap, oar_json::new_fnis_aa_slot_config_json,
     },
     errors::Error,
 };

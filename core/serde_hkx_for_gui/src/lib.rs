@@ -8,7 +8,7 @@ use core::str::FromStr as _;
 use std::path::Path;
 
 use futures::{future::join_all, stream::FuturesUnordered};
-pub use par_walk_dir::{load_dir_node, DirEntry};
+pub use par_walk_dir::{DirEntry, load_dir_node};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde_hkx_features::Format;
 

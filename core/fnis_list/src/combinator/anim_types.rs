@@ -4,8 +4,8 @@
 // This is based on the logic of Pandora-Behaviour-Engine-Plus.
 
 use winnow::{
-    error::{StrContext, StrContextValue},
     ModalResult, Parser as _,
+    error::{StrContext, StrContextValue},
 };
 
 /// Core FNIS animation types from `<AnimType>` syntax.

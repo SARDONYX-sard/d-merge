@@ -3,7 +3,7 @@ use rayon::prelude::*;
 
 use crate::{
     mod_item::ModItem,
-    ui::{hyperlink_with_hover, label_with_hover, ROW_HEIGHT},
+    ui::{ROW_HEIGHT, hyperlink_with_hover, label_with_hover},
 };
 
 /// Handle drag-and-drop reordering of mods.

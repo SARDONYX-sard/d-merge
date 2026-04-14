@@ -1,8 +1,8 @@
 use winnow::{
-    ascii::{line_ending, space0, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, line_ending, space0},
     combinator::delimited,
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 /// Parse `//* delete this line *//`

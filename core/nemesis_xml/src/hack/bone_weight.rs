@@ -1,11 +1,11 @@
 use simd_json::borrowed::Array;
 use winnow::{
-    ascii::{float, multispace0},
     ModalResult, Parser,
+    ascii::{float, multispace0},
 };
 
 use crate::helpers::{
-    comment::{close_comment, comment_kind, CommentKind},
+    comment::{CommentKind, close_comment, comment_kind},
     tag::end_tag,
 };
 

@@ -5,11 +5,11 @@ pub mod variable;
 
 pub use ptr::pointer;
 use winnow::{
+    Parser,
     ascii::multispace0,
     combinator::trace,
     error::ParserError,
     stream::{AsChar, Stream, StreamIsPartial},
-    Parser,
 };
 
 pub fn delimited_multispace0<Input, Output, Error, ParseNext>(

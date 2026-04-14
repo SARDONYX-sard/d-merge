@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use nemesis_merge::{errors::Error, PriorityMap};
+use nemesis_merge::{PriorityMap, errors::Error};
 use rayon::prelude::*;
 
 pub(crate) fn parse_ids_ini(path: &Path, start_idx: usize) -> Result<PriorityMap, Error> {

@@ -4,7 +4,7 @@ use rayon::prelude::*;
 
 use crate::{
     asdsf::{
-        alt::{alt_key::to_normal_txt_project_name, AltAsdsf},
+        alt::{AltAsdsf, alt_key::to_normal_txt_project_name},
         normal::ser::write_anim_set,
     },
     diff_line::DiffLines,

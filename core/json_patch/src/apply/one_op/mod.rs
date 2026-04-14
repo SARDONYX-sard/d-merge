@@ -6,7 +6,7 @@ use simd_json::BorrowedValue;
 
 use self::{add::apply_add, remove::apply_remove, replace::apply_replace};
 use super::error::Result;
-use crate::{operation::Op, Action, JsonPatch, JsonPatchError, JsonPath, ValueWithPriority};
+use crate::{Action, JsonPatch, JsonPatchError, JsonPath, ValueWithPriority, operation::Op};
 
 /// Applies a JSON patch operation to a mutable reference to a JSON value.
 ///

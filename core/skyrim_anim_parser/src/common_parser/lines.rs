@@ -2,10 +2,10 @@ use core::str::FromStr;
 use std::borrow::Cow;
 
 use winnow::{
+    ModalResult, Parser,
     ascii::{line_ending, space0, till_line_ending},
     combinator::alt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    ModalResult, Parser,
 };
 
 pub type Str<'a> = Cow<'a, str>;

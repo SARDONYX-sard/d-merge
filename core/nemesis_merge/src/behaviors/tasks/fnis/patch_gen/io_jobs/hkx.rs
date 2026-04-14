@@ -7,13 +7,13 @@ use std::{
 use rayon::prelude::*;
 
 use crate::{
+    Config,
     behaviors::tasks::fnis::{
         collect::owned::OwnedFnisInjection,
         patch_gen::{alternate::group_names::AAGroupName, io_jobs::AnimIoJob},
     },
     config::OutPutTarget,
     errors::Error,
-    Config,
 };
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,9 @@ pub fn prepare_behavior_conversion_job(
         }
         Err(_err) => {
             #[cfg(feature = "tracing")]
-            tracing::error!("Failed to prepare behavior file conversion job(Since it should be checked at the collect::owned stage, it should not normally result in an error.): {_err}");
+            tracing::error!(
+                "Failed to prepare behavior file conversion job(Since it should be checked at the collect::owned stage, it should not normally result in an error.): {_err}"
+            );
             None
         }
     }

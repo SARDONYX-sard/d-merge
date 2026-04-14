@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use json_patch::{json_path, Action, JsonPatch, ValueWithPriority};
+use json_patch::{Action, JsonPatch, ValueWithPriority, json_path};
 use rayon::prelude::*;
 use simd_json::borrowed::Value;
 

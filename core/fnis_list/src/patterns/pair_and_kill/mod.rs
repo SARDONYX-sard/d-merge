@@ -1,16 +1,16 @@
 mod flags;
 
 use winnow::{
-    ascii::{space0, space1, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, space0, space1},
     combinator::{alt, opt, repeat, seq},
     error::{StrContext, StrContextValue},
     token::take_till,
-    ModalResult, Parser,
 };
 
 use crate::{
     combinator::comment::skip_ws_and_comments,
-    patterns::pair_and_kill::flags::{parse_anim_flags, FNISPairAndKillMoveAnimFlagSet},
+    patterns::pair_and_kill::flags::{FNISPairAndKillMoveAnimFlagSet, parse_anim_flags},
 };
 
 #[derive(Debug, PartialEq)]
@@ -91,7 +91,7 @@ fn parse_anim_object_numbered<'a>(input: &mut &'a str) -> ModalResult<AnimObject
 mod tests {
     use super::*;
     use crate::{
-        combinator::{flags::FNISAnimFlags, Trigger},
+        combinator::{Trigger, flags::FNISAnimFlags},
         test_helpers::must_parse,
     };
 

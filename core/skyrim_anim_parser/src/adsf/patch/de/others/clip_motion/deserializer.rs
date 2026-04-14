@@ -1,25 +1,25 @@
 use json_patch::Op;
 use winnow::{
+    Parser,
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    Parser,
 };
 use winnow_ext::ReadableError;
 
 use crate::{
     adsf::{
-        normal::{de::from_word_and_space, Rotation, Translation},
+        normal::{Rotation, Translation, de::from_word_and_space},
         patch::de::{
             error::{Error, Result},
             others::clip_motion::{
-                current_state::{CurrentState, PartialRotations, PartialTranslations},
                 ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
+                current_state::{CurrentState, PartialRotations, PartialTranslations},
             },
         },
     },
     common_parser::{
-        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        comment::{CommentKind, open_comment, original_or_close_comment, take_till_close},
         delete_line::delete_this_line,
         lines::{one_line, verify_line_parses_to},
     },

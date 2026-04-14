@@ -1,4 +1,4 @@
-use crate::{config::StatusReporterFn, Status};
+use crate::{Status, config::StatusReporterFn};
 
 /// Status Report
 pub(crate) struct StatusReportCounter<'a> {

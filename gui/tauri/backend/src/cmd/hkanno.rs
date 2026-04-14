@@ -1,6 +1,6 @@
 use std::{path::Path, str::FromStr as _};
 
-use serde_hkx_for_gui::hkanno::{parse_as_hkanno, Format, Hkanno};
+use serde_hkx_for_gui::hkanno::{Format, Hkanno, parse_as_hkanno};
 use tokio::fs;
 
 /// path: hkx or xml path

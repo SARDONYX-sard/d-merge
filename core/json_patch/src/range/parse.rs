@@ -1,11 +1,11 @@
 use winnow::{
+    ModalResult, Parser,
     ascii::digit1,
     combinator::{alt, delimited, opt},
     token::take_till,
-    ModalResult, Parser,
 };
 
-use super::{error::RangeError, Range};
+use super::{Range, error::RangeError};
 
 /// Parses a string segment to determine if it represents an index or a range.
 ///

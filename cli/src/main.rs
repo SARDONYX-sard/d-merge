@@ -4,7 +4,7 @@ mod ini_parser;
 mod mod_info_cmd;
 
 use clap::Parser;
-use nemesis_merge::{behavior_gen, cache_remover, PatchMaps};
+use nemesis_merge::{PatchMaps, behavior_gen, cache_remover};
 
 use crate::{
     args::{Cli, Command, InfoCommand},
@@ -46,7 +46,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .as_deref()
                     .is_some_and(|d| cache_remover::is_dangerous_remove(&args.output_dir, d));
                 if is_dangerous_remove {
-                    tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
+                    tracing::warn!(
+                        "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
+                    );
                 } else {
                     if args.auto_remove_meshes {
                         cache_remover::remove_meshes_dir_all(&args.output_dir);

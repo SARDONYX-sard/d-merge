@@ -47,7 +47,9 @@ pub fn prepare_namespace_json(
         Ok(json) => json,
         Err(err) => {
             #[cfg(feature = "tracing")]
-            tracing::error!("(Originally unreachable)Failed to serialize namespace config JSON for namespace '{namespace}': {err}");
+            tracing::error!(
+                "(Originally unreachable)Failed to serialize namespace config JSON for namespace '{namespace}': {err}"
+            );
             String::new()
         }
     }

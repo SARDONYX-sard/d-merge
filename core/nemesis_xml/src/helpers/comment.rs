@@ -1,9 +1,9 @@
 use winnow::{
+    ModalResult, Parser,
     ascii::Caseless,
     combinator::{alt, delimited, terminated},
     error::{StrContext, StrContextValue},
     token::take_until,
-    ModalResult, Parser,
 };
 
 use super::delimited_multispace0;

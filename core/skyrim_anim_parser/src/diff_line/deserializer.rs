@@ -1,21 +1,21 @@
 use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 use winnow::{
+    Parser,
     ascii::multispace0,
     combinator::{eof, opt},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    Parser,
 };
 use winnow_ext::ReadableError;
 
 use crate::{
     common_parser::{
-        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        comment::{CommentKind, open_comment, original_or_close_comment, take_till_close},
         lines::one_line,
     },
     diff_line::{
+        DiffLines,
         current_state::CurrentState,
         error::{Error, Result},
-        DiffLines,
     },
 };
 

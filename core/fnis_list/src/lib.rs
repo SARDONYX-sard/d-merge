@@ -7,26 +7,26 @@ pub mod patterns;
 mod test_helpers;
 
 use winnow::{
+    ModalResult, Parser,
     ascii::Caseless,
     combinator::{alt, fail, opt},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use self::{
     combinator::{
-        anim_types::{parse_anim_type, FNISAnimType},
+        anim_types::{FNISAnimType, parse_anim_type},
         anim_var::parse_anim_var_line,
         comment::skip_ws_and_comments,
-        fnis_animation::{parse_fnis_animation, FNISAnimation},
-        version::{parse_version_line, Version},
+        fnis_animation::{FNISAnimation, parse_fnis_animation},
+        version::{Version, parse_version_line},
     },
     patterns::{
-        alt_anim::{parse_alternate_animation, AlternateAnimation},
-        chair::{parse_fnis_chair_animation, FNISChairAnimation},
-        furniture::{parse_furniture_animation, FurnitureAnimation},
-        pair_and_kill::{parse_paired_animation, FNISPairedAndKillAnimation},
-        sequenced::{parse_seq_animation, SequencedAnimation},
+        alt_anim::{AlternateAnimation, parse_alternate_animation},
+        chair::{FNISChairAnimation, parse_fnis_chair_animation},
+        furniture::{FurnitureAnimation, parse_furniture_animation},
+        pair_and_kill::{FNISPairedAndKillAnimation, parse_paired_animation},
+        sequenced::{SequencedAnimation, parse_seq_animation},
     },
 };
 

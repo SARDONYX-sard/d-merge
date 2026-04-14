@@ -1,9 +1,9 @@
 use winnow::{
-    ascii::{line_ending, multispace0, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, line_ending, multispace0},
     combinator::{alt, delimited, terminated},
     error::{StrContext, StrContextValue},
     token::take_until,
-    ModalResult, Parser,
 };
 use winnow_ext::take_until_ext;
 

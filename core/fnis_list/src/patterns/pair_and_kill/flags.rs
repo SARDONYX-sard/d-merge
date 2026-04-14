@@ -8,15 +8,15 @@
 //!   - `T2_<event>/<time>` → stored in `triggers2` (event string keeps the `2_` prefix)
 
 use winnow::{
-    ascii::{float, space0, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, float, space0},
     combinator::{alt, fail, opt, peek, preceded, terminated},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use crate::combinator::{
-    flags::{parse_anim_flag_simple, parse_trigger_options, FNISAnimFlags},
     Trigger,
+    flags::{FNISAnimFlags, parse_anim_flag_simple, parse_trigger_options},
 };
 
 /// Combination of simple bitflags and parameterized flags.

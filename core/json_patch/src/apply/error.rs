@@ -81,7 +81,9 @@ pub enum JsonPatchError {
     },
 
     /// Invalid matrix operation: attempted to simulate 2D array in a flat structure.
-    #[snafu(display("Tried to put Alary for array index, but that is invalid. 2D arrays do not exist in the C++ class.\n{path}\n{value}"))]
+    #[snafu(display(
+        "Tried to put Alary for array index, but that is invalid. 2D arrays do not exist in the C++ class.\n{path}\n{value}"
+    ))]
     WrongMatrix { path: String, value: String },
 
     #[snafu(display("Expected Seq. but got {unexpected:#?}"))]

@@ -1,6 +1,6 @@
 pub(crate) mod alternate;
 
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
 use rayon::prelude::*;
 
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;

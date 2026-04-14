@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use serde_hkx::xml::de::parser::{delimited_with_multispace0, tag::attr_string};
 use winnow::{
+    ModalResult, Parser,
     ascii::digit1,
     combinator::{alt, delimited, seq},
     error::{
@@ -9,13 +10,12 @@ use winnow::{
         StrContextValue::{self},
     },
     token::take_until,
-    ModalResult, Parser,
 };
 
 use super::delimited_multispace0;
 use crate::{
     error::Error,
-    patch::class_table::{find_json_parser_by, FieldInfo},
+    patch::class_table::{FieldInfo, find_json_parser_by},
 };
 
 /// Parses the start tag `<tag>`

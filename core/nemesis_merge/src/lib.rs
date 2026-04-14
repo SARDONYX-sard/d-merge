@@ -10,5 +10,4 @@ pub use crate::{
 };
 
 #[cfg(test)]
-mod tests
-;
+mod tests;

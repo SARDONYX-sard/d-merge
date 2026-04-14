@@ -1,7 +1,7 @@
 /// key: className, value: (fieldName, fieldType)
 pub type ClassTable = OrderedMap<&'static str, FieldInfo>;
 pub type FieldInfo = OrderedMap<&'static str, &'static str>;
-use phf::{phf_ordered_map, OrderedMap};
+use phf::{OrderedMap, phf_ordered_map};
 const CLASS_TABLE: ClassTable = phf_ordered_map! {
     "BGSGamebryoSequenceGenerator" => phf_ordered_map! { "memSizeAndFlags" => "U64",
     "referenceCount" => "I64", "variableBindingSet" => "Pointer", "cachedBindables" =>

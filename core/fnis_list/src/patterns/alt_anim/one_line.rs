@@ -1,15 +1,15 @@
 //! Alternate animations parsing (AAprefix, AAset, T)
 
 use winnow::{
-    ascii::{dec_uint, space0, space1, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, dec_uint, space0, space1},
     combinator::{repeat, seq},
     error::{StrContext, StrContextValue},
     token::take_till,
-    ModalResult, Parser,
 };
 
 use crate::combinator::{
-    comment::skip_ws_and_comments, take_till_fnis_ignores, take_till_space, Trigger,
+    Trigger, comment::skip_ws_and_comments, take_till_fnis_ignores, take_till_space,
 };
 
 /// AlterativeAnimation set

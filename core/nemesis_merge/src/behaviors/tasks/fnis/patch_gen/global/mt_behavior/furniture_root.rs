@@ -1,6 +1,6 @@
 //! For `character/behaviors/mt_behavior.xml` 1 file patch
 //! - `FNIS Furniture Begin (ROOT)`
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
 
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 

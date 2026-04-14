@@ -3,16 +3,17 @@
 use core::str::FromStr;
 
 use winnow::{
+    ModalResult, Parser,
     ascii::{line_ending, multispace0, till_line_ending},
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    seq, ModalResult, Parser,
+    seq,
 };
 use winnow_ext::ReadableError;
 
 use crate::{
     adsf::normal::{
-        de::from_word_and_space, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
+        ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation, de::from_word_and_space,
     },
     common_parser::lines::Str,
 };

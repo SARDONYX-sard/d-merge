@@ -36,8 +36,7 @@ fn build_base_map(config: &AAConfig) -> BaseMap {
 // =============================================================================
 
 /// JSON schema URI embedded in every generated `config.json`.
-const SCHEMA_URI: &str =
-    "https://raw.githubusercontent.com/SARDONYX-sard/d-merge/refs/heads/main/tools/schemas/aa_config.schema.json";
+const SCHEMA_URI: &str = "https://raw.githubusercontent.com/SARDONYX-sard/d-merge/refs/heads/main/tools/schemas/aa_config.schema.json";
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

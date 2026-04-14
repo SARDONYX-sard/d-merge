@@ -3,14 +3,14 @@ pub mod owned;
 use std::sync::LazyLock;
 
 use crate::{
+    PriorityMap,
     behaviors::tasks::fnis::{
-        collect::owned::{collect_fnis_injection, OwnedFnisInjection},
+        collect::owned::{OwnedFnisInjection, collect_fnis_injection},
         patch_gen::generated_behaviors::{
-            BehaviorEntry, AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
+            AUXBONES, BehaviorEntry, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
         },
     },
     errors::Error,
-    PriorityMap,
 };
 
 static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {

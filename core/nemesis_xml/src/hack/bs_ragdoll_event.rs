@@ -1,7 +1,7 @@
 use winnow::{
+    ModalResult, Parser,
     ascii::Caseless,
     combinator::{alt, delimited},
-    ModalResult, Parser,
 };
 
 use crate::helpers::tag::{field_start_close_tag, field_start_open_tag};

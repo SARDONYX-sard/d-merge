@@ -19,10 +19,10 @@
 //! AnimVar Speed REAL 2.5
 //! ```
 use winnow::{
-    ascii::{dec_int, float, space1, Caseless},
+    ModalResult, Parser,
+    ascii::{Caseless, dec_int, float, space1},
     combinator::{alt, seq},
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
 use crate::combinator::{comment::skip_ws_and_comments, take_till_space};

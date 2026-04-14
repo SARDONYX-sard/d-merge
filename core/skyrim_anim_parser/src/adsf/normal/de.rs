@@ -6,12 +6,12 @@
 use core::str::FromStr;
 
 use winnow::{
+    ModalResult, Parser,
     ascii::{line_ending, space1, till_line_ending},
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
     token::take_till,
-    ModalResult, Parser,
 };
 use winnow_ext::ReadableError;
 
@@ -19,7 +19,7 @@ use super::{
     Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
 };
 use crate::common_parser::lines::{
-    lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to, Str,
+    Str, lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

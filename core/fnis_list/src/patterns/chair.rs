@@ -1,18 +1,18 @@
 //! - FNIS Animation: <AnimType> [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::{
+    ModalResult, Parser,
     ascii::{space0, space1},
     combinator::{repeat, seq},
     error::{StrContext, StrContextValue},
     token::take_till,
-    ModalResult, Parser,
 };
 
 use crate::combinator::{
     anim_types::FNISAnimType,
     comment::skip_ws_and_comments,
     flags::FNISAnimFlags,
-    fnis_animation::{parse_fnis_animation, FNISAnimation},
+    fnis_animation::{FNISAnimation, parse_fnis_animation},
 };
 
 #[derive(Debug, PartialEq)]

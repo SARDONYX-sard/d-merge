@@ -1,9 +1,9 @@
 use json_patch::Op;
 use winnow::{
+    Parser,
     ascii::multispace0,
     combinator::opt,
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
-    Parser,
 };
 use winnow_ext::ReadableError;
 
@@ -11,12 +11,12 @@ use super::current_state::CurrentState;
 use crate::{
     adsf::patch::de::{
         anim_header::{
-            current_state::PartialProjectAssets, AnimHeaderDiffPatch, DiffProjectAssets, LineKind,
+            AnimHeaderDiffPatch, DiffProjectAssets, LineKind, current_state::PartialProjectAssets,
         },
         error::{Error, Result},
     },
     common_parser::{
-        comment::{open_comment, original_or_close_comment, take_till_close, CommentKind},
+        comment::{CommentKind, open_comment, original_or_close_comment, take_till_close},
         delete_line::delete_this_line,
         lines::{num_bool_line, one_line, verify_line_parses_to},
     },

@@ -2,7 +2,7 @@ mod anim_infos;
 mod attacks;
 pub(crate) mod patch_map;
 
-use json_patch::{apply_seq_array_directly, JsonPatchError, ValueWithPriority};
+use json_patch::{JsonPatchError, ValueWithPriority, apply_seq_array_directly};
 use rayon::prelude::*;
 use simd_json::{base::ValueTryAsArrayMut, borrowed::Value, serde::from_borrowed_value};
 

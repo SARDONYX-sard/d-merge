@@ -4,7 +4,7 @@ pub mod error;
 
 use std::borrow::Cow;
 
-use json_patch::{apply_seq_array_directly, ValueWithPriority};
+use json_patch::{ValueWithPriority, apply_seq_array_directly};
 use rayon::prelude::*;
 use simd_json::{borrowed::Value, serde::from_borrowed_value};
 

@@ -1,9 +1,9 @@
 use simd_json::borrowed::Value;
 
 use crate::{
+    JsonPath,
     apply::error::{JsonPatchError, Result},
     ptr_mut::PointerMut as _,
-    JsonPath,
 };
 
 /// Replace one value.

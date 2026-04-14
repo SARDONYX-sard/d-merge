@@ -1,8 +1,8 @@
 use winnow::{
+    Parser as _,
     ascii::{line_ending, till_line_ending},
     combinator::opt,
     error::{StrContext, StrContextValue},
-    Parser as _,
 };
 
 use crate::common_parser::comment::take_till_original;
