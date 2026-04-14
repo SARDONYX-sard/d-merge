@@ -1,6 +1,6 @@
 use simd_json::BorrowedValue;
 
-use crate::range::{parse::parse_range, Range};
+use crate::range::{Range, parse::parse_range};
 
 /// A trait that provides a mutable reference to a `BorrowedValue`
 /// given a sequence of strings (representing the path or pointer).
@@ -64,7 +64,7 @@ mod tests {
         let pointer: &[Cow<str>] = &["outer_key".into(), "inner_key".into()];
 
         if let Some(val) = value.ptr_mut(pointer) {
-            if let BorrowedValue::String(ref mut s) = val {
+            if let BorrowedValue::String(s) = val {
                 *s = Cow::Borrowed("modified_inner_value");
             }
         } else {
@@ -89,7 +89,7 @@ mod tests {
         let pointer: &[Cow<str>] = &["array_key".into(), "[1]".into()];
 
         if let Some(val) = value.ptr_mut(pointer) {
-            if let BorrowedValue::String(ref mut s) = val {
+            if let BorrowedValue::String(s) = val {
                 *s = Cow::Borrowed("modified_second");
             }
         } else {
@@ -114,7 +114,7 @@ mod tests {
         let pointer: &[Cow<str>] = &["object_key".into(), "array_key".into(), "[1]".into()];
 
         if let Some(val) = value.ptr_mut(pointer) {
-            if let BorrowedValue::String(ref mut s) = val {
+            if let BorrowedValue::String(s) = val {
                 *s = Cow::Borrowed("modified_item_1");
             }
         } else {
@@ -160,7 +160,7 @@ mod tests {
         let val = value
             .ptr_mut(pointer)
             .unwrap_or_else(|| panic!("Expected a mutable reference"));
-        if let BorrowedValue::String(ref mut s) = val {
+        if let BorrowedValue::String(s) = val {
             *s = Cow::Borrowed("modified_item_1");
         }
 

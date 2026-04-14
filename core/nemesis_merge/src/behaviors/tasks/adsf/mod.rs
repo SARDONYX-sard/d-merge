@@ -8,26 +8,27 @@ use rayon::prelude::*;
 pub use skyrim_anim_parser::adsf::patch::de::{
     add::{parse_clip_anim_block_patch, parse_clip_motion_block_patch},
     others::{
-        clip_anim::{deserializer::parse_clip_anim_diff_patch, ClipAnimDiffPatch},
-        clip_motion::{deserializer::parse_clip_motion_diff_patch, ClipMotionDiffPatch},
+        clip_anim::{ClipAnimDiffPatch, deserializer::parse_clip_anim_diff_patch},
+        clip_motion::{ClipMotionDiffPatch, deserializer::parse_clip_motion_diff_patch},
     },
 };
 use skyrim_anim_parser::{
     adsf::{
-        alt::{ser::serialize_alt_adsf, AltAdsf},
+        alt::{AltAdsf, ser::serialize_alt_adsf},
         normal::{ClipAnimDataBlock, ClipMotionBlock},
-        patch::de::anim_header::{deserializer::parse_anim_header_diff_patch, AnimHeaderDiffPatch},
+        patch::de::anim_header::{AnimHeaderDiffPatch, deserializer::parse_anim_header_diff_patch},
     },
-    diff_line::{deserializer::parse_lines_diff_patch, DiffLines},
+    diff_line::{DiffLines, deserializer::parse_lines_diff_patch},
 };
 use snafu::ResultExt as _;
 
 use self::{
-    path_parser::{parse_adsf_path, ParsedAdsfPatchPath, ParserType},
+    path_parser::{ParsedAdsfPatchPath, ParserType, parse_adsf_path},
     sort::dedup_patches_by_priority_parallel,
     types::OwnedAdsfPatchMap,
 };
 use crate::{
+    Config, PatchMaps,
     behaviors::tasks::hkx::generate::write_patched_json,
     errors::{
         AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
@@ -35,7 +36,6 @@ use crate::{
         FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
     },
     results::partition_results,
-    Config, PatchMaps,
 };
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -187,10 +187,10 @@ pub(crate) fn apply_adsf_patches(
         }
     }
 
-    if config.debug.output_merged_json {
-        if let Err(_err) = output_merged_alt_adsf(&alt_adsf, config) {
-            tracing::error!("{_err}");
-        }
+    if config.debug.output_merged_json
+        && let Err(_err) = output_merged_alt_adsf(&alt_adsf, config)
+    {
+        tracing::error!("{_err}");
     }
 
     // 5/5 Write adsf.

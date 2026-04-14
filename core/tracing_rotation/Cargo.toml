@@ -13,14 +13,14 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-chrono = "0.4.41"
+chrono = "0.4.44"
 once_cell = { workspace = true }
 snafu = { workspace = true } # Implement error types
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-temp-dir = "0.1.16"
+temp-dir = "0.2.0"
 pretty_assertions = { workspace = true }
 
 [lints]

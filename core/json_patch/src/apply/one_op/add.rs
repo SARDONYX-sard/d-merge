@@ -1,8 +1,8 @@
-use simd_json::{borrowed::Value, derived::ValueTryAsScalar as _, StaticNode};
+use simd_json::{StaticNode, borrowed::Value, derived::ValueTryAsScalar as _};
 
 use crate::{
-    apply::error::{JsonPatchError, Result},
     JsonPath,
+    apply::error::{JsonPatchError, Result},
 };
 
 /// Adds a new key (for objects) or a new index (for arrays) if they don't exist.
@@ -26,7 +26,7 @@ pub(crate) fn apply_add<'value>(
     let mut target = json;
     for (i, token) in path.into_iter().enumerate() {
         match target {
-            Value::Object(ref mut map) => {
+            Value::Object(map) => {
                 if i == last_index {
                     map.insert(token, value);
                     return Ok(());
@@ -37,7 +37,7 @@ pub(crate) fn apply_add<'value>(
                         .or_insert_with(|| Value::Object(Default::default()));
                 }
             }
-            Value::Array(ref mut list) => {
+            Value::Array(list) => {
                 if let Ok(index) = token.parse::<usize>() {
                     while list.len() <= index {
                         list.push(Default::default()); // Push a placeholder to extend the array
@@ -56,7 +56,7 @@ pub(crate) fn apply_add<'value>(
                     ));
                 }
             }
-            Value::String(ref mut s) => {
+            Value::String(s) => {
                 if i == last_index {
                     match value {
                         Value::String(s2) => {
@@ -70,7 +70,7 @@ pub(crate) fn apply_add<'value>(
                     // Can't go deeper in a String
                 }
             }
-            Value::Static(ref mut static_node) => {
+            Value::Static(static_node) => {
                 if i == last_index {
                     return {
                         macro_rules! try_insert {

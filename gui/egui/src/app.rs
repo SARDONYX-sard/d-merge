@@ -1,9 +1,9 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicBool},
 };
 
-use eframe::{egui, App, Frame};
+use eframe::{App, Frame, egui};
 use egui::{Checkbox, Separator};
 use rayon::prelude::*;
 
@@ -11,7 +11,7 @@ use crate::{
     dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
-    mod_item::{inherit_reorder_cast, to_patches, ModItem, SortColumn},
+    mod_item::{ModItem, SortColumn, inherit_reorder_cast, to_patches},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -325,11 +325,10 @@ impl ModManagerApp {
 
         panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
-                if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked() {
-                    if let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
-                    {
-                        self.set_notification(err);
-                    };
+                if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
+                    && let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
+                {
+                    self.set_notification(err);
                 };
 
                 self.draw_skyrim_dir_ui(ui);
@@ -388,10 +387,10 @@ impl ModManagerApp {
         panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 let output_dir_label = self.t(I18nKey::OutputDirLabel);
-                if ui.button(output_dir_label).clicked() {
-                    if let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir)) {
-                        self.set_notification(err);
-                    };
+                if ui.button(output_dir_label).clicked()
+                    && let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir))
+                {
+                    self.set_notification(err);
                 };
                 let text_line = egui::TextEdit::singleline(&mut self.output_dir);
                 let text_line = if self.transparent {
@@ -669,11 +668,7 @@ impl ModManagerApp {
                 SortColumn::Site => a.site.cmp(&b.site),
                 SortColumn::Priority => a.priority.cmp(&b.priority),
             };
-            if self.sort_asc {
-                ord
-            } else {
-                ord.reverse()
-            }
+            if self.sort_asc { ord } else { ord.reverse() }
         });
     }
 
@@ -1062,7 +1057,9 @@ impl ModManagerApp {
         let skyrim_data_directory = self.current_skyrim_data_dir();
 
         if nemesis_merge::cache_remover::is_dangerous_remove(output_dir, skyrim_data_directory) {
-            tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
+            tracing::warn!(
+                "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
+            );
         } else {
             self.set_notification(format!(
                 "0/6: {} `{output_dir}/meshes`",
@@ -1094,7 +1091,7 @@ where
                 return Err(format!(
                     "No existing directory found in path hierarchy({})",
                     dir.display()
-                ))
+                ));
             }
         }
     }

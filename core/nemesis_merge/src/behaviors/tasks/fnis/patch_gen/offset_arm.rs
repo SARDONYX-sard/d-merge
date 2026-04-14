@@ -2,16 +2,17 @@
 use std::borrow::Cow;
 
 use fnis_list::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation};
-use json_patch::{json_path, Action, JsonPatch, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
 use rayon::prelude::*;
 use simd_json::json_typed;
 
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
+        JsonPatchPairs,
         global::mt_behavior::{self, FNIS_BA_BLEND_TRANSITION_5231},
         kill_move::{calculate_hash, new_push_transitions_seq_patch},
-        new_push_events_seq_patch, JsonPatchPairs,
+        new_push_events_seq_patch,
     },
 };
 
@@ -80,7 +81,9 @@ pub fn new_offset_arm_patches<'a>(
             .map(|(index, name)| {
                 let new_anim_object_index = owned_data.next_class_name_attribute();
                 class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
-                let one_anim_obj = (
+
+                // One anim object
+                (
                     vec![
                         Cow::Owned(new_anim_object_index.clone()),
                         Cow::Borrowed("hkbStringEventPayload"),
@@ -95,8 +98,7 @@ pub fn new_offset_arm_patches<'a>(
                         },
                         priority,
                     },
-                );
-                one_anim_obj
+                )
             }),
     );
 

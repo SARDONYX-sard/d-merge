@@ -13,7 +13,7 @@ mod pair;
 use std::borrow::Cow;
 
 use fnis_list::parse_fnis_list;
-use json_patch::{json_path, Action, JsonPatch, JsonPath, Op, ValueWithPriority};
+use json_patch::{Action, JsonPatch, JsonPath, Op, ValueWithPriority, json_path};
 use rayon::{iter::Either, prelude::*};
 use simd_json::json_typed;
 use snafu::ResultExt;
@@ -26,7 +26,7 @@ use crate::{
         fnis::{
             collect::owned::OwnedFnisInjection,
             patch_gen::{
-                gen_list_patch::{generate_patch, OneListPatch},
+                gen_list_patch::{OneListPatch, generate_patch},
                 generated_behaviors::{BehaviorEntry, DEFAULT_FEMALE, DRAUGR_SKELETON},
                 global::{
                     _0_master::{
@@ -320,11 +320,11 @@ pub fn collect_borrowed_patches<'a>(
     #[cfg(feature = "tracing")]
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
-    if config.generate_fnis_esp {
-        if let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir) {
-            errors.push(Error::FNISGenerateEspError { source: e });
-        };
-    }
+    if config.generate_fnis_esp
+        && let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir)
+    {
+        errors.push(Error::FNISGenerateEspError { source: e });
+    };
 
     errors.par_extend(io_jobs::run_conversion_jobs(
         conversion_jobs,

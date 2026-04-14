@@ -1,12 +1,12 @@
 //! - FNIS Sequenced Animation: s|so [-<option,option,...>] <AnimEvent> <AnimFile> [<AnimObject> ...]
 
 use winnow::{
+    ModalResult, Parser,
     combinator::fail,
     error::{StrContext, StrContextValue},
-    ModalResult, Parser,
 };
 
-use crate::combinator::fnis_animation::{parse_fnis_animation, FNISAnimation};
+use crate::combinator::fnis_animation::{FNISAnimation, parse_fnis_animation};
 
 /// Furniture animation
 #[derive(Debug, PartialEq)]
@@ -66,10 +66,10 @@ fn parse_furniture_animations_inner<'a>(
         return fail.parse_next(input)?;
     }
 
-    if let Some(last) = animations.last() {
-        if !last.flag_set.flags.contains(FNISAnimFlags::Acyclic) {
-            return fail.parse_next(input)?;
-        }
+    if let Some(last) = animations.last()
+        && !last.flag_set.flags.contains(FNISAnimFlags::Acyclic)
+    {
+        return fail.parse_next(input)?;
     };
 
     // Omitted since already checked initially

@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use simd_json::{borrowed::Value, ValueBuilder};
+use simd_json::{ValueBuilder, borrowed::Value};
 
 use crate::{
-    apply::error::{JsonPatchError, Result},
     JsonPath,
+    apply::error::{JsonPatchError, Result},
 };
 
 /// Remove one value.
@@ -45,7 +45,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
 
     // Navigate to the second-to-last element in the path
     let parent = path.try_fold(target, |target, token| match target {
-        Value::Object(ref mut map) => map.get_mut(token),
+        Value::Object(map) => map.get_mut(token),
         Value::Array(list) => list.get_mut(last.parse::<usize>().ok()?),
         _ => None,
     })?;

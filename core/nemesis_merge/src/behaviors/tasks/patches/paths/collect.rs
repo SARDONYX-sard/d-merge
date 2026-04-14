@@ -47,11 +47,8 @@ fn is_txt_file(path: &Path) -> bool {
 /// # Assumption.
 /// - The file is a file with a txt extension.
 fn is_nemesis_file(path: &Path) -> bool {
-    let is_sharp_prefix = path
-        .file_stem()
-        .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')));
-
-    is_sharp_prefix
+    path.file_stem()
+        .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
 }
 
 /// Has `animationdatasinglefile` dir?

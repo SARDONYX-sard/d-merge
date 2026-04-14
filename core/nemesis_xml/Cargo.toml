@@ -26,8 +26,7 @@ winnow_ext = { workspace = true }
 json_patch = { workspace = true }
 
 [dev-dependencies]
-pretty_assertions = { workspace = true }
-quick_tracing = { workspace = true }
+# quick_tracing = { workspace = true }
 
 [lints]
 workspace = true

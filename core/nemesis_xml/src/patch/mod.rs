@@ -6,27 +6,27 @@ use std::{collections::HashMap, mem};
 use json_patch::{Action, JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
 use serde_hkx::xml::de::parser::type_kind::{boolean, real, string};
-use simd_json::{borrowed::Object, BorrowedValue, StaticNode, ValueBuilder};
+use simd_json::{BorrowedValue, StaticNode, ValueBuilder, borrowed::Object};
 use winnow::{
+    Parser,
     ascii::{dec_int, dec_uint, multispace0},
     combinator::{alt, opt},
     error::{ContextError, ErrMode},
-    Parser,
 };
 use winnow_ext::ReadableError;
 
 use self::{
-    class_table::{find_class_info, FieldInfo},
+    class_table::{FieldInfo, find_class_info},
     current_state::{CurrentJsonPatch, CurrentState},
 };
 use crate::{
     error::{Error, Result},
-    hack::{do_hack_cast_ragdoll_event, HackOptions},
+    hack::{HackOptions, do_hack_cast_ragdoll_event},
     helpers::{
-        comment::{close_comment, comment_kind, take_till_close, CommentKind},
+        comment::{CommentKind, close_comment, comment_kind, take_till_close},
         delimited_multispace0,
         ptr::pointer,
-        tag::{class_start_tag, end_tag, field_start_tag, start_tag, PointerType},
+        tag::{PointerType, class_start_tag, end_tag, field_start_tag, start_tag},
         variable::{event_id, variable_id},
     },
 };
@@ -298,7 +298,7 @@ impl<'de> PatchDeserializer<'de> {
             unknown => {
                 return Err(Error::UnknownFieldType {
                     field_type: unknown.to_string(),
-                })
+                });
             }
         };
         Ok(value)
@@ -1079,10 +1079,7 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    #[cfg_attr(
-        feature = "tracing",
-        quick_tracing::init(file = "./parse.log", stdio = false)
-    )]
+    // #[quick_tracing::init(file = "./parse.log", stdio = false)]
     #[ignore = "because we need external test files"]
     #[test]
     fn parse() {

@@ -9,10 +9,10 @@ use rayon::prelude::*;
 use simd_json::borrowed::Value;
 
 use crate::{
+    Action, JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority,
     ptr_mut::PointerMut as _,
     range::split_range::split_range_at_len,
     vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _},
-    Action, JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority,
 };
 
 const MARK_AS_REMOVED_STR: &str = "##Mark_As_Removed##"; // Separate inner str for test
@@ -541,10 +541,10 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
     let mut last = None;
 
     for seg in &segments {
-        if let Some(prev) = last {
-            if seg.start > prev + GAP_THRESHOLD {
-                header.push_str(&format!("{ELLIPSIS:^cell_width$}"));
-            }
+        if let Some(prev) = last
+            && seg.start > prev + GAP_THRESHOLD
+        {
+            header.push_str(&format!("{ELLIPSIS:^cell_width$}"));
         }
 
         if seg.end == seg.start + 1 {
@@ -591,10 +591,10 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
         out.push_str(&format!("{:<7} | {:>3} |", row.op.as_str(), row.priority));
         let mut last = None;
         for seg in &segments {
-            if let Some(prev) = last {
-                if seg.start > prev + GAP_THRESHOLD {
-                    out.push_str(ELLIPSIS);
-                }
+            if let Some(prev) = last
+                && seg.start > prev + GAP_THRESHOLD
+            {
+                out.push_str(ELLIPSIS);
             }
             last = Some(seg.end - 1);
 

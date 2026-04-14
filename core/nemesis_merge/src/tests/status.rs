@@ -16,7 +16,7 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
     let start = std::time::Instant::now();
 
     Box::new(move |status| {
-        use std::io::{stdout, Write};
+        use std::io::{Write, stdout};
         match &status {
             Status::ReadingPatches { .. } => {
                 print!("{CLEAR_LINE}{CYAN}{status}{RESET}");

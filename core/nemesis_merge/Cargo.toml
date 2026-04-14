@@ -28,7 +28,6 @@ snafu = { workspace = true }
 sonic-rs = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true, optional = true }
-tracing-subscriber = { workspace = true, optional = true }
 winnow = { workspace = true }
 winnow_ext = { workspace = true }
 
@@ -42,9 +41,9 @@ skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 
 [dev-dependencies]
 havok_classes = { workspace = true }
-pretty_assertions = { workspace = true }
-quick_tracing = { workspace = true }
+# quick_tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
+tracing_rotation = { workspace = true }
 
 [lints]
 workspace = true
@@ -52,13 +51,7 @@ workspace = true
 [features]
 default = ["tracing"]
 
-tracing = [
-  "dep:tracing",
-  "dep:tracing-subscriber",
-  "json_patch/tracing",
-  "jwalk_glob/tracing",
-  "serde_hkx_features/dedup_tracing",
-]
+tracing = ["dep:tracing", "json_patch/tracing", "jwalk_glob/tracing", "serde_hkx_features/dedup_tracing"]
 
 # Enables TypeScript-compatible serialization for the `Status` enum.
 # This feature modifies the `Status` enum to use Serde's externally tagged representation

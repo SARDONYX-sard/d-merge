@@ -6,11 +6,11 @@ pub(crate) use mod_info_loader::{
     __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
 };
 use nemesis_merge::{
-    behavior_gen, Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status,
+    Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status, behavior_gen,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
-use tauri::{path::BaseDirectory, AppHandle, Emitter as _, Manager};
+use tauri::{AppHandle, Emitter as _, Manager, path::BaseDirectory};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 use crate::{
@@ -68,7 +68,9 @@ pub(crate) async fn patch(
             .as_deref()
             .is_some_and(|d| cache_remover::is_dangerous_remove(&output, d));
         if is_dangerous_remove {
-            tracing::warn!("0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped.");
+            tracing::warn!(
+                "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
+            );
         } else {
             if options.auto_remove_meshes {
                 cache_remover::remove_meshes_dir_all(&output);
@@ -84,6 +86,7 @@ pub(crate) async fn patch(
 
     let app_handle = app.clone();
     let handle = tokio::spawn(async move {
+        #[allow(trivial_casts)]
         let status_report = options.use_progress_reporter.then(|| {
             let cloned_app_handle = app.clone();
             Box::new(move |payload: Status| emit_status(&cloned_app_handle, payload))

@@ -19,7 +19,6 @@ serde = { workspace = true }
 serde_repr = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 
 havok_classes = { workspace = true }
 havok_types = { workspace = true }
@@ -29,8 +28,6 @@ serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 node_expr = { workspace = true }
 
 [dev-dependencies]
-temp-dir = "0.1.16"
-pretty_assertions = { workspace = true }
 
 [lints]
 workspace = true

@@ -9,13 +9,13 @@ use simd_json::json_typed;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        furniture::one_anim::{new_furniture_one_anim_patches, FurniturePhase},
+        JsonPatchPairs,
+        furniture::one_anim::{FurniturePhase, new_furniture_one_anim_patches},
         global::mt_behavior::{
             FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
             FNIS_BA_BLEND_TRANSITION_5232, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
         },
         kill_move::calculate_hash,
-        JsonPatchPairs,
     },
 };
 
@@ -146,7 +146,9 @@ pub fn new_furniture_one_group_patches<'a>(
     one_patches.par_extend(first_animation.anim_objects.par_iter().enumerate().map(
         |(_index, name)| {
             let new_anim_object_index = owned_data.next_class_name_attribute();
-            let one_anim_obj = (
+
+            // One anim object
+            (
                 vec![
                     Cow::Owned(new_anim_object_index.clone()),
                     Cow::Borrowed("hkbStringEventPayload"),
@@ -161,8 +163,7 @@ pub fn new_furniture_one_group_patches<'a>(
                     },
                     priority,
                 },
-            );
-            one_anim_obj
+            )
         },
     ));
 

@@ -8,22 +8,23 @@ use rayon::prelude::*;
 use skyrim_anim_parser::{
     asdsf::{
         alt::{
-            ser::{serialize_alt_asdsf, SubHeaderDiffMap},
             AltAsdsf,
+            ser::{SubHeaderDiffMap, serialize_alt_asdsf},
         },
-        patch::de::{deserializer::parse_anim_set_diff_patch, DiffPatchAnimSetData},
+        patch::de::{DiffPatchAnimSetData, deserializer::parse_anim_set_diff_patch},
     },
-    diff_line::{deserializer::parse_lines_diff_patch, DiffLines},
+    diff_line::{DiffLines, deserializer::parse_lines_diff_patch},
 };
 use snafu::ResultExt as _;
 use winnow::Parser;
 
 use self::{
-    path_parser::{parse_asdsf_path, ParsedAsdsfPatchPath, ParserType},
+    path_parser::{ParsedAsdsfPatchPath, ParserType, parse_asdsf_path},
     sort::dedup_patches_by_priority_parallel,
     types::OwnedAsdsfPatchMap,
 };
 use crate::{
+    Config,
     behaviors::{priority_ids::types::PriorityMap, tasks::hkx::generate::write_patched_json},
     errors::{
         AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
@@ -31,7 +32,6 @@ use crate::{
         FailedSerializeAsdsfSnafu,
     },
     results::partition_results,
-    Config,
 };
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -179,10 +179,10 @@ pub(crate) fn apply_asdsf_patches(
         }
     }
 
-    if config.debug.output_merged_json {
-        if let Err(_err) = output_merged_alt_adsf(&alt_adsf, config) {
-            tracing::error!("{_err}");
-        }
+    if config.debug.output_merged_json
+        && let Err(_err) = output_merged_alt_adsf(&alt_adsf, config)
+    {
+        tracing::error!("{_err}");
     }
 
     // 5/5 Write adsf.

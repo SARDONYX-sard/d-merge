@@ -1,29 +1,17 @@
-mod global_logger;
 mod status;
 
 #[tokio::test]
 #[ignore = "local test"]
-#[cfg(feature = "tracing")]
 async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
+    use self::status::*;
+    use crate::{PatchMaps, PriorityMap, behavior_gen};
     use rayon::prelude::*;
-
-    use crate::{
-        behavior_gen,
-        tests::{global_logger::global_logger, status::*},
-        PatchMaps,
-    };
 
     std::fs::remove_dir_all("../../dummy/behavior_gen/output")?; // remove prev output
 
-    std::fs::create_dir_all("../../dummy/behavior_gen/")?;
-    global_logger(
-        "../../dummy/behavior_gen/merge_test.log",
-        tracing::Level::TRACE,
-    )?;
+    tracing_rotation::init("../../dummy/behavior_gen", "merge_test.log")?;
 
     let patches = {
-        use crate::behaviors::PriorityMap;
-
         let string = std::fs::read_to_string("../../dummy/ids.ini")?;
 
         let lines: Vec<_> = string

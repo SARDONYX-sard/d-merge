@@ -71,10 +71,8 @@ fn tail_loop(
 
         pos = reader.stream_position().context(IoSnafu)?;
 
-        if new_line {
-            if let Some(ref ctx) = ctx {
-                ctx.request_repaint();
-            }
+        if new_line && let Some(ref ctx) = ctx {
+            ctx.request_repaint();
         }
 
         thread::sleep(Duration::from_millis(100));

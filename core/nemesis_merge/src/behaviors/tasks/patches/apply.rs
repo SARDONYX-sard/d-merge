@@ -7,6 +7,7 @@ use simd_json::borrowed::Value;
 use snafu::ResultExt;
 
 use crate::{
+    Config,
     behaviors::tasks::{
         patches::types::{BehaviorPatchesMap, HkxPatchMaps},
         templates::{key::TemplateKey, types::BorrowedTemplateMap},
@@ -14,7 +15,6 @@ use crate::{
     config::{ReportType, StatusReportCounter},
     errors::{Error, PatchSnafu, Result},
     results::filter_results,
-    Config,
 };
 
 /// Apply to hkx with merged json patch.
@@ -79,11 +79,11 @@ fn apply_to_one_template<'a, 'b: 'a>(
     patches: HkxPatchMaps<'b>,
     status_reporter: &StatusReportCounter,
 ) -> Vec<Result<(), Error>> {
-    if config.debug.output_patch_json {
-        if let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches) {
-            #[cfg(feature = "tracing")]
-            tracing::error!("{err}");
-        }
+    if config.debug.output_patch_json
+        && let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches)
+    {
+        #[cfg(feature = "tracing")]
+        tracing::error!("{err}");
     }
 
     let patches_len = patches.len();

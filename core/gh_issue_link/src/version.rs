@@ -95,13 +95,13 @@ where
     P: AsRef<Path>,
 {
     use std::{
-        ffi::{c_void, OsStr},
+        ffi::{OsStr, c_void},
         os::windows::ffi::OsStrExt as _,
         ptr,
     };
 
     #[link(name = "version")]
-    extern "system" {
+    unsafe extern "system" {
         fn GetFileVersionInfoSizeW(lptstrFilename: *const u16, lpdwHandle: *mut u32) -> u32;
         fn GetFileVersionInfoW(
             lptstrFilename: *const u16,

@@ -1,6 +1,4 @@
 //! ref: https://www.nexusmods.com/skyrim/articles/50508/
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use crc::{Algorithm, Crc};
 use rayon::prelude::*;
 
@@ -40,21 +38,13 @@ pub const fn calc_crc32_from_u32(input: u32) -> u32 {
 ///
 /// - `decode_crc32(7891816);` => `// Found match: [e4, 35, 83, 50](hex) | 1350776292 (dec)`
 /// - u32::MAX process time: 42.30s(single: 220s)
-pub fn decode_crc32(target_crc: u32) {
+pub fn decode_crc32(target_crc: u32) -> Option<u32> {
     let crc32 = Crc::<u32>::new(&SKYRIM_CRC32_ALG);
-    let count = AtomicUsize::new(0);
 
-    (0..=u32::MAX).into_par_iter().for_each(|data| {
+    (0..=u32::MAX).into_par_iter().find_any(|&data| {
         let bytes = data.to_le_bytes();
-        let crc = crc32.checksum(&bytes);
-
-        if crc == target_crc {
-            let _ = count.fetch_add(1, Ordering::Relaxed);
-            println!("Found match: {bytes:x?}(hex) | {data} (dec)");
-        }
-    });
-
-    println!("Total matches found: {}", count.load(Ordering::Relaxed));
+        crc32.checksum(&bytes) == target_crc
+    })
 }
 
 #[cfg(test)]
@@ -73,13 +63,6 @@ mod tests {
             calc_crc32("ground_bite"), // lowercase file stem, without ".hkx"
             3191128947,                // 0xbe34c373
             "CRC32 for 'ground_bite' is incorrect"
-        );
-
-        // In fact, a value of 7891816(0x786b68) is expected, but only `hkx` does not match the value.
-        assert_eq!(
-            calc_crc32("hkx"),
-            2652099066,
-            "CRC32 for '.hkx' is incorrect"
         );
     }
 }

@@ -11,6 +11,7 @@ use bitvec::prelude::*;
 /// This manager starts allocating IDs *after* the known maximum used ID.
 /// Each call to `next_id()` returns the next unused ID, incrementing
 /// until it reaches `i16::MAX`. After that, it returns `None`.
+#[derive(Debug)]
 pub struct ClipIdManager {
     used_ids: BitVec,
     current: usize,

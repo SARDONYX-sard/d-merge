@@ -5,9 +5,10 @@ pub mod errors;
 mod results;
 
 pub use crate::{
-    behaviors::{behavior_gen, create_bin_templates, PatchMaps, PriorityMap},
+    behaviors::{PatchMaps, PriorityMap, behavior_gen, create_bin_templates},
     config::{Config, DebugOptions, HackOptions, OutPutTarget, Status},
 };
 
 #[cfg(test)]
-mod tests;
+mod tests
+;

@@ -110,7 +110,7 @@ mod bindings {
     pub const ERROR_SUCCESS: i32 = 0;
 
     #[link(name = "advapi32")]
-    extern "system" {
+    unsafe extern "system" {
         /// - docs: https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-reggetvaluew
         pub fn RegGetValueW(
             hkey: usize,

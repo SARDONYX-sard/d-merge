@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use rayon::prelude::*;
 
@@ -36,7 +36,7 @@ pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AsdsfPatch<'a>>) -> V
                 match map.entry(key) {
                     Entry::Occupied(mut entry) => match (&mut entry.get_mut().patch, patch.patch) {
                         (
-                            PatchKind::EditAnimSet(ref mut existing_edit),
+                            PatchKind::EditAnimSet(existing_edit),
                             PatchKind::EditAnimSet(new_edit),
                         ) if new_edit.priority > existing_edit.priority => {
                             existing_edit.patch.merge(new_edit.patch);

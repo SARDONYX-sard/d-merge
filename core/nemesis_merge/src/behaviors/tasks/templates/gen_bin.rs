@@ -96,11 +96,7 @@ fn get_meshes_relative_path(path: &Path) -> Option<PathBuf> {
         }
     }
 
-    if found {
-        Some(result)
-    } else {
-        None
-    }
+    if found { Some(result) } else { None }
 }
 
 #[cfg(test)]
@@ -327,12 +323,12 @@ mod tests {
                 .par_iter()
                 .find_first(|(_, class)| matches!(class, Classes::hkRootLevelContainer(_)))?;
 
-            if let Classes::hkRootLevelContainer(container) = root {
-                if let Some(variant) = container.m_namedVariants.first() {
-                    let ptr = &variant.m_variant;
-                    if let Some(Classes::hkbBehaviorGraph(graph)) = class_map.get(ptr.get()) {
-                        return Some(graph.m_rootGenerator.to_string());
-                    }
+            if let Classes::hkRootLevelContainer(container) = root
+                && let Some(variant) = container.m_namedVariants.first()
+            {
+                let ptr = &variant.m_variant;
+                if let Some(Classes::hkbBehaviorGraph(graph)) = class_map.get(ptr.get()) {
+                    return Some(graph.m_rootGenerator.to_string());
                 }
             }
 

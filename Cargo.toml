@@ -6,8 +6,9 @@ authors = ["SARDONYX-sard"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/SARDONYX-sard/d-merge"
 readme = "README.md"
-edition = "2021"
-rust-version = "1.91"
+edition = "2024"
+rust-version = "1.94"
+
 
 [workspace]
 members = [
@@ -29,7 +30,8 @@ members = [
   "gui/egui",
   "gui/tauri/backend",
 ]
-resolver = "2"
+resolver = "3"
+
 
 [workspace.dependencies]
 dashmap = { version = "6.1.0" }
@@ -107,6 +109,38 @@ panic = 'unwind'
 incremental = false
 codegen-units = 16
 rpath = false
+
+
+[workspace.lints.rust]
+bad_style = "deny"
+dead_code = "deny"
+future_incompatible = "deny"
+improper_ctypes = "deny"
+keyword_idents = "deny"
+missing_debug_implementations = "deny"
+# missing_docs = "deny"
+no_mangle_generic_items = "deny"
+non_ascii_idents = "deny"
+non_shorthand_field_patterns = "deny"
+nonstandard_style = "deny"
+noop_method_call = "deny"
+overflowing_literals = "deny"
+path_statements = "deny"
+patterns_in_fns_without_body = "deny"
+renamed_and_removed_lints = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unconditional_recursion = "deny"
+unused = "deny"
+unused_allocation = "deny"
+unused_comparisons = "deny"
+unused_crate_dependencies = "deny"
+unused_extern_crates = "deny"
+unused_import_braces = "deny"
+unused_parens = "deny"
+# unused_results = "deny"
+while_true = "deny"
+
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
