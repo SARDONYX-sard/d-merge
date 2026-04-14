@@ -154,23 +154,23 @@ impl Default for ModManagerApp {
 }
 
 impl App for ModManagerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
-        self.start_log_watcher(ctx);
-        self.update_window_info(ctx);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut Frame) {
+        self.start_log_watcher(ui.ctx());
+        self.update_window_info(ui);
 
-        self.ui_execution_mode(ctx);
-        self.ui_skyrim_dir(ctx);
-        self.ui_output_dir(ctx);
-        self.ui_search_panel(ctx);
+        self.ui_execution_mode(ui);
+        self.ui_skyrim_dir(ui);
+        self.ui_output_dir(ui);
+        self.ui_search_panel(ui);
 
-        self.ui_notification(ctx);
+        self.ui_notification(ui);
         // NOTE: TopBottomPanel must be added before any other panels.
         // The first added panel becomes the outermost (front-most), and the last
         // becomes the innermost. Central panels must always be added last.
         // See: https://docs.rs/flatbox/0.1.0/flatbox/egui/struct.TopBottomPanel.html
-        self.ui_bottom_panel(ctx);
-        self.ui_mod_list(ctx);
-        self.ui_log_window(ctx);
+        self.ui_bottom_panel(ui);
+        self.ui_mod_list(ui);
+        self.ui_log_window(ui);
 
         self.is_first_render = false;
     }
@@ -178,7 +178,7 @@ impl App for ModManagerApp {
     // Called when the app is about to close
     //
     // NOTE: Using mem take!
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self) {
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
         crate::i18n::I18nMap::save_translation();
@@ -201,8 +201,8 @@ impl ModManagerApp {
     }
 
     /// To save settings.
-    fn update_window_info(&mut self, ctx: &egui::Context) {
-        let (pos, size, maximized) = ctx.input(|i| {
+    fn update_window_info(&mut self, ui: &egui::Ui) {
+        let (pos, size, maximized) = ui.input(|i| {
             // NOTE: Accessing self internally causes deadlock
             // Do not write directly to self within the closure
             let mut temp_pos = None;
@@ -231,13 +231,13 @@ impl ModManagerApp {
         }
     }
 
-    fn ui_execution_mode(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_execution_mode");
+    fn ui_execution_mode(&mut self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::top("top_execution_mode");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 let vfs_mode_label = self.t(I18nKey::VfsMode).to_string();
                 let vfs_mode_hover = self.t(I18nKey::VfsModeHover).to_string();
@@ -317,13 +317,13 @@ impl ModManagerApp {
     }
 
     /// Skyrim data directory selection panel.
-    fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_data_dir");
+    fn ui_skyrim_dir(&mut self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::top("top_data_dir");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked() {
                     if let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
@@ -379,13 +379,13 @@ impl ModManagerApp {
     }
 
     /// Output directory selection panel.
-    fn ui_output_dir(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_output_dir");
+    fn ui_output_dir(&mut self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::top("top_output_dir");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 let output_dir_label = self.t(I18nKey::OutputDirLabel);
                 if ui.button(output_dir_label).clicked() {
@@ -432,13 +432,13 @@ impl ModManagerApp {
     }
 
     /// Search & lock panel.
-    fn ui_search_panel(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_panel");
+    fn ui_search_panel(&mut self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::top("top_panel");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(self.t(I18nKey::SearchLabel));
 
@@ -473,41 +473,41 @@ impl ModManagerApp {
     }
 
     /// Notification bar at bottom.
-    fn ui_notification(&self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::bottom("notification_panel");
+    fn ui_notification(&self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::bottom("notification_panel");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.label(self.notification());
         });
     }
 
     /// Bottom panel with buttons (Log, Patch).
-    fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::bottom("bottom_panel");
+    fn ui_bottom_panel(&mut self, ui: &mut egui::Ui) {
+        let mut panel = egui::Panel::bottom("bottom_panel");
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
-                self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
+                self.add_button(ui, I18nKey::LogDir, |s, _| {
                     if let Err(err) = open_existing_dir_or_ancestor(get_log_dir(&s.output_dir)) {
                         s.set_notification(err);
                     }
                 });
-                self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
+                self.add_button(ui, I18nKey::LogButton, |s, _| {
                     s.show_log_window
                         .fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // Intended: toggle
                 });
-                self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
+                self.add_button(ui, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
-                self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
+                self.add_button(ui, I18nKey::PatchButton, |s, _| {
                     s.patch();
                 });
 
@@ -517,7 +517,7 @@ impl ModManagerApp {
                         .on_hover_text(self.t(I18nKey::IssueReportHover))
                         .clicked()
                     {
-                        ui.ctx().open_url(egui::OpenUrl {
+                        ui.open_url(egui::OpenUrl {
                             url: create_issue_link(self),
                             new_tab: true,
                         });
@@ -528,15 +528,15 @@ impl ModManagerApp {
     }
 
     /// Add bottom button
-    fn add_button<F>(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, key: I18nKey, f: F)
+    fn add_button<F>(&mut self, ui: &mut egui::Ui, key: I18nKey, f: F)
     where
-        F: FnOnce(&mut Self, &egui::Context),
+        F: FnOnce(&mut Self, &egui::Ui),
     {
         if ui
             .add_sized([120.0, 40.0], egui::Button::new(self.t(key)))
             .clicked()
         {
-            f(self, ctx);
+            f(self, ui);
         }
     }
 
@@ -568,7 +568,7 @@ impl ModManagerApp {
     }
 
     /// Deferred log viewer window.
-    fn ui_log_window(&self, ctx: &egui::Context) {
+    fn ui_log_window(&self, ui: &egui::Ui) {
         if self
             .show_log_window
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -577,7 +577,7 @@ impl ModManagerApp {
             let log_lines = Arc::clone(&self.log_lines);
             let clear_button_name = self.t(I18nKey::ClearButton).to_string();
 
-            ctx.show_viewport_deferred(
+            ui.show_viewport_deferred(
                 egui::ViewportId::from_hash_of("log_viewer"),
                 egui::ViewportBuilder {
                     title: Some("Log viewer".to_string()),
@@ -585,7 +585,7 @@ impl ModManagerApp {
                     resizable: Some(true),
                     ..Default::default()
                 },
-                move |ctx, class| {
+                move |ui, class| {
                     assert!(
                         class == egui::ViewportClass::Deferred,
                         "This egui backend doesn't support multiple viewports"
@@ -593,7 +593,7 @@ impl ModManagerApp {
 
                     egui::CentralPanel::default()
                         .frame(egui::Frame::new())
-                        .show(ctx, |ui| {
+                        .show_inside(ui, |ui| {
                             ui.horizontal(|ui| {
                                 if ui.button(clear_button_name.as_str()).clicked() {
                                     log_lines.lock().unwrap().clear();
@@ -601,7 +601,7 @@ impl ModManagerApp {
 
                                 ui.button("Copy").clicked().then(|| {
                                     let text = log_lines.lock().unwrap().join("\n");
-                                    ui.ctx().copy_text(text);
+                                    ui.copy_text(text);
                                 });
                             });
 
@@ -613,7 +613,7 @@ impl ModManagerApp {
                                 });
                         });
 
-                    if ctx.input(|i| i.viewport().close_requested()) {
+                    if ui.input(|i| i.viewport().close_requested()) {
                         show_log_window.store(false, std::sync::atomic::Ordering::Relaxed);
                     }
                 },
@@ -624,13 +624,13 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Central panel with mod list table.
-    fn ui_mod_list(&mut self, ctx: &egui::Context) {
+    fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let mut panel = egui::CentralPanel::default();
         if self.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
-        panel.show(ctx, |ui| {
+        panel.show_inside(ui, |ui| {
             ui.heading(self.t(I18nKey::ModsListTitle));
             ui.separator();
 

@@ -26,12 +26,10 @@ fn bone_weight_empty_hkparam(input: &mut &str) -> ModalResult<()> {
 pub fn bone_weight_then_mod_code(input: &mut &str) -> ModalResult<()> {
     (
         bone_weight_empty_hkparam,
-        // NOTE: `colisc` is `Precision Creatures` id
         comment_kind.verify(|kind| matches!(kind, CommentKind::ModCode("colisc"))),
     )
         .void()
         .parse_next(input)
-    // Note: validate it's actually ModCode in the caller if needed
 }
 
 /// Parses whitespace-separated floats until `</hkparam>` (consuming the tag).
@@ -39,7 +37,6 @@ pub fn parse_floats_till_end_hkparam(input: &mut &str) -> ModalResult<Array<'sta
     let mut values: Array = Vec::new();
     loop {
         multispace0.parse_next(input)?;
-        // Peek for </hkparam>
         if end_tag("hkparam").parse_peek(input).is_ok() {
             end_tag("hkparam").parse_next(input)?;
             close_comment.parse_next(input)?;
