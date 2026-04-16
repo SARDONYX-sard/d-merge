@@ -203,7 +203,14 @@ fn check_header(
     const TAG_MAGIC: [u8; 8] = [0x1E, 0x0D, 0xB0, 0xCA, 0xCE, 0xFA, 0x11, 0xD0];
     if header[0..8] == TAG_MAGIC {
         #[cfg(feature = "tracing")]
-        tracing::info!(path = %input_path.display(), "Tag file detected; skipping.");
+        tracing::info!(path = %input_path.display(), "Tag file detected; Skipped.");
+        return Ok(output_format);
+    }
+
+    const TAG_XML_START: &[u8; 16] = b"<?xml version=\"1";
+    if &header[0..16] == TAG_XML_START {
+        #[cfg(feature = "tracing")]
+        tracing::info!(path = %input_path.display(), "XML Tag file detected; Skipped.");
         return Ok(output_format);
     }
 
