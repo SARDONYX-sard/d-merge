@@ -38,7 +38,7 @@ pub enum Error {
         "While attempting to automatically convert FNIS HKX for target {target:?}, \
         the file {} did not have the expected Havok magic numbers. \
         Expected magic=[0x57, 0xe0, 0xe0, 0x57, 0x10, 0xc0, 0xc0, 0x10, ...], \
-        but got {magic_bytes:x?}. \
+        but got {magic_bytes:#x?}. \
         This file is not a valid Havok animation or may be from an unsupported version.",
         input_path.display()
     ))]
@@ -48,6 +48,7 @@ pub enum Error {
         magic_bytes: [u8; 17],
     },
 
+    /// Expected pointer size 4/8-byte, but got {}
     #[snafu(display(
         "While attempting to automatically convert FNIS HKX for target {target:?}, \
         pointer size check failed for {}. \

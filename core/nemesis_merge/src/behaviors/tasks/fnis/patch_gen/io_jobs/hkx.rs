@@ -209,11 +209,16 @@ fn check_header(
 
     const HKX_MAGIC: [u8; 8] = [0x57, 0xE0, 0xE0, 0x57, 0x10, 0xC0, 0xC0, 0x10];
     if header[0..8] != HKX_MAGIC {
-        return Err(Error::FNISHkxInvalidMagic {
-            input_path: input_path.to_path_buf(),
-            target: output_format,
-            magic_bytes: header,
-        });
+        #[cfg(feature = "tracing")]
+        {
+            let err = Error::FNISHkxInvalidMagic {
+                input_path: input_path.to_path_buf(),
+                target: output_format,
+                magic_bytes: header,
+            };
+            tracing::warn!(path = %input_path.display(), "Skipped.: {err}");
+        }
+        return Ok(output_format);
     }
 
     match header[16] {
