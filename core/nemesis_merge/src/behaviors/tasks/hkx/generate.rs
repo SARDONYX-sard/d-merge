@@ -68,7 +68,7 @@ pub(crate) fn generate_hkx_files(
                     // It checks whether the number of values associated with an event matches the number of default values associated with a value name.
                     // This is done to prevent crashes before they occur.
                     use serde_hkx_features::id_maker::check_len_from_map;
-                    check_len_from_map(&class_map, &master_behavior_graph_index).with_context(
+                    check_len_from_map(&class_map, master_behavior_graph_index).with_context(
                         |_| crate::errors::DedupEventVariableSnafu {
                             path: output_path.clone(),
                         },
@@ -78,7 +78,7 @@ pub(crate) fn generate_hkx_files(
                     class_map.sort_for_bytes(); // NOTE: If we don't sort hkx by dependency order, a T/A pose will occur.
 
                     if let Some((event_map, var_map)) =
-                        create_maps(&class_map, &master_behavior_graph_index)
+                        create_maps(&class_map, master_behavior_graph_index)
                     {
                         event_id_map = Some(event_map);
                         variable_id_map = Some(var_map);

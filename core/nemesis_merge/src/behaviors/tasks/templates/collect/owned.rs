@@ -1,22 +1,23 @@
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
-    behaviors::tasks::templates::{key::TemplateKey, types::OwnedTemplateMap},
+    behaviors::tasks::{patches::types::BehaviorPatchesMap, templates::types::OwnedTemplateMap},
     errors::Error,
 };
 
 /// Collect templates path & content map.
 ///
 /// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
-pub fn collect_templates(
+pub fn collect_templates<'a>(
     template_root: &Path,
-    template_names: HashSet<TemplateKey<'static>>,
+    template_names: &BehaviorPatchesMap<'a>,
 ) -> (OwnedTemplateMap, Vec<Error>) {
     template_names
-        .into_par_iter()
-        .map(|template_key| {
+        .0
+        .par_iter()
+        .partition_map(|(template_key, _)| {
             // Intended sample:
             // - `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.bin`
             // - `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.xml`
@@ -29,11 +30,10 @@ pub fn collect_templates(
             }
 
             match std::fs::read(&template_path) {
-                Ok(bytes) => Either::Left((template_key, bytes)),
+                Ok(bytes) => Either::Left((template_key.clone(), bytes)),
                 Err(_err) => Either::Right(Error::NotFoundTemplate {
                     template_name: template_path.display().to_string(),
                 }),
             }
         })
-        .partition_map(|either| either)
 }

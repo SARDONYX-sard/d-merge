@@ -1,8 +1,11 @@
 mod patch_map;
 
-use std::{borrow::Cow, path::PathBuf};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, hash_map::Entry},
+    path::PathBuf,
+};
 
-use dashmap::DashMap;
 use indexmap::IndexMap;
 
 pub use self::patch_map::HkxPatchMaps;
@@ -65,7 +68,7 @@ pub struct PatchCollection<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub(crate) struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
+pub(crate) struct BehaviorPatchesMap<'a>(pub HashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
 impl<'a> BehaviorPatchesMap<'a> {
     pub(crate) fn len(&self) -> usize {
@@ -73,19 +76,19 @@ impl<'a> BehaviorPatchesMap<'a> {
         self.0
             .par_iter()
             .map(|pair| {
-                let HkxPatchMaps { one, seq } = pair.value();
+                let HkxPatchMaps { one, seq } = pair.1;
                 one.0.len() + seq.0.len()
             })
             .sum()
     }
 
-    pub(crate) fn merge(&self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         for (key, other_maps) in other.0 {
             match self.0.entry(key) {
-                dashmap::Entry::Vacant(v) => {
+                Entry::Vacant(v) => {
                     v.insert(other_maps);
                 }
-                dashmap::Entry::Occupied(mut occ) => {
+                Entry::Occupied(mut occ) => {
                     occ.get_mut().merge(other_maps);
                 }
             }
@@ -102,11 +105,4 @@ impl<'a> BehaviorPatchesMap<'a> {
 /// - key: template_name
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, Cow<'static, str>>);
-impl BehaviorGraphDataMap<'_> {
-    /// Create `Self`
-    #[inline]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-}
+pub struct BehaviorGraphDataMap<'a>(pub HashMap<TemplateKey<'a>, Cow<'static, str>>);

@@ -9,7 +9,8 @@
 //!
 //! These are ideal for use-cases where patches must be merged, prioritized, or combined from multiple threads.
 
-use dashmap::DashMap;
+use std::collections::{HashMap, hash_map::Entry};
+
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 
@@ -34,7 +35,7 @@ impl<'a> HkxPatchMaps<'a> {
     }
 
     #[inline]
-    pub(crate) fn merge(&self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         self.one.merge(other.one);
         self.seq.merge(other.seq);
     }
@@ -43,16 +44,9 @@ impl<'a> HkxPatchMaps<'a> {
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default)]
-pub struct OnePatchMap<'a>(pub DashMap<JsonPath<'a>, ValueWithPriority<'a>>);
+pub struct OnePatchMap<'a>(pub HashMap<JsonPath<'a>, ValueWithPriority<'a>>);
 
 impl<'a> OnePatchMap<'a> {
-    /// Constructs a new, empty [`OnePatchMap`].
-    #[inline]
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// If an existing value is present, its priority is compared with
@@ -62,8 +56,8 @@ impl<'a> OnePatchMap<'a> {
     ///
     /// - `key`: The JSON path associated with the value.
     /// - `new_value`: The value with an associated priority.
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
-        if let Some(mut existing) = self.0.get_mut(&key) {
+    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+        if let Some(existing) = self.0.get_mut(&key) {
             let new_priority = new_value.priority;
             let existing_priority = existing.priority;
 
@@ -79,16 +73,16 @@ impl<'a> OnePatchMap<'a> {
     }
 
     /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
-    pub(crate) fn merge(&self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         for (path, new_val) in other.0 {
             match self.0.entry(path) {
-                dashmap::Entry::Occupied(mut occ) => {
+                Entry::Occupied(mut occ) => {
                     let existing = occ.get_mut();
                     if new_val.priority > existing.priority {
                         *existing = new_val;
                     }
                 }
-                dashmap::Entry::Vacant(v) => {
+                Entry::Vacant(v) => {
                     v.insert(new_val);
                 }
             }
@@ -99,39 +93,32 @@ impl<'a> OnePatchMap<'a> {
 /// A map that stores **multiple** values per JSON path,
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default)]
-pub struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
+pub struct SeqPatchMap<'a>(pub HashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
 
 impl<'a> SeqPatchMap<'a> {
-    /// Constructs a new, empty [`SeqPatchMap`].
-    #[inline]
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
-            dashmap::Entry::Occupied(mut existing) => {
+            Entry::Occupied(mut existing) => {
                 existing.get_mut().push(new_value);
             }
-            dashmap::Entry::Vacant(v) => {
+            Entry::Vacant(v) => {
                 v.insert(vec![new_value]);
             }
         }
     }
 
     /// Extends the list of values for the given JSON path.
-    pub fn merge(&self, other: Self) {
+    pub fn merge(&mut self, other: Self) {
         for (path, other_vals) in other.0 {
             match self.0.entry(path) {
-                dashmap::Entry::Occupied(mut occ) => {
+                Entry::Occupied(mut occ) => {
                     occ.get_mut().par_extend(other_vals);
                 }
-                dashmap::Entry::Vacant(v) => {
+                Entry::Vacant(v) => {
                     v.insert(other_vals);
                 }
             }
@@ -158,9 +145,9 @@ impl<'a> serde::Serialize for OnePatchMap<'a> {
         use serde::ser::SerializeMap;
 
         let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for item in self.0.iter() {
-            let joined = item.key().join("/"); // JsonPath -> "a/b/c"
-            map.serialize_entry(&joined, item.value())?;
+        for item in &self.0 {
+            let joined = item.0.join("/"); // JsonPath -> "a/b/c"
+            map.serialize_entry(&joined, &item.1)?;
         }
         map.end()
     }
@@ -186,7 +173,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::new();
+                let mut map = HashMap::new();
                 while let Some((key, value)) =
                     access.next_entry::<String, ValueWithPriority<'de>>()?
                 {
@@ -214,9 +201,9 @@ impl<'a> serde::Serialize for SeqPatchMap<'a> {
         use serde::ser::SerializeMap;
 
         let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for item in self.0.iter() {
-            let joined = item.key().join("/"); // "a/b/c"
-            map.serialize_entry(&joined, item.value())?;
+        for item in &self.0 {
+            let joined = item.0.join("/"); // "a/b/c"
+            map.serialize_entry(&joined, &item.1)?;
         }
         map.end()
     }
@@ -242,7 +229,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::new();
+                let mut map = HashMap::new();
 
                 while let Some((key, value)) =
                     access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?

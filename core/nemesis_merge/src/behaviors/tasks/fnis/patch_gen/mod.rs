@@ -61,7 +61,7 @@ impl<'a> LocalAgg<'a> {
     fn new() -> Self {
         Self {
             borrowed_patches: BehaviorPatchesMap::default(),
-            behavior_graph_data_map: BehaviorGraphDataMap::new(),
+            behavior_graph_data_map: BehaviorGraphDataMap::default(),
             adsf_patches: Vec::new(),
             furniture_groups: Vec::new(),
             conversion_jobs: Vec::new(),
@@ -83,11 +83,6 @@ impl<'a> LocalAgg<'a> {
 }
 
 /// Collect borrowed patches from multiple FNIS One Mods.
-///
-/// # Note
-/// Since this function uses I/O internally for operations like hkx conversion,
-/// do not call this function itself within `rayon::par_iter`.
-/// This is because semaphore locks in MO2 may potentially deadlock.
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
@@ -122,7 +117,7 @@ pub fn collect_borrowed_patches<'a>(
         });
 
     let LocalAgg {
-        borrowed_patches,
+        mut borrowed_patches,
         behavior_graph_data_map,
         adsf_patches,
         furniture_groups,
@@ -173,7 +168,7 @@ pub fn collect_borrowed_patches<'a>(
                 }
 
                 // Push Mod Root behavior to master xml
-                let mut entry = borrowed_patches.0.entry(master_template_key).or_default();
+                let entry = borrowed_patches.0.entry(master_template_key).or_default();
                 {
                     let (one_gen, one_state_info, seq_state) =
                         new_injectable_mod_root_behavior(owned_data);
@@ -278,7 +273,7 @@ pub fn collect_borrowed_patches<'a>(
         .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
     {
         let (one, seq) = new_mt_global_patch(furniture_groups, 0);
-        let mut entry = borrowed_patches
+        let entry = borrowed_patches
             .0
             .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
             .or_default();
@@ -494,7 +489,7 @@ fn new_push_anim_seq_patch<'a>(
     animations: &[&'a str],
     owned_data: &'a OwnedFnisInjection,
     behavior_entry: &'static BehaviorEntry,
-    patches: &BehaviorPatchesMap<'a>,
+    patches: &mut BehaviorPatchesMap<'a>,
 ) {
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;

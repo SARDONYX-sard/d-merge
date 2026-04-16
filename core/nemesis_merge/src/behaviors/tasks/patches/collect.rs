@@ -5,7 +5,7 @@ use std::{
 
 use json_patch::ValueWithPriority;
 use nemesis_xml::patch::parse_nemesis_patch;
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 use snafu::{OptionExt as _, ResultExt as _};
 use tokio::fs;
 
@@ -20,14 +20,16 @@ use crate::{
         tasks::{
             adsf::types::OwnedAdsfPatchMap,
             asdsf::types::OwnedAsdsfPatchMap,
-            patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+            patches::types::{
+                BehaviorGraphDataMap, BehaviorPatchesMap, OwnedPatchMap, OwnedPatches,
+                PatchCollection,
+            },
         },
     },
     config::{ReportType, StatusReportCounter},
     errors::{
         Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
     },
-    results::filter_results,
 };
 
 struct OwnedPath {
@@ -125,87 +127,111 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
     }
 }
 
+struct LocalAgg<'a> {
+    nemesis_borrowed_patches: BehaviorPatchesMap<'a>,
+    nemesis_variable_class_map: BehaviorGraphDataMap<'a>,
+}
+
+impl<'a> LocalAgg<'a> {
+    fn new() -> Self {
+        Self {
+            nemesis_borrowed_patches: BehaviorPatchesMap::default(),
+            nemesis_variable_class_map: BehaviorGraphDataMap::default(),
+        }
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        self.nemesis_borrowed_patches
+            .merge(other.nemesis_borrowed_patches);
+        self.nemesis_variable_class_map
+            .0
+            .par_extend(other.nemesis_variable_class_map.0);
+        self
+    }
+}
+
 pub fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
-    fnis_patches: PatchCollection<'a>,
+    mut fnis_patches: PatchCollection<'a>,
 ) -> (PatchCollection<'a>, Vec<Error>) {
-    let PatchCollection {
-        borrowed_patches: raw_borrowed_patches,
-        behavior_graph_data_map: variable_class_map,
-    } = fnis_patches;
-
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::ParsingPatches,
         owned_patches.len(),
     );
 
-    let results: Vec<Result<()>> = owned_patches
+    let (locals, errors): (Vec<LocalAgg<'a>>, Vec<Error>) = owned_patches
         .par_iter()
-        .map(|(path, (xml, priority))| {
+        .map(|(path, (xml, priority))| -> Result<LocalAgg<'a>> {
             reporter.increment();
-            // Since we could not make a destructing assignment, we have to write it this way.
             let priority = *priority;
 
             let (json_patches, parsed_var_index) =
                 parse_nemesis_patch(xml, config.hack_options.map(Into::into))
                     .with_context(|_| NemesisXmlErrSnafu { path })?;
 
-            let key = {
-                let nemesis_path = parse_nemesis_path(path)?;
+            let nemesis_path = parse_nemesis_path(path)?;
+            let key = nemesis_path
+                .to_template_key()
+                .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
 
-                let key = nemesis_path
-                    .to_template_key()
-                    .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
+            let mut agg = LocalAgg::new();
 
-                // Store variable class for nemesis variable to replace
-                if let Some(master_behavior_graph_index) = nemesis_path.get_variable_index() {
-                    variable_class_map
-                        .0
-                        .entry(key.clone())
-                        .or_insert(Cow::Borrowed(master_behavior_graph_index));
-                } else if let Some(parsed_var_index) = parsed_var_index {
-                    variable_class_map
-                        .0
-                        .entry(key.clone())
-                        .or_insert(Cow::Owned(parsed_var_index.to_string()));
-                }
+            if let Some(master_behavior_graph_index) = nemesis_path.get_variable_index() {
+                agg.nemesis_variable_class_map
+                    .0
+                    .entry(key.clone())
+                    .or_insert(Cow::Borrowed(master_behavior_graph_index));
+            } else if let Some(parsed_var_index) = parsed_var_index {
+                agg.nemesis_variable_class_map
+                    .0
+                    .entry(key.clone())
+                    .or_insert_with(|| Cow::Owned(parsed_var_index.to_string()));
+            }
 
-                key
-            };
-
-            json_patches.into_par_iter().for_each(|(json_path, value)| {
-                // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
-
-                // Overwrite to match patch structure
+            for (json_path, value) in json_patches {
+                let entry = agg
+                    .nemesis_borrowed_patches
+                    .0
+                    .entry(key.clone())
+                    .or_default();
                 match &value.action {
                     json_patch::Action::Pure { .. } => {
-                        let value = ValueWithPriority::new(value, priority);
-                        entry.value().one.insert(json_path, value); // Pure: no add and remove because of single value
+                        entry
+                            .one
+                            .insert(json_path, ValueWithPriority::new(value, priority));
                     }
                     json_patch::Action::Seq { .. } | json_patch::Action::SeqPush => {
-                        let value = ValueWithPriority::new(value, priority);
-                        entry.value().seq.insert(json_path, value);
+                        entry
+                            .seq
+                            .insert(json_path, ValueWithPriority::new(value, priority));
                     }
                 }
-            });
+            }
 
-            Ok(())
+            Ok(agg)
         })
-        .collect();
+        .partition_map(|r| match r {
+            Ok(agg) => Either::Left(agg),
+            Err(e) => Either::Right(e),
+        });
 
-    let errors = match filter_results(results) {
-        Ok(()) => vec![],
-        Err(errors) => errors,
-    };
+    let LocalAgg {
+        nemesis_borrowed_patches,
+        nemesis_variable_class_map,
+    } = locals
+        .into_par_iter()
+        .reduce(LocalAgg::new, |a, b| a.merge(b));
 
-    (
-        PatchCollection {
-            borrowed_patches: raw_borrowed_patches,
-            behavior_graph_data_map: variable_class_map,
-        },
-        errors,
-    )
+    // Merge nemesis results on top of the fnis base
+    fnis_patches
+        .borrowed_patches
+        .merge(nemesis_borrowed_patches);
+    fnis_patches
+        .behavior_graph_data_map
+        .0
+        .par_extend(nemesis_variable_class_map.0);
+
+    (fnis_patches, errors)
 }

@@ -23,5 +23,4 @@ pub use self::{
     json_path::JsonPath,
     operation::Op,
     patch_types::{Action, JsonPatch, ValueWithPriority},
-    range::parse::parse_range,
 };

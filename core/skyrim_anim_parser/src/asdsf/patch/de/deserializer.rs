@@ -426,7 +426,7 @@ $crc32[ground_bite]$
             attacks_patches: AttacksDiff {
                 one: Default::default(),
                 seq: {
-                    let mut map = SeqPatchMap::new();
+                    let mut map = SeqPatchMap::default();
                     map.insert(
                         json_patch::json_path!["[0]", "clip_names"],
                         ValueWithPriority {

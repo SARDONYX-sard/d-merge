@@ -177,15 +177,8 @@ fn apply_and_gen_patched_hkx<'a>(
     let owned_templates = {
         use self::tasks::templates::collect::owned;
 
-        // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        let needed_template_names: std::collections::HashSet<_> = borrowed_patches
-            .0
-            .par_iter()
-            .map(|entry| entry.key().clone())
-            .collect();
-
         let (owned_templates, errors) =
-            owned::collect_templates(&config.resource_dir, needed_template_names);
+            owned::collect_templates(&config.resource_dir, &borrowed_patches);
         template_error_len = errors.len();
         all_errors.par_extend(errors);
         owned_templates
@@ -194,7 +187,6 @@ fn apply_and_gen_patched_hkx<'a>(
     {
         // NOTE: Without this seemingly meaningless move, an lifetime error is made.
         // Need `'owned_templates`: `'variable_class_map` & `'borrowed_patches`. So let's move here and shrink these lifetimes.
-        let variable_class_map = variable_class_map;
         let borrowed_patches = borrowed_patches;
 
         let mut templates = {

@@ -65,13 +65,6 @@ impl<'a> OnePatchMap<'a> {
 pub struct SeqPatchMap<'a>(pub HashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
 
 impl<'a> SeqPatchMap<'a> {
-    /// Constructs a new, empty [`SeqPatchMap`].
-    #[inline]
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// - If the path already has an entry, the new value is pushed to the list.

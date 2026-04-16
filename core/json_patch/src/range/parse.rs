@@ -14,7 +14,7 @@ use super::{Range, error::RangeError};
 /// # Errors
 /// Returns `PatchError::InvalidOperation` if the segment does not conform to the
 /// expected format or contains invalid numeric values.
-pub fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
+pub(crate) fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
     let input = &mut segment;
 
     _parse_range
