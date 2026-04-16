@@ -47,7 +47,7 @@ export const PatchOptionsDialog = () => {
         <DialogTitle id='patch-options-dialog-title'>{t('patch.options_title')}</DialogTitle>
         <DialogContent dividers={true}>
           {/* Output Target */}
-          <Box mb={3}>
+          <Box sx={{ mb: 3 }}>
             <FormLabel component='legend' sx={{ mb: 1, fontWeight: 'bold' }}>
               {t('patch.output_target_label')}
             </FormLabel>
@@ -109,7 +109,7 @@ export const PatchOptionsDialog = () => {
           </Box>
 
           {/* Hack Options */}
-          <Box mb={3}>
+          <Box sx={{ mb: 3 }}>
             <FormLabel component='legend' sx={{ mb: 1, fontWeight: 'bold' }}>
               {t('patch.hack_options_label')}
             </FormLabel>
@@ -135,7 +135,7 @@ export const PatchOptionsDialog = () => {
           </Box>
 
           {/* Debug Options */}
-          <Box mb={3}>
+          <Box sx={{ mb: 3 }}>
             <FormLabel component='legend' sx={{ mb: 1, fontWeight: 'bold' }}>
               {t('patch.debug_options_label')}
             </FormLabel>

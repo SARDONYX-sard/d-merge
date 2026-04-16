@@ -17,7 +17,7 @@ export const PathSelector = () => {
     setSelectedPaths(selectedPaths.filter((file) => file !== fileToDelete));
 
   return (
-    <Box mt={2}>
+    <Box sx={{ mt: 2 }}>
       {selectionType === 'tree' ? (
         <PathTreeSelector />
       ) : (

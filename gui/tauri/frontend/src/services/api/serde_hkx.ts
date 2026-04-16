@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 
-import type { TreeViewBaseItem } from '@mui/x-tree-view';
+import type { TreeViewDefaultItemModelProperties } from '@mui/x-tree-view';
 
 // NOTE: Do not use yaml because it cannot be reversed.
 export type OutFormat = 'amd64' | 'win32' | 'xml' | 'json';
@@ -25,7 +25,7 @@ export async function convert(inputs: string[], output: string, format: OutForma
  */
 export async function loadDirNode(dirs: string[]) {
   if (isTauri()) {
-    return await invoke<TreeViewBaseItem[]>('load_dir_node', { dirs });
+    return await invoke<TreeViewDefaultItemModelProperties[]>('load_dir_node', { dirs });
   }
 
   throw new Error('Unsupported platform: Non Tauri');

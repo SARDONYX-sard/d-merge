@@ -20,17 +20,22 @@ export const CacheItem = ({ title, value, selected, onToggle }: Props) => {
               checked={selected}
               disableRipple={true}
               edge='start'
-              inputProps={{ 'aria-labelledby': labelId }}
+              slotProps={{
+                input: {
+                  'aria-labelledby': labelId,
+                },
+              }}
               // tabIndex={-1}
             />
           </ListItemIcon>
         </ListItemButton>
 
-        <Box display='flex' flexDirection='column' flexGrow={1}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
           <Typography color='textSecondary' id={labelId}>
             {title}
           </Typography>
-          <Box mt={1}>{value}</Box> {/*  Also supports cases where value contains <pre> tags */}
+          <Box sx={{ mt: 1 }}>{value}</Box>
+          {/*  Also supports cases where value contains <pre> tags */}{' '}
         </Box>
       </ListItem>
       <Divider sx={{ borderColor: '#616161' }} />

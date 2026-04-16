@@ -6,7 +6,7 @@ import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { stringArraySchema, stringSchema } from '@/lib/zod/schema-utils';
 
 import type { OutFormat } from '@/services/api/serde_hkx';
-import type { TreeViewBaseItem } from '@mui/x-tree-view';
+import type { TreeViewDefaultItemModelProperties } from '@mui/x-tree-view';
 
 export type ConvertStatusPayload = {
   /**  Djb2 hash algorism */
@@ -22,7 +22,7 @@ export type SelectedTree = {
   selectedItems: string[];
   expandedItems: string[];
   roots: string[];
-  tree: TreeViewBaseItem[];
+  tree: TreeViewDefaultItemModelProperties[];
 };
 export const CONVERT_TREE_INIT_VALUES = {
   expandedItems: [],

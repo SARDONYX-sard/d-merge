@@ -40,7 +40,7 @@ export const WelcomePage = () => {
         {t('welcome.subtitle')}
       </Typography>
 
-      <Grid container spacing={4} justifyContent='center' sx={{ maxWidth: 900 }}>
+      <Grid container spacing={4} sx={{ justifyContent: 'center', maxWidth: 900 }}>
         {PAGES_DATA.map((page) => (
           <GridCard key={page.path} page={page} />
         ))}
