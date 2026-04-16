@@ -1,32 +1,21 @@
-mod mod_info_loader;
+pub(crate) mod mod_info_loader;
 
 use std::path::PathBuf;
 
-pub(crate) use mod_info_loader::{
-    __cmd__get_skyrim_data_dir, __cmd__load_mods_info, get_skyrim_data_dir, load_mods_info,
-};
 use nemesis_merge::{
     Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status, behavior_gen,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
-use tauri::{AppHandle, Emitter as _, Manager, path::BaseDirectory};
-use tokio::{sync::Mutex, task::JoinHandle};
+use tauri::{AppHandle, Emitter as _, Manager, async_runtime::JoinHandle, path::BaseDirectory};
+use tokio::sync::Mutex;
 
 use crate::{
     cmd::{bail, time},
     error::NotFoundResourceDirSnafu,
 };
 
-const PATCH_STATUS_EVENT_NAME: &str = "d_merge://progress/patch";
 static PATCH_TASK: Lazy<Mutex<Option<JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
-
-/// Emits a patch status event to the frontend.
-fn emit_status(app: &AppHandle, payload: Status) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.emit(PATCH_STATUS_EVENT_NAME, payload);
-    }
-}
 
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +40,7 @@ pub(crate) struct GuiPatchOptions {
 // TODO: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
 #[tauri::command]
 pub(crate) async fn patch(
-    app: AppHandle,
+    app_handle: AppHandle,
     output: PathBuf,
     patches: PatchMaps,
     options: GuiPatchOptions,
@@ -59,38 +48,21 @@ pub(crate) async fn patch(
     tracing::info!("Starting patch with options: {options:#?}");
 
     cancel_patch_inner().await?; // Abort previous task if exists
+    remove_prev_output_if_no_dangerous(&options, &output);
 
-    {
-        use nemesis_merge::cache_remover;
-
-        let is_dangerous_remove = options
-            .skyrim_data_dir_glob
-            .as_deref()
-            .is_some_and(|d| cache_remover::is_dangerous_remove(&output, d));
-        if is_dangerous_remove {
-            tracing::warn!(
-                "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
-            );
-        } else {
-            if options.auto_remove_meshes {
-                cache_remover::remove_meshes_dir_all(&output);
-            }
-        }
-    }
-
-    let resource_dir = app
+    let resource_dir = app_handle
         .path()
         .resolve("assets/templates", BaseDirectory::Resource)
         .context(NotFoundResourceDirSnafu)
         .or_else(|err| bail!(err))?;
 
-    let app_handle = app.clone();
-    let handle = tokio::spawn(async move {
-        #[allow(trivial_casts)]
+    let handle = tauri::async_runtime::spawn(async move {
         let status_report = options.use_progress_reporter.then(|| {
-            let cloned_app_handle = app.clone();
-            Box::new(move |payload: Status| emit_status(&cloned_app_handle, payload))
-                as Box<dyn Fn(Status) + Send + Sync>
+            // NOTE: This is necessary because the coercion does not happen automatically through `Option` returned by `then()`.
+            let f: Box<dyn Fn(Status) + Send + Sync> = Box::new(move |payload: Status| {
+                let _ = app_handle.emit("d_merge://progress/patch", payload);
+            });
+            f
         });
 
         let config = Config {
@@ -104,14 +76,29 @@ pub(crate) async fn patch(
             generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
         };
 
-        match time!("[patch]", behavior_gen(patches, config).await) {
-            Ok(()) => emit_status(&app_handle, Status::Done),
-            Err(err) => emit_status(&app_handle, Status::Error(err)),
-        }
+        let _ = time!("[patch]", behavior_gen(patches, config).await);
     });
 
     PATCH_TASK.lock().await.replace(handle);
     Ok(())
+}
+
+fn remove_prev_output_if_no_dangerous(options: &GuiPatchOptions, output: &std::path::Path) {
+    use nemesis_merge::cache_remover;
+
+    let is_dangerous_remove = options
+        .skyrim_data_dir_glob
+        .as_deref()
+        .is_some_and(|d| cache_remover::is_dangerous_remove(output, d));
+    if is_dangerous_remove {
+        tracing::warn!(
+            "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
+        );
+    } else {
+        if options.auto_remove_meshes {
+            cache_remover::remove_meshes_dir_all(output);
+        }
+    }
 }
 
 async fn cancel_patch_inner() -> Result<(), String> {
