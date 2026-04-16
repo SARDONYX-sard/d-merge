@@ -5,11 +5,12 @@ use std::{
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Read as _, Seek as _, SeekFrom},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
     thread,
     time::Duration,
 };
 
+use parking_lot::Mutex;
 use snafu::ResultExt as _;
 
 /// Maximum number of log entries to retain (older entries are automatically discarded)
@@ -81,7 +82,7 @@ fn tail_loop(
 
 /// inner fn：ring buffer push
 fn push_line(log_lines: &Arc<Mutex<Vec<String>>>, line: String) {
-    let mut lines = log_lines.lock().unwrap();
+    let mut lines = log_lines.lock();
     lines.push(line);
     let len = lines.len();
     if len > MAX_LOG_LINES {

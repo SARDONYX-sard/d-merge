@@ -1,10 +1,11 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, atomic::AtomicBool},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use eframe::{App, Frame, egui};
 use egui::{Checkbox, Separator};
+use parking_lot::Mutex;
 use rayon::prelude::*;
 
 use crate::{
@@ -139,7 +140,7 @@ impl Default for ModManagerApp {
             font_path: None,
 
             // ============
-            async_rt: tokio::runtime::Runtime::new().unwrap(),
+            async_rt: tokio::runtime::Runtime::new().expect("Failed to spawn tokio runtime."),
             is_locked: false,
             check_all: false,
             log_lines: Arc::new(Mutex::new(Vec::new())),
@@ -559,7 +560,7 @@ impl ModManagerApp {
                             .selectable_value(&mut self.log_level, level, label)
                             .changed()
                         {
-                            tracing_rotation::change_level(level.as_str()).unwrap();
+                            let _ = tracing_rotation::change_level(level.as_str());
                         }
                     }
                 });
@@ -595,11 +596,11 @@ impl ModManagerApp {
                         .show(ctx, |ui| {
                             ui.horizontal(|ui| {
                                 if ui.button(clear_button_name.as_str()).clicked() {
-                                    log_lines.lock().unwrap().clear();
+                                    log_lines.lock().clear();
                                 }
 
                                 ui.button("Copy").clicked().then(|| {
-                                    let text = log_lines.lock().unwrap().join("\n");
+                                    let text = log_lines.lock().join("\n");
                                     ui.ctx().copy_text(text);
                                 });
                             });
@@ -607,7 +608,7 @@ impl ModManagerApp {
                             egui::ScrollArea::vertical()
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
-                                    let text = log_lines.lock().unwrap().join("\n");
+                                    let text = log_lines.lock().join("\n");
                                     ui.label(text);
                                 });
                         });
@@ -972,26 +973,20 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Set message to notification
-    pub fn set_notification<S: Into<String>>(&self, msg: S) {
-        if let Ok(mut guard) = self.notification.lock() {
-            let msg = msg.into();
-            *guard = msg;
-        }
+    #[inline]
+    pub(crate) fn set_notification<S: Into<String>>(&self, msg: S) {
+        *self.notification.lock() = msg.into();
     }
 
-    pub fn clear_notification(&self) {
-        if let Ok(mut guard) = self.notification.lock() {
-            guard.clear();
-        }
+    #[inline]
+    pub(crate) fn clear_notification(&self) {
+        self.notification.lock().clear();
     }
 
     /// Get notification message
-    pub fn notification(&self) -> String {
-        self.notification
-            .lock()
-            .ok()
-            .map(|s| s.clone())
-            .unwrap_or_default()
+    #[inline]
+    pub(crate) fn notification(&self) -> String {
+        self.notification.lock().clone()
     }
 }
 
@@ -1033,7 +1028,7 @@ impl ModManagerApp {
                     }
                 },
                 status_report: Some(Box::new(move |status| {
-                    let mut n = notify.lock().unwrap();
+                    let mut n = notify.lock();
                     *n = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {

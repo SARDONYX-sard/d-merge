@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![expect(clippy::expect_used)]
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
@@ -35,7 +35,8 @@ fn main() -> Result<(), eframe::Error> {
         tracing::info!("[Settings loader] Loaded settings.json");
     };
 
-    let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../tauri/backend/icons/icon.ico"));
+    let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../tauri/backend/icons/icon.ico"))
+        .map_err(eframe::Error::AppCreation)?;
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
@@ -69,12 +70,14 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-fn ico_to_rgba(bytes: &[u8]) -> (Vec<u8>, [u32; 2]) {
+fn ico_to_rgba(
+    bytes: &[u8],
+) -> Result<(Vec<u8>, [u32; 2]), Box<dyn std::error::Error + Send + Sync>> {
     let cursor = std::io::Cursor::new(bytes);
-    let ico = ico::IconDir::read(cursor).unwrap();
-    let entry = ico.entries().first().unwrap();
-    let image = entry.decode().unwrap();
+    let ico = ico::IconDir::read(cursor)?;
+    let entry = ico.entries().first().ok_or("missing icon")?;
+    let image = entry.decode()?;
     let width = image.width();
     let height = image.height();
-    (image.rgba_data().to_vec(), [width, height])
+    Ok((image.rgba_data().to_vec(), [width, height]))
 }
