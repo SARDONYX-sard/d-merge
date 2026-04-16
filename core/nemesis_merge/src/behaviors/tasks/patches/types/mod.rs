@@ -78,19 +78,6 @@ impl<'a> BehaviorPatchesMap<'a> {
             })
             .sum()
     }
-
-    pub(crate) fn merge(&self, other: Self) {
-        for (key, other_maps) in other.0 {
-            match self.0.entry(key) {
-                dashmap::Entry::Vacant(v) => {
-                    v.insert(other_maps);
-                }
-                dashmap::Entry::Occupied(mut occ) => {
-                    occ.get_mut().merge(other_maps);
-                }
-            }
-        }
-    }
 }
 
 /// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
@@ -103,10 +90,3 @@ impl<'a> BehaviorPatchesMap<'a> {
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
 pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, Cow<'static, str>>);
-impl BehaviorGraphDataMap<'_> {
-    /// Create `Self`
-    #[inline]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-}
