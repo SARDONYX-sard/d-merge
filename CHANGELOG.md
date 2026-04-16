@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-16
+### :sparkles: New Features
+- [`413719d`](https://github.com/SARDONYX-sard/d-merge/commit/413719d99017e3cb6101925f2bfc8813d48c557b) - **tauri**: add gen FNIS.esp option *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8c4ac23`](https://github.com/SARDONYX-sard/d-merge/commit/8c4ac239b375849d7126c5000acdafcd40a8f5f2) - **tauri_front**: fix virt to horizontal *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4a0f5b6`](https://github.com/SARDONYX-sard/d-merge/commit/4a0f5b644b291d36f14373faf6aae2c3d1b85eed) - add support for bone weight patches outside hkparam tags *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2c3d4bc`](https://github.com/SARDONYX-sard/d-merge/commit/2c3d4bcb64581cb7f005b4879792e8ce89de2298) - skip invalid hkx magic(to avoid tag file xml err) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`dcd9875`](https://github.com/SARDONYX-sard/d-merge/commit/dcd98753e4293367f8209aa555dac84f7a421f1b) - skip xml tag file *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`05096ad`](https://github.com/SARDONYX-sard/d-merge/commit/05096ad4d9da915fce5d3bf0acc18a8ffe9572b1) - **tauri**: fix patch failed *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f12951f`](https://github.com/SARDONYX-sard/d-merge/commit/f12951fec1d670e6e3fafce597e9ee52e78c7ef0) - **tauri_frontend**: fix settings path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`10e9ccd`](https://github.com/SARDONYX-sard/d-merge/commit/10e9ccd329e56a5a3913898a8f8c48ce62759c91) - **tauri**: fix emit crash *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ee0af74`](https://github.com/SARDONYX-sard/d-merge/commit/ee0af74c64c2de0247ae3c5cb5e7c63b738a77b9) - **tauri**: try to fix async freeze *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`332c8cb`](https://github.com/SARDONYX-sard/d-merge/commit/332c8cb0cdf1127518b2da7e8b6c76d078db0b52) - **merge**: rename error name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6a7bc5a`](https://github.com/SARDONYX-sard/d-merge/commit/6a7bc5a945c6b14fa42d18c59f7f632e87495cad) - use function *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`586787a`](https://github.com/SARDONYX-sard/d-merge/commit/586787a70f144742ae6c75120bd667642c4c9a8a) - **lint**: lint fix *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.2.0] - 2026-04-06
 ### :sparkles: New Features
 - [`72c8e96`](https://github.com/SARDONYX-sard/d-merge/commit/72c8e9637c55e10c9adfa01e9785c5dd28cec6b7) - add `fnis_creature_version` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -356,3 +376,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.3]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.2...1.0.3
 [1.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.3...1.1.0
 [1.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.1.0...1.2.0
+[1.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.2.0...1.3.0
