@@ -7,6 +7,16 @@ mod log;
 
 // NOTE: For some reason, other tasks freeze after executing async cmd, so I don't use #[tokio::main].
 fn main() {
+    // tauri: v2.5 emit crash hack: https://github.com/tauri-apps/tauri/issues/10987#issuecomment-3687624898
+    // It could be avoid async run freeze?
+    #[expect(clippy::expect_used)]
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .expect("Failed to build Tokio runtime");
+    tauri::async_runtime::set(runtime.handle().clone());
+
     #[allow(clippy::large_stack_frames)]
     if let Err(err) = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
