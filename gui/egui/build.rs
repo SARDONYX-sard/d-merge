@@ -2,12 +2,10 @@ use std::env;
 
 fn main() {
     // only run if target os is windows
-    let is_non_windows = env::var("CARGO_CFG_TARGET_OS")
-        .map(|os| os != "windows")
-        .unwrap_or(true);
+    let is_non_windows = env::var("CARGO_CFG_TARGET_OS").map_or(true, |os| os != "windows");
 
     // Since the PROFILE environment variable becomes empty for builds other than "debug" or "release", use OPT_LEVEL instead.
-    let release_opt_level = env::var("OPT_LEVEL").unwrap_or_default() == "3";
+    let release_opt_level = env::var("OPT_LEVEL").is_ok_and(|var| var == "3");
 
     if is_non_windows || !release_opt_level {
         return;

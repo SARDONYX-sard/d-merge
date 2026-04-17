@@ -50,13 +50,13 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
         ids.get(id_str).copied()
     }
 
-    let paths = nemesis_entries
-        .iter()
-        .flat_map(|(path, _)| collect_nemesis_paths(path));
-
     let mut handles = tokio::task::JoinSet::new();
-    for (category, path) in paths {
-        let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or(usize::MAX); // todo error handling
+    for (category, path) in nemesis_entries.keys().flat_map(collect_nemesis_paths) {
+        let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or_else(|| {
+            #[cfg(feature = "tracing")]
+            tracing::warn!("Not found id from path: Path({})", path.display());
+            usize::MAX // todo error handling
+        });
 
         handles.spawn(async move {
             let content = fs::read_to_string(&path)

@@ -141,7 +141,7 @@ mod tests {
             let dir = fs::read_dir(dir_path)?;
             let files = dir
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| entry.file_type().map(|ft| !ft.is_dir()).unwrap_or(false))
+                .filter(|entry| entry.file_type().is_ok_and(|ft| !ft.is_dir()))
                 .collect::<Vec<DirEntry>>();
             Ok(files)
         }
