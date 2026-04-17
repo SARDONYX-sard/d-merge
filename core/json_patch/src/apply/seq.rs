@@ -492,8 +492,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
                 Action::SeqPush => {
                     let push_len =
                         simd_json::derived::ValueTryAsArray::try_as_array(&patch.patch.value)
-                            .map(|a| a.len())
-                            .unwrap_or(1);
+                            .map_or(1, |a| a.len());
 
                     let start = target_array_len;
                     let end = start + push_len;
