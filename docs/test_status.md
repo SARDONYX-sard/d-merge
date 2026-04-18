@@ -167,3 +167,16 @@ Tag Legend
   - Requires:
     - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
     - [fnis_aa](https://github.com/SARDONYX-sard/fnis_aa)
+
+## About `TrailingData at character 0` Error
+
+This occurs when converting data from a patched JSON file to a data type that can be converted to HKX.
+
+This is likely to occur in the following scenarios:
+
+- When attempting to apply two DMCO patch MODs simultaneously
+
+- When attempting to apply TkDodge and TkDodge RE simultaneously (TkDodge should normally be overwritten by RE)
+
+If you know of any other specific conditions where this error occurs, please let me know.
+This error should not occur if the patches are applied correctly.

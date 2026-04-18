@@ -221,7 +221,11 @@ pub enum Error {
     },
 
     /// (De)Serialize json error
-    #[snafu(display("[json -> ClassMap Error] {}:\n {source}", path.display()))]
+    #[snafu(display("[json -> ClassMap Error] {}:\n {source}\n
+To users: This error may be caused by an issue with the d_merge developer. It is an error that should not normally occur.
+An unknown error is occurring during the conversion from JSON to the data type immediately preceding hkx.
+We need to verify the conditions under which this occurs in a minimal environment.
+    ", path.display()))]
     JsonToClassMapError {
         /// input path
         path: PathBuf,
