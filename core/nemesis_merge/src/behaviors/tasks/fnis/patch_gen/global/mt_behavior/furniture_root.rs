@@ -367,7 +367,7 @@ pub(super) fn new_mt_global_patch<'a>(
                     "__ptr": FNIS_FU_MT_5211,
                     "variableBindingSet": "#0000",
                     "userData": 3,
-                    "name": "IdleChairGetUp_DeactivateMod",
+                    "name": "IdelChairGetUp_DeactivateMod", // NOTE: `Idel` is intentional, not a typo
                     "enable": true,
                     "event": {
                         "id": 15,          // IdleChairGetUp
