@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
-pub type BaseMap = std::collections::HashMap<(Arc<str>, u64), u64>;
+pub(crate) type BaseMap = std::collections::HashMap<(Arc<str>, u64), u64>;
 
 /// Builds the base lookup map from a finalized [`AAConfig`].
 ///
@@ -40,7 +40,7 @@ const SCHEMA_URI: &str = "https://raw.githubusercontent.com/SARDONYX-sard/d-merg
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct AAGroup {
+pub(crate) struct AAGroup {
     /// FNIS group identifier.
     ///
     /// Serializes to the FNIS wire string (e.g. `"_1hmeqp"`).
@@ -68,7 +68,7 @@ pub struct AAGroup {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct AAMod {
+pub(crate) struct AAMod {
     /// 3-character mod prefix used by FNIS, e.g. `xpe` for XPMSE.
     ///
     /// Used as the key in `FNIS_aa2::GetAAprefixList()`.
@@ -117,7 +117,7 @@ pub struct AAMod {
 /// ```
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct AAConfig {
+pub(crate) struct AAConfig {
     /// URI of the JSON schema for this file.
     ///
     /// Always set to the canonical schema URI. Enables schema validation in
@@ -152,7 +152,7 @@ impl AAConfig {
     ///
     /// When the `schema` feature is enabled, the canonical schema URI is
     /// embedded in the output JSON as `$schema`.
-    pub fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
+    pub(crate) fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
         let fnis_version = fnis_version.into();
         Self {
             schema: Cow::Borrowed(SCHEMA_URI),
@@ -235,7 +235,10 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error
 ///
 /// # Output path
 /// `SKSE/Plugins/fnis_aa/config.json`
-pub fn build_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<BaseMap, Error> {
+pub(crate) fn build_aa_config_from_jobs(
+    jobs: &[AnimIoJob],
+    output_dir: &Path,
+) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
     let mut aa_mods = IndexMap::new();
 

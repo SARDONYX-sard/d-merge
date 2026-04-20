@@ -8,7 +8,7 @@ use crate::behaviors::tasks::fnis::collect::owned::OwnedFnisInjection;
 /// - `hkbBehaviorGraphStringData.variableNames`
 /// - `hkbVariableValueSet.wordVariableValues`
 /// - `hkbBehaviorGraphData.variableInfos`(as [i32])
-pub fn new_push_anim_vars_patch<'a>(
+pub(super) fn new_push_anim_vars_patch<'a>(
     values: &[AnimVar<'a>],
     owned_data: &'a OwnedFnisInjection,
 ) -> [(json_path::JsonPath<'a>, ValueWithPriority<'a>); 3] {

@@ -65,7 +65,9 @@ enum PatchKey<'a> {
 ///
 /// A `Vec<AdsfPatch<'a>>` containing only the relevant, deduplicated patches,
 /// with priority-based merging applied.
-pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AdsfPatch<'a>>) -> Vec<AdsfPatch<'a>> {
+pub(super) fn dedup_patches_by_priority_parallel<'a>(
+    patches: Vec<AdsfPatch<'a>>,
+) -> Vec<AdsfPatch<'a>> {
     patches
         .into_par_iter()
         .enumerate()

@@ -1,11 +1,11 @@
-pub mod path_parser;
+pub(crate) mod path_parser;
 mod sort;
-pub mod types;
+pub(crate) mod types;
 
 use std::path::{Path, PathBuf};
 
-use rayon::prelude::*;
-pub use skyrim_anim_parser::adsf::patch::de::{
+use rayon::{iter::Either, prelude::*};
+pub(crate) use skyrim_anim_parser::adsf::patch::de::{
     add::{parse_clip_anim_block_patch, parse_clip_motion_block_patch},
     others::{
         clip_anim::{ClipAnimDiffPatch, deserializer::parse_clip_anim_diff_patch},
@@ -35,7 +35,6 @@ use crate::{
         FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
         FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
     },
-    results::partition_results,
 };
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
@@ -109,13 +108,13 @@ pub(crate) fn apply_adsf_patches(
     fnis_adsf_patches: Vec<AdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse adsf patch (1 loop with par_iter)
-    let results: Vec<Result<AdsfPatch, Error>> = owned_anim_data_patches
+    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
         .0
-        .par_iter() // par iter
-        .map(parse_anim_data_patch)
-        .collect(); // back iter
-
-    let (mut borrowed_patches, mut errors) = partition_results(results);
+        .par_iter()
+        .partition_map(|path| match parse_anim_data_patch(path) {
+            Ok(v) => Either::Left(v),
+            Err(e) => Either::Right(e),
+        });
     borrowed_patches.par_extend(fnis_adsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map

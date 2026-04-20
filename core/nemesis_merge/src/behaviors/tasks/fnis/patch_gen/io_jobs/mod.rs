@@ -1,14 +1,14 @@
 //! Dispatches animation I/O jobs across three parallel branches:
 //! HKX conversion, static config writes, and FNIS AA deferred config writes.
-pub mod config;
-pub mod fnis_aa;
-pub mod hkx;
+pub(super) mod config;
+pub(super) mod fnis_aa;
+pub(super) mod hkx;
 
 use std::sync::Arc;
 
 use rayon::prelude::*;
 
-pub use self::hkx::{AnimKind, ConversionJob};
+pub(super) use self::hkx::{AnimKind, ConversionJob};
 use crate::{
     behaviors::tasks::fnis::patch_gen::alternate::{FnisAANamespaceConfigJob, FnisAASlotConfigJob},
     config::OutPutTarget,

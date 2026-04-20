@@ -3,7 +3,7 @@ mod anim_var;
 mod dummy_esp;
 mod furniture;
 mod gen_list_patch;
-pub mod generated_behaviors;
+pub(crate) mod generated_behaviors;
 mod global;
 mod io_jobs;
 mod kill_move;
@@ -19,7 +19,7 @@ use simd_json::json_typed;
 use snafu::ResultExt;
 use winnow::Parser;
 
-pub use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
+pub(crate) use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPatchGenerationError;
 use crate::{
     behaviors::tasks::{
         adsf::AdsfPatch,
@@ -88,7 +88,7 @@ impl<'a> LocalAgg<'a> {
 /// Since this function uses I/O internally for operations like hkx conversion,
 /// do not call this function itself within `rayon::par_iter`.
 /// This is because semaphore locks in MO2 may potentially deadlock.
-pub fn collect_borrowed_patches<'a>(
+pub(crate) fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
 ) -> (
@@ -428,7 +428,7 @@ fn new_injectable_mod_root_behavior<'a>(
 }
 
 /// Register event name & event flag(`"0"`).
-pub fn new_push_events_seq_patch<'a>(
+pub(crate) fn new_push_events_seq_patch<'a>(
     events: &[Cow<'_, str>],
     string_data_index: &'static str,
     behavior_graph_index: &'static str,

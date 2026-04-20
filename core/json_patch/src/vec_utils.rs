@@ -13,7 +13,7 @@ use rayon::prelude::*;
 /// let mut vec = Vec::new();
 /// vec.smart_extend(vec![1, 2, 3]);
 /// ```
-pub trait SmartExtend<T> {
+pub(crate) trait SmartExtend<T> {
     /// Extend the container using an iterator, which could be sequential or parallel
     /// depending on whether the `rayon` feature is enabled.
     fn smart_extend<I>(&mut self, iter: I)
@@ -25,7 +25,7 @@ pub trait SmartExtend<T> {
 ///
 /// The implementation returns either a standard iterator or a parallel iterator
 /// depending on whether the `rayon` feature is enabled.
-pub trait SmartIntoIter {
+pub(crate) trait SmartIntoIter {
     /// The item type produced by the iterator.
     type Item;
 
@@ -95,7 +95,7 @@ where
 
 /// A trait that abstracts over obtaining a mutable iterator (and potentially parallel
 /// mutable iterator) from a container.
-pub trait SmartIterMut<'a, T: 'a> {
+pub(crate) trait SmartIterMut<'a, T: 'a> {
     /// The item type of the iterator.
     type Item;
 

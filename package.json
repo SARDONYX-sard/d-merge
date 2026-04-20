@@ -20,7 +20,7 @@
     "fmt:back": "cargo +nightly fmt --all",
     "fmt": "npm run fmt:front && npm run fmt:back",
     "lint": "vp lint ./ && cargo clippy --workspace",
-    "lint:fix": "npm run fmt && vp check ./ --fix && cargo clippy --workspace --fix --allow-staged --allow-dirty",
+    "lint:fix": "npm run fmt && vp lint ./ --fix && cargo clippy --workspace --fix --allow-staged --allow-dirty",
     "tauri": "tauri",
     "test": "npm --workspace gui/tauri/frontend run test"
   },

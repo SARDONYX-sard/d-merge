@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, atomic::AtomicBool},
+    sync::{Arc, RwLock, atomic::AtomicBool},
 };
 
 use eframe::{App, Frame, egui};
@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum DataMode {
+pub(crate) enum DataMode {
     /// Virtual File System mode.(MO2 etc.)
     Vfs,
     /// Manual mode.
@@ -25,7 +25,7 @@ pub enum DataMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum LogLevel {
+pub(crate) enum LogLevel {
     Error,
     Warn,
     Info,
@@ -34,7 +34,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    pub const fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Error => "error",
             Self::Warn => "warn",
@@ -46,7 +46,7 @@ impl LogLevel {
 }
 
 /// Main application state for Mod Manager.
-pub struct ModManagerApp {
+pub(crate) struct ModManagerApp {
     /// Execution mode. VFS or not
     pub mode: DataMode,
     /// Target Skyrim runtime when behavior generation. SE or LE
@@ -97,9 +97,9 @@ pub struct ModManagerApp {
     pub is_locked: bool,
     /// Global "check all" flag.
     pub check_all: bool,
-    pub notification: Arc<Mutex<String>>,
+    pub notification: Arc<RwLock<String>>,
 
-    pub log_lines: Arc<Mutex<Vec<String>>>,
+    pub log_lines: Arc<RwLock<Vec<String>>>,
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
     /// It exists because mod_info must be loaded automatically only on the first run.
@@ -142,10 +142,10 @@ impl Default for ModManagerApp {
             async_rt: tokio::runtime::Runtime::new().unwrap(),
             is_locked: false,
             check_all: false,
-            log_lines: Arc::new(Mutex::new(Vec::new())),
+            log_lines: Arc::new(RwLock::new(Vec::new())),
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
-            notification: Arc::new(Mutex::new(String::new())),
+            notification: Arc::new(RwLock::new(String::new())),
             is_first_render: true,
             prev_table_available_width: 0.0,
             fetch_is_empty: true,
@@ -595,11 +595,11 @@ impl ModManagerApp {
                         .show(ctx, |ui| {
                             ui.horizontal(|ui| {
                                 if ui.button(clear_button_name.as_str()).clicked() {
-                                    log_lines.lock().unwrap().clear();
+                                    log_lines.write().unwrap().clear();
                                 }
 
                                 ui.button("Copy").clicked().then(|| {
-                                    let text = log_lines.lock().unwrap().join("\n");
+                                    let text = log_lines.read().unwrap().join("\n");
                                     ui.ctx().copy_text(text);
                                 });
                             });
@@ -607,7 +607,7 @@ impl ModManagerApp {
                             egui::ScrollArea::vertical()
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
-                                    let text = log_lines.lock().unwrap().join("\n");
+                                    let text = log_lines.read().unwrap().join("\n");
                                     ui.label(text);
                                 });
                         });
@@ -919,7 +919,7 @@ impl ModManagerApp {
 
                     let mut has_update_notify = false;
                     let msg = self.t(I18nKey::NotifyInfoUpdatingModList);
-                    let _ = self.notification.try_lock().map(|mut guard| {
+                    let _ = self.notification.try_write().map(|mut guard| {
                         *guard = msg.to_string();
                         has_update_notify = true;
                     });
@@ -972,23 +972,23 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Set message to notification
-    pub fn set_notification<S: Into<String>>(&self, msg: S) {
-        if let Ok(mut guard) = self.notification.lock() {
+    pub(crate) fn set_notification<S: Into<String>>(&self, msg: S) {
+        if let Ok(mut guard) = self.notification.write() {
             let msg = msg.into();
             *guard = msg;
         }
     }
 
-    pub fn clear_notification(&self) {
-        if let Ok(mut guard) = self.notification.lock() {
+    pub(crate) fn clear_notification(&self) {
+        if let Ok(mut guard) = self.notification.write() {
             guard.clear();
         }
     }
 
     /// Get notification message
-    pub fn notification(&self) -> String {
+    pub(crate) fn notification(&self) -> String {
         self.notification
-            .lock()
+            .read()
             .ok()
             .map(|s| s.clone())
             .unwrap_or_default()
@@ -1033,7 +1033,7 @@ impl ModManagerApp {
                     }
                 },
                 status_report: Some(Box::new(move |status| {
-                    let mut n = notify.lock().unwrap();
+                    let mut n = notify.write().unwrap();
                     *n = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {

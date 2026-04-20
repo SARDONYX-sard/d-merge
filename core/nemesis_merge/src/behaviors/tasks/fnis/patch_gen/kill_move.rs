@@ -24,7 +24,7 @@ use crate::behaviors::tasks::fnis::{
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
-pub fn new_kill_patches<'a>(
+pub(super) fn new_kill_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
@@ -750,7 +750,7 @@ pub fn new_kill_patches<'a>(
 /// - `enter_notify_events`: #2530 or null
 /// - `exit_notify_events`: #2532 or null
 #[must_use]
-pub fn make_player_root_state_info_patch<'a>(
+pub(super) fn make_player_root_state_info_patch<'a>(
     class_index: &str,
     generator_index: &str,
     flags: FNISAnimFlags,
@@ -801,7 +801,7 @@ pub fn make_player_root_state_info_patch<'a>(
 /// - `enter_notify_events`: index or null or #2526
 /// - `exit_notify_events`: `$-h,o|#2528|h|null|o|#2529|#2527$`
 #[must_use]
-pub fn make_event_state_info_patch<'a>(
+pub(super) fn make_event_state_info_patch<'a>(
     class_index: &str,
     flags: FNISAnimFlags,
     enter_notify_events_index: &str,
@@ -857,7 +857,7 @@ pub fn make_event_state_info_patch<'a>(
 
 /// - `state_name`:  e.g. `NPC_FNIS_km{class_index_0_id}`, `NPC_FNISpa$1/1$`
 #[must_use]
-pub fn make_npc_root_state_info_patch<'a>(
+pub(super) fn make_npc_root_state_info_patch<'a>(
     class_index: &str,
     generator_index: &str,
     flags: FNISAnimFlags,
@@ -903,7 +903,7 @@ pub fn make_npc_root_state_info_patch<'a>(
 }
 
 #[must_use]
-pub fn new_player_synchronized_clip_generator<'a>(
+pub(super) fn new_player_synchronized_clip_generator<'a>(
     class_index: &String,
     event: &str,
     generator_index: &str,
@@ -939,7 +939,7 @@ pub fn new_player_synchronized_clip_generator<'a>(
 }
 
 #[must_use]
-pub fn new_npc_synchronized_clip_generator<'a>(
+pub(super) fn new_npc_synchronized_clip_generator<'a>(
     class_index: &String,
     event: &str,
     generator_index: &str,
@@ -976,7 +976,7 @@ pub fn new_npc_synchronized_clip_generator<'a>(
 }
 
 #[must_use]
-pub fn new_event_property_array<'a>(
+pub(super) fn new_event_property_array<'a>(
     flags: FNISAnimFlags,
     anim_object_indexes: &[String],
     class_index: &str,
@@ -1056,7 +1056,7 @@ fn new_values_from_triggers<'a>(
 
 /// stateID(i32) generator?
 #[must_use]
-pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
+pub(super) fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
     let mut hasher = std::hash::DefaultHasher::new();
     t.hash(&mut hasher);
     (std::hash::Hasher::finish(&hasher) & (i32::MAX as u64)) as i32
@@ -1101,7 +1101,7 @@ pub fn calculate_hash<T: std::hash::Hash + ?Sized>(t: &T) -> i32 {
 /// If `eventId` and `toStateId` do not correctly match the root
 /// `hkbStateMachineInfo`, the game will **crash instantly**
 /// at the moment the animation is played.
-pub fn new_push_transitions_seq_patch<'a, const N: usize>(
+pub(super) fn new_push_transitions_seq_patch<'a, const N: usize>(
     index: &'static str,
     transition_index: &'static str,
     events: [&str; N],

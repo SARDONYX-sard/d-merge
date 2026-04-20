@@ -5,7 +5,7 @@ use json_patch::Op;
 use crate::adsf::patch::de::{anim_header::LineKind, error::Error};
 
 #[derive(Debug)]
-pub struct CurrentState<'input> {
+pub(super) struct CurrentState<'input> {
     /// current parsing filed kind
     line_kinds: Iter<'static, LineKind>,
     current_kind: Option<LineKind>,
@@ -33,21 +33,21 @@ const LINE_KINDS: [LineKind; 4] = [
 ];
 
 #[derive(Debug, PartialEq, Default)]
-pub struct PartialAdsfPatch<'a> {
+pub(super) struct PartialAdsfPatch<'a> {
     pub lead_int: Option<Cow<'a, str>>,
     pub project_assets: Option<PartialProjectAssets<'a>>,
 }
 
 /// not judge operation yet at this time.
 #[derive(Debug, PartialEq, Default)]
-pub struct PartialProjectAssets<'input> {
+pub(super) struct PartialProjectAssets<'input> {
     pub range: core::ops::Range<usize>,
     pub values: Vec<Cow<'input, str>>,
 }
 
 impl<'de> CurrentState<'de> {
     #[inline]
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             line_kinds: LINE_KINDS.iter(),
             current_kind: None,
@@ -73,7 +73,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn replace_lead_int(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
+    pub(super) fn replace_lead_int(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
         if self.mode_code.is_none() {
             return Err(Error::NeedInModDiff);
         }
@@ -89,7 +89,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_as_project_assets(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
+    pub(super) fn push_as_project_assets(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         #[cfg(feature = "tracing")]
         tracing::trace!("{self:#?}");
@@ -116,7 +116,7 @@ impl<'de> CurrentState<'de> {
         Ok(())
     }
 
-    pub fn increment_project_assets_range(&mut self) {
+    pub(super) fn increment_project_assets_range(&mut self) {
         let project_assets = self
             .patch
             .get_or_insert_default()
@@ -127,7 +127,7 @@ impl<'de> CurrentState<'de> {
     }
 
     /// Sets the range start index for either transitions or rotations.
-    pub fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
+    pub(super) fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
         let is_in_diff = self.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
@@ -151,12 +151,12 @@ impl<'de> CurrentState<'de> {
 
     /// - `<!-- ORIGINAL --!> is found.
     #[inline]
-    pub const fn set_is_passed_original(&mut self) {
+    pub(super) const fn set_is_passed_original(&mut self) {
         self.is_passed_original = true;
     }
 
     #[inline]
-    pub fn judge_operation(&self) -> Op {
+    pub(super) fn judge_operation(&self) -> Op {
         self.mode_code.map_or(Op::Remove, |_| {
             if self.force_removed {
                 return Op::Remove;
@@ -175,7 +175,7 @@ impl<'de> CurrentState<'de> {
     }
 
     #[inline]
-    pub const fn clear_flags(&mut self) {
+    pub(super) const fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
     }

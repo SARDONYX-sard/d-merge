@@ -39,7 +39,7 @@ use crate::behaviors::tasks::fnis::patch_gen::generated_behaviors::BehaviorEntry
 /// # Note
 /// This is derived by considering the information necessary to generate the Borrowed Nemesis patch after parsing the list.
 #[derive(Debug)]
-pub struct OwnedFnisInjection {
+pub(crate) struct OwnedFnisInjection {
     /// # Format
     /// `<skyrim_data_dir>/meshes/<base_dir>/<fnis_namespace>/animations`
     ///
@@ -130,7 +130,7 @@ impl OwnedFnisInjection {
     /// Returns relative `meshes/.../FNIS_*_List.txt` path.
     /// - Humanoid: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_List.txt`
     /// - Creature: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt`
-    pub fn to_list_path(&self) -> PathBuf {
+    pub(crate) fn to_list_path(&self) -> PathBuf {
         let base_dir = self.behavior_entry.base_dir;
         let namespace = &self.namespace;
         if self.behavior_entry.is_humanoid() {
@@ -147,7 +147,7 @@ impl OwnedFnisInjection {
     ///  input_path: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`,
     ///  inner path for output: `meshes/actors/character/behavior/FNIS_<namespace>_Behavior.hkx`
     /// )
-    pub fn to_behavior_path(&self) -> Result<(PathBuf, PathBuf), FnisError> {
+    pub(crate) fn to_behavior_path(&self) -> Result<(PathBuf, PathBuf), FnisError> {
         let animations_mod_dir = &self.animations_mod_dir;
         let behavior_entry = self.behavior_entry;
         let master_path = Path::new(behavior_entry.master_behavior);
@@ -192,7 +192,7 @@ impl OwnedFnisInjection {
     /// # Returns
     /// - humanoid: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`,
     /// - creature: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`
-    pub fn to_fnis_aa_override_config_path(&self) -> PathBuf {
+    pub(crate) fn to_fnis_aa_override_config_path(&self) -> PathBuf {
         override_config_path(
             &self.animations_mod_dir,
             self.behavior_entry,
@@ -209,14 +209,14 @@ impl OwnedFnisInjection {
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$1");
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$2");
     /// ```
-    pub fn next_class_name_attribute(&self) -> String {
+    pub(crate) fn next_class_name_attribute(&self) -> String {
         let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire) + 1;
         format!("#{}${idx}", self.namespace)
     }
 
     /// Returns a new ID for adding a patch to the new `animationdatasinglefile.txt`.
     /// - `#FNIS_{namespace}${idx}`
-    pub fn next_adsf_id(&self) -> String {
+    pub(crate) fn next_adsf_id(&self) -> String {
         let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire) + 1;
         format!("#FNIS_{}${idx}", self.namespace)
     }
@@ -254,7 +254,7 @@ impl OwnedFnisInjection {
 /// - The animation directory is empty (`MissingNameSpace`)
 /// - The List file is missing (`ListMissing`)
 /// - The Behavior file is missing (`BehaviorMissing`)
-pub async fn collect_fnis_injection<P>(
+pub(crate) async fn collect_fnis_injection<P>(
     animations_mod_dir: P,
     behavior_entry: &'static BehaviorEntry,
     namespace: &str,

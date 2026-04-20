@@ -85,7 +85,7 @@ use crate::{
 
 /// Just write file
 #[derive(Debug)]
-pub struct FnisAANamespaceConfigJob {
+pub(crate) struct FnisAANamespaceConfigJob {
     pub output_path: PathBuf,
     pub config: String,
 }
@@ -95,7 +95,7 @@ pub struct FnisAANamespaceConfigJob {
 ///
 /// e.g., `_1hmeqp_1`
 #[derive(Debug)]
-pub struct FnisAASlotConfigJob {
+pub(crate) struct FnisAASlotConfigJob {
     pub output_path: PathBuf,
     /// The FNIS group enum, used to look up the computed base.
     pub group_name: AAGroupName,
@@ -110,7 +110,7 @@ pub struct FnisAASlotConfigJob {
     pub group_config_dir: String,
 }
 
-pub fn alt_anim_to_oar<'a>(
+pub(super) fn alt_anim_to_oar<'a>(
     owned_data: &'a OwnedFnisInjection,
     alt_anim: AlternateAnimation<'a>,
     config: &Config,

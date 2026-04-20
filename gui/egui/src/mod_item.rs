@@ -6,7 +6,7 @@ use rayon::{iter::Either, prelude::*};
 
 /// Represents a single mod entry.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)] // Need hash to dnd
-pub struct ModItem {
+pub(crate) struct ModItem {
     /// Whether the mod is enabled.
     pub enabled: bool,
     /// - Nemesis/FNIS(vfs): e.g. `aaaa`
@@ -28,7 +28,7 @@ pub struct ModItem {
 /// Columns that can be used for sorting mods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum SortColumn {
+pub(crate) enum SortColumn {
     Id,
     Name,
     ModType,
@@ -39,7 +39,7 @@ pub enum SortColumn {
 /// Inherit priority/enabled from old list.
 /// New items are appended in alphabetical order.
 /// Final priorities are always normalized.
-pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
+pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
     let old_map: HashMap<&str, (bool, usize)> = old
         .iter()
         .map(|m| (m.id.as_str(), (m.enabled, m.priority)))
@@ -88,7 +88,7 @@ pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> 
 }
 
 /// Convert `ModItem` into `PatchMaps`.
-pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
+pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
     // - Nemesis/FNIS(vfs): e.g. `aaaa`
     // - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`

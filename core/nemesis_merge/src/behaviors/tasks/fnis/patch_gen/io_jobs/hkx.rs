@@ -21,14 +21,14 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct ConversionJob {
+pub(crate) struct ConversionJob {
     pub input_path: PathBuf,
     pub output_path: PathBuf,
     pub kind: AnimKind,
 }
 
 #[derive(Debug, Clone)]
-pub enum AnimKind {
+pub(crate) enum AnimKind {
     /// Standard animation — no FNIS metadata needed.
     Standard,
     /// FNIS alternate animation — carries metadata for `aa_config.json`.
@@ -59,7 +59,7 @@ pub enum AnimKind {
 
 /// Runs the full HKX read → convert → write pipeline in parallel.
 #[must_use]
-pub fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<Error> {
+pub(crate) fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<Error> {
     // Stage 1: read
     let read_results: Vec<Result<ConversionBytes, Error>> = jobs
         .into_par_iter()
@@ -263,7 +263,7 @@ fn find_case_insensitive(path: &Path) -> Option<PathBuf> {
 /// # Returns
 /// Vector of `ConversionJob` ready for parallel processing.
 #[must_use]
-pub fn prepare_conversion_jobs(
+pub(crate) fn prepare_conversion_jobs(
     animations: &[&str],
     owned_data: &OwnedFnisInjection,
     config: &Config,
@@ -293,7 +293,7 @@ pub fn prepare_conversion_jobs(
 
 /// Prepare a single conversion job for the behavior file itself.
 #[must_use]
-pub fn prepare_behavior_conversion_job(
+pub(crate) fn prepare_behavior_conversion_job(
     owned_data: &OwnedFnisInjection,
     config: &Config,
 ) -> Option<AnimIoJob> {

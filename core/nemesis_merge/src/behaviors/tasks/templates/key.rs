@@ -8,7 +8,7 @@ use std::{borrow::Cow, path::Path};
 /// - e.g. `meshes/actors/character/_1stperson/behaviors/0_master.bin`
 // #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)] <- Path link manual implemented.
 #[derive(Clone)]
-pub struct TemplateKey<'a> {
+pub(crate) struct TemplateKey<'a> {
     template_name: Cow<'a, str>,
 }
 
@@ -17,7 +17,7 @@ impl TemplateKey<'static> {
     ///
     /// # Note
     /// If the search fails using get(`O(1)`), it falls back to an ASCII Ignore(`O(n)`) search.
-    pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
+    pub(crate) fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
         let map = if is_1st_person {
             &NEMESIS_1ST_PERSON_MAP
         } else {
@@ -49,7 +49,7 @@ impl<'a> TemplateKey<'a> {
     /// - extension: `bin` or `xml`
     ///
     /// Otherwise [`Option::None`]
-    pub fn new(template_name: Cow<'a, str>) -> Option<Self> {
+    pub(crate) fn new(template_name: Cow<'a, str>) -> Option<Self> {
         fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
             s.len() >= prefix.len()
                 && s.get(..prefix.len())
@@ -69,18 +69,18 @@ impl<'a> TemplateKey<'a> {
 
     /// # Safety
     /// valid template path(from `meshes`)
-    pub const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
+    pub(crate) const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
         Self { template_name }
     }
 
     /// As utf-8
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         self.template_name.as_ref()
     }
 
     /// Get inner `meshes` path.
     /// - e.g. `meshes/actors/character/_1stperson/behaviors/0_master.bin`
-    pub fn as_meshes_inner_path(&self) -> &Path {
+    pub(crate) fn as_meshes_inner_path(&self) -> &Path {
         Path::new(self.template_name.as_ref())
     }
 
@@ -93,7 +93,7 @@ impl<'a> TemplateKey<'a> {
     /// # Note
     /// Vanilla Skyrim is configured this way. Removing duplicates causes NPCs to become immobile when casting spells.
     #[allow(unused)]
-    pub fn has_duplicate_event_names(&self) -> bool {
+    pub(crate) fn has_duplicate_event_names(&self) -> bool {
         matches!(
             self.as_str(),
             "meshes/actors/character/_1stperson/behaviors/magicbehavior.bin"
@@ -182,12 +182,12 @@ impl<'a> core::hash::Hash for TemplateKey<'a> {
     }
 }
 
-pub const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
+pub(crate) const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
     TemplateKey::new_unchecked(Cow::Borrowed(
         "meshes/actors/character/behaviors/0_master.bin",
     ))
 };
-pub const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
+pub(crate) const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
     TemplateKey::new_unchecked(Cow::Borrowed(
         "meshes/actors/character/behaviors/mt_behavior.bin",
     ))
@@ -292,7 +292,7 @@ pub(crate) static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> =
 
 /// Map from full template path to actor name
 #[derive(Debug, Clone)]
-pub struct MasterIndex {
+pub(crate) struct MasterIndex {
     #[allow(unused)]
     pub master_string_data_index: &'static str,
     pub master_behavior_graph_index: &'static str,
@@ -300,7 +300,7 @@ pub struct MasterIndex {
 
 impl MasterIndex {
     /// From nemesis file stem. e.g. `0_master` -> MasterIndex
-    pub fn from_nemesis_file(
+    pub(crate) fn from_nemesis_file(
         template_file_stem: &str,
         is_1st_person: bool,
     ) -> Option<&'static Self> {

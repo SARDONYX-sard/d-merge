@@ -12,7 +12,7 @@ use crate::{
 
 /// Resolves each slot's base and writes its `config.json` in parallel.
 #[must_use]
-pub fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) -> Vec<Error> {
+pub(crate) fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) -> Vec<Error> {
     jobs.into_par_iter()
         .filter_map(|job| {
             let base = base_map

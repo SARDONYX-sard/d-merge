@@ -2,12 +2,12 @@ use std::borrow::Cow;
 
 use crate::behaviors::tasks::templates::key::{MasterIndex, TemplateKey};
 
-pub mod collect;
-pub mod parse;
+pub(super) mod collect;
+pub(super) mod parse;
 
 /// Parsed Nemesis path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NemesisPath<'a> {
+pub(super) enum NemesisPath<'a> {
     /// Normal Nemesis template-based patch.
     Normal {
         /// Template name such as `0_master`.
@@ -29,7 +29,7 @@ pub enum NemesisPath<'a> {
 
 impl<'a> NemesisPath<'a> {
     /// Attempts to convert this path into a [`TemplateKey`].
-    pub fn to_template_key(&self) -> Option<TemplateKey<'static>> {
+    pub(super) fn to_template_key(&self) -> Option<TemplateKey<'static>> {
         match self {
             NemesisPath::Normal {
                 template_name,
@@ -56,7 +56,7 @@ impl<'a> NemesisPath<'a> {
     ///
     /// This distinction is intentional and reflects the semantic difference
     /// between template-based Nemesis patches and free-form EngineExt patches.
-    pub fn get_variable_index(&self) -> Option<&'static str> {
+    pub(super) fn get_variable_index(&self) -> Option<&'static str> {
         match self {
             NemesisPath::Normal {
                 template_name,

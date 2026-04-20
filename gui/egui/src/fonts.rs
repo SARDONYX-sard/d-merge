@@ -3,7 +3,7 @@ use std::path::Path;
 use egui::{Context, FontData, FontDefinitions, FontFamily};
 
 /// Setup custom system fonts.
-pub fn setup_custom_fonts<A>(ctx: &Context, font_path: Option<A>)
+pub(crate) fn setup_custom_fonts<A>(ctx: &Context, font_path: Option<A>)
 where
     A: AsRef<Path>,
 {

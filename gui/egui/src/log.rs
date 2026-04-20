@@ -5,7 +5,7 @@ use std::{
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Read as _, Seek as _, SeekFrom},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
     thread,
     time::Duration,
 };
@@ -14,9 +14,9 @@ use snafu::ResultExt as _;
 
 /// Maximum number of log entries to retain (older entries are automatically discarded)
 const MAX_LOG_LINES: usize = 10_000;
-pub const LOG_FILENAME: &str = "d_merge.log";
+pub(crate) const LOG_FILENAME: &str = "d_merge.log";
 
-pub fn get_log_dir<P>(output_dir: P) -> PathBuf
+pub(crate) fn get_log_dir<P>(output_dir: P) -> PathBuf
 where
     P: AsRef<Path>,
 {
@@ -27,9 +27,9 @@ where
 ///
 /// # Errors
 /// If fail to canonicalize log path.
-pub fn start_log_tail(
+pub(crate) fn start_log_tail(
     log_path: &Path,
-    log_lines: Arc<Mutex<Vec<String>>>,
+    log_lines: Arc<RwLock<Vec<String>>>,
     ctx: Option<egui::Context>,
 ) -> Result<()> {
     let log_path = log_path
@@ -47,10 +47,10 @@ pub fn start_log_tail(
 
 fn tail_loop(
     log_path: PathBuf,
-    log_lines: Arc<Mutex<Vec<String>>>,
+    log_lines: Arc<RwLock<Vec<String>>>,
     ctx: Option<egui::Context>,
 ) -> Result<()> {
-    #[allow(clippy::suspicious_open_options)]
+    // #[allow(clippy::suspicious_open_options)]
     let file = OpenOptions::new()
         .read(true)
         .open(&log_path)
@@ -80,8 +80,8 @@ fn tail_loop(
 }
 
 /// inner fn：ring buffer push
-fn push_line(log_lines: &Arc<Mutex<Vec<String>>>, line: String) {
-    let mut lines = log_lines.lock().unwrap();
+fn push_line(log_lines: &Arc<RwLock<Vec<String>>>, line: String) {
+    let mut lines = log_lines.write().unwrap();
     lines.push(line);
     let len = lines.len();
     if len > MAX_LOG_LINES {
@@ -90,7 +90,7 @@ fn push_line(log_lines: &Arc<Mutex<Vec<String>>>, line: String) {
 }
 
 #[derive(Debug, snafu::Snafu)]
-pub enum LogError {
+pub(crate) enum LogError {
     #[snafu(display("Failed to open log file at {path:?}: {source}"))]
     Open {
         path: PathBuf,

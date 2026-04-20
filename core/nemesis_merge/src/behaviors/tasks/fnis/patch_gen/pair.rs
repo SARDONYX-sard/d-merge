@@ -22,7 +22,7 @@ use crate::behaviors::tasks::fnis::{
 };
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
-pub fn new_pair_patches<'a>(
+pub(super) fn new_pair_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {

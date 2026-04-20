@@ -4,7 +4,7 @@
 /// # Returns
 /// * `Some(())` if the conversion succeeded
 /// * `None` if the input did not contain a `~` separator
-pub fn to_normal_txt_project_name(s: &str, out: &mut String) -> Option<()> {
+pub(super) fn to_normal_txt_project_name(s: &str, out: &mut String) -> Option<()> {
     let (a, b) = s.split_once('~')?;
     out.reserve(a.len() + b.len() + 5); // "\\" + ".txt" + margin
     out.push_str(a);
@@ -24,7 +24,7 @@ pub fn to_normal_txt_project_name(s: &str, out: &mut String) -> Option<()> {
 ///   - The path does not end with `.txt`
 ///   - The path contains fewer than two components
 ///   - The path contains more than two components (i.e. nested directories)
-pub fn to_alt_txt_project_name(path: &str, out: &mut String) -> Option<()> {
+pub(super) fn to_alt_txt_project_name(path: &str, out: &mut String) -> Option<()> {
     let path = path.strip_suffix(".txt")?;
     let mut parts = path.split('\\');
     let first = parts.next()?;

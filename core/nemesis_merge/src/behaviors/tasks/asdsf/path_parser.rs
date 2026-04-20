@@ -23,7 +23,7 @@ use crate::behaviors::priority_ids::get_nemesis_id;
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
-pub enum ParserType<'a> {
+pub(crate) enum ParserType<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     ///
     /// e.g. `DefaultMaleData~DefaultMale`
@@ -46,7 +46,7 @@ pub enum ParserType<'a> {
 /// This contains the mod ID, the animation target (e.g., `Default` or `$header$`),
 /// the type of data being patched, and whether it's an add or replace operation.
 #[derive(Debug, PartialEq)]
-pub struct ParsedAsdsfPatchPath<'a> {
+pub(crate) struct ParsedAsdsfPatchPath<'a> {
     /// Unique ID corresponding to the mod(e.g. `slide`)
     pub id: &'a str,
     /// txt project name data (e.g. `DefaultMaleData~DefaultMale`)
@@ -61,7 +61,7 @@ pub struct ParsedAsdsfPatchPath<'a> {
 ///
 /// # Returns
 /// Returns a [`ParsedAdsfPatchPath`] with extracted metadata or a [`ParseError`] if the format is invalid.
-pub fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, ParseError> {
+pub(crate) fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, ParseError> {
     let components: Vec<&'a str> = path
         .components()
         .filter_map(|c| c.as_os_str().to_str())

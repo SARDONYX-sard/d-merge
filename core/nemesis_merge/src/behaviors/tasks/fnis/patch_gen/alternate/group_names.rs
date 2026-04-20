@@ -63,7 +63,7 @@
 /// | `Shield`       | `_shield`        | 53         |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum AAGroupName {
+pub(crate) enum AAGroupName {
     // -------------------------------------------------------------------------
     // Idle
     // -------------------------------------------------------------------------
@@ -207,7 +207,7 @@ impl AAGroupName {
     /// assert_eq!(AAGroupName::Shield.group_id(),  53);
     /// ```
     #[inline]
-    pub const fn group_id(self) -> u64 {
+    pub(crate) const fn group_id(self) -> u64 {
         match self {
             Self::MtIdle => 0,
             Self::OneHmIdle => 1,
@@ -268,7 +268,7 @@ impl AAGroupName {
 
     /// Returns the FNIS wire string for this group, e.g. `"_1hmeqp"`.
     #[inline]
-    pub const fn as_fnis_str(self) -> &'static str {
+    pub(crate) const fn as_fnis_str(self) -> &'static str {
         match self {
             Self::MtIdle => "_mtidle",
             Self::OneHmIdle => "_1hmidle",
@@ -337,7 +337,7 @@ impl std::fmt::Display for AAGroupName {
 /// Error returned when a string does not match any known FNIS group name.
 #[derive(Debug, snafu::Snafu)]
 #[snafu(display("unknown FNIS group name: `{message}`"))]
-pub struct UnknownGroupName {
+pub(crate) struct UnknownGroupName {
     pub message: String,
 }
 

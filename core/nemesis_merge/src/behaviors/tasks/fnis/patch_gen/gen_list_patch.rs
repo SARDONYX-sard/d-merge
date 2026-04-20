@@ -28,7 +28,7 @@ use crate::behaviors::tasks::{
 
 /// A patch with borrowed references to a single FNIS_*_List.txt file.
 #[derive(Debug)]
-pub struct OneListPatch<'a> {
+pub(super) struct OneListPatch<'a> {
     /// A set of raw animation path entries extracted from FNIS list files.
     ///
     /// Each element represents a relative path (e.g. `"..\\sample.hkx"`)
@@ -72,7 +72,7 @@ pub struct OneListPatch<'a> {
 }
 
 /// Generate from one list file.
-pub fn generate_patch<'a>(
+pub(super) fn generate_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     list: FNISList<'a>,
     config: &crate::Config,

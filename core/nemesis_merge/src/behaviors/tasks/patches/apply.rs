@@ -24,7 +24,7 @@ use crate::{
 /// shrinking the lifetime of the patch by the higher-level function.
 ///
 /// Therefore, this seemingly strange lifetime annotation is intentional.
-pub fn apply_patches<'t, 'p: 't>(
+pub(crate) fn apply_patches<'t, 'p: 't>(
     templates: &mut BorrowedTemplateMap<'t>,
     borrowed_patches: BehaviorPatchesMap<'p>,
     config: &Config,

@@ -26,7 +26,7 @@ use crate::behaviors::tasks::fnis::{
 ///
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.
-pub fn new_furniture_one_group_patches<'a>(
+pub(crate) fn new_furniture_one_group_patches<'a>(
     furniture: &FurnitureAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>, String) {

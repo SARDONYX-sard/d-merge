@@ -104,15 +104,15 @@ fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
 #[allow(non_upper_case_globals)]
 mod bindings {
     /// -ref: https://docs.rs/windows-sys/latest/windows_sys/Win32/System/Registry/constant.HKEY_LOCAL_MACHINE.html
-    pub const HKEY_LOCAL_MACHINE: usize = 0xffffffff80000002;
-    pub const RRF_SUBKEY_WOW6432KEY: u32 = 0x00020000;
-    pub const RRF_RT_REG_SZ: u32 = 0x00000002;
-    pub const ERROR_SUCCESS: i32 = 0;
+    pub(super) const HKEY_LOCAL_MACHINE: usize = 0xffffffff80000002;
+    pub(super) const RRF_SUBKEY_WOW6432KEY: u32 = 0x00020000;
+    pub(super) const RRF_RT_REG_SZ: u32 = 0x00000002;
+    pub(super) const ERROR_SUCCESS: i32 = 0;
 
     #[link(name = "advapi32")]
     unsafe extern "system" {
         /// - docs: https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-reggetvaluew
-        pub fn RegGetValueW(
+        pub(super) fn RegGetValueW(
             hkey: usize,
             lpSubKey: *const u16,
             lpValue: *const u16,

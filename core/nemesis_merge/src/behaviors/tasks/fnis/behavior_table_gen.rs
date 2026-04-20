@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     #[derive(Debug, serde::Deserialize)]
-    pub struct BehaviorEntry {
+    pub(super) struct BehaviorEntry {
         pub behavior_object: String,
         pub base_dir: String,
         pub default_behavior: String,
@@ -22,7 +22,7 @@ mod tests {
     }
 
     #[derive(Debug, serde::Deserialize)]
-    pub struct Root {
+    pub(super) struct Root {
         pub creatures: Vec<BehaviorEntry>,
         pub skeletons: Vec<BehaviorEntry>,
         pub auxbones: Vec<BehaviorEntry>,
@@ -68,7 +68,7 @@ mod tests {
 
         format!(
             r###"
-pub static {name}: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {{
+pub(crate) static {name}: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {{
 {entries}}};
 "###,
             name = static_name,
@@ -100,7 +100,7 @@ use std::borrow::Cow;
 /// By joining these and using `/` as the path separator, the `TemplateKey` is intended to be generated.
 /// This integrates FNIS Patch Maps into Nemesis patchMaps.
 #[derive(Debug)]
-pub struct BehaviorEntry {
+pub(crate) struct BehaviorEntry {
     /// e.g. `character`
     pub behavior_object: &'static str,
     /// e.g. `actors/character`
@@ -150,7 +150,7 @@ impl BehaviorEntry {
     /// - e.g. `meshes/actors/character/characters/defaultmale.bin`
     ///
     /// FNIS registers the animation paths specified in FNIS_*_List.txt in this template.
-    pub fn to_default_behavior_template_key(&self) -> TemplateKey<'static> {
+    pub(crate) fn to_default_behavior_template_key(&self) -> TemplateKey<'static> {
         let path = format!("meshes/{}/{}", self.base_dir, self.default_behavior);
         // Safety: caller guarantees the path is a valid TemplateKey
         unsafe { TemplateKey::new_unchecked(Cow::Owned(path)) }
@@ -160,7 +160,7 @@ impl BehaviorEntry {
     /// - e.g. `meshes/actors/character/behaviors/0_master.bin`
     ///
     /// FNIS registers the Mod Root behavior in this template.
-    pub fn to_master_behavior_template_key(&self) -> TemplateKey<'static> {
+    pub(crate) fn to_master_behavior_template_key(&self) -> TemplateKey<'static> {
         let path = format!("meshes/{}/{}", self.base_dir, self.master_behavior);
         // Safety: caller guarantees the path is a valid TemplateKey
         unsafe { TemplateKey::new_unchecked(Cow::Owned(path)) }
@@ -168,7 +168,7 @@ impl BehaviorEntry {
 
     /// Is `character` patch.
     #[inline]
-    pub fn is_3rd_person_character(&self) -> bool {
+    pub(crate) fn is_3rd_person_character(&self) -> bool {
         self.behavior_object == "character"
     }
 
@@ -179,7 +179,7 @@ impl BehaviorEntry {
     /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
     /// This is the condition check for that purpose.
     #[inline]
-    pub fn is_humanoid(&self) -> bool {
+    pub(crate) fn is_humanoid(&self) -> bool {
         HUMANOID.contains_key(self.behavior_object)
     }
 
@@ -189,12 +189,12 @@ impl BehaviorEntry {
     /// `draugr` shares `draugrskeleton` and skeleton, so the same Animation must be registered. This is used for that determination.
     /// Consequently, `event` and `animationdatasinglefile.txt` are also synchronized. (It's unclear if this is actually correct)
     #[inline]
-    pub fn is_draugr(&self) -> bool {
+    pub(crate) fn is_draugr(&self) -> bool {
         self.behavior_object == "draugr"
     }
 }
 
-pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
+pub(crate) static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
     "character/_1stperson" => BehaviorEntry {
         behavior_object: "character/_1stperson",
         base_dir: "actors/character/_1stperson",
@@ -226,7 +226,7 @@ pub static HUMANOID: phf::Map<&'static str, BehaviorEntry> = phf::phf_map! {
 /// # Usage
 /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
 /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
-pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
+pub(crate) const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
     behavior_object: "character",
     base_dir: "actors/character",
     default_behavior: "characters female/defaultfemale.bin",
@@ -242,7 +242,7 @@ pub const DEFAULT_FEMALE: BehaviorEntry = BehaviorEntry {
 /// # Why need this?
 /// It seems draugr must have the animations path added to both draugr.xml and
 /// draugr_skeleton.xml (information from the FNIS Creature pack's behavior object).
-pub const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
+pub(crate) const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
     behavior_object: "draugr",
     base_dir: "actors/draugr",
     default_behavior: "characterskeleton/draugr_skeleton.bin",

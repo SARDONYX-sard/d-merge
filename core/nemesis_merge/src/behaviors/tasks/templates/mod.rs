@@ -1,4 +1,4 @@
-pub mod collect;
-pub mod gen_bin;
-pub mod key;
-pub mod types;
+pub(crate) mod collect;
+pub(crate) mod gen_bin;
+pub(crate) mod key;
+pub(crate) mod types;

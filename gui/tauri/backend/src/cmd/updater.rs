@@ -5,7 +5,7 @@ const REPO_NAME: &str = "d-merge";
 const BIN_NAME: &str = "d_merge";
 
 #[tauri::command]
-pub async fn fetch_versions() -> Result<Vec<String>, String> {
+pub(crate) async fn fetch_versions() -> Result<Vec<String>, String> {
     // NOTE: self_update uses `requwest` crate, and there is an issue where it does not function properly
     //       unless it is used within spawn_blocking in an asynchronous function.
     tauri::async_runtime::spawn_blocking(move || {
@@ -24,7 +24,7 @@ pub async fn fetch_versions() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub async fn update_to_version(version: String) -> Result<String, String> {
+pub(crate) async fn update_to_version(version: String) -> Result<String, String> {
     use snafu::{OptionExt, ResultExt};
 
     tauri::async_runtime::spawn_blocking(move || -> Result<String, UpdaterError> {
@@ -90,7 +90,7 @@ where
 }
 
 #[derive(Debug, snafu::Snafu)]
-pub enum UpdaterError {
+pub(crate) enum UpdaterError {
     #[snafu(display("Failed to build updater: {}", source))]
     BuildError { source: self_update::errors::Error },
 

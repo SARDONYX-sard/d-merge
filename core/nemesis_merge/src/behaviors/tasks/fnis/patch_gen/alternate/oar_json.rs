@@ -10,7 +10,7 @@ use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupNam
 
 /// Represents the configuration structure for the 'config.json' namespace.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub struct NamespaceConfig<'config> {
+pub(crate) struct NamespaceConfig<'config> {
     /// The name associated with the configuration.
     #[serde(default)]
     pub name: &'config str,
@@ -24,7 +24,7 @@ pub struct NamespaceConfig<'config> {
     pub author: &'config str,
 }
 
-pub fn prepare_namespace_json(
+pub(crate) fn prepare_namespace_json(
     namespace: &str,
     override_config: &Option<FnisToOarConfig<'_>>,
 ) -> String {
@@ -57,7 +57,7 @@ pub fn prepare_namespace_json(
 
 /// Represents the configuration for each animation root specified in a `config.json` file.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub struct ConditionsConfig<'a> {
+pub(crate) struct ConditionsConfig<'a> {
     /// An arbitrary name given by the user (value in the mapping table).
     ///
     /// # Note
@@ -107,7 +107,7 @@ fn fnis_aa_condition(group_name: AAGroupName, value: u64) -> Object {
 /// `Value B` is `base + slot` (1-based graph variable value):
 /// - slot 0 of a mod whose base=6  → variable value 6
 /// - slot 1                        → variable value 7
-pub fn new_fnis_aa_slot_config_json(
+pub(crate) fn new_fnis_aa_slot_config_json(
     group_config_dir: &str,
     group_name: AAGroupName,
     slot: u64,

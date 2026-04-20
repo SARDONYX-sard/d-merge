@@ -231,7 +231,7 @@ mod tests {
         });
         let alt_adsf: AltAdsf = adsf.into();
 
-        pub fn max_clip_id(adsf: &AltAdsf) -> Option<u64> {
+        fn max_clip_id(adsf: &AltAdsf) -> Option<u64> {
             adsf.0
                 .par_values()
                 .filter_map(|anim_data| {

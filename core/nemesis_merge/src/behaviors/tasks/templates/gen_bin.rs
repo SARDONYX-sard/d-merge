@@ -132,7 +132,7 @@ mod tests {
         // Input structures (from json)
         // -------------------------------
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        pub struct Root {
+        pub(crate) struct Root {
             pub version: String,
             pub columns: Vec<Entry>,
             pub creatures: Vec<Entry>,
@@ -143,7 +143,7 @@ mod tests {
         }
 
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        pub struct Entry {
+        pub(crate) struct Entry {
             /// "behavior_object": "riekling",
             pub behavior_object: String,
             /// "base_folder": "actors\\dlc02\\riekling",
@@ -175,7 +175,7 @@ mod tests {
         // Output structures
         // -------------------------------
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        pub struct NewRoot {
+        pub(crate) struct NewRoot {
             pub creatures: Vec<NewEntry>,
             pub skeletons: Vec<NewEntry>,
             pub auxbones: Vec<NewEntry>,
@@ -184,7 +184,7 @@ mod tests {
         }
 
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        pub struct NewEntry {
+        pub(crate) struct NewEntry {
             /// "behavior_object": "riekling",
             pub behavior_object: String,
             /// "base_folder": "actors\\dlc02\\riekling",

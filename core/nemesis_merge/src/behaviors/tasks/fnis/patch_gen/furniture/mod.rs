@@ -37,4 +37,4 @@
 //! - This is **not officially documented**; the interpretation is based on observed
 //!   patterns in FNIS templates and may not be universally accurate.
 mod one_anim;
-pub mod one_group;
+pub(super) mod one_group;

@@ -6,7 +6,7 @@
 /// - `**` — matches zero or more path components (must be its own component)
 ///
 /// Matching is always **case-insensitive** (ASCII only).
-pub fn match_segment(pattern: &str, name: &str) -> bool {
+pub(crate) fn match_segment(pattern: &str, name: &str) -> bool {
     match_segment_inner(
         &pattern.chars().collect::<Vec<_>>(),
         &name.chars().collect::<Vec<_>>(),
@@ -40,7 +40,7 @@ fn match_segment_inner(p: &[char], n: &[char]) -> bool {
 /// Path components are extracted via [`std::path::Path::components`].
 ///
 /// `**` must occupy its own component and matches zero or more path components.
-pub fn match_glob_path(pattern: &str, path: &std::path::Path) -> bool {
+pub(crate) fn match_glob_path(pattern: &str, path: &std::path::Path) -> bool {
     let pat_components: Vec<&str> = pattern
         .split(['/', '\\'])
         .filter(|s| !s.is_empty())

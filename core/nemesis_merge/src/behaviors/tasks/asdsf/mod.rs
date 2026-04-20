@@ -1,10 +1,10 @@
-pub mod path_parser;
+pub(crate) mod path_parser;
 mod sort;
-pub mod types;
+pub(crate) mod types;
 
 use std::path::{Path, PathBuf};
 
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
 use skyrim_anim_parser::{
     asdsf::{
         alt::{
@@ -31,11 +31,10 @@ use crate::{
         FailedParseAdsfTemplateSnafu, FailedParseAsdsfPatchSnafu, FailedParseEditAsdsfPatchSnafu,
         FailedSerializeAsdsfSnafu,
     },
-    results::partition_results,
 };
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-pub struct AsdsfPatch<'a> {
+pub(crate) struct AsdsfPatch<'a> {
     /// e.g. `DefaultMaleData~DefaultMale`
     pub target: &'a str,
     /// e.g. `/some/Nemesis_Engine/mod/slide`
@@ -87,14 +86,14 @@ pub(crate) fn apply_asdsf_patches(
     id_order: &PriorityMap,
     config: &Config,
 ) -> Vec<Error> {
-    // 1/5 Parse adsf patch (1 loop with par_iter)
-    let results: Vec<Result<AsdsfPatch, Error>> = owned_anim_data_patches
+    // 1/5 Parse adsf patch
+    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
         .0
-        .par_iter() // par iter
-        .map(parse_anim_data_patch)
-        .collect(); // back iter
-
-    let (mut borrowed_patches, mut errors) = partition_results(results);
+        .par_iter()
+        .partition_map(|path| match parse_anim_data_patch(path) {
+            Ok(v) => Either::Left(v),
+            Err(e) => Either::Right(e),
+        });
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
     sort_patches_by_priority(&mut borrowed_patches, id_order);

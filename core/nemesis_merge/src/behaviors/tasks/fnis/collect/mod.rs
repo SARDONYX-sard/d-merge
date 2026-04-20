@@ -1,4 +1,4 @@
-pub mod owned;
+pub(crate) mod owned;
 
 use std::sync::LazyLock;
 
@@ -23,7 +23,7 @@ static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
         .collect()
 });
 
-pub async fn collect_all_fnis_injections(
+pub(crate) async fn collect_all_fnis_injections(
     skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
 ) -> (Vec<OwnedFnisInjection>, Vec<Error>) {

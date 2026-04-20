@@ -10,7 +10,7 @@ use crate::{
 /// Collect templates path & content map.
 ///
 /// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
-pub fn collect_templates(
+pub(crate) fn collect_templates(
     template_root: &Path,
     template_names: HashSet<TemplateKey<'static>>,
 ) -> (OwnedTemplateMap, Vec<Error>) {

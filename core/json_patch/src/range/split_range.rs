@@ -9,7 +9,7 @@ use std::ops::Range;
 /// A tuple `(in_bounds, overflow)`:
 /// - `in_bounds`: the portion of the range that fits within `0..len`
 /// - `overflow`: the portion of the range that exceeds `len`
-pub const fn split_range_at_len(
+pub(crate) const fn split_range_at_len(
     range: Range<usize>,
     len: usize,
 ) -> (Option<Range<usize>>, Option<Range<usize>>) {

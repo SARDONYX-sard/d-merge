@@ -44,7 +44,10 @@ struct OwnedPath {
 ///
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
-pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Config) -> OwnedPatches {
+pub(crate) async fn collect_owned_patches(
+    nemesis_entries: &PriorityMap,
+    config: &Config,
+) -> OwnedPatches {
     fn get_priority_by_path_id(path: &Path, ids: &PriorityMap) -> Option<usize> {
         let id_str = get_nemesis_id(path.to_str()?).ok()?;
         ids.get(id_str).copied()
@@ -125,7 +128,7 @@ pub async fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Confi
     }
 }
 
-pub fn collect_borrowed_patches<'a>(
+pub(crate) fn collect_borrowed_patches<'a>(
     owned_patches: &'a OwnedPatchMap,
     config: &Config,
     fnis_patches: PatchCollection<'a>,
