@@ -77,12 +77,15 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
-    seq_patches.extend(new_push_events_seq_patch(
-        &[animation.anim_event.into()],
-        "#0083",
-        "#0085",
-        priority,
-    ));
+    seq_patches.extend({
+        let events: &[Cow<'_, str>] = if matches!(current_phase, FurniturePhase::End(_)) {
+            &[event_name.into(), format!("{}_DONE", event_name).into()]
+        } else {
+            &[event_name.into()]
+        };
+
+        new_push_events_seq_patch(events, "#0083", "#0085", priority)
+    });
     if !is_empty_anim_vars {
         seq_patches.par_extend(new_push_values_seq_patch(
             &animation.flag_set.anim_vars,
