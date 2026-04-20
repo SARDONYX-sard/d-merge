@@ -154,6 +154,13 @@ pub(super) fn generate_patch<'a>(
                     );
                 }
 
+                all_anim_files.par_extend(
+                    furniture_animation
+                        .animations
+                        .par_iter()
+                        .map(|fnis_anim| fnis_anim.anim_file),
+                );
+
                 // NOTE: Based on the temporal_log, it appears Furniture does not need to register its animation with behaviors like `defaultmale.xml`.
                 let (one, seq, group_root_index) =
                     new_furniture_one_group_patches(&furniture_animation, owned_data);
