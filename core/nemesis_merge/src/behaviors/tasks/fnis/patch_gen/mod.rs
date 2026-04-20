@@ -161,10 +161,9 @@ pub(crate) fn collect_borrowed_patches<'a>(
                     .0
                     .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
                 {
-                    behavior_graph_data_map.0.insert(
-                        THREAD_PERSON_MT_BEHAVIOR_KEY,
-                        Cow::Borrowed(owned_data.behavior_entry.master_behavior_graph_index),
-                    );
+                    behavior_graph_data_map
+                        .0
+                        .insert(THREAD_PERSON_MT_BEHAVIOR_KEY, Cow::Borrowed("#0085"));
                 }
 
                 for (path, patch) in one_mt_behavior_patches {
