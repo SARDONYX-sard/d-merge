@@ -79,6 +79,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
     seq_patches.extend({
         let events: &[Cow<'_, str>] = if matches!(current_phase, FurniturePhase::End(_)) {
+            // DONE suffix event unused. But FNIS generate it.
             &[event_name.into(), format!("{}_DONE", event_name).into()]
         } else {
             &[event_name.into()]
