@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
-pub enum Category {
+pub(crate) enum Category {
     Nemesis,
     Adsf,
     Asdsf,
@@ -12,7 +12,7 @@ pub enum Category {
 ///
 /// # Errors
 /// Returns an error if path traversal fails.
-pub fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)> {
+pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)> {
     jwalk::WalkDir::new(path)
         .into_iter()
         .par_bridge()

@@ -1,10 +1,10 @@
 use egui::{Align, Ui};
 
 /// Table: 1 row height size.
-pub const ROW_HEIGHT: f32 = 20.0;
+pub(crate) const ROW_HEIGHT: f32 = 20.0;
 
 /// Add a label with hover tooltip (truncated if too long).
-pub fn label_with_hover(ui: &mut Ui, text: &str, width: f32) {
+pub(crate) fn label_with_hover(ui: &mut Ui, text: &str, width: f32) {
     let truncated = truncate_to_width(ui, text, width);
     let display = if truncated.is_empty() {
         " ".repeat((width / 6.0).max(3.0) as usize)
@@ -19,7 +19,7 @@ pub fn label_with_hover(ui: &mut Ui, text: &str, width: f32) {
 }
 
 /// Add a hyperlink with hover tooltip (truncated if too long).
-pub fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
+pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
     if url.trim().is_empty() {
         ui.add_sized(
             [width, ROW_HEIGHT],

@@ -13,7 +13,9 @@ use crate::{
 };
 
 /// Return  Map<name, (inner_path, value)>
-pub fn collect_templates(templates: &OwnedTemplateMap) -> (BorrowedTemplateMap<'_>, Vec<Error>) {
+pub(crate) fn collect_templates(
+    templates: &OwnedTemplateMap,
+) -> (BorrowedTemplateMap<'_>, Vec<Error>) {
     templates
         .into_par_iter()
         .partition_map(|(template_key, bytes)| {

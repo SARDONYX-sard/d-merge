@@ -1,6 +1,6 @@
-pub mod error;
+pub(crate) mod error;
 pub(crate) mod parse;
-pub mod split_range;
+pub(crate) mod split_range;
 
 use core::fmt;
 

@@ -41,7 +41,7 @@ use crate::{
 };
 
 /// Parse nemesis patch path and return structured information.
-pub fn parse_nemesis_path(path: &Path) -> Result<NemesisPath<'_>, Error> {
+pub(crate) fn parse_nemesis_path(path: &Path) -> Result<NemesisPath<'_>, Error> {
     let input = path.to_str().with_context(|| NonUtf8PathSnafu { path })?;
 
     parse_components

@@ -38,7 +38,7 @@ use crate::behaviors::priority_ids::get_nemesis_id;
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
-pub enum ParserType<'a> {
+pub(crate) enum ParserType<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     TxtProjectHeader,
 
@@ -68,7 +68,7 @@ pub enum ParserType<'a> {
 /// This contains the mod ID, the animation target (e.g., `Default` or `$header$`),
 /// the type of data being patched, and whether it's an add or replace operation.
 #[derive(Debug, PartialEq)]
-pub struct ParsedAdsfPatchPath<'a> {
+pub(crate) struct ParsedAdsfPatchPath<'a> {
     /// Unique ID corresponding to the mod(e.g. `slide`)
     pub id: &'a str,
     /// `project_name~index` (e.g. `DefaultMale~1`)
@@ -84,7 +84,7 @@ pub struct ParsedAdsfPatchPath<'a> {
 ///
 /// # Returns
 /// Returns a [`ParsedAdsfPatchPath`] with extracted metadata or a [`ParseError`] if the format is invalid.
-pub fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
+pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
     let components: Vec<&'a str> = path
         .components()
         .filter_map(|c| c.as_os_str().to_str())

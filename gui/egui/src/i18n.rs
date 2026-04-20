@@ -6,7 +6,7 @@ use indexmap::IndexMap;
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum I18nKey {
+pub(crate) enum I18nKey {
     AutoDetectButton,
     AutoDetectHover,
     AutoRemoveMeshes,
@@ -66,7 +66,7 @@ pub enum I18nKey {
 }
 
 impl I18nKey {
-    pub const fn default_eng(&self) -> &'static str {
+    pub(crate) const fn default_eng(&self) -> &'static str {
         match self {
             Self::AutoDetectButton => "Auto Detect",
             Self::AutoDetectHover => {
@@ -146,10 +146,10 @@ impl I18nKey {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>>);
+pub(crate) struct I18nMap(IndexMap<I18nKey, Cow<'static, str>>);
 
 impl I18nMap {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(IndexMap::new())
     }
 
@@ -165,7 +165,7 @@ impl I18nMap {
 
     /// Generate all key-value pairs for translation.
     #[rustfmt::skip]
-    pub fn default_map() -> Self {
+    pub(crate) fn default_map() -> Self {
         use I18nKey::*;
 
         // To preserve the order using serde, you have no choice but to use an index map.
@@ -227,7 +227,7 @@ impl I18nMap {
 
     /// Try to load `./.d_merge/translation.json`.
     /// If not exists or failed to parse, fallback to `default_map()`.
-    pub fn load_translation() -> Self {
+    pub(crate) fn load_translation() -> Self {
         use std::{fs, path::Path};
 
         let i18n_file = Self::FILE;
@@ -257,7 +257,7 @@ impl I18nMap {
     /// Try save `./.d_merge/translation.json`.
     ///
     /// If already exits, then skip.
-    pub fn save_translation() {
+    pub(crate) fn save_translation() {
         use std::{fs, path::Path};
 
         let i18n_file = Self::FILE;
@@ -280,7 +280,7 @@ impl I18nMap {
     }
 }
 
-pub fn status_to_text(
+pub(crate) fn status_to_text(
     status: nemesis_merge::Status,
     i18n: &I18nMap,
     start_time: std::time::Instant,

@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
-pub struct AppSettings {
+pub(crate) struct AppSettings {
     mode: crate::app::DataMode,
     target_runtime: skyrim_data_dir::Runtime,
     /// The directory containing the HKX templates you want to patch.
@@ -143,7 +143,7 @@ impl AppSettings {
     const FILE: &'static str = "./.d_merge/d_merge_settings.json";
 
     /// Load settings from JSON file
-    pub fn load() -> Result<Self, SettingsError> {
+    pub(crate) fn load() -> Result<Self, SettingsError> {
         if Path::new(Self::FILE).exists() {
             let text = fs::read_to_string(Self::FILE).with_context(|_| IoSnafu {
                 path: Path::new(Self::FILE),
@@ -155,7 +155,7 @@ impl AppSettings {
     }
 
     /// Save settings to JSON file
-    pub fn save(&self) {
+    pub(crate) fn save(&self) {
         match serde_json::to_string_pretty(self) {
             Ok(text) => {
                 if let Err(err) = fs::write(Self::FILE, text) {
@@ -171,7 +171,7 @@ impl AppSettings {
 }
 
 #[derive(Debug, snafu::Snafu)]
-pub enum SettingsError {
+pub(crate) enum SettingsError {
     #[snafu(display("Failed to read file `{}`: {source}", path.display()))]
     Io {
         source: std::io::Error,

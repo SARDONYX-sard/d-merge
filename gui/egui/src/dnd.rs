@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Handle drag-and-drop reordering of mods.
-pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
+pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
     let checkbox_rect = [widths[0], ROW_HEIGHT];
     let w_path = widths[1];
     let w_name = widths[2];
@@ -65,7 +65,7 @@ pub fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]
 
 /// This table is read-only for all fields except the `enabled` checkbox.
 /// Useful for displaying filtered or sorted items where drag-and-drop is disabled.
-pub fn check_only_table_body(
+pub(crate) fn check_only_table_body(
     body: &mut egui_extras::TableBody,
     filtered_items: &[ModItem],
     original_items: &mut [ModItem],

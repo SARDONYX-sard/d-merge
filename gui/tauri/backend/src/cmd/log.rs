@@ -5,7 +5,7 @@ pub(crate) async fn change_log_level(log_level: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn log(level: &str, message: String) {
+pub(crate) fn log(level: &str, message: String) {
     match level {
         _ if level.eq_ignore_ascii_case("trace") => tracing::trace!("{message}"),
         _ if level.eq_ignore_ascii_case("debug") => tracing::debug!("{message}"),

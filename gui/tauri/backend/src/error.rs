@@ -4,7 +4,7 @@ use std::io;
 /// GUI Error
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub))]
-pub enum Error {
+pub(crate) enum Error {
     /// Failed to get skyrim data dir: {source}
     NotFoundSkyrimDataDir { source: io::Error },
 
@@ -28,4 +28,4 @@ pub enum Error {
 }
 
 /// `Result` for this crate.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+pub(crate) type Result<T, E = Error> = core::result::Result<T, E>;

@@ -16,7 +16,9 @@ enum PatchKey<'a> {
     AddAnim(&'a str, &'a str, &'a str),
 }
 
-pub fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AsdsfPatch<'a>>) -> Vec<AsdsfPatch<'a>> {
+pub(super) fn dedup_patches_by_priority_parallel<'a>(
+    patches: Vec<AsdsfPatch<'a>>,
+) -> Vec<AsdsfPatch<'a>> {
     patches
         .into_par_iter()
         .fold(

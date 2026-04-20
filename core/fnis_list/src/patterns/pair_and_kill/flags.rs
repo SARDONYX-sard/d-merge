@@ -53,7 +53,7 @@ enum ParsedFlag<'a> {
 /// # Errors
 /// Pair and KillMove animations require a duration specified by `D<time>`.
 /// If this is missing, the parser will return an error.
-pub fn parse_anim_flags<'a>(
+pub(super) fn parse_anim_flags<'a>(
     input: &mut &'a str,
 ) -> ModalResult<FNISPairAndKillMoveAnimFlagSet<'a>> {
     preceded("-", __parse_anim_flags)

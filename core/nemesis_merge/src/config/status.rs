@@ -1,6 +1,6 @@
 use core::fmt;
 
-pub type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
+pub(crate) type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
 
 /// An enum representing various statuses during a process.
 ///

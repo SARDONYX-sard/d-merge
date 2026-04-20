@@ -1,3 +1,3 @@
-pub mod error;
-pub mod one_op;
-pub mod seq;
+pub(crate) mod error;
+pub(crate) mod one_op;
+pub(crate) mod seq;

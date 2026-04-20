@@ -19,7 +19,7 @@ use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 /// However, they are actually also reused in Offset Arm Animations, so they must be generated.
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt`
-pub fn new_mt_global_patch<'a>(
+pub(crate) fn new_mt_global_patch<'a>(
     anim_groups_states: Vec<String>,
     priority: usize,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {

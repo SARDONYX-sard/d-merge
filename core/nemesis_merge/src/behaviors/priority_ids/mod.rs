@@ -9,7 +9,7 @@
 //! - Parallel extraction of mod codes from paths using Rayon
 //! - Custom parsing logic with detailed error reporting using `winnow`
 //! - Friendly, readable error reporting via `ReadableError`
-pub mod types;
+pub(super) mod types;
 
 use winnow::{
     ascii::Caseless,
@@ -34,7 +34,7 @@ use winnow_ext::ReadableError;
 /// ```txt
 /// `D:\\...\\Nemesis_Engine\\mod\\abc\\somefile.txt` -> `D:\\...\\Nemesis_Engine\\mod\\abc`
 /// ```
-pub fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
+pub(super) fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
     _get_nemesis_id
         .parse(input)
         .map_err(|e| ReadableError::from_parse(e))

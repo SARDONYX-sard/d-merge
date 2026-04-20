@@ -16,7 +16,7 @@ use crate::behaviors::{
 ///
 /// # Target template
 /// `0_master`
-pub fn new_push_alt_anim_values_seq_patch<'a>(
+pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
     priority: usize,
 ) -> [(json_path::JsonPath<'a>, ValueWithPriority<'a>); 3] {
     let BehaviorEntry {

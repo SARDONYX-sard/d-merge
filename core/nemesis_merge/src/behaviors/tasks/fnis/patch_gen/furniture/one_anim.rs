@@ -37,7 +37,7 @@ use crate::behaviors::tasks::fnis::{
 ///
 /// This enum is used to identify which phase of the sequence is currently being processed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FurniturePhase {
+pub(super) enum FurniturePhase {
     /// The first phase of the Furniture animation sequence (`-F`).
     Start,
 
@@ -54,7 +54,7 @@ pub enum FurniturePhase {
 ///
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.
-pub fn new_furniture_one_anim_patches<'a>(
+pub(super) fn new_furniture_one_anim_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
     current_phase: FurniturePhase,
@@ -644,7 +644,7 @@ fn new_values_from_triggers<'a>(
 /// - `hkbBehaviorGraphStringData.variableNames`
 /// - `hkbVariableValueSet.wordVariableValues`
 /// - `hkbBehaviorGraphData.variableInfos`(as [i32])
-pub fn new_push_values_seq_patch<'a>(
+pub(super) fn new_push_values_seq_patch<'a>(
     values: &[AnimVar<'a>],
     string_data_index: &'static str,
     variable_index: &'static str,

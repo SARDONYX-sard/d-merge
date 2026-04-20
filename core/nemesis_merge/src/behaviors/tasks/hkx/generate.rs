@@ -128,7 +128,7 @@ fn debug_file_path(output_dir: &Path, inner_path: &Path) -> PathBuf {
 }
 
 /// Output template.json & template.json debug string
-pub fn write_patched_json<S>(output_file: &Path, template_json: S) -> Result<()>
+pub(crate) fn write_patched_json<S>(output_file: &Path, template_json: S) -> Result<()>
 where
     S: serde::Serialize + core::fmt::Debug,
 {

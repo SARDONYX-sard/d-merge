@@ -18,7 +18,7 @@ use crate::behaviors::tasks::fnis::{
 
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.
-pub fn new_offset_arm_patches<'a>(
+pub(super) fn new_offset_arm_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {

@@ -9,7 +9,7 @@ use simd_json::owned::Object;
 ///
 /// Allows overriding default FNIS -> OAR conversion per namespace.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct FnisToOarConfig<'a> {
+pub(crate) struct FnisToOarConfig<'a> {
     #[serde(borrow)]
     #[serde(rename = "$schema")]
     pub schema: Option<Cow<'a, str>>,
@@ -38,7 +38,7 @@ pub struct FnisToOarConfig<'a> {
 
 /// Configuration for a single FNIS group.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct GroupConfig {
+pub(crate) struct GroupConfig {
     /// 1based Slot index -> Slot configuration
     #[serde(default, flatten)]
     #[serde(deserialize_with = "num_key_map::deserialize")]
@@ -54,7 +54,7 @@ mod num_key_map {
         de::{self, MapAccess, Visitor},
     };
 
-    pub fn deserialize<'de, D>(
+    pub(super) fn deserialize<'de, D>(
         deserializer: D,
     ) -> Result<HashMap<u64, Arc<super::SlotConfig>>, D::Error>
     where
@@ -90,7 +90,7 @@ mod num_key_map {
 
 /// Configuration for a single slot in a group.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SlotConfig {
+pub(crate) struct SlotConfig {
     /// Optional rename of the animation
     pub rename_to: Option<String>,
 

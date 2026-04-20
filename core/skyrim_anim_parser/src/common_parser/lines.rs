@@ -8,7 +8,7 @@ use winnow::{
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
 };
 
-pub type Str<'a> = Cow<'a, str>;
+pub(crate) type Str<'a> = Cow<'a, str>;
 
 /// Parse 1 line.
 pub(crate) fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {

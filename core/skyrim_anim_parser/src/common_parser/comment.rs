@@ -115,7 +115,7 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     .parse_next(input)
 }
 
-pub fn delimited_multispace0<Input, Output, Error, ParseNext>(
+pub(crate) fn delimited_multispace0<Input, Output, Error, ParseNext>(
     mut parser: ParseNext,
 ) -> impl Parser<Input, Output, Error>
 where

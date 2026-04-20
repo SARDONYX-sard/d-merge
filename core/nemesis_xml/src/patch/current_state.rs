@@ -8,7 +8,7 @@ use super::class_table::FieldInfo;
 type Patches<'xml> = Vec<CurrentJsonPatch<'xml>>;
 
 #[derive(Debug, Clone, Default)]
-pub struct CurrentState<'xml> {
+pub(super) struct CurrentState<'xml> {
     /// current parsing filed type info.
     pub field_info: Option<&'static FieldInfo>,
     /// When present, this signals the start of a differential change
@@ -42,7 +42,7 @@ pub struct CurrentState<'xml> {
 }
 
 impl<'de> CurrentState<'de> {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             field_info: None,
             mode_code: None,
@@ -57,7 +57,7 @@ impl<'de> CurrentState<'de> {
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
-    pub fn push_current_patch(&mut self, value: BorrowedValue<'de>) {
+    pub(super) fn push_current_patch(&mut self, value: BorrowedValue<'de>) {
         if self.mode_code.is_some() && !self.is_passed_original {
             if self.seq_range.is_some() {
                 self.seq_values.push(value);
@@ -70,12 +70,12 @@ impl<'de> CurrentState<'de> {
 
     /// - `<!-- ORIGINAL --!> is found.
     #[inline]
-    pub const fn set_is_passed_original(&mut self) {
+    pub(super) const fn set_is_passed_original(&mut self) {
         self.is_passed_original = true;
     }
 
     #[inline]
-    pub fn judge_operation(&self) -> Op {
+    pub(super) fn judge_operation(&self) -> Op {
         self.mode_code.map_or(Op::Remove, |_| {
             if self.is_passed_original {
                 if self.patches.is_empty() && self.seq_values.is_empty() {
@@ -90,20 +90,20 @@ impl<'de> CurrentState<'de> {
     }
 
     #[inline]
-    pub const fn clear_flags(&mut self) {
+    pub(super) const fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
     }
 
     /// Judge Op + clear flags + take patches
     #[inline]
-    pub fn take_patches(&mut self) -> (Op, Patches<'de>) {
+    pub(super) fn take_patches(&mut self) -> (Op, Patches<'de>) {
         let op = self.judge_operation();
         self.clear_flags();
         (op, mem::take(&mut self.patches))
     }
 
-    pub const fn increment_range(&mut self) {
+    pub(super) const fn increment_range(&mut self) {
         if let Some(ref mut range) = self.seq_range {
             range.end += 1;
         }
@@ -113,7 +113,7 @@ impl<'de> CurrentState<'de> {
 /// The reason this is necessary is because
 /// `<!-- ORIGINAL -->` or `<! -- CLOSE -->` is read, the operation type cannot be determined.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CurrentJsonPatch<'xml> {
+pub(super) struct CurrentJsonPatch<'xml> {
     /// $(root), index, className, fieldName
     /// - e.g. "$.4514.hkbStateMachineStateInfo.generator",
     pub path: Vec<Cow<'xml, str>>,

@@ -1434,6 +1434,7 @@ dependencies = [
  "mod_info",
  "nemesis_merge",
  "open",
+ "parking_lot",
  "rayon",
  "rfd 0.15.4",
  "rfd 0.17.2",

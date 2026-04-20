@@ -18,7 +18,7 @@ use rayon::prelude::*;
 /// This is useful when you want to manage both *single-value patches*
 /// and *multi-value patches* in the same context.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct HkxPatchMaps<'a> {
+pub(crate) struct HkxPatchMaps<'a> {
     /// Stores one value per path (highest priority wins).
     #[serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))]
     pub one: OnePatchMap<'a>,
@@ -29,7 +29,7 @@ pub struct HkxPatchMaps<'a> {
 
 impl<'a> HkxPatchMaps<'a> {
     #[inline]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.one.0.len() + self.seq.0.len()
     }
 
@@ -43,16 +43,9 @@ impl<'a> HkxPatchMaps<'a> {
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default)]
-pub struct OnePatchMap<'a>(pub DashMap<JsonPath<'a>, ValueWithPriority<'a>>);
+pub(crate) struct OnePatchMap<'a>(pub DashMap<JsonPath<'a>, ValueWithPriority<'a>>);
 
 impl<'a> OnePatchMap<'a> {
-    /// Constructs a new, empty [`OnePatchMap`].
-    #[inline]
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// If an existing value is present, its priority is compared with
@@ -62,7 +55,7 @@ impl<'a> OnePatchMap<'a> {
     ///
     /// - `key`: The JSON path associated with the value.
     /// - `new_value`: The value with an associated priority.
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+    pub(crate) fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         if let Some(mut existing) = self.0.get_mut(&key) {
             let new_priority = new_value.priority;
             let existing_priority = existing.priority;
@@ -99,21 +92,14 @@ impl<'a> OnePatchMap<'a> {
 /// A map that stores **multiple** values per JSON path,
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default)]
-pub struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
+pub(crate) struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
 
 impl<'a> SeqPatchMap<'a> {
-    /// Constructs a new, empty [`SeqPatchMap`].
-    #[inline]
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self(DashMap::new())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+    pub(crate) fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut existing) => {
                 existing.get_mut().push(new_value);
@@ -125,7 +111,7 @@ impl<'a> SeqPatchMap<'a> {
     }
 
     /// Extends the list of values for the given JSON path.
-    pub fn merge(&self, other: Self) {
+    pub(crate) fn merge(&self, other: Self) {
         for (path, other_vals) in other.0 {
             match self.0.entry(path) {
                 dashmap::Entry::Occupied(mut occ) => {

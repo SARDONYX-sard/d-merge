@@ -5,12 +5,12 @@ use std::{borrow::Cow, path::PathBuf};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
-pub use self::patch_map::HkxPatchMaps;
+pub(crate) use self::patch_map::HkxPatchMaps;
 use crate::behaviors::tasks::{
     adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::key::TemplateKey,
 };
 
-pub struct OwnedPatches {
+pub(crate) struct OwnedPatches {
     /// Name of the template that needs to be read.
     ///
     /// - format: template_name, is_1st_person
@@ -32,10 +32,10 @@ pub struct OwnedPatches {
 
 /// - key: full path
 /// - value: nemesis xml
-pub type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
+pub(crate) type OwnedPatchMap = IndexMap<PathBuf, (String, usize)>;
 
 /// Collection of patches with metadata
-pub struct PatchCollection<'a> {
+pub(crate) struct PatchCollection<'a> {
     /// Actual template patch map
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
@@ -102,11 +102,11 @@ impl<'a> BehaviorPatchesMap<'a> {
 /// - key: template_name
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, Cow<'static, str>>);
+pub(crate) struct BehaviorGraphDataMap<'a>(pub DashMap<TemplateKey<'a>, Cow<'static, str>>);
 impl BehaviorGraphDataMap<'_> {
     /// Create `Self`
     #[inline]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(DashMap::new())
     }
 }

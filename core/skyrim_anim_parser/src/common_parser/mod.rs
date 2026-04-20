@@ -1,3 +1,3 @@
-pub mod comment;
-pub mod delete_line;
-pub mod lines;
+pub(crate) mod comment;
+pub(crate) mod delete_line;
+pub(crate) mod lines;

@@ -29,7 +29,7 @@ pub(crate) async fn convert(
 /// # Errors
 /// Returns an error message if the directory cannot be loaded or if there are issues reading the path.
 #[tauri::command]
-pub fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, String> {
+pub(crate) fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, String> {
     serde_hkx_for_gui::load_dir_node(dirs).map_err(|errs| {
         let err = errs
             .par_iter()

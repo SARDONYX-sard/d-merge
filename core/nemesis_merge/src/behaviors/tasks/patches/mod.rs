@@ -1,4 +1,4 @@
-pub mod apply;
-pub mod collect;
+pub(crate) mod apply;
+pub(crate) mod collect;
 mod paths;
-pub mod types;
+pub(crate) mod types;
