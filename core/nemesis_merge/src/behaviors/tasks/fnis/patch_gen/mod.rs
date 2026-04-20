@@ -150,11 +150,22 @@ pub(crate) fn collect_borrowed_patches<'a>(
             let borrowed_patches = &mut acc.borrowed_patches;
             let behavior_graph_data_map = &mut acc.behavior_graph_data_map;
 
+            // Add patches to mt_behavior.xml
             if owned_data.behavior_entry.is_3rd_person_character() {
                 let entry = borrowed_patches
                     .0
                     .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
                     .or_default();
+
+                if !behavior_graph_data_map
+                    .0
+                    .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
+                {
+                    behavior_graph_data_map.0.insert(
+                        THREAD_PERSON_MT_BEHAVIOR_KEY,
+                        Cow::Borrowed(owned_data.behavior_entry.master_behavior_graph_index),
+                    );
+                }
 
                 for (path, patch) in one_mt_behavior_patches {
                     entry.one.insert(path, patch);
