@@ -52,11 +52,14 @@ pub(super) enum FurniturePhase {
 
 /// Creates JSON patches for a single Furniture animation, depending on its phase.
 ///
+/// - `has_any_anim_obj`: Whether any furniture sequence contains an animation object
+///
 /// # Target Template
 /// `meshes\actors\character\behaviors\mt_behavior.xml`.
 pub(super) fn new_furniture_one_anim_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
+    has_any_anim_obj: bool,
     current_phase: FurniturePhase,
     class_indexes: &[String; 9],
     end_anim_state_id: i32,
@@ -79,7 +82,6 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
     seq_patches.extend({
         let events: &[Cow<'_, str>] = if matches!(current_phase, FurniturePhase::End(_)) {
-            // DONE suffix event unused. But FNIS generate it.
             &[event_name.into(), format!("{}_DONE", event_name).into()]
         } else {
             &[event_name.into()]
@@ -206,6 +208,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     });
     one_patches.push(new_event_property_array_ri2(
         flags,
+        has_any_anim_obj,
         current_phase,
         &class_indexes[2],
         priority,
@@ -509,14 +512,15 @@ fn new_event_property_array_ri1<'a>(
 #[must_use]
 fn new_event_property_array_ri2<'a>(
     flags: FNISAnimFlags,
+    has_any_anim_obj: bool,
     current_phase: FurniturePhase,
     class_index: &str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let mut events = Vec::new();
 
-    // AnimObjects OFF block (-o-)
-    if !flags.contains(FNISAnimFlags::AnimObjects) {
+    // `$-o-$`: Whether any furniture sequence contains an animation object
+    if has_any_anim_obj {
         events.push(json_typed!(borrowed, {
             "id": 165, // AnimObjectUnequip
             "payload": "#0000"
@@ -531,6 +535,7 @@ fn new_event_property_array_ri2<'a>(
         }));
     }
 
+    // $-F$: Furniture Start block
     if matches!(current_phase, FurniturePhase::Start) {
         events.push(json_typed!(borrowed, {
             "id": 14, // IdleChairSitting
@@ -604,7 +609,7 @@ fn new_values_from_triggers<'a>(
         values.push(json_typed!(borrowed, {
             "localTime": -0.2,
             "event": {
-                "id": format!("$eventID[{current_event_name}]$"), // DONE AnimEvent: $AE1fug+&fug$ (Maybe seq last event)
+                "id": format!("$eventID[{current_event_name}_DONE]$"), // DONE AnimEvent: $AE1fug+&fug$ (Need: seq last event + _DONE suffix)
                 "payload": "#0000"
             },
             "relativeToEndOfClip": true,

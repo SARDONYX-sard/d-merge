@@ -51,6 +51,11 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
         None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
     };
 
+    let has_any_anim_obj = furniture
+        .animations
+        .iter()
+        .any(|anim| !anim.anim_objects.is_empty());
+
     for (i, (animation, class_indexes)) in furniture
         .animations
         .iter()
@@ -68,6 +73,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
         let (one, seq) = new_furniture_one_anim_patches(
             animation,
             owned_data,
+            has_any_anim_obj,
             phase,
             class_indexes,
             end_anim_state_id,
