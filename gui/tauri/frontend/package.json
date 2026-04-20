@@ -30,7 +30,7 @@
     "@tauri-apps/plugin-fs": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "allotment": "^1.20.5",
-    "i18next": "26.0.3",
+    "i18next": "26.0.6",
     "immer": "^11.1.4",
     "monaco-editor": "latest",
     "monaco-vim": "^0.4.4",
