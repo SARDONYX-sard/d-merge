@@ -34,7 +34,7 @@ use crate::{
                     },
                     mt_behavior::new_mt_global_patch,
                 },
-                io_jobs::AnimIoJob,
+                io_jobs::{AnimIoJob, FNISIoJobRunner},
                 kill_move::calculate_hash,
             },
         },
@@ -91,7 +91,12 @@ impl<'a> LocalAgg<'a> {
 pub fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
-) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<Error>) {
+) -> (
+    PatchCollection<'a>,
+    Vec<AdsfPatch<'a>>,
+    FNISIoJobRunner,
+    Vec<Error>,
+) {
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::GeneratingFnisPatches,
@@ -292,7 +297,7 @@ pub fn collect_borrowed_patches<'a>(
 
     // fnis_aa/config.json / BDI.json
     let aa_base_map = if conversion_jobs
-        .iter()
+        .par_iter()
         .any(|job| matches!(job, AnimIoJob::FnisAANamespaceConfig(_)))
     {
         match alternate::aa_config::build_aa_config_from_jobs(&conversion_jobs, &config.output_dir) // Write fnis_aa/config.json
@@ -326,18 +331,13 @@ pub fn collect_borrowed_patches<'a>(
         errors.push(Error::FNISGenerateEspError { source: e });
     };
 
-    errors.par_extend(io_jobs::run_conversion_jobs(
-        conversion_jobs,
-        config.output_target,
-        aa_base_map.as_ref(),
-    ));
-
     (
         PatchCollection {
             borrowed_patches,
             behavior_graph_data_map,
         },
         adsf_patches,
+        FNISIoJobRunner::new(conversion_jobs, config.output_target, aa_base_map),
         errors,
     )
 }

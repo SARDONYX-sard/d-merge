@@ -60,12 +60,12 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
     };
 
-    let (fnis_hkx_patches, fnis_adsf_patches) = {
-        let (fnis_hkx_patches, fnis_adsf_patches, errors) =
+    let (fnis_hkx_patches, fnis_adsf_patches, io_job_runner) = {
+        let (fnis_hkx_patches, fnis_adsf_patches, io_job_runner, errors) =
             fnis::patch_gen::collect_borrowed_patches(&owned_fnis_patches, &config);
         fnis_errors.par_extend(errors);
 
-        (fnis_hkx_patches, fnis_adsf_patches)
+        (fnis_hkx_patches, fnis_adsf_patches, io_job_runner)
     };
 
     // Collect all patches file.
@@ -79,8 +79,10 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
     let mut patched_hkx_errors = None;
+    let mut fnis_convert_errors = vec![];
 
     rayon::scope(|s| {
+        s.spawn(|_| fnis_convert_errors = io_job_runner.convert());
         s.spawn(|_| {
             adsf_errors =
                 apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
@@ -105,14 +107,18 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
             hkx_errors_len,
             hkx_errors,
         } = patched_hkx_errors.unwrap_or_default();
-        let fnis_errors_errors_len = fnis_errors.len();
+        let fnis_errors_errors_len = fnis_errors.len() + fnis_convert_errors.len();
+
         let owned_file_errors_len = owned_file_errors.len();
         let adsf_errors_len = adsf_errors.len();
         let asdsf_errors_len = asdsf_errors.len();
 
         let all_errors = {
             let mut all_errors = vec![];
+
             all_errors.par_extend(fnis_errors);
+            all_errors.par_extend(fnis_convert_errors);
+
             all_errors.par_extend(owned_file_errors);
             all_errors.par_extend(adsf_errors);
             all_errors.par_extend(asdsf_errors);

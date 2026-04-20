@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum AnimIoJob {
+pub(crate) enum AnimIoJob {
     Hkx(ConversionJob),
     /// Static namespace-level OAR config (no base dependency).
     FnisAANamespaceConfig(FnisAANamespaceConfigJob),
@@ -24,21 +24,50 @@ pub enum AnimIoJob {
     FnisAASlotConfig(FnisAASlotConfigJob),
 }
 
-/// Run the HKX conversion jobs in parallel.
-///
-/// Checks each file header first; skips files already matching the target format.
-/// Returns all errors encountered during conversion.
-///
-/// # Note
-/// AAConfig is pre-built by the caller; None when no FnisAA jobs exist.
-///
-/// # Returns Errors
-/// Returns a collection of errors if any file:
-/// - Cannot be read (I/O errors),
-/// - Has invalid HKX magic numbers,
-/// - Has a pointer size that cannot be determined.
+/// Runner for animation I/O jobs, including HKX conversions and FNIS AA config writes.
+#[derive(Debug)]
+pub(crate) struct FNISIoJobRunner {
+    jobs: Vec<AnimIoJob>,
+    output_target: OutPutTarget,
+    aa_base_map: Option<super::alternate::aa_config::BaseMap>,
+}
+
+impl FNISIoJobRunner {
+    #[inline]
+    pub(crate) const fn new(
+        jobs: Vec<AnimIoJob>,
+        output_target: OutPutTarget,
+        aa_base_map: Option<super::alternate::aa_config::BaseMap>,
+    ) -> Self {
+        Self {
+            jobs,
+            output_target,
+            aa_base_map,
+        }
+    }
+
+    /// Run the HKX conversion jobs in parallel.
+    ///
+    /// Checks each file header first; skips files already matching the target format.
+    /// Returns all errors encountered during conversion.
+    ///
+    /// # Note
+    /// AAConfig is pre-built by the caller; None when no FnisAA jobs exist.
+    ///
+    /// # Returns Errors
+    /// Returns a collection of errors if any file:
+    /// - Cannot be read (I/O errors),
+    /// - Has invalid HKX magic numbers,
+    /// - Has a pointer size that cannot be determined.
+    #[must_use]
+    #[inline]
+    pub(crate) fn convert(self) -> Vec<Error> {
+        run_conversion_jobs(self.jobs, self.output_target, self.aa_base_map.as_ref())
+    }
+}
+
 #[must_use]
-pub fn run_conversion_jobs(
+fn run_conversion_jobs(
     jobs: Vec<AnimIoJob>,
     output_target: OutPutTarget,
     aa_base_map: Option<&super::alternate::aa_config::BaseMap>,
