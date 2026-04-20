@@ -1,10 +1,11 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, RwLock, atomic::AtomicBool},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use eframe::{App, Frame, egui};
 use egui::{Checkbox, Separator};
+use parking_lot::RwLock;
 use rayon::prelude::*;
 
 use crate::{
@@ -595,11 +596,11 @@ impl ModManagerApp {
                         .show(ctx, |ui| {
                             ui.horizontal(|ui| {
                                 if ui.button(clear_button_name.as_str()).clicked() {
-                                    log_lines.write().unwrap().clear();
+                                    log_lines.write().clear();
                                 }
 
                                 ui.button("Copy").clicked().then(|| {
-                                    let text = log_lines.read().unwrap().join("\n");
+                                    let text = log_lines.read().join("\n");
                                     ui.ctx().copy_text(text);
                                 });
                             });
@@ -607,7 +608,7 @@ impl ModManagerApp {
                             egui::ScrollArea::vertical()
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
-                                    let text = log_lines.read().unwrap().join("\n");
+                                    let text = log_lines.read().join("\n");
                                     ui.label(text);
                                 });
                         });
@@ -973,25 +974,16 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Set message to notification
     pub(crate) fn set_notification<S: Into<String>>(&self, msg: S) {
-        if let Ok(mut guard) = self.notification.write() {
-            let msg = msg.into();
-            *guard = msg;
-        }
+        *self.notification.write() = msg.into();
     }
 
     pub(crate) fn clear_notification(&self) {
-        if let Ok(mut guard) = self.notification.write() {
-            guard.clear();
-        }
+        self.notification.write().clear();
     }
 
     /// Get notification message
     pub(crate) fn notification(&self) -> String {
-        self.notification
-            .read()
-            .ok()
-            .map(|s| s.clone())
-            .unwrap_or_default()
+        self.notification.read().clone()
     }
 }
 
@@ -1033,8 +1025,7 @@ impl ModManagerApp {
                     }
                 },
                 status_report: Some(Box::new(move |status| {
-                    let mut n = notify.write().unwrap();
-                    *n = crate::i18n::status_to_text(status, &i18n, start_time);
+                    *notify.write() = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {
                     cast_ragdoll_event: true,
