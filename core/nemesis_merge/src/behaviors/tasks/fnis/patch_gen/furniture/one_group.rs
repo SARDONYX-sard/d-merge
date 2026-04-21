@@ -12,8 +12,8 @@ use crate::behaviors::tasks::fnis::{
         JsonPatchPairs,
         furniture::one_anim::{FurniturePhase, new_furniture_one_anim_patches},
         global::mt_behavior::{
-            FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5231,
-            FNIS_BA_BLEND_TRANSITION_5232, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
+            FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_BA_BLEND_TRANSITION_5232,
+            FNIS_BA_BLEND_TRANSITION_5235, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
         },
         kill_move::calculate_hash,
     },
@@ -368,7 +368,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
 
         let transitions: Vec<_> = all_state_infos_indexes.iter().zip(&all_event_ids).enumerate().map(|(index, (class_index, event_id))| {
             let blend_class_index = if index == 0 {
-                FNIS_BA_BLEND_TRANSITION_5231
+                FNIS_BA_BLEND_TRANSITION_5235
             } else {
                 FNIS_BA_BLEND_TRANSITION_5232
             };

@@ -20,7 +20,7 @@ use simd_json::{borrowed::Value, json_typed};
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        JsonPatchPairs, global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5231,
+        JsonPatchPairs, global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5235,
         kill_move::calculate_hash, new_push_events_seq_patch,
     },
 };
@@ -142,9 +142,11 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         } else {
             "#0000"
         };
+
         // $-o-|#%RI+2%|h+|#%RI+2%|F|#%RI+2%|ac0|#%RI+2%|null$
         let exit_notify_events = if !flags.contains(FNISAnimFlags::AnimObjects)
-            || flags.contains(FNISAnimFlags::HeadTracking)
+            || flags.contains(FNISAnimFlags::HeadTracking) // h+
+            || matches!(current_phase, FurniturePhase::Start) // F
             || flags.contains(FNISAnimFlags::AnimatedCameraReset)
         {
             &class_indexes[2]
@@ -157,7 +159,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
             "#0000"
         } else {
             &class_indexes[3] // `#%:FuTransExit` only matched two entries within mt_behavior, both pointing to RI+3.
-        };
+        }; // else first phase $RI+3
 
         // #$-AV|%RI+4%|%RI+7%$
         let generator = if is_empty_anim_vars {
@@ -239,7 +241,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                                 "enterTime": 0.0,
                                 "exitTime": 0.0,
                             },
-                            "transition": FNIS_BA_BLEND_TRANSITION_5231, // #$:BlendTransition+&bl$
+                            "transition": FNIS_BA_BLEND_TRANSITION_5235, // #$:BlendTransition+&bl$
                             "condition": "#0000",
                             "eventId": 152, // IdleChairExitStart
 
