@@ -133,21 +133,25 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
     // $RI
     one_patches.push({
+        // NOTE: For some reason, everything except Start seems to be a null pointer(confirmed by checking the actual XML output from FNIS).
         // $-o+|#%RI+1%|h-|#%RI+1%|ac1|#%RI+1%|null$
-        let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects)
-            || !flags.contains(FNISAnimFlags::HeadTracking)
-            || flags.contains(FNISAnimFlags::AnimatedCameraSet)
+        let enter_notify_events = if matches!(current_phase, FurniturePhase::Start)
+            && (flags.contains(FNISAnimFlags::AnimObjects)
+                || !flags.contains(FNISAnimFlags::HeadTracking)
+                || flags.contains(FNISAnimFlags::AnimatedCameraSet))
         {
             &class_indexes[1]
         } else {
             "#0000"
         };
 
+        // NOTE: For some reason, the middle element of seq seems to be a null pointer. (confirmed by checking the actual XML output from FNIS)
         // $-o-|#%RI+2%|h+|#%RI+2%|F|#%RI+2%|ac0|#%RI+2%|null$
-        let exit_notify_events = if !flags.contains(FNISAnimFlags::AnimObjects)
-            || flags.contains(FNISAnimFlags::HeadTracking) // h+
-            || matches!(current_phase, FurniturePhase::Start) // F
-            || flags.contains(FNISAnimFlags::AnimatedCameraReset)
+        let exit_notify_events = if !matches!(current_phase, FurniturePhase::Middle(_))
+            && (!flags.contains(FNISAnimFlags::AnimObjects)
+                || flags.contains(FNISAnimFlags::HeadTracking) // h+
+                || matches!(current_phase, FurniturePhase::Start) // F
+                || flags.contains(FNISAnimFlags::AnimatedCameraReset))
         {
             &class_indexes[2]
         } else {
@@ -158,14 +162,24 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         let transition = if matches!(current_phase, FurniturePhase::End(_)) {
             "#0000"
         } else {
+            // first phase $RI+3
             &class_indexes[3] // `#%:FuTransExit` only matched two entries within mt_behavior, both pointing to RI+3.
-        }; // else first phase $RI+3
+        };
 
         // #$-AV|%RI+4%|%RI+7%$
         let generator = if is_empty_anim_vars {
             &class_indexes[7]
         } else {
             &class_indexes[4]
+        };
+
+        // Actually, since this comes in as 1, 2, 3... every sequence, it seems fine to reuse the same stateId.
+        // one FNIS_List.txt
+        // - fu syntax: 1, 2, 3
+        // - fu syntax: 1, 2, 3
+        let state_id = match current_phase {
+            FurniturePhase::Start => 1,
+            FurniturePhase::Middle(i) | FurniturePhase::End(i) => (i + 1) as i32,
         };
 
         (
@@ -185,11 +199,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                         "transitions": transition,
                         "generator": generator,
                         "name": event_name,
-                        // Actually, since this comes in as 1, 2, 3... every sequence, it seems fine to reuse the same stateId.
-                        // one FNIS_List.txt
-                        // - fu syntax: 1, 2, 3
-                        // - fu syntax: 1, 2, 3
-                        "stateId": class_index_0_id, // $1+.fu$
+                        "stateId": state_id, // $1+.fu$
                         "probability": 1.0,
                         "enable": true
                     }),
@@ -374,7 +384,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         // Therefore, it seems necessary to make them unique per file.
         let name = match current_phase {
             FurniturePhase::Start => Cow::Borrowed("IdleBlessingKneelEnter"),
-            FurniturePhase::Middle(_index) | FurniturePhase::End(_index) => {
+            FurniturePhase::Middle(_) | FurniturePhase::End(_) => {
                 format!("FNISCG_{class_index_0_id}").into()
             }
         };
@@ -478,12 +488,10 @@ fn new_event_property_array_ri1<'a>(
     }
 
     // HeadTracking OFF block (h-)
-    if !flags.contains(FNISAnimFlags::HeadTracking) {
-        events.push(json_typed!(borrowed, {
-            "id": 20, // HeadTrackingOff
-            "payload": "#0000"
-        }));
-    }
+    events.push(json_typed!(borrowed, {
+        "id": 20, // HeadTrackingOff
+        "payload": "#0000"
+    }));
 
     // AnimatedCameraSet block (-ac1)
     if flags.contains(FNISAnimFlags::AnimatedCameraSet) {
@@ -530,7 +538,7 @@ fn new_event_property_array_ri2<'a>(
     }
 
     // HeadTracking ON block (-h+)
-    if flags.contains(FNISAnimFlags::HeadTracking) {
+    if matches!(current_phase, FurniturePhase::End(_)) {
         events.push(json_typed!(borrowed, {
             "id": 18, // HeadTrackingOn
             "payload": "#0000"

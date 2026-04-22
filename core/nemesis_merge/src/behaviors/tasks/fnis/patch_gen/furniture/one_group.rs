@@ -46,10 +46,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
 
     // Why need this?
     // Analysis of the FNIS output reveals that the stateId for each $RI+3$ index in the Furniture sequence must be set to the sequence's final stateId.
-    let end_anim_state_id = match all_class_indexes.last() {
-        Some(lasts) => calculate_hash(&lasts[0]),
-        None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
-    };
+    let end_anim_state_id = total as i32;
 
     let has_any_anim_obj = furniture
         .animations
@@ -106,12 +103,6 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
 
     // Push the first animation for furniture seq
     seq_patches.push({
-        let first_animation_event_id = format!("$eventID[{}]$", first_animation.anim_event);
-        let first_animation_state_id = match all_class_indexes.first() {
-            Some(first) => calculate_hash(&first[0]),
-            None => 0, // Since the list parser already validates that Furniture must consist of at least three items, this is actually unreachable.
-        };
-
         (
             json_patch::json_path!["#0089", "hkbStateMachineTransitionInfoArray", "transitions"],
             ValueWithPriority {
@@ -132,12 +123,10 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
                         },
                         "transition": FNIS_FU_MT_5216,
                         "condition": "#0000",
-                        // eventId is Nemesis variable, derived from `events`
-                        "eventId": first_animation_event_id,
-                        // toStateId must match root_event (NOT the event)
-                        "toStateId": FNIS_GLOBAL_FU_MT_STATE_ID,
+                        "eventId": format!("$eventID[{}]$", first_animation.anim_event), // eventId is Nemesis variable
+                        "toStateId": FNIS_GLOBAL_FU_MT_STATE_ID, // Must match root_state
                         "fromNestedStateId": 0,
-                        "toNestedStateId": first_animation_state_id,
+                        "toNestedStateId": class_index_0_id, // $1/1$ (original FNIS: 1, 2, 3...) group state ID
                         "priority": 0,
                         "flags": "FLAG_TO_NESTED_STATE_ID_IS_VALID|FLAG_IS_LOCAL_WILDCARD|FLAG_DISABLE_CONDITION"
                     }]),
@@ -339,7 +328,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
                             "payload": "#0000"
                         },
                         "startStateChooser": "#0000",
-                        "startStateId": 1,
+                        "startStateId": 1, // first_animation_root_state_id
                         "returnToPreviousStateEventId": -1,
                         "randomTransitionEventId": -1,
                         "transitionToNextHigherStateEventId": -1,
@@ -366,7 +355,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
             .map(|anim| format!("$eventID[{}]$", anim.anim_event)) // use Nemesis variable
             .collect();
 
-        let transitions: Vec<_> = all_state_infos_indexes.iter().zip(&all_event_ids).enumerate().map(|(index, (class_index, event_id))| {
+        let transitions: Vec<_> = all_state_infos_indexes.iter().zip(&all_event_ids).enumerate().map(|(index, (_, event_id))| {
             let blend_class_index = if index == 0 {
                 FNIS_BA_BLEND_TRANSITION_5235
             } else {
@@ -389,7 +378,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
                 "transition": blend_class_index, // #$:BlendTransition+&bl$
                 "condition": "#0000",
                 "eventId": event_id, // $AE1fu+%fu$
-                "toStateId": calculate_hash(class_index), // $1/1$
+                "toStateId": index + 1, // $1/1$
                 "fromNestedStateId": 0,
                 "toNestedStateId": 0,
                 "priority": 0,
