@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-04-22
+### :sparkles: New Features
+- [`51ea072`](https://github.com/SARDONYX-sard/d-merge/commit/51ea0721d79604e35ff147d38ca16b73b13715ce) - **egui**: use `parking_lot::RwLock` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`241a27e`](https://github.com/SARDONYX-sard/d-merge/commit/241a27e7a97036d6fde20a55c58476da3568ba5e) - **fnis_fu**: fix state id *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`b134bf2`](https://github.com/SARDONYX-sard/d-merge/commit/b134bf2ea84505d0498cbf8e3cef34f998c4fffb) - **fnis_fu**: fix forgotten furniture animation files appending *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7451cbe`](https://github.com/SARDONYX-sard/d-merge/commit/7451cbef56007c093e1f0a68a2d11497af211426) - **fnis_fu**: fix forgotten furniture DONE event *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`29b9d68`](https://github.com/SARDONYX-sard/d-merge/commit/29b9d687cf9870aee313daf5314b2087bbe0c88e) - **fnis_fu**: fix forgotten furniture DONE event *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`82891ba`](https://github.com/SARDONYX-sard/d-merge/commit/82891ba0701e3bd26f039ad73a906b7d473e4dc1) - **fnis**: add forgotten mt_behavior index map *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`63f2359`](https://github.com/SARDONYX-sard/d-merge/commit/63f23595b13c443aa6a82e276c71edd3ef118269) - **fnis**: add forgotten mt_behavior index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`27fb870`](https://github.com/SARDONYX-sard/d-merge/commit/27fb8709f16cadaa517b82000ae795b29b7e440f) - **fnis_fu**: fix event name `IdelChairGetUp_DeactivateMod` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d5b63e6`](https://github.com/SARDONYX-sard/d-merge/commit/d5b63e66be01502bcfdfa85761e90f8226e8fa56) - **fnis_fu**: fix xml index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`c2dd4d1`](https://github.com/SARDONYX-sard/d-merge/commit/c2dd4d10b89182ff86e16b50b60c73ed78d5888e) - parallel process fnis io job *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`ed73b74`](https://github.com/SARDONYX-sard/d-merge/commit/ed73b74d72608ca36bff32183f96f7159829c063) - fix lint *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`ac30341`](https://github.com/SARDONYX-sard/d-merge/commit/ac30341013e18c9819f38f7068af2c6d36a94113) - **error**: add ` TrailingData at character 0` error notes *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`0c6a171`](https://github.com/SARDONYX-sard/d-merge/commit/0c6a1714e192638694aa4ccd2ef3c1705095b41d) - add note *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.3.0] - 2026-04-16
 ### :sparkles: New Features
 - [`413719d`](https://github.com/SARDONYX-sard/d-merge/commit/413719d99017e3cb6101925f2bfc8813d48c557b) - **tauri**: add gen FNIS.esp option *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -377,3 +402,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.0.3...1.1.0
 [1.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.1.0...1.2.0
 [1.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.2.0...1.3.0
+[1.3.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.0...1.3.1
