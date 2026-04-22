@@ -134,6 +134,7 @@ Tag Legend
 | ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
 | ✅     | FNIS Sexy Move SE                         | 7.2     | AAPrefix    |
 | ✅     | FNIS Zoo(LE Mod)                          | 5.0.1   | b           |
+| ✅     | Fort Knox                                 | 1.4.3   | fu          |
 | ✅     | Immersive Interactions - Animated Actions | 1.78    | b,ofa       |
 | ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
 | ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
