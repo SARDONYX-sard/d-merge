@@ -8,7 +8,7 @@ pub(crate) use crate::operation::Op;
 /// A JSON patch along with its associated priority.
 ///
 /// The priority determines how conflicting patches should be resolved.
-/// Lower numbers indicate higher precedence.
+/// Higher numbers indicate higher precedence.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ValueWithPriority<'a> {
@@ -17,7 +17,7 @@ pub struct ValueWithPriority<'a> {
         serde(bound(deserialize = "JsonPatch<'a>: serde::Deserialize<'de>"))
     )]
     pub patch: JsonPatch<'a>,
-    /// The priority of the patch. Lower values have higher precedence.
+    /// The priority of the patch. Higher values have higher precedence.
     pub priority: usize,
 }
 
