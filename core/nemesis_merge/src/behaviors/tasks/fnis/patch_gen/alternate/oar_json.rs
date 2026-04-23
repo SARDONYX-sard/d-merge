@@ -112,6 +112,7 @@ pub(crate) fn new_fnis_aa_slot_config_json(
     group_name: AAGroupName,
     slot: u64,
     base: u64,
+    fallback_priority: i32,
     slot_config: Option<&SlotConfig>,
 ) -> String {
     let user_conditions = slot_config
@@ -123,16 +124,14 @@ pub(crate) fn new_fnis_aa_slot_config_json(
         .chain(user_conditions.iter().cloned())
         .collect();
 
-    // description
     let description = match slot_config.and_then(|s| s.description.as_deref()) {
         Some(desc) => Cow::Borrowed(desc),
         None => Cow::Owned(format!("base({base}) + value({slot})")),
     };
 
-    // priority
     let priority = slot_config
         .and_then(|s| s.priority)
-        .map_or(i32::MAX, |p| p as i32);
+        .map_or(fallback_priority, |p| p as i32);
 
     let config = ConditionsConfig {
         name: Cow::Borrowed(group_config_dir),
