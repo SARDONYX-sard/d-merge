@@ -10,7 +10,7 @@ use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupNam
 
 /// Represents the configuration structure for the 'config.json' namespace.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub(crate) struct NamespaceConfig<'config> {
+struct NamespaceConfig<'config> {
     /// The name associated with the configuration.
     #[serde(default)]
     pub name: &'config str,
@@ -57,7 +57,7 @@ pub(crate) fn prepare_namespace_json(
 
 /// Represents the configuration for each animation root specified in a `config.json` file.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub(crate) struct ConditionsConfig<'a> {
+struct ConditionsConfig<'a> {
     /// An arbitrary name given by the user (value in the mapping table).
     ///
     /// # Note
