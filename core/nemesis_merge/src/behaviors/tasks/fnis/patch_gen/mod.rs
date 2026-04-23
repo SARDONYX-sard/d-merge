@@ -336,7 +336,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
     if config.generate_fnis_esp
-        && let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir)
+        && let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir, config.output_target)
     {
         errors.push(Error::FNISGenerateEspError { source: e });
     };
