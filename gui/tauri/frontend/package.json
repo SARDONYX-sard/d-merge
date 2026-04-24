@@ -30,7 +30,7 @@
     "@tauri-apps/plugin-fs": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "allotment": "^1.20.5",
-    "i18next": "26.0.3",
+    "i18next": "26.0.6",
     "immer": "^11.1.4",
     "monaco-editor": "latest",
     "monaco-vim": "^0.4.4",
@@ -51,7 +51,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^29.0.2",
-    "typescript": "6.0.2",
+    "typescript": "6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vite-plus": "latest",
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
