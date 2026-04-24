@@ -32,7 +32,7 @@
       "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
-  "oxc.fmt.configPath": "./vite.config.ts",
+  "oxc.fmt.configPath": "./oxfmt.config.ts",
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],

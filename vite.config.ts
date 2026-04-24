@@ -2,6 +2,7 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
   lint: { options: { typeAware: true, typeCheck: true } },
+  // NOTE: https://github.com/oxc-project/oxc-vscode/issues/215#issuecomment-4283558960
   fmt: {
     sortImports: {
       newlinesBetween: false,
