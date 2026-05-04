@@ -50,7 +50,7 @@
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
-    "jsdom": "^29.0.2",
+    "jsdom": "^29.1.1",
     "typescript": "6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vite-plus": "latest",
