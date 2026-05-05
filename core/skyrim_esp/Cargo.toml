@@ -1,0 +1,18 @@
+[package]
+name = "skyrim_esp"
+version = "0.1.0"
+description = "Skyrim esp creator"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

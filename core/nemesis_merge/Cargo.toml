@@ -38,6 +38,7 @@ json_patch = { workspace = true, features = ["rayon", "serde"] }
 jwalk_glob = { workspace = true }
 nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
+skyrim_esp = { workspace = true }
 
 [dev-dependencies]
 havok_classes = { workspace = true }

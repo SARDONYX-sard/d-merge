@@ -4287,6 +4287,7 @@ dependencies = [
  "serde_hkx_features",
  "simd-json",
  "skyrim_anim_parser",
+ "skyrim_esp",
  "snafu",
  "sonic-rs",
  "tokio",
@@ -6829,6 +6830,10 @@ version = "0.1.0"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "skyrim_esp"
+version = "0.1.0"
 
 [[package]]
 name = "slab"
