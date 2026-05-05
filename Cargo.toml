@@ -24,8 +24,8 @@ members = [
   "core/serde_hkx_for_gui",
   "core/skyrim_anim_parser",
   "core/skyrim_crc",
-  "core/skyrim_esp",
   "core/skyrim_data_dir",
+  "core/skyrim_esp",
   "core/tracing_rotation",
   "ffi/python",
   "gui/egui",
@@ -81,8 +81,8 @@ node_expr = { path = "./core/node_expr" }
 serde_hkx_for_gui = { path = "./core/serde_hkx_for_gui" }
 skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
 skyrim_crc = { path = "./core/skyrim_crc" }
-skyrim_esp = { path = "./core/skyrim_esp" }
 skyrim_data_dir = { path = "./core/skyrim_data_dir" }
+skyrim_esp = { path = "./core/skyrim_esp" }
 tracing_rotation = { path = "./core/tracing_rotation" }
 
 
