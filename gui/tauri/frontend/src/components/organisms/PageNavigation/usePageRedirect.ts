@@ -44,10 +44,17 @@ export const usePageRedirect = <T extends Readonly<[string, ...string[]]>>(valid
     if (!lastPath) return;
 
     const hasRedirected = sessionStorage.getItem('hasRedirected');
-    if (hasRedirected) return;
-    if (lastPath === '/' || pathname.endsWith(lastPath)) return;
 
+    if (hasRedirected) {
+      return;
+    }
+
+    // Mark as redirected to prevent future redirects in the same session
     sessionStorage.setItem('hasRedirected', 'true');
+
+    if (lastPath === '/' || pathname.endsWith(lastPath)) {
+      return; // Already on the correct page, no need to redirect
+    }
 
     router
       .navigate({

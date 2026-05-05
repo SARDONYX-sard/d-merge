@@ -6,7 +6,7 @@
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
   "editor.codeActionsOnSave": {
-    "source.fixAll.oxc": "explicit",
+    // "source.fixAll.oxc": "explicit",
     "source.fixAll.sortJSON": "never"
   },
   "editor.formatOnSave": true,
@@ -33,6 +33,7 @@
     }
   ],
   "oxc.fmt.configPath": "./oxfmt.config.ts",
+  "oxc.configPath": "./oxlint.config.ts",
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
