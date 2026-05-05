@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-05-05
+### :bug: Bug Fixes
+- [`fa752b4`](https://github.com/SARDONYX-sard/d-merge/commit/fa752b46457101aa02606342c0c44f1bbc53d3b0) - **oar**: ensure unique priorities for FNIS AA slot configs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1b3c0fa`](https://github.com/SARDONYX-sard/d-merge/commit/1b3c0fa5a8b20437bd5ed3f9353a5d788c55a552) - **frontend**: fix redirect *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`843f25e`](https://github.com/SARDONYX-sard/d-merge/commit/843f25e4189ca801cff3fee4f3d12a9f94cd92db) - **fnis**: switch to a method for generating `FNIS.esp` that minimizes intermediate heap allocations *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`dbe08e4`](https://github.com/SARDONYX-sard/d-merge/commit/dbe08e48420bdb812235e19c5beb53a182485a1f) - remove pub(crate) visibility from `NamespaceConfig` and `ConditionsConfig` structs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a5ff787`](https://github.com/SARDONYX-sard/d-merge/commit/a5ff7875cc0354148e21ccb7e4525248feed412e) - **core**: separate esp creator *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`632b700`](https://github.com/SARDONYX-sard/d-merge/commit/632b700f60b9c8f44c1f3126887b5a98068d5944) - **fmt**: apply fmt workaround *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1c21282`](https://github.com/SARDONYX-sard/d-merge/commit/1c2128248ebd87fabe2e958a4452d3fd2666c5ab) - **toml**: sort members order *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.3.1] - 2026-04-22
 ### :sparkles: New Features
 - [`51ea072`](https://github.com/SARDONYX-sard/d-merge/commit/51ea0721d79604e35ff147d38ca16b73b13715ce) - **egui**: use `parking_lot::RwLock` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -403,3 +420,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.1.0...1.2.0
 [1.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.2.0...1.3.0
 [1.3.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.0...1.3.1
+[1.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.1...1.3.2
