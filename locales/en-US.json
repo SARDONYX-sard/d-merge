@@ -176,6 +176,42 @@
     "preview": {
       "title": "Preview",
       "error_title": "Preview (Error)"
+    },
+    "lsp_options": {
+      "title": "HkAnno Language Server Settings",
+      "close_button_name": "Close",
+      "completion": {
+        "label": "Completion",
+        "description": "Enable code completion"
+      },
+      "code_action": {
+        "label": "Code Action",
+        "description": "Enable code actions (automatic correction suggestions)"
+      },
+      "diagnostics": {
+        "label": "Diagnostics",
+        "description": "Show errors and warnings"
+      },
+      "formatter": {
+        "label": "Formatter",
+        "description": "Enable code formatting"
+      },
+      "semantic_tokens": {
+        "label": "Semantic Tokens",
+        "description": "Enable syntax-based highlighting"
+      },
+      "hover": {
+        "label": "Hover",
+        "description": "Show information at the cursor position"
+      },
+      "inlay_hints": {
+        "label": "Inlay Hints",
+        "description": "Show type and parameter hints"
+      },
+      "signature_help": {
+        "label": "Signature Help",
+        "description": "Show function parameter information"
+      }
     }
   },
   "select_button": "Select",

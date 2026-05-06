@@ -176,6 +176,42 @@
     "preview": {
       "title": "XMLプレビュー",
       "error_title": "プレビュー (エラー)"
+    },
+    "lsp_options": {
+      "title": "HkAnno言語サーバー設定",
+      "close_button_name": "閉じる",
+      "completion": {
+        "label": "補完",
+        "description": "コード補完を有効にします"
+      },
+      "code_action": {
+        "label": "コードアクション",
+        "description": "コードアクション(自動修正候補)を有効にします"
+      },
+      "diagnostics": {
+        "label": "診断",
+        "description": "エラーや警告を表示します"
+      },
+      "formatter": {
+        "label": "フォーマッター",
+        "description": "コードフォーマットを有効にします"
+      },
+      "semantic_tokens": {
+        "label": "セマンティックトークン",
+        "description": "構文に応じた色分けを有効にします"
+      },
+      "hover": {
+        "label": "ホバー",
+        "description": "カーソル位置の情報を表示します"
+      },
+      "inlay_hints": {
+        "label": "インレイヒント",
+        "description": "型や引数のヒントを表示します"
+      },
+      "signature_help": {
+        "label": "シグネチャヘルプ",
+        "description": "関数の引数情報を表示します"
+      }
     }
   },
   "select_button": "選択",

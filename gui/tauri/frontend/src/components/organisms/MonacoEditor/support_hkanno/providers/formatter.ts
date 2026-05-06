@@ -1,5 +1,4 @@
-import * as monaco from 'monaco-editor';
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 import { parseHkannoLine } from '../parser/strict/parser';
 
 import type { HkannoNode } from '../parser/strict/nodes';
@@ -8,8 +7,8 @@ import type { HkannoNode } from '../parser/strict/nodes';
  * Registers a document formatting provider for HKANNO language in Monaco.
  * Uses a precise parser to preserve spacing and positional info.
  */
-export const registerDocumentFormattingEditProvider = (monacoEnv: typeof monaco) => {
-  monacoEnv.languages.registerDocumentFormattingEditProvider(HKANNO_LANGUAGE_ID, {
+export const registerDocumentFormattingEditProvider: NewProviderFn = (monacoEnv) => {
+  return monacoEnv.languages.registerDocumentFormattingEditProvider(HKANNO_LANGUAGE_ID, {
     provideDocumentFormattingEdits(model) {
       return [
         {

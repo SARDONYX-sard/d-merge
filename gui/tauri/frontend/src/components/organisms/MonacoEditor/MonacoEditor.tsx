@@ -6,7 +6,6 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { isTauri } from '@tauri-apps/api/core';
 import { type ComponentPropsWithoutRef, memo, type RefObject, useCallback, useEffect, useRef } from 'react';
 import { atomOneDarkPro } from './atom_onedark_pro';
-import { supportHkanno } from './support_hkanno';
 import { loadVimKeyBindings } from './vim_key_bindings';
 import { openUrl } from '@/services/api/shell';
 
@@ -75,9 +74,7 @@ export const MonacoEditor = memo(function MonacoEditor({ vimMode = false, onMoun
  * - javascript: enable inlay-hint
  * - json: enable schema
  * */
-const setLangCustomConfig: OnMount = (editor, monacoEnv) => {
-  supportHkanno(editor, monacoEnv);
-
+const setLangCustomConfig: OnMount = (_editor, monacoEnv) => {
   // NOTE: By default, the URL is opened in the app, so prevent this and call the backend API to open the URL in the browser of each PC.
   if (isTauri()) {
     monacoEnv.editor.registerLinkOpener({

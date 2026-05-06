@@ -1,5 +1,4 @@
-import * as monaco from 'monaco-editor';
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes';
@@ -15,8 +14,8 @@ import type {
 
 const UNKNOWN = '<unknown>';
 
-export const registerHoverProvider = (monacoEnv: typeof monaco) => {
-  monacoEnv.languages.registerHoverProvider(HKANNO_LANGUAGE_ID, {
+export const registerHoverProvider: NewProviderFn = (monacoEnv) => {
+  return monacoEnv.languages.registerHoverProvider(HKANNO_LANGUAGE_ID, {
     provideHover(model, position) {
       const lineContent = model.getLineContent(position.lineNumber);
       const node = parseHkannoLineExt(lineContent, position.lineNumber);

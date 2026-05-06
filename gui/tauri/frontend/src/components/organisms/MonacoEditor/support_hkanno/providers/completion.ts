@@ -1,12 +1,12 @@
 import * as monaco from 'monaco-editor';
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 import { providePieCompletions } from '../parser/payload_interpreter/completion';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 import type { MotionNode, Pos, RotationNode, TextNode } from '../parser/strict/nodes';
 
-export const registerCompletionProvider = (monacoEnv: typeof monaco) => {
-  monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
+export const registerCompletionProvider: NewProviderFn = (monacoEnv) => {
+  return monacoEnv.languages.registerCompletionItemProvider(HKANNO_LANGUAGE_ID, {
     triggerCharacters: [' ', '.', '@'],
     provideCompletionItems(document, position) {
       const lineContent = document.getLineContent(position.lineNumber);

@@ -1,14 +1,18 @@
 import { Box, Button } from '@mui/material';
 import { useEditorContext } from '../context/editorContext';
 import { useHkannoCommands } from '../hooks/useHkannoCommands';
+import { LspOptionDialogButton } from './LspOptionDialogButton';
+import { RevertButton } from './RevertDialog';
 import { useTranslation } from '@/components/hooks/useTranslation';
+import { hkannoToText } from '@/services/api/hkanno';
 
 /** Top toolbar with save and preview controls */
 export const HeaderToolbar = () => {
   const { t } = useTranslation();
   const [state, dispatch] = useEditorContext();
   const { saveCurrent } = useHkannoCommands();
-  const hasTab = Boolean(state.tabs[state.active]);
+  const tab = state.tabs[state.active];
+  const hasTab = Boolean(tab);
 
   return (
     <Box
@@ -26,14 +30,9 @@ export const HeaderToolbar = () => {
         {t('hkanno.toolbar.save')}
       </Button>
 
-      <Button
-        variant='outlined'
-        size='small'
-        disabled={!hasTab}
-        onClick={() => dispatch({ type: 'REVERT_ACTIVE_TAB' })}
-      >
-        {t('hkanno.toolbar.revert')}
-      </Button>
+      <RevertButton hasTab={hasTab} originalText={hkannoToText(tab.hkanno)} />
+
+      <LspOptionDialogButton />
 
       <Box sx={{ flexGrow: 1 }} />
 

@@ -1,9 +1,9 @@
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 
 import type * as monaco from 'monaco-editor';
 
-export const registerCodeActionProvider = (monacoEnv: typeof monaco) => {
-  monacoEnv.languages.registerCodeActionProvider(HKANNO_LANGUAGE_ID, {
+export const registerCodeActionProvider: NewProviderFn = (monacoEnv) => {
+  return monacoEnv.languages.registerCodeActionProvider(HKANNO_LANGUAGE_ID, {
     provideCodeActions(model, _range, context, _token) {
       const actions: monaco.languages.CodeAction[] = [];
 
