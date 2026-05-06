@@ -376,6 +376,14 @@ pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
     /// - `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     Nemesis,
+
+    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+    /// - `<skyrim data dir>/Nemesis_EngineExt/mod/aaaa`
+    ///
+    /// A patch for the exact path from meshes (note that the file extension is .bin, not .hkx)
+    /// - e.g., `Nemesis_EngineExt/mod/aaaa/meshes/actors/troll/characters/troll.bin/#0029.txt`
+    NemesisExt,
+
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
     /// - `<skyrim data dir>/meshes/actors/character/animations/<namespace>`
     Fnis,
@@ -385,6 +393,7 @@ impl From<RustModType> for ModType {
     fn from(value: RustModType) -> Self {
         match value {
             RustModType::Nemesis => ModType::Nemesis,
+            RustModType::NemesisExt => ModType::NemesisExt,
             RustModType::Fnis => ModType::Fnis,
         }
     }

@@ -34,8 +34,13 @@ use winnow_ext::ReadableError;
 /// ```txt
 /// `D:\\...\\Nemesis_Engine\\mod\\abc\\somefile.txt` -> `D:\\...\\Nemesis_Engine\\mod\\abc`
 /// ```
+///
+/// - Ext
+/// ```txt
+/// `D:\\...\\Nemesis_EngineExt\\mod\\abc\\meshes\\somefile.txt` -> `D:\\...\\Nemesis_EngineExt\\mod\\abc`
+/// ```
 pub(super) fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
-    _get_nemesis_id
+    alt((_get_nemesis_id, _get_nemesis_ext_id))
         .parse(input)
         .map_err(|e| ReadableError::from_parse(e))
 }
@@ -50,6 +55,28 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let mut parser = seq! {
         winnow_ext::take_until_ext(0.., Caseless("Nemesis_Engine")).context(Expected(StringLiteral("Nemesis_Engine"))),
         Caseless("Nemesis_Engine"),
+        sep,
+        "mod".context(Expected(StringLiteral("mod"))),
+        sep,
+        take_while(1.., |c: char| c != '/' && c != '\\').context(Expected(Description("mod code"))),
+    }
+    .take();
+
+    let id = parser.parse_next(input)?;
+    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?; // consume remaining input
+    Ok(id)
+}
+
+fn _get_nemesis_ext_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    // Match either '/' or '\\' as path separator
+    let mut sep = alt(('/', '\\'))
+        .context(Expected(CharLiteral('/')))
+        .context(Expected(CharLiteral('\\')));
+
+    // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
+    let mut parser = seq! {
+        winnow_ext::take_until_ext(0.., Caseless("Nemesis_EngineExt")).context(Expected(StringLiteral("Nemesis_EngineExt"))),
+        Caseless("Nemesis_EngineExt"),
         sep,
         "mod".context(Expected(StringLiteral("mod"))),
         sep,

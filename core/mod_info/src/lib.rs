@@ -17,6 +17,12 @@ use crate::error::Error;
 /// | true   | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
 /// | false  | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
 ///
+/// # NemesisExt
+/// | is_vfs | glob pattern                                               | id extracted as                   |
+/// |--------|------------------------------------------------------------|-----------------------------------|
+/// | true   | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
+/// | false  | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
+///
 /// # FNIS
 /// | is_vfs | glob pattern                                                         | id extracted as                   |
 /// |--------|----------------------------------------------------------------------|-----------------------------------|
@@ -42,6 +48,7 @@ use crate::error::Error;
 pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let mut mods = Vec::new();
     mods.par_extend(get_all_nemesis(skyrim_data_dir, is_vfs)?);
+    mods.par_extend(get_all_nemesis_ext(skyrim_data_dir, is_vfs)?);
     mods.par_extend(get_all_fnis(skyrim_data_dir)?);
     Ok(mods)
 }
@@ -76,6 +83,30 @@ fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, 
                 path.parent().unwrap_or(path).display().to_string()
             };
             read_mod_info(path, id)
+        })
+        .collect();
+
+    Ok(mods)
+}
+
+fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
+    let nemesis_pattern = format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini");
+
+    let mods = jwalk_glob::glob_files(&nemesis_pattern)
+        .par_iter()
+        .filter_map(|path| {
+            if !path.exists() {
+                return None;
+            }
+            let id = if is_vfs {
+                extract_nemesis_id_from_path(path)?.to_string()
+            } else {
+                path.parent().unwrap_or(path).display().to_string()
+            };
+            let mut mod_info = read_mod_info(path, id)?;
+            mod_info.mod_type = ModType::NemesisExt;
+
+            Some(mod_info)
         })
         .collect();
 
@@ -188,7 +219,7 @@ pub struct ModInfo {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
     /// - `<skyrim data dir>/meshes/actors/character/animations/aaaa`
@@ -197,6 +228,13 @@ pub enum ModType {
     /// - `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     #[default]
     Nemesis,
+
+    /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.
+    /// - `<skyrim data dir>/Nemesis_EngineExt/mod/aaaa`
+    ///
+    /// A patch for the exact path from meshes (note that the file extension is .bin, not .hkx)
+    /// - e.g., `Nemesis_EngineExt/mod/aaaa/meshes/actors/troll/characters/troll.bin/#0029.txt`
+    NemesisExt,
 }
 
 impl ModType {
@@ -211,6 +249,7 @@ impl ModType {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Nemesis => "Nemesis",
+            Self::NemesisExt => "NemesisExt",
             Self::Fnis => "FNIS",
         }
     }
