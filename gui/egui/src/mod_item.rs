@@ -113,6 +113,14 @@ pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModIt
                     };
                     Either::Left((id, priority))
                 }
+                ModType::NemesisExt => {
+                    let id = if is_vfs {
+                        format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/{id}")
+                    } else {
+                        id.clone()
+                    };
+                    Either::Left((id, priority))
+                }
                 ModType::Fnis => {
                     let id = id.clone();
                     Either::Right((id, priority))

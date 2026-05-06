@@ -58,13 +58,23 @@ export const toPatches = (vfsSkyrimDataDir: string, isVfsMode: boolean, modInfos
   for (const mod of modInfos) {
     if (!mod.enabled) continue;
 
-    if (mod.mod_type === 'nemesis') {
-      const path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}` : mod.id;
-      nemesisEntries[path] = mod.priority;
-    } else if (mod.mod_type === 'fnis') {
-      // Note that duplicates may cause malfunctions due to FNIS specifications.
-      const path = mod.id;
-      fnisEntries[path] = mod.priority;
+    switch (mod.mod_type) {
+      case 'nemesis': {
+        const path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_Engine/mod/${mod.id}` : mod.id;
+        nemesisEntries[path] = mod.priority;
+        break;
+      }
+      case 'nemesis_ext': {
+        const path = isVfsMode ? `${vfsSkyrimDataDir}/Nemesis_EngineExt/mod/${mod.id}` : mod.id;
+        nemesisEntries[path] = mod.priority;
+        break;
+      }
+      case 'fnis': {
+        // Note that duplicates may cause malfunctions due to FNIS specifications.
+        const path = mod.id;
+        fnisEntries[path] = mod.priority;
+        break;
+      }
     }
   }
 
