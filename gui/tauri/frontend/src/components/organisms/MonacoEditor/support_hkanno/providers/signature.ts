@@ -1,12 +1,11 @@
-import { OnMount } from '@monaco-editor/react';
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 import { providePieSignatureHelp } from '../parser/payload_interpreter/signature';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
 import type * as monaco from 'monaco-editor';
 
-export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
-  const provider: monaco.languages.SignatureHelpProvider = {
+export const registerSignatureHelpProvider: NewProviderFn = (monacoEnv) => {
+  const provider = {
     signatureHelpTriggerCharacters: [' ', '.', '0'],
 
     provideSignatureHelp(model, position) {
@@ -67,10 +66,9 @@ export const registerSignatureHelpProvider: OnMount = (_editor, monacoNS) => {
         }
       }
     },
-  };
+  } as const satisfies monaco.languages.SignatureHelpProvider;
 
-  monacoNS.languages.registerSignatureHelpProvider(HKANNO_LANGUAGE_ID, provider);
-  return provider;
+  return monacoEnv.languages.registerSignatureHelpProvider(HKANNO_LANGUAGE_ID, provider);
 };
 
 /* --- helpers --- */

@@ -1,3 +1,4 @@
+import { HkAnnoLspOptions } from '../../MonacoEditor/support_hkanno';
 import { FileTab } from '../types/FileTab';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 import { schemaStorage } from '@/lib/storage/schemaStorage';
@@ -120,6 +121,16 @@ export const editorReducer = (state: EditorState, action: EditorAction): EditorS
 
       schemaStorage.set<FileTab[]>(PRIVATE_CACHE_OBJ.hkannoFileTabs, tabs);
       return { ...state, tabs };
+    }
+
+    case 'SET_LSP_OPTIONS': {
+      const lspOptions = {
+        ...state.lspOptions,
+        ...action.lspOptions,
+      };
+
+      schemaStorage.set<HkAnnoLspOptions>(PRIVATE_CACHE_OBJ.hkannoLspOptions, lspOptions);
+      return { ...state, lspOptions };
     }
 
     default:

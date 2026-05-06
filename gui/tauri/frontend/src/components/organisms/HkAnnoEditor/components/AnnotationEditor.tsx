@@ -3,6 +3,7 @@ import { Typography } from '@mui/material';
 import { editor } from 'monaco-editor';
 import { useEditorModeContext } from '../../../providers/EditorModeProvider';
 import { useEditorContext } from '../context/editorContext';
+import { useHkAnnoLsp } from '../hooks/useHkAnnoLsp';
 import { useTranslation } from '@/components/hooks/useTranslation';
 import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 
@@ -12,6 +13,7 @@ export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
   const isVimMode = useEditorModeContext().editorMode === 'vim';
   const tab = state.tabs[state.active];
   const { t } = useTranslation();
+  const handleOnMountLsp = useHkAnnoLsp(state.lspOptions);
 
   const handleOnChange: OnChange = (text) => {
     if (text) {
@@ -21,6 +23,7 @@ export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
 
   const handleOnMount: OnMount = (editor, monaco) => {
     onMount(editor, monaco);
+    handleOnMountLsp(editor, monaco);
 
     // Restore cursorPos in FileTab
     if (tab.cursorPos) {
@@ -60,7 +63,7 @@ export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
   );
 };
 
-const MONACO_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
+export const MONACO_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   'semanticHighlighting.enabled': true,
   fontSize: 13,
   minimap: { enabled: true },

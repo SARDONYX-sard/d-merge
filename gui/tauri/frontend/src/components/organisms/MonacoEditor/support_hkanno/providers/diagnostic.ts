@@ -7,19 +7,34 @@ import type { PayloadInstructionNode } from '../parser/payload_interpreter/nodes
 import type { OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 
-export const registerCodeLen: OnMount = (editor, monacoEnv) => {
-  // first
-  if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
-    updateHkannoDiagnostics(editor, monacoEnv);
-  }
-  editor.onDidChangeModelContent(() => {
-    if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
-      updateHkannoDiagnostics(editor, monacoEnv);
-    }
-  });
+const DIAGNOSTIC_OWNER = 'hkanno-diagnostics';
+
+export const registerCodeLen = (
+  editor: monaco.editor.IStandaloneCodeEditor,
+  monacoEnv: typeof monaco,
+): monaco.IDisposable[] => {
+  let disposables: monaco.IDisposable[] = [];
+
+  disposables.push(
+    editor.onDidFocusEditorText(() => {
+      if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+        updateDiagnostics(editor, monacoEnv);
+      }
+    }),
+  );
+
+  disposables.push(
+    editor.onDidChangeModelContent(() => {
+      if (editor.getModel()?.getLanguageId() === HKANNO_LANGUAGE_ID) {
+        updateDiagnostics(editor, monacoEnv);
+      }
+    }),
+  );
+
+  return disposables;
 };
 
-const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
+const updateDiagnostics: OnMount = (editor, monacoEnv) => {
   const model = editor.getModel();
   if (!model) return;
 
@@ -113,7 +128,7 @@ const updateHkannoDiagnostics: OnMount = (editor, monacoEnv) => {
     }
   }
 
-  monacoEnv.editor.setModelMarkers(model, 'hkanno-diagnostics', markers);
+  monacoEnv.editor.setModelMarkers(model, DIAGNOSTIC_OWNER, markers);
 };
 
 const provideIFrameDiagnostics = (
@@ -199,4 +214,8 @@ const provideIFrameDiagnostics = (
   }
 
   return markers;
+};
+
+export const clearDiagnostics = (monacoEnv: typeof monaco) => {
+  monacoEnv.editor.removeAllMarkers(DIAGNOSTIC_OWNER);
 };

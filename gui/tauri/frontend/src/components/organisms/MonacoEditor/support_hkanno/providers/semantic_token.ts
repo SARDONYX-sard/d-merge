@@ -1,11 +1,9 @@
-import { HKANNO_LANGUAGE_ID } from '..';
+import { HKANNO_LANGUAGE_ID, NewProviderFn } from '..';
 import { Pos } from '../parser/strict/nodes';
 import { parseHkannoLineExt } from '../parser/strict/parser';
 
-import type * as monaco from 'monaco-editor';
-
-export const registerDocumentSemanticTokensProvider = (monacoEnv: typeof monaco) => {
-  monacoEnv.languages.registerDocumentSemanticTokensProvider(HKANNO_LANGUAGE_ID, {
+export const registerDocumentSemanticTokensProvider: NewProviderFn = (monacoEnv) => {
+  return monacoEnv.languages.registerDocumentSemanticTokensProvider(HKANNO_LANGUAGE_ID, {
     getLegend: () => ({ tokenTypes: TOKEN_TYPES.slice(), tokenModifiers: TOKEN_MODIFIERS }),
 
     provideDocumentSemanticTokens(model) {
