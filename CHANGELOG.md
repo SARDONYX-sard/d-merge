@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-06
+### :sparkles: New Features
+- [`3bf680e`](https://github.com/SARDONYX-sard/d-merge/commit/3bf680ef89d9298a3f81c60e04fa8e9113663faa) - **tauri**: implement hkanno lsp options *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`3dac80f`](https://github.com/SARDONYX-sard/d-merge/commit/3dac80fec06179b9c1cea9a762743bcc0bf49726) - **core**: add Nemesis_EngineExt fetcher *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`027cb4f`](https://github.com/SARDONYX-sard/d-merge/commit/027cb4f9065dc58fbb659425f6e4d5ceed211b87) - **tauri**: fix package.json meta path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.3.2] - 2026-05-05
 ### :bug: Bug Fixes
 - [`fa752b4`](https://github.com/SARDONYX-sard/d-merge/commit/fa752b46457101aa02606342c0c44f1bbc53d3b0) - **oar**: ensure unique priorities for FNIS AA slot configs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -421,3 +430,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.2.0...1.3.0
 [1.3.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.0...1.3.1
 [1.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.1...1.3.2
+[1.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.2...1.4.0
