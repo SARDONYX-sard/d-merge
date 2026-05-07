@@ -41,7 +41,7 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
             sorted_entries
                 .par_iter()
                 // e.g., FNISaa_1hmeqp_crc
-                .map(|(_, key)| Value::String(Cow::Owned(format!("fNISaa{}_crc", *key))))
+                .map(|(_, key)| Value::String(Cow::Owned(format!("FNISaa{}_crc", *key))))
                 .chain(rayon::iter::once(Value::String(Cow::Borrowed(
                     "FNISaa_crc",
                 )))),
