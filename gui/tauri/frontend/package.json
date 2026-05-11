@@ -32,11 +32,11 @@
     "allotment": "^1.20.5",
     "i18next": "26.0.6",
     "immer": "^11.1.4",
-    "monaco-editor": "latest",
+    "monaco-editor": "*",
     "monaco-vim": "^0.4.4",
     "notistack": "3.0.2",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "*",
+    "react-dom": "^19.2.6",
     "react-i18next": "17.0.2",
     "zod": "^4.3.6"
   },
@@ -46,14 +46,14 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@types/node": "25.5.2",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
+    "@types/react": "*",
+    "@types/react-dom": "*",
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^29.0.2",
     "typescript": "6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-    "vite-plus": "latest",
+    "vite-plus": "*",
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
   }
 }
