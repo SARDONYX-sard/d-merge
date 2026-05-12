@@ -9,7 +9,7 @@ use winnow::{
 };
 
 use crate::combinator::{
-    Trigger, comment::skip_ws_and_comments, take_till_fnis_ignores, take_till_space,
+    Trigger, comment::skip_ws_and_comments0, take_till_fnis_ignores, take_till_space,
 };
 
 /// AlterativeAnimation set
@@ -37,7 +37,7 @@ pub(crate) fn parse_alt_anim_prefix_line<'a>(input: &mut &'a str) -> ModalResult
         _: Caseless("AAprefix"),
         _: space1,
         take_till_fnis_ignores,
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -56,7 +56,7 @@ pub(crate) fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AA
         take_till(0.., [' ', '\t']),
         _: space1,
         dec_uint,
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(
@@ -90,7 +90,7 @@ pub(crate) fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResul
         take_till_space.context(StrContext::Label("anim_name: str")),
         _: space0,
         repeat(0.., parse_trigger).context(StrContext::Label("triggers: Vec<Trigger>")),
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     }
     .context(StrContext::Label("Alternate Animations"))
     .context(StrContext::Expected(StrContextValue::Description(

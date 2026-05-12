@@ -7,7 +7,7 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments0;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
@@ -26,7 +26,7 @@ pub(crate) fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
             major: digit1.parse_to(),
             _: space0,
             minor: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)),
-            _: skip_ws_and_comments,
+            _: skip_ws_and_comments0,
         }
     }
     .context(StrContext::Label("Version"))

@@ -9,7 +9,7 @@ use winnow::{
 };
 
 use crate::{
-    combinator::comment::skip_ws_and_comments,
+    combinator::comment::skip_ws_and_comments0,
     patterns::pair_and_kill::flags::{FNISPairAndKillMoveAnimFlagSet, parse_anim_flags},
 };
 
@@ -62,7 +62,7 @@ pub(crate) fn parse_paired_animation<'a>(
         anim_file: take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
         _: space0,
         anim_objects: repeat(0.., parse_anim_object_numbered),
-        _: opt(skip_ws_and_comments),
+        _: opt(skip_ws_and_comments0),
     })
     .context(StrContext::Label("FNIS Paired/KillMove Animation"))
     .context(StrContext::Expected(StrContextValue::Description(

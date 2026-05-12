@@ -14,7 +14,7 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments0;
 
 /// Rotation data for an animation with a common `time` and specific format data.
 #[derive(Debug, PartialEq)]
@@ -105,7 +105,7 @@ pub(crate) fn parse_rd_data<'a>(input: &mut &'a str) -> ModalResult<RotationData
         float::<_, f32, _>.take().context(StrContext::Label("Rotation time")),
         _: space1,
         alt((parse_rd_data1, parse_rd_data2)),
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     }
     .map(|(time, format)| RotationData { time, format })
     .context(StrContext::Label("Rotation"))

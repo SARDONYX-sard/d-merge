@@ -6,7 +6,10 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::fnis_animation::{FNISAnimation, parse_fnis_animation};
+use crate::combinator::{
+    comment::skip_ws_and_comments0,
+    fnis_animation::{FNISAnimation, parse_fnis_animation},
+};
 
 /// sequenced animations
 #[derive(Debug, PartialEq)]
@@ -24,10 +27,12 @@ pub(crate) fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<Sequen
         .verify(|anim| matches!(anim.anim_type, Sequenced | SequencedOptimized))
         .parse_next(input)?;
 
-    let mut animations = vec![seq_start_anim];
+    let mut animations = vec![];
+    animations.push(seq_start_anim);
 
     // NOTE: To avoid intermediate allocations of `Vec` caused by using `repeat`, manually perform the loop.
     loop {
+        skip_ws_and_comments0.parse_next(input)?;
         match parse_fnis_animation
             .verify(|anim| matches!(anim.anim_type, SequencedContinued))
             .parse_next(input)

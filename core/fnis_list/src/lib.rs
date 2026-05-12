@@ -17,7 +17,7 @@ use self::{
     combinator::{
         anim_types::{FNISAnimType, parse_anim_type},
         anim_var::parse_anim_var_line,
-        comment::skip_ws_and_comments,
+        comment::skip_ws_and_comments0,
         fnis_animation::{FNISAnimation, parse_fnis_animation},
         version::{Version, parse_version_line},
     },
@@ -30,17 +30,27 @@ use self::{
     },
 };
 
+/// Represents different syntax patterns found in FNIS list files.
+/// Each variant corresponds to a specific type of animation or configuration entry.
 #[derive(Debug, PartialEq)]
 pub enum SyntaxPattern<'a> {
+    /// Represents an alternate animation pattern.
     AltAnim(AlternateAnimation<'a>),
+    /// Represents an animation object pattern.
     AnimObject(FNISAnimation<'a>),
+    /// Represents a basic animation pattern.
     Basic(FNISAnimation<'a>),
+    /// Represents a chair animation pattern.
     Chair(FNISChairAnimation<'a>),
+    /// Represents a furniture animation pattern.
     Furniture(FurnitureAnimation<'a>),
+    /// Represents an offset arm animation pattern.
     OffsetArm(FNISAnimation<'a>),
+    /// Represents a paired and kill move animation pattern.
     PairAndKillMove(FNISPairedAndKillAnimation<'a>),
+    /// Represents a sequenced animation pattern.
     Sequenced(SequencedAnimation<'a>),
-
+    /// Represents an animation variable pattern.
     AnimVar(combinator::anim_var::AnimVar<'a>),
 }
 
@@ -59,11 +69,11 @@ pub struct FNISList<'a> {
 /// # Errors
 /// Return an error if it violates the FNIS PDF specifications.
 pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
-    skip_ws_and_comments.parse_next(input)?;
+    skip_ws_and_comments0.parse_next(input)?;
 
     let version = opt(parse_version_line).parse_next(input)?;
 
-    skip_ws_and_comments.parse_next(input)?;
+    skip_ws_and_comments0.parse_next(input)?;
 
     let mut patterns = vec![];
 

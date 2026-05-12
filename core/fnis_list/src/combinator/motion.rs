@@ -10,7 +10,7 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::comment::skip_ws_and_comments;
+use crate::combinator::comment::skip_ws_and_comments0;
 
 pub(crate) fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<'a>> {
     seq!(Translation {
@@ -27,7 +27,7 @@ pub(crate) fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<
         y: f32_parser.context(StrContext::Label("delta_y: f32")),
         _: space1,
         z: f32_parser.context(StrContext::Label("delta_z: f32")),
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     })
     .context(StrContext::Label("MotionData"))
     .context(StrContext::Expected(StrContextValue::Description(

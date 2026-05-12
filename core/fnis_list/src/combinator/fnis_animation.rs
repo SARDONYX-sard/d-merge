@@ -11,7 +11,7 @@ use winnow::{
 use crate::combinator::{
     anim_types::{FNISAnimType, parse_anim_type},
     anim_var::{AnimVar, parse_anim_var_line},
-    comment::skip_ws_and_comments,
+    comment::skip_ws_and_comments0,
     flags::{FNISAnimFlagSet, FNISAnimFlags, parse_anim_flags},
     motion::parse_md_data,
     rotation::{RotationData, parse_rd_data},
@@ -56,7 +56,7 @@ pub(crate) fn parse_fnis_animation<'a>(input: &mut &'a str) -> ModalResult<FNISA
             _: space1,
             anim_file: take_till_fnis_ignores.context(StrContext::Label("anim_file: str")),
             anim_objects: parse_anim_objects(anim_type, flag_set.flags).context(StrContext::Label("anim_objects: str")),
-            _: skip_ws_and_comments,
+            _: skip_ws_and_comments0,
 
             anim_vars: repeat(0.., parse_anim_var_line), // n time lines
             motions: repeat(0.., parse_md_data), // n time lines

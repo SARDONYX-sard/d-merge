@@ -25,7 +25,7 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::{comment::skip_ws_and_comments, take_till_space};
+use crate::combinator::{comment::skip_ws_and_comments0, take_till_space};
 
 /// Value stored in AnimVar
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -58,7 +58,7 @@ pub(crate) fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVa
             name: take_till_space.context(StrContext::Label("name: str")),
             _: space1,
             value: parse_value,
-            _: skip_ws_and_comments,
+            _: skip_ws_and_comments0,
         }
     }
     .context(StrContext::Label("AnimVar"))

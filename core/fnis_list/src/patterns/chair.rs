@@ -3,14 +3,14 @@
 use winnow::{
     ModalResult, Parser,
     ascii::{space0, space1},
-    combinator::{repeat, seq},
+    combinator::{delimited, repeat, seq},
     error::{StrContext, StrContextValue},
     token::take_till,
 };
 
 use crate::combinator::{
     anim_types::FNISAnimType,
-    comment::skip_ws_and_comments,
+    comment::skip_ws_and_comments0,
     flags::FNISAnimFlags,
     fnis_animation::{FNISAnimation, parse_fnis_animation},
 };
@@ -49,11 +49,14 @@ pub(crate) fn parse_fnis_chair_animation<'a>(
 }
 
 fn parse_sequenced_animation<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
-    repeat(3.., parse_file)
-        .context(StrContext::Expected(StrContextValue::Description(
-            "Chair animation requires at least 4 consecutive animations.",
-        )))
-        .parse_next(input)
+    repeat(
+        3..,
+        delimited(skip_ws_and_comments0, parse_file, skip_ws_and_comments0),
+    )
+    .context(StrContext::Expected(StrContextValue::Description(
+        "Chair animation requires at least 4 consecutive animations.",
+    )))
+    .parse_next(input)
 }
 
 fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
@@ -64,7 +67,7 @@ fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
         _: take_till(1.., [' ' , '\t']).context(StrContext::Label("dummy_event: str")),
         _: space1,
         take_till(1.., [' ' , '\t', '\r', '\n']).context(StrContext::Label("anim_file: str")),
-        _: skip_ws_and_comments,
+        _: skip_ws_and_comments0,
     }
     .parse_next(input)?;
     Ok(file)
@@ -84,6 +87,7 @@ mod tests {
             parse_fnis_chair_animation,
             r"ch -o PlayFluteSitting PlayFluteSittingStart.hkx AnimObjectFlute
 + PlayFluteSitting_2 PlayFluteSittingIdlebase.hkx
+' comment
 + PlayFluteSitting_3 PlayFluteSittingIdlevar1.hkx
 + PlayFluteSitting_4 PlayFluteSittingIdlevar2.hkx",
         );

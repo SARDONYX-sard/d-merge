@@ -6,7 +6,10 @@ use winnow::{
     error::{StrContext, StrContextValue},
 };
 
-use crate::combinator::fnis_animation::{FNISAnimation, parse_fnis_animation};
+use crate::combinator::{
+    comment::skip_ws_and_comments0,
+    fnis_animation::{FNISAnimation, parse_fnis_animation},
+};
 
 /// Furniture animation
 #[derive(Debug, PartialEq)]
@@ -48,10 +51,12 @@ fn parse_furniture_animations_inner<'a>(
         })
         .parse_next(input)?;
 
-    let mut animations = vec![seq_start_anim];
+    let mut animations = vec![];
+    animations.push(seq_start_anim);
 
     // NOTE: To avoid intermediate allocations of `Vec` caused by using `repeat`, manually perform the loop.
     loop {
+        skip_ws_and_comments0.parse_next(input)?;
         match parse_fnis_animation
             .verify(|anim| matches!(anim.anim_type, SequencedContinued))
             .parse_next(input)
