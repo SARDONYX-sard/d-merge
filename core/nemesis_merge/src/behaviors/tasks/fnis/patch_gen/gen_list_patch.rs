@@ -18,7 +18,7 @@ use crate::behaviors::tasks::{
     fnis::{
         collect::owned::OwnedFnisInjection,
         patch_gen::{
-            anim_var::new_push_anim_vars_patch,
+            anim_var::new_push_anim_vars_patch, chair::new_chair_patches,
             furniture::one_group::new_furniture_one_group_patches, io_jobs::AnimIoJob,
             kill_move::new_kill_patches, offset_arm::new_offset_arm_patches,
             pair::new_pair_patches,
@@ -140,10 +140,10 @@ pub(super) fn generate_patch<'a>(
                 one_master_patches.par_extend(one);
                 seq_master_patches.par_extend(seq);
             }
-            SyntaxPattern::Chair(_chair_animation) => {
-                return Err(FnisPatchGenerationError::UnsupportedChairAnimation {
-                    path: owned_data.to_list_path(),
-                });
+            SyntaxPattern::Chair(chair_animation) => {
+                let (one, seq) = new_chair_patches(&chair_animation, owned_data);
+                one_master_patches.par_extend(one);
+                seq_master_patches.par_extend(seq);
             }
             SyntaxPattern::Furniture(furniture_animation) => {
                 if !owned_data.behavior_entry.is_3rd_person_character() {
@@ -243,10 +243,6 @@ pub enum FnisPatchGenerationError {
         "Failed to convert alternate animation to OAR: {}", errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")
     ))]
     FailedToConvertAltAnimToOAR { errors: Vec<crate::errors::Error> },
-
-    /// Chair animation is not supported yet
-    #[snafu(display("Chair Animation is not supported yet: {}", path.display()))]
-    UnsupportedChairAnimation { path: PathBuf },
 
     /// The addition of furniture animation applies only to 3rd person character; `_1stperson`, creatures are not supported.
     #[snafu(display("The addition of furniture(fu, fuo) animation applies only to 3rd person `character`; `_1stperson`, creatures are not supported.: {}", path.display()))]

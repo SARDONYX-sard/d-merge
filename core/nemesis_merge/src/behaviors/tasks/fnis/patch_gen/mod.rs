@@ -1,5 +1,6 @@
 mod alternate;
 mod anim_var;
+mod chair;
 mod dummy_esp;
 mod furniture;
 mod gen_list_patch;
