@@ -663,7 +663,7 @@ fn new_values_from_triggers<'a>(
 /// - `hkbBehaviorGraphStringData.variableNames`
 /// - `hkbVariableValueSet.wordVariableValues`
 /// - `hkbBehaviorGraphData.variableInfos`(as [i32])
-pub(super) fn new_push_values_seq_patch<'a>(
+pub(crate) fn new_push_values_seq_patch<'a>(
     values: &[AnimVar<'a>],
     string_data_index: &'static str,
     variable_index: &'static str,

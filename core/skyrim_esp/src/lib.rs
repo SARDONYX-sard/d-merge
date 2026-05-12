@@ -202,8 +202,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     fn write_to_vec(config: &Config) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());

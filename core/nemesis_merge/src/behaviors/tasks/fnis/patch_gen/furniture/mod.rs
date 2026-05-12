@@ -36,5 +36,5 @@
 //!   be considered ON or OFF for the condition.
 //! - This is **not officially documented**; the interpretation is based on observed
 //!   patterns in FNIS templates and may not be universally accurate.
-mod one_anim;
+pub(super) mod one_anim;
 pub(super) mod one_group;
