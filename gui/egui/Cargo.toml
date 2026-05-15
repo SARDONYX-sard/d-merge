@@ -45,6 +45,8 @@ nemesis_merge = { workspace = true, features = ["tracing"] }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
 
+egui_derive = { path = "../egui_derive" }
+
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.17.2", default-features = false }
 

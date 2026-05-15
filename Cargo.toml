@@ -1,12 +1,14 @@
 [workspace.package]
 version = "1.4.0"
-description = ""
-categories = ["games", "parsing"]
+description = "Diff & Merge hkx patcher"
+
 authors = ["SARDONYX-sard"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/SARDONYX-sard/d-merge"
-readme = "README.md"
+categories = ["games", "parsing"]
 edition = "2024"
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/SARDONYX-sard/d-merge"
 rust-version = "1.94"
 
 
@@ -29,6 +31,7 @@ members = [
   "core/tracing_rotation",
   "ffi/python",
   "gui/egui",
+  "gui/egui_derive",
   "gui/tauri/backend",
 ]
 resolver = "3"

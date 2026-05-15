@@ -46,6 +46,22 @@ impl LogLevel {
     }
 }
 
+/// Represents the state of a mod list fetching task.
+#[derive(Debug)]
+pub(crate) enum FetchState {
+    /// No fetch is in progress.
+    Idle,
+
+    // /// A background worker thread is currently fetching
+    // Fetching { start_time: std::time::Instant },
+    /// Successfully fetched and the result is non-empty.
+    Done,
+    /// Fetch succeeded but returned zero items.
+    Empty,
+    /// Fetch failed with an error.
+    Error,
+}
+
 /// Main application state for Mod Manager.
 pub(crate) struct ModManagerApp {
     /// Execution mode. VFS or not
@@ -106,8 +122,11 @@ pub(crate) struct ModManagerApp {
     /// It exists because mod_info must be loaded automatically only on the first run.
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
-    /// Even if no mod info can be retrieved, We want to maintain the check status and display it as empty.
-    pub fetch_is_empty: bool,
+    /// Represents the current state of the mod list fetching process.
+    ///
+    /// Even if no mod info can be retrieved, we want to maintain the
+    /// check status and display it as empty.
+    pub fetch_state: FetchState,
 }
 
 impl Default for ModManagerApp {
@@ -149,7 +168,7 @@ impl Default for ModManagerApp {
             notification: Arc::new(RwLock::new(String::new())),
             is_first_render: true,
             prev_table_available_width: 0.0,
-            fetch_is_empty: true,
+            fetch_state: FetchState::Idle,
         }
     }
 }
@@ -182,7 +201,6 @@ impl App for ModManagerApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let settings = crate::settings::AppSettings::from(core::mem::take(self));
         settings.save();
-        crate::i18n::I18nMap::save_translation();
     }
 }
 
@@ -304,9 +322,7 @@ impl ModManagerApp {
                         (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
                     ];
                     for (runtime, label) in runtimes {
-                        if ui
-                            .selectable_value(&mut self.target_runtime, runtime, label)
-                            .changed()
+                        if ui.selectable_value(&mut self.target_runtime, runtime, label).changed()
                             && self.mode == DataMode::Vfs
                         {
                             #[cfg(target_os = "windows")]
@@ -349,10 +365,7 @@ impl ModManagerApp {
                 }
 
                 if ui
-                    .add_sized(
-                        [60.0, 40.0],
-                        egui::Button::new(self.t(I18nKey::SelectButton)),
-                    )
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
                     .clicked()
                 {
                     let dialog = match find_existing_dir_or_ancestor(self.current_skyrim_data_dir())
@@ -402,10 +415,7 @@ impl ModManagerApp {
                 let _ = ui.add_sized([ui.available_width() * 0.9, 40.0], text_line);
 
                 if ui
-                    .add_sized(
-                        [60.0, 40.0],
-                        egui::Button::new(self.t(I18nKey::SelectButton)),
-                    )
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
                     .clicked()
                 {
                     let dialog = if !self.output_dir.is_empty() {
@@ -451,10 +461,7 @@ impl ModManagerApp {
                 ui.add_sized([300.0, 40.0], text_line);
 
                 if ui
-                    .add_sized(
-                        [60.0, 40.0],
-                        egui::Button::new(self.t(I18nKey::ClearButton)),
-                    )
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::ClearButton)))
                     .clicked()
                 {
                     self.filter_text.clear();
@@ -501,8 +508,7 @@ impl ModManagerApp {
                     }
                 });
                 self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
-                    s.show_log_window
-                        .fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // Intended: toggle
+                    s.show_log_window.fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // Intended: toggle
                 });
                 self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
@@ -512,6 +518,14 @@ impl ModManagerApp {
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(self.t(I18nKey::WriteNewI18nJsonButton))
+                        .on_hover_text(self.t(I18nKey::WriteNewI18nJsonHover))
+                        .clicked()
+                    {
+                        I18nMap::save_translation();
+                    }
+
                     if ui
                         .button(self.t(I18nKey::IssueReportButton))
                         .on_hover_text(self.t(I18nKey::IssueReportHover))
@@ -532,10 +546,7 @@ impl ModManagerApp {
     where
         F: FnOnce(&mut Self, &egui::Context),
     {
-        if ui
-            .add_sized([120.0, 40.0], egui::Button::new(self.t(key)))
-            .clicked()
-        {
+        if ui.add_sized([120.0, 40.0], egui::Button::new(self.t(key))).clicked() {
             f(self, ctx);
         }
     }
@@ -556,10 +567,7 @@ impl ModManagerApp {
                     ];
 
                     for (level, label) in levels {
-                        if ui
-                            .selectable_value(&mut self.log_level, level, label)
-                            .changed()
-                        {
+                        if ui.selectable_value(&mut self.log_level, level, label).changed() {
                             tracing_rotation::change_level(level.as_str()).unwrap();
                         }
                     }
@@ -569,10 +577,7 @@ impl ModManagerApp {
 
     /// Deferred log viewer window.
     fn ui_log_window(&self, ctx: &egui::Context) {
-        if self
-            .show_log_window
-            .load(std::sync::atomic::Ordering::Relaxed)
-        {
+        if self.show_log_window.load(std::sync::atomic::Ordering::Relaxed) {
             let show_log_window = Arc::clone(&self.show_log_window);
             let log_lines = Arc::clone(&self.log_lines);
             let clear_button_name = self.t(I18nKey::ClearButton).to_string();
@@ -591,27 +596,23 @@ impl ModManagerApp {
                         "This egui backend doesn't support multiple viewports"
                     );
 
-                    egui::CentralPanel::default()
-                        .frame(egui::Frame::new())
-                        .show(ctx, |ui| {
-                            ui.horizontal(|ui| {
-                                if ui.button(clear_button_name.as_str()).clicked() {
-                                    log_lines.write().clear();
-                                }
+                    egui::CentralPanel::default().frame(egui::Frame::new()).show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            if ui.button(clear_button_name.as_str()).clicked() {
+                                log_lines.write().clear();
+                            }
 
-                                ui.button("Copy").clicked().then(|| {
-                                    let text = log_lines.read().join("\n");
-                                    ui.ctx().copy_text(text);
-                                });
+                            ui.button("Copy").clicked().then(|| {
+                                let text = log_lines.read().join("\n");
+                                ui.ctx().copy_text(text);
                             });
-
-                            egui::ScrollArea::vertical()
-                                .stick_to_bottom(true)
-                                .show(ui, |ui| {
-                                    let text = log_lines.read().join("\n");
-                                    ui.label(text);
-                                });
                         });
+
+                        egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
+                            let text = log_lines.read().join("\n");
+                            ui.label(text);
+                        });
+                    });
 
                     if ctx.input(|i| i.viewport().close_requested()) {
                         show_log_window.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -631,7 +632,14 @@ impl ModManagerApp {
         }
 
         panel.show(ctx, |ui| {
-            ui.heading(self.t(I18nKey::ModsListTitle));
+            ui.horizontal(|ui| {
+                ui.heading(self.t(I18nKey::ModsListTitle));
+
+                if ui.button(format!("🔄 {}", self.t(I18nKey::ReloadButton))).clicked() {
+                    self.update_mod_list();
+                }
+            });
+
             ui.separator();
 
             let mut filtered = self.filtered_mods();
@@ -709,8 +717,7 @@ impl ModManagerApp {
                     .body(|mut body| {
                         let mut widths = [0.0; 6]; // 6 ==  column count
                         widths.clone_from_slice(body.widths());
-
-                        let mod_list = if self.fetch_is_empty {
+                        let mod_list = if matches!(self.fetch_state, FetchState::Empty) {
                             &mut vec![] // Apply dummy to preserve check state.
                         } else {
                             self.mod_list_mut()
@@ -760,24 +767,15 @@ impl ModManagerApp {
     /// Check all mods header button.
     fn checkbox_header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
         header.col(|ui| {
-            if ui
-                .add(Checkbox::without_text(&mut self.check_all))
-                .clicked()
-            {
+            if ui.add(Checkbox::without_text(&mut self.check_all)).clicked() {
                 let filtered_ids: Vec<String> = self
                     .mod_list()
                     .par_iter()
                     .filter(|m| {
                         self.filter_text.trim().is_empty()
-                            || m.id
-                                .to_lowercase()
-                                .contains(&self.filter_text.to_lowercase())
-                            || m.name
-                                .to_lowercase()
-                                .contains(&self.filter_text.to_lowercase())
-                            || m.site
-                                .to_lowercase()
-                                .contains(&self.filter_text.to_lowercase())
+                            || m.id.to_lowercase().contains(&self.filter_text.to_lowercase())
+                            || m.name.to_lowercase().contains(&self.filter_text.to_lowercase())
+                            || m.site.to_lowercase().contains(&self.filter_text.to_lowercase())
                     })
                     .map(|item| item.id.clone())
                     .collect();
@@ -785,10 +783,8 @@ impl ModManagerApp {
                 // Update filtered's enabled state to match self.check_all
                 let check_all = self.check_all;
                 for filtered_id in filtered_ids {
-                    if let Some(orig_item) = self
-                        .mod_list_mut()
-                        .par_iter_mut()
-                        .find_any(|o| o.id == filtered_id)
+                    if let Some(orig_item) =
+                        self.mod_list_mut().par_iter_mut().find_any(|o| o.id == filtered_id)
                     {
                         orig_item.enabled = check_all;
                     }
@@ -885,8 +881,7 @@ impl ModManagerApp {
                     line
                 };
 
-                ui.add_sized([ui.available_width() * 0.85, 40.0], line)
-                    .changed()
+                ui.add_sized([ui.available_width() * 0.85, 40.0], line).changed()
             }
             DataMode::Manual => {
                 let line = egui::TextEdit::singleline(&mut self.skyrim_data_dir)
@@ -897,8 +892,7 @@ impl ModManagerApp {
                     line
                 };
 
-                ui.add_sized([ui.available_width() * 0.9, 40.0], line)
-                    .changed()
+                ui.add_sized([ui.available_width() * 0.9, 40.0], line).changed()
             }
         };
 
@@ -954,15 +948,17 @@ impl ModManagerApp {
         match mod_info::get_all(self.current_skyrim_data_dir(), self.mode == DataMode::Vfs) {
             Ok(new_mods) => {
                 let is_empty = new_mods.is_empty();
-                self.fetch_is_empty = is_empty;
                 if is_empty {
+                    self.fetch_state = FetchState::Empty;
                     return; // To preserve check state even if empty
                 }
 
+                self.fetch_state = FetchState::Done;
                 let new_mods = inherit_reorder_cast(self.mod_list(), new_mods);
                 let _ = core::mem::replace(self.mod_list_mut(), new_mods);
             }
             Err(err) => {
+                self.fetch_state = FetchState::Error;
                 tracing::error!(%err);
                 let err_title = self.t(I18nKey::ErrorReadingModInfo);
                 self.set_notification(format!("{err_title} {err}"));
@@ -1118,9 +1114,7 @@ fn create_issue_link(app: &ModManagerApp) -> String {
     };
 
     let skyrim_data_dir: Option<Cow<'_, Path>> = if app.vfs_skyrim_data_dir.trim().is_empty() {
-        skyrim_data_dir::get_skyrim_data_dir(app.target_runtime)
-            .ok()
-            .map(Cow::Owned)
+        skyrim_data_dir::get_skyrim_data_dir(app.target_runtime).ok().map(Cow::Owned)
     } else {
         Some(Path::new(&app.vfs_skyrim_data_dir).into())
     };
@@ -1133,9 +1127,7 @@ fn create_issue_link(app: &ModManagerApp) -> String {
         };
         let exe_path = skyrim_data_dir.parent()?.join(exe);
 
-        gh_issue_link::version::get_file_version(exe_path)
-            .map(|ver| ver.to_string())
-            .ok()
+        gh_issue_link::version::get_file_version(exe_path).map(|ver| ver.to_string()).ok()
     });
     gh_issue_link::new_gh_issue_link(
         env!("CARGO_PKG_VERSION"),

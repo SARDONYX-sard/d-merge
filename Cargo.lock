@@ -1418,6 +1418,7 @@ version = "1.4.0"
 dependencies = [
  "eframe",
  "egui",
+ "egui_derive",
  "egui_dnd",
  "egui_extras",
  "gh_issue_link",
@@ -1919,6 +1920,14 @@ dependencies = [
  "egui",
  "hello_egui_utils",
  "simple-easing",
+]
+
+[[package]]
+name = "egui_derive"
+version = "1.4.0"
+dependencies = [
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]

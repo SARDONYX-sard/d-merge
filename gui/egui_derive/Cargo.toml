@@ -1,0 +1,25 @@
+[package]
+name = "egui_derive"
+version.workspace = true
+description = "egui ver. derive attr"
+
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+
+[lib]
+proc-macro = true
+
+
+[dependencies]
+syn = { version = "2.0.117", features = [] }
+quote = "1.0.45"
+
+
+[lints]
+workspace = true
