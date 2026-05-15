@@ -117,6 +117,8 @@ fn expand(pattern: &str, is_dir: bool) -> Vec<PathBuf> {
     let max_depth = if has_recursive { usize::MAX } else { pat_depth };
 
     jwalk::WalkDir::new(&root)
+        // NOTE: Important: By configuring the settings below to reserve just one core for the UI, we can prevent the UI from freezing.
+        .parallelism(jwalk::Parallelism::RayonNewPool(num_cpus::get() - 1))
         .max_depth(max_depth)
         .into_iter()
         .filter_map(|r| {

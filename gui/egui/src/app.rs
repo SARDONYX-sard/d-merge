@@ -1,10 +1,13 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, atomic::AtomicBool},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use eframe::{App, Frame, egui};
-use egui::{Checkbox, Separator};
+use egui::{Checkbox, Color32, Separator};
 use parking_lot::RwLock;
 use rayon::prelude::*;
 
@@ -51,15 +54,17 @@ impl LogLevel {
 pub(crate) enum FetchState {
     /// No fetch is in progress.
     Idle,
+    /// A background worker thread is currently fetching
+    Fetching,
 
-    // /// A background worker thread is currently fetching
-    // Fetching { start_time: std::time::Instant },
     /// Successfully fetched and the result is non-empty.
-    Done,
+    Done { elapsed: std::time::Duration },
+
     /// Fetch succeeded but returned zero items.
-    Empty,
+    Empty { elapsed: std::time::Duration },
+
     /// Fetch failed with an error.
-    Error,
+    Error { elapsed: std::time::Duration },
 }
 
 /// Main application state for Mod Manager.
@@ -96,6 +101,7 @@ pub(crate) struct ModManagerApp {
     /// If true, generates a FNIS.esp(dummy ESP) file.
     pub generate_fnis_esp: bool,
     pub filter_text: String,
+    pub filter_column: Option<SortColumn>,
     pub sort_column: SortColumn,
     pub sort_asc: bool,
     pub i18n: Arc<I18nMap>,
@@ -114,7 +120,11 @@ pub(crate) struct ModManagerApp {
     pub is_locked: bool,
     /// Global "check all" flag.
     pub check_all: bool,
+    /// mod list fetching message with color
+    pub mod_list_msg: (String, Color32),
+
     pub notification: Arc<RwLock<String>>,
+    pub notify_color: Arc<RwLock<egui::Color32>>,
 
     pub log_lines: Arc<RwLock<Vec<String>>>,
     pub log_watcher_started: bool,
@@ -122,11 +132,14 @@ pub(crate) struct ModManagerApp {
     /// It exists because mod_info must be loaded automatically only on the first run.
     pub is_first_render: bool,
     pub prev_table_available_width: f32,
+
     /// Represents the current state of the mod list fetching process.
     ///
     /// Even if no mod info can be retrieved, we want to maintain the
     /// check status and display it as empty.
-    pub fetch_state: FetchState,
+    pub fetch_state: Arc<RwLock<FetchState>>,
+
+    pub fetched_mod_info: Arc<RwLock<Vec<mod_info::ModInfo>>>,
 }
 
 impl Default for ModManagerApp {
@@ -148,6 +161,7 @@ impl Default for ModManagerApp {
             template_dir: String::new(),
             output_dir: String::new(),
             filter_text: String::new(),
+            filter_column: None,
             sort_column: SortColumn::Priority,
             sort_asc: true,
             i18n: Arc::new(I18nMap::load_translation()),
@@ -158,23 +172,28 @@ impl Default for ModManagerApp {
             last_window_maximized: false,
             font_path: None,
 
-            // ============
+            // ====================== Non export Settings targets =================================
+            //
             async_rt: tokio::runtime::Runtime::new().unwrap(),
             is_locked: false,
             check_all: false,
             log_lines: Arc::new(RwLock::new(Vec::new())),
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
+            mod_list_msg: (String::new(), egui::Color32::WHITE),
             notification: Arc::new(RwLock::new(String::new())),
+            notify_color: Arc::new(RwLock::new(egui::Color32::WHITE)),
             is_first_render: true,
             prev_table_available_width: 0.0,
-            fetch_state: FetchState::Idle,
+            fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
+            fetched_mod_info: Arc::new(RwLock::new(vec![])),
         }
     }
 }
 
 impl App for ModManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        self.poll_fetch_result();
         self.start_log_watcher(ctx);
         self.update_window_info(ctx);
 
@@ -345,7 +364,7 @@ impl ModManagerApp {
                 if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
                     && let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
                 {
-                    self.set_notification(err);
+                    self.set_colored_notification(err, Color32::RED);
                 };
 
                 self.draw_skyrim_dir_ui(ui);
@@ -404,7 +423,7 @@ impl ModManagerApp {
                 if ui.button(output_dir_label).clicked()
                     && let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir))
                 {
-                    self.set_notification(err);
+                    self.set_colored_notification(err, Color32::RED);
                 };
                 let text_line = egui::TextEdit::singleline(&mut self.output_dir);
                 let text_line = if self.transparent {
@@ -423,9 +442,8 @@ impl ModManagerApp {
                         match find_existing_dir_or_ancestor(&self.output_dir) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
-                                self.set_notification(format!(
-                                    "Couldn't find output dir or ancestor: {err}"
-                                ));
+                                let err = format!("Couldn't find output dir or ancestor: {err}");
+                                self.set_colored_notification(err, Color32::RED);
                                 return;
                             }
                         }
@@ -460,6 +478,55 @@ impl ModManagerApp {
                 };
                 ui.add_sized([300.0, 40.0], text_line);
 
+                // Pre-fetch labels to avoid simultaneous borrow of self
+                let all_label = self.t(I18nKey::FilterTextAll).to_string();
+                let id_label = self.t(I18nKey::ColumnId).to_string();
+                let name_label = self.t(I18nKey::ColumnName).to_string();
+                let mod_type_label = self.t(I18nKey::ColumnModType).to_string();
+                let site_label = self.t(I18nKey::ColumnSite).to_string();
+                let priority_label = self.t(I18nKey::ColumnPriority).to_string();
+
+                let selected_text = match self.filter_column {
+                    None => all_label.clone(),
+                    Some(SortColumn::Id) => id_label.clone(),
+                    Some(SortColumn::Name) => name_label.clone(),
+                    Some(SortColumn::ModType) => mod_type_label.clone(),
+                    Some(SortColumn::Site) => site_label.clone(),
+                    Some(SortColumn::Priority) => priority_label.clone(),
+                };
+
+                egui::ComboBox::from_id_salt("filter_column").selected_text(selected_text).show_ui(
+                    ui,
+                    |ui| {
+                        ui.selectable_value(&mut self.filter_column, None, &all_label);
+                        ui.selectable_value(
+                            &mut self.filter_column,
+                            Some(SortColumn::Id),
+                            &id_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.filter_column,
+                            Some(SortColumn::Name),
+                            &name_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.filter_column,
+                            Some(SortColumn::ModType),
+                            &mod_type_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.filter_column,
+                            Some(SortColumn::Site),
+                            &site_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.filter_column,
+                            Some(SortColumn::Priority),
+                            &priority_label,
+                        );
+                    },
+                );
+
                 if ui
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::ClearButton)))
                     .clicked()
@@ -487,7 +554,7 @@ impl ModManagerApp {
         }
 
         panel.show(ctx, |ui| {
-            ui.label(self.notification());
+            ui.colored_label(*self.notify_color.read(), self.notification());
         });
     }
 
@@ -504,28 +571,34 @@ impl ModManagerApp {
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
                     if let Err(err) = open_existing_dir_or_ancestor(get_log_dir(&s.output_dir)) {
-                        s.set_notification(err);
+                        s.set_colored_notification(err, Color32::RED);
                     }
                 });
                 self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
-                    s.show_log_window.fetch_xor(true, std::sync::atomic::Ordering::Relaxed); // Intended: toggle
+                    s.show_log_window.fetch_xor(true, Ordering::Relaxed); // Intended: toggle
                 });
                 self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
-                self.add_button(ui, ctx, I18nKey::PatchButton, |s, _| {
-                    s.patch();
+
+                let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
+                ui.add_enabled_ui(!is_fetching, |ui| {
+                    if ui
+                        .add_sized(
+                            [120.0, 40.0],
+                            egui::Button::new(if is_fetching {
+                                self.t(I18nKey::PatchFetchingButton)
+                            } else {
+                                self.t(I18nKey::PatchButton)
+                            }),
+                        )
+                        .clicked()
+                    {
+                        self.patch();
+                    }
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .button(self.t(I18nKey::WriteNewI18nJsonButton))
-                        .on_hover_text(self.t(I18nKey::WriteNewI18nJsonHover))
-                        .clicked()
-                    {
-                        I18nMap::save_translation();
-                    }
-
                     if ui
                         .button(self.t(I18nKey::IssueReportButton))
                         .on_hover_text(self.t(I18nKey::IssueReportHover))
@@ -535,6 +608,22 @@ impl ModManagerApp {
                             url: create_issue_link(self),
                             new_tab: true,
                         });
+                    }
+
+                    if ui
+                        .button(self.t(I18nKey::WriteNewI18nJsonButton))
+                        .on_hover_text(self.t(I18nKey::WriteNewI18nJsonHover))
+                        .clicked()
+                    {
+                        match I18nMap::save_translation() {
+                            Ok(()) => self.set_colored_notification(
+                                format!("OK. Wrote {}", I18nMap::FILE),
+                                Color32::GREEN,
+                            ),
+                            Err(err) => {
+                                self.set_colored_notification(err.to_string(), Color32::RED);
+                            }
+                        }
                     }
                 });
             });
@@ -577,7 +666,7 @@ impl ModManagerApp {
 
     /// Deferred log viewer window.
     fn ui_log_window(&self, ctx: &egui::Context) {
-        if self.show_log_window.load(std::sync::atomic::Ordering::Relaxed) {
+        if self.show_log_window.load(Ordering::Relaxed) {
             let show_log_window = Arc::clone(&self.show_log_window);
             let log_lines = Arc::clone(&self.log_lines);
             let clear_button_name = self.t(I18nKey::ClearButton).to_string();
@@ -615,7 +704,7 @@ impl ModManagerApp {
                     });
 
                     if ctx.input(|i| i.viewport().close_requested()) {
-                        show_log_window.store(false, std::sync::atomic::Ordering::Relaxed);
+                        show_log_window.store(false, Ordering::Relaxed);
                     }
                 },
             );
@@ -635,15 +724,25 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 ui.heading(self.t(I18nKey::ModsListTitle));
 
-                if ui.button(format!("🔄 {}", self.t(I18nKey::ReloadButton))).clicked() {
+                let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
+                if ui
+                    .add_enabled(
+                        !is_fetching,
+                        egui::Button::new(format!("🔄 {}", self.t(I18nKey::ReloadButton))),
+                    )
+                    .clicked()
+                {
                     self.update_mod_list();
                 }
+
+                ui.add_visible(is_fetching, egui::Spinner::new());
+                ui.colored_label(self.mod_list_msg.1, self.mod_list_msg.0.clone());
             });
 
             ui.separator();
 
-            let mut filtered = self.filtered_mods();
-            self.sort_mods(&mut filtered);
+            let mut filtered = self.filtered_mod_ids();
+            filtered.par_sort_unstable();
 
             let dnd_allowed = self.is_dnd_allowed();
             self.is_locked = !dnd_allowed;
@@ -653,32 +752,33 @@ impl ModManagerApp {
     }
 
     /// Filter cloned  mods according to current search text.
-    fn filtered_mods(&self) -> Vec<ModItem> {
-        self.mod_list()
-            .par_iter()
-            .filter(|&m| {
-                let q = self.filter_text.to_lowercase();
-                q.trim().is_empty()
-                    || m.id.to_lowercase().contains(&q)
-                    || m.name.to_lowercase().contains(&q)
-                    || m.site.to_lowercase().contains(&q)
-            })
-            .cloned()
-            .collect()
-    }
+    fn filtered_mod_ids(&self) -> Vec<String> {
+        if self.filter_text.trim().is_empty() {
+            return vec![]; // unused when DnD grid
+        }
 
-    /// Sort mods according to current sort settings.
-    fn sort_mods(&self, mods: &mut [ModItem]) {
-        mods.sort_by(|a, b| {
-            let ord = match self.sort_column {
-                SortColumn::Id => a.id.cmp(&b.id),
-                SortColumn::Name => a.name.cmp(&b.name),
-                SortColumn::ModType => a.mod_type.cmp(&b.mod_type),
-                SortColumn::Site => a.site.cmp(&b.site),
-                SortColumn::Priority => a.priority.cmp(&b.priority),
-            };
-            if self.sort_asc { ord } else { ord.reverse() }
-        });
+        // read only(but checkable grid)
+        let text = self.filter_text.trim().to_lowercase();
+        let matches_filter = |m: &&ModItem| {
+            if text.is_empty() {
+                return true;
+            }
+
+            match self.filter_column {
+                None => {
+                    m.id.to_lowercase().contains(&text)
+                        || m.name.to_lowercase().contains(&text)
+                        || m.site.to_lowercase().contains(&text)
+                }
+                Some(SortColumn::Id) => m.id.to_lowercase().contains(&text),
+                Some(SortColumn::Name) => m.name.to_lowercase().contains(&text),
+                Some(SortColumn::ModType) => m.mod_type.as_str().contains(&text),
+                Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
+                Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
+            }
+        };
+
+        self.mod_list().par_iter().filter(matches_filter).map(|m| m.id.clone()).collect()
     }
 
     /// Returns true if drag-and-drop reordering is currently allowed.
@@ -691,11 +791,11 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
-    fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
+    fn render_table(&mut self, ui: &mut egui::Ui, filtered_ids: &[String], editable: bool) {
         let table_max_height = ui.available_height() * 0.97;
         let total_width = ui.available_width();
 
-        let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5; // ignore 0.5px diff
+        let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5;
         if changed_width {
             self.prev_table_available_width = total_width;
         }
@@ -703,7 +803,7 @@ impl ModManagerApp {
         egui::ScrollArea::vertical()
             .max_height(table_max_height)
             .max_width(total_width)
-            .scroll_bar_rect(egui::Rect::everything_above(20.0)) // The scroll bar was too long, so I shortened it.
+            .scroll_bar_rect(egui::Rect::everything_above(20.0))
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
@@ -717,16 +817,17 @@ impl ModManagerApp {
                     .body(|mut body| {
                         let mut widths = [0.0; 6]; // 6 ==  column count
                         widths.clone_from_slice(body.widths());
-                        let mod_list = if matches!(self.fetch_state, FetchState::Empty) {
-                            &mut vec![] // Apply dummy to preserve check state.
-                        } else {
-                            self.mod_list_mut()
-                        };
+                        let mod_list =
+                            if matches!(*self.fetch_state.read(), FetchState::Empty { .. }) {
+                                &mut vec![] // Apply dummy to preserve check state.
+                            } else {
+                                self.mod_list_mut()
+                            };
 
                         if editable {
                             dnd_table_body(body.ui_mut(), mod_list, widths);
                         } else {
-                            check_only_table_body(&mut body, filtered_mods, mod_list, widths);
+                            check_only_table_body(&mut body, filtered_ids, mod_list, widths);
                         }
                     });
             });
@@ -768,27 +869,18 @@ impl ModManagerApp {
     fn checkbox_header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
         header.col(|ui| {
             if ui.add(Checkbox::without_text(&mut self.check_all)).clicked() {
-                let filtered_ids: Vec<String> = self
-                    .mod_list()
-                    .par_iter()
-                    .filter(|m| {
-                        self.filter_text.trim().is_empty()
-                            || m.id.to_lowercase().contains(&self.filter_text.to_lowercase())
-                            || m.name.to_lowercase().contains(&self.filter_text.to_lowercase())
-                            || m.site.to_lowercase().contains(&self.filter_text.to_lowercase())
-                    })
-                    .map(|item| item.id.clone())
-                    .collect();
-
-                // Update filtered's enabled state to match self.check_all
                 let check_all = self.check_all;
-                for filtered_id in filtered_ids {
-                    if let Some(orig_item) =
-                        self.mod_list_mut().par_iter_mut().find_any(|o| o.id == filtered_id)
-                    {
-                        orig_item.enabled = check_all;
+
+                let filtered_ids: egui::ahash::HashSet<_> =
+                    self.filtered_mod_ids().into_par_iter().collect();
+                // If nothing has been searched for, everything is displayed, so everything is subject to checking.
+                let is_empty_filtered_ids = filtered_ids.is_empty();
+
+                self.mod_list_mut().par_iter_mut().for_each(|item| {
+                    if is_empty_filtered_ids || filtered_ids.contains(&item.id) {
+                        item.enabled = check_all;
                     }
-                }
+                });
             }
         });
     }
@@ -911,18 +1003,7 @@ impl ModManagerApp {
                 let new_vfs_skyrim_data_dir = dir.display().to_string();
                 if self.vfs_skyrim_data_dir != new_vfs_skyrim_data_dir {
                     self.vfs_skyrim_data_dir = new_vfs_skyrim_data_dir;
-
-                    let mut has_update_notify = false;
-                    let msg = self.t(I18nKey::NotifyInfoUpdatingModList);
-                    let _ = self.notification.try_write().map(|mut guard| {
-                        *guard = msg.to_string();
-                        has_update_notify = true;
-                    });
-
                     self.update_mod_list();
-                    if has_update_notify {
-                        self.clear_notification();
-                    }
                 }
             }
             Err(err) => {
@@ -932,7 +1013,7 @@ impl ModManagerApp {
                 #[cfg(not(target_os = "windows"))]
                 let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported);
 
-                self.set_notification(err_msg);
+                self.set_colored_notification(err_msg, Color32::RED);
             }
         }
     }
@@ -945,24 +1026,87 @@ impl ModManagerApp {
     ///
     /// This allows vfs mode to maintain the check state on a different PC.
     fn update_mod_list(&mut self) {
-        match mod_info::get_all(self.current_skyrim_data_dir(), self.mode == DataMode::Vfs) {
-            Ok(new_mods) => {
-                let is_empty = new_mods.is_empty();
-                if is_empty {
-                    self.fetch_state = FetchState::Empty;
-                    return; // To preserve check state even if empty
-                }
+        tracing::debug!("`update_mod_list` has been called.");
 
-                self.fetch_state = FetchState::Done;
-                let new_mods = inherit_reorder_cast(self.mod_list(), new_mods);
-                let _ = core::mem::replace(self.mod_list_mut(), new_mods);
+        self.mod_list_msg =
+            (self.t(I18nKey::ModsListFetchStateFetching).to_string(), crate::i18n::EGUI_RIGHT_BLUE);
+        *self.fetch_state.write() = FetchState::Fetching;
+
+        let start_time = std::time::Instant::now();
+        let dir = self.current_skyrim_data_dir().to_owned();
+        let use_vfs = self.mode == DataMode::Vfs;
+
+        let state = Arc::clone(&self.fetch_state);
+        let fetched_mod_info = Arc::clone(&self.fetched_mod_info);
+
+        std::thread::spawn(move || {
+            // NOTE: If the number of rayon threads reaches the CPU limit, the UI will freeze,
+            // so be careful not to let that happen internally.
+            let new_state = match mod_info::get_all(&dir, use_vfs) {
+                Ok(mod_info) => {
+                    if mod_info.is_empty() {
+                        FetchState::Empty { elapsed: start_time.elapsed() }
+                    } else {
+                        *fetched_mod_info.write() = mod_info;
+                        FetchState::Done { elapsed: start_time.elapsed() }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(%e, "mod_info::get_all error");
+                    FetchState::Error { elapsed: start_time.elapsed() }
+                }
+            };
+
+            *state.write() = new_state;
+        });
+    }
+
+    /// Polls for worker results and updates the fetch state.
+    ///
+    /// Outdated worker results (due to a forced fetch) are ignored.
+    /// Only results matching the latest `fetch_generation` are applied.
+    fn poll_fetch_result(&mut self) {
+        let Some(state) = self.fetch_state.try_read() else {
+            return;
+        };
+
+        match *state {
+            FetchState::Done { elapsed } => {
+                let elapsed_secs = elapsed.as_secs_f32();
+                drop(state);
+
+                let mod_info = core::mem::take(&mut *self.fetched_mod_info.write());
+                let new_mods = inherit_reorder_cast(self.mod_list(), mod_info);
+                self.check_all = new_mods.par_iter().all(|m| m.enabled);
+                *self.mod_list_mut() = new_mods;
+
+                *self.fetch_state.write() = FetchState::Idle;
+                self.mod_list_msg = (
+                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateDone)),
+                    Color32::GREEN,
+                );
             }
-            Err(err) => {
-                self.fetch_state = FetchState::Error;
-                tracing::error!(%err);
-                let err_title = self.t(I18nKey::ModsListFetchStateError);
-                self.set_notification(format!("[{err_title}]: {err}"));
+            FetchState::Empty { elapsed } => {
+                let elapsed_secs = elapsed.as_secs_f32();
+                drop(state);
+
+                *self.fetch_state.write() = FetchState::Idle;
+                self.mod_list_msg = (
+                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateEmpty)),
+                    Color32::WHITE,
+                );
             }
+            FetchState::Error { elapsed } => {
+                let elapsed_secs = elapsed.as_secs_f32();
+                drop(state);
+
+                *self.fetch_state.write() = FetchState::Idle;
+                self.mod_list_msg = (
+                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateError)),
+                    Color32::RED,
+                );
+            }
+            FetchState::Fetching | FetchState::Idle => {}
         }
     }
 }
@@ -970,7 +1114,13 @@ impl ModManagerApp {
 impl ModManagerApp {
     /// Set message to notification
     pub(crate) fn set_notification<S: Into<String>>(&self, msg: S) {
+        self.set_colored_notification(msg, Color32::WHITE);
+    }
+
+    /// Set message to notification with color
+    pub(crate) fn set_colored_notification<S: Into<String>>(&self, msg: S, color: egui::Color32) {
         *self.notification.write() = msg.into();
+        *self.notify_color.write() = color;
     }
 
     pub(crate) fn clear_notification(&self) {
@@ -1007,6 +1157,7 @@ impl ModManagerApp {
         }
 
         let notify = Arc::clone(&self.notification);
+        let notify_color = Arc::clone(&self.notify_color);
         let i18n = Arc::clone(&self.i18n);
 
         self.async_rt.spawn(nemesis_merge::behavior_gen(
@@ -1021,6 +1172,7 @@ impl ModManagerApp {
                     }
                 },
                 status_report: Some(Box::new(move |status| {
+                    *notify_color.write() = crate::i18n::status_to_color(&status);
                     *notify.write() = crate::i18n::status_to_text(status, &i18n, start_time);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {

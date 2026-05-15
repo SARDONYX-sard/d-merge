@@ -1,9 +1,6 @@
 pub mod error;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use rayon::prelude::*;
 
@@ -74,9 +71,6 @@ fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, 
     let mods = jwalk_glob::glob_files(&nemesis_pattern)
         .par_iter()
         .filter_map(|path| {
-            if !path.exists() {
-                return None;
-            }
             let id = if is_vfs {
                 extract_nemesis_id_from_path(path)?.to_string()
             } else {
@@ -95,9 +89,6 @@ fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInf
     let mods = jwalk_glob::glob_files(&nemesis_pattern)
         .par_iter()
         .filter_map(|path| {
-            if !path.exists() {
-                return None;
-            }
             let id = if is_vfs {
                 extract_nemesis_id_from_path(path)?.to_string()
             } else {
@@ -113,7 +104,7 @@ fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInf
     Ok(mods)
 }
 
-fn read_mod_info(path: &PathBuf, id: String) -> Option<ModInfo> {
+fn read_mod_info(path: &Path, id: String) -> Option<ModInfo> {
     let contents = fs::read_to_string(path).ok()?;
     let mut mod_info: ModInfo = serde_ini::from_str(&contents).ok()?;
     mod_info.id = id;
@@ -136,9 +127,6 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
         let mods = jwalk_glob::glob_files(fnis_list_pattern)
             .par_iter()
             .filter_map(|path| {
-                if !path.exists() {
-                    return None;
-                }
                 // <skyrim_data_dir>/meshes/**/animations/<vfs_id>
                 let parent_dir = path.parent()?;
 

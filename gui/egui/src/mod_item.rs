@@ -41,7 +41,7 @@ pub(crate) enum SortColumn {
 /// Final priorities are always normalized.
 pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
     let old_map: HashMap<&str, (bool, usize)> =
-        old.iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
+        old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
     let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) = new
         .into_par_iter()

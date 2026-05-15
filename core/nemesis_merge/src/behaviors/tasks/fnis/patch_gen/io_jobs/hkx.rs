@@ -98,7 +98,7 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
     let actual_input: Cow<Path> = if !job.input_path.exists() {
         if matches!(job.kind, AnimKind::FnisAA { .. }) {
             #[cfg(feature = "tracing")]
-            tracing::warn!(
+            tracing::info!(
                 path = %job.input_path.display(),
                 "Input file does not exist; skipping (FNIS AltAnim → OAR)."
             );

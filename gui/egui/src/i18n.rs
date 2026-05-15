@@ -53,6 +53,9 @@ pub(crate) enum I18nKey {
     /// Execution mode:
     ExecutionModeLabel,
 
+    /// All
+    FilterTextAll,
+
     /// Gen FNIS.esp
     GenerateFnisEspLabel,
 
@@ -200,7 +203,7 @@ impl I18nMap {
     }
 
     /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
-    const FILE: &'static str = "./.d_merge/translation.json";
+    pub(crate) const FILE: &'static str = "./.d_merge/translation.json";
 
     /// Translate given key or fallback to default English.
     pub(crate) fn t(&self, key: I18nKey) -> &str {
@@ -225,7 +228,7 @@ impl I18nMap {
             })
             .ok()
             .and_then(|content| {
-                serde_json::from_str::<Self>(&content)
+                sonic_rs::from_str::<Self>(&content)
                     .map_err(|err| {
                         tracing::error!(
                             "Failed to parse translation.json: {err}. Fallback to default."
@@ -237,33 +240,25 @@ impl I18nMap {
     }
 
     /// Try save `./.d_merge/translation.json`.
-    ///
-    /// If already exits, then skip.
-    pub(crate) fn save_translation() {
-        use std::{fs, path::Path};
-
+    pub(crate) fn save_translation() -> Result<(), nemesis_merge::errors::Error> {
+        use std::{fs, path::PathBuf};
         let i18n_file = Self::FILE;
 
-        if Path::new(i18n_file).exists() {
-            tracing::info!("{i18n_file} is already exist. So skip write.");
-        } else {
-            let mut map = Self::new();
-            for key in I18nKey::ALL {
-                map.0.insert(*key, Cow::Borrowed(key.default_eng()));
-            }
+        let mut map = Self::new();
+        for key in I18nKey::ALL {
+            map.0.insert(*key, Cow::Borrowed(key.default_eng()));
+        }
 
-            match serde_json::to_string_pretty(&map) {
-                Ok(text) => {
-                    if let Err(err) = fs::write(i18n_file, text) {
-                        tracing::error!("Failed to save translation.json: {err}");
-                    };
-                    tracing::info!("Settings saved to {i18n_file}");
-                }
-                Err(err) => {
-                    tracing::error!("Failed to parse translation as JSON: {err}");
-                }
-            }
-        };
+        let text = sonic_rs::to_string_pretty(&map).map_err(|e| {
+            tracing::error!("Failed to parse translation as JSON: {e}");
+            nemesis_merge::errors::Error::JsonError { path: PathBuf::from(Self::FILE), source: e }
+        })?;
+
+        fs::write(i18n_file, text).map_err(|e| {
+            tracing::error!("Failed to save translation.json: {e}");
+            nemesis_merge::errors::Error::FailedIo { path: PathBuf::from(Self::FILE), source: e }
+        })?;
+        Ok(())
     }
 }
 
@@ -289,12 +284,28 @@ pub(crate) fn status_to_text(
             format!("[5/6] {} ({index}/{total})", i18n.t(I18nKey::StatusGeneratingHkxFiles),)
         }
         nemesis_merge::Status::Done => {
-            let elapsed = start_time.elapsed();
-            format!("[6/6] {} ({elapsed:.2?})", i18n.t(I18nKey::StatusDone))
+            let elapsed = start_time.elapsed().as_secs_f32();
+            format!("[6/6] {} ({elapsed:.2}s)", i18n.t(I18nKey::StatusDone))
         }
         nemesis_merge::Status::Error(msg) => {
-            let elapsed = start_time.elapsed();
-            format!("[Error] {} ({elapsed:.2?}) {msg}", i18n.t(I18nKey::StatusError),)
+            let elapsed = start_time.elapsed().as_secs_f32();
+            format!("[Error] {} ({elapsed:.2}s) {msg}", i18n.t(I18nKey::StatusError),)
         }
     }
 }
+
+pub(crate) const fn status_to_color(status: &nemesis_merge::Status) -> egui::Color32 {
+    match status {
+        nemesis_merge::Status::GeneratingFnisPatches { .. } => {
+            egui::Color32::from_rgb(120, 170, 255)
+        }
+        nemesis_merge::Status::ReadingPatches { .. } => EGUI_RIGHT_BLUE,
+        nemesis_merge::Status::ParsingPatches { .. } => egui::Color32::from_rgb(140, 200, 255),
+        nemesis_merge::Status::ApplyingPatches { .. } => egui::Color32::from_rgb(255, 170, 120),
+        nemesis_merge::Status::GeneratingHkxFiles { .. } => egui::Color32::from_rgb(200, 140, 255),
+        nemesis_merge::Status::Done => egui::Color32::GREEN,
+        nemesis_merge::Status::Error(_) => egui::Color32::RED,
+    }
+}
+
+pub(crate) const EGUI_RIGHT_BLUE: egui::Color32 = egui::Color32::from_rgb(120, 220, 255);
