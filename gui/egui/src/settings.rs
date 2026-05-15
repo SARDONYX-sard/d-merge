@@ -29,16 +29,18 @@ pub(crate) struct AppSettings {
     enable_debug_output: bool,
     /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
     pub generate_fnis_esp: bool,
+
     pub log_level: crate::app::LogLevel,
+    pub auto_run: bool,
+    pub transparent: bool,
     pub filter_text: String,
     pub font_path: Option<PathBuf>,
     pub sort_asc: bool,
     pub sort_column: SortColumn,
-    pub transparent: bool,
-    pub window_width: f32,
-    pub window_height: f32,
     pub window_pos_x: f32,
     pub window_pos_y: f32,
+    pub window_height: f32,
+    pub window_width: f32,
     pub window_maximized: bool,
 
     pub vfs_skyrim_data_dir: String,
@@ -52,6 +54,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             auto_remove_meshes: false, // If an incorrect output directory(e.g. skyrim data dir) is specified, it is dangerous, so false.
+            auto_run: false,
             enable_debug_output: false,
             generate_fnis_esp: false,
             filter_text: String::new(),
@@ -88,6 +91,7 @@ impl From<ModManagerApp> for AppSettings {
             mod_list: app.mod_list,
 
             auto_remove_meshes: app.auto_remove_meshes,
+            auto_run: app.auto_run,
             enable_debug_output: app.enable_debug_output,
             generate_fnis_esp: app.generate_fnis_esp,
             filter_text: app.filter_text,
@@ -129,6 +133,7 @@ impl From<AppSettings> for ModManagerApp {
             sort_asc: settings.sort_asc,
             log_level: settings.log_level,
             transparent: settings.transparent,
+            auto_run: settings.auto_run,
             last_window_size: egui::vec2(settings.window_width, settings.window_height),
             last_window_pos: egui::pos2(settings.window_pos_x, settings.window_pos_y),
             last_window_maximized: settings.window_maximized,
