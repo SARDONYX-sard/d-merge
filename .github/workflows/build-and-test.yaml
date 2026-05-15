@@ -48,6 +48,7 @@ jobs:
 
   test:
     strategy:
+      fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
@@ -164,7 +165,7 @@ jobs:
           cache_key_suffix: 'cli'
           install_front_deps: false
 
-      - name: Build GUI
+      - name: Build CLI
         run: cargo build -p d_merge_cli --profile ${{ env.BUILD_PROFILE }}
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release

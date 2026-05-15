@@ -47,6 +47,7 @@
     "indexmap",
     "Jwalk",
     "maturin",
+    "mimalloc",
     "modder",
     "Modders",
     "msvc",

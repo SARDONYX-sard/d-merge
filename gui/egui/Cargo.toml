@@ -13,8 +13,10 @@ repository.workspace = true
 rust-version.workspace = true
 build = "build.rs"
 
+
 [build-dependencies]
 winres = "0.1.12"
+
 
 [dependencies]
 # Fixed version. To avoid scroll crash bug
@@ -26,7 +28,8 @@ egui_extras = "0.33.0"
 
 ico = "0.5.0"
 indexmap = { workspace = true, features = ["serde"] }
-open = { version = "5.3.3" }
+mimalloc = { version = "0.1.50", optional = true }
+open = { version = "5.3.5" }
 parking_lot = "0.12.5"
 rayon = { workspace = true }
 serde = { workspace = true }
@@ -48,8 +51,13 @@ rfd = { version = "0.17.2", default-features = false }
 [target.'cfg(target_os = "linux")'.dependencies]
 rfd = { version = "0.15.4", features = ["xdg-portal"] }
 
+
 [features]
-default = []
+default = ["mimalloc"]
+
+# The patch time was reduced by 4secs.
+mimalloc = ["dep:mimalloc"]
+
 
 [lints]
 workspace = true
