@@ -37,10 +37,7 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
 
             ui.scope_builder(egui::UiBuilder::new().max_rect(row_rect), |ui| {
                 ui.horizontal(|ui| {
-                    ui.add_sized(
-                        checkbox_rect,
-                        egui::Checkbox::without_text(&mut item.enabled),
-                    );
+                    ui.add_sized(checkbox_rect, egui::Checkbox::without_text(&mut item.enabled));
                     label_with_hover(ui, &item.id, w_path);
 
                     draggable_handle.ui(ui, |ui| {

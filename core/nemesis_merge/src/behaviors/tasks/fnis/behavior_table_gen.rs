@@ -261,10 +261,7 @@ pub(crate) const DRAUGR_SKELETON: BehaviorEntry = BehaviorEntry {
         rs_code.push_str(&generate_map_code("creatures", &root.creatures));
         rs_code.push_str(&generate_map_code("skeletons", &root.skeletons));
         rs_code.push_str(&generate_map_code("auxbones", &root.auxbones));
-        rs_code.push_str(&generate_map_code(
-            "plants/activators",
-            &root.plants_activators,
-        ));
+        rs_code.push_str(&generate_map_code("plants/activators", &root.plants_activators));
 
         let path = Path::new("./src/behaviors/tasks/fnis/patch_gen/generated_behaviors.rs");
         let mut f = File::create(path)?;

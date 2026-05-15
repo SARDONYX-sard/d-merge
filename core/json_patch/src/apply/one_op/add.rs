@@ -49,11 +49,7 @@ pub(crate) fn apply_add<'value>(
                         target = &mut list[index];
                     }
                 } else {
-                    return Err(JsonPatchError::invalid_index_from(
-                        last_index,
-                        &[token],
-                        &value,
-                    ));
+                    return Err(JsonPatchError::invalid_index_from(last_index, &[token], &value));
                 }
             }
             Value::String(s) => {
@@ -124,12 +120,8 @@ mod tests {
             "age": 30
         });
 
-        apply_add(
-            &mut target,
-            json_path!("address"),
-            Value::String(Cow::Borrowed("123 Main St")),
-        )
-        .unwrap_or_else(|err| panic!("{err}"));
+        apply_add(&mut target, json_path!("address"), Value::String(Cow::Borrowed("123 Main St")))
+            .unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["address"], "123 Main St");
     }

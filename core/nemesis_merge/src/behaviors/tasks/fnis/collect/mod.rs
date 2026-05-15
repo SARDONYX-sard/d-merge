@@ -45,10 +45,7 @@ pub(crate) async fn collect_all_fnis_injections(
 
     for data_dir in &data_dirs {
         for entry in ALL_ENTRIES.iter() {
-            let animations_dir = data_dir
-                .join("meshes")
-                .join(entry.base_dir)
-                .join("animations");
+            let animations_dir = data_dir.join("meshes").join(entry.base_dir).join("animations");
 
             #[cfg(feature = "tracing")]
             tracing::trace!(?animations_dir, "Scanning animations directory");

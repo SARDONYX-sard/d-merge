@@ -39,9 +39,8 @@ pub(crate) fn generate_hkx_files(
             let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
-                fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
-                    path: output_dir_all,
-                })?;
+                fs::create_dir_all(output_dir_all)
+                    .context(FailedIoSnafu { path: output_dir_all })?;
             }
 
             let hkx_bytes = {
@@ -52,10 +51,8 @@ pub(crate) fn generate_hkx_files(
                     write_patched_json(&debug_path, &template_json)?;
                 }
 
-                let mut class_map: ClassMap =
-                    from_borrowed_value(template_json).with_context(|_| JsonToClassMapSnafu {
-                        path: output_path.clone(),
-                    })?;
+                let mut class_map: ClassMap = from_borrowed_value(template_json)
+                    .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
 
                 let mut event_id_map = None;
                 let mut variable_id_map = None;
@@ -69,9 +66,7 @@ pub(crate) fn generate_hkx_files(
                     // This is done to prevent crashes before they occur.
                     use serde_hkx_features::id_maker::check_len_from_map;
                     check_len_from_map(&class_map, &master_behavior_graph_index).with_context(
-                        |_| crate::errors::DedupEventVariableSnafu {
-                            path: output_path.clone(),
-                        },
+                        |_| crate::errors::DedupEventVariableSnafu { path: output_path.clone() },
                     )?;
 
                     // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
@@ -104,15 +99,12 @@ pub(crate) fn generate_hkx_files(
                 // Output error info
                 // serialize target class, field ptr number.
                 serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
-                    .with_context(|_| HkxSerSnafu {
-                        path: output_path.clone(),
-                    })?
+                    .with_context(|_| HkxSerSnafu { path: output_path.clone() })?
             };
 
             output_path.set_extension("hkx");
-            fs::write(&output_path, hkx_bytes).with_context(|_| FailedIoSnafu {
-                path: output_path.clone(),
-            })?;
+            fs::write(&output_path, hkx_bytes)
+                .with_context(|_| FailedIoSnafu { path: output_path.clone() })?;
 
             #[cfg(feature = "tracing")]
             tracing::info!("Generated: {}", output_path.display());
@@ -133,9 +125,7 @@ where
     S: serde::Serialize + core::fmt::Debug,
 {
     if let Some(output_dir_all) = output_file.parent() {
-        fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
-            path: output_dir_all,
-        })?;
+        fs::create_dir_all(output_dir_all).context(FailedIoSnafu { path: output_dir_all })?;
     }
     if let Ok(pretty_json) = sonic_rs::to_string_pretty(&template_json) {
         let mut json_path = output_file.to_path_buf();
@@ -156,22 +146,16 @@ fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()>
     use serde_hkx::HavokSort as _;
 
     let mut class_map = class_map.clone();
-    let ptr = class_map
-        .sort_for_xml()
-        .with_context(|_| HkxSerSnafu { path: output_path })?;
+    let ptr = class_map.sort_for_xml().with_context(|_| HkxSerSnafu { path: output_path })?;
     let xml = serde_hkx::to_string(&class_map, &ptr)
         .with_context(|_| HkxSerSnafu { path: output_path })?;
 
     let mut xml_path = output_path.to_path_buf();
     xml_path.set_extension("xml");
     if let Some(output_dir_all) = xml_path.parent() {
-        fs::create_dir_all(output_dir_all).context(FailedIoSnafu {
-            path: output_dir_all,
-        })?;
+        fs::create_dir_all(output_dir_all).context(FailedIoSnafu { path: output_dir_all })?;
     }
-    fs::write(&xml_path, &xml).context(FailedIoSnafu {
-        path: xml_path.clone(),
-    })?;
+    fs::write(&xml_path, &xml).context(FailedIoSnafu { path: xml_path.clone() })?;
 
     Ok(())
 }

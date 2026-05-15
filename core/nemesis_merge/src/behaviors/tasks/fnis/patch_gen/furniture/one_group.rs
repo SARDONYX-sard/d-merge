@@ -48,16 +48,10 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     // Analysis of the FNIS output reveals that the stateId for each $RI+3$ index in the Furniture sequence must be set to the sequence's final stateId.
     let end_anim_state_id = total as i32;
 
-    let has_any_anim_obj = furniture
-        .animations
-        .iter()
-        .any(|anim| !anim.anim_objects.is_empty());
+    let has_any_anim_obj = furniture.animations.iter().any(|anim| !anim.anim_objects.is_empty());
 
-    for (i, (animation, class_indexes)) in furniture
-        .animations
-        .iter()
-        .zip(&all_class_indexes)
-        .enumerate()
+    for (i, (animation, class_indexes)) in
+        furniture.animations.iter().zip(&all_class_indexes).enumerate()
     {
         let phase = match i {
             0 => FurniturePhase::Start,
@@ -96,10 +90,8 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     let first_animation_flags = first_animation.flag_set.flags;
     let first_animation_vars = first_animation.flag_set.anim_vars.as_slice();
     // furniture seq hkbStateMachineStateInfo indexes
-    let all_state_infos_indexes: Vec<&str> = all_class_indexes
-        .iter()
-        .map(|indexes| indexes[0].as_str())
-        .collect();
+    let all_state_infos_indexes: Vec<&str> =
+        all_class_indexes.iter().map(|indexes| indexes[0].as_str()).collect();
 
     // Push the first animation for furniture seq
     seq_patches.push({
@@ -180,17 +172,11 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
             };
 
         // #$-AV|%RI+1%|%RI+4%$
-        let generator = if first_animation_vars.is_empty() {
-            &class_indexes[4]
-        } else {
-            &class_indexes[1]
-        };
+        let generator =
+            if first_animation_vars.is_empty() { &class_indexes[4] } else { &class_indexes[1] };
 
         (
-            vec![
-                Cow::Owned(class_indexes[0].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
+            vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -217,10 +203,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     if !first_animation_vars.is_empty() {
         // RI+2
         one_patches.push((
-            vec![
-                Cow::Owned(class_indexes[1].clone()),
-                Cow::Borrowed("hkbModifierGenerator"),
-            ],
+            vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbModifierGenerator")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -243,10 +226,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
                 core::array::from_fn(|i| first_animation_vars.get(i).is_some_and(|v| v.inverse));
 
             (
-                vec![
-                    Cow::Owned(class_indexes[2].clone()),
-                    Cow::Borrowed("BSIsActiveModifier"),
-                ],
+                vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("BSIsActiveModifier")],
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
@@ -289,10 +269,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
                 .collect();
 
             (
-                vec![
-                    Cow::Owned(class_indexes[3].clone()),
-                    Cow::Borrowed("hkbVariableBindingSet"),
-                ],
+                vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbVariableBindingSet")],
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
@@ -311,10 +288,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     // RI+4
     one_patches.push({
         (
-            vec![
-                Cow::Owned(class_indexes[4].clone()),
-                Cow::Borrowed("hkbStateMachine"),
-            ],
+            vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbStateMachine")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },

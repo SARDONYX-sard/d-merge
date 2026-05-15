@@ -28,9 +28,7 @@ use crate::{
 /// Parse failed.
 pub fn parse_anim_header_diff_patch(input: &str) -> Result<AnimHeaderDiffPatch<'_>, Error> {
     let mut deserializer = Deserializer::new(input);
-    deserializer
-        .root()
-        .map_err(|err| deserializer.to_readable_err(err))?;
+    deserializer.root().map_err(|err| deserializer.to_readable_err(err))?;
     Ok(deserializer.output_patches)
 }
 
@@ -64,9 +62,7 @@ impl<'de> Deserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::Context { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
@@ -76,9 +72,7 @@ impl<'de> Deserializer<'de> {
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
+        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
 

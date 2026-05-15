@@ -12,10 +12,7 @@ pub(crate) struct NonNestedArrayDiff<'a> {
     ///   - ["[0]", "hashed_path"]
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
     )]
     pub one: OnePatchMap<'a>,
 
@@ -24,10 +21,7 @@ pub(crate) struct NonNestedArrayDiff<'a> {
     /// This is processed after partial patching is complete.
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>"))
     )]
     pub seq: Vec<ValueWithPriority<'a>>,
 }

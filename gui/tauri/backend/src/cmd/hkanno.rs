@@ -10,9 +10,7 @@ pub(crate) async fn load_hkanno(input: &Path) -> Result<Hkanno<'static>, String>
         .await
         .map_err(|e| format!("Failed to read file({}: {e}", input.display()))?;
 
-    parse_as_hkanno(&bytes, input)
-        .map_err(|e| e.to_string())
-        .map(|anno| anno.into_static())
+    parse_as_hkanno(&bytes, input).map_err(|e| e.to_string()).map(|anno| anno.into_static())
 }
 
 #[tauri::command]
@@ -33,9 +31,7 @@ pub(crate) async fn save_hkanno(
         .update_hkx_bytes(&bytes, format, input)
         .map_err(|e| format!("Failed to update hkx: {e}"))?;
 
-    fs::write(&output, updated)
-        .await
-        .map_err(|e| format!("Failed to write file: {e}"))?;
+    fs::write(&output, updated).await.map_err(|e| format!("Failed to write file: {e}"))?;
 
     Ok(())
 }

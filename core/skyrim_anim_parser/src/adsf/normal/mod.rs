@@ -65,31 +65,17 @@ impl AnimData<'_> {
 
     pub(crate) fn clip_anim_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize = self
-            .clip_anim_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
-        let add_len: usize = self
-            .add_clip_anim_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
+        let len: usize = self.clip_anim_blocks.par_iter().map(|block| block.to_line_len()).sum();
+        let add_len: usize =
+            self.add_clip_anim_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 
     pub(crate) fn clip_motion_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize = self
-            .clip_motion_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
-        let add_len: usize = self
-            .add_clip_motion_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
+        let len: usize = self.clip_motion_blocks.par_iter().map(|block| block.to_line_len()).sum();
+        let add_len: usize =
+            self.add_clip_motion_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 }

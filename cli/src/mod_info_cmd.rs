@@ -25,10 +25,8 @@ pub(crate) fn run_mods(
     let json = sonic_rs::to_string_pretty(&infos)?;
 
     match output {
-        Some(output) => std::fs::write(output, json).map_err(|e| Error::IoError {
-            source: e,
-            path: output.to_path_buf(),
-        })?,
+        Some(output) => std::fs::write(output, json)
+            .map_err(|e| Error::IoError { source: e, path: output.to_path_buf() })?,
         None => println!("{json}"),
     }
 

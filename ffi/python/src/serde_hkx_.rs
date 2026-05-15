@@ -44,11 +44,7 @@ impl From<RustDirEntry> for DirEntry {
 /// Returns an error message if the directory cannot be loaded or if there are issues reading the path.
 pub fn load_dir_node(dirs: Vec<String>) -> pyo3::PyResult<Vec<DirEntry>> {
     let dir_entries = serde_hkx_for_gui::load_dir_node(dirs).map_err(|errs| {
-        let err = errs
-            .par_iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<String>>()
-            .join("\n");
+        let err = errs.par_iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n");
         pyo3::exceptions::PyRuntimeError::new_err(err)
     })?;
 

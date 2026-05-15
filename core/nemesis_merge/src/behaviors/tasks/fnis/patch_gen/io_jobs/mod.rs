@@ -39,11 +39,7 @@ impl FNISIoJobRunner {
         output_target: OutPutTarget,
         aa_base_map: Option<super::alternate::aa_config::BaseMap>,
     ) -> Self {
-        Self {
-            jobs,
-            output_target,
-            aa_base_map,
-        }
+        Self { jobs, output_target, aa_base_map }
     }
 
     /// Run the HKX conversion jobs in parallel.
@@ -102,11 +98,7 @@ fn run_conversion_jobs(
 /// Partitions jobs into three buckets in a single parallel pass.
 fn partition_jobs(
     jobs: Vec<AnimIoJob>,
-) -> (
-    Vec<ConversionJob>,
-    Vec<FnisAANamespaceConfigJob>,
-    Vec<FnisAASlotConfigJob>,
-) {
+) -> (Vec<ConversionJob>, Vec<FnisAANamespaceConfigJob>, Vec<FnisAASlotConfigJob>) {
     jobs.into_par_iter()
         .fold(
             || (Vec::new(), Vec::new(), Vec::new()),
@@ -139,27 +131,18 @@ fn partition_jobs(
 
 pub(super) fn write_file(output_path: &std::path::Path, bytes: &[u8]) -> Result<(), Error> {
     if let Some(parent) = output_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError {
-            path: parent.to_path_buf(),
-            source: e,
-        })?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| Error::FNISHkxIoError { path: parent.to_path_buf(), source: e })?;
     }
-    std::fs::write(output_path, bytes).map_err(|e| Error::FNISHkxIoError {
-        path: output_path.into(),
-        source: e,
-    })
+    std::fs::write(output_path, bytes)
+        .map_err(|e| Error::FNISHkxIoError { path: output_path.into(), source: e })
 }
 
 /// Creates a mirrored `female/` copy of a `male/` HKX job.
 ///
 /// Returns `None` when `job.kind` is not `FnisAA { is_male_subdir: true, .. }`.
 fn mirror_male_to_female(job: &ConversionJob) -> Option<ConversionJob> {
-    let AnimKind::FnisAA {
-        is_male_subdir: true,
-        prefix,
-        group_name,
-        slot_count,
-    } = &job.kind
+    let AnimKind::FnisAA { is_male_subdir: true, prefix, group_name, slot_count } = &job.kind
     else {
         return None;
     };

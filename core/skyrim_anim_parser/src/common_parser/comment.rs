@@ -23,11 +23,7 @@ pub(crate) fn open_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'
     let kind_parser = {
         let mod_code_parser = {
             let id_parser = delimited('~', take_until(0.., '~'), '~');
-            delimited(
-                Caseless("MOD_CODE"),
-                delimited_multispace0(id_parser),
-                Caseless("OPEN"),
-            )
+            delimited(Caseless("MOD_CODE"), delimited_multispace0(id_parser), Caseless("OPEN"))
         };
         delimited_multispace0(mod_code_parser).map(CommentKind::ModCode)
     };
@@ -35,9 +31,7 @@ pub(crate) fn open_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'
 
     delimited_multispace0(comment_parser)
         .context(StrContext::Label("Open diff comment"))
-        .context(StrContext::Expected(StrContextValue::Description(
-            "<!-- MOD_CODE ~id~ OPEN -->",
-        )))
+        .context(StrContext::Expected(StrContextValue::Description("<!-- MOD_CODE ~id~ OPEN -->")))
         .parse_next(input)
 }
 
@@ -49,11 +43,8 @@ pub(crate) fn take_till_original<'a>(input: &mut &'a str) -> ModalResult<&'a str
     let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
 
     terminated(
-        take_until_ext(
-            0..,
-            delimited("<!--", original_parser.value(CommentKind::Original), "-->"),
-        )
-        .take(),
+        take_until_ext(0.., delimited("<!--", original_parser.value(CommentKind::Original), "-->"))
+            .take(),
         (Caseless("<!-- ORIGINAL -->"), multispace0),
     )
     .context(StrContext::Expected(StrContextValue::Description(
@@ -103,15 +94,10 @@ pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
     terminated(
-        take_until_ext(
-            0..,
-            delimited("<!--", close_parser.value(CommentKind::Close), "-->"),
-        ),
+        take_until_ext(0.., delimited("<!--", close_parser.value(CommentKind::Close), "-->")),
         (Caseless("<!-- CLOSE -->"), multispace0),
     )
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Comment(e.g. `<!-- CLOSE -->`)",
-    )))
+    .context(StrContext::Expected(StrContextValue::Description("Comment(e.g. `<!-- CLOSE -->`)")))
     .parse_next(input)
 }
 
@@ -144,15 +130,9 @@ mod tests {
             Ok(CommentKind::ModCode("hi!"))
         );
 
-        assert_eq!(
-            original_or_close_comment.parse("<!-- ORIGINAL -->"),
-            Ok(CommentKind::Original)
-        );
+        assert_eq!(original_or_close_comment.parse("<!-- ORIGINAL -->"), Ok(CommentKind::Original));
 
-        assert_eq!(
-            original_or_close_comment.parse("<!-- CLOSE -->"),
-            Ok(CommentKind::Close)
-        );
+        assert_eq!(original_or_close_comment.parse("<!-- CLOSE -->"), Ok(CommentKind::Close));
 
         assert_eq!(
             original_or_close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),

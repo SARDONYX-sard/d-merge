@@ -276,32 +276,20 @@ mod tests {
 
     #[test]
     fn le_hedr_version_bytes() {
-        let config = Config {
-            version: Version::Form43,
-            author: None,
-            description: None,
-        };
+        let config = Config { version: Version::Form43, author: None, description: None };
         // offset 30..34: TES4 header (24) + HEDR tag (4) + HEDR size (2) = 30
         assert_eq!(&write_to_vec(&config)[30..34], &[0xd7, 0xa3, 0x70, 0x3f]);
     }
 
     #[test]
     fn se_hedr_version_bytes() {
-        let config = Config {
-            version: Version::Form44,
-            author: None,
-            description: None,
-        };
+        let config = Config { version: Version::Form44, author: None, description: None };
         assert_eq!(&write_to_vec(&config)[30..34], &[0x9a, 0x99, 0xd9, 0x3f]);
     }
 
     #[test]
     fn write_dummy_esp_no_optional_fields() {
-        let config = Config {
-            version: Version::Form44,
-            author: None,
-            description: None,
-        };
+        let config = Config { version: Version::Form44, author: None, description: None };
 
         let bytes = write_to_vec(&config);
 
@@ -320,11 +308,7 @@ mod tests {
     #[test]
     fn write_dummy_esp_flags_should_be_non_esl_flag() {
         // See: https://github.com/ShikyoKira/Project-New-Reign---Nemesis-Main/issues/128
-        let config = Config {
-            version: Version::Form44,
-            author: None,
-            description: None,
-        };
+        let config = Config { version: Version::Form44, author: None, description: None };
 
         let bytes = write_to_vec(&config);
 

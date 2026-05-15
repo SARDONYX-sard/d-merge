@@ -16,16 +16,11 @@ pub enum Error {
     MissingSkyrimDataDirGlob,
 
     #[snafu(transparent)]
-    FnisError {
-        source: crate::behaviors::tasks::fnis::collect::owned::FnisError,
-    },
+    FnisError { source: crate::behaviors::tasks::fnis::collect::owned::FnisError },
 
     /// Failed to parse FNIS_*_List.txt file.
     #[snafu(display("[FNIS_*_List.txt file Parse Error]{}:\n{source}", path.display()))]
-    FailedParseFnisModList {
-        source: ReadableError,
-        path: PathBuf,
-    },
+    FailedParseFnisModList { source: ReadableError, path: PathBuf },
 
     #[snafu(display(
             "FNIS I/O processing (read/write to config.json or hkx files) failed. This is likely due to a busy condition or lack of permission.:\n
@@ -42,11 +37,7 @@ pub enum Error {
         This file is not a valid Havok animation or may be from an unsupported version.",
         input_path.display()
     ))]
-    FNISHkxInvalidMagic {
-        input_path: PathBuf,
-        target: crate::OutPutTarget,
-        magic_bytes: [u8; 17],
-    },
+    FNISHkxInvalidMagic { input_path: PathBuf, target: crate::OutPutTarget, magic_bytes: [u8; 17] },
 
     /// Expected pointer size 4/8-byte, but got {}
     #[snafu(display(
@@ -57,17 +48,10 @@ pub enum Error {
         The HKX may be malformed or from an incompatible platform.",
         input_path.display()
     ))]
-    FNISHkxInvalidHeader {
-        input_path: PathBuf,
-        target: crate::OutPutTarget,
-        actual: u8,
-    },
+    FNISHkxInvalidHeader { input_path: PathBuf, target: crate::OutPutTarget, actual: u8 },
 
     #[snafu(display("The conversion of FNIS's hkx failed. input_path: {}, why: {source}", input_path.display()))]
-    FNISHkxConversionError {
-        input_path: PathBuf,
-        source: serde_hkx_features::error::Error,
-    },
+    FNISHkxConversionError { input_path: PathBuf, source: serde_hkx_features::error::Error },
 
     #[snafu(display("Failed to generate FNIS.esp file: (cause: {source})"))]
     FNISGenerateEspError { source: std::io::Error },
@@ -101,10 +85,7 @@ pub enum Error {
 
     /// Json patch error
     #[snafu(display("[Apply patch Error to template file(`{template_name}`)]\n{source}\n"))]
-    PatchError {
-        template_name: String,
-        source: json_patch::JsonPatchError,
-    },
+    PatchError { template_name: String, source: json_patch::JsonPatchError },
 
     /// Nemesis XML parsing error
     #[snafu(display("[Nemesis XML Patch Parsing Error `{}`]:\n{source}\n", path.display()))]
@@ -116,10 +97,7 @@ pub enum Error {
 
     /// Failed to parse adsf template
     #[snafu(display("[animationdatasinglefile template Parse Error]{}:\n{source}", path.display()))]
-    FailedParseAdsfTemplate {
-        source: rmp_serde::decode::Error,
-        path: PathBuf,
-    },
+    FailedParseAdsfTemplate { source: rmp_serde::decode::Error, path: PathBuf },
 
     /// Failed to diff line patch error
     #[snafu(display("[{} -> {} patch Parse Error]{}:\n{source}", kind.as_str(), sub_kind.as_str(), path.display()))]
@@ -164,10 +142,7 @@ pub enum Error {
 
     /// Failed to parse asdsf patch
     #[snafu(display("[animationsetdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseAsdsfPatch {
-        source: ReadableError,
-        path: PathBuf,
-    },
+    FailedParseAsdsfPatch { source: ReadableError, path: PathBuf },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationsetdatasinglefile edit(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
@@ -178,31 +153,19 @@ pub enum Error {
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseAdsfPatch {
-        source: ReadableError,
-        path: PathBuf,
-    },
+    FailedParseAdsfPatch { source: ReadableError, path: PathBuf },
 
     /// hkbBehaviorGraphData/hkbBehaviorGraphStringData missing or length check error.
     #[snafu(display("{}:\n {source}", path.display()))]
-    DedupEventVariableError {
-        path: PathBuf,
-        source: serde_hkx_features::id_maker::DedupError,
-    },
+    DedupEventVariableError { path: PathBuf, source: serde_hkx_features::id_maker::DedupError },
 
     /// serde_hkx serialize error.
     #[snafu(display("[serde_hkx Ser Error] {}:\n {source}", path.display()))]
-    HkxSerError {
-        path: PathBuf,
-        source: serde_hkx::errors::ser::Error,
-    },
+    HkxSerError { path: PathBuf, source: serde_hkx::errors::ser::Error },
 
     /// serde_hkx Deserialize error.
     #[snafu(display("[serde_hkx De Error] {}:\n {source}", path.display()))]
-    HkxDeError {
-        path: PathBuf,
-        source: serde_hkx::errors::de::Error,
-    },
+    HkxDeError { path: PathBuf, source: serde_hkx::errors::de::Error },
 
     /// Deserialize template error
     #[snafu(display("[hkx template Parsing Error]{}:\n{source}", path.display()))]
@@ -257,14 +220,10 @@ We need to verify the conditions under which this occurs in a minimal environmen
     FailedToCastNemesisPathToTemplateKey { path: PathBuf },
 
     #[snafu(transparent)]
-    ParsedAdsfPathError {
-        source: crate::behaviors::AsdfPathParseError,
-    },
+    ParsedAdsfPathError { source: crate::behaviors::AsdfPathParseError },
 
     #[snafu(transparent)]
-    ParsedAsdsfPathError {
-        source: crate::behaviors::AsdsfPathParseError,
-    },
+    ParsedAsdsfPathError { source: crate::behaviors::AsdsfPathParseError },
 
     /// dir strip error
     #[snafu(transparent)]
@@ -354,25 +313,16 @@ impl core::fmt::Display for BehaviorGenerationError {
 
         writeln!(f, "Behavior generation failed with the following errors:")?;
         if fnis_errors_len > 0 {
-            writeln!(
-                f,
-                "-    Generating FNIS patch Error count: {fnis_errors_len}",
-            )?;
+            writeln!(f, "-    Generating FNIS patch Error count: {fnis_errors_len}",)?;
         }
         if owned_file_errors_len > 0 {
             writeln!(f, "-    Reading file Error count: {owned_file_errors_len}",)?;
         }
         if adsf_errors_len > 0 {
-            writeln!(
-                f,
-                "- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}",
-            )?;
+            writeln!(f, "- `animationdatasinglefile.txt` Error Count: {adsf_errors_len}",)?;
         }
         if asdsf_errors_len > 0 {
-            writeln!(
-                f,
-                "- `animationsetdatasinglefile.txt` Error Count: {asdsf_errors_len}",
-            )?;
+            writeln!(f, "- `animationsetdatasinglefile.txt` Error Count: {asdsf_errors_len}",)?;
         }
         if patch_errors_len > 0 {
             writeln!(f, "-       Json Patch Error Count: {patch_errors_len}")?;

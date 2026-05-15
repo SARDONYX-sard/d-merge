@@ -12,10 +12,7 @@ pub struct AttacksDiff<'a> {
     ///   - ["[2]", "clip_names", "[0]"]
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
     )]
     pub one: OnePatchMap<'a>,
 
@@ -26,10 +23,7 @@ pub struct AttacksDiff<'a> {
     ///   - ["[1]", "clip_names"]
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))
     )]
     pub seq: SeqPatchMap<'a>,
 }
@@ -42,21 +36,11 @@ pub(crate) fn attacks_to_borrowed_value(
     let mut vec = Vec::with_capacity(attacks.len());
     for attack in attacks {
         let mut map = simd_json::borrowed::Object::new();
-        map.insert(
-            "attack_trigger".into(),
-            Value::String(attack.attack_trigger),
-        );
+        map.insert("attack_trigger".into(), Value::String(attack.attack_trigger));
         map.insert("is_contextual".into(), attack.is_contextual.into());
         map.insert("clip_names_len".into(), attack.clip_names_len.into());
-        let clip_names_array = attack
-            .clip_names
-            .into_iter()
-            .map(Value::String)
-            .collect::<Vec<_>>();
-        map.insert(
-            "clip_names".into(),
-            Value::Array(Box::new(clip_names_array)),
-        );
+        let clip_names_array = attack.clip_names.into_iter().map(Value::String).collect::<Vec<_>>();
+        map.insert("clip_names".into(), Value::Array(Box::new(clip_names_array)));
 
         vec.push(Value::Object(Box::new(map)));
     }

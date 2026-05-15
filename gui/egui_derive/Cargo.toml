@@ -5,6 +5,7 @@ description = "egui ver. derive attr"
 
 authors.workspace = true
 categories.workspace = true
+keywords.workspace = true
 edition.workspace = true
 license.workspace = true
 readme.workspace = true

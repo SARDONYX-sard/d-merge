@@ -66,9 +66,7 @@ impl Action {
     pub fn try_as_seq(&self) -> Result<(Op, Range<usize>), JsonPatchError> {
         match self {
             Self::Seq { op, range } => Ok((*op, range.clone())),
-            _ => Err(JsonPatchError::ExpectedSeq {
-                unexpected: self.clone(),
-            }),
+            _ => Err(JsonPatchError::ExpectedSeq { unexpected: self.clone() }),
         }
     }
 }
@@ -106,10 +104,7 @@ mod tests {
         use super::*;
 
         let pure = Action::Pure { op: Op::Replace };
-        let seq = Action::Seq {
-            op: Op::Add,
-            range: 2..5,
-        };
+        let seq = Action::Seq { op: Op::Add, range: 2..5 };
         let push = Action::SeqPush;
 
         let pure_json = simd_json::to_string(&pure).unwrap();

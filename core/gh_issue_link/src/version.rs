@@ -26,11 +26,7 @@ pub struct Version {
 
 impl core::fmt::Display for Version {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}.{}",
-            self.major, self.minor, self.patch, self.build
-        )
+        write!(f, "{}.{}.{}.{}", self.major, self.minor, self.patch, self.build)
     }
 }
 
@@ -54,10 +50,7 @@ pub struct VersionError;
 
 impl core::fmt::Display for VersionError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "file version info not available on this platform or file"
-        )
+        write!(f, "file version info not available on this platform or file")
     }
 }
 
@@ -136,12 +129,8 @@ where
         dwFileDateLS: u32,
     }
 
-    let wide: Vec<u16> = path
-        .as_ref()
-        .as_os_str()
-        .encode_wide()
-        .chain(core::iter::once(0))
-        .collect();
+    let wide: Vec<u16> =
+        path.as_ref().as_os_str().encode_wide().chain(core::iter::once(0)).collect();
 
     unsafe {
         let mut handle = 0_u32;
@@ -157,18 +146,10 @@ where
 
         let mut lp_buffer: *mut c_void = ptr::null_mut();
         let mut len = 0_u32;
-        let sub_block: Vec<u16> = OsStr::new("\\")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
+        let sub_block: Vec<u16> =
+            OsStr::new("\\").encode_wide().chain(std::iter::once(0)).collect();
 
-        if VerQueryValueW(
-            data.as_ptr().cast(),
-            sub_block.as_ptr(),
-            &mut lp_buffer,
-            &mut len,
-        ) == 0
-        {
+        if VerQueryValueW(data.as_ptr().cast(), sub_block.as_ptr(), &mut lp_buffer, &mut len) == 0 {
             return Err(VersionError);
         }
 

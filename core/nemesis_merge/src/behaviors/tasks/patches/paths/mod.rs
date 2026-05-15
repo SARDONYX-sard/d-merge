@@ -31,10 +31,9 @@ impl<'a> NemesisPath<'a> {
     /// Attempts to convert this path into a [`TemplateKey`].
     pub(super) fn to_template_key(&self) -> Option<TemplateKey<'static>> {
         match self {
-            NemesisPath::Normal {
-                template_name,
-                is_1st_person,
-            } => TemplateKey::from_nemesis_file(template_name, *is_1st_person),
+            NemesisPath::Normal { template_name, is_1st_person } => {
+                TemplateKey::from_nemesis_file(template_name, *is_1st_person)
+            }
             // Safety: Ext verifies that the parsing stage for creation begins with meshes.
             NemesisPath::EngineExt { meshes_path } => {
                 TemplateKey::new(Cow::Owned(meshes_path.to_string()))
@@ -58,10 +57,7 @@ impl<'a> NemesisPath<'a> {
     /// between template-based Nemesis patches and free-form EngineExt patches.
     pub(super) fn get_variable_index(&self) -> Option<&'static str> {
         match self {
-            NemesisPath::Normal {
-                template_name,
-                is_1st_person,
-            } => Some(
+            NemesisPath::Normal { template_name, is_1st_person } => Some(
                 MasterIndex::from_nemesis_file(template_name, *is_1st_person)?
                     .master_behavior_graph_index,
             ),

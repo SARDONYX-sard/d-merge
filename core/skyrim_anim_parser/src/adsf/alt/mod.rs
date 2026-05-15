@@ -66,10 +66,7 @@ impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
     /// The dir spec for the Nemesis adsf patch is 1based_index, but here it is 0based_index.
     #[inline]
     fn from(adsf: Adsf<'a>) -> Self {
-        let Adsf {
-            project_names,
-            anim_list,
-        } = adsf;
+        let Adsf { project_names, anim_list } = adsf;
 
         debug_assert_eq!(
             project_names.len(),
@@ -128,10 +125,7 @@ impl<'a> From<AltAdsf<'a>> for Adsf<'a> {
             anim_list.push(anim.into());
         }
 
-        Adsf {
-            project_names,
-            anim_list,
-        }
+        Adsf { project_names, anim_list }
     }
 }
 
@@ -205,31 +199,19 @@ impl AltAnimData<'_> {
 
     pub(crate) fn clip_anim_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize = self
-            .clip_anim_blocks
-            .par_iter()
-            .map(|(_, block)| block.to_line_len())
-            .sum();
-        let add_len: usize = self
-            .add_clip_anim_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
+        let len: usize =
+            self.clip_anim_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
+        let add_len: usize =
+            self.add_clip_anim_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 
     pub(crate) fn clip_motion_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize = self
-            .clip_motion_blocks
-            .par_iter()
-            .map(|(_, block)| block.to_line_len())
-            .sum();
-        let add_len: usize = self
-            .add_clip_motion_blocks
-            .par_iter()
-            .map(|block| block.to_line_len())
-            .sum();
+        let len: usize =
+            self.clip_motion_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
+        let add_len: usize =
+            self.add_clip_motion_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 }
@@ -238,17 +220,9 @@ impl<'a> From<AltAnimData<'a>> for AnimData<'a> {
     fn from(alt: AltAnimData<'a>) -> Self {
         AnimData {
             header: alt.header,
-            clip_anim_blocks: alt
-                .clip_anim_blocks
-                .into_par_iter()
-                .map(|(_, v)| v)
-                .collect(),
+            clip_anim_blocks: alt.clip_anim_blocks.into_par_iter().map(|(_, v)| v).collect(),
             add_clip_anim_blocks: alt.add_clip_anim_blocks,
-            clip_motion_blocks: alt
-                .clip_motion_blocks
-                .into_par_iter()
-                .map(|(_, v)| v)
-                .collect(),
+            clip_motion_blocks: alt.clip_motion_blocks.into_par_iter().map(|(_, v)| v).collect(),
             add_clip_motion_blocks: alt.add_clip_motion_blocks,
         }
     }

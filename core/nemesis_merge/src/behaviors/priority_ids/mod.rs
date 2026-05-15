@@ -47,9 +47,8 @@ pub(super) fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
 
 fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // Match either '/' or '\\' as path separator
-    let mut sep = alt(('/', '\\'))
-        .context(Expected(CharLiteral('/')))
-        .context(Expected(CharLiteral('\\')));
+    let mut sep =
+        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
 
     // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {
@@ -69,9 +68,8 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 fn _get_nemesis_ext_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // Match either '/' or '\\' as path separator
-    let mut sep = alt(('/', '\\'))
-        .context(Expected(CharLiteral('/')))
-        .context(Expected(CharLiteral('\\')));
+    let mut sep =
+        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
 
     // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {
@@ -96,13 +94,8 @@ mod tests {
     #[test]
     fn test_get_nemesis_id() {
         let input = r"D:\GAME\ModOrganizer Skyrim SE\mods\SomeMod\Nemesis_Engine\mod\abc\0_master\#0001.txt";
-        let id = _get_nemesis_id
-            .parse(input)
-            .unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            id,
-            r"D:\GAME\ModOrganizer Skyrim SE\mods\SomeMod\Nemesis_Engine\mod\abc"
-        );
+        let id = _get_nemesis_id.parse(input).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(id, r"D:\GAME\ModOrganizer Skyrim SE\mods\SomeMod\Nemesis_Engine\mod\abc");
     }
 
     #[test]

@@ -33,9 +33,7 @@ pub(crate) fn start_log_tail(
     log_lines: Arc<RwLock<Vec<String>>>,
     ctx: Option<egui::Context>,
 ) -> Result<()> {
-    let log_path = log_path
-        .canonicalize()
-        .context(CanonicalizeSnafu { path: log_path })?;
+    let log_path = log_path.canonicalize().context(CanonicalizeSnafu { path: log_path })?;
 
     thread::spawn(move || {
         if let Err(e) = tail_loop(log_path, log_lines, ctx) {
@@ -93,19 +91,13 @@ fn push_line(log_lines: &Arc<RwLock<Vec<String>>>, line: String) {
 #[derive(Debug, snafu::Snafu)]
 pub(crate) enum LogError {
     #[snafu(display("Failed to open log file at {path:?}: {source}"))]
-    Open {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    Open { path: PathBuf, source: std::io::Error },
 
     #[snafu(display("I/O error while reading log file: {source}"))]
     Io { source: std::io::Error },
 
     #[snafu(display("Failed to canonicalize path {path:?}: {source}"))]
-    Canonicalize {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    Canonicalize { path: PathBuf, source: std::io::Error },
 }
 
 type Result<T, E = LogError> = std::result::Result<T, E>;

@@ -43,14 +43,9 @@ where
         .with_writer(create_rotate_log(log_dir, log_name, 4)?);
 
     let (filter, reload_handle) = reload::Layer::new(LevelFilter::TRACE);
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .init();
+    tracing_subscriber::registry().with(filter).with(fmt_layer).init();
 
-    RELOAD_HANDLE
-        .set(reload_handle)
-        .map_err(|_e| Error::FailedInitLog)
+    RELOAD_HANDLE.set(reload_handle).map_err(|_e| Error::FailedInitLog)
 }
 
 /// Change log level
@@ -87,12 +82,7 @@ fn create_rotate_log(
 
     let mut log_files = fs::read_dir(&log_dir)?
         .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            entry
-                .file_name()
-                .to_str()
-                .is_some_and(|name| name.starts_with(log_name))
-        })
+        .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.starts_with(log_name)))
         .collect::<Vec<_>>();
 
     let log_file = log_dir.as_ref().join(log_name);
@@ -111,10 +101,8 @@ fn create_rotate_log(
         }
     };
 
-    let old_file = log_dir.as_ref().join(format!(
-        "{log_name}_{}.log",
-        Local::now().format("%F_%H-%M-%S")
-    ));
+    let old_file =
+        log_dir.as_ref().join(format!("{log_name}_{}.log", Local::now().format("%F_%H-%M-%S")));
     if log_file.exists() {
         fs::rename(&log_file, old_file)?;
     };

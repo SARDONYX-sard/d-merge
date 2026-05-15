@@ -68,15 +68,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 None => Default::default(),
             };
 
-            let patches = PatchMaps {
-                nemesis_entries,
-                fnis_entries,
-            };
+            let patches = PatchMaps { nemesis_entries, fnis_entries };
             let config = build_config(args);
 
-            behavior_gen(patches, config)
-                .await
-                .map_err(|e| format!("behavior_gen failed: {e}"))?;
+            behavior_gen(patches, config).await.map_err(|e| format!("behavior_gen failed: {e}"))?;
         }
         Command::Info(ref info) => match &info.command {
             InfoCommand::SkyrimDir(args) => {

@@ -9,10 +9,8 @@ const FILTER: [&str; 3] = ["hkx", "xml", "json"];
 /// # Errors
 /// Returns an error message if the directory cannot be loaded or if there are issues reading the path.
 pub fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, Vec<Error>> {
-    let (entries, errors): (Vec<_>, Vec<_>) = dirs
-        .par_iter()
-        .map(|dir| build_dir_tree(dir, FILTER))
-        .partition(Result::is_ok);
+    let (entries, errors): (Vec<_>, Vec<_>) =
+        dirs.par_iter().map(|dir| build_dir_tree(dir, FILTER)).partition(Result::is_ok);
 
     // Collect error messages and join them
     if !errors.is_empty() {

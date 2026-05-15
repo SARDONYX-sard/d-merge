@@ -185,14 +185,8 @@ pub fn apply_seq_array_directly<'a>(
 // Separate sorted ops into Add and others
 fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
     let cmp_fn = |a: &ValueWithPriority<'a>, b: &ValueWithPriority<'a>| {
-        let ValueWithPriority {
-            patch: a,
-            priority: a_priority,
-        } = a;
-        let ValueWithPriority {
-            patch: b,
-            priority: b_priority,
-        } = b;
+        let ValueWithPriority { patch: a, priority: a_priority } = a;
+        let ValueWithPriority { patch: b, priority: b_priority } = b;
 
         let op_rank = |patch: &JsonPatch<'_>| match &patch.action {
             Action::Seq { op, .. } | Action::Pure { op } => match op {
@@ -221,13 +215,11 @@ fn apply_ops_parallel<'a>(
     patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<Vec<Value<'a>>> {
     let (non_add_ops, mut add_ops): (Vec<_>, Vec<_>) =
-        patches
-            .smart_iter()
-            .partition(|ValueWithPriority { patch, .. }| match &patch.action {
-                Action::Pure { op } => matches!(op, Op::Replace | Op::Remove),
-                Action::Seq { op, .. } => matches!(op, Op::Replace | Op::Remove),
-                Action::SeqPush => false,
-            });
+        patches.smart_iter().partition(|ValueWithPriority { patch, .. }| match &patch.action {
+            Action::Pure { op } => matches!(op, Op::Replace | Op::Remove),
+            Action::Seq { op, .. } => matches!(op, Op::Replace | Op::Remove),
+            Action::SeqPush => false,
+        });
 
     // Apply Replace and Remove operations
     for ValueWithPriority { patch, priority } in non_add_ops {
@@ -305,10 +297,7 @@ fn value_as_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError
             let value_type = simd_json::base::TypedValue::value_type(&other);
 
             Err(JsonPatchError::try_type_from(
-                simd_json::TryTypeError {
-                    expected: simd_json::ValueType::Array,
-                    got: value_type,
-                },
+                simd_json::TryTypeError { expected: simd_json::ValueType::Array, got: value_type },
                 &["".into()],
                 other,
             ))
@@ -316,10 +305,8 @@ fn value_as_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError
     }
 }
 
-type SplitValue<'a> = (
-    Option<(Range<usize>, Vec<Value<'a>>)>,
-    Option<(Range<usize>, Vec<Value<'a>>)>,
-);
+type SplitValue<'a> =
+    (Option<(Range<usize>, Vec<Value<'a>>)>, Option<(Range<usize>, Vec<Value<'a>>)>);
 
 /// Splits a replacement operation into two parts:
 /// - one that applies within bounds of `base`
@@ -367,13 +354,10 @@ fn apply_replace_with_overflow<'a>(
         };
 
         let written = AtomicUsize::new(0);
-        slice
-            .smart_iter_mut()
-            .zip(in_bounds_values)
-            .for_each(|(element, patch)| {
-                *element = patch;
-                written.fetch_add(1, Ordering::Relaxed);
-            });
+        slice.smart_iter_mut().zip(in_bounds_values).for_each(|(element, patch)| {
+            *element = patch;
+            written.fetch_add(1, Ordering::Relaxed);
+        });
 
         let written_count = written.load(Ordering::Relaxed);
         if written_count < slice.len() {
@@ -384,9 +368,7 @@ fn apply_replace_with_overflow<'a>(
                 marking remaining {remain_range:?} elements as removed",
                 slice.len(),
             );
-            slice[remain_range]
-                .smart_iter_mut()
-                .for_each(|element| *element = MARK_AS_REMOVED);
+            slice[remain_range].smart_iter_mut().for_each(|element| *element = MARK_AS_REMOVED);
         }
     }
 
@@ -402,10 +384,7 @@ fn apply_replace_with_overflow<'a>(
         if !overflow_values.is_empty() {
             return Ok(Some(ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Add,
-                        range: base.len()..base.len(),
-                    },
+                    action: Action::Seq { op: Op::Add, range: base.len()..base.len() },
                     value: overflow_values.into(),
                 },
                 priority,
@@ -551,10 +530,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
             header.push_str(&format!("{:^cell_width$}", seg.start));
         } else {
             // multiple indices
-            header.push_str(&format!(
-                "{:^cell_width$}",
-                format!("{}-{}", seg.start, seg.end - 1)
-            ));
+            header.push_str(&format!("{:^cell_width$}", format!("{}-{}", seg.start, seg.end - 1)));
         }
 
         last = Some(seg.end - 1);
@@ -575,9 +551,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
     // --- 6. sort rows by op rank then priority
     {
         let priority_sort = |a: &TableRow, b: &TableRow| {
-            a.op.rank()
-                .cmp(&b.op.rank())
-                .then(a.priority.cmp(&b.priority))
+            a.op.rank().cmp(&b.op.rank()).then(a.priority.cmp(&b.priority))
         };
         #[cfg(feature = "rayon")]
         rows.par_sort_unstable_by(priority_sort);
@@ -625,10 +599,7 @@ mod tests {
         // replace range 1..4 but has 2
         let patches: Vec<ValueWithPriority<'_>> = vec![ValueWithPriority {
             patch: JsonPatch {
-                action: Action::Seq {
-                    op: Op::Replace,
-                    range: 1..4,
-                },
+                action: Action::Seq { op: Op::Replace, range: 1..4 },
                 value: json_typed! {borrowed, ["A", "B"]},
             },
             priority: 0,
@@ -647,10 +618,7 @@ mod tests {
             // Add in the middle
             ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Add,
-                        range: 1..3,
-                    },
+                    action: Action::Seq { op: Op::Add, range: 1..3 },
                     value: simd_json::json_typed! {borrowed, ["a", "b"]},
                 },
                 priority: 1,
@@ -658,10 +626,7 @@ mod tests {
             // Replace a range
             ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Replace,
-                        range: 4..6,
-                    },
+                    action: Action::Seq { op: Op::Replace, range: 4..6 },
                     value: simd_json::json_typed! {borrowed, ["x1", "x2"]},
                 },
                 priority: 0,
@@ -669,10 +634,7 @@ mod tests {
             // Remove a range
             ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Remove,
-                        range: 2..4,
-                    },
+                    action: Action::Seq { op: Op::Remove, range: 2..4 },
                     value: simd_json::json_typed! {borrowed, []},
                 },
                 priority: 2,

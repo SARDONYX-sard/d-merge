@@ -31,11 +31,7 @@ pub(crate) async fn convert(
 #[tauri::command]
 pub(crate) fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, String> {
     serde_hkx_for_gui::load_dir_node(dirs).map_err(|errs| {
-        let err = errs
-            .par_iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<String>>()
-            .join("\n");
+        let err = errs.par_iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n");
 
         tracing::error!("{err}");
         err

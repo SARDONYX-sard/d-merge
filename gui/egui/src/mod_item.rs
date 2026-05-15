@@ -40,10 +40,8 @@ pub(crate) enum SortColumn {
 /// New items are appended in alphabetical order.
 /// Final priorities are always normalized.
 pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
-    let old_map: HashMap<&str, (bool, usize)> = old
-        .iter()
-        .map(|m| (m.id.as_str(), (m.enabled, m.priority)))
-        .collect();
+    let old_map: HashMap<&str, (bool, usize)> =
+        old.iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
     let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) = new
         .into_par_iter()
@@ -79,10 +77,7 @@ pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<Mo
     with_old.par_extend(without_old);
 
     // Final deterministic normalization
-    with_old
-        .par_iter_mut()
-        .enumerate()
-        .for_each(|(index, item)| item.priority = index);
+    with_old.par_iter_mut().enumerate().for_each(|(index, item)| item.priority = index);
 
     with_old
 }
@@ -92,16 +87,9 @@ pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModIt
     // - Nemesis/FNIS(vfs): e.g. `aaaa`
     // - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
-    let (nemesis_entries, fnis_entries) = mod_infos
-        .par_iter()
-        .filter(|item| item.enabled)
-        .partition_map(|mod_item| {
-            let ModItem {
-                id,
-                priority,
-                mod_type,
-                ..
-            } = mod_item;
+    let (nemesis_entries, fnis_entries) =
+        mod_infos.par_iter().filter(|item| item.enabled).partition_map(|mod_item| {
+            let ModItem { id, priority, mod_type, .. } = mod_item;
             let priority = *priority;
 
             match mod_type {
@@ -127,10 +115,7 @@ pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModIt
                 }
             }
         });
-    PatchMaps {
-        nemesis_entries,
-        fnis_entries,
-    }
+    PatchMaps { nemesis_entries, fnis_entries }
 }
 
 #[cfg(test)]

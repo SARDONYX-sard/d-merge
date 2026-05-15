@@ -6,9 +6,7 @@
 pub enum Error {
     // NOTE: Cannot `#snafu(transparent)`
     /// Parser combinator Error: {err}
-    ContextError {
-        err: winnow::error::ErrMode<winnow::error::ContextError>,
-    },
+    ContextError { err: winnow::error::ErrMode<winnow::error::ContextError> },
 
     /// Human readable XML parsing error
     #[snafu(transparent)]

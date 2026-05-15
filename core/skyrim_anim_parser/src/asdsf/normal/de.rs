@@ -31,18 +31,14 @@ fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
         let mut anim_set_list = indexmap::IndexMap::new();
 
         for file_name in file_names.parse_next(input)? {
-            let anim_set_data = anim_set_data
-                .context(Label("AnimSetData"))
-                .parse_next(input)?;
+            let anim_set_data = anim_set_data.context(Label("AnimSetData")).parse_next(input)?;
             anim_set_list.insert(file_name, anim_set_data);
         }
 
         txt_projects.insert(txt_project, AnimSetList(anim_set_list));
     }
 
-    Ok(Asdsf {
-        txt_projects: TxtProjects(txt_projects),
-    })
+    Ok(Asdsf { txt_projects: TxtProjects(txt_projects) })
 }
 
 /// Parses the project names from the input.
@@ -96,30 +92,26 @@ pub fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
         .context(Expected(Description("version == V3")))
         .parse_next(input)?;
 
-    let triggers_len = parse_one_line
-        .context(Expected(Description("triggers_len: usize")))
-        .parse_next(input)?;
+    let triggers_len =
+        parse_one_line.context(Expected(Description("triggers_len: usize"))).parse_next(input)?;
     let triggers = lines(triggers_len)
         .context(Expected(Description("triggers: Vec<Str>")))
         .parse_next(input)?;
 
-    let conditions_len = parse_one_line
-        .context(Expected(Description("conditions_len: usize")))
-        .parse_next(input)?;
+    let conditions_len =
+        parse_one_line.context(Expected(Description("conditions_len: usize"))).parse_next(input)?;
     let conditions = conditions(conditions_len)
         .context(Expected(Description("conditions: Vec<Str>")))
         .parse_next(input)?;
 
-    let attacks_len = parse_one_line
-        .context(Expected(Description("attacks_len: usize")))
-        .parse_next(input)?;
+    let attacks_len =
+        parse_one_line.context(Expected(Description("attacks_len: usize"))).parse_next(input)?;
     let attacks = attacks(attacks_len)
         .context(Expected(Description("attacks: Vec<Str>")))
         .parse_next(input)?;
 
-    let anim_infos_len = parse_one_line
-        .context(Expected(Description("anim_infos_len: usize")))
-        .parse_next(input)?;
+    let anim_infos_len =
+        parse_one_line.context(Expected(Description("anim_infos_len: usize"))).parse_next(input)?;
     let anim_infos = anim_infos(anim_infos_len)
         .context(Expected(Description("anim_infos: Vec<Str>")))
         .parse_next(input)?;

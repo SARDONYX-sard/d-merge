@@ -118,10 +118,7 @@ impl HackOptions {
     /// Enable all hack options.
     #[inline]
     pub const fn enable_all() -> Self {
-        Self {
-            cast_ragdoll_event: true,
-            bone_weight_outside_hkparam: true,
-        }
+        Self { cast_ragdoll_event: true, bone_weight_outside_hkparam: true }
     }
 }
 
@@ -163,11 +160,7 @@ pub struct DebugOptions {
 impl Default for DebugOptions {
     #[inline]
     fn default() -> Self {
-        Self {
-            output_patch_json: true,
-            output_merged_json: true,
-            output_merged_xml: false,
-        }
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: false }
     }
 }
 
@@ -175,11 +168,7 @@ impl DebugOptions {
     /// Enable all debug options.
     #[inline]
     pub const fn enable_all() -> Self {
-        Self {
-            output_patch_json: true,
-            output_merged_json: true,
-            output_merged_xml: true,
-        }
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: true }
     }
 }
 

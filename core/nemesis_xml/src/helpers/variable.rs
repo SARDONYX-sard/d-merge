@@ -70,9 +70,7 @@ use winnow::{
 pub fn event_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     separated_pair(Caseless("$eventID["), take_until(0.., "]$"), "]$")
         .take()
-        .context(Expected(Description(
-            "eventID(e.g. `$eventID[sampleEventName]$`)",
-        )))
+        .context(Expected(Description("eventID(e.g. `$eventID[sampleEventName]$`)")))
         .parse_next(input)
 }
 
@@ -81,9 +79,7 @@ pub fn event_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 pub fn variable_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     separated_pair(Caseless("$variableID["), take_until(0.., "]$"), "]$")
         .take()
-        .context(Expected(Description(
-            "variableID(e.g. `$variableID[sampleName]$`)",
-        )))
+        .context(Expected(Description("variableID(e.g. `$variableID[sampleName]$`)")))
         .parse_next(input)
 }
 

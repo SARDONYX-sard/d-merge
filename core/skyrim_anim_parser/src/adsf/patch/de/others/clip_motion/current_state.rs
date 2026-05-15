@@ -118,11 +118,8 @@ impl<'de> CurrentState<'de> {
         match self.current_kind {
             Some(LineKind::TranslationLen | LineKind::RotationLen) => {}
             Some(LineKind::Translation) => {
-                let transition = self
-                    .patch
-                    .get_or_insert_default()
-                    .translations
-                    .get_or_insert_default();
+                let transition =
+                    self.patch.get_or_insert_default().translations.get_or_insert_default();
 
                 transition.range.end += 1;
                 transition.values.push(value);
@@ -134,11 +131,7 @@ impl<'de> CurrentState<'de> {
     }
 
     pub(super) fn increment_translations_range(&mut self) {
-        let transition = self
-            .patch
-            .get_or_insert_default()
-            .translations
-            .get_or_insert_default();
+        let transition = self.patch.get_or_insert_default().translations.get_or_insert_default();
         transition.range.end += 1;
     }
 
@@ -154,11 +147,8 @@ impl<'de> CurrentState<'de> {
         match self.current_kind {
             Some(LineKind::TranslationLen | LineKind::RotationLen) => {}
             Some(LineKind::Rotation) => {
-                let rotations = self
-                    .patch
-                    .get_or_insert_default()
-                    .rotations
-                    .get_or_insert_default();
+                let rotations =
+                    self.patch.get_or_insert_default().rotations.get_or_insert_default();
 
                 rotations.range.end += 1;
                 rotations.values.push(value);
@@ -170,11 +160,7 @@ impl<'de> CurrentState<'de> {
     }
 
     pub(super) fn increment_rotations_range(&mut self) {
-        let rotation = self
-            .patch
-            .get_or_insert_default()
-            .rotations
-            .get_or_insert_default();
+        let rotation = self.patch.get_or_insert_default().rotations.get_or_insert_default();
         rotation.range.end += 1;
     }
 
@@ -187,20 +173,14 @@ impl<'de> CurrentState<'de> {
 
         match self.current_kind {
             Some(LineKind::TranslationLen | LineKind::Translation) => {
-                let transitions = self
-                    .patch
-                    .get_or_insert_default()
-                    .translations
-                    .get_or_insert_default();
+                let transitions =
+                    self.patch.get_or_insert_default().translations.get_or_insert_default();
                 transitions.range.start = start;
                 transitions.range.end = start;
             }
             Some(LineKind::RotationLen | LineKind::Rotation) => {
-                let rotations = self
-                    .patch
-                    .get_or_insert_default()
-                    .rotations
-                    .get_or_insert_default();
+                let rotations =
+                    self.patch.get_or_insert_default().rotations.get_or_insert_default();
                 rotations.range.start = start;
                 rotations.range.end = start;
             }
@@ -224,11 +204,7 @@ impl<'de> CurrentState<'de> {
             }
 
             if self.is_passed_original {
-                if self.patch.is_some() {
-                    Op::Replace
-                } else {
-                    Op::Remove
-                }
+                if self.patch.is_some() { Op::Replace } else { Op::Remove }
             } else {
                 Op::Add
             }

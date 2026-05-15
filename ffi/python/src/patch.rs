@@ -158,11 +158,7 @@ impl Config {
                 cast_ragdoll_event: cast_ragdoll_event.unwrap_or_default(),
                 bone_weight_outside_hkparam: bone_weight_outside_hkparam.unwrap_or_default(),
             }),
-            debug: DebugOptions {
-                output_patch_json,
-                output_merged_json,
-                output_merged_xml,
-            },
+            debug: DebugOptions { output_patch_json, output_merged_json, output_merged_xml },
             skyrim_data_dir_glob,
             generate_fnis_esp,
         }
@@ -283,27 +279,20 @@ impl From<&PatchStatus> for RustStatus {
     fn from(s: &PatchStatus) -> Self {
         match s.clone() {
             PatchStatus::GeneratingFnisPatches { index, total } => {
-                RustStatus::GeneratingFnisPatches {
-                    index: index as usize,
-                    total: total as usize,
-                }
+                RustStatus::GeneratingFnisPatches { index: index as usize, total: total as usize }
             }
-            PatchStatus::ReadingPatches { index, total } => RustStatus::ReadingPatches {
-                index: index as usize,
-                total: total as usize,
-            },
-            PatchStatus::ParsingPatches { index, total } => RustStatus::ParsingPatches {
-                index: index as usize,
-                total: total as usize,
-            },
-            PatchStatus::ApplyingPatches { index, total } => RustStatus::ApplyingPatches {
-                index: index as usize,
-                total: total as usize,
-            },
-            PatchStatus::GeneratingHkxFiles { index, total } => RustStatus::GeneratingHkxFiles {
-                index: index as usize,
-                total: total as usize,
-            },
+            PatchStatus::ReadingPatches { index, total } => {
+                RustStatus::ReadingPatches { index: index as usize, total: total as usize }
+            }
+            PatchStatus::ParsingPatches { index, total } => {
+                RustStatus::ParsingPatches { index: index as usize, total: total as usize }
+            }
+            PatchStatus::ApplyingPatches { index, total } => {
+                RustStatus::ApplyingPatches { index: index as usize, total: total as usize }
+            }
+            PatchStatus::GeneratingHkxFiles { index, total } => {
+                RustStatus::GeneratingHkxFiles { index: index as usize, total: total as usize }
+            }
             PatchStatus::Done() => RustStatus::Done,
             PatchStatus::Error(message) => RustStatus::Error(message),
         }
@@ -313,27 +302,20 @@ impl From<RustStatus> for PatchStatus {
     fn from(s: RustStatus) -> Self {
         match s {
             RustStatus::GeneratingFnisPatches { index, total } => {
-                PatchStatus::GeneratingFnisPatches {
-                    index: index as u32,
-                    total: total as u32,
-                }
+                PatchStatus::GeneratingFnisPatches { index: index as u32, total: total as u32 }
             }
-            RustStatus::ReadingPatches { index, total } => PatchStatus::ReadingPatches {
-                index: index as u32,
-                total: total as u32,
-            },
-            RustStatus::ParsingPatches { index, total } => PatchStatus::ParsingPatches {
-                index: index as u32,
-                total: total as u32,
-            },
-            RustStatus::ApplyingPatches { index, total } => PatchStatus::ApplyingPatches {
-                index: index as u32,
-                total: total as u32,
-            },
-            RustStatus::GeneratingHkxFiles { index, total } => PatchStatus::GeneratingHkxFiles {
-                index: index as u32,
-                total: total as u32,
-            },
+            RustStatus::ReadingPatches { index, total } => {
+                PatchStatus::ReadingPatches { index: index as u32, total: total as u32 }
+            }
+            RustStatus::ParsingPatches { index, total } => {
+                PatchStatus::ParsingPatches { index: index as u32, total: total as u32 }
+            }
+            RustStatus::ApplyingPatches { index, total } => {
+                PatchStatus::ApplyingPatches { index: index as u32, total: total as u32 }
+            }
+            RustStatus::GeneratingHkxFiles { index, total } => {
+                PatchStatus::GeneratingHkxFiles { index: index as u32, total: total as u32 }
+            }
             RustStatus::Done => PatchStatus::Done(),
             RustStatus::Error(message) => PatchStatus::Error(message),
         }
@@ -444,10 +426,7 @@ impl PatchMaps {
 
 #[inline]
 fn into_rust_priority_map(map: PatchMaps) -> RustPatchMaps {
-    RustPatchMaps {
-        nemesis_entries: map.nemesis_entries,
-        fnis_entries: map.fnis_entries,
-    }
+    RustPatchMaps { nemesis_entries: map.nemesis_entries, fnis_entries: map.fnis_entries }
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]

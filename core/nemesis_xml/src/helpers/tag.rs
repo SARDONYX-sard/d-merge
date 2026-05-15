@@ -86,9 +86,7 @@ pub fn field_start_open_tag(input: &mut &str) -> ModalResult<()> {
         _: delimited_with_multispace0("="),
     )
     .context(StrContext::Label("field of class: start opening tag"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "e.g. `<hkparam name=`",
-    )))
+    .context(StrContext::Expected(StrContextValue::Description("e.g. `<hkparam name=`")))
     .parse_next(input)
 }
 
@@ -109,9 +107,7 @@ pub fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
     )
     .map(|(n,)| n.map(|n| n.0))
     .context(StrContext::Label("field of class: start closing tag"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "e.g. `>`",
-    )))
+    .context(StrContext::Expected(StrContextValue::Description("e.g. `>`")))
     .parse_next(input)
 }
 
@@ -119,10 +115,7 @@ fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, E
     find_json_parser_by(field_name, field_info).ok_or_else(|| {
         let acceptable_fields: Vec<&'static str> = field_info.keys().copied().collect();
 
-        Error::UnknownField {
-            field_name: field_name.to_string(),
-            acceptable_fields,
-        }
+        Error::UnknownField { field_name: field_name.to_string(), acceptable_fields }
     })
 }
 
@@ -185,9 +178,7 @@ where
     attr_string
         .parse_to()
         .context(StrContext::Label("number in string"))
-        .context(StrContext::Expected(StrContextValue::Description(
-            r#"Number(e.g. `"64"`)"#,
-        )))
+        .context(StrContext::Expected(StrContextValue::Description(r#"Number(e.g. `"64"`)"#)))
         .parse_next(input)
 }
 
@@ -214,11 +205,8 @@ fn index_name_attr<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
 /// # Errors
 /// If parsing failed.
 pub fn index_name<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
-    alt((
-        ("#", digit1).take().map(PointerType::Index),
-        take_until(0.., '\"').map(PointerType::Var),
-    ))
-    .parse_next(input)
+    alt((("#", digit1).take().map(PointerType::Index), take_until(0.., '\"').map(PointerType::Var)))
+        .parse_next(input)
 }
 
 #[cfg(test)]
@@ -227,13 +215,7 @@ mod tests {
 
     #[test]
     fn test_index() {
-        assert_eq!(
-            index_name_attr.parse("\"#0002\""),
-            Ok(PointerType::Index("#0002"))
-        );
-        assert_eq!(
-            index_name_attr.parse("\"$id$2\""),
-            Ok(PointerType::Var("$id$2"))
-        );
+        assert_eq!(index_name_attr.parse("\"#0002\""), Ok(PointerType::Index("#0002")));
+        assert_eq!(index_name_attr.parse("\"$id$2\""), Ok(PointerType::Var("$id$2")));
     }
 }

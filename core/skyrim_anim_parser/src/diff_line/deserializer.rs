@@ -25,9 +25,7 @@ use crate::{
 /// Parse failed.
 pub fn parse_lines_diff_patch(input: &str, priority: usize) -> Result<DiffLines<'_>, Error> {
     let mut deserializer = Deserializer::new(input, priority);
-    deserializer
-        .root()
-        .map_err(|err| deserializer.to_readable_err(err))?;
+    deserializer.root().map_err(|err| deserializer.to_readable_err(err))?;
     Ok(deserializer.output_patches)
 }
 
@@ -63,9 +61,7 @@ impl<'de> Deserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::Context { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
@@ -75,9 +71,7 @@ impl<'de> Deserializer<'de> {
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
+        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
 
@@ -193,10 +187,7 @@ impl<'de> Deserializer<'de> {
             let values = if op == Op::Remove { vec![] } else { lines };
             let values = ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op,
-                        range: self.current.take_range()?,
-                    },
+                    action: Action::Seq { op, range: self.current.take_range()? },
                     value: values.into(),
                 },
                 priority: self.priority,
@@ -239,10 +230,7 @@ TextAdd.txt
         let expected = DiffLines(vec![
             ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Replace,
-                        range: 0..1,
-                    },
+                    action: Action::Seq { op: Op::Replace, range: 0..1 },
                     value: simd_json::json_typed! { borrowed, [
                         "TextReplace.txt"
                     ] },
@@ -251,10 +239,7 @@ TextAdd.txt
             },
             ValueWithPriority {
                 patch: JsonPatch {
-                    action: Action::Seq {
-                        op: Op::Add,
-                        range: 7..9,
-                    },
+                    action: Action::Seq { op: Op::Add, range: 7..9 },
                     value: simd_json::json_typed! { borrowed, [
                         "TextAdd.txt",
                         "TextAdd.txt"

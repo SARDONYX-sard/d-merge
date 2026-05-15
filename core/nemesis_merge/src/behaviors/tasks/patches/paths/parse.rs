@@ -46,9 +46,7 @@ pub(crate) fn parse_nemesis_path(path: &Path) -> Result<NemesisPath<'_>, Error> 
 
     parse_components
         .parse(input)
-        .map_err(|e| Error::FailedParseNemesisPatchPath {
-            source: ReadableError::from_parse(e),
-        })
+        .map_err(|e| Error::FailedParseNemesisPatchPath { source: ReadableError::from_parse(e) })
 }
 
 fn parse_components<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
@@ -121,25 +119,13 @@ mod tests {
     #[test]
     fn normal_basic() {
         let p = parse("Nemesis_Engine/mod/flinch/0_master/#0106.txt");
-        assert_eq!(
-            p,
-            NemesisPath::Normal {
-                template_name: "0_master",
-                is_1st_person: false
-            }
-        );
+        assert_eq!(p, NemesisPath::Normal { template_name: "0_master", is_1st_person: false });
     }
 
     #[test]
     fn normal_1stperson() {
         let p = parse("Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt");
-        assert_eq!(
-            p,
-            NemesisPath::Normal {
-                template_name: "0_master",
-                is_1st_person: true
-            }
-        );
+        assert_eq!(p, NemesisPath::Normal { template_name: "0_master", is_1st_person: true });
     }
 
     #[test]

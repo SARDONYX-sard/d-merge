@@ -86,25 +86,25 @@ pub fn parse_fnis_list<'a>(input: &mut &'a str) -> ModalResult<FNISList<'a>> {
     {
         // FIXME: Need validate OffsetArm
         let pattern = match anim_type {
-            FNISAnimType::AnimVar => parse_anim_var_line
-                .map(SyntaxPattern::AnimVar)
-                .parse_next(input)?,
-            FNISAnimType::Basic => parse_fnis_animation
-                .map(SyntaxPattern::Basic)
-                .parse_next(input)?,
-            FNISAnimType::AnimObject => parse_fnis_animation
-                .map(SyntaxPattern::AnimObject)
-                .parse_next(input)?,
-            FNISAnimType::OffsetArm => parse_fnis_animation
-                .map(SyntaxPattern::OffsetArm)
-                .parse_next(input)?,
-            FNISAnimType::Sequenced | FNISAnimType::SequencedOptimized => parse_seq_animation
-                .map(SyntaxPattern::Sequenced)
-                .parse_next(input)?,
+            FNISAnimType::AnimVar => {
+                parse_anim_var_line.map(SyntaxPattern::AnimVar).parse_next(input)?
+            }
+            FNISAnimType::Basic => {
+                parse_fnis_animation.map(SyntaxPattern::Basic).parse_next(input)?
+            }
+            FNISAnimType::AnimObject => {
+                parse_fnis_animation.map(SyntaxPattern::AnimObject).parse_next(input)?
+            }
+            FNISAnimType::OffsetArm => {
+                parse_fnis_animation.map(SyntaxPattern::OffsetArm).parse_next(input)?
+            }
+            FNISAnimType::Sequenced | FNISAnimType::SequencedOptimized => {
+                parse_seq_animation.map(SyntaxPattern::Sequenced).parse_next(input)?
+            }
 
-            FNISAnimType::Furniture | FNISAnimType::FurnitureOptimized => parse_furniture_animation
-                .map(SyntaxPattern::Furniture)
-                .parse_next(input)?,
+            FNISAnimType::Furniture | FNISAnimType::FurnitureOptimized => {
+                parse_furniture_animation.map(SyntaxPattern::Furniture).parse_next(input)?
+            }
 
             FNISAnimType::SequencedContinued => fail
                 .context(StrContext::Expected(StrContextValue::Description(
@@ -116,17 +116,17 @@ Example of correct usage:
                 )))
                 .parse_next(input)?,
 
-            FNISAnimType::Paired | FNISAnimType::KillMove => parse_paired_animation
-                .map(SyntaxPattern::PairAndKillMove)
-                .parse_next(input)?,
+            FNISAnimType::Paired | FNISAnimType::KillMove => {
+                parse_paired_animation.map(SyntaxPattern::PairAndKillMove).parse_next(input)?
+            }
 
-            FNISAnimType::Alternate => parse_alternate_animation
-                .map(SyntaxPattern::AltAnim)
-                .parse_next(input)?,
+            FNISAnimType::Alternate => {
+                parse_alternate_animation.map(SyntaxPattern::AltAnim).parse_next(input)?
+            }
 
-            FNISAnimType::Chair => parse_fnis_chair_animation
-                .map(SyntaxPattern::Chair)
-                .parse_next(input)?,
+            FNISAnimType::Chair => {
+                parse_fnis_chair_animation.map(SyntaxPattern::Chair).parse_next(input)?
+            }
         };
 
         patterns.push(pattern);

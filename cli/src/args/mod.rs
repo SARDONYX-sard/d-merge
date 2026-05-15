@@ -139,9 +139,7 @@ impl core::str::FromStr for Runtime {
             _ if s.eq_ignore_ascii_case("SkyrimSE") => Self::Se,
             _ if s.eq_ignore_ascii_case("SkyrimLE") => Self::Le,
             invalid => {
-                return Err(format!(
-                    "Expected `SkyrimSE` or `SkyrimLE`. But got {invalid}"
-                ));
+                return Err(format!("Expected `SkyrimSE` or `SkyrimLE`. But got {invalid}"));
             }
         })
     }

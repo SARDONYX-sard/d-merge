@@ -42,9 +42,7 @@ where
     T: FromStr,
 {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
-    let line = till_line_ending
-        .verify(|s: &str| s.parse::<T>().is_ok())
-        .parse_next(input)?;
+    let line = till_line_ending.verify(|s: &str| s.parse::<T>().is_ok()).parse_next(input)?;
     opt(line_ending).parse_next(input)?; // skip line end
     Ok(line.into())
 }
@@ -64,9 +62,7 @@ fn parse_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
 /// If parsing fails, returns human readable error.
 #[inline]
 pub fn parse_clip_anim_block_patch(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
-    clip_anim_block_patch
-        .parse(input)
-        .map_err(|e| ReadableError::from_parse(e))
+    clip_anim_block_patch.parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 /// Parses `ClipAnimDataBlock`
@@ -96,9 +92,7 @@ fn clip_anim_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlo
 /// If parsing fails, returns human readable error.
 #[inline]
 pub fn parse_clip_motion_block_patch(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
-    clip_motion_block_patch
-        .parse(input)
-        .map_err(|e| ReadableError::from_parse(e))
+    clip_motion_block_patch.parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 /// Parses a clip motion block from the input.

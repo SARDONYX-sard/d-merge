@@ -35,9 +35,7 @@ pub fn parse_anim_set_diff_patch(
     priority: usize,
 ) -> Result<DiffPatchAnimSetData<'_>> {
     let mut patcher_de = PatchDeserializer::new(asdsf_patch);
-    patcher_de
-        .root_class()
-        .map_err(|err| patcher_de.to_readable_err(err))?;
+    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
 
     super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
 }
@@ -116,9 +114,7 @@ impl<'de> PatchDeserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::ContextError { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
     }
 
     /// Convert Visitor errors to position-assigned errors.
@@ -431,10 +427,7 @@ $crc32[ground_bite]$
                         json_patch::json_path!["[0]", "clip_names"],
                         ValueWithPriority {
                             patch: JsonPatch {
-                                action: Action::Seq {
-                                    op: Op::Replace,
-                                    range: 0..1,
-                                },
+                                action: Action::Seq { op: Op::Replace, range: 0..1 },
                                 value: simd_json::json_typed!(
                                     borrowed,
                                     ["AttackTestReplacedClipName"]
@@ -451,10 +444,7 @@ $crc32[ground_bite]$
                 seq: vec![
                     ValueWithPriority {
                         patch: JsonPatch {
-                            action: Action::Seq {
-                                op: Op::Replace,
-                                range: 0..1,
-                            },
+                            action: Action::Seq { op: Op::Replace, range: 0..1 },
                             value: simd_json::json_typed!(borrowed, [
                                 {
                                     "hashed_path": "4000000000",

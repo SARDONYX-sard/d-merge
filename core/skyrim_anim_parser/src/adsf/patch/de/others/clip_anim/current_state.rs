@@ -121,11 +121,8 @@ impl<'de> CurrentState<'de> {
         match self.current_kind {
             Some(LineKind::TriggerNamesLen) => {}
             Some(LineKind::TriggerNames) => {
-                let trigger_names = self
-                    .patch
-                    .get_or_insert_default()
-                    .trigger_names
-                    .get_or_insert_default();
+                let trigger_names =
+                    self.patch.get_or_insert_default().trigger_names.get_or_insert_default();
 
                 trigger_names.range.end += 1;
                 trigger_names.values.push(value);
@@ -137,11 +134,8 @@ impl<'de> CurrentState<'de> {
     }
 
     pub(super) fn increment_trigger_names_range(&mut self) {
-        let trigger_names = self
-            .patch
-            .get_or_insert_default()
-            .trigger_names
-            .get_or_insert_default();
+        let trigger_names =
+            self.patch.get_or_insert_default().trigger_names.get_or_insert_default();
         trigger_names.range.end += 1;
     }
 
@@ -154,11 +148,8 @@ impl<'de> CurrentState<'de> {
 
         match self.current_kind {
             Some(LineKind::TriggerNamesLen | LineKind::TriggerNames) => {
-                let rotations = self
-                    .patch
-                    .get_or_insert_default()
-                    .trigger_names
-                    .get_or_insert_default();
+                let rotations =
+                    self.patch.get_or_insert_default().trigger_names.get_or_insert_default();
                 rotations.range.start = start;
                 rotations.range.end = start;
             }
@@ -182,11 +173,7 @@ impl<'de> CurrentState<'de> {
             }
 
             if self.is_passed_original {
-                if self.patch.is_some() {
-                    Op::Replace
-                } else {
-                    Op::Remove
-                }
+                if self.patch.is_some() { Op::Replace } else { Op::Remove }
             } else {
                 Op::Add
             }

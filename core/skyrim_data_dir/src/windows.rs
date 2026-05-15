@@ -95,9 +95,7 @@ fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
 
     // Convert UTF-16 buffer to PathBuf
     let wide_slice = &buffer[..(data_size as usize / 2)];
-    let os_string = OsString::from_wide(wide_slice)
-        .to_string_lossy()
-        .to_string();
+    let os_string = OsString::from_wide(wide_slice).to_string_lossy().to_string();
     Ok(PathBuf::from(os_string.trim_end_matches('\0')))
 }
 

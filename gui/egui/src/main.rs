@@ -45,10 +45,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder {
             title: Some("D Merge".to_string()),
             app_id: Some("D Merge".to_string()),
-            position: Some(egui::Pos2::new(
-                settings.window_pos_x,
-                settings.window_pos_y,
-            )),
+            position: Some(egui::Pos2::new(settings.window_pos_x, settings.window_pos_y)),
             transparent: Some(true),
             maximized: Some(settings.window_maximized),
             inner_size: Some(egui::vec2(settings.window_width, settings.window_height)),

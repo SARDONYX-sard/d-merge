@@ -22,9 +22,7 @@ pub(crate) enum Error {
 
     /// Failed to initialize logger.
     #[snafu(transparent)]
-    FailedInitRotationLog {
-        source: tracing_rotation::error::Error,
-    },
+    FailedInitRotationLog { source: tracing_rotation::error::Error },
 }
 
 /// `Result` for this crate.

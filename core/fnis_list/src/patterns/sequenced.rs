@@ -137,14 +137,8 @@ mod tests {
         use crate::combinator::version::parse_version_line;
 
         let list = std::fs::read_to_string("../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt").unwrap();
-        let ret = must_parse(
-            (
-                parse_version_line,
-                parse_seq_animation,
-                parse_fnis_animation,
-            ),
-            &list,
-        );
+        let ret =
+            must_parse((parse_version_line, parse_seq_animation, parse_fnis_animation), &list);
         std::fs::write("./debug.log", format!("{ret:#?}")).unwrap();
     }
 }

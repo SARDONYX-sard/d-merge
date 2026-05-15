@@ -25,9 +25,7 @@ pub(crate) fn delete_this_line(input: &mut &str) -> ModalResult<()> {
     );
 
     (comment_parser, line_ending)
-        .context(StrContext::Expected(StrContextValue::StringLiteral(
-            "//* delete this line *//",
-        )))
+        .context(StrContext::Expected(StrContextValue::StringLiteral("//* delete this line *//")))
         .parse_next(input)?;
     Ok(())
 }
@@ -41,8 +39,6 @@ mod tests {
         let input = "//* delete this line *//
 ";
 
-        delete_this_line
-            .parse(input)
-            .unwrap_or_else(|e| panic!("{e}"));
+        delete_this_line.parse(input).unwrap_or_else(|e| panic!("{e}"));
     }
 }

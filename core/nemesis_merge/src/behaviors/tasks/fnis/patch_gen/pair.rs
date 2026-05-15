@@ -39,10 +39,7 @@ pub(super) fn new_pair_patches<'a>(
     let player_event = paired_and_kill_animation.anim_event;
     let npc_event = format!("pa_{player_event}");
     let duration = paired_and_kill_animation.flag_set.duration;
-    let anim_file = format!(
-        "Animations\\{namespace}\\{}",
-        paired_and_kill_animation.anim_file
-    ); // Animations\\$Fpa$
+    let anim_file = format!("Animations\\{namespace}\\{}", paired_and_kill_animation.anim_file); // Animations\\$Fpa$
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
@@ -134,10 +131,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // RI+1
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[1].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -171,10 +165,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // #$RI+2$  hkbVariableBindingSet
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[2].clone()),
-            Cow::Borrowed("hkbVariableBindingSet"),
-        ],
+        vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -197,10 +188,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // #$RI+3$  hkbStateMachineStateInfo
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[3].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -224,10 +212,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // #$RI+4$  hkbStateMachine
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[4].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -261,10 +246,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // #$RI+5$  hkbVariableBindingSet
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[5].clone()),
-            Cow::Borrowed("hkbVariableBindingSet"),
-        ],
+        vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -311,10 +293,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // #$RI+9$  hkbClipGenerator
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[9].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[9].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -376,10 +355,7 @@ pub(super) fn new_pair_patches<'a>(
         }));
 
         (
-            vec![
-                Cow::Owned(class_indexes[10].clone()),
-                Cow::Borrowed("hkbClipTriggerArray"),
-            ],
+            vec![Cow::Owned(class_indexes[10].clone()), Cow::Borrowed("hkbClipTriggerArray")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -405,10 +381,7 @@ pub(super) fn new_pair_patches<'a>(
 
     // $RI+12
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[12].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[12].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -440,10 +413,7 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[13].clone()),
-            Cow::Borrowed("hkbVariableBindingSet"),
-        ],
+        vec![Cow::Owned(class_indexes[13].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -465,10 +435,7 @@ pub(super) fn new_pair_patches<'a>(
     ));
 
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[14].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[14].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -491,10 +458,7 @@ pub(super) fn new_pair_patches<'a>(
     ));
 
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[15].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[15].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -526,10 +490,7 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[16].clone()),
-            Cow::Borrowed("hkbVariableBindingSet"),
-        ],
+        vec![Cow::Owned(class_indexes[16].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -574,10 +535,7 @@ pub(super) fn new_pair_patches<'a>(
         priority,
     ));
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[20].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[20].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -623,10 +581,7 @@ pub(super) fn new_pair_patches<'a>(
             .collect();
 
         (
-            vec![
-                Cow::Owned(class_indexes[21].clone()),
-                Cow::Borrowed("hkbClipTriggerArray"),
-            ],
+            vec![Cow::Owned(class_indexes[21].clone()), Cow::Borrowed("hkbClipTriggerArray")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },

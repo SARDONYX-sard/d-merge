@@ -55,21 +55,13 @@ impl<'a> StatusReportCounter<'a> {
             };
         }
 
-        Self {
-            status_reporter,
-            total,
-            counter: std::sync::atomic::AtomicUsize::new(0),
-            kind,
-        }
+        Self { status_reporter, total, counter: std::sync::atomic::AtomicUsize::new(0), kind }
     }
 
     /// index += 1
     #[inline]
     pub(crate) fn increment(&self) {
-        let done = self
-            .counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            + 1;
+        let done = self.counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         if let Some(status_reporter) = self.status_reporter {
             match self.kind {
                 ReportType::GeneratingFnisPatches => {
@@ -78,18 +70,15 @@ impl<'a> StatusReportCounter<'a> {
                         total: self.total,
                     });
                 }
-                ReportType::ReadingPatches => (status_reporter)(Status::ReadingPatches {
-                    index: done,
-                    total: self.total,
-                }),
-                ReportType::ParsingPatches => (status_reporter)(Status::ParsingPatches {
-                    index: done,
-                    total: self.total,
-                }),
-                ReportType::ApplyingPatches => (status_reporter)(Status::ApplyingPatches {
-                    index: done,
-                    total: self.total,
-                }),
+                ReportType::ReadingPatches => {
+                    (status_reporter)(Status::ReadingPatches { index: done, total: self.total });
+                }
+                ReportType::ParsingPatches => {
+                    (status_reporter)(Status::ParsingPatches { index: done, total: self.total });
+                }
+                ReportType::ApplyingPatches => {
+                    (status_reporter)(Status::ApplyingPatches { index: done, total: self.total });
+                }
                 ReportType::GeneratingHkxFiles => {
                     (status_reporter)(Status::GeneratingHkxFiles {
                         index: done,

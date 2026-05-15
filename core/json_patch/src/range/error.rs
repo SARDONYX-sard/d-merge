@@ -13,11 +13,7 @@ pub enum RangeError {
     EndOutOfBounds { end: usize, len: usize },
 
     /// `FromTo` range out of bounds: Expected `0 <= start < end <= {len}`, but got `[start..end]` where `start = {start}` and `end = {end}`
-    FromToOutOfBounds {
-        start: usize,
-        end: usize,
-        len: usize,
-    },
+    FromToOutOfBounds { start: usize, end: usize, len: usize },
 
     /// Invalid range format: {range}
     InvalidRange { range: String },

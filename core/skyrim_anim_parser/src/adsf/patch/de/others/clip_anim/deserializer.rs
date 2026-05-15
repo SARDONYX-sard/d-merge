@@ -28,9 +28,7 @@ use crate::{
 /// Parse failed.
 pub fn parse_clip_anim_diff_patch(input: &str) -> Result<ClipAnimDiffPatch<'_>, Error> {
     let mut deserializer = Deserializer::new(input);
-    deserializer
-        .root()
-        .map_err(|err| deserializer.to_readable_err(err))?;
+    deserializer.root().map_err(|err| deserializer.to_readable_err(err))?;
     Ok(deserializer.output_patches)
 }
 
@@ -64,9 +62,7 @@ impl<'de> Deserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::Context { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
@@ -76,9 +72,7 @@ impl<'de> Deserializer<'de> {
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
+        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
 
@@ -313,16 +307,12 @@ impl<'de> Deserializer<'de> {
                 }
                 LineKind::CropStartLocalTime => {
                     if let Some(crop_start_time) = partial_patch.crop_start_local_time.take() {
-                        self.output_patches
-                            .crop_start_local_time
-                            .replace(crop_start_time);
+                        self.output_patches.crop_start_local_time.replace(crop_start_time);
                     }
                 }
                 LineKind::CropEndLocalTime => {
                     if let Some(crop_end_local_time) = partial_patch.crop_end_local_time.take() {
-                        self.output_patches
-                            .crop_end_local_time
-                            .replace(crop_end_local_time);
+                        self.output_patches.crop_end_local_time.replace(crop_end_local_time);
                     }
                 }
                 LineKind::TriggerNamesLen => {}

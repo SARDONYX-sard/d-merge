@@ -140,9 +140,7 @@ pub(crate) fn apply_adsf_patches(
     // 3/5 read template adsf.
     let alt_adsf_bytes = bail!(read_adsf_file(config));
     let mut alt_adsf: AltAdsf = bail!(rmp_serde::from_slice(&alt_adsf_bytes).with_context(|_| {
-        FailedParseAdsfTemplateSnafu {
-            path: config.resource_dir.join(ADSF_INNER_PATH),
-        }
+        FailedParseAdsfTemplateSnafu { path: config.resource_dir.join(ADSF_INNER_PATH) }
     }));
 
     let mut project_names_header_patches = DiffLines::DEFAULT;
@@ -150,17 +148,12 @@ pub(crate) fn apply_adsf_patches(
     // 4/5. Apply adsf patch to base adsf(anim_data & motion data).
     for mut adsf_patch in borrowed_patches {
         if let PatchKind::ProjectNamesHeader(ref mut diff) = adsf_patch.patch {
-            project_names_header_patches
-                .0
-                .par_extend(core::mem::take(&mut diff.0));
+            project_names_header_patches.0.par_extend(core::mem::take(&mut diff.0));
             continue;
         }
 
         use indexmap::map::Entry;
-        let anim_data = match alt_adsf
-            .0
-            .entry(std::borrow::Cow::Borrowed(adsf_patch.target))
-        {
+        let anim_data = match alt_adsf.0.entry(std::borrow::Cow::Borrowed(adsf_patch.target)) {
             Entry::Occupied(e) => e.into_mut(),
             Entry::Vacant(e) => e.insert(skyrim_anim_parser::adsf::alt::AltAnimData::default()),
         };
@@ -195,11 +188,7 @@ pub(crate) fn apply_adsf_patches(
     // 5/5 Write adsf.
     let mut output_path = config.output_dir.join(ADSF_INNER_PATH);
     output_path.set_extension("txt");
-    bail!(write_alt_adsf_file(
-        output_path,
-        alt_adsf,
-        project_names_header_patches
-    ));
+    bail!(write_alt_adsf_file(output_path, alt_adsf, project_names_header_patches));
 
     errors
 }
@@ -237,11 +226,7 @@ fn parse_anim_data_patch<'a>(
         ParserType::EditAnim(index) => {
             let patch = parse_clip_anim_diff_patch(adsf_patch)
                 .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::EditAnim(EditAnim {
-                patch,
-                priority,
-                name_clip: index,
-            })
+            PatchKind::EditAnim(EditAnim { patch, priority, name_clip: index })
         }
 
         ParserType::AddMotion => PatchKind::AddMotion(
@@ -251,11 +236,7 @@ fn parse_anim_data_patch<'a>(
         ParserType::EditMotion(index) => {
             let patch = parse_clip_motion_diff_patch(adsf_patch)
                 .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::EditMotion(EditMotion {
-                patch,
-                priority,
-                clip_id: index,
-            })
+            PatchKind::EditMotion(EditMotion { patch, priority, clip_id: index })
         }
     };
     Ok(AdsfPatch { target, id, patch })
@@ -267,11 +248,7 @@ fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_orders: &PatchMaps) {
         let priority = id_orders.nemesis_entries.get(patch.id).copied();
         match priority {
             Some(priority) => priority,
-            None => id_orders
-                .fnis_entries
-                .get(patch.id)
-                .copied()
-                .unwrap_or(usize::MAX), // unreachable
+            None => id_orders.fnis_entries.get(patch.id).copied().unwrap_or(usize::MAX), // unreachable
         }
     });
 }
@@ -279,9 +256,8 @@ fn sort_patches_by_priority(patches: &mut [AdsfPatch], id_orders: &PatchMaps) {
 /// Read the ADSF file from the resource directory
 fn read_adsf_file(config: &Config) -> Result<Vec<u8>, Error> {
     let adsf_read_path = config.resource_dir.join(ADSF_INNER_PATH);
-    let adsf_string = std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu {
-        path: adsf_read_path,
-    })?;
+    let adsf_string =
+        std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu { path: adsf_read_path })?;
     Ok(adsf_string)
 }
 
@@ -303,20 +279,15 @@ fn write_alt_adsf_file(
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);
     }
-    std::fs::write(path, serialized).with_context(|_| FailedIoSnafu {
-        path: path.to_path_buf(),
-    })?;
+    std::fs::write(path, serialized)
+        .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
     Ok(())
 }
 
 /// Outputs debug JSON files for each patch in the provided slice.
 fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
-    let mut adsf_path = config
-        .output_dir
-        .join(".d_merge")
-        .join(".debug")
-        .join("patches")
-        .join(ADSF_INNER_PATH);
+    let mut adsf_path =
+        config.output_dir.join(".d_merge").join(".debug").join("patches").join(ADSF_INNER_PATH);
     adsf_path.set_extension("patch.json");
     if let Err(_err) = write_patched_json(&adsf_path, patches) {
         #[cfg(feature = "tracing")]
@@ -326,11 +297,7 @@ fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
 
 /// Debug merged json.
 fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
-    let mut dest_path = config
-        .output_dir
-        .join(".d_merge")
-        .join(".debug")
-        .join(ADSF_INNER_PATH);
+    let mut dest_path = config.output_dir.join(".d_merge").join(".debug").join(ADSF_INNER_PATH);
     dest_path.set_extension("json");
     write_patched_json(&dest_path, alt_adsf)
 }
@@ -344,22 +311,10 @@ mod tests {
         let ids = ["dmco", "flinch", "a", "slide"];
 
         let mut patches = vec![
-            AdsfPatch {
-                id: ids[1],
-                ..Default::default()
-            }, // flinch
-            AdsfPatch {
-                id: ids[2],
-                ..Default::default()
-            }, // a
-            AdsfPatch {
-                id: ids[0],
-                ..Default::default()
-            }, // dmco
-            AdsfPatch {
-                id: ids[3],
-                ..Default::default()
-            },
+            AdsfPatch { id: ids[1], ..Default::default() }, // flinch
+            AdsfPatch { id: ids[2], ..Default::default() }, // a
+            AdsfPatch { id: ids[0], ..Default::default() }, // dmco
+            AdsfPatch { id: ids[3], ..Default::default() },
         ];
 
         sort_patches_by_priority(

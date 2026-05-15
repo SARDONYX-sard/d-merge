@@ -19,10 +19,7 @@ fn main() {
 
 // ref: https://github.com/mxre/winres/blob/master/example/build.rs
 fn embed_resources() -> Result<(), std::io::Error> {
-    const ICO_PATH: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../tauri/backend/icons/icon.ico"
-    );
+    const ICO_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tauri/backend/icons/icon.ico");
     let path = std::path::Path::new(ICO_PATH);
     let mut res = winres::WindowsResource::new();
 

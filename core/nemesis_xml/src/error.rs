@@ -7,10 +7,7 @@ use std::{io, path::PathBuf};
 pub enum Error {
     /// Unknown field names: \"{field_name}\". Expected one of [{}].", acceptable_fields.join(", ")
     #[snafu(display("Unknown field names: \"{field_name}\". Expected one of `[{}]`.", acceptable_fields.join(", ")))]
-    UnknownField {
-        field_name: String,
-        acceptable_fields: Vec<&'static str>,
-    },
+    UnknownField { field_name: String, acceptable_fields: Vec<&'static str> },
 
     /// Missing field info
     MissingFieldInfo,
@@ -34,9 +31,7 @@ pub enum Error {
 
     // NOTE: Cannot `#snafu(transparent)`
     /// Parser combinator Error: {err}
-    ContextError {
-        err: winnow::error::ErrMode<winnow::error::ContextError>,
-    },
+    ContextError { err: winnow::error::ErrMode<winnow::error::ContextError> },
 
     /// Human readable XML parsing error
     #[snafu(transparent)]

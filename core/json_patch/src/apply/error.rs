@@ -59,26 +59,15 @@ pub enum JsonPatchError {
 
     /// Type conversion or inference failed during patching.
     #[snafu(display("TryType failed: {source}\n{path}\n{value}"))]
-    TryType {
-        source: TryTypeError,
-        path: String,
-        value: String,
-    },
+    TryType { source: TryTypeError, path: String, value: String },
 
     /// Attempted to access a range that is out of bounds in an array.
     #[snafu(display("Out Of Range {path}: {source}\n{value}"))]
-    OutOfRange {
-        source: crate::range::error::RangeError,
-        path: String,
-        value: String,
-    },
+    OutOfRange { source: crate::range::error::RangeError, path: String, value: String },
 
     /// Attempted to access a range that is out of bounds in an array.
     #[snafu(display("Valid range is [0, {actual_len}), but got {patch_range:?}"))]
-    UnexpectedRange {
-        patch_range: std::ops::Range<usize>,
-        actual_len: usize,
-    },
+    UnexpectedRange { patch_range: std::ops::Range<usize>, actual_len: usize },
 
     /// Invalid matrix operation: attempted to simulate 2D array in a flat structure.
     #[snafu(display(
@@ -118,11 +107,7 @@ impl JsonPatchError {
         value: impl core::fmt::Debug,
     ) -> Self {
         let (path, value) = Self::format_path_value(path, value);
-        Self::InvalidIndex {
-            index: index.to_string(),
-            path,
-            value,
-        }
+        Self::InvalidIndex { index: index.to_string(), path, value }
     }
 
     /// Creates a `MismatchApplyType` error with the unexpected type, path, and value.
@@ -132,11 +117,7 @@ impl JsonPatchError {
         value: impl core::fmt::Debug,
     ) -> Self {
         let (path, value) = Self::format_path_value(path, value);
-        Self::MismatchApplyType {
-            unexpected,
-            path,
-            value,
-        }
+        Self::MismatchApplyType { unexpected, path, value }
     }
 
     /// Creates an `UnsupportedRangeKind` error from the given path and value.
@@ -167,10 +148,6 @@ impl JsonPatchError {
         value: impl core::fmt::Debug,
     ) -> Self {
         let (path, value) = Self::format_path_value(path, value);
-        Self::TryType {
-            source,
-            path,
-            value,
-        }
+        Self::TryType { source, path, value }
     }
 }

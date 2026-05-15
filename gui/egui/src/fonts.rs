@@ -7,9 +7,8 @@ pub(crate) fn setup_custom_fonts<A>(ctx: &Context, font_path: Option<A>)
 where
     A: AsRef<Path>,
 {
-    let font_path = font_path
-        .as_ref()
-        .map_or_else(|| Path::new("c:/Windows/Fonts/msyh.ttc"), |p| p.as_ref());
+    let font_path =
+        font_path.as_ref().map_or_else(|| Path::new("c:/Windows/Fonts/msyh.ttc"), |p| p.as_ref());
     __setup_custom_fonts(ctx, font_path);
 }
 
@@ -18,9 +17,7 @@ fn __setup_custom_fonts(ctx: &Context, font_path: &Path) {
 
     match std::fs::read(font_path) {
         Ok(font) => {
-            fonts
-                .font_data
-                .insert("sys_font".to_owned(), FontData::from_owned(font).into());
+            fonts.font_data.insert("sys_font".to_owned(), FontData::from_owned(font).into());
             fonts
                 .families
                 .entry(FontFamily::Proportional)

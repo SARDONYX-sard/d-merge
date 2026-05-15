@@ -102,34 +102,25 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();
-    one_patches.par_extend(
-        animation
-            .anim_objects
-            .par_iter()
-            .enumerate()
-            .map(|(index, name)| {
-                let new_anim_object_index = owned_data.next_class_name_attribute();
-                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+    one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
+        let new_anim_object_index = owned_data.next_class_name_attribute();
+        class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
 
-                // One anim object
-                (
-                    vec![
-                        Cow::Owned(new_anim_object_index.clone()),
-                        Cow::Borrowed("hkbStringEventPayload"),
-                    ],
-                    ValueWithPriority {
-                        patch: JsonPatch {
-                            action: Action::Pure { op: Op::Add },
-                            value: simd_json::json_typed!(borrowed, {
-                                "__ptr": new_anim_object_index,
-                                "data": name, // StringPtr
-                            }),
-                        },
-                        priority,
-                    },
-                )
-            }),
-    );
+        // One anim object
+        (
+            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: simd_json::json_typed!(borrowed, {
+                        "__ptr": new_anim_object_index,
+                        "data": name, // StringPtr
+                    }),
+                },
+                priority,
+            },
+        )
+    }));
 
     // $RI
     one_patches.push({
@@ -167,11 +158,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         };
 
         // #$-AV|%RI+4%|%RI+7%$
-        let generator = if is_empty_anim_vars {
-            &class_indexes[7]
-        } else {
-            &class_indexes[4]
-        };
+        let generator = if is_empty_anim_vars { &class_indexes[7] } else { &class_indexes[4] };
 
         // Actually, since this comes in as 1, 2, 3... every sequence, it seems fine to reuse the same stateId.
         // one FNIS_List.txt
@@ -183,10 +170,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         };
 
         (
-            vec![
-                Cow::Owned(class_indexes[0].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
+            vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -274,10 +258,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     if !is_empty_anim_vars {
         // RI+4
         one_patches.push((
-            vec![
-                Cow::Owned(class_indexes[4].clone()),
-                Cow::Borrowed("hkbModifierGenerator"),
-            ],
+            vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbModifierGenerator")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -297,18 +278,11 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         // #RI+5
         one_patches.push({
             let inverse_flags: [bool; 5] = core::array::from_fn(|i| {
-                animation
-                    .flag_set
-                    .anim_vars
-                    .get(i)
-                    .is_some_and(|v| v.inverse)
+                animation.flag_set.anim_vars.get(i).is_some_and(|v| v.inverse)
             });
 
             (
-                vec![
-                    Cow::Owned(class_indexes[5].clone()),
-                    Cow::Borrowed("BSIsActiveModifier"),
-                ],
+                vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("BSIsActiveModifier")],
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
@@ -352,10 +326,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                 .collect();
 
             (
-                vec![
-                    Cow::Owned(class_indexes[6].clone()),
-                    Cow::Borrowed("hkbVariableBindingSet"),
-                ],
+                vec![Cow::Owned(class_indexes[6].clone()), Cow::Borrowed("hkbVariableBindingSet")],
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
@@ -408,10 +379,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         };
 
         (
-            vec![
-                Cow::Owned(class_indexes[7].clone()),
-                Cow::Borrowed("hkbClipGenerator"),
-            ],
+            vec![Cow::Owned(class_indexes[7].clone()), Cow::Borrowed("hkbClipGenerator")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -447,10 +415,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         );
 
         (
-            vec![
-                Cow::Owned(class_indexes[8].clone()),
-                Cow::Borrowed("hkbClipTriggerArray"),
-            ],
+            vec![Cow::Owned(class_indexes[8].clone()), Cow::Borrowed("hkbClipTriggerArray")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -672,11 +637,7 @@ pub(crate) fn new_push_values_seq_patch<'a>(
 ) -> [(json_path::JsonPath<'a>, ValueWithPriority<'a>); 3] {
     [
         (
-            json_path![
-                string_data_index,
-                "hkbBehaviorGraphStringData",
-                "variableNames",
-            ],
+            json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,
@@ -706,11 +667,7 @@ pub(crate) fn new_push_values_seq_patch<'a>(
             },
         ),
         (
-            json_path![
-                behavior_graph_index,
-                "hkbBehaviorGraphData",
-                "variableInfos",
-            ],
+            json_path![behavior_graph_index, "hkbBehaviorGraphData", "variableInfos",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,

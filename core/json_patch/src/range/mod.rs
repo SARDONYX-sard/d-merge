@@ -40,10 +40,7 @@ impl Range {
         match self {
             Self::Index(index) => {
                 if *index >= array_len {
-                    return Err(RangeError::IndexOutOfBounds {
-                        index: *index,
-                        len: array_len,
-                    });
+                    return Err(RangeError::IndexOutOfBounds { index: *index, len: array_len });
                 }
             }
             Self::FromTo(range) => {
@@ -57,10 +54,7 @@ impl Range {
             }
             Self::To(range_to) => {
                 if range_to.end > array_len {
-                    return Err(RangeError::EndOutOfBounds {
-                        end: range_to.end,
-                        len: array_len,
-                    });
+                    return Err(RangeError::EndOutOfBounds { end: range_to.end, len: array_len });
                 }
             }
             Self::From(range_from) => {
@@ -84,59 +78,32 @@ mod tests {
     #[test]
     fn test_index_out_of_bounds() {
         let result = Range::Index(6).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::IndexOutOfBounds { index: 6, len: 5 })
-        );
+        assert_eq!(result, Err(RangeError::IndexOutOfBounds { index: 6, len: 5 }));
     }
 
     #[test]
     fn test_invalid_range() {
         let result = Range::FromTo(3..6).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::FromToOutOfBounds {
-                start: 3,
-                end: 6,
-                len: 5
-            })
-        );
+        assert_eq!(result, Err(RangeError::FromToOutOfBounds { start: 3, end: 6, len: 5 }));
     }
 
     #[test]
     fn test_to_from_out_of_bounds_start() {
         #[allow(clippy::reversed_empty_ranges)]
         let result = Range::FromTo(6..4).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::FromToOutOfBounds {
-                start: 6,
-                end: 4,
-                len: 5
-            })
-        );
+        assert_eq!(result, Err(RangeError::FromToOutOfBounds { start: 6, end: 4, len: 5 }));
     }
 
     #[test]
     fn test_to_from_out_of_bounds_end() {
         let result = Range::FromTo(2..6).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::FromToOutOfBounds {
-                start: 2,
-                end: 6,
-                len: 5
-            })
-        );
+        assert_eq!(result, Err(RangeError::FromToOutOfBounds { start: 2, end: 6, len: 5 }));
     }
 
     #[test]
     fn test_start_out_of_bounds() {
         let result = Range::From(6..).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::StartOutOfBounds { start: 6, len: 5 })
-        );
+        assert_eq!(result, Err(RangeError::StartOutOfBounds { start: 6, len: 5 }));
     }
 
     #[test]
@@ -161,13 +128,6 @@ mod tests {
     fn test_invalid_pattern() {
         #[allow(clippy::reversed_empty_ranges)]
         let result = Range::FromTo(2..1).check_valid_range(5);
-        assert_eq!(
-            result,
-            Err(RangeError::FromToOutOfBounds {
-                start: 2,
-                end: 1,
-                len: 5
-            })
-        );
+        assert_eq!(result, Err(RangeError::FromToOutOfBounds { start: 2, end: 1, len: 5 }));
     }
 }

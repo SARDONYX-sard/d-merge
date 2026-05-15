@@ -42,17 +42,13 @@ pub(crate) async fn update_to_version(version: String) -> Result<String, String>
 
         let extractor = self_update::Extract::from_source(Path::new(&archive_path));
         let tmp_dir = self_update::TempDir::new().context(IoSnafu)?;
-        extractor
-            .extract_into(tmp_dir.path())
-            .context(ExtractSnafu)?;
+        extractor.extract_into(tmp_dir.path()).context(ExtractSnafu)?;
 
         // Copy assets, interface
         let current_dir = std::env::current_exe()
             .context(IoSnafu)?
             .parent()
-            .context(OtherSnafu {
-                msg: "No parent directory".to_string(),
-            })?
+            .context(OtherSnafu { msg: "No parent directory".to_string() })?
             .to_path_buf();
 
         for name in &["assets", "interface"] {
@@ -104,10 +100,7 @@ pub(crate) enum UpdaterError {
     IoError { source: io::Error },
 
     #[snafu(display("Failed to copy {}: {}", name, source))]
-    CopyError {
-        name: &'static str,
-        source: io::Error,
-    },
+    CopyError { name: &'static str, source: io::Error },
 
     #[snafu(display("Other error: {}", msg))]
     Other { msg: String },

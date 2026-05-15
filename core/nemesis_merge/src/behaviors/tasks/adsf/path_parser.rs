@@ -85,27 +85,20 @@ pub(crate) struct ParsedAdsfPatchPath<'a> {
 /// # Returns
 /// Returns a [`ParsedAdsfPatchPath`] with extracted metadata or a [`ParseError`] if the format is invalid.
 pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
-    let components: Vec<&'a str> = path
-        .components()
-        .filter_map(|c| c.as_os_str().to_str())
-        .collect();
+    let components: Vec<&'a str> =
+        path.components().filter_map(|c| c.as_os_str().to_str()).collect();
 
     let anim_data_index = components
         .iter()
         .position(|comp| comp.eq_ignore_ascii_case("animationdatasinglefile"))
-        .ok_or_else(|| ParseError::MissingAnimationData {
-            path: path.to_path_buf(),
-        })?;
+        .ok_or_else(|| ParseError::MissingAnimationData { path: path.to_path_buf() })?;
 
     if anim_data_index < 1 || components.len() <= anim_data_index + 2 {
-        return Err(ParseError::TooShortPathFormat {
-            path: path.to_path_buf(),
-        });
+        return Err(ParseError::TooShortPathFormat { path: path.to_path_buf() });
     }
 
-    let path_str = path.to_str().ok_or_else(|| ParseError::NonUtf8Path {
-        path: path.to_path_buf(),
-    })?;
+    let path_str =
+        path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
     let id = get_nemesis_id(path_str)?;
 
     let target_component = components[anim_data_index + 1];
@@ -114,16 +107,13 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
     } else if target_component.contains('~') {
         target_component
     } else {
-        return Err(ParseError::SplitTilde {
-            path: path.to_path_buf(),
-        });
+        return Err(ParseError::SplitTilde { path: path.to_path_buf() });
     };
 
-    let file_stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
-        ParseError::TooShortPathFormat {
-            path: path.to_path_buf(),
-        }
-    })?;
+    let file_stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| ParseError::TooShortPathFormat { path: path.to_path_buf() })?;
     let is_header_file = file_stem.eq_ignore_ascii_case("$header$");
 
     let parser_type = if target == "$header$" && is_header_file {
@@ -152,11 +142,7 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
         ParserType::EditMotion(file_stem)
     };
 
-    Ok(ParsedAdsfPatchPath {
-        target,
-        id,
-        parser_type,
-    })
+    Ok(ParsedAdsfPatchPath { target, id, parser_type })
 }
 
 /// Represents parsing errors from `parse_adsf_path`.
@@ -196,11 +182,7 @@ Expected format: D:/mod/<id>/animationdatasinglefile/<target>~1/...",
 
     /// Target component doesn't follow the expected `Target~1` format
     #[snafu(display( "Replace/Remove Edit patches expect index, i.e., numeric filenames. However, this {index_str} of path is different. {}", path.display()))]
-    IndexMustBeNumber {
-        source: ParseIntError,
-        index_str: String,
-        path: PathBuf,
-    },
+    IndexMustBeNumber { source: ParseIntError, index_str: String, path: PathBuf },
 }
 
 #[cfg(test)]

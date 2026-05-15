@@ -259,13 +259,9 @@ mod tests {
         // Behavior analyzers
         // -------------------------------
         fn get_behavior(root_dir: &Path, entry: &Entry) -> Result<BehaviorIndexes, String> {
-            let mut master = root_dir
-                .join(&entry.base_folder)
-                .join(&entry.master_behavior);
+            let mut master = root_dir.join(&entry.base_folder).join(&entry.master_behavior);
             master.set_extension("xml");
-            let mut default = root_dir
-                .join(&entry.base_folder)
-                .join(&entry.default_behavior);
+            let mut default = root_dir.join(&entry.base_folder).join(&entry.default_behavior);
             default.set_extension("xml");
 
             let default_root_index = get_default_root_state(&default)?;

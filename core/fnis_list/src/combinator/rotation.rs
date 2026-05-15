@@ -34,12 +34,7 @@ impl<'a> RotationData<'a> {
         let time = Cow::Borrowed(time);
 
         match format {
-            RotationFormat::Quaternion {
-                quat_x,
-                quat_y,
-                quat_z,
-                quat_w,
-            } => Rotation {
+            RotationFormat::Quaternion { quat_x, quat_y, quat_z, quat_w } => Rotation {
                 time,
                 x: Cow::Borrowed(quat_x),
                 y: Cow::Borrowed(quat_y),
@@ -85,12 +80,7 @@ fn quat_from_z(deg: f32) -> (f32, f32, f32, f32) {
 #[derive(Debug, PartialEq)]
 pub enum RotationFormat<'a> {
     /// Quaternion-based rotation
-    Quaternion {
-        quat_x: &'a str,
-        quat_y: &'a str,
-        quat_z: &'a str,
-        quat_w: &'a str,
-    },
+    Quaternion { quat_x: &'a str, quat_y: &'a str, quat_z: &'a str, quat_w: &'a str },
     /// Single-axis Z rotation
     DeltaZAngle { delta_z_angle: f32 },
 }
@@ -169,9 +159,7 @@ mod tests {
         let input = "RD 2.0 90\n";
         let expected = RotationData {
             time: "2.0",
-            format: RotationFormat::DeltaZAngle {
-                delta_z_angle: 90.0,
-            },
+            format: RotationFormat::DeltaZAngle { delta_z_angle: 90.0 },
         };
         let parsed = must_parse(parse_rd_data, input);
         assert_eq!(parsed, expected);
@@ -201,9 +189,7 @@ mod tests {
         let input2 = "RD 2.0 45\n";
         let expected2 = RotationData {
             time: "2.0",
-            format: RotationFormat::DeltaZAngle {
-                delta_z_angle: 45.0,
-            },
+            format: RotationFormat::DeltaZAngle { delta_z_angle: 45.0 },
         };
         let parsed2 = must_parse(parse_rd_data, input2);
         assert_eq!(parsed2, expected2);

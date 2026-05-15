@@ -47,9 +47,6 @@ pub(crate) enum I18nKey {
     /// (To `<Output dir>/.d_merge/.debug/patches`)
     DebugOutputHover,
 
-    /// Error: reading mod info
-    ErrorReadingModInfo,
-
     /// Execute
     ExecuteButton,
 
@@ -92,6 +89,15 @@ pub(crate) enum I18nKey {
     /// When using it completely manually.
     /// (The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)
     ManualModeHover,
+
+    /// Updated mod list
+    ModsListFetchStateDone,
+    /// No mods found
+    ModsListFetchStateEmpty,
+    /// Failed to update mod list
+    ModsListFetchStateError,
+    /// Fetching mod list...
+    ModsListFetchStateFetching,
 
     /// Mods
     ModsListTitle,

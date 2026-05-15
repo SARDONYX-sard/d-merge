@@ -960,8 +960,8 @@ impl ModManagerApp {
             Err(err) => {
                 self.fetch_state = FetchState::Error;
                 tracing::error!(%err);
-                let err_title = self.t(I18nKey::ErrorReadingModInfo);
-                self.set_notification(format!("{err_title} {err}"));
+                let err_title = self.t(I18nKey::ModsListFetchStateError);
+                self.set_notification(format!("[{err_title}]: {err}"));
             }
         }
     }

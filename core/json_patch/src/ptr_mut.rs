@@ -29,19 +29,18 @@ impl PointerMut for BorrowedValue<'_> {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        ptr.into_iter()
-            .try_fold(self, move |target, token| match target {
-                Self::Object(map) => map.get_mut(token.as_ref()),
-                Self::Array(list) => {
-                    let token = token.as_ref();
-                    let range = parse_range(token).ok()?;
-                    match range {
-                        Range::Index(index) => list.get_mut(index),
-                        _ => None,
-                    }
+        ptr.into_iter().try_fold(self, move |target, token| match target {
+            Self::Object(map) => map.get_mut(token.as_ref()),
+            Self::Array(list) => {
+                let token = token.as_ref();
+                let range = parse_range(token).ok()?;
+                match range {
+                    Range::Index(index) => list.get_mut(index),
+                    _ => None,
                 }
-                _v => None,
-            })
+            }
+            _v => None,
+        })
     }
 }
 
@@ -157,9 +156,7 @@ mod tests {
         });
         let pointer: &[Cow<str>] = &["array_key".into(), "[1]".into()];
 
-        let val = value
-            .ptr_mut(pointer)
-            .unwrap_or_else(|| panic!("Expected a mutable reference"));
+        let val = value.ptr_mut(pointer).unwrap_or_else(|| panic!("Expected a mutable reference"));
         if let BorrowedValue::String(s) = val {
             *s = Cow::Borrowed("modified_item_1");
         }

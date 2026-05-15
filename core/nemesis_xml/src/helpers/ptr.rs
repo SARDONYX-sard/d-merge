@@ -17,9 +17,7 @@ pub fn pointer<'a>(input: &mut &'a str) -> ModalResult<BorrowedValue<'a>> {
         take_till(0.., |c| matches!(c, '\r' | '\n' | '\t' | ' ' | '<'))
             .map(|s: &str| BorrowedValue::String(s.trim().into())), // Double cut off because winnow doesn't omit `\r` in release builds for some reason.
     ))
-    .context(StrContext::Expected(StrContextValue::Description(
-        r#"Pointer(e.g. `#0050`)"#,
-    )))
+    .context(StrContext::Expected(StrContextValue::Description(r#"Pointer(e.g. `#0050`)"#)))
     .parse_next(input)
 }
 

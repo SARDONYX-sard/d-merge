@@ -24,11 +24,8 @@ pub fn serialize_alt_adsf(
 ) -> Result<String, SerializeError> {
     let mut output = String::new();
 
-    let mut project_names: Vec<_> = alt_adsf
-        .0
-        .par_iter()
-        .map(|(k, _)| to_adsf_key(k.clone()))
-        .collect();
+    let mut project_names: Vec<_> =
+        alt_adsf.0.par_iter().map(|(k, _)| to_adsf_key(k.clone())).collect();
 
     if let Some(patches) = project_names_patches {
         patches.into_apply(&mut project_names)?;
@@ -53,22 +50,14 @@ pub fn serialize_alt_adsf(
         let name_str = name.as_ref();
         let base = name_str.strip_suffix(".txt").unwrap_or(name_str);
         let count = counter.entry(base.to_string()).or_insert(1);
-        let name = if *count == 1 {
-            format!("{base}~1")
-        } else {
-            format!("{base}~{count}")
-        };
+        let name = if *count == 1 { format!("{base}~1") } else { format!("{base}~{count}") };
 
         let anim_data = alt_adsf
             .0
             .get(name.as_str())
             .ok_or_else(|| SerializeError::MissingAnimData { name })?;
 
-        output.push_str(&serialize_anim_data(
-            anim_data,
-            &mut clip_id_manager,
-            &mut clip_id_map,
-        )?);
+        output.push_str(&serialize_anim_data(anim_data, &mut clip_id_manager, &mut clip_id_map)?);
     }
 
     Ok(output)
@@ -103,15 +92,9 @@ fn serialize_anim_data<'a>(
         if let Some(new_id) = new_id {
             clip_id_map.insert(&block.clip_id, new_id);
         } else {
-            return Err(SerializeError::ClipIdLimitReached {
-                base_len,
-                needed: add_clip_len,
-            });
+            return Err(SerializeError::ClipIdLimitReached { base_len, needed: add_clip_len });
         }
-        output.push_str(&serialize_clip_anim_block(
-            block,
-            new_id.map(|id| id.to_string().into()),
-        ));
+        output.push_str(&serialize_clip_anim_block(block, new_id.map(|id| id.to_string().into())));
     }
 
     for (_, block) in &anim_data.clip_anim_blocks {
@@ -125,10 +108,8 @@ fn serialize_anim_data<'a>(
     if has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
             if let Some(&new_id) = clip_id_map.get(block.clip_id.as_ref()) {
-                output.push_str(&serialize_clip_motion_block(
-                    block,
-                    Some(new_id.to_string().into()),
-                ));
+                output
+                    .push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
             } else {
                 let new_id = clip_id_manager.next_id();
                 output.push_str(&serialize_clip_motion_block(
@@ -179,9 +160,7 @@ pub enum SerializeError {
     ClipIdLimitReached { base_len: usize, needed: usize },
 
     #[snafu(transparent)]
-    DiffLine {
-        source: crate::diff_line::error::Error,
-    },
+    DiffLine { source: crate::diff_line::error::Error },
 
     /// Missing project name: `{name}`
     MissingAnimData { name: String },
@@ -253,11 +232,8 @@ mod tests {
             let keys_json = serde_json::to_string_pretty(&keys).unwrap_or_else(|err| {
                 panic!("Failed to serialize adsf to JSON:\n{err}");
             });
-            std::fs::write(
-                "../../dummy/debug/animationdatasinglefile_keys.json",
-                keys_json,
-            )
-            .unwrap();
+            std::fs::write("../../dummy/debug/animationdatasinglefile_keys.json", keys_json)
+                .unwrap();
         }
         let json = serde_json::to_string_pretty(&alt_adsf).unwrap_or_else(|err| {
             panic!("Failed to serialize adsf to JSON:\n{err}");
