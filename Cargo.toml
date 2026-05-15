@@ -90,9 +90,9 @@ tracing_rotation = { path = "./core/tracing_rotation" }
 [profile.release]
 # NOTE: Optimizing to the limit reduces the size of the binary, but for some reason,
 # the second async fn cannot be executed, resulting in an error, so it is turned off.
-# codegen-units = 1
+codegen-units = 1
 debug = false
-# lto = true
+lto = true
 opt-level = 3
 # panic = 'abort'
 strip = true
