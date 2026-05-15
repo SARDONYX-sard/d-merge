@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-05-15
+### :sparkles: New Features
+- [`dce2ba4`](https://github.com/SARDONYX-sard/d-merge/commit/dce2ba4955e7005ced91911656688ac61938b89d) - **fnis_list**: support comment ignored *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`5e0bf10`](https://github.com/SARDONYX-sard/d-merge/commit/5e0bf1045e094c6f61d9c249cd490e01ea18156e) - **egui**: use mimalloc *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8f8629f`](https://github.com/SARDONYX-sard/d-merge/commit/8f8629fc8132d6de0d470804b5eee24dabea71fb) - **egui_i18n**: i18n auto gen from docs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`eef60fd`](https://github.com/SARDONYX-sard/d-merge/commit/eef60fd3ee3127e6355e901d9e661b7e25c2e59b) - **egui**: impl color notify *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`e6090dc`](https://github.com/SARDONYX-sard/d-merge/commit/e6090dce6dbefd14d571436d89ded134107c82c8) - **fnis**: fix casing in FNISaa var name *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.4.0] - 2026-05-06
 ### :sparkles: New Features
 - [`3bf680e`](https://github.com/SARDONYX-sard/d-merge/commit/3bf680ef89d9298a3f81c60e04fa8e9113663faa) - **tauri**: implement hkanno lsp options *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -431,3 +442,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.3.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.0...1.3.1
 [1.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.1...1.3.2
 [1.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.2...1.4.0
+[1.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.4.0...1.5.0
