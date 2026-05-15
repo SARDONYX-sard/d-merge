@@ -56,10 +56,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
         .map(|(idx, namespace)| (namespace.to_string(), nemesis_mods_count + idx))
         .collect();
 
-        PatchMaps {
-            nemesis_entries,
-            fnis_entries,
-        }
+        PatchMaps { nemesis_entries, fnis_entries }
     };
 
     behavior_gen(patches, slow_debug_config()).await?;

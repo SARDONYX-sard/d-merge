@@ -66,10 +66,7 @@ pub fn serialize_alt_asdsf(
             #[cfg(feature = "tracing")]
             tracing::error!("Missing txt project header: {name}.txt. Added txt project header.");
 
-            alt_asdsf
-                .txt_projects
-                .0
-                .insert(name.clone().into(), Default::default());
+            alt_asdsf.txt_projects.0.insert(name.clone().into(), Default::default());
 
             match alt_asdsf.txt_projects.0.get(name.as_str()) {
                 Some(anim_set_list) => anim_set_list,
@@ -117,9 +114,7 @@ fn write_file_names(out: &mut String, sub_txt_headers: &[Cow<'_, str>]) {
 #[derive(Debug, snafu::Snafu)]
 pub enum SerializeError {
     #[snafu(transparent)]
-    DiffLine {
-        source: crate::diff_line::error::Error,
-    },
+    DiffLine { source: crate::diff_line::error::Error },
 
     /// Expected: `{name}.txt`. but  got none.
     MissingTxtProjectHeader { name: String },

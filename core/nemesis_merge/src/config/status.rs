@@ -86,14 +86,8 @@ mod tests {
         let serialized = sonic_rs::to_string(&status).unwrap();
         assert_eq!(serialized, r#"{"type":"Error","content":"Error message"}"#);
 
-        let status = Status::ReadingPatches {
-            index: 0,
-            total: 100,
-        };
+        let status = Status::ReadingPatches { index: 0, total: 100 };
         let serialized = sonic_rs::to_string(&status).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"type":"ReadingPatches","content":{"index":0,"total":100}}"#
-        );
+        assert_eq!(serialized, r#"{"type":"ReadingPatches","content":{"index":0,"total":100}}"#);
     }
 }

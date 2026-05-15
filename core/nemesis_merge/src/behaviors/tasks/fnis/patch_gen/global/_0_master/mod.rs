@@ -77,10 +77,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         .collect();
 
     let multi_event_2529 = (
-        json_path![
-            FNIS_AA_GLOBAL_AUTO_GEN_2529,
-            "hkbStateMachineEventPropertyArray"
-        ],
+        json_path![FNIS_AA_GLOBAL_AUTO_GEN_2529, "hkbStateMachineEventPropertyArray"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -96,10 +93,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         },
     );
     let multi_event_2534 = (
-        json_path![
-            FNIS_AA_GLOBAL_AUTO_GEN_2534,
-            "hkbStateMachineEventPropertyArray"
-        ],
+        json_path![FNIS_AA_GLOBAL_AUTO_GEN_2534, "hkbStateMachineEventPropertyArray"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },

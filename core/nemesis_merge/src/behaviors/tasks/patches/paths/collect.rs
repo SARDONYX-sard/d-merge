@@ -34,9 +34,7 @@ pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, Pa
 
 #[inline]
 fn is_txt_file(path: &Path) -> bool {
-    let is_txt = path
-        .extension()
-        .is_some_and(|path| path.eq_ignore_ascii_case("txt"));
+    let is_txt = path.extension().is_some_and(|path| path.eq_ignore_ascii_case("txt"));
     let is_file = path.is_file();
 
     is_txt && is_file
@@ -47,8 +45,7 @@ fn is_txt_file(path: &Path) -> bool {
 /// # Assumption.
 /// - The file is a file with a txt extension.
 fn is_nemesis_file(path: &Path) -> bool {
-    path.file_stem()
-        .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
+    path.file_stem().is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
 }
 
 /// Has `animationdatasinglefile` dir?

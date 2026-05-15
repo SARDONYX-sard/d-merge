@@ -48,9 +48,7 @@ where
     T: FromStr,
 {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
-    let line = till_line_ending
-        .verify(|s: &str| s.parse::<T>().is_ok())
-        .parse_next(input)?;
+    let line = till_line_ending.verify(|s: &str| s.parse::<T>().is_ok()).parse_next(input)?;
     line_ending.parse_next(input)?; // skip line end
     Ok(line.into())
 }

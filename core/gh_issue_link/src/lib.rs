@@ -77,23 +77,13 @@ impl<'a> EnvInfo<'a> {
     /// - `d_merge_version` - Version of d-merge
     /// - `skyrim_version` - Version of Skyrim
     pub fn new(sys: &'a System) -> Self {
-        let cpu = sys
-            .cpus()
-            .first()
-            .map(|c| c.brand().trim())
-            .filter(|c| !c.is_empty());
-        let dram = format!(
-            "{:.1} GB",
-            sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0
-        );
+        let cpu = sys.cpus().first().map(|c| c.brand().trim()).filter(|c| !c.is_empty());
+        let dram = format!("{:.1} GB", sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0);
 
         let os = System::long_os_version();
         let ver = System::kernel_version();
-        let os = format!(
-            "{} {}",
-            os.as_deref().unwrap_or("Unknown OS"),
-            ver.as_deref().unwrap_or("")
-        );
+        let os =
+            format!("{} {}", os.as_deref().unwrap_or("Unknown OS"), ver.as_deref().unwrap_or(""));
 
         Self { cpu, dram, os }
     }

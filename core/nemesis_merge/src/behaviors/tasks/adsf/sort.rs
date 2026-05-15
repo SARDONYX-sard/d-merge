@@ -71,67 +71,57 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
     patches
         .into_par_iter()
         .enumerate()
-        .fold(
-            HashMap::new,
-            |mut map: HashMap<PatchKey<'_>, AdsfPatch<'a>>, (idx, patch)| {
-                let key = match &patch.patch {
-                    PatchKind::ProjectNamesHeader(_) => PatchKey::ProjectNamesHeader {
-                        target: patch.target,
-                        id: patch.id,
-                    },
-                    PatchKind::AnimDataHeader(_) => PatchKey::AnimDataHeader {
-                        target: patch.target,
-                        id: patch.id,
-                    },
-                    PatchKind::EditAnim(edit) => PatchKey::EditAnim {
-                        target: patch.target,
-                        id: patch.id,
-                        clip_name: edit.name_clip,
-                    },
-                    PatchKind::EditMotion(edit) => PatchKey::EditMotion {
-                        target: patch.target,
-                        id: patch.id,
-                        clip_id: edit.clip_id,
-                    },
-                    PatchKind::AddAnim(_) => PatchKey::AddAnim {
-                        target: patch.target,
-                        id: patch.id,
-                        index: idx,
-                    },
-                    PatchKind::AddMotion(_) => PatchKey::AddMotion {
-                        target: patch.target,
-                        id: patch.id,
-                        index: idx,
-                    },
-                };
-                match map.entry(key) {
-                    std::collections::hash_map::Entry::Occupied(mut entry) => {
-                        match (&mut entry.get_mut().patch, patch.patch) {
-                            (PatchKind::EditAnim(existing_edit), PatchKind::EditAnim(new_edit))
-                                if new_edit.priority > existing_edit.priority =>
-                            {
-                                existing_edit.patch.merge(new_edit.patch);
-                                existing_edit.name_clip = new_edit.name_clip;
-                                existing_edit.priority = new_edit.priority;
-                            }
-                            (
-                                PatchKind::EditMotion(existing_edit),
-                                PatchKind::EditMotion(new_edit),
-                            ) if new_edit.priority > existing_edit.priority => {
-                                existing_edit.patch.merge(new_edit.patch);
-                                existing_edit.clip_id = new_edit.clip_id;
-                                existing_edit.priority = new_edit.priority;
-                            }
-                            _ => {} // Do nothing if the new patch has lower or equal priority.
+        .fold(HashMap::new, |mut map: HashMap<PatchKey<'_>, AdsfPatch<'a>>, (idx, patch)| {
+            let key = match &patch.patch {
+                PatchKind::ProjectNamesHeader(_) => {
+                    PatchKey::ProjectNamesHeader { target: patch.target, id: patch.id }
+                }
+                PatchKind::AnimDataHeader(_) => {
+                    PatchKey::AnimDataHeader { target: patch.target, id: patch.id }
+                }
+                PatchKind::EditAnim(edit) => PatchKey::EditAnim {
+                    target: patch.target,
+                    id: patch.id,
+                    clip_name: edit.name_clip,
+                },
+                PatchKind::EditMotion(edit) => PatchKey::EditMotion {
+                    target: patch.target,
+                    id: patch.id,
+                    clip_id: edit.clip_id,
+                },
+                PatchKind::AddAnim(_) => {
+                    PatchKey::AddAnim { target: patch.target, id: patch.id, index: idx }
+                }
+                PatchKind::AddMotion(_) => {
+                    PatchKey::AddMotion { target: patch.target, id: patch.id, index: idx }
+                }
+            };
+            match map.entry(key) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    match (&mut entry.get_mut().patch, patch.patch) {
+                        (PatchKind::EditAnim(existing_edit), PatchKind::EditAnim(new_edit))
+                            if new_edit.priority > existing_edit.priority =>
+                        {
+                            existing_edit.patch.merge(new_edit.patch);
+                            existing_edit.name_clip = new_edit.name_clip;
+                            existing_edit.priority = new_edit.priority;
                         }
-                    }
-                    std::collections::hash_map::Entry::Vacant(entry) => {
-                        entry.insert(patch);
+                        (PatchKind::EditMotion(existing_edit), PatchKind::EditMotion(new_edit))
+                            if new_edit.priority > existing_edit.priority =>
+                        {
+                            existing_edit.patch.merge(new_edit.patch);
+                            existing_edit.clip_id = new_edit.clip_id;
+                            existing_edit.priority = new_edit.priority;
+                        }
+                        _ => {} // Do nothing if the new patch has lower or equal priority.
                     }
                 }
-                map
-            },
-        )
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(patch);
+                }
+            }
+            map
+        })
         .reduce(HashMap::new, |mut map1, map2| {
             for (key, patch2) in map2 {
                 match map1.entry(key) {

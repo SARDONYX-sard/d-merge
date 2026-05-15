@@ -402,9 +402,7 @@ impl std::str::FromStr for AAGroupName {
             s if s.eq_ignore_ascii_case("_jump") => Ok(Self::Jump),
             s if s.eq_ignore_ascii_case("_sprint") => Ok(Self::Sprint),
             s if s.eq_ignore_ascii_case("_shield") => Ok(Self::Shield),
-            _ => Err(UnknownGroupName {
-                message: s.to_owned(),
-            }),
+            _ => Err(UnknownGroupName { message: s.to_owned() }),
         }
     }
 }

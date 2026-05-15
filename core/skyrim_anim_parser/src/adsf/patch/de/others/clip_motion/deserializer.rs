@@ -31,9 +31,7 @@ use crate::{
 /// Parse failed.
 pub fn parse_clip_motion_diff_patch(input: &str) -> Result<ClipMotionDiffPatch<'_>, Error> {
     let mut deserializer = Deserializer::new(input);
-    deserializer
-        .root()
-        .map_err(|err| deserializer.to_readable_err(err))?;
+    deserializer.root().map_err(|err| deserializer.to_readable_err(err))?;
     Ok(deserializer.output_patches)
 }
 
@@ -67,9 +65,7 @@ impl<'de> Deserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::Context { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
@@ -79,9 +75,7 @@ impl<'de> Deserializer<'de> {
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::Context { err })?;
+        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
 
@@ -161,10 +155,7 @@ impl<'de> Deserializer<'de> {
                 LineKind::Translation => {
                     // until rotation length line
                     let mut start_index = 0;
-                    while self
-                        .parse_peek(opt(verify_line_parses_to::<usize>))?
-                        .is_none()
-                    {
+                    while self.parse_peek(opt(verify_line_parses_to::<usize>))?.is_none() {
                         let diff_start = self.parse_opt_start_comment()?;
                         if diff_start {
                             self.current.set_range_start(start_index)?;
@@ -231,8 +222,7 @@ impl<'de> Deserializer<'de> {
         self.parse_next(opt(line_ending))?;
 
         if self.current.mode_code.is_some() {
-            self.current
-                .push_as_translation(Translation { time, x, y, z })?;
+            self.current.push_as_translation(Translation { time, x, y, z })?;
         }
 
         Ok(())
@@ -490,11 +480,7 @@ mod tests {
                     },
                 ],
             }),
-            rotations: Some(DiffRotations {
-                op: Op::Remove,
-                range: 0..1,
-                values: vec![],
-            }),
+            rotations: Some(DiffRotations { op: Op::Remove, range: 0..1, values: vec![] }),
             ..Default::default()
         };
 

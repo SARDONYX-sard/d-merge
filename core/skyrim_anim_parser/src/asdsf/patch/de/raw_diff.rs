@@ -101,56 +101,33 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
     let op = raw.op;
 
     let (range, value) = match (raw.category, op, last) {
-        (ArrayType::Condition, Op::Replace, Some("variable_name")) => (
-            None,
-            one_line
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?
-                .into(),
-        ),
+        (ArrayType::Condition, Op::Replace, Some("variable_name")) => {
+            (None, one_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+        }
         (ArrayType::Condition, Op::Replace, Some("value_a" | "value_b")) => (
             None,
-            parse_one_line::<i32>
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?
-                .into(),
+            parse_one_line::<i32>.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into(),
         ),
         (ArrayType::Condition, _, None) => {
-            let conditions = conditions
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?;
-            let range = raw.seq_index.map(|start| Range {
-                start,
-                end: start + conditions.len(),
-            });
+            let conditions =
+                conditions.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let range = raw.seq_index.map(|start| Range { start, end: start + conditions.len() });
             (range, conditions.into())
         }
 
         // attack
         (ArrayType::Attack, Op::Replace, Some("attack_trigger")) => (
             None,
-            attack_trigger_line
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?
-                .into(),
+            attack_trigger_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into(),
         ),
-        (ArrayType::Attack, Op::Replace, Some("is_contextual")) => (
-            None,
-            num_bool_line
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?
-                .into(),
-        ),
+        (ArrayType::Attack, Op::Replace, Some("is_contextual")) => {
+            (None, num_bool_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+        }
 
         // Attack array
         (ArrayType::Attack, Op::Add | Op::Replace | Op::Remove, None) => {
-            let attacks = attacks
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?;
-            let range = raw.seq_index.map(|start| Range {
-                start,
-                end: start + attacks.len(),
-            });
+            let attacks = attacks.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let range = raw.seq_index.map(|start| Range { start, end: start + attacks.len() });
             (range, attacks_to_borrowed_value(attacks))
         }
 
@@ -163,15 +140,12 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         (ArrayType::ClipName, Op::SeqPush, _) => {
             // has unknown num bool, then maybe attack array patch
             let value = if is_attack_array_patch(raw.text) {
-                let attacks = attacks
-                    .parse(raw.text)
-                    .map_err(|e| ReadableError::from_parse(e))?;
+                let attacks = attacks.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
                 raw.path.clear();
                 attacks_to_borrowed_value(attacks)
             } else {
-                let clip_names = clip_names_lines
-                    .parse(raw.text)
-                    .map_err(|e| ReadableError::from_parse(e))?; // clip_names
+                let clip_names =
+                    clip_names_lines.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?; // clip_names
                 raw.path.pop(); // remove `clip_name` from `["attack", "[9]", "clip_names", "clip_name"]`
                 clip_names.into()
             };
@@ -186,13 +160,9 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         // clip_names
         // - path: `["[9]", "clip_names"]`
         (ArrayType::Trigger, _, _) | (ArrayType::ClipName, _, Some("clip_names")) => {
-            let vec_str = till_ending_str_lines
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?;
-            let range = raw.seq_index.map(|start| Range {
-                start,
-                end: start + vec_str.len(),
-            });
+            let vec_str =
+                till_ending_str_lines.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let range = raw.seq_index.map(|start| Range { start, end: start + vec_str.len() });
             (range, vec_str.into())
         }
 
@@ -204,13 +174,9 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         (ArrayType::AnimInfo, Op::Replace, Some("hashed_path"))
             if raw.text.par_lines().count() == 3 =>
         {
-            let anim_infos = anim_infos
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?;
-            let range = raw.seq_index.map(|start| Range {
-                start,
-                end: start + anim_infos.len(),
-            });
+            let anim_infos =
+                anim_infos.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let range = raw.seq_index.map(|start| Range { start, end: start + anim_infos.len() });
             (range, anim_infos.into())
         }
 
@@ -227,13 +193,9 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         ),
 
         (ArrayType::AnimInfo, Op::SeqPush, None) => {
-            let anim_infos = anim_infos
-                .parse(raw.text)
-                .map_err(|e| ReadableError::from_parse(e))?;
-            let range = raw.seq_index.map(|start| Range {
-                start,
-                end: start + anim_infos.len(),
-            });
+            let anim_infos =
+                anim_infos.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let range = raw.seq_index.map(|start| Range { start, end: start + anim_infos.len() });
             (range, anim_infos.into())
         }
 
@@ -268,20 +230,12 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
                 _ => {}
             }
 
-            json_patch::Action::Pure {
-                op: to_json_patch_op(op),
-            }
+            json_patch::Action::Pure { op: to_json_patch_op(op) }
         }
-        (Some(range), op) => json_patch::Action::Seq {
-            op: to_json_patch_op(op),
-            range,
-        },
+        (Some(range), op) => json_patch::Action::Seq { op: to_json_patch_op(op), range },
     };
 
-    Ok(ValueWithPriority {
-        patch: json_patch::JsonPatch { action, value },
-        priority,
-    })
+    Ok(ValueWithPriority { patch: json_patch::JsonPatch { action, value }, priority })
 }
 
 /// # Panics
@@ -372,8 +326,7 @@ fn clip_names_lines<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
     fn is_attack_starts(s: &str) -> bool {
         fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
             s.len() >= prefix.len()
-                && s.get(..prefix.len())
-                    .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
+                && s.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix))
         }
 
         starts_with_ignore_ascii(s, "attackStart")
@@ -421,13 +374,9 @@ fn u32_or_crc32_macro_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
 /// # Errors
 /// If not found `$crc32[` `]`
 fn crc32_macro<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    winnow::combinator::delimited(
-        Caseless("$crc32["),
-        winnow::token::take_until(1.., "]$"),
-        "]$",
-    )
-    .context(Expected(Description("crc32(e.g. `$crc32[sampleName]$`)")))
-    .parse_next(input)
+    winnow::combinator::delimited(Caseless("$crc32["), winnow::token::take_until(1.., "]$"), "]$")
+        .context(Expected(Description("crc32(e.g. `$crc32[sampleName]$`)")))
+        .parse_next(input)
 }
 
 #[cfg(test)]

@@ -88,10 +88,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[0].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -122,10 +119,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+2
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[2].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -159,10 +153,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+3
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[3].clone()),
-            Cow::Borrowed("hkbVariableBindingSet"),
-        ],
+        vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -185,10 +176,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+4
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[4].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -212,10 +200,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+5
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[5].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -269,10 +254,7 @@ pub(super) fn new_chair_patches<'a>(
         }));
 
         (
-            vec![
-                Cow::Owned(class_indexes[6].clone()),
-                Cow::Borrowed("hkbClipTriggerArray"),
-            ],
+            vec![Cow::Owned(class_indexes[6].clone()), Cow::Borrowed("hkbClipTriggerArray")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -288,10 +270,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+7
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[7].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[7].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -315,10 +294,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+8
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[8].clone()),
-            Cow::Borrowed("hkbStateMachine"),
-        ],
+        vec![Cow::Owned(class_indexes[8].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -352,10 +328,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+9
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[9].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[9].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -379,10 +352,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+10
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[10].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[10].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -410,10 +380,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+11
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[11].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[11].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -437,10 +404,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+12
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[12].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[12].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -468,10 +432,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+13
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[13].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[13].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -495,10 +456,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+14
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[14].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[14].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -526,10 +484,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+15
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[15].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[15].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -553,10 +508,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+16
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[16].clone()),
-            Cow::Borrowed("hkbModifierGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[16].clone()), Cow::Borrowed("hkbModifierGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -575,10 +527,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+17
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[17].clone()),
-            Cow::Borrowed("BSEventEveryNEventsModifier"),
-        ],
+        vec![Cow::Owned(class_indexes[17].clone()), Cow::Borrowed("BSEventEveryNEventsModifier")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -607,10 +556,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // $RI+18
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[18].clone()),
-            Cow::Borrowed("hkbClipGenerator"),
-        ],
+        vec![Cow::Owned(class_indexes[18].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -728,16 +674,10 @@ fn build_anim_files(namespace: &str, chair: &FNISChairAnimation) -> [String; 5] 
 
     [
         format!("Animations\\{namespace}\\{start_anim_file}"),
+        format!("Animations\\{namespace}\\{}", sequenced.first().unwrap_or(&start_anim_file)),
         format!(
             "Animations\\{namespace}\\{}",
-            sequenced.first().unwrap_or(&start_anim_file)
-        ),
-        format!(
-            "Animations\\{namespace}\\{}",
-            sequenced
-                .get(1)
-                .or_else(|| sequenced.first())
-                .unwrap_or(&start_anim_file)
+            sequenced.get(1).or_else(|| sequenced.first()).unwrap_or(&start_anim_file)
         ),
         format!(
             "Animations\\{namespace}\\{}",

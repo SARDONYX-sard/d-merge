@@ -33,7 +33,7 @@ open = { version = "5.3.5" }
 parking_lot = "0.12.5"
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+sonic-rs = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -44,6 +44,8 @@ mod_info = { workspace = true }
 nemesis_merge = { workspace = true, features = ["tracing"] }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
+
+egui_derive = { path = "../egui_derive" }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.17.2", default-features = false }

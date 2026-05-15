@@ -61,10 +61,8 @@ pub(crate) enum AnimKind {
 #[must_use]
 pub(crate) fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<Error> {
     // Stage 1: read
-    let read_results: Vec<Result<ConversionBytes, Error>> = jobs
-        .into_par_iter()
-        .filter_map(|job| read(job, output_target))
-        .collect();
+    let read_results: Vec<Result<ConversionBytes, Error>> =
+        jobs.into_par_iter().filter_map(|job| read(job, output_target)).collect();
 
     // Stage 2: convert (in-memory)
     let (converted, mut errors): (Vec<ConversionBytes>, Vec<Error>) =
@@ -78,9 +76,7 @@ pub(crate) fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<
 
     // Stage 3: write
     errors.par_extend(
-        converted
-            .into_par_iter()
-            .filter_map(|b| super::write_file(&b.output_path, &b.bytes).err()),
+        converted.into_par_iter().filter_map(|b| super::write_file(&b.output_path, &b.bytes).err()),
     );
 
     errors
@@ -102,7 +98,7 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
     let actual_input: Cow<Path> = if !job.input_path.exists() {
         if matches!(job.kind, AnimKind::FnisAA { .. }) {
             #[cfg(feature = "tracing")]
-            tracing::warn!(
+            tracing::info!(
                 path = %job.input_path.display(),
                 "Input file does not exist; skipping (FNIS AltAnim → OAR)."
             );
@@ -123,19 +119,13 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
     let mut file = match File::open(actual_input.as_ref()) {
         Ok(f) => f,
         Err(e) => {
-            return Some(Err(Error::FNISHkxIoError {
-                path: actual_input.into_owned(),
-                source: e,
-            }));
+            return Some(Err(Error::FNISHkxIoError { path: actual_input.into_owned(), source: e }));
         }
     };
 
     let mut header = [0_u8; 17];
     if let Err(e) = file.read_exact(&mut header) {
-        return Some(Err(Error::FNISHkxIoError {
-            path: actual_input.into_owned(),
-            source: e,
-        }));
+        return Some(Err(Error::FNISHkxIoError { path: actual_input.into_owned(), source: e }));
     }
 
     let current_format = match check_header(header, &actual_input, output_target) {
@@ -151,10 +141,7 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
     let bytes = match std::fs::read(actual_input.as_ref()) {
         Ok(b) => b,
         Err(e) => {
-            return Some(Err(Error::FNISHkxIoError {
-                path: actual_input.into_owned(),
-                source: e,
-            }));
+            return Some(Err(Error::FNISHkxIoError { path: actual_input.into_owned(), source: e }));
         }
     };
 
@@ -177,20 +164,16 @@ fn convert(
         return Ok(());
     }
 
-    let class_map: ClassMap = serde_hkx::from_bytes(bytes).map_err(|e| Error::HkxDeError {
-        path: input_path.to_path_buf(),
-        source: e,
-    })?;
+    let class_map: ClassMap = serde_hkx::from_bytes(bytes)
+        .map_err(|e| Error::HkxDeError { path: input_path.to_path_buf(), source: e })?;
 
     let header = match output_target {
         OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
         OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
     };
 
-    *bytes = serde_hkx::to_bytes(&class_map, &header).map_err(|e| Error::HkxSerError {
-        path: input_path.to_path_buf(),
-        source: e,
-    })?;
+    *bytes = serde_hkx::to_bytes(&class_map, &header)
+        .map_err(|e| Error::HkxSerError { path: input_path.to_path_buf(), source: e })?;
 
     Ok(())
 }
@@ -245,9 +228,7 @@ fn find_case_insensitive(path: &Path) -> Option<PathBuf> {
     let file_name = path.file_name()?;
     std::fs::read_dir(parent).ok()?.find_map(|e| {
         let e = e.ok()?;
-        e.file_name()
-            .eq_ignore_ascii_case(file_name)
-            .then(|| e.path())
+        e.file_name().eq_ignore_ascii_case(file_name).then(|| e.path())
     })
 }
 
@@ -282,11 +263,7 @@ pub(crate) fn prepare_conversion_jobs(
             output_path.push(namespace);
             output_path.push(&anim_file);
 
-            AnimIoJob::Hkx(ConversionJob {
-                input_path,
-                output_path,
-                kind: AnimKind::Standard,
-            })
+            AnimIoJob::Hkx(ConversionJob { input_path, output_path, kind: AnimKind::Standard })
         })
         .collect()
 }

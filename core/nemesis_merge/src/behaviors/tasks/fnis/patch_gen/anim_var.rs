@@ -19,11 +19,7 @@ pub(super) fn new_push_anim_vars_patch<'a>(
 
     [
         (
-            json_path![
-                string_data_index,
-                "hkbBehaviorGraphStringData",
-                "variableNames",
-            ],
+            json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,
@@ -65,11 +61,7 @@ pub(super) fn new_push_anim_vars_patch<'a>(
             },
         ),
         (
-            json_path![
-                behavior_graph_index,
-                "hkbBehaviorGraphData",
-                "variableInfos",
-            ],
+            json_path![behavior_graph_index, "hkbBehaviorGraphData", "variableInfos",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,

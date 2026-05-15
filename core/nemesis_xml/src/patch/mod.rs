@@ -45,9 +45,7 @@ pub fn parse_nemesis_patch(
     hack_options: Option<HackOptions>,
 ) -> Result<(PatchesMap<'_>, Option<&str>)> {
     let mut patcher_de = PatchDeserializer::new(nemesis_xml, hack_options.unwrap_or_default());
-    patcher_de
-        .root_class()
-        .map_err(|err| patcher_de.to_readable_err(err))?;
+    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
     Ok((patcher_de.output_patches, patcher_de.id_index))
 }
 
@@ -105,9 +103,7 @@ impl<'de> PatchDeserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser
-            .parse_next(&mut self.input)
-            .map_err(|err| Error::ContextError { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
     }
 
     /// Parse by argument parser no consume.
@@ -117,9 +113,7 @@ impl<'de> PatchDeserializer<'de> {
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        let (_, res) = parser
-            .parse_peek(self.input)
-            .map_err(|err| Error::ContextError { err })?;
+        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::ContextError { err })?;
         Ok(res)
     }
 
@@ -174,9 +168,8 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(class_name.into());
 
         {
-            let field_info = find_class_info(class_name).ok_or_else(|| Error::UnknownClass {
-                class_name: class_name.to_string(),
-            })?;
+            let field_info = find_class_info(class_name)
+                .ok_or_else(|| Error::UnknownClass { class_name: class_name.to_string() })?;
             self.push_current_field_table(field_info);
         }
 
@@ -217,9 +210,8 @@ impl<'de> PatchDeserializer<'de> {
         self.parse_next(start_tag("hkobject"))?;
 
         {
-            let field_info = find_class_info(class_name).ok_or_else(|| Error::UnknownClass {
-                class_name: class_name.to_string(),
-            })?;
+            let field_info = find_class_info(class_name)
+                .ok_or_else(|| Error::UnknownClass { class_name: class_name.to_string() })?;
             self.push_current_field_table(field_info);
         }
 
@@ -296,9 +288,7 @@ impl<'de> PatchDeserializer<'de> {
             "Pointer" => self.parse_next(pointer)?,
             "Bool" => self.parse_next(boolean.map(|boolean| boolean.into()))?,
             unknown => {
-                return Err(Error::UnknownFieldType {
-                    field_type: unknown.to_string(),
-                });
+                return Err(Error::UnknownFieldType { field_type: unknown.to_string() });
             }
         };
         Ok(value)
@@ -602,10 +592,7 @@ impl<'de> PatchDeserializer<'de> {
 
         self.output_patches.insert(
             patch_path,
-            JsonPatch {
-                action: Action::SeqPush,
-                value: BorrowedValue::Array(Box::new(floats)),
-            },
+            JsonPatch { action: Action::SeqPush, value: BorrowedValue::Array(Box::new(floats)) },
         );
 
         Ok(true)
@@ -694,23 +681,11 @@ impl<'de> PatchDeserializer<'de> {
             //         </hkparam>
             // ```
             if matches!(op, Op::Add) && self.parse_peek(opt(end_tag("hkparam")))?.is_some() {
-                self.output_patches.insert(
-                    path,
-                    JsonPatch {
-                        action: Action::SeqPush,
-                        value,
-                    },
-                );
+                self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
             } else {
                 self.output_patches.insert(
                     path,
-                    JsonPatch {
-                        action: Action::Seq {
-                            op,
-                            range: new_range,
-                        },
-                        value,
-                    },
+                    JsonPatch { action: Action::Seq { op, range: new_range }, value },
                 );
             }
 
@@ -722,13 +697,7 @@ impl<'de> PatchDeserializer<'de> {
         let (op, patches) = self.current.take_patches();
         self.output_patches.par_extend(patches.into_par_iter().map(
             |CurrentJsonPatch { path, value }| {
-                (
-                    path,
-                    JsonPatch {
-                        action: Action::Pure { op },
-                        value,
-                    },
-                )
+                (path, JsonPatch { action: Action::Pure { op }, value })
             },
         ));
 
@@ -763,10 +732,7 @@ mod tests {
         let mut hash_map = HashMap::new();
         hash_map.insert(
             json_path!["#0010", "hkbProjectData", "stringData"],
-            JsonPatch {
-                action: Action::Pure { op: Op::Replace },
-                value: "$id".into(),
-            },
+            JsonPatch { action: Action::Pure { op: Op::Replace }, value: "$id".into() },
         );
 
         assert_eq!(actual, hash_map);
@@ -824,14 +790,7 @@ mod tests {
                 // path: https://crates.io/crates/jsonpath-rust
                 value: json_typed!(
                     borrowed,
-                    [
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy"
-                    ]
+                    ["PushDummy", "PushDummy", "PushDummy", "PushDummy", "PushDummy", "PushDummy"]
                 ),
             },
         );
@@ -877,31 +836,18 @@ mod tests {
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
             JsonPatch {
-                action: Action::Seq {
-                    op: Op::Add,
-                    range: 1..7,
-                },
+                action: Action::Seq { op: Op::Add, range: 1..7 },
                 // path: https://crates.io/crates/jsonpath-rust
                 value: json_typed!(
                     borrowed,
-                    [
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy",
-                        "PushDummy"
-                    ]
+                    ["PushDummy", "PushDummy", "PushDummy", "PushDummy", "PushDummy", "PushDummy"]
                 ),
             },
         );
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
             JsonPatch {
-                action: Action::Seq {
-                    op: Op::Remove,
-                    range: 11..13,
-                },
+                action: Action::Seq { op: Op::Remove, range: 11..13 },
                 value: json_typed!(borrowed, null),
             },
         );
@@ -945,10 +891,7 @@ mod tests {
         hash_map.insert(
             json_path,
             JsonPatch {
-                action: Action::Seq {
-                    op: Op::Remove,
-                    range: 5..7,
-                },
+                action: Action::Seq { op: Op::Remove, range: 5..7 },
                 value: Default::default(),
             },
         );
@@ -975,13 +918,7 @@ mod tests {
 		</hkobject>
 "###;
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
-        let json_path = json_path![
-            "#0008",
-            "hkRootLevelContainer",
-            "namedVariants",
-            "[0]",
-            "name"
-        ];
+        let json_path = json_path!["#0008", "hkRootLevelContainer", "namedVariants", "[0]", "name"];
         let mut hash_map = HashMap::new();
 
         hash_map.insert(
@@ -1019,28 +956,18 @@ mod tests {
         "###;
         let (actual, _) = parse_nemesis_patch(
             nemesis_xml,
-            Some(HackOptions {
-                cast_ragdoll_event: true,
-                ..Default::default()
-            }),
+            Some(HackOptions { cast_ragdoll_event: true, ..Default::default() }),
         )
         .unwrap_or_else(|e| panic!("{e}"));
 
-        let json_path = json_path![
-            "#2521",
-            "BSRagdollContactListenerModifier",
-            "contactEvent",
-            "id"
-        ];
+        let json_path =
+            json_path!["#2521", "BSRagdollContactListenerModifier", "contactEvent", "id"];
 
         let mut hash_map = HashMap::new();
 
         hash_map.insert(
             json_path,
-            JsonPatch {
-                action: Action::Pure { op: Op::Replace },
-                value: 0.into(),
-            },
+            JsonPatch { action: Action::Pure { op: Op::Replace }, value: 0.into() },
         );
         assert_eq!(actual, hash_map);
     }
@@ -1061,10 +988,7 @@ mod tests {
 
         let (actual, _) = parse_nemesis_patch(
             nemesis_xml,
-            Some(HackOptions {
-                bone_weight_outside_hkparam: true,
-                ..Default::default()
-            }),
+            Some(HackOptions { bone_weight_outside_hkparam: true, ..Default::default() }),
         )
         .unwrap_or_else(|e| panic!("{e}"));
 

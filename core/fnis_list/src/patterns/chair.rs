@@ -49,14 +49,11 @@ pub(crate) fn parse_fnis_chair_animation<'a>(
 }
 
 fn parse_sequenced_animation<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
-    repeat(
-        3..,
-        delimited(skip_ws_and_comments0, parse_file, skip_ws_and_comments0),
-    )
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Chair animation requires at least 4 consecutive animations.",
-    )))
-    .parse_next(input)
+    repeat(3.., delimited(skip_ws_and_comments0, parse_file, skip_ws_and_comments0))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "Chair animation requires at least 4 consecutive animations.",
+        )))
+        .parse_next(input)
 }
 
 fn parse_file<'a>(input: &mut &'a str) -> ModalResult<&'a str> {

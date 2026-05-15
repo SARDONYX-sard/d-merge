@@ -34,12 +34,7 @@ macro_rules! time {
         let start = std::time::Instant::now();
         let res = $expr.or_else(|err| bail!(err));
         let elapsed = start.elapsed();
-        tracing::info!(
-            "{} time: {}.{}s.",
-            $name,
-            elapsed.as_secs(),
-            elapsed.subsec_millis()
-        );
+        tracing::info!("{} time: {}.{}s.", $name, elapsed.as_secs(), elapsed.subsec_millis());
         res
     }};
 }

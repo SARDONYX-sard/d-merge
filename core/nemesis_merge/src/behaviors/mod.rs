@@ -31,10 +31,7 @@ use crate::{
 /// # Errors
 /// Returns an error if file parsing, I/O operations, or JSON serialization fails.
 pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
-    let PatchMaps {
-        nemesis_entries,
-        fnis_entries,
-    } = &patches;
+    let PatchMaps { nemesis_entries, fnis_entries } = &patches;
 
     #[cfg(feature = "tracing")]
     {
@@ -53,10 +50,8 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let (owned_fnis_patches, mut fnis_errors) = if fnis_entries.is_empty() {
         (vec![], vec![])
     } else {
-        let skyrim_data_dir_glob = config
-            .skyrim_data_dir_glob
-            .as_ref()
-            .ok_or(Error::MissingSkyrimDataDirGlob)?;
+        let skyrim_data_dir_glob =
+            config.skyrim_data_dir_glob.as_ref().ok_or(Error::MissingSkyrimDataDirGlob)?;
         fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
     };
 
@@ -91,22 +86,15 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
             asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, nemesis_entries, &config);
         });
         s.spawn(|_| {
-            patched_hkx_errors = Some(apply_and_gen_patched_hkx(
-                &owned_patches,
-                &config,
-                fnis_hkx_patches,
-            ));
+            patched_hkx_errors =
+                Some(apply_and_gen_patched_hkx(&owned_patches, &config, fnis_hkx_patches));
         });
     });
 
     // Error process
     {
-        let Errors {
-            patch_errors_len,
-            apply_errors_len,
-            hkx_errors_len,
-            hkx_errors,
-        } = patched_hkx_errors.unwrap_or_default();
+        let Errors { patch_errors_len, apply_errors_len, hkx_errors_len, hkx_errors } =
+            patched_hkx_errors.unwrap_or_default();
         let fnis_errors_errors_len = fnis_errors.len() + fnis_convert_errors.len();
 
         let owned_file_errors_len = owned_file_errors.len();
@@ -164,10 +152,7 @@ fn apply_and_gen_patched_hkx<'a>(
 
     // 1/3: Parse nemesis patches
     let (
-        PatchCollection {
-            borrowed_patches,
-            behavior_graph_data_map: variable_class_map,
-        },
+        PatchCollection { borrowed_patches, behavior_graph_data_map: variable_class_map },
         patch_errors_len,
     ) = {
         let (borrowed_patches, errors) =
@@ -184,11 +169,8 @@ fn apply_and_gen_patched_hkx<'a>(
         use self::tasks::templates::collect::owned;
 
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        let needed_template_names: std::collections::HashSet<_> = borrowed_patches
-            .0
-            .par_iter()
-            .map(|entry| entry.key().clone())
-            .collect();
+        let needed_template_names: std::collections::HashSet<_> =
+            borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
 
         let (owned_templates, errors) =
             owned::collect_templates(&config.resource_dir, needed_template_names);
@@ -235,11 +217,6 @@ fn apply_and_gen_patched_hkx<'a>(
             }
         };
 
-        Errors {
-            patch_errors_len,
-            apply_errors_len,
-            hkx_errors_len,
-            hkx_errors: all_errors,
-        }
+        Errors { patch_errors_len, apply_errors_len, hkx_errors_len, hkx_errors: all_errors }
     }
 }

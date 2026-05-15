@@ -16,14 +16,12 @@ where
     P: AsRef<Path>,
 {
     let output_dir = output_dir.as_ref();
-    let output_path = output_dir
-        .canonicalize()
-        .map_or_else(|_| Cow::Borrowed(output_dir), Cow::Owned);
+    let output_path =
+        output_dir.canonicalize().map_or_else(|_| Cow::Borrowed(output_dir), Cow::Owned);
 
     let skyrim_data_dir = skyrim_data_dir.as_ref();
-    let skyrim_data_dir = skyrim_data_dir
-        .canonicalize()
-        .map_or_else(|_| Cow::Borrowed(skyrim_data_dir), Cow::Owned);
+    let skyrim_data_dir =
+        skyrim_data_dir.canonicalize().map_or_else(|_| Cow::Borrowed(skyrim_data_dir), Cow::Owned);
 
     output_path == skyrim_data_dir
 }
@@ -51,11 +49,7 @@ where
             let _ = fs::remove_file(output_dir.join(".d_merge").join("d_merge_errors.log"));
             let _ = remove_if_exists(output_dir.join(".d_merge").join(".debug"));
             let _ = fs::remove_file(
-                output_dir
-                    .join("SKSE")
-                    .join("Plugins")
-                    .join("fnis_aa")
-                    .join("config.json"),
+                output_dir.join("SKSE").join("Plugins").join("fnis_aa").join("config.json"),
             );
             let _ = fs::remove_file(output_dir.join("FNIS.esp"));
         },
@@ -81,10 +75,8 @@ fn remove_if_exists(path: impl AsRef<Path>) -> std::io::Result<()> {
     }
 
     // Get the contents
-    let entries: Vec<PathBuf> = fs::read_dir(path)?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .collect();
+    let entries: Vec<PathBuf> =
+        fs::read_dir(path)?.filter_map(Result::ok).map(|e| e.path()).collect();
 
     // directories recursively deleted in parallel, files deleted in parallel
     entries.par_iter().for_each(|entry_path| {

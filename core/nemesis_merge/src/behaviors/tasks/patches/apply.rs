@@ -44,9 +44,7 @@ pub(crate) fn apply_patches<'t, 'p: 't>(
         .0
         .into_iter()
         .filter_map(|(key, patches)| {
-            templates
-                .remove(&key)
-                .map(|(_, template)| (key, patches, template))
+            templates.remove(&key).map(|(_, template)| (key, patches, template))
         })
         .collect();
 
@@ -87,28 +85,22 @@ fn apply_to_one_template<'a, 'b: 'a>(
     }
 
     let patches_len = patches.len();
-    let HkxPatchMaps {
-        one: one_patch_map,
-        seq: seq_patch_map,
-    } = patches;
+    let HkxPatchMaps { one: one_patch_map, seq: seq_patch_map } = patches;
 
     let mut results = Vec::with_capacity(patches_len);
 
     // NOTE: Why not use par_iter here?
     // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
     for (path, patch) in one_patch_map.0 {
-        let result = apply_one_field(template_value, path, patch).with_context(|_| PatchSnafu {
-            template_name: key.to_string(),
-        });
+        let result = apply_one_field(template_value, path, patch)
+            .with_context(|_| PatchSnafu { template_name: key.to_string() });
         status_reporter.increment();
         results.push(result);
     }
 
     for (path, patches) in seq_patch_map.0 {
         let result = apply_seq_by_priority(key.as_str(), template_value, path, patches)
-            .with_context(|_| PatchSnafu {
-                template_name: key.to_string(),
-            });
+            .with_context(|_| PatchSnafu { template_name: key.to_string() });
         status_reporter.increment();
         results.push(result);
     }
@@ -127,20 +119,16 @@ fn write_debug_json_patch(
 
     use crate::errors::FailedIoSnafu;
 
-    let mut output_path = output_dir
-        .join(".d_merge")
-        .join(".debug")
-        .join("patches")
-        .join(key.as_meshes_inner_path());
+    let mut output_path =
+        output_dir.join(".d_merge").join(".debug").join("patches").join(key.as_meshes_inner_path());
     output_path.set_extension("patch.json");
 
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
     }
 
-    let json = sonic_rs::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu {
-        path: output_path.clone(),
-    })?;
+    let json = sonic_rs::to_string_pretty(patches)
+        .with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
 
     Ok(())

@@ -102,11 +102,7 @@ impl<'de> CurrentState<'de> {
             }
 
             if self.is_passed_original {
-                if self.patch.is_some() {
-                    Op::Replace
-                } else {
-                    Op::Remove
-                }
+                if self.patch.is_some() { Op::Replace } else { Op::Remove }
             } else {
                 Op::Add
             }

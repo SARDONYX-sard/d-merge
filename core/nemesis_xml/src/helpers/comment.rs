@@ -22,11 +22,7 @@ pub(crate) fn comment_kind<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'
     let kind_parser = {
         let mod_code_parser = {
             let id_parser = delimited('~', take_until(0.., '~'), '~');
-            delimited(
-                Caseless("MOD_CODE"),
-                delimited_multispace0(id_parser),
-                Caseless("OPEN"),
-            )
+            delimited(Caseless("MOD_CODE"), delimited_multispace0(id_parser), Caseless("OPEN"))
         };
 
         let mod_code_parser = delimited_multispace0(mod_code_parser);
@@ -100,15 +96,9 @@ mod tests {
             Ok(CommentKind::ModCode("hi!"))
         );
 
-        assert_eq!(
-            close_comment.parse("<!-- ORIGINAL -->"),
-            Ok(CommentKind::Original)
-        );
+        assert_eq!(close_comment.parse("<!-- ORIGINAL -->"), Ok(CommentKind::Original));
 
-        assert_eq!(
-            close_comment.parse("<!-- CLOSE -->"),
-            Ok(CommentKind::Close)
-        );
+        assert_eq!(close_comment.parse("<!-- CLOSE -->"), Ok(CommentKind::Close));
 
         assert_eq!(
             close_comment.parse("<!-- memSizeAndFlags SERIALIZE_IGNORED -->"),

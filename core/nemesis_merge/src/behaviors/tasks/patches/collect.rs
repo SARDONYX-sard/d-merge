@@ -66,12 +66,7 @@ pub(crate) async fn collect_owned_patches(
                 .await
                 .with_context(|_| FailedIoSnafu { path: path.clone() })?;
 
-            Ok(OwnedPath {
-                category,
-                path,
-                content,
-                priority,
-            })
+            Ok(OwnedPath { category, path, content, priority })
         });
     }
 
@@ -80,11 +75,8 @@ pub(crate) async fn collect_owned_patches(
     let mut asdsf_patches = OwnedAsdsfPatchMap::new();
     let mut errors = vec![];
 
-    let reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::ReadingPatches,
-        handles.len(),
-    );
+    let reporter =
+        StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, handles.len());
 
     while let Some(result) = handles.join_next().await {
         reporter.increment();
@@ -98,12 +90,7 @@ pub(crate) async fn collect_owned_patches(
         };
 
         match result {
-            Ok(OwnedPath {
-                category,
-                path,
-                content,
-                priority,
-            }) => match category {
+            Ok(OwnedPath { category, path, content, priority }) => match category {
                 Category::Nemesis => {
                     owned_patches.insert(path, (content, priority));
                 }
@@ -120,12 +107,7 @@ pub(crate) async fn collect_owned_patches(
         }
     }
 
-    OwnedPatches {
-        owned_patches,
-        adsf_patches,
-        asdsf_patches,
-        errors,
-    }
+    OwnedPatches { owned_patches, adsf_patches, asdsf_patches, errors }
 }
 
 pub(crate) fn collect_borrowed_patches<'a>(

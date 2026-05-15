@@ -27,10 +27,7 @@ pub struct DiffProjectAssets<'a> {
 }
 
 impl AnimHeaderDiffPatch<'_> {
-    const DEFAULT: Self = Self {
-        lead_int: None,
-        project_assets: None,
-    };
+    const DEFAULT: Self = Self { lead_int: None, project_assets: None };
 
     pub fn merge(&mut self, other: Self) {
         if other.lead_int.is_some() {
@@ -55,9 +52,7 @@ impl<'a> AnimHeaderDiffPatch<'a> {
                 Op::Add => {
                     if range.start >= anim_data_header.project_assets.len() {
                         // Out-of-bounds → append at the end
-                        anim_data_header
-                            .project_assets
-                            .extend(project_assets.values);
+                        anim_data_header.project_assets.extend(project_assets.values);
                     } else {
                         // In-bounds → insert at the middle
                         anim_data_header
@@ -79,9 +74,7 @@ impl<'a> AnimHeaderDiffPatch<'a> {
                     };
 
                     // Replace within the valid range
-                    anim_data_header
-                        .project_assets
-                        .splice(start..end, replace_vals);
+                    anim_data_header.project_assets.splice(start..end, replace_vals);
 
                     // Append any remaining values (out-of-range)
                     if !append_vals.is_empty() {

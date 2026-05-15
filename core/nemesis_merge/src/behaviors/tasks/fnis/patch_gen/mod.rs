@@ -72,9 +72,7 @@ impl<'a> LocalAgg<'a> {
     fn merge(mut self, other: Self) -> Self {
         self.borrowed_patches.merge(other.borrowed_patches);
 
-        self.behavior_graph_data_map
-            .0
-            .par_extend(other.behavior_graph_data_map.0);
+        self.behavior_graph_data_map.0.par_extend(other.behavior_graph_data_map.0);
         self.adsf_patches.par_extend(other.adsf_patches);
         self.furniture_groups.par_extend(other.furniture_groups);
         self.conversion_jobs.par_extend(other.conversion_jobs);
@@ -92,12 +90,7 @@ impl<'a> LocalAgg<'a> {
 pub(crate) fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
-) -> (
-    PatchCollection<'a>,
-    Vec<AdsfPatch<'a>>,
-    FNISIoJobRunner,
-    Vec<Error>,
-) {
+) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, FNISIoJobRunner, Vec<Error>) {
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::GeneratingFnisPatches,
@@ -109,9 +102,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
             match parse_fnis_list
                 .parse(&owned_data.list_content)
                 .map_err(|e| winnow_ext::ReadableError::from_parse(e))
-                .with_context(|_| FailedParseFnisModListSnafu {
-                    path: owned_data.to_list_path(),
-                })
+                .with_context(|_| FailedParseFnisModListSnafu { path: owned_data.to_list_path() })
                 .and_then(|list| {
                     #[cfg(feature = "tracing")]
                     tracing::debug!("{}: \n{list:#?}", owned_data.to_list_path().display());
@@ -153,15 +144,9 @@ pub(crate) fn collect_borrowed_patches<'a>(
 
             // Add patches to mt_behavior.xml
             if owned_data.behavior_entry.is_3rd_person_character() {
-                let entry = borrowed_patches
-                    .0
-                    .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
-                    .or_default();
+                let entry = borrowed_patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
-                if !behavior_graph_data_map
-                    .0
-                    .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
-                {
+                if !behavior_graph_data_map.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
                     behavior_graph_data_map
                         .0
                         .insert(THREAD_PERSON_MT_BEHAVIOR_KEY, Cow::Borrowed("#0085"));
@@ -270,8 +255,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
             reporter.increment();
 
             acc.adsf_patches.par_extend(adsf_patches);
-            acc.furniture_groups
-                .par_extend(furniture_group_root_indexes);
+            acc.furniture_groups.par_extend(furniture_group_root_indexes);
             acc.conversion_jobs.par_extend(conversion_jobs);
             acc
         })
@@ -289,15 +273,9 @@ pub(crate) fn collect_borrowed_patches<'a>(
             .par_extend(new_global_master_patch(0));
     }
 
-    if borrowed_patches
-        .0
-        .contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY)
-    {
+    if borrowed_patches.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
         let (one, seq) = new_mt_global_patch(furniture_groups, 0);
-        let mut entry = borrowed_patches
-            .0
-            .entry(THREAD_PERSON_MT_BEHAVIOR_KEY)
-            .or_default();
+        let mut entry = borrowed_patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
         // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
         entry.one.0.par_extend(one);
@@ -307,11 +285,10 @@ pub(crate) fn collect_borrowed_patches<'a>(
     }
 
     // fnis_aa/config.json / BDI.json
-    let aa_base_map = if conversion_jobs
-        .par_iter()
-        .any(|job| matches!(job, AnimIoJob::FnisAANamespaceConfig(_)))
-    {
-        match alternate::aa_config::build_aa_config_from_jobs(&conversion_jobs, &config.output_dir) // Write fnis_aa/config.json
+    let aa_base_map =
+        if conversion_jobs.par_iter().any(|job| matches!(job, AnimIoJob::FnisAANamespaceConfig(_)))
+        {
+            match alternate::aa_config::build_aa_config_from_jobs(&conversion_jobs, &config.output_dir) // Write fnis_aa/config.json
         {
             Ok(aa_base_map) => {
                 let seq = new_push_alt_anim_values_seq_patch(0);
@@ -330,9 +307,9 @@ pub(crate) fn collect_borrowed_patches<'a>(
                 None
             }
         }
-    } else {
-        None
-    };
+        } else {
+            None
+        };
     #[cfg(feature = "tracing")]
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
@@ -343,10 +320,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     };
 
     (
-        PatchCollection {
-            borrowed_patches,
-            behavior_graph_data_map,
-        },
+        PatchCollection { borrowed_patches, behavior_graph_data_map },
         adsf_patches,
         FNISIoJobRunner::new(conversion_jobs, config.output_target, aa_base_map),
         errors,
@@ -447,11 +421,7 @@ pub(crate) fn new_push_events_seq_patch<'a>(
 ) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
     [
         (
-            json_path![
-                string_data_index,
-                "hkbBehaviorGraphStringData",
-                "eventNames",
-            ],
+            json_path![string_data_index, "hkbBehaviorGraphStringData", "eventNames",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,
@@ -534,10 +504,5 @@ fn new_push_anim_seq_patch<'a>(
     #[cfg(feature = "tracing")]
     tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
 
-    patches
-        .0
-        .entry(behavior_key)
-        .or_default()
-        .seq
-        .insert(json_path, patch);
+    patches.0.entry(behavior_key).or_default().seq.insert(json_path, patch);
 }

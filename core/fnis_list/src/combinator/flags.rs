@@ -118,11 +118,7 @@ fn __parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISAnimFlagSet<'a
 
 /// Parse a single animation flag (simple or parameterized).
 fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
-    alt((
-        parse_anim_flag_simple.map(ParsedFlag::Simple),
-        parse_anim_flag_param,
-    ))
-    .parse_next(input)
+    alt((parse_anim_flag_simple.map(ParsedFlag::Simple), parse_anim_flag_param)).parse_next(input)
 }
 
 pub(crate) fn parse_anim_flag_simple(input: &mut &str) -> ModalResult<FNISAnimFlags> {
@@ -178,22 +174,10 @@ mod tests {
 
     #[test]
     fn parse_single_simple_flag() {
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "a"),
-            FNISAnimFlags::Acyclic
-        );
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "ac0"),
-            FNISAnimFlags::AnimatedCameraReset
-        );
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "bsa"),
-            FNISAnimFlags::BSA
-        );
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "Tn"),
-            FNISAnimFlags::TransitionNext
-        );
+        assert_eq!(must_parse(parse_anim_flag_simple, "a"), FNISAnimFlags::Acyclic);
+        assert_eq!(must_parse(parse_anim_flag_simple, "ac0"), FNISAnimFlags::AnimatedCameraReset);
+        assert_eq!(must_parse(parse_anim_flag_simple, "bsa"), FNISAnimFlags::BSA);
+        assert_eq!(must_parse(parse_anim_flag_simple, "Tn"), FNISAnimFlags::TransitionNext);
     }
 
     #[test]
@@ -204,32 +188,20 @@ mod tests {
 
     #[test]
     fn parse_parameterized_flags() {
-        assert_eq!(
-            must_parse(parse_anim_flag_param, "B2.5"),
-            ParsedFlag::BlendTime(2.5)
-        );
+        assert_eq!(must_parse(parse_anim_flag_param, "B2.5"), ParsedFlag::BlendTime(2.5));
 
         assert_eq!(
             must_parse(parse_anim_flag_param, "TJump/1.0"),
-            ParsedFlag::Trigger(Trigger {
-                event: "Jump",
-                time: 1.0
-            })
+            ParsedFlag::Trigger(Trigger { event: "Jump", time: 1.0 })
         );
 
         assert_eq!(
             must_parse(parse_anim_flag_param, "AVfoo"),
-            ParsedFlag::AnimVar(AnimVar {
-                name: "foo",
-                inverse: false
-            })
+            ParsedFlag::AnimVar(AnimVar { name: "foo", inverse: false })
         );
         assert_eq!(
             must_parse(parse_anim_flag_param, "AVbar"),
-            ParsedFlag::AnimVar(AnimVar {
-                name: "bar",
-                inverse: false,
-            })
+            ParsedFlag::AnimVar(AnimVar { name: "bar", inverse: false })
         );
     }
 
@@ -249,19 +221,10 @@ mod tests {
         let expected = FNISAnimFlagSet {
             flags: FNISAnimFlags::Acyclic | FNISAnimFlags::AnimatedCameraReset,
             blend_time: Some(1.5),
-            triggers: vec![Trigger {
-                event: "Jump",
-                time: 2.0,
-            }],
+            triggers: vec![Trigger { event: "Jump", time: 2.0 }],
             anim_vars: vec![
-                AnimVar {
-                    name: "foo",
-                    inverse: false,
-                },
-                AnimVar {
-                    name: "bar",
-                    inverse: true,
-                },
+                AnimVar { name: "foo", inverse: false },
+                AnimVar { name: "bar", inverse: true },
             ],
         };
 
@@ -275,19 +238,10 @@ mod tests {
         let expected = FNISAnimFlagSet {
             flags: FNISAnimFlags::TransitionNext | FNISAnimFlags::MotionDriven,
             blend_time: Some(1.0),
-            triggers: vec![Trigger {
-                event: "Run",
-                time: 3.0,
-            }],
+            triggers: vec![Trigger { event: "Run", time: 3.0 }],
             anim_vars: vec![
-                AnimVar {
-                    name: "x",
-                    inverse: false,
-                },
-                AnimVar {
-                    name: "y",
-                    inverse: true,
-                },
+                AnimVar { name: "x", inverse: false },
+                AnimVar { name: "y", inverse: true },
             ],
         };
 

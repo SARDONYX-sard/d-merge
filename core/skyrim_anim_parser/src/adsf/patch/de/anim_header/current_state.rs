@@ -100,11 +100,8 @@ impl<'de> CurrentState<'de> {
         match self.current_kind {
             Some(LineKind::HasMotionData | LineKind::ProjectAssetsLen) => {}
             Some(LineKind::ProjectAssets) => {
-                let project_assets = self
-                    .patch
-                    .get_or_insert_default()
-                    .project_assets
-                    .get_or_insert_default();
+                let project_assets =
+                    self.patch.get_or_insert_default().project_assets.get_or_insert_default();
 
                 project_assets.range.end += 1;
                 project_assets.values.push(value);
@@ -117,11 +114,8 @@ impl<'de> CurrentState<'de> {
     }
 
     pub(super) fn increment_project_assets_range(&mut self) {
-        let project_assets = self
-            .patch
-            .get_or_insert_default()
-            .project_assets
-            .get_or_insert_default();
+        let project_assets =
+            self.patch.get_or_insert_default().project_assets.get_or_insert_default();
 
         project_assets.range.end += 1;
     }
@@ -135,11 +129,8 @@ impl<'de> CurrentState<'de> {
 
         match self.current_kind {
             Some(LineKind::ProjectAssetsLen | LineKind::ProjectAssets) => {
-                let project_assets = self
-                    .patch
-                    .get_or_insert_default()
-                    .project_assets
-                    .get_or_insert_default();
+                let project_assets =
+                    self.patch.get_or_insert_default().project_assets.get_or_insert_default();
                 project_assets.range.start = start;
                 project_assets.range.end = start;
             }
@@ -163,11 +154,7 @@ impl<'de> CurrentState<'de> {
             }
 
             if self.is_passed_original {
-                if self.patch.is_some() {
-                    Op::Replace
-                } else {
-                    Op::Remove
-                }
+                if self.patch.is_some() { Op::Replace } else { Op::Remove }
             } else {
                 Op::Add
             }

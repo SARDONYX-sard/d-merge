@@ -63,10 +63,7 @@ pub(crate) fn parse_alt_anim_set_line<'a>(input: &mut &'a str) -> ModalResult<AA
         "Expected Syntax: `AAset <animation_group: str> <number: u64>`",
     )))
     .parse_next(input)?;
-    Ok(AASet {
-        group: anim_group,
-        slots: slots_count,
-    })
+    Ok(AASet { group: anim_group, slots: slots_count })
 }
 
 /// Parse `T <alternate_animation> <trigger1> <time1> ...`
@@ -97,10 +94,7 @@ pub(crate) fn parse_alt_anim_trigger_line<'a>(input: &mut &'a str) -> ModalResul
         "Expected Syntax: `T <alternate_animation: str> <trigger1: str> <time1: f32> ...`",
     )))
     .parse_next(input)?;
-    Ok(AnimTrigger {
-        anim_name,
-        triggers,
-    })
+    Ok(AnimTrigger { anim_name, triggers })
 }
 
 #[cfg(test)]
@@ -125,22 +119,10 @@ mod tests {
     #[test]
     fn test_parse_alt_anim_set_line() {
         let res = must_parse(parse_alt_anim_set_line, "AAset _mt 9\n");
-        assert_eq!(
-            res,
-            AASet {
-                group: "_mt",
-                slots: 9
-            }
-        );
+        assert_eq!(res, AASet { group: "_mt", slots: 9 });
 
         let res2 = must_parse(parse_alt_anim_set_line, "  AAset _run 42\n");
-        assert_eq!(
-            res2,
-            AASet {
-                group: "_run",
-                slots: 42
-            }
-        );
+        assert_eq!(res2, AASet { group: "_run", slots: 42 });
 
         must_fail(parse_alt_anim_set_line, "AAset _mt not_a_number\n");
     }
@@ -153,35 +135,20 @@ mod tests {
             AnimTrigger {
                 anim_name: "_run",
                 triggers: vec![
-                    Trigger {
-                        event: "start",
-                        time: 0.0
-                    },
-                    Trigger {
-                        event: "end",
-                        time: 1.5
-                    },
+                    Trigger { event: "start", time: 0.0 },
+                    Trigger { event: "end", time: 1.5 },
                 ],
             }
         );
 
-        let res2 = must_parse(
-            parse_alt_anim_trigger_line,
-            "  T _walk trigger1 0.2 trigger2 3.5\n",
-        );
+        let res2 = must_parse(parse_alt_anim_trigger_line, "  T _walk trigger1 0.2 trigger2 3.5\n");
         assert_eq!(
             res2,
             AnimTrigger {
                 anim_name: "_walk",
                 triggers: vec![
-                    Trigger {
-                        event: "trigger1",
-                        time: 0.2
-                    },
-                    Trigger {
-                        event: "trigger2",
-                        time: 3.5
-                    },
+                    Trigger { event: "trigger1", time: 0.2 },
+                    Trigger { event: "trigger2", time: 3.5 },
                 ],
             }
         );

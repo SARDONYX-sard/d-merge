@@ -145,10 +145,9 @@ impl AppSettings {
     /// Load settings from JSON file
     pub(crate) fn load() -> Result<Self, SettingsError> {
         if Path::new(Self::FILE).exists() {
-            let text = fs::read_to_string(Self::FILE).with_context(|_| IoSnafu {
-                path: Path::new(Self::FILE),
-            })?;
-            serde_json::from_str(&text).with_context(|_| JsonSnafu)
+            let text = fs::read_to_string(Self::FILE)
+                .with_context(|_| IoSnafu { path: Path::new(Self::FILE) })?;
+            sonic_rs::from_str(&text).with_context(|_| JsonSnafu)
         } else {
             Ok(Self::default())
         }
@@ -156,7 +155,7 @@ impl AppSettings {
 
     /// Save settings to JSON file
     pub(crate) fn save(&self) {
-        match serde_json::to_string_pretty(self) {
+        match sonic_rs::to_string_pretty(self) {
             Ok(text) => {
                 if let Err(err) = fs::write(Self::FILE, text) {
                     tracing::error!("Failed to save settings: {err}");
@@ -173,11 +172,8 @@ impl AppSettings {
 #[derive(Debug, snafu::Snafu)]
 pub(crate) enum SettingsError {
     #[snafu(display("Failed to read file `{}`: {source}", path.display()))]
-    Io {
-        source: std::io::Error,
-        path: std::path::PathBuf,
-    },
+    Io { source: std::io::Error, path: std::path::PathBuf },
 
     #[snafu(display("Failed to parse JSON: {source}"))]
-    Json { source: serde_json::Error },
+    Json { source: sonic_rs::Error },
 }

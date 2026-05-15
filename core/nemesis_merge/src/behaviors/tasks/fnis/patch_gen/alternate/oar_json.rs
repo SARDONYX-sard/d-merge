@@ -37,11 +37,7 @@ pub(crate) fn prepare_namespace_json(
     } else {
         (namespace, "", "")
     };
-    let config = NamespaceConfig {
-        name,
-        description,
-        author,
-    };
+    let config = NamespaceConfig { name, description, author };
 
     match sonic_rs::to_string_pretty(&config) {
         Ok(json) => json,
@@ -115,9 +111,7 @@ pub(crate) fn new_fnis_aa_slot_config_json(
     fallback_priority: i32,
     slot_config: Option<&SlotConfig>,
 ) -> String {
-    let user_conditions = slot_config
-        .map(|s| s.conditions.as_slice())
-        .unwrap_or_default();
+    let user_conditions = slot_config.map(|s| s.conditions.as_slice()).unwrap_or_default();
 
     // Always prepend the FNISaa condition, then append user-defined conditions.
     let conditions: Vec<_> = core::iter::once(fnis_aa_condition(group_name, base + slot))
@@ -129,9 +123,7 @@ pub(crate) fn new_fnis_aa_slot_config_json(
         None => Cow::Owned(format!("base({base}) + value({slot})")),
     };
 
-    let priority = slot_config
-        .and_then(|s| s.priority)
-        .map_or(fallback_priority, |p| p as i32);
+    let priority = slot_config.and_then(|s| s.priority).map_or(fallback_priority, |p| p as i32);
 
     let config = ConditionsConfig {
         name: Cow::Borrowed(group_config_dir),

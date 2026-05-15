@@ -16,10 +16,7 @@ use self::error::Error;
 pub struct DiffLines<'a>(
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>"))
     )]
     pub Vec<ValueWithPriority<'a>>,
 );

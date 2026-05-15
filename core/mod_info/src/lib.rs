@@ -1,9 +1,6 @@
 pub mod error;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use rayon::prelude::*;
 
@@ -74,9 +71,6 @@ fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, 
     let mods = jwalk_glob::glob_files(&nemesis_pattern)
         .par_iter()
         .filter_map(|path| {
-            if !path.exists() {
-                return None;
-            }
             let id = if is_vfs {
                 extract_nemesis_id_from_path(path)?.to_string()
             } else {
@@ -95,9 +89,6 @@ fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInf
     let mods = jwalk_glob::glob_files(&nemesis_pattern)
         .par_iter()
         .filter_map(|path| {
-            if !path.exists() {
-                return None;
-            }
             let id = if is_vfs {
                 extract_nemesis_id_from_path(path)?.to_string()
             } else {
@@ -113,7 +104,7 @@ fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInf
     Ok(mods)
 }
 
-fn read_mod_info(path: &PathBuf, id: String) -> Option<ModInfo> {
+fn read_mod_info(path: &Path, id: String) -> Option<ModInfo> {
     let contents = fs::read_to_string(path).ok()?;
     let mut mod_info: ModInfo = serde_ini::from_str(&contents).ok()?;
     mod_info.id = id;
@@ -122,9 +113,7 @@ fn read_mod_info(path: &PathBuf, id: String) -> Option<ModInfo> {
 
 /// Get `<id>` from `Nemesis_Engine/mods/<id>/info.ini`
 fn extract_nemesis_id_from_path(path: &Path) -> Option<&str> {
-    path.parent()
-        .and_then(Path::file_name)
-        .and_then(|os_str| os_str.to_str())
+    path.parent().and_then(Path::file_name).and_then(|os_str| os_str.to_str())
 }
 
 /// FNIS: `<skyrim_data_dir>/meshes/actors/character/animations/*/FNIS_*_List.txt`
@@ -138,9 +127,6 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
         let mods = jwalk_glob::glob_files(fnis_list_pattern)
             .par_iter()
             .filter_map(|path| {
-                if !path.exists() {
-                    return None;
-                }
                 // <skyrim_data_dir>/meshes/**/animations/<vfs_id>
                 let parent_dir = path.parent()?;
 
@@ -148,12 +134,7 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
                 let name = parent_dir.file_name()?.display().to_string();
                 let id = name.clone();
 
-                let mod_info = ModInfo {
-                    id,
-                    name,
-                    mod_type: ModType::Fnis,
-                    ..Default::default()
-                };
+                let mod_info = ModInfo { id, name, mod_type: ModType::Fnis, ..Default::default() };
                 Some(mod_info)
             })
             .collect();
@@ -164,9 +145,7 @@ fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
     // TkDodgeSE lacks FNIS_*_List.txt and consists solely of animations, making acquisition difficult.
     // It would be easier to distribute the FNIS patch separately as a Nemesis patch.
     let fnis_list_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
-    let mut mods: Vec<_> = collect_from_fnis_list(&fnis_list_pattern)?
-        .into_par_iter()
-        .collect();
+    let mut mods: Vec<_> = collect_from_fnis_list(&fnis_list_pattern)?.into_par_iter().collect();
     mods.par_sort_unstable_by(|a, b| a.name.cmp(&b.name));
 
     Ok(mods)
@@ -217,7 +196,7 @@ pub struct ModInfo {
     Ord,
     Hash,
     serde::Serialize,
-    serde::Deserialize,
+    serde::Deserialize
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ModType {
@@ -299,11 +278,7 @@ mod tests {
 
         dbg!(info.len());
         std::fs::create_dir_all("../../dummy").unwrap();
-        std::fs::write(
-            "../../dummy/debug/get_all_mods_info.log",
-            format!("{info:#?}"),
-        )
-        .unwrap();
+        std::fs::write("../../dummy/debug/get_all_mods_info.log", format!("{info:#?}")).unwrap();
     }
 
     #[test]

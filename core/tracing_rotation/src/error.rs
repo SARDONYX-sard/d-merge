@@ -17,15 +17,11 @@ pub enum Error {
 
     /// Tracing log error
     #[snafu(transparent)]
-    FailedSetTracing {
-        source: tracing::subscriber::SetGlobalDefaultError,
-    },
+    FailedSetTracing { source: tracing::subscriber::SetGlobalDefaultError },
 
     /// Tracing subscriber reload error
     #[snafu(transparent)]
-    FailedReloadTracingSub {
-        source: tracing_subscriber::reload::Error,
-    },
+    FailedReloadTracingSub { source: tracing_subscriber::reload::Error },
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 

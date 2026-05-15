@@ -119,9 +119,7 @@ pub(crate) fn apply_asdsf_patches(
     let alt_asdsf_bytes = bail!(read_asdsf_file(config));
     let mut alt_adsf: AltAsdsf =
         bail!(rmp_serde::from_slice(&alt_asdsf_bytes).with_context(|_| {
-            FailedParseAdsfTemplateSnafu {
-                path: config.resource_dir.join(ASDSF_INNER_PATH),
-            }
+            FailedParseAdsfTemplateSnafu { path: config.resource_dir.join(ASDSF_INNER_PATH) }
         }));
 
     let mut txt_project_header_patches = DiffLines::DEFAULT;
@@ -132,9 +130,7 @@ pub(crate) fn apply_asdsf_patches(
     for mut asdsf_patch in borrowed_patches {
         match asdsf_patch.patch {
             PatchKind::TxtProjectHeader(ref mut diff) => {
-                txt_project_header_patches
-                    .0
-                    .par_extend(core::mem::take(&mut diff.0));
+                txt_project_header_patches.0.par_extend(core::mem::take(&mut diff.0));
                 continue;
             }
             PatchKind::SubTxtHeader(ref mut diff) => {
@@ -156,20 +152,14 @@ pub(crate) fn apply_asdsf_patches(
 
         if let Some(anim_data) = alt_adsf.txt_projects.0.get_mut(asdsf_patch.target) {
             match asdsf_patch.patch {
-                PatchKind::AddAnimSet {
-                    patch, file_name, ..
-                } => {
-                    anim_data
-                        .0
-                        .insert(std::borrow::Cow::Borrowed(file_name), patch);
+                PatchKind::AddAnimSet { patch, file_name, .. } => {
+                    anim_data.0.insert(std::borrow::Cow::Borrowed(file_name), patch);
                 }
                 PatchKind::EditAnimSet(edit_anim) => {
                     let file_name = edit_anim.file_name;
                     if let Some(anim) = anim_data.0.get_mut(file_name) {
                         bail!(edit_anim.patch.into_apply(anim).with_context(|_| {
-                            FailedParseEditAsdsfPatchSnafu {
-                                path: edit_anim.file_name,
-                            }
+                            FailedParseEditAsdsfPatchSnafu { path: edit_anim.file_name }
                         }));
                     }
                 }
@@ -232,20 +222,12 @@ fn parse_anim_data_patch<'a>(
                 .parse(asdsf_patch)
                 .map_err(|err| winnow_ext::ReadableError::from_parse(err))
                 .with_context(|_| FailedParseAsdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::AddAnimSet {
-                patch,
-                priority,
-                file_name,
-            }
+            PatchKind::AddAnimSet { patch, priority, file_name }
         }
         ParserType::EditAnimSet(file_name) => {
             let patch = parse_anim_set_diff_patch(asdsf_patch, priority)
                 .with_context(|_| FailedParseEditAsdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::EditAnimSet(Box::new(EditAnimSet {
-                patch,
-                priority,
-                file_name,
-            }))
+            PatchKind::EditAnimSet(Box::new(EditAnimSet { patch, priority, file_name }))
         }
     };
     Ok(AsdsfPatch { target, id, patch })
@@ -259,9 +241,8 @@ fn sort_patches_by_priority(patches: &mut [AsdsfPatch], id_order: &PriorityMap) 
 /// Read `animationsetdatasinglefile.txt` from the resource directory
 fn read_asdsf_file(config: &Config) -> Result<Vec<u8>, Error> {
     let adsf_read_path = config.resource_dir.join(ASDSF_INNER_PATH);
-    let adsf_string = std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu {
-        path: adsf_read_path,
-    })?;
+    let adsf_string =
+        std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu { path: adsf_read_path })?;
     Ok(adsf_string)
 }
 
@@ -284,20 +265,15 @@ fn write_alt_asdsf_file(
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);
     }
-    std::fs::write(path, serialized).with_context(|_| FailedIoSnafu {
-        path: path.to_path_buf(),
-    })?;
+    std::fs::write(path, serialized)
+        .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
     Ok(())
 }
 
 /// Outputs debug JSON files for each patch in the provided slice.
 fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
-    let mut dest_path = config
-        .output_dir
-        .join(".d_merge")
-        .join(".debug")
-        .join("patches")
-        .join(ASDSF_INNER_PATH);
+    let mut dest_path =
+        config.output_dir.join(".d_merge").join(".debug").join("patches").join(ASDSF_INNER_PATH);
     dest_path.set_extension("patch.json");
     if let Err(_err) = write_patched_json(&dest_path, patches) {
         #[cfg(feature = "tracing")]
@@ -307,11 +283,7 @@ fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
 
 /// Debug merged json.
 fn output_merged_alt_adsf(alt_adsf: &AltAsdsf, config: &Config) -> Result<(), Error> {
-    let mut dest_path = config
-        .output_dir
-        .join(".d_merge")
-        .join(".debug")
-        .join(ASDSF_INNER_PATH);
+    let mut dest_path = config.output_dir.join(".d_merge").join(".debug").join(ASDSF_INNER_PATH);
     dest_path.set_extension("json");
     write_patched_json(&dest_path, alt_adsf)
 }

@@ -12,19 +12,16 @@ where
 {
     let input_path = input.as_ref();
 
-    strip_roots
-        .par_iter()
-        .find_first(|root| input_path.starts_with(root))
-        .map_or_else(
-            || {
-                let file_name = input_path.file_stem().unwrap_or_default();
-                Path::new(output_dir).join(file_name)
-            },
-            |root| {
-                let relative_path = input_path.strip_prefix(root).unwrap_or(input_path);
-                Path::new(output_dir).join(relative_path)
-            },
-        )
+    strip_roots.par_iter().find_first(|root| input_path.starts_with(root)).map_or_else(
+        || {
+            let file_name = input_path.file_stem().unwrap_or_default();
+            Path::new(output_dir).join(file_name)
+        },
+        |root| {
+            let relative_path = input_path.strip_prefix(root).unwrap_or(input_path);
+            Path::new(output_dir).join(relative_path)
+        },
+    )
 }
 
 #[cfg(test)]

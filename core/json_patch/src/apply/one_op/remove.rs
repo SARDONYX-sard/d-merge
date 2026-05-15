@@ -33,11 +33,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
             Value::Object(map) => map.remove(last),
             Value::Array(list) => {
                 let index = last.parse::<usize>().ok()?;
-                if index < list.len() {
-                    Some(list.remove(index))
-                } else {
-                    None
-                }
+                if index < list.len() { Some(list.remove(index)) } else { None }
             }
             _ => None,
         };
@@ -55,11 +51,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
         Value::Object(map) => map.remove(last),
         Value::Array(list) => {
             let index = last.parse::<usize>().ok()?;
-            if index < list.len() {
-                Some(list.remove(index))
-            } else {
-                None
-            }
+            if index < list.len() { Some(list.remove(index)) } else { None }
         }
         _ => None,
     }

@@ -24,8 +24,6 @@ pub fn apply_one_field<'v>(
         Action::Pure { op: Op::Add } => apply_add(json, path, value),
         Action::Pure { op: Op::Remove } => apply_remove(json, path),
         Action::Pure { op: Op::Replace } => apply_replace(json, path, value),
-        unexpected => Err(JsonPatchError::mismatch_apply_type_from(
-            unexpected, &path, &value,
-        )),
+        unexpected => Err(JsonPatchError::mismatch_apply_type_from(unexpected, &path, &value)),
     }
 }

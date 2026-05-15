@@ -26,10 +26,8 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
     } = DEFAULT_FEMALE;
 
     let keys = {
-        let mut sorted_entries: Vec<_> = ALT_GROUPS
-            .into_iter()
-            .map(|(&key, group)| (group.id, key))
-            .collect();
+        let mut sorted_entries: Vec<_> =
+            ALT_GROUPS.into_iter().map(|(&key, group)| (group.id, key)).collect();
         sorted_entries.par_sort_by_key(|&(id, _)| id);
 
         let mut keys: Vec<Value> = sorted_entries
@@ -42,9 +40,7 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
                 .par_iter()
                 // e.g., FNISaa_1hmeqp_crc
                 .map(|(_, key)| Value::String(Cow::Owned(format!("FNISaa{}_crc", *key))))
-                .chain(rayon::iter::once(Value::String(Cow::Borrowed(
-                    "FNISaa_crc",
-                )))),
+                .chain(rayon::iter::once(Value::String(Cow::Borrowed("FNISaa_crc")))),
         );
         keys
     };
@@ -70,11 +66,7 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
             },
         ),
         (
-            json_path![
-                behavior_graph_index,
-                "hkbBehaviorGraphData",
-                "variableInfos",
-            ],
+            json_path![behavior_graph_index, "hkbBehaviorGraphData", "variableInfos",],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,
@@ -97,16 +89,9 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
             },
         ),
         (
-            json_path![
-                string_data_index,
-                "hkbBehaviorGraphStringData",
-                "variableNames",
-            ],
+            json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
             ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: keys.into(),
-                },
+                patch: JsonPatch { action: Action::SeqPush, value: keys.into() },
                 priority,
             },
         ),

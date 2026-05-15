@@ -45,9 +45,8 @@ pub async fn convert(
     roots: Option<Vec<String>>,
     status_sender: impl Fn(Payload) + Clone + Send + 'static,
 ) -> Result<(), ConvertError> {
-    let format = Format::from_str(format).map_err(|_| ConvertError::FormatParse {
-        invalid: format.to_string(),
-    })?;
+    let format = Format::from_str(format)
+        .map_err(|_| ConvertError::FormatParse { invalid: format.to_string() })?;
     let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
     let strip_roots = roots.unwrap_or_default();
 
@@ -67,24 +66,15 @@ pub async fn convert(
             });
 
             tokio::spawn(async move {
-                status_sender(Payload {
-                    path_id,
-                    status: Status::Processing,
-                });
+                status_sender(Payload { path_id, status: Status::Processing });
 
                 serde_hkx_features::convert(&input, output, format)
                     .await
                     .map(|_| {
-                        status_sender(Payload {
-                            path_id,
-                            status: Status::Done,
-                        });
+                        status_sender(Payload { path_id, status: Status::Done });
                     })
                     .map_err(|err| {
-                        status_sender(Payload {
-                            path_id,
-                            status: Status::Error,
-                        });
+                        status_sender(Payload { path_id, status: Status::Error });
 
                         let input = input;
 
@@ -109,21 +99,14 @@ pub async fn convert(
         }
     }
 
-    if !errors.is_empty() {
-        Err(ConvertError::Multi { errors })
-    } else {
-        Ok(())
-    }
+    if !errors.is_empty() { Err(ConvertError::Multi { errors }) } else { Ok(()) }
 }
 
 #[derive(Debug, snafu::Snafu)]
 pub enum ConvertOneError {
     /// serde_hkx conversion error
     #[snafu(display("{}:\n    {source}", input.display()))]
-    FailedToConvert {
-        input: std::path::PathBuf,
-        source: serde_hkx_features::error::Error,
-    },
+    FailedToConvert { input: std::path::PathBuf, source: serde_hkx_features::error::Error },
 
     #[snafu(display("Join error id: {id}"))]
     ThreadJoin { id: tokio::task::Id },

@@ -135,28 +135,22 @@ impl<'a> Hkanno<'a> {
         use havok_classes::Classes;
         use havok_types::{I32, StringPtr};
 
-        let mut animations: Vec<_> = class_map
-            .par_iter_mut()
-            .filter(|(_, class)| is_hka_animation_derived(class))
-            .collect();
+        let mut animations: Vec<_> =
+            class_map.par_iter_mut().filter(|(_, class)| is_hka_animation_derived(class)).collect();
         let (_, animation_class) = {
             match animations.len() {
                 0 => return MissingHkaAnimationClassSnafu.fail(),
                 1 => animations.swap_remove(0),
                 _ => {
-                    return Err(HkannoError::MultipleHkaAnimationFound {
-                        count: animations.len(),
-                    });
+                    return Err(HkannoError::MultipleHkaAnimationFound { count: animations.len() });
                 }
             }
         };
 
         let (num_original_frames, duration, annotation_tracks) = match animation_class {
-            Classes::hkaAnimation(class) => (
-                &mut I32::Number(0),
-                &mut class.m_duration,
-                &mut class.m_annotationTracks,
-            ),
+            Classes::hkaAnimation(class) => {
+                (&mut I32::Number(0), &mut class.m_duration, &mut class.m_annotationTracks)
+            }
             Classes::hkaDeltaCompressedAnimation(class) => (
                 &mut I32::Number(0),
                 &mut class.parent.m_duration,
@@ -239,12 +233,9 @@ impl<'a> Hkanno<'a> {
             bytes,
             input,
             |mut classes| {
-                self.clone()
-                    .into_static()
-                    .write_to_classmap(&mut classes)
-                    .map_err(|e| serde_hkx_features::error::Error::IoError {
-                        source: std::io::Error::other(e),
-                    })?;
+                self.clone().into_static().write_to_classmap(&mut classes).map_err(|e| {
+                    serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+                })?;
 
                 match output_format {
                     Format::Amd64 | Format::Win32 | Format::Xml => {
@@ -262,9 +253,7 @@ impl<'a> Hkanno<'a> {
             },
             |mut classes| {
                 self.clone().write_to_classmap(&mut classes).map_err(|e| {
-                    serde_hkx_features::error::Error::IoError {
-                        source: std::io::Error::other(e),
-                    }
+                    serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
                 })?;
 
                 match output_format {
@@ -384,11 +373,9 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
 
     const FPS: f32 = 30.0;
     let (num_original_frames, duration, annotation_tracks): (f32, _, _) = match animation_class {
-        Classes::hkaAnimation(class) => (
-            class.m_duration * FPS,
-            class.m_duration,
-            class.m_annotationTracks,
-        ),
+        Classes::hkaAnimation(class) => {
+            (class.m_duration * FPS, class.m_duration, class.m_annotationTracks)
+        }
         Classes::hkaDeltaCompressedAnimation(class) => (
             class.parent.m_duration * FPS,
             class.parent.m_duration,
@@ -408,14 +395,10 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
             match &class.m_numFrames {
                 I32::Number(n) => *n as f32,
                 I32::EventId(event) => {
-                    return Err(HkannoError::UnsupportedI32Variant {
-                        variant: event.to_string(),
-                    });
+                    return Err(HkannoError::UnsupportedI32Variant { variant: event.to_string() });
                 }
                 I32::VariableId(var) => {
-                    return Err(HkannoError::UnsupportedI32Variant {
-                        variant: var.to_string(),
-                    });
+                    return Err(HkannoError::UnsupportedI32Variant { variant: var.to_string() });
                 }
             },
             class.parent.m_duration,
@@ -435,15 +418,9 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
             let annotations = track
                 .m_annotations
                 .into_par_iter()
-                .map(|ann| Annotation {
-                    time: ann.m_time,
-                    text: ann.m_text.into_inner(),
-                })
+                .map(|ann| Annotation { time: ann.m_time, text: ann.m_text.into_inner() })
                 .collect::<Vec<_>>();
-            AnnotationTrack {
-                track_name: track.m_trackName.into_inner(),
-                annotations,
-            }
+            AnnotationTrack { track_name: track.m_trackName.into_inner(), annotations }
         })
         .collect::<Vec<_>>();
 
@@ -540,9 +517,7 @@ pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, 
 pub enum HkannoError {
     /// Raised when the HKX data could not be parsed into a valid ClassMap.
     #[snafu(display("internal serde_hkx_features err: {source}"))]
-    SerdeHkxFeatureError {
-        source: serde_hkx_features::error::Error,
-    },
+    SerdeHkxFeatureError { source: serde_hkx_features::error::Error },
 
     /// No `hkaAnimation`-derived class found
     MissingHkaAnimationClass,
@@ -576,23 +551,14 @@ mod tests {
                 AnnotationTrack {
                     track_name: Some(Cow::Borrowed("Track1")),
                     annotations: vec![
-                        Annotation {
-                            time: 0.1,
-                            text: Some(Cow::Borrowed("Start")),
-                        },
-                        Annotation {
-                            time: 0.5,
-                            text: Some(Cow::Borrowed("Mid")),
-                        },
+                        Annotation { time: 0.1, text: Some(Cow::Borrowed("Start")) },
+                        Annotation { time: 0.5, text: Some(Cow::Borrowed("Mid")) },
                     ],
                 },
                 AnnotationTrack {
                     track_name: Some(Cow::Borrowed("Track2")),
                     annotations: vec![
-                        Annotation {
-                            time: 0.3,
-                            text: Some(Cow::Borrowed("Alt1")),
-                        },
+                        Annotation { time: 0.3, text: Some(Cow::Borrowed("Alt1")) },
                         Annotation {
                             time: 0.7,
                             text: None, // missing text

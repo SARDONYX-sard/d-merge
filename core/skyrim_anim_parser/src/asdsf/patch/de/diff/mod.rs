@@ -21,37 +21,25 @@ pub struct DiffPatchAnimSetData<'a> {
     /// This is so that multiple seq patches can be resolved simultaneously later.
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>"))
     )]
     pub(crate) triggers_patches: Vec<ValueWithPriority<'a>>,
 
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>"))
     )]
     pub(crate) conditions_patches: NonNestedArrayDiff<'a>,
 
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "AttacksDiff<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "AttacksDiff<'a>: serde::Deserialize<'de>"))
     )]
     pub(crate) attacks_patches: AttacksDiff<'a>,
 
     #[cfg_attr(
         feature = "serde",
-        serde(
-            borrow,
-            bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>")
-        )
+        serde(borrow, bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>"))
     )]
     pub(crate) anim_infos_patches: NonNestedArrayDiff<'a>,
 }
@@ -71,9 +59,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
         }
 
         if !other.conditions_patches.seq.is_empty() {
-            self.conditions_patches
-                .seq
-                .par_extend(other.conditions_patches.seq);
+            self.conditions_patches.seq.par_extend(other.conditions_patches.seq);
         }
 
         self.attacks_patches.one.merge(other.attacks_patches.one);
@@ -84,9 +70,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
         }
 
         if !other.anim_infos_patches.seq.is_empty() {
-            self.anim_infos_patches
-                .seq
-                .par_extend(other.anim_infos_patches.seq);
+            self.anim_infos_patches.seq.par_extend(other.anim_infos_patches.seq);
         }
     }
 
@@ -135,10 +119,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             let attacks = core::mem::take(&mut anim_set_data.attacks);
             let mut template_value = attacks_to_borrowed_value(attacks);
 
-            let AttacksDiff {
-                one: one_patch_map,
-                seq: seq_patch_map,
-            } = self.attacks_patches;
+            let AttacksDiff { one: one_patch_map, seq: seq_patch_map } = self.attacks_patches;
             for (path, patch) in one_patch_map.0 {
                 json_patch::apply_one_field(&mut template_value, path, patch)?;
             }

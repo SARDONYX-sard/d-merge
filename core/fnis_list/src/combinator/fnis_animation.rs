@@ -127,9 +127,6 @@ mod tests {
 
     #[test]
     fn test_parse_fnis_animation_invalid() {
-        must_fail(
-            parse_fnis_animation,
-            "T s -a,k MyCheerSA1 ..\\idlewave.hkx \n",
-        );
+        must_fail(parse_fnis_animation, "T s -a,k MyCheerSA1 ..\\idlewave.hkx \n");
     }
 }

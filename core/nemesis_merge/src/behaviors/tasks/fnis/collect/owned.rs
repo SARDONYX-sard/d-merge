@@ -154,11 +154,9 @@ impl OwnedFnisInjection {
         let namespace = &self.namespace;
 
         // e.g. `behaviors wolf/`
-        let master_behavior_dir = master_path
-            .parent()
-            .and_then(|p| p.file_name())
-            .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
-                sub_dir: master_path.to_path_buf(),
+        let master_behavior_dir =
+            master_path.parent().and_then(|p| p.file_name()).ok_or_else(|| {
+                FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() }
             })?;
 
         let file_name = if behavior_entry.is_humanoid() {
@@ -170,19 +168,14 @@ impl OwnedFnisInjection {
         };
 
         // e.g. ../meshes/actors/canine
-        let parent_dir = animations_mod_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .ok_or_else(|| FnisError::BehaviorParentMissing {
-                animations_mod_dir: animations_mod_dir.clone(),
-            })?;
+        let parent_dir = animations_mod_dir.parent().and_then(|p| p.parent()).ok_or_else(|| {
+            FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.clone() }
+        })?;
 
         // e.g., `behavior/FNIS_{namespace}_Behavior.hkx`
         let behavior_path = Path::new(master_behavior_dir).join(&file_name);
 
-        let inner_path = Path::new("meshes")
-            .join(behavior_entry.base_dir)
-            .join(&behavior_path);
+        let inner_path = Path::new("meshes").join(behavior_entry.base_dir).join(&behavior_path);
 
         Ok((parent_dir.join(behavior_path), inner_path))
     }
@@ -193,11 +186,7 @@ impl OwnedFnisInjection {
     /// - humanoid: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`,
     /// - creature: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`
     pub(crate) fn to_fnis_aa_override_config_path(&self) -> PathBuf {
-        override_config_path(
-            &self.animations_mod_dir,
-            self.behavior_entry,
-            &self.namespace,
-        )
+        override_config_path(&self.animations_mod_dir, self.behavior_entry, &self.namespace)
     }
 
     /// Increments the index and returns the full `name` attribute
@@ -337,19 +326,13 @@ async fn load_fnis_list_file(
         format!("{}/FNIS_{namespace}_List.txt", animations_mod_dir.display())
     } else {
         let creature_object_name = behavior_entry.behavior_object;
-        format!(
-            "{}/FNIS_{namespace}_{creature_object_name}_List.txt",
-            animations_mod_dir.display()
-        )
+        format!("{}/FNIS_{namespace}_{creature_object_name}_List.txt", animations_mod_dir.display())
     };
 
     // NOTE: Since there are mod files that are not UTF-8, we need to support them.
-    let content = fs::read(&list_path_string)
-        .await
-        .and_then(auto_charset::decode_to_utf8)
-        .map_err(|e| FnisError::FailedReadingListFile {
-            expected: list_path_string.clone(),
-            source: e,
+    let content =
+        fs::read(&list_path_string).await.and_then(auto_charset::decode_to_utf8).map_err(|e| {
+            FnisError::FailedReadingListFile { expected: list_path_string.clone(), source: e }
         })?;
 
     Ok(content)
@@ -371,21 +354,16 @@ fn find_behavior_file(
     namespace: &str,
 ) -> Result<String, FnisError> {
     // e.g. ../meshes/actors/canine
-    let parent_dir = animations_mod_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| FnisError::BehaviorParentMissing {
-            animations_mod_dir: animations_mod_dir.to_path_buf(),
-        })?;
+    let parent_dir = animations_mod_dir.parent().and_then(|p| p.parent()).ok_or_else(|| {
+        FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.to_path_buf() }
+    })?;
 
     let master_path = Path::new(behavior_entry.master_behavior);
 
     // e.g. `behaviors wolf`
-    let master_behavior_dir = master_path
-        .parent()
-        .and_then(|p| p.file_name())
-        .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent {
-            sub_dir: master_path.to_path_buf(),
+    let master_behavior_dir =
+        master_path.parent().and_then(|p| p.file_name()).ok_or_else(|| {
+            FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() }
         })?;
 
     let file_name = if behavior_entry.is_humanoid() {
@@ -411,10 +389,8 @@ fn find_behavior_file(
 
     // NOTE: This relative path uses `\` as the path separator for the game to read it.
     // e.g. `behaviors wolf\FNIS_FNISZoo_wolf_Behavior.hkx`
-    let behavior_relative_path = format!(
-        "{}\\{file_name}",
-        master_behavior_dir.display().to_string().replace("/", "\\")
-    );
+    let behavior_relative_path =
+        format!("{}\\{file_name}", master_behavior_dir.display().to_string().replace("/", "\\"));
     Ok(behavior_relative_path)
 }
 

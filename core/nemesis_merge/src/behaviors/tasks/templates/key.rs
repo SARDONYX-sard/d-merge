@@ -18,17 +18,11 @@ impl TemplateKey<'static> {
     /// # Note
     /// If the search fails using get(`O(1)`), it falls back to an ASCII Ignore(`O(n)`) search.
     pub(crate) fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
-        let map = if is_1st_person {
-            &NEMESIS_1ST_PERSON_MAP
-        } else {
-            &NEMESIS_3RD_PERSON_MAP
-        };
+        let map = if is_1st_person { &NEMESIS_1ST_PERSON_MAP } else { &NEMESIS_3RD_PERSON_MAP };
 
         // Lookup by hash
         if let Some(template_name) = map.get(template_file_stem) {
-            return Some(Self {
-                template_name: Cow::Borrowed(template_name),
-            });
+            return Some(Self { template_name: Cow::Borrowed(template_name) });
         }
 
         // Fallback search by ASCII ignore(For Nemesis_Engine\mod\pscd\MagicBehavior)
@@ -36,9 +30,7 @@ impl TemplateKey<'static> {
             .into_iter()
             .find_map(|(k, v)| k.eq_ignore_ascii_case(template_file_stem).then_some(*v))?;
 
-        Some(Self {
-            template_name: Cow::Borrowed(template_name),
-        })
+        Some(Self { template_name: Cow::Borrowed(template_name) })
     }
 }
 
@@ -52,13 +44,11 @@ impl<'a> TemplateKey<'a> {
     pub(crate) fn new(template_name: Cow<'a, str>) -> Option<Self> {
         fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
             s.len() >= prefix.len()
-                && s.get(..prefix.len())
-                    .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
+                && s.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix))
         }
         fn ends_with_ignore_ascii(s: &str, suffix: &str) -> bool {
             s.len() >= suffix.len()
-                && s.get(s.len() - suffix.len()..)
-                    .is_some_and(|p| p.eq_ignore_ascii_case(suffix))
+                && s.get(s.len() - suffix.len()..).is_some_and(|p| p.eq_ignore_ascii_case(suffix))
         }
 
         (starts_with_ignore_ascii(&template_name, "meshes")
@@ -163,15 +153,13 @@ impl<'a> Eq for TemplateKey<'a> {}
 /* Ordering: delegate to Path ordering */
 impl<'a, 'b> PartialOrd<TemplateKey<'b>> for TemplateKey<'a> {
     fn partial_cmp(&self, other: &TemplateKey<'b>) -> Option<core::cmp::Ordering> {
-        self.as_meshes_inner_path()
-            .partial_cmp(other.as_meshes_inner_path())
+        self.as_meshes_inner_path().partial_cmp(other.as_meshes_inner_path())
     }
 }
 
 impl<'a> Ord for TemplateKey<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.as_meshes_inner_path()
-            .cmp(other.as_meshes_inner_path())
+        self.as_meshes_inner_path().cmp(other.as_meshes_inner_path())
     }
 }
 
@@ -183,14 +171,10 @@ impl<'a> core::hash::Hash for TemplateKey<'a> {
 }
 
 pub(crate) const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed(
-        "meshes/actors/character/behaviors/0_master.bin",
-    ))
+    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/behaviors/0_master.bin"))
 };
 pub(crate) const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed(
-        "meshes/actors/character/behaviors/mt_behavior.bin",
-    ))
+    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/behaviors/mt_behavior.bin"))
 };
 
 /// Nemesis 1st person to meshes rel template .bin path

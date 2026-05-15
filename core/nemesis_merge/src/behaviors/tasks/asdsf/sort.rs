@@ -21,40 +21,36 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
 ) -> Vec<AsdsfPatch<'a>> {
     patches
         .into_par_iter()
-        .fold(
-            HashMap::new,
-            |mut map: HashMap<PatchKey<'_>, AsdsfPatch<'a>>, patch| {
-                let key = match &patch.patch {
-                    PatchKind::EditAnimSet(edit) => {
-                        PatchKey::EditAnim(patch.target, patch.id, edit.file_name)
-                    }
-                    PatchKind::AddAnimSet { file_name, .. } => {
-                        PatchKey::AddAnim(patch.target, patch.id, file_name)
-                    }
-                    PatchKind::TxtProjectHeader(_) => PatchKey::TxtProjectHeader,
-                    PatchKind::SubTxtHeader(_) => PatchKey::SubTxtHeader,
-                };
-
-                match map.entry(key) {
-                    Entry::Occupied(mut entry) => match (&mut entry.get_mut().patch, patch.patch) {
-                        (
-                            PatchKind::EditAnimSet(existing_edit),
-                            PatchKind::EditAnimSet(new_edit),
-                        ) if new_edit.priority > existing_edit.priority => {
-                            existing_edit.patch.merge(new_edit.patch);
-                            existing_edit.file_name = new_edit.file_name;
-                            existing_edit.priority = new_edit.priority;
-                        }
-                        _ => {}
-                    },
-                    Entry::Vacant(entry) => {
-                        entry.insert(patch);
-                    }
+        .fold(HashMap::new, |mut map: HashMap<PatchKey<'_>, AsdsfPatch<'a>>, patch| {
+            let key = match &patch.patch {
+                PatchKind::EditAnimSet(edit) => {
+                    PatchKey::EditAnim(patch.target, patch.id, edit.file_name)
                 }
+                PatchKind::AddAnimSet { file_name, .. } => {
+                    PatchKey::AddAnim(patch.target, patch.id, file_name)
+                }
+                PatchKind::TxtProjectHeader(_) => PatchKey::TxtProjectHeader,
+                PatchKind::SubTxtHeader(_) => PatchKey::SubTxtHeader,
+            };
 
-                map
-            },
-        )
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => match (&mut entry.get_mut().patch, patch.patch) {
+                    (PatchKind::EditAnimSet(existing_edit), PatchKind::EditAnimSet(new_edit))
+                        if new_edit.priority > existing_edit.priority =>
+                    {
+                        existing_edit.patch.merge(new_edit.patch);
+                        existing_edit.file_name = new_edit.file_name;
+                        existing_edit.priority = new_edit.priority;
+                    }
+                    _ => {}
+                },
+                Entry::Vacant(entry) => {
+                    entry.insert(patch);
+                }
+            }
+
+            map
+        })
         .reduce(HashMap::new, |mut map1, map2| {
             for (key, patch2) in map2 {
                 match map1.entry(key) {

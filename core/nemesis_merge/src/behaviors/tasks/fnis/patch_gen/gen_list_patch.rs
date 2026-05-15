@@ -108,19 +108,13 @@ pub(super) fn generate_patch<'a>(
             SyntaxPattern::PairAndKillMove(paired_and_kill_anim) => {
                 // NOTE: It seems FNIS doesn't support `_1stperson` kill moves.
                 if owned_data.behavior_entry.behavior_object != "character" {
-                    return Err(
-                        FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
-                            path: owned_data.to_list_path(),
-                        },
-                    );
+                    return Err(FnisPatchGenerationError::UnsupportedPairAndKillMoveForCreature {
+                        path: owned_data.to_list_path(),
+                    });
                 }
 
-                let FNISPairedAndKillAnimation {
-                    kind,
-                    flag_set,
-                    anim_file,
-                    ..
-                } = &paired_and_kill_anim;
+                let FNISPairedAndKillAnimation { kind, flag_set, anim_file, .. } =
+                    &paired_and_kill_anim;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(*anim_file);
@@ -155,10 +149,7 @@ pub(super) fn generate_patch<'a>(
                 }
 
                 all_anim_files.par_extend(
-                    furniture_animation
-                        .animations
-                        .par_iter()
-                        .map(|fnis_anim| fnis_anim.anim_file),
+                    furniture_animation.animations.par_iter().map(|fnis_anim| fnis_anim.anim_file),
                 );
 
                 // NOTE: Based on the temporal_log, it appears Furniture does not need to register its animation with behaviors like `defaultmale.xml`.
@@ -185,11 +176,7 @@ pub(super) fn generate_patch<'a>(
                     );
                 }
 
-                let FNISAnimation {
-                    flag_set,
-                    anim_file,
-                    ..
-                } = &fnis_animation;
+                let FNISAnimation { flag_set, anim_file, .. } = &fnis_animation;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(anim_file);
@@ -201,12 +188,7 @@ pub(super) fn generate_patch<'a>(
                 all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
             }
             SyntaxPattern::Basic(fnis_animation) | SyntaxPattern::AnimObject(fnis_animation) => {
-                let FNISAnimation {
-                    flag_set,
-                    anim_event,
-                    anim_file,
-                    ..
-                } = &fnis_animation;
+                let FNISAnimation { flag_set, anim_event, anim_file, .. } = &fnis_animation;
 
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(*anim_file);
@@ -264,12 +246,7 @@ fn collect_seq_patch<'a>(
         .animations
         .into_par_iter()
         .flat_map(|fnis_animation| {
-            let FNISAnimation {
-                flag_set,
-                anim_file,
-                anim_event,
-                ..
-            } = &fnis_animation;
+            let FNISAnimation { flag_set, anim_file, anim_event, .. } = &fnis_animation;
 
             if !flag_set.flags.contains(FNISAnimFlags::Known) {
                 files.insert(*anim_file);
@@ -306,13 +283,7 @@ fn new_adsf_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     fnis_animation: FNISAnimation<'a>,
 ) -> Vec<AdsfPatch<'a>> {
-    let FNISAnimation {
-        flag_set,
-        anim_event,
-        motions,
-        rotations,
-        ..
-    } = fnis_animation;
+    let FNISAnimation { flag_set, anim_event, motions, rotations, .. } = fnis_animation;
 
     // Since there is no need to output adsf if there are no rotation (RD) or motion (MD) syntaxes,
     // skip it.
@@ -342,10 +313,8 @@ fn new_adsf_patch<'a>(
     });
 
     let motion_block = {
-        let rotations: Vec<Rotation<'a>> = rotations
-            .into_par_iter()
-            .map(|rotation| rotation.into_rotation())
-            .collect();
+        let rotations: Vec<Rotation<'a>> =
+            rotations.into_par_iter().map(|rotation| rotation.into_rotation()).collect();
 
         let duration = match (motions.last(), rotations.last()) {
             (None, None) => Cow::Borrowed("0.000000"), // NOTE: Unreachable. The empty check has already been done above.
@@ -366,64 +335,24 @@ fn new_adsf_patch<'a>(
     let anim_data_target = owned_data.behavior_entry.anim_data_key;
     if owned_data.behavior_entry.is_3rd_person_character() {
         vec![
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: anim_block.clone(),
-            },
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: motion_block.clone(),
-            },
-            AdsfPatch {
-                target: "DefaultFemale~1",
-                id: namespace,
-                patch: anim_block,
-            },
-            AdsfPatch {
-                target: "DefaultFemale~1",
-                id: namespace,
-                patch: motion_block,
-            },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: anim_block.clone() },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: motion_block.clone() },
+            AdsfPatch { target: "DefaultFemale~1", id: namespace, patch: anim_block },
+            AdsfPatch { target: "DefaultFemale~1", id: namespace, patch: motion_block },
         ]
     } else if owned_data.behavior_entry.is_draugr() {
         // The draugr synchronizes its skeleton and animation.
         // It also synchronizes events and anim data. (It's unclear if this is actually correct)
         vec![
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: anim_block.clone(),
-            },
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: motion_block.clone(),
-            },
-            AdsfPatch {
-                target: "DraugrSkeletonProject~1",
-                id: namespace,
-                patch: anim_block,
-            },
-            AdsfPatch {
-                target: "DraugrSkeletonProject~1",
-                id: namespace,
-                patch: motion_block,
-            },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: anim_block.clone() },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: motion_block.clone() },
+            AdsfPatch { target: "DraugrSkeletonProject~1", id: namespace, patch: anim_block },
+            AdsfPatch { target: "DraugrSkeletonProject~1", id: namespace, patch: motion_block },
         ]
     } else {
         vec![
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: anim_block,
-            },
-            AdsfPatch {
-                target: anim_data_target,
-                id: namespace,
-                patch: motion_block,
-            },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: anim_block },
+            AdsfPatch { target: anim_data_target, id: namespace, patch: motion_block },
         ]
     }
 }

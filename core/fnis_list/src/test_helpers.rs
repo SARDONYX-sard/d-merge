@@ -9,9 +9,7 @@ pub(crate) fn must_parse<'a, O>(
     mut parser: impl Parser<&'a str, O, ErrMode<ContextError>>,
     input: &'a str,
 ) -> O {
-    parser
-        .parse(input)
-        .unwrap_or_else(|e| panic!("ERROR:\n{e}"))
+    parser.parse(input).unwrap_or_else(|e| panic!("ERROR:\n{e}"))
 }
 
 /// Must fail to parse or panic

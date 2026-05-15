@@ -73,41 +73,29 @@ pub(super) fn new_offset_arm_patches<'a>(
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map = dashmap::DashMap::new();
-    one_patches.par_extend(
-        animation
-            .anim_objects
-            .par_iter()
-            .enumerate()
-            .map(|(index, name)| {
-                let new_anim_object_index = owned_data.next_class_name_attribute();
-                class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+    one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
+        let new_anim_object_index = owned_data.next_class_name_attribute();
+        class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
 
-                // One anim object
-                (
-                    vec![
-                        Cow::Owned(new_anim_object_index.clone()),
-                        Cow::Borrowed("hkbStringEventPayload"),
-                    ],
-                    ValueWithPriority {
-                        patch: JsonPatch {
-                            action: Action::Pure { op: Op::Add },
-                            value: simd_json::json_typed!(borrowed, {
-                                "__ptr": new_anim_object_index,
-                                "data": name, // StringPtr
-                            }),
-                        },
-                        priority,
-                    },
-                )
-            }),
-    );
+        // One anim object
+        (
+            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: simd_json::json_typed!(borrowed, {
+                        "__ptr": new_anim_object_index,
+                        "data": name, // StringPtr
+                    }),
+                },
+                priority,
+            },
+        )
+    }));
 
     // $RI
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[0].clone()),
-            Cow::Borrowed("hkbStateMachineStateInfo"),
-        ],
+        vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -139,10 +127,7 @@ pub(super) fn new_offset_arm_patches<'a>(
         };
 
         (
-            vec![
-                Cow::Owned(class_indexes[1].clone()),
-                Cow::Borrowed("hkbClipGenerator"),
-            ],
+            vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbClipGenerator")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -186,17 +171,10 @@ pub(super) fn new_offset_arm_patches<'a>(
             mt_behavior::FNIS_AA_MT_AUTO_GEN_5218
         };
         // $-o|#5147|#5152$
-        let transition = if flags.contains(FNISAnimFlags::AnimObjects) {
-            "#5147"
-        } else {
-            "#5152"
-        };
+        let transition = if flags.contains(FNISAnimFlags::AnimObjects) { "#5147" } else { "#5152" };
 
         (
-            vec![
-                Cow::Owned(class_indexes[2].clone()),
-                Cow::Borrowed("hkbStateMachineStateInfo"),
-            ],
+            vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },
@@ -231,10 +209,7 @@ pub(super) fn new_offset_arm_patches<'a>(
         };
 
         (
-            vec![
-                Cow::Owned(class_indexes[3].clone()),
-                Cow::Borrowed("hkbClipGenerator"),
-            ],
+            vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbClipGenerator")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },

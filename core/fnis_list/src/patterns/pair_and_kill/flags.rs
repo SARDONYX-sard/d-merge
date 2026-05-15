@@ -111,11 +111,8 @@ fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
 }
 
 fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
-    alt((
-        preceded(Caseless("D"), float).map(ParsedFlag::DurationTime),
-        parse_trigger_flag,
-    ))
-    .parse_next(input)
+    alt((preceded(Caseless("D"), float).map(ParsedFlag::DurationTime), parse_trigger_flag))
+        .parse_next(input)
 }
 
 /// Parse a simple animation flag, ensuring it does not accidentally
@@ -168,18 +165,9 @@ mod tests {
 
     #[test]
     fn parse_simple_flags() {
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "bsa"),
-            FNISAnimFlags::BSA
-        );
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "h"),
-            FNISAnimFlags::HeadTracking
-        );
-        assert_eq!(
-            must_parse(parse_anim_flag_simple, "o"),
-            FNISAnimFlags::AnimObjects
-        );
+        assert_eq!(must_parse(parse_anim_flag_simple, "bsa"), FNISAnimFlags::BSA);
+        assert_eq!(must_parse(parse_anim_flag_simple, "h"), FNISAnimFlags::HeadTracking);
+        assert_eq!(must_parse(parse_anim_flag_simple, "o"), FNISAnimFlags::AnimObjects);
     }
 
     #[test]
@@ -200,10 +188,7 @@ mod tests {
             FNISPairAndKillMoveAnimFlagSet {
                 flags: FNISAnimFlags::default(),
                 duration: 2.0,
-                triggers: vec![Trigger {
-                    event: "Jump",
-                    time: 2.0,
-                }],
+                triggers: vec![Trigger { event: "Jump", time: 2.0 }],
                 triggers2: vec![],
             }
         );
@@ -220,10 +205,7 @@ mod tests {
                 flags: FNISAnimFlags::empty(),
                 duration: 2.0,
                 triggers: vec![],
-                triggers2: vec![Trigger {
-                    event: "2_killactor",
-                    time: 3.333,
-                }],
+                triggers2: vec![Trigger { event: "2_killactor", time: 3.333 }],
             }
         );
     }
@@ -238,14 +220,8 @@ mod tests {
             FNISPairAndKillMoveAnimFlagSet {
                 flags: FNISAnimFlags::BSA,
                 duration: 1.0,
-                triggers: vec![Trigger {
-                    event: "Jump",
-                    time: 1.0,
-                }],
-                triggers2: vec![Trigger {
-                    event: "2_killactor",
-                    time: 3.333,
-                }],
+                triggers: vec![Trigger { event: "Jump", time: 1.0 }],
+                triggers2: vec![Trigger { event: "2_killactor", time: 3.333 }],
             }
         );
     }

@@ -28,28 +28,19 @@ mod tests {
         let input = "example";
         let hash1 = hash_djb2(input);
         let hash2 = hash_djb2(input);
-        assert_eq!(
-            hash1, hash2,
-            "Different hash values were generated for the same input"
-        );
+        assert_eq!(hash1, hash2, "Different hash values were generated for the same input");
     }
 
     #[test]
     fn test_different_hashes_for_different_inputs() {
         let hash1 = hash_djb2("example1");
         let hash2 = hash_djb2("example2");
-        assert_ne!(
-            hash1, hash2,
-            "Same hash values were generated for different inputs"
-        );
+        assert_ne!(hash1, hash2, "Same hash values were generated for different inputs");
     }
 
     #[test]
     fn test_empty_string() {
         let hash = hash_djb2("");
-        assert_eq!(
-            hash, 5381,
-            "Hash for empty string does not match the expected initial value"
-        );
+        assert_eq!(hash, 5381, "Hash for empty string does not match the expected initial value");
     }
 }

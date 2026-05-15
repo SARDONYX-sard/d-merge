@@ -48,9 +48,7 @@ impl<'a> TryFrom<Asdsf<'a>> for AltAsdsf<'a> {
             let alt_key = Str::from(buf);
             txt_projects.insert(alt_key, anim_set_list);
         }
-        Ok(AltAsdsf {
-            txt_projects: AltTxtProjects(txt_projects),
-        })
+        Ok(AltAsdsf { txt_projects: AltTxtProjects(txt_projects) })
     }
 }
 
@@ -66,8 +64,6 @@ impl<'a> TryFrom<AltAsdsf<'a>> for Asdsf<'a> {
             let normal_key = Str::from(buf);
             txt_projects.insert(normal_key, anim_set_list);
         }
-        Ok(Asdsf {
-            txt_projects: TxtProjects(txt_projects),
-        })
+        Ok(Asdsf { txt_projects: TxtProjects(txt_projects) })
     }
 }

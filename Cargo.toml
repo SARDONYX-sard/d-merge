@@ -1,12 +1,14 @@
 [workspace.package]
 version = "1.4.0"
-description = ""
-categories = ["games", "parsing"]
+description = "Diff & Merge hkx patcher"
+
 authors = ["SARDONYX-sard"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/SARDONYX-sard/d-merge"
-readme = "README.md"
+categories = ["games", "parsing"]
 edition = "2024"
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/SARDONYX-sard/d-merge"
 rust-version = "1.94"
 
 
@@ -29,6 +31,7 @@ members = [
   "core/tracing_rotation",
   "ffi/python",
   "gui/egui",
+  "gui/egui_derive",
   "gui/tauri/backend",
 ]
 resolver = "3"
@@ -50,10 +53,10 @@ serde_repr = "0.1.20" # C like Serialize enum into numbers.(Using progress repor
 simd-json = "0.17.0"
 snafu = "0.9.0"
 sonic-rs = "0.5.8"
-tokio = { version = "1.52.0", features = ["fs", "rt-multi-thread"] } # Async runtime
+tokio = { version = "1.52.3", features = ["fs", "rt-multi-thread"] } # Async runtime
 tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.23"
-winnow = { version = "1.0.1", features = ["simd"] }
+winnow = { version = "1.0.3", features = ["simd"] }
 
 auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "2d0358a", default-features = false }
 diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "2d0358a", default-features = false }

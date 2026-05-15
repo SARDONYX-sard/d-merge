@@ -25,10 +25,7 @@ impl ClipIdManager {
     ///
     /// The next available ID will start from `start_from + 1`.
     fn new(start_from: usize) -> Self {
-        Self {
-            used_ids: bitvec![0; Self::MAX_ID + 1],
-            current: start_from,
-        }
+        Self { used_ids: bitvec![0; Self::MAX_ID + 1], current: start_from }
     }
 
     /// Creates a new manager using the vanilla Skyrim SE baseline.

@@ -23,11 +23,7 @@ fn build_base_map(config: &AAConfig) -> BaseMap {
     config
         .mods
         .iter()
-        .flat_map(|m| {
-            m.groups
-                .iter()
-                .map(|g| ((Arc::clone(&m.prefix), g.name.group_id()), g.base))
-        })
+        .flat_map(|m| m.groups.iter().map(|g| ((Arc::clone(&m.prefix), g.name.group_id()), g.base)))
         .collect()
 }
 
@@ -206,20 +202,13 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error
     let config = AAConfig::new("V07.06.00.0", mods);
 
     let path = output_dir.join("SKSE/Plugins/fnis_aa/config.json");
-    let json = sonic_rs::to_string_pretty(&config).map_err(|e| Error::JsonError {
-        path: path.clone(),
-        source: e,
-    })?;
+    let json = sonic_rs::to_string_pretty(&config)
+        .map_err(|e| Error::JsonError { path: path.clone(), source: e })?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| Error::FailedIo {
-            path: parent.to_path_buf(),
-            source: e,
-        })?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| Error::FailedIo { path: parent.to_path_buf(), source: e })?;
     }
-    std::fs::write(&path, &json).map_err(|e| Error::FailedIo {
-        path: path.clone(),
-        source: e,
-    })?;
+    std::fs::write(&path, &json).map_err(|e| Error::FailedIo { path: path.clone(), source: e })?;
 
     Ok(build_base_map(&config))
 }
@@ -244,13 +233,7 @@ pub(crate) fn build_aa_config_from_jobs(
 
     for job in jobs {
         let AnimIoJob::Hkx(ConversionJob {
-            kind:
-                AnimKind::FnisAA {
-                    prefix,
-                    group_name,
-                    slot_count,
-                    ..
-                },
+            kind: AnimKind::FnisAA { prefix, group_name, slot_count, .. },
             ..
         }) = job
         else {
@@ -384,13 +367,7 @@ mod tests {
         let mut aa_mods = IndexMap::new();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
-                kind:
-                    AnimKind::FnisAA {
-                        prefix,
-                        group_name,
-                        slot_count,
-                        is_male_subdir: false,
-                    },
+                kind: AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false },
                 ..
             }) = job
             else {
@@ -403,11 +380,7 @@ mod tests {
                 groups: vec![],
             });
             if !aa_mod.groups.iter().any(|g| g.name == *group_name) {
-                aa_mod.groups.push(AAGroup {
-                    name: *group_name,
-                    base: 0,
-                    slot_count: *slot_count,
-                });
+                aa_mod.groups.push(AAGroup { name: *group_name, base: 0, slot_count: *slot_count });
             }
         }
         aa_mods

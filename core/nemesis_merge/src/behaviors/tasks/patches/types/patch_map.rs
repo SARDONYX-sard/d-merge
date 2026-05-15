@@ -176,19 +176,15 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
                 while let Some((key, value)) =
                     access.next_entry::<String, ValueWithPriority<'de>>()?
                 {
-                    let json_path = key
-                        .split('/')
-                        .map(|s| std::borrow::Cow::Owned(s.to_string()))
-                        .collect();
+                    let json_path =
+                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     map.insert(json_path, value);
                 }
                 Ok(OnePatchMap(map))
             }
         }
 
-        deserializer.deserialize_map(Visitor {
-            marker: std::marker::PhantomData,
-        })
+        deserializer.deserialize_map(Visitor { marker: std::marker::PhantomData })
     }
 }
 
@@ -233,10 +229,8 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
                 while let Some((key, value)) =
                     access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?
                 {
-                    let json_path = key
-                        .split('/')
-                        .map(|s| std::borrow::Cow::Owned(s.to_string()))
-                        .collect();
+                    let json_path =
+                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     map.insert(json_path, value);
                 }
 
@@ -244,8 +238,6 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             }
         }
 
-        deserializer.deserialize_map(Visitor {
-            marker: std::marker::PhantomData,
-        })
+        deserializer.deserialize_map(Visitor { marker: std::marker::PhantomData })
     }
 }

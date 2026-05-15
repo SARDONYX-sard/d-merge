@@ -37,10 +37,7 @@ pub(crate) fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<
 }
 
 fn f32_parser<'a>(input: &mut &'a str) -> ModalResult<Cow<'a, str>> {
-    float::<_, f32, _>
-        .take()
-        .map(Cow::Borrowed)
-        .parse_next(input)
+    float::<_, f32, _>.take().map(Cow::Borrowed).parse_next(input)
 }
 
 #[cfg(test)]

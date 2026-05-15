@@ -31,11 +31,7 @@ fn parse_furniture_animations_inner<'a>(
     let set = repeat(1.., parse_alt_anim_set_line).parse_next(input)?;
     let trigger = repeat(0.., parse_alt_anim_trigger_line).parse_next(input)?;
 
-    Ok(AlternateAnimation {
-        prefix,
-        set,
-        trigger,
-    })
+    Ok(AlternateAnimation { prefix, set, trigger })
 }
 
 #[cfg(test)]
@@ -60,52 +56,25 @@ T test2.hkx Test2_Event -0.100 Test2_trigger -0.00 Test2_trigger2 3.00
         let expected = AlternateAnimation {
             prefix: "fsm",
             set: vec![
-                AASet {
-                    group: "_mt",
-                    slots: 9,
-                },
-                AASet {
-                    group: "_boweqp",
-                    slots: 1,
-                },
-                AASet {
-                    group: "_bowidle",
-                    slots: 1,
-                },
+                AASet { group: "_mt", slots: 9 },
+                AASet { group: "_boweqp", slots: 1 },
+                AASet { group: "_bowidle", slots: 1 },
             ],
             trigger: vec![
                 AnimTrigger {
                     anim_name: "test.hkx",
                     triggers: vec![
-                        Trigger {
-                            event: "Test_Event",
-                            time: -0.1,
-                        },
-                        Trigger {
-                            event: "Test_trigger",
-                            time: -0.0,
-                        },
-                        Trigger {
-                            event: "Test_trigger2",
-                            time: 3.0,
-                        },
+                        Trigger { event: "Test_Event", time: -0.1 },
+                        Trigger { event: "Test_trigger", time: -0.0 },
+                        Trigger { event: "Test_trigger2", time: 3.0 },
                     ],
                 },
                 AnimTrigger {
                     anim_name: "test2.hkx",
                     triggers: vec![
-                        Trigger {
-                            event: "Test2_Event",
-                            time: -0.1,
-                        },
-                        Trigger {
-                            event: "Test2_trigger",
-                            time: -0.0,
-                        },
-                        Trigger {
-                            event: "Test2_trigger2",
-                            time: 3.0,
-                        },
+                        Trigger { event: "Test2_Event", time: -0.1 },
+                        Trigger { event: "Test2_trigger", time: -0.0 },
+                        Trigger { event: "Test2_trigger2", time: 3.0 },
                     ],
                 },
             ],

@@ -111,25 +111,13 @@ mod tests {
     #[test]
     fn test_parse_bool_valid_0() {
         let parsed = must_parse(parse_anim_var_line, "AnimVar MyFlag BOOL 0\n");
-        assert_eq!(
-            parsed,
-            AnimVar {
-                name: "MyFlag",
-                value: Value::Bool(false),
-            }
-        );
+        assert_eq!(parsed, AnimVar { name: "MyFlag", value: Value::Bool(false) });
     }
 
     #[test]
     fn test_parse_bool_valid_1() {
         let parsed = must_parse(parse_anim_var_line, "AnimVar Enabled BOOL 1\n");
-        assert_eq!(
-            parsed,
-            AnimVar {
-                name: "Enabled",
-                value: Value::Bool(true),
-            }
-        );
+        assert_eq!(parsed, AnimVar { name: "Enabled", value: Value::Bool(true) });
     }
 
     #[test]
@@ -142,37 +130,19 @@ mod tests {
     #[test]
     fn test_parse_int32_valid() {
         let parsed = must_parse(parse_anim_var_line, "AnimVar Counter INT32 42\n");
-        assert_eq!(
-            parsed,
-            AnimVar {
-                name: "Counter",
-                value: Value::Int32(42),
-            }
-        );
+        assert_eq!(parsed, AnimVar { name: "Counter", value: Value::Int32(42) });
     }
 
     #[test]
     fn test_parse_real_valid() {
         let parsed = must_parse(parse_anim_var_line, "AnimVar Speed REAL 2.5\n");
-        assert_eq!(
-            parsed,
-            AnimVar {
-                name: "Speed",
-                value: Value::Real(2.5),
-            }
-        );
+        assert_eq!(parsed, AnimVar { name: "Speed", value: Value::Real(2.5) });
     }
 
     #[test]
     fn test_parse_real_valid_with_spaces() {
         let parsed = must_parse(parse_anim_var_line, "AnimVar Accel   REAL   0.123   \n");
-        assert_eq!(
-            parsed,
-            AnimVar {
-                name: "Accel",
-                value: Value::Real(0.123),
-            }
-        );
+        assert_eq!(parsed, AnimVar { name: "Accel", value: Value::Real(0.123) });
     }
 
     #[test]

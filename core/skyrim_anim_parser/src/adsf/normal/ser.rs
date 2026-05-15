@@ -34,10 +34,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     let mut output = String::new();
 
     // Serialize header
-    output.push_str(&serialize_anim_header(
-        &anim_data.header,
-        anim_data.to_line_range(),
-    ));
+    output.push_str(&serialize_anim_header(&anim_data.header, anim_data.to_line_range()));
 
     // Serialize clip animation blocks
     // TODO: clip id unique check
@@ -54,10 +51,7 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
             #[cfg(feature = "tracing")]
             tracing::error!("clip_id allocation has reached its limit");
         }
-        output.push_str(&serialize_clip_anim_block(
-            block,
-            new_id.map(|id| id.to_string().into()),
-        ));
+        output.push_str(&serialize_clip_anim_block(block, new_id.map(|id| id.to_string().into())));
     }
 
     for block in &anim_data.clip_anim_blocks {
@@ -71,10 +65,8 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     if anim_data.header.has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
             if let Some(&new_id) = clip_id_map.get(&block.clip_id) {
-                output.push_str(&serialize_clip_motion_block(
-                    block,
-                    Some(new_id.to_string().into()),
-                ));
+                output
+                    .push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
             } else {
                 let new_id = clip_id_manager.next_id();
                 output.push_str(&serialize_clip_motion_block(
@@ -168,13 +160,7 @@ pub(crate) fn serialize_clip_motion_block(
 ) -> String {
     let mut output = String::new();
 
-    let ClipMotionBlock {
-        clip_id,
-        duration,
-        translations,
-        rotations,
-        ..
-    } = block;
+    let ClipMotionBlock { clip_id, duration, translations, rotations, .. } = block;
 
     match replace_clip_id {
         Some(new_clip_id) => output.push_str(new_clip_id.as_ref()),

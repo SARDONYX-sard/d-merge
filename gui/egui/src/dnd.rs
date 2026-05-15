@@ -37,10 +37,7 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
 
             ui.scope_builder(egui::UiBuilder::new().max_rect(row_rect), |ui| {
                 ui.horizontal(|ui| {
-                    ui.add_sized(
-                        checkbox_rect,
-                        egui::Checkbox::without_text(&mut item.enabled),
-                    );
+                    ui.add_sized(checkbox_rect, egui::Checkbox::without_text(&mut item.enabled));
                     label_with_hover(ui, &item.id, w_path);
 
                     draggable_handle.ui(ui, |ui| {
@@ -67,7 +64,7 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
 /// Useful for displaying filtered or sorted items where drag-and-drop is disabled.
 pub(crate) fn check_only_table_body(
     body: &mut egui_extras::TableBody,
-    filtered_items: &[ModItem],
+    filtered_ids: &[String],
     original_items: &mut [ModItem],
     widths: [f32; 6],
 ) {
@@ -77,11 +74,11 @@ pub(crate) fn check_only_table_body(
     let w_mod_type = widths[3];
     let w_site = widths[4];
 
-    for filtered_item in filtered_items {
-        let orig_item = original_items
-            .iter_mut()
-            .find(|o| o.id == filtered_item.id)
-            .expect("Original item must exist");
+    let mut orig_map: std::collections::HashMap<String, &mut ModItem> =
+        original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
+
+    for filtered_id in filtered_ids {
+        let orig_item = orig_map.get_mut(filtered_id).expect("Original item must exist");
 
         body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
@@ -91,22 +88,22 @@ pub(crate) fn check_only_table_body(
                 );
             });
             row.col(|ui| {
-                label_with_hover(ui, &filtered_item.id, w_path);
+                label_with_hover(ui, &orig_item.id, w_path);
             });
             row.col(|ui| {
-                label_with_hover(ui, &filtered_item.name, w_name);
+                label_with_hover(ui, &orig_item.name, w_name);
             });
             row.col(|ui| {
-                label_with_hover(ui, filtered_item.mod_type.as_str(), w_mod_type);
+                label_with_hover(ui, orig_item.mod_type.as_str(), w_mod_type);
             });
             row.col(|ui| {
-                hyperlink_with_hover(ui, &filtered_item.site, w_site);
+                hyperlink_with_hover(ui, &orig_item.site, w_site);
             });
             row.col(|ui| {
                 ui.with_layout(
                     egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
                     |ui| {
-                        ui.label(filtered_item.priority.to_string());
+                        ui.label(orig_item.priority.to_string());
                     },
                 );
             });

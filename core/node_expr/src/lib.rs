@@ -40,10 +40,7 @@ pub fn build_dir_tree<const N: usize>(
     let children = if path.is_dir() {
         // Collect entries in a vector for parallel processing
         let entries: Vec<_> = fs::read_dir(path)
-            .map_err(|e| Error::IoError {
-                source: e,
-                path: path.to_path_buf(),
-            })?
+            .map_err(|e| Error::IoError { source: e, path: path.to_path_buf() })?
             .collect();
 
         // Use parallel processing to handle entries
@@ -67,32 +64,22 @@ pub fn build_dir_tree<const N: usize>(
                     }
                 }
 
-                build_dir_tree(&child_path, allowed_extensions)
-                    .ok()
-                    .and_then(|child_node| {
-                        if child_node.children.is_some() || child_path.is_file() {
-                            Some(child_node)
-                        } else {
-                            None // Skip empty directories
-                        }
-                    })
+                build_dir_tree(&child_path, allowed_extensions).ok().and_then(|child_node| {
+                    if child_node.children.is_some() || child_path.is_file() {
+                        Some(child_node)
+                    } else {
+                        None // Skip empty directories
+                    }
+                })
             })
             .collect();
 
-        if child_nodes.is_empty() {
-            None
-        } else {
-            Some(child_nodes)
-        }
+        if child_nodes.is_empty() { None } else { Some(child_nodes) }
     } else {
         None // No children if the path is a file
     };
 
-    Ok(DirEntry {
-        path: path.to_string_lossy().to_string(),
-        name,
-        children,
-    })
+    Ok(DirEntry { path: path.to_string_lossy().to_string(), name, children })
 }
 
 #[cfg(test)]

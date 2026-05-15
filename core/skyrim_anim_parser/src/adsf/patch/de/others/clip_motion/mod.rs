@@ -17,12 +17,8 @@ pub struct ClipMotionDiffPatch<'a> {
 }
 
 impl ClipMotionDiffPatch<'_> {
-    const DEFAULT: Self = Self {
-        clip_id: None,
-        duration: None,
-        translations: None,
-        rotations: None,
-    };
+    const DEFAULT: Self =
+        Self { clip_id: None, duration: None, translations: None, rotations: None };
 
     pub fn merge(&mut self, other: Self) {
         if other.clip_id.is_some() {
@@ -107,9 +103,7 @@ impl<'a> ClipMotionDiffPatch<'a> {
                         motion_block.rotations.extend(rotations.values);
                     } else {
                         // In-bounds → insert at the middle
-                        motion_block
-                            .rotations
-                            .splice(range.start..range.start, rotations.values);
+                        motion_block.rotations.splice(range.start..range.start, rotations.values);
                     }
                 }
                 Op::Replace => {
