@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-05-15
+### :sparkles: New Features
+- [`a34f17d`](https://github.com/SARDONYX-sard/d-merge/commit/a34f17ddbddafdd22aa771f74ee0ef4daa7afb08) - **egui**: add `auto_run` checkbox *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.5.0] - 2026-05-15
 ### :sparkles: New Features
 - [`dce2ba4`](https://github.com/SARDONYX-sard/d-merge/commit/dce2ba4955e7005ced91911656688ac61938b89d) - **fnis_list**: support comment ignored *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -443,3 +448,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.3.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.1...1.3.2
 [1.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.2...1.4.0
 [1.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.4.0...1.5.0
+[1.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.5.0...1.6.0
