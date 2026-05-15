@@ -100,17 +100,20 @@ pub(crate) struct ModManagerApp {
     pub auto_remove_meshes: bool,
     /// If true, generates a FNIS.esp(dummy ESP) file.
     pub generate_fnis_esp: bool,
-    pub filter_text: String,
+
+    /// Once the mod list has been updated, enable all mods and run the patch once.
+    pub auto_run: bool,
     pub filter_column: Option<SortColumn>,
-    pub sort_column: SortColumn,
-    pub sort_asc: bool,
-    pub i18n: Arc<I18nMap>,
-    pub log_level: LogLevel,
-    pub transparent: bool,
-    pub last_window_size: egui::Vec2,
-    pub last_window_pos: egui::Pos2,
-    pub last_window_maximized: bool,
+    pub filter_text: String,
     pub font_path: Option<PathBuf>,
+    pub i18n: Arc<I18nMap>,
+    pub last_window_maximized: bool,
+    pub last_window_pos: egui::Pos2,
+    pub last_window_size: egui::Vec2,
+    pub log_level: LogLevel,
+    pub sort_asc: bool,
+    pub sort_column: SortColumn,
+    pub transparent: bool,
 
     // ====================== Non export Settings targets =================================
     //
@@ -166,6 +169,7 @@ impl Default for ModManagerApp {
             sort_asc: true,
             i18n: Arc::new(I18nMap::load_translation()),
             log_level: LogLevel::Debug,
+            auto_run: false,
             transparent: true,
             last_window_size: egui::Vec2::ZERO,
             last_window_pos: egui::Pos2::ZERO,
@@ -323,6 +327,10 @@ impl ModManagerApp {
                 let transparent_hover = self.t(I18nKey::TransparentHover).to_string();
                 ui.checkbox(&mut self.transparent, transparent_label)
                     .on_hover_text(transparent_hover);
+
+                let auto_run_label = self.t(I18nKey::AutoRun).to_string();
+                let auto_run_hover = self.t(I18nKey::AutoRunHover).to_string();
+                ui.checkbox(&mut self.auto_run, auto_run_label).on_hover_text(auto_run_hover);
             });
         });
     }
@@ -1085,6 +1093,11 @@ impl ModManagerApp {
                     format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateDone)),
                     Color32::GREEN,
                 );
+
+                if self.auto_run {
+                    self.mod_list_mut().par_iter_mut().for_each(|m| m.enabled = true);
+                    self.patch();
+                }
             }
             FetchState::Empty { elapsed } => {
                 let elapsed_secs = elapsed.as_secs_f32();

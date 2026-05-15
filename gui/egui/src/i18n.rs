@@ -19,6 +19,21 @@ pub(crate) enum I18nKey {
     /// Note: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods.
     AutoRemoveMeshesHover,
 
+    /// Auto run
+    AutoRun,
+
+    /// Once the mod list has been updated, enable all mods and run the patch once.
+    /// (You must close the window manually to prevent the auto-run option from becoming disabled.)
+    ///
+    /// NOTE: To enable this feature, you must restart the app after enabling this option.
+    ///
+    /// # Mod list update triggers
+    /// - Once at startup
+    /// - When the reload button is pressed
+    /// - When switching between vfs and manual environments
+    /// - When the Skyrim data directory is changed
+    AutoRunHover,
+
     /// Cancel
     CancelButton,
 
