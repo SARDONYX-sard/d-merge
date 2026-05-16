@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-05-16
+### :bug: Bug Fixes
+- [`b4330eb`](https://github.com/SARDONYX-sard/d-merge/commit/b4330ebaf83e4f1a629a2f02152f152bc9744da4) - **egui**: fix i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`86eea75`](https://github.com/SARDONYX-sard/d-merge/commit/86eea7532bb2f1be4abd415027e08a963056aff6) - fix filter & add normalize button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.6.0] - 2026-05-15
 ### :sparkles: New Features
 - [`a34f17d`](https://github.com/SARDONYX-sard/d-merge/commit/a34f17ddbddafdd22aa771f74ee0ef4daa7afb08) - **egui**: add `auto_run` checkbox *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -449,3 +455,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.3.2...1.4.0
 [1.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.4.0...1.5.0
 [1.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.5.0...1.6.0
+[1.6.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.0...1.6.1
