@@ -732,6 +732,14 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 ui.heading(self.t(I18nKey::ModsListTitle));
 
+                if ui
+                    .add(egui::Button::new(self.t(I18nKey::NormalizeButton)))
+                    .on_hover_text(self.t(I18nKey::NormalizeHover))
+                    .clicked()
+                {
+                    crate::mod_item::reorder_mods_priorities(self.mod_list_mut());
+                }
+
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
                 if ui
                     .add_enabled(
@@ -750,7 +758,7 @@ impl ModManagerApp {
             ui.separator();
 
             let mut filtered = self.filtered_mod_ids();
-            filtered.par_sort_unstable();
+            self.sort_filtered_mods(&mut filtered);
 
             let dnd_allowed = self.is_dnd_allowed();
             self.is_locked = !dnd_allowed;
@@ -760,33 +768,40 @@ impl ModManagerApp {
     }
 
     /// Filter cloned  mods according to current search text.
-    fn filtered_mod_ids(&self) -> Vec<String> {
+    fn filtered_mod_ids(&self) -> Vec<ModItem> {
         if self.filter_text.trim().is_empty() {
-            return vec![]; // unused when DnD grid
+            return self.mod_list().par_iter().cloned().collect(); // unused when DnD grid
         }
 
         // read only(but checkable grid)
         let text = self.filter_text.trim().to_lowercase();
-        let matches_filter = |m: &&ModItem| {
-            if text.is_empty() {
-                return true;
+        let matches_filter = |m: &&ModItem| match self.filter_column {
+            None => {
+                m.id.to_lowercase().contains(&text)
+                    || m.name.to_lowercase().contains(&text)
+                    || m.site.to_lowercase().contains(&text)
             }
-
-            match self.filter_column {
-                None => {
-                    m.id.to_lowercase().contains(&text)
-                        || m.name.to_lowercase().contains(&text)
-                        || m.site.to_lowercase().contains(&text)
-                }
-                Some(SortColumn::Id) => m.id.to_lowercase().contains(&text),
-                Some(SortColumn::Name) => m.name.to_lowercase().contains(&text),
-                Some(SortColumn::ModType) => m.mod_type.as_str().contains(&text),
-                Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
-                Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
-            }
+            Some(SortColumn::Id) => m.id.to_lowercase().contains(&text),
+            Some(SortColumn::Name) => m.name.to_lowercase().contains(&text),
+            Some(SortColumn::ModType) => m.mod_type.as_str().contains(&text),
+            Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
+            Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
         };
+        self.mod_list().par_iter().filter(matches_filter).cloned().collect()
+    }
 
-        self.mod_list().par_iter().filter(matches_filter).map(|m| m.id.clone()).collect()
+    /// Sort mods according to current sort settings.
+    fn sort_filtered_mods(&self, mods: &mut [ModItem]) {
+        mods.par_sort_unstable_by(|a, b| {
+            let ord = match self.sort_column {
+                SortColumn::Id => a.id.cmp(&b.id),
+                SortColumn::Name => a.name.cmp(&b.name),
+                SortColumn::ModType => a.mod_type.cmp(&b.mod_type),
+                SortColumn::Site => a.site.cmp(&b.site),
+                SortColumn::Priority => a.priority.cmp(&b.priority),
+            };
+            if self.sort_asc { ord } else { ord.reverse() }
+        });
     }
 
     /// Returns true if drag-and-drop reordering is currently allowed.
@@ -799,7 +814,7 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Render mods table (with headers + rows).
-    fn render_table(&mut self, ui: &mut egui::Ui, filtered_ids: &[String], editable: bool) {
+    fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
         let table_max_height = ui.available_height() * 0.97;
         let total_width = ui.available_width();
 
@@ -835,7 +850,7 @@ impl ModManagerApp {
                         if editable {
                             dnd_table_body(body.ui_mut(), mod_list, widths);
                         } else {
-                            check_only_table_body(&mut body, filtered_ids, mod_list, widths);
+                            check_only_table_body(&mut body, filtered_mods, mod_list, widths);
                         }
                     });
             });
@@ -880,7 +895,7 @@ impl ModManagerApp {
                 let check_all = self.check_all;
 
                 let filtered_ids: egui::ahash::HashSet<_> =
-                    self.filtered_mod_ids().into_par_iter().collect();
+                    self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
                 // If nothing has been searched for, everything is displayed, so everything is subject to checking.
                 let is_empty_filtered_ids = filtered_ids.is_empty();
 

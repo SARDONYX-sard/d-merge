@@ -118,6 +118,13 @@ pub(crate) enum I18nKey {
     /// Mods
     ModsListTitle,
 
+    /// Normalize
+    NormalizeButton,
+
+    /// Reorder priorities by mod type (Nemesis -> NemesisExt -> FNIS)
+    /// and sort mods alphabetically by id within each group.
+    NormalizeHover,
+
     /// Clear Notify
     NotificationClearButton,
 

@@ -118,6 +118,30 @@ pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModIt
     PatchMaps { nemesis_entries, fnis_entries }
 }
 
+/// Reorder priorities by mod type:
+/// Nemesis -> NemesisExt -> FNIS
+///
+/// Inside each mod type, mods are ordered by `id` alphabetically.
+/// After sorting, priorities are reassigned sequentially starting from 0.
+pub(crate) fn reorder_mods_priorities(mods: &mut [ModItem]) {
+    use mod_info::ModType;
+
+    const fn mod_type_rank(mod_type: &ModType) -> u8 {
+        match mod_type {
+            ModType::Nemesis => 0,
+            ModType::NemesisExt => 1,
+            ModType::Fnis => 2,
+        }
+    }
+
+    mods.par_sort_unstable_by(|a, b| {
+        mod_type_rank(&a.mod_type).cmp(&mod_type_rank(&b.mod_type)).then_with(|| a.id.cmp(&b.id))
+    });
+    mods.par_iter_mut().enumerate().for_each(|(priority, item)| {
+        item.priority = priority;
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

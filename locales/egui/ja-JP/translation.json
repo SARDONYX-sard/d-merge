@@ -33,6 +33,8 @@
   "mods_list_fetch_state_error": "MODリストの更新に失敗しました",
   "mods_list_fetch_state_fetching": "MODリストを取得しています...",
   "mods_list_title": "MOD 一覧",
+  "normalize_button": "正規化",
+  "normalize_hover": "MODタイプごとに優先順位を並べ替えます(Nemesis -> NemesisExt -> FNIS)\nその後各グループ内のIDでMODをアルファベット順に並べ替えます。",
   "notification_clear_button": "下部通知クリア",
   "notify_err_platform_not_supported": "注意: `get_skyrim_data_dir` はこのプラットフォーム (Linux / macOS) ではサポートされていません。SkyrimのDataディレクトリを手動で指定してください。",
   "notify_err_windows_registry_not_found": "エラー: Windowsレジストリからパスを取得できませんでした。\nSteam版以外を使用している場合は、SkyrimのDataディレクトリを手動で指定してください。",

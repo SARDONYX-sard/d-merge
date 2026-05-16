@@ -64,7 +64,7 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
 /// Useful for displaying filtered or sorted items where drag-and-drop is disabled.
 pub(crate) fn check_only_table_body(
     body: &mut egui_extras::TableBody,
-    filtered_ids: &[String],
+    filtered_ids: &[ModItem],
     original_items: &mut [ModItem],
     widths: [f32; 6],
 ) {
@@ -77,8 +77,8 @@ pub(crate) fn check_only_table_body(
     let mut orig_map: std::collections::HashMap<String, &mut ModItem> =
         original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
 
-    for filtered_id in filtered_ids {
-        let orig_item = orig_map.get_mut(filtered_id).expect("Original item must exist");
+    for filtered_mod in filtered_ids {
+        let orig_item = orig_map.get_mut(&filtered_mod.id).expect("Original item must exist");
 
         body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
