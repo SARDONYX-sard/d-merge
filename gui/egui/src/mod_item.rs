@@ -43,9 +43,8 @@ pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<Mo
     let old_map: HashMap<&str, (bool, usize)> =
         old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
-    let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) = new
-        .into_par_iter()
-        .map(|info| {
+    let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =
+        new.into_par_iter().partition_map(|info| {
             if let Some(&(enabled, priority)) = old_map.get(info.id.as_str()) {
                 Either::Left(ModItem {
                     enabled,
@@ -65,8 +64,7 @@ pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<Mo
                     mod_type: info.mod_type,
                 })
             }
-        })
-        .partition_map(|e| e);
+        });
 
     rayon::join(
         // Existing mods: order by old priority

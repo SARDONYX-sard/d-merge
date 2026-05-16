@@ -143,6 +143,7 @@ pub(crate) struct ModManagerApp {
     pub fetch_state: Arc<RwLock<FetchState>>,
 
     pub fetched_mod_info: Arc<RwLock<Vec<mod_info::ModInfo>>>,
+    pub last_fetch_was_empty: bool,
 }
 
 impl Default for ModManagerApp {
@@ -191,6 +192,7 @@ impl Default for ModManagerApp {
             prev_table_available_width: 0.0,
             fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
             fetched_mod_info: Arc::new(RwLock::new(vec![])),
+            last_fetch_was_empty: false,
         }
     }
 }
@@ -840,12 +842,11 @@ impl ModManagerApp {
                     .body(|mut body| {
                         let mut widths = [0.0; 6]; // 6 ==  column count
                         widths.clone_from_slice(body.widths());
-                        let mod_list =
-                            if matches!(*self.fetch_state.read(), FetchState::Empty { .. }) {
-                                &mut vec![] // Apply dummy to preserve check state.
-                            } else {
-                                self.mod_list_mut()
-                            };
+                        let mod_list = if self.last_fetch_was_empty {
+                            &mut vec![] // Apply dummy to preserve check state.
+                        } else {
+                            self.mod_list_mut()
+                        };
 
                         if editable {
                             dnd_table_body(body.ui_mut(), mod_list, widths);
@@ -1103,7 +1104,9 @@ impl ModManagerApp {
                 self.check_all = new_mods.par_iter().all(|m| m.enabled);
                 *self.mod_list_mut() = new_mods;
 
-                *self.fetch_state.write() = FetchState::Idle;
+                *self.fetch_state.write() = FetchState::Idle; // NOTE: If we don't include this, it will go here every time, and the mod list will be overwritten unintentionally.
+                self.last_fetch_was_empty = false;
+
                 self.mod_list_msg = (
                     format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateDone)),
                     Color32::GREEN,
@@ -1119,6 +1122,8 @@ impl ModManagerApp {
                 drop(state);
 
                 *self.fetch_state.write() = FetchState::Idle;
+                self.last_fetch_was_empty = true;
+
                 self.mod_list_msg = (
                     format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateEmpty)),
                     Color32::WHITE,
@@ -1129,6 +1134,7 @@ impl ModManagerApp {
                 drop(state);
 
                 *self.fetch_state.write() = FetchState::Idle;
+
                 self.mod_list_msg = (
                     format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateError)),
                     Color32::RED,
