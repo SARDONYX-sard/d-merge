@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-05-16
+### :bug: Bug Fixes
+- [`9a79f23`](https://github.com/SARDONYX-sard/d-merge/commit/9a79f2300b30857d22387a675b4d8937abe17baf) - **egui_i18n**: fix typo *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9a2a82f`](https://github.com/SARDONYX-sard/d-merge/commit/9a2a82fb54be577a107cc6b63c3aa6c14b38b028) - **egui**: fix empty grid display *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.6.1] - 2026-05-16
 ### :bug: Bug Fixes
 - [`b4330eb`](https://github.com/SARDONYX-sard/d-merge/commit/b4330ebaf83e4f1a629a2f02152f152bc9744da4) - **egui**: fix i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -456,3 +462,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.4.0...1.5.0
 [1.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.5.0...1.6.0
 [1.6.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.0...1.6.1
+[1.6.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.1...1.6.2
