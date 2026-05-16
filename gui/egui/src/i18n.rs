@@ -25,8 +25,6 @@ pub(crate) enum I18nKey {
     /// Once the mod list has been updated, enable all mods and run the patch once.
     /// (You must close the window manually to prevent the auto-run option from becoming disabled.)
     ///
-    /// NOTE: To enable this feature, you must restart the app after enabling this option.
-    ///
     /// # Mod list update triggers
     /// - Once at startup
     /// - When the reload button is pressed

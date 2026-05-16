@@ -2,7 +2,7 @@
   "auto_detect_button": "自動検出",
   "auto_detect_hover": "出力形式に応じたSkyrimのDataディレクトリを自動検出します(Steam版のレジストリを読み込むことで検出するため、Skyrimを一度でも起動していないと機能しません)",
   "auto_run": "自動実行",
-  "auto_run_hover": "modリストの更新が済むたびmodリスト全てを有効化してを自動で「パッチ適用」します。(自動実行の切替不可になるのを避けるためwindowは手動で閉じる必要があります。)\n\n注意: 機能させるにはこの項目を有効化後、アプリの再起動が必要です。\n\nmodリストの更新タイミング\n- 起動時に一度だけ\n- 再読み込みボタン押下時\n- vfs/manualの環境切り替え時\n- Skyrim Dataディレクトリの変更時",
+  "auto_run_hover": "modリストの更新が済むたびmodリスト全てを有効化してを自動で「パッチ適用」します。(自動実行の切替不可になるのを避けるためwindowは手動で閉じる必要があります。)\n\nmodリストの更新タイミング\n- 起動時に一度だけ\n- 再読み込みボタン押下時\n- vfs/manualの環境切り替え時\n- Skyrim Dataディレクトリの変更時",
   "auto_remove_meshes": "`meshes`を自動削除",
   "auto_remove_meshes_hover": "パッチ実行前に `<出力ディレクトリ>/meshes` と `<出力ディレクトリ>/.d_merge/.debug` を削除します。\n注意: 出力ディレクトリが Skyrim Data ディレクトリと同じ場合、削除処理はスキップされます。メッシュ削除で全ての MOD が壊れる可能性があるためです。",
   "cancel_button": "キャンセル",
