@@ -12,7 +12,7 @@ use crate::{
 /// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
 pub(crate) fn collect_templates(
     template_root: &Path,
-    template_names: HashSet<TemplateKey<'static>>,
+    template_names: HashSet<TemplateKey<'static>, rapidhash::fast::RandomState>,
 ) -> (OwnedTemplateMap, Vec<Error>) {
     template_names
         .into_par_iter()

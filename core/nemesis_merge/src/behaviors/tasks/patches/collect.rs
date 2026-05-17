@@ -70,7 +70,7 @@ pub(crate) async fn collect_owned_patches(
         });
     }
 
-    let mut owned_patches = OwnedPatchMap::new();
+    let mut owned_patches = OwnedPatchMap::default();
     let mut adsf_patches = OwnedAdsfPatchMap::new();
     let mut asdsf_patches = OwnedAsdsfPatchMap::new();
     let mut errors = vec![];

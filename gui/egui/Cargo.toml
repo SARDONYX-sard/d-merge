@@ -31,6 +31,7 @@ indexmap = { workspace = true, features = ["serde"] }
 mimalloc = { version = "0.1.50", optional = true }
 open = { version = "5.3.5" }
 parking_lot = "0.12.5"
+rapidhash = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 sonic-rs = { workspace = true }

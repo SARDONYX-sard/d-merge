@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
-pub(crate) type BaseMap = std::collections::HashMap<(Arc<str>, u64), u64>;
+pub(crate) type BaseMap = rapidhash::fast::RapidHashMap<(Arc<str>, u64), u64>;
 
 /// Builds the base lookup map from a finalized [`AAConfig`].
 ///
@@ -167,7 +167,7 @@ impl AAConfig {
 /// Assigns `base` and `mod_id` for every group across all mods in load order.
 /// Slot 0 is always reserved for vanilla; custom slots start at 1.
 fn compute_bases(mods: &mut [AAMod]) {
-    let mut next_slot = std::collections::HashMap::new();
+    let mut next_slot = rapidhash::fast::RapidHashMap::default();
 
     for (mod_id, aa_mod) in mods.iter_mut().enumerate() {
         aa_mod.mod_id = mod_id as u64;
@@ -229,7 +229,7 @@ pub(crate) fn build_aa_config_from_jobs(
     output_dir: &Path,
 ) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
-    let mut aa_mods = IndexMap::new();
+    let mut aa_mods = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
 
     for job in jobs {
         let AnimIoJob::Hkx(ConversionJob {
@@ -363,8 +363,10 @@ mod tests {
     }
 
     // Helper used by tests to inspect intermediate state without file I/O.
-    fn collect_aa_mods(jobs: &[AnimIoJob]) -> IndexMap<Arc<str>, AAMod> {
-        let mut aa_mods = IndexMap::new();
+    fn collect_aa_mods(
+        jobs: &[AnimIoJob],
+    ) -> IndexMap<Arc<str>, AAMod, rapidhash::fast::RandomState> {
+        let mut aa_mods = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
                 kind: AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false },

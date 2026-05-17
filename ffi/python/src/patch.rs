@@ -1,9 +1,10 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use mod_info::{ModInfo as RustModInfo, ModType as RustModType};
 use nemesis_merge::{
     Config as RustConfig, DebugOptions as RustDebugOptions, HackOptions as RustHackOptions,
-    OutPutTarget as RustOutPutTarget, PatchMaps as RustPatchMaps, Status as RustStatus,
+    OutPutTarget as RustOutPutTarget, PatchMaps as RustPatchMaps, PriorityMap,
+    Status as RustStatus,
 };
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -406,12 +407,12 @@ pub struct PatchMaps {
     /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
     /// - value: priority
     #[pyo3(get, set)]
-    pub nemesis_entries: HashMap<String, usize>,
+    pub nemesis_entries: PriorityMap,
     /// FNIS patch path
     /// - key: FNIS namespace(e.g. `namespace` of `<skyrim_data_dir>/path/meshes/actors/character/animations/<namespace>`)
     /// - value: priority
     #[pyo3(get, set)]
-    pub fnis_entries: HashMap<String, usize>,
+    pub fnis_entries: PriorityMap,
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pymethods]

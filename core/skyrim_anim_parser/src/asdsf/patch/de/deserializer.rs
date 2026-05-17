@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use json_patch::{JsonPath, ValueWithPriority};
 use winnow::{
     Parser,
@@ -24,7 +22,8 @@ use crate::{
     },
 };
 
-pub type PatchesMap<'a> = HashMap<JsonPath<'a>, ValueWithPriority<'a>>;
+pub type PatchesMap<'a> =
+    std::collections::HashMap<JsonPath<'a>, ValueWithPriority<'a>, rapidhash::fast::RandomState>;
 
 /// Parse `animationsetdatasinglefile.txt` patch.
 ///

@@ -1429,6 +1429,7 @@ dependencies = [
  "nemesis_merge",
  "open",
  "parking_lot",
+ "rapidhash",
  "rayon",
  "rfd 0.15.4",
  "rfd 0.17.2",
@@ -4206,6 +4207,7 @@ dependencies = [
  "jwalk_glob",
  "nemesis_xml",
  "phf 0.13.1",
+ "rapidhash",
  "rayon",
  "rmp-serde",
  "schemars 1.2.1",
@@ -5665,6 +5667,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
 
 [[package]]
+name = "rapidhash"
+version = "4.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5e48930979c155e2f33aa36ab3119b5ee81332beb6482199a8ecd6029b80b59"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "raw-window-handle"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6645,6 +6656,7 @@ dependencies = [
  "indexmap 2.14.0",
  "json_patch",
  "pretty_assertions",
+ "rapidhash",
  "rayon",
  "rmp-serde",
  "serde",

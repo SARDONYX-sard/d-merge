@@ -25,13 +25,13 @@ pub struct Asdsf<'a> {
 /// - key: project data file names: e.g. `ChickenProjectData\\ChickenProject.txt`
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone)]
-pub struct TxtProjects<'a>(pub IndexMap<Str<'a>, AnimSetList<'a>>);
+pub struct TxtProjects<'a>(pub IndexMap<Str<'a>, AnimSetList<'a>, rapidhash::fast::RandomState>);
 
 /// A list of animation data corresponding to each project.
 /// - key: file_name(e.g. `full_body.txt`, `_MTSolo.txt`)
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone)]
-pub struct AnimSetList<'a>(pub IndexMap<Str<'a>, AnimSetData<'a>>);
+pub struct AnimSetList<'a>(pub IndexMap<Str<'a>, AnimSetData<'a>, rapidhash::fast::RandomState>);
 
 /// Represents individual animation data.
 ///

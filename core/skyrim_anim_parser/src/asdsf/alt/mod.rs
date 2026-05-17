@@ -34,13 +34,13 @@ pub struct AltAsdsf<'a> {
 ///   e.g. `ChickenProjectData~ChickenProject`, `DefaultMale~DefaultMale`
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone)]
-pub struct AltTxtProjects<'a>(pub IndexMap<Str<'a>, AnimSetList<'a>>);
+pub struct AltTxtProjects<'a>(pub IndexMap<Str<'a>, AnimSetList<'a>, rapidhash::fast::RandomState>);
 
 impl<'a> TryFrom<Asdsf<'a>> for AltAsdsf<'a> {
     type Error = String;
 
     fn try_from(asdsf: Asdsf<'a>) -> Result<Self, Self::Error> {
-        let mut txt_projects = IndexMap::new();
+        let mut txt_projects = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
         for (key, anim_set_list) in asdsf.txt_projects.0 {
             let mut buf = String::new();
             to_alt_txt_project_name(key.as_ref(), &mut buf)
@@ -56,7 +56,7 @@ impl<'a> TryFrom<AltAsdsf<'a>> for Asdsf<'a> {
     type Error = String;
 
     fn try_from(alt_asdsf: AltAsdsf<'a>) -> Result<Self, Self::Error> {
-        let mut txt_projects = IndexMap::new();
+        let mut txt_projects = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
         for (key, anim_set_list) in alt_asdsf.txt_projects.0 {
             let mut buf = String::new();
             to_normal_txt_project_name(key.as_ref(), &mut buf)

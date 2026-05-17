@@ -26,9 +26,9 @@ pub fn parse_asdsf(input: &str) -> Result<Asdsf<'_>, ReadableError> {
 fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
     let txt_projects_ = txt_projects.parse_next(input)?;
 
-    let mut txt_projects = indexmap::IndexMap::new();
+    let mut txt_projects = indexmap::IndexMap::default();
     for txt_project in txt_projects_ {
-        let mut anim_set_list = indexmap::IndexMap::new();
+        let mut anim_set_list = indexmap::IndexMap::default();
 
         for file_name in file_names.parse_next(input)? {
             let anim_set_data = anim_set_data.context(Label("AnimSetData")).parse_next(input)?;
@@ -200,7 +200,7 @@ fn anim_infos<'a>(
 mod tests {
     use super::*;
     // use rayon::prelude::*;
-    // use std::collections::HashMap;
+    // use rapidhash::fast::HashMap;
 
     fn test_parse(input: &str) {
         match parse_asdsf(input) {

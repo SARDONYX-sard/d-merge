@@ -1,6 +1,5 @@
-use std::{borrow::Cow, collections::HashSet, path::PathBuf};
+use std::{borrow::Cow, path::PathBuf};
 
-use dashmap::DashSet;
 use fnis_list::{
     FNISList, SyntaxPattern,
     combinator::{Trigger, flags::FNISAnimFlags, fnis_animation::FNISAnimation},
@@ -10,6 +9,7 @@ use fnis_list::{
     },
 };
 use json_patch::{JsonPath, ValueWithPriority};
+use rapidhash::fast::RapidHashSet as HashSet;
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
@@ -25,6 +25,8 @@ use crate::behaviors::tasks::{
         },
     },
 };
+
+type DashSet<K> = dashmap::DashSet<K, rapidhash::fast::RandomState>;
 
 /// A patch with borrowed references to a single FNIS_*_List.txt file.
 #[derive(Debug)]
@@ -78,9 +80,9 @@ pub(super) fn generate_patch<'a>(
     config: &crate::Config,
 ) -> Result<OneListPatch<'a>, FnisPatchGenerationError> {
     // TODO: Support AsciiCaseIgnore
-    let mut all_anim_files = HashSet::new();
+    let mut all_anim_files = HashSet::default();
     // NOTE: Currently, during the creation of the event/variable map immediately before hkx conversion in serde_hkx, duplicates are removed using ASCII ignore.
-    let mut all_events = HashSet::new();
+    let mut all_events = HashSet::default();
 
     let mut all_adsf_patches = vec![];
     let mut one_master_patches = vec![];
@@ -239,8 +241,8 @@ fn collect_seq_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     sequenced_animation: SequencedAnimation<'a>,
 ) -> (DashSet<&'a str>, DashSet<Cow<'a, str>>, Vec<AdsfPatch<'a>>) {
-    let files = DashSet::new();
-    let events = DashSet::new();
+    let files = DashSet::default();
+    let events = DashSet::default();
 
     let adsf_patches: Vec<AdsfPatch<'a>> = sequenced_animation
         .animations

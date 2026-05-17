@@ -215,11 +215,11 @@ pub(crate) enum I18nKey {
 }
 
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub(crate) struct I18nMap(IndexMap<I18nKey, Cow<'static, str>>);
+pub(crate) struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, rapidhash::fast::RandomState>);
 
 impl I18nMap {
     pub(crate) fn new() -> Self {
-        Self(IndexMap::new())
+        Self(IndexMap::default())
     }
 
     /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.

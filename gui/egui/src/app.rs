@@ -895,7 +895,7 @@ impl ModManagerApp {
             if ui.add(Checkbox::without_text(&mut self.check_all)).clicked() {
                 let check_all = self.check_all;
 
-                let filtered_ids: egui::ahash::HashSet<_> =
+                let filtered_ids: rapidhash::fast::RapidHashSet<_> =
                     self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
                 // If nothing has been searched for, everything is displayed, so everything is subject to checking.
                 let is_empty_filtered_ids = filtered_ids.is_empty();
