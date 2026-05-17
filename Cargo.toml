@@ -38,6 +38,7 @@ resolver = "3"
 
 
 [workspace.dependencies]
+ahash = { version = "0.8.12" }
 dashmap = { version = "6.1.0" }
 educe = { version = "0.6.0" }
 futures = { version = "0.3.32" }

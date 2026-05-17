@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::HashMap;
 use rayon::prelude::*;
 
 use crate::{
@@ -41,11 +40,11 @@ pub fn serialize_alt_adsf(
     // Serialize in the order of project_names.
     // NOTE: Any additions to the project headers will be reflected.
     let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
-    let mut clip_id_map = HashMap::new(); // TODO: clip id unique check - It did not crash even if the number of `anim_data` and `motion_data` did not match.
+    let mut clip_id_map = HashMap::default(); // TODO: clip id unique check - It did not crash even if the number of `anim_data` and `motion_data` did not match.
 
     // NOTE: Since we reverted to the vanilla style name for serialization,
     // we must mode the key to reference alt_adsf. This is the procedure for that.
-    let mut counter: HashMap<String, usize> = HashMap::new();
+    let mut counter = HashMap::default();
     for name in project_names {
         let name_str = name.as_ref();
         let base = name_str.strip_suffix(".txt").unwrap_or(name_str);

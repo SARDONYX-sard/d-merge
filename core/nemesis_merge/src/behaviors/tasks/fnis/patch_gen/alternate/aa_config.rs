@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
-pub(crate) type BaseMap = std::collections::HashMap<(Arc<str>, u64), u64>;
+pub(crate) type BaseMap = ahash::HashMap<(Arc<str>, u64), u64>;
 
 /// Builds the base lookup map from a finalized [`AAConfig`].
 ///
@@ -167,7 +167,7 @@ impl AAConfig {
 /// Assigns `base` and `mod_id` for every group across all mods in load order.
 /// Slot 0 is always reserved for vanilla; custom slots start at 1.
 fn compute_bases(mods: &mut [AAMod]) {
-    let mut next_slot = std::collections::HashMap::new();
+    let mut next_slot = ahash::HashMap::default();
 
     for (mod_id, aa_mod) in mods.iter_mut().enumerate() {
         aa_mod.mod_id = mod_id as u64;

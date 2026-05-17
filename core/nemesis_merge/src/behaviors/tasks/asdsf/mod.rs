@@ -124,7 +124,7 @@ pub(crate) fn apply_asdsf_patches(
 
     let mut txt_project_header_patches = DiffLines::DEFAULT;
 
-    let mut sub_txt_header_patch_map = SubHeaderDiffMap::new();
+    let mut sub_txt_header_patch_map = SubHeaderDiffMap::default();
 
     // 4/5. Apply adsf patch to base adsf(anim_data & motion data).
     for mut asdsf_patch in borrowed_patches {

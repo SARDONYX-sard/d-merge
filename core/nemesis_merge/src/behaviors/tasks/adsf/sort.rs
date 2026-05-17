@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::HashMap;
 use rayon::prelude::*;
 
 use super::{AdsfPatch, PatchKind};
@@ -71,7 +70,7 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
     patches
         .into_par_iter()
         .enumerate()
-        .fold(HashMap::new, |mut map: HashMap<PatchKey<'_>, AdsfPatch<'a>>, (idx, patch)| {
+        .fold(HashMap::default, |mut map: HashMap<PatchKey<'_>, AdsfPatch<'a>>, (idx, patch)| {
             let key = match &patch.patch {
                 PatchKind::ProjectNamesHeader(_) => {
                     PatchKey::ProjectNamesHeader { target: patch.target, id: patch.id }
@@ -122,7 +121,7 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
             }
             map
         })
-        .reduce(HashMap::new, |mut map1, map2| {
+        .reduce(HashMap::default, |mut map1, map2| {
             for (key, patch2) in map2 {
                 match map1.entry(key) {
                     std::collections::hash_map::Entry::Occupied(mut entry) => {

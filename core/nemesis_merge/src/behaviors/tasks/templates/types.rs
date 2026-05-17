@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::HashMap;
 use dashmap::DashMap;
 use simd_json::BorrowedValue;
 

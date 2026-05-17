@@ -74,10 +74,8 @@ impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
             "Need to be the same length. but got project_names.len() != anim_list.len()"
         );
 
-        use std::collections::HashMap;
-
         let mut map = indexmap::IndexMap::with_capacity(project_names.len());
-        let mut counter: HashMap<String, usize> = HashMap::new();
+        let mut counter = ahash::AHashMap::new();
 
         for (name, anim) in project_names.into_iter().zip(anim_list) {
             let name_str = name.as_ref();

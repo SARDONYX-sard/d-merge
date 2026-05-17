@@ -200,7 +200,7 @@ fn anim_infos<'a>(
 mod tests {
     use super::*;
     // use rayon::prelude::*;
-    // use std::collections::HashMap;
+    // use ahash::HashMap;
 
     fn test_parse(input: &str) {
         match parse_asdsf(input) {
