@@ -74,7 +74,7 @@ pub(crate) fn check_only_table_body(
     let w_mod_type = widths[3];
     let w_site = widths[4];
 
-    let mut orig_map: ahash::HashMap<String, &mut ModItem> =
+    let mut orig_map: rapidhash::fast::RapidHashMap<String, &mut ModItem> =
         original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
 
     for filtered_mod in filtered_ids {

@@ -169,7 +169,7 @@ fn apply_and_gen_patched_hkx<'a>(
         use self::tasks::templates::collect::owned;
 
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        let needed_template_names: std::collections::HashSet<_> =
+        let needed_template_names =
             borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
 
         let (owned_templates, errors) =

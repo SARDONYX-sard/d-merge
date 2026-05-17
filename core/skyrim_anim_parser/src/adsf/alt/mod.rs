@@ -47,7 +47,9 @@ use crate::{
 /// This allows fast O(1) access without extra heap allocations during patching.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct AltAdsf<'a>(pub indexmap::IndexMap<Str<'a>, AltAnimData<'a>>);
+pub struct AltAdsf<'a>(
+    pub indexmap::IndexMap<Str<'a>, AltAnimData<'a>, rapidhash::fast::RandomState>,
+);
 
 impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
     /// Converts [`Adsf`] into [`AltAdsf`] by transforming the parallel `Vec` fields
@@ -74,8 +76,8 @@ impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
             "Need to be the same length. but got project_names.len() != anim_list.len()"
         );
 
-        let mut map = indexmap::IndexMap::with_capacity(project_names.len());
-        let mut counter = ahash::AHashMap::new();
+        let mut map = IndexMap::default();
+        let mut counter = rapidhash::fast::RapidHashMap::default();
 
         for (name, anim) in project_names.into_iter().zip(anim_list) {
             let name_str = name.as_ref();

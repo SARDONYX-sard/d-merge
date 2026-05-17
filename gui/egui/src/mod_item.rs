@@ -38,7 +38,7 @@ pub(crate) enum SortColumn {
 /// New items are appended in alphabetical order.
 /// Final priorities are always normalized.
 pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
-    let old_map: ahash::HashMap<&str, (bool, usize)> =
+    let old_map: rapidhash::fast::RapidHashMap<&str, (bool, usize)> =
         old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
     let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =

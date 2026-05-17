@@ -43,7 +43,9 @@ impl<'a> HkxPatchMaps<'a> {
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct OnePatchMap<'a>(pub DashMap<JsonPath<'a>, ValueWithPriority<'a>>);
+pub(crate) struct OnePatchMap<'a>(
+    pub DashMap<JsonPath<'a>, ValueWithPriority<'a>, rapidhash::fast::RandomState>,
+);
 
 impl<'a> OnePatchMap<'a> {
     /// Inserts a value for the given JSON path.
@@ -89,10 +91,12 @@ impl<'a> OnePatchMap<'a> {
     }
 }
 
-/// A map that stores **multiple** values per JSON path,
+/// A map that stores array field patches per JSON path,
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
+pub(crate) struct SeqPatchMap<'a>(
+    pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, rapidhash::fast::RandomState>,
+);
 
 impl<'a> SeqPatchMap<'a> {
     /// Inserts a value for the given JSON path.
@@ -172,7 +176,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::new();
+                let map = DashMap::<_, _, rapidhash::fast::RandomState>::default();
                 while let Some((key, value)) =
                     access.next_entry::<String, ValueWithPriority<'de>>()?
                 {
@@ -224,7 +228,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::new();
+                let map = DashMap::<_, _, rapidhash::fast::RandomState>::default();
 
                 while let Some((key, value)) =
                     access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?

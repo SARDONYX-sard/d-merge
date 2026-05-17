@@ -4,12 +4,14 @@ use indexmap::IndexMap;
 /// - key: full path(For asdsf)
 /// - value: adsf patch
 #[derive(Debug, Default)]
-pub(crate) struct OwnedAsdsfPatchMap(pub IndexMap<PathBuf, (String, usize)>);
+pub(crate) struct OwnedAsdsfPatchMap(
+    pub IndexMap<PathBuf, (String, usize), rapidhash::fast::RandomState>,
+);
 
 impl OwnedAsdsfPatchMap {
     #[inline]
     pub(crate) fn new() -> Self {
-        Self(IndexMap::new())
+        Self(IndexMap::default())
     }
 
     #[inline]

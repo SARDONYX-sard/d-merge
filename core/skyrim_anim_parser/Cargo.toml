@@ -13,9 +13,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ahash = { workspace = true }
 bitvec = "1.0.1"
 indexmap = { workspace = true }
+rapidhash = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true, optional = true } # Implement (De)Serializer
 simd-json = { workspace = true }
