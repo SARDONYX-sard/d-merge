@@ -63,6 +63,7 @@
     "pymethods",
     "pymodule",
     "Ragdoll",
+    "rapidhash",
     "refin",
     "refout",
     "repr",
