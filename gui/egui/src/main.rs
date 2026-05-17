@@ -2,7 +2,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
-mod dnd;
 mod fonts;
 mod i18n;
 mod log;
@@ -43,7 +42,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
-            title: Some("D Merge".to_string()),
+            title: Some(format!("D Merge v{}", env!("CARGO_PKG_VERSION"))),
             app_id: Some("D Merge".to_string()),
             position: Some(egui::Pos2::new(settings.window_pos_x, settings.window_pos_y)),
             transparent: Some(true),
