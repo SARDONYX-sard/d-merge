@@ -125,9 +125,7 @@ pub(crate) struct ModManagerApp {
     pub check_all: bool,
     /// mod list fetching message with color
     pub mod_list_msg: (String, Color32),
-
-    pub notification: Arc<RwLock<String>>,
-    pub notify_color: Arc<RwLock<egui::Color32>>,
+    pub notify: (String, egui::Color32),
 
     pub log_lines: Arc<RwLock<Vec<String>>>,
     pub log_watcher_started: bool,
@@ -141,9 +139,12 @@ pub(crate) struct ModManagerApp {
     /// Even if no mod info can be retrieved, we want to maintain the
     /// check status and display it as empty.
     pub fetch_state: Arc<RwLock<FetchState>>,
-
     pub fetched_mod_info: Arc<RwLock<Vec<mod_info::ModInfo>>>,
     pub last_fetch_was_empty: bool,
+
+    /// Patch status
+    pub patch_status: Arc<RwLock<Option<nemesis_merge::Status>>>,
+    pub patch_start_time: Option<std::time::Instant>,
 }
 
 impl Default for ModManagerApp {
@@ -186,13 +187,14 @@ impl Default for ModManagerApp {
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
             mod_list_msg: (String::new(), egui::Color32::WHITE),
-            notification: Arc::new(RwLock::new(String::new())),
-            notify_color: Arc::new(RwLock::new(egui::Color32::WHITE)),
+            notify: (String::new(), egui::Color32::WHITE),
             is_first_render: true,
             prev_table_available_width: 0.0,
             fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
             fetched_mod_info: Arc::new(RwLock::new(vec![])),
             last_fetch_was_empty: false,
+            patch_status: Arc::new(RwLock::new(None)),
+            patch_start_time: None,
         }
     }
 }
@@ -200,6 +202,7 @@ impl Default for ModManagerApp {
 impl App for ModManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
         self.poll_fetch_result();
+        self.poll_patch_result();
         self.start_log_watcher(ctx);
         self.update_window_info(ctx);
 
@@ -374,7 +377,7 @@ impl ModManagerApp {
                 if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
                     && let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
                 {
-                    self.set_colored_notification(err, Color32::RED);
+                    self.set_colored_notify(err, Color32::RED);
                 };
 
                 self.draw_skyrim_dir_ui(ui);
@@ -433,7 +436,7 @@ impl ModManagerApp {
                 if ui.button(output_dir_label).clicked()
                     && let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir))
                 {
-                    self.set_colored_notification(err, Color32::RED);
+                    self.set_colored_notify(err, Color32::RED);
                 };
                 let text_line = egui::TextEdit::singleline(&mut self.output_dir);
                 let text_line = if self.transparent {
@@ -453,7 +456,7 @@ impl ModManagerApp {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
                                 let err = format!("Couldn't find output dir or ancestor: {err}");
-                                self.set_colored_notification(err, Color32::RED);
+                                self.set_colored_notify(err, Color32::RED);
                                 return;
                             }
                         }
@@ -564,7 +567,7 @@ impl ModManagerApp {
         }
 
         panel.show(ctx, |ui| {
-            ui.colored_label(*self.notify_color.read(), self.notification());
+            ui.colored_label(self.notify.1, &self.notify.0);
         });
     }
 
@@ -581,7 +584,7 @@ impl ModManagerApp {
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
                     if let Err(err) = open_existing_dir_or_ancestor(get_log_dir(&s.output_dir)) {
-                        s.set_colored_notification(err, Color32::RED);
+                        s.set_colored_notify(err, Color32::RED);
                     }
                 });
                 self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
@@ -626,12 +629,12 @@ impl ModManagerApp {
                         .clicked()
                     {
                         match I18nMap::save_translation() {
-                            Ok(()) => self.set_colored_notification(
+                            Ok(()) => self.set_colored_notify(
                                 format!("OK. Wrote {}", I18nMap::FILE),
                                 Color32::GREEN,
                             ),
                             Err(err) => {
-                                self.set_colored_notification(err.to_string(), Color32::RED);
+                                self.set_colored_notify(err.to_string(), Color32::RED);
                             }
                         }
                     }
@@ -1033,11 +1036,11 @@ impl ModManagerApp {
             Err(err) => {
                 tracing::error!(%err);
                 #[cfg(target_os = "windows")]
-                let err_msg = self.t(I18nKey::NotifyErrWindowsRegistryNotFound);
+                let err_msg = self.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
                 #[cfg(not(target_os = "windows"))]
-                let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported);
+                let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
 
-                self.set_colored_notification(err_msg, Color32::RED);
+                self.set_colored_notify(err_msg, Color32::RED);
             }
         }
     }
@@ -1147,23 +1150,20 @@ impl ModManagerApp {
 
 impl ModManagerApp {
     /// Set message to notification
-    pub(crate) fn set_notification<S: Into<String>>(&self, msg: S) {
-        self.set_colored_notification(msg, Color32::WHITE);
+    pub(crate) fn set_notify<S: Into<String>>(&mut self, msg: S) {
+        self.set_colored_notify(msg, Color32::WHITE);
     }
 
     /// Set message to notification with color
-    pub(crate) fn set_colored_notification<S: Into<String>>(&self, msg: S, color: egui::Color32) {
-        *self.notification.write() = msg.into();
-        *self.notify_color.write() = color;
+    pub(crate) fn set_colored_notify<S>(&mut self, msg: S, color: egui::Color32)
+    where
+        S: Into<String>,
+    {
+        self.notify = (msg.into(), color);
     }
 
-    pub(crate) fn clear_notification(&self) {
-        self.notification.write().clear();
-    }
-
-    /// Get notification message
-    pub(crate) fn notification(&self) -> String {
-        self.notification.read().clone()
+    pub(crate) fn clear_notification(&mut self) {
+        self.notify.0.clear();
     }
 }
 
@@ -1177,8 +1177,9 @@ impl ModManagerApp {
 }
 
 impl ModManagerApp {
-    fn patch(&self) {
-        let start_time = std::time::Instant::now();
+    fn patch(&mut self) {
+        self.patch_start_time = Some(std::time::Instant::now());
+        *self.patch_status.write() = None;
 
         let patches = match self.mode {
             DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
@@ -1190,9 +1191,7 @@ impl ModManagerApp {
             self.remove_meshes_dir_all();
         }
 
-        let notify = Arc::clone(&self.notification);
-        let notify_color = Arc::clone(&self.notify_color);
-        let i18n = Arc::clone(&self.i18n);
+        let patch_status = Arc::clone(&self.patch_status);
 
         self.async_rt.spawn(nemesis_merge::behavior_gen(
             patches,
@@ -1206,8 +1205,7 @@ impl ModManagerApp {
                     }
                 },
                 status_report: Some(Box::new(move |status| {
-                    *notify_color.write() = crate::i18n::status_to_color(&status);
-                    *notify.write() = crate::i18n::status_to_text(status, &i18n, start_time);
+                    *patch_status.write() = Some(status);
                 })),
                 hack_options: Some(nemesis_merge::HackOptions {
                     cast_ragdoll_event: true,
@@ -1225,22 +1223,41 @@ impl ModManagerApp {
     }
 
     /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
-    fn remove_meshes_dir_all(&self) {
-        let output_dir = &self.output_dir;
+    fn remove_meshes_dir_all(&mut self) {
+        let output_dir = self.output_dir.clone();
         let skyrim_data_directory = self.current_skyrim_data_dir();
 
-        if nemesis_merge::cache_remover::is_dangerous_remove(output_dir, skyrim_data_directory) {
+        if nemesis_merge::cache_remover::is_dangerous_remove(&output_dir, skyrim_data_directory) {
             tracing::warn!(
                 "0/6: The `auto remove meshes` option is checked, but the output directory is the Skyrim data directory.\nSince deleting meshes in that location risks destroying mods, the process was skipped."
             );
         } else {
-            self.set_notification(format!(
+            self.set_notify(format!(
                 "0/6: {} `{output_dir}/meshes`",
                 self.t(I18nKey::RemovingMeshesMessage)
             ));
 
             nemesis_merge::cache_remover::remove_meshes_dir_all(output_dir);
         }
+    }
+
+    fn poll_patch_result(&mut self) {
+        // By accessing `start_time` first, we minimize the cost of `RwLock::read` as much as possible
+        let Some(start_time) = self.patch_start_time else {
+            return;
+        };
+        let Some(Some(status)) = self.patch_status.try_read().as_deref().cloned() else {
+            return;
+        };
+
+        if matches!(status, nemesis_merge::Status::Done) {
+            self.patch_start_time = None;
+            *self.patch_status.write() = None;
+        }
+
+        let color = crate::i18n::status_to_color(&status);
+        let msg = crate::i18n::status_to_text(status, &self.i18n, start_time);
+        self.set_colored_notify(msg, color);
     }
 }
 
