@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-05-17
+### :sparkles: New Features
+- [`b33a458`](https://github.com/SARDONYX-sard/d-merge/commit/b33a458c8a4528443d72122c451c44d5740e108b) - **egui**: implement help modal *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.7.0] - 2026-05-17
 ### :sparkles: New Features
 - [`fe78d34`](https://github.com/SARDONYX-sard/d-merge/commit/fe78d34b3b9733376f5e01e6bcca499e0af1af27) - use `ahash` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -473,3 +478,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.6.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.0...1.6.1
 [1.6.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.1...1.6.2
 [1.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.2...1.7.0
+[1.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.7.0...1.8.0
