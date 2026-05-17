@@ -19,6 +19,7 @@
   "filter_text_all": "全て",
   "generate_fnis_esp_hover": "ダミーのFNIS.espを生成します。(元のFNIS SEのFNIS.espを使いたくないがFNIS.espが必要なModを使う場合に使用します)",
   "generate_fnis_esp_label": "FNIS.esp生成",
+  "help_button": "ヘルプ",
   "issue_report_button": "問題を報告",
   "issue_report_hover": "GitHubでバグを報告します。\nバージョン情報と一部のハードウェア情報が自動入力されます。(GitHub側の制限により、GitHubアカウントが必要です)",
   "lock_button": "🔒ロック済み",

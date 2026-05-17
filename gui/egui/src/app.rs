@@ -12,10 +12,13 @@ use parking_lot::RwLock;
 use rayon::prelude::*;
 
 use crate::{
-    dnd::{check_only_table_body, dnd_table_body},
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
     mod_item::{ModItem, SortColumn, inherit_reorder_cast, to_patches},
+    ui::{
+        confirm::{ConfirmAction, ConfirmDialog},
+        dnd_table::{check_only_table_body, dnd_table_body},
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -118,11 +121,18 @@ pub(crate) struct ModManagerApp {
     // ====================== Non export Settings targets =================================
     //
     pub async_rt: tokio::runtime::Runtime,
+    pub confirm_dialog: ConfirmDialog,
+
+    /// It exists because mod_info must be loaded automatically only on the first run.
+    pub is_first_render: bool,
+    pub show_help: bool,
 
     /// Unless the priority order is ascending, moving items will disrupt the order, so lock them.
     pub is_locked: bool,
     /// Global "check all" flag.
     pub check_all: bool,
+    pub prev_table_available_width: f32,
+
     /// mod list fetching message with color
     pub mod_list_msg: (String, Color32),
     pub notify: (String, egui::Color32),
@@ -130,9 +140,6 @@ pub(crate) struct ModManagerApp {
     pub log_lines: Arc<RwLock<Vec<String>>>,
     pub log_watcher_started: bool,
     pub show_log_window: Arc<AtomicBool>,
-    /// It exists because mod_info must be loaded automatically only on the first run.
-    pub is_first_render: bool,
-    pub prev_table_available_width: f32,
 
     /// Represents the current state of the mod list fetching process.
     ///
@@ -181,18 +188,26 @@ impl Default for ModManagerApp {
             // ====================== Non export Settings targets =================================
             //
             async_rt: tokio::runtime::Runtime::new().unwrap(),
+            confirm_dialog: ConfirmDialog::default(),
+
+            is_first_render: true,
+            show_help: false,
+
             is_locked: false,
             check_all: false,
+
             log_lines: Arc::new(RwLock::new(Vec::new())),
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
+            prev_table_available_width: 0.0,
+
             mod_list_msg: (String::new(), egui::Color32::WHITE),
             notify: (String::new(), egui::Color32::WHITE),
-            is_first_render: true,
-            prev_table_available_width: 0.0,
+
             fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
             fetched_mod_info: Arc::new(RwLock::new(vec![])),
             last_fetch_was_empty: false,
+
             patch_status: Arc::new(RwLock::new(None)),
             patch_start_time: None,
         }
@@ -219,6 +234,8 @@ impl App for ModManagerApp {
         self.ui_bottom_panel(ctx);
         self.ui_mod_list(ctx);
         self.ui_log_window(ctx);
+        self.ui_help_window(ctx);
+        self.ui_show_confirm(ctx);
 
         self.is_first_render = false;
     }
@@ -491,6 +508,13 @@ impl ModManagerApp {
                 };
                 ui.add_sized([300.0, 40.0], text_line);
 
+                if ui
+                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::ClearButton)))
+                    .clicked()
+                {
+                    self.filter_text.clear();
+                }
+
                 // Pre-fetch labels to avoid simultaneous borrow of self
                 let all_label = self.t(I18nKey::FilterTextAll).to_string();
                 let id_label = self.t(I18nKey::ColumnId).to_string();
@@ -539,13 +563,6 @@ impl ModManagerApp {
                         );
                     },
                 );
-
-                if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::ClearButton)))
-                    .clicked()
-                {
-                    self.filter_text.clear();
-                }
 
                 if self.is_locked {
                     let lock_button_response = ui
@@ -613,30 +630,10 @@ impl ModManagerApp {
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .button(self.t(I18nKey::IssueReportButton))
-                        .on_hover_text(self.t(I18nKey::IssueReportHover))
+                        .add_sized([30.0, 40.0], egui::Button::new(self.t(I18nKey::HelpButton)))
                         .clicked()
                     {
-                        ui.ctx().open_url(egui::OpenUrl {
-                            url: create_issue_link(self),
-                            new_tab: true,
-                        });
-                    }
-
-                    if ui
-                        .button(self.t(I18nKey::WriteNewI18nJsonButton))
-                        .on_hover_text(self.t(I18nKey::WriteNewI18nJsonHover))
-                        .clicked()
-                    {
-                        match I18nMap::save_translation() {
-                            Ok(()) => self.set_colored_notify(
-                                format!("OK. Wrote {}", I18nMap::FILE),
-                                Color32::GREEN,
-                            ),
-                            Err(err) => {
-                                self.set_colored_notify(err.to_string(), Color32::RED);
-                            }
-                        }
+                        self.show_help = true;
                     }
                 });
             });
@@ -721,6 +718,149 @@ impl ModManagerApp {
                     }
                 },
             );
+        }
+    }
+}
+
+// help modal
+impl ModManagerApp {
+    fn ui_help_window(&mut self, ctx: &egui::Context) {
+        if !self.show_help {
+            return;
+        }
+
+        // Extract all strings/values needed inside the closure upfront
+        // to avoid borrowing `self` inside the `Window::show` closure.
+        let window_title = self.t(I18nKey::HelpButton).to_string();
+        let issue_report_label = self.t(I18nKey::IssueReportButton).to_string();
+        let issue_report_hover = self.t(I18nKey::IssueReportHover).to_string();
+        let write_i18n_label = self.t(I18nKey::WriteNewI18nJsonButton).to_string();
+        let write_i18n_hover = self.t(I18nKey::WriteNewI18nJsonHover).to_string();
+        let issue_url = crate::app::create_issue_link(self);
+
+        let mut show = true;
+        let mut issue_clicked = false;
+        let mut write_i18n_clicked = false;
+
+        egui::Window::new(window_title)
+            .open(&mut show)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                // ── App info ──────────────────────────────────────────
+                ui.vertical_centered(|ui| {
+                    ui.heading(format!("D Merge v{}", env!("CARGO_PKG_VERSION")));
+                });
+                ui.add_space(8.0);
+
+                // ── Links ─────────────────────────────────────────────
+                ui.separator();
+                ui.add_space(4.0);
+
+                egui::Grid::new("help_info_grid").num_columns(2).spacing([8.0, 6.0]).show(
+                    ui,
+                    |ui| {
+                        ui.label("Author:");
+                        ui.label(env!("CARGO_PKG_AUTHORS"));
+                        ui.end_row();
+
+                        ui.label("License:");
+                        const LICENSE_URL: &str = concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/blob/",
+                            env!("CARGO_PKG_VERSION"),
+                            "/LICENSE"
+                        );
+                        ui.hyperlink_to(env!("CARGO_PKG_LICENSE"), LICENSE_URL)
+                            .on_hover_text(LICENSE_URL);
+                        ui.end_row();
+
+                        const SOURCE_CODE_URL: &str = concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/tree/",
+                            env!("CARGO_PKG_VERSION"),
+                        );
+                        ui.label("Source Code:");
+                        ui.hyperlink_to("GitHub", SOURCE_CODE_URL).on_hover_text(SOURCE_CODE_URL);
+                        ui.end_row();
+
+                        ui.label("Change Log:");
+                        const CHANGELOG_URL: &str =
+                            concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md");
+                        ui.hyperlink_to("CHANGELOG.md", CHANGELOG_URL).on_hover_text(CHANGELOG_URL);
+                        ui.end_row();
+
+                        const MOD_TEST_URL: &str = concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/blob/",
+                            env!("CARGO_PKG_VERSION"),
+                            "/docs/test_status.md"
+                        );
+                        ui.label("Mod Test Status:");
+                        ui.hyperlink_to("test_status.md", MOD_TEST_URL).on_hover_text(MOD_TEST_URL);
+                        ui.add_space(4.0);
+                        ui.end_row();
+                    },
+                );
+                ui.add_space(8.0);
+
+                // ── Bug Report ────────────────────────────────────────
+                ui.separator();
+                ui.add_space(4.0);
+
+                ui.label("Bug Report:");
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
+                    ui.hyperlink_to("See Issues", ISSUE_URL).on_hover_text(ISSUE_URL);
+                    if ui.button(&issue_report_label).on_hover_text(&issue_report_hover).clicked() {
+                        issue_clicked = true;
+                    }
+                });
+                ui.add_space(8.0);
+
+                // ── Tooling ───────────────────────────────────────────
+                ui.separator();
+                ui.add_space(4.0);
+
+                ui.label("Tooling:");
+                ui.add_space(4.0);
+                if ui.button(&write_i18n_label).on_hover_text(&write_i18n_hover).clicked() {
+                    write_i18n_clicked = true;
+                }
+                ui.add_space(8.0);
+            });
+
+        // Apply deferred mutations after the closure has released its borrow
+        if !show {
+            self.show_help = false;
+        }
+        if issue_clicked {
+            ctx.open_url(egui::OpenUrl { url: issue_url, new_tab: true });
+        }
+        if write_i18n_clicked {
+            self.confirm_dialog.open(write_i18n_hover, ConfirmAction::WriteI18nJson);
+        }
+    }
+
+    fn ui_show_confirm(&mut self, ctx: &egui::Context) {
+        // Render confirm dialog and capture the confirmed action outside the closure
+        let confirmed_action = {
+            let mut result = None;
+            self.confirm_dialog.show(ctx, |action| {
+                result = Some(action);
+            });
+            result
+        };
+        if let Some(action) = confirmed_action {
+            match action {
+                ConfirmAction::WriteI18nJson => match I18nMap::save_translation() {
+                    Ok(()) => self
+                        .set_colored_notify(format!("OK. Wrote {}", I18nMap::FILE), Color32::GREEN),
+                    Err(err) => self.set_colored_notify(err.to_string(), Color32::RED),
+                },
+            }
         }
     }
 }
