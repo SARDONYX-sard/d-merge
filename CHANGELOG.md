@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-05-17
+### :sparkles: New Features
+- [`fe78d34`](https://github.com/SARDONYX-sard/d-merge/commit/fe78d34b3b9733376f5e01e6bcca499e0af1af27) - use `ahash` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`18e7d1c`](https://github.com/SARDONYX-sard/d-merge/commit/18e7d1c6bc957ee88f58397512c16a2a247ba6fc) - use `rapidhash` (patch time -7s: 14 -> 7s) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`d166513`](https://github.com/SARDONYX-sard/d-merge/commit/d166513aa1d05157151ffc5a3e7d6c1d7ad8d609) - **egui**: implement efficient notifications for patch status *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.6.2] - 2026-05-16
 ### :bug: Bug Fixes
 - [`9a79f23`](https://github.com/SARDONYX-sard/d-merge/commit/9a79f2300b30857d22387a675b4d8937abe17baf) - **egui_i18n**: fix typo *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -463,3 +472,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.5.0...1.6.0
 [1.6.1]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.0...1.6.1
 [1.6.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.1...1.6.2
+[1.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.2...1.7.0
