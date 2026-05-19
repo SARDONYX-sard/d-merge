@@ -633,7 +633,7 @@ impl ModManagerApp {
                         .add_sized([30.0, 40.0], egui::Button::new(self.t(I18nKey::HelpButton)))
                         .clicked()
                     {
-                        self.show_help = true;
+                        self.show_help ^= true; // Intended: toggle
                     }
                 });
             });
