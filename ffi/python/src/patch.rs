@@ -15,7 +15,7 @@ use skyrim_data_dir::Runtime;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object, get_all, set_all)]
 /// A collection of hack options that enable non-standard parsing behavior.
 ///
 /// These options exist to handle cases where game mods or other tools produce
@@ -28,7 +28,6 @@ pub struct HackOptions {
     /// This option activates targeted fixes for common field naming mistakes in patches:
     /// - Substitutes `event` with `contactEvent`
     /// - Substitutes `anotherBoneIndex` with `bones`
-    #[pyo3(get, set)]
     pub cast_ragdoll_event: bool,
 
     /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
@@ -38,12 +37,28 @@ pub struct HackOptions {
     /// at the class field level, which is structurally invalid in normal Nemesis XML.
     ///
     /// For `Precision Creatures` patch.
-    #[pyo3(get, set)]
     pub bone_weight_outside_hkparam: bool,
+}
+#[pyo3_stub_gen::derive::gen_stub_pymethods]
+#[pymethods]
+impl HackOptions {
+    /// Create a new [`HackOptions`].
+    ///
+    /// # Arguments
+    /// - `cast_ragdoll_event`: If true, casts ragdoll events even when the type is ambiguous.
+    /// - `bone_weight_outside_hkparam`: If true, allows bone weights to appear outside of `hkparam` bounds.
+    #[new]
+    #[pyo3(signature = (
+        cast_ragdoll_event = false,
+        bone_weight_outside_hkparam = false
+    ))]
+    const fn new(cast_ragdoll_event: bool, bone_weight_outside_hkparam: bool) -> Self {
+        Self { cast_ragdoll_event, bone_weight_outside_hkparam }
+    }
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object, get_all, set_all)]
 /// A group of flags to enable debug output of intermediate files.
 #[derive(Debug, Clone, Default)]
 pub struct DebugOptions {
@@ -53,26 +68,46 @@ pub struct DebugOptions {
     /// - `patch.json`: The raw parsed patch data.
     ///   - For `One` patches, it reflects the result of priority-based overwriting.
     ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
-    #[pyo3(get, set)]
     pub output_patch_json: bool,
 
     /// If true, outputs the merged JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
     /// This represents the state of the data after all patches have been applied and
     /// conflicts resolved, but before converting to `.hkx` format.
-    #[pyo3(get, set)]
     pub output_merged_json: bool,
 
     /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `<output_dir>/.d_merge`.
     ///
     /// This is the final XML representation of the patched and merged data,
     /// just before conversion to the binary `.hkx` format.
-    #[pyo3(get, set)]
     pub output_merged_xml: bool,
+}
+#[pyo3_stub_gen::derive::gen_stub_pymethods]
+#[pymethods]
+impl DebugOptions {
+    /// Create a new [`DebugOptions`].
+    ///
+    /// # Arguments
+    /// - `output_patch_json`: If true, outputs the patch JSON file for debugging.
+    /// - `output_merged_json`: If true, outputs the merged JSON file for debugging.
+    /// - `output_merged_xml`: If true, outputs the merged XML file for debugging.
+    #[new]
+    #[pyo3(signature = (
+        output_patch_json = false,
+        output_merged_json = false,
+        output_merged_xml = false
+    ))]
+    const fn new(
+        output_patch_json: bool,
+        output_merged_json: bool,
+        output_merged_xml: bool,
+    ) -> Self {
+        Self { output_patch_json, output_merged_json, output_merged_xml }
+    }
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass_enum]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
 /// Behavior Output target
 #[derive(Debug, Clone, Copy, Default)]
 pub enum OutPutTarget {
@@ -84,7 +119,7 @@ pub enum OutPutTarget {
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object, get_all, set_all)]
 /// A configuration structure used to specify various directories and a status report callback.
 ///
 /// The `Config` struct holds paths for input resources and output directories, along with optional
@@ -96,17 +131,14 @@ pub struct Config {
     ///
     /// Typically this is a directory like `assets/templates`. The actual patch target directory
     /// should be a subdirectory such as `assets/templates/meshes`.
-    #[pyo3(get, set)]
     pub resource_dir: String,
 
     /// The directory where the output files will be saved.
     ///
     /// This directory will also contain `.debug` subdirectory if debug output is enabled.
-    #[pyo3(get, set)]
     pub output_dir: String,
 
     /// Generation target
-    #[pyo3(get, set)]
     pub output_target: OutPutTarget,
 
     /// Enables lenient parsing for known issues in unofficial or modded patches.
@@ -114,52 +146,63 @@ pub struct Config {
     /// This setting allows the parser to work around common community patch errors
     /// such as incorrect field names or missing values. Use with caution as it may
     /// mask actual data issues.
-    #[pyo3(get, set)]
     pub hack_options: Option<HackOptions>,
 
     /// Options controlling the output of debug artifacts.
-    #[pyo3(get, set)]
     pub debug: DebugOptions,
 
     /// Skyrim data directories glob (required **only when using FNIS**).
     ///
     /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
     /// entries will not be detected and the process will fail.
-    #[pyo3(get, set)]
     pub skyrim_data_dir_glob: Option<String>,
 
     /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
-    #[pyo3(get, set)]
     pub generate_fnis_esp: Option<bool>,
 }
-
 #[pyo3_stub_gen::derive::gen_stub_pymethods]
 #[pymethods]
 impl Config {
-    /// Create a new Config class.
+    /// Create a new [`Config`].
+    ///
+    /// # Arguments
+    /// - `resource_dir`: The directory containing the HKX templates you want to patch.
+    ///   Typically something like `assets/templates`.
+    /// - `output_dir`: The directory where the output files will be saved.
+    ///   A `.debug` subdirectory will be created here if debug output is enabled.
+    /// - `output_target`: The generation target variant.
+    /// - `hack_options`: Optional lenient-parsing settings for unofficial or modded patches.
+    ///   Pass `None` to disable all workarounds.
+    /// - `debug`: Options controlling the output of debug artifacts. Defaults to all disabled.
+    /// - `skyrim_data_dir_glob`: Glob pattern covering all Skyrim data directories that contain
+    ///   `animations/<namespace>`. Required only when using FNIS.
+    /// - `generate_fnis_esp`: If true, generates a dummy `FNIS.esp` with correct version and
+    ///   author information.
     #[new]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        resource_dir,
+        output_dir,
+        output_target,
+        hack_options = None,
+        debug = None,
+        skyrim_data_dir_glob = None,
+        generate_fnis_esp = None,
+    ))]
     fn new(
         resource_dir: String,
         output_dir: String,
         output_target: OutPutTarget,
-        cast_ragdoll_event: Option<bool>,
-        bone_weight_outside_hkparam: Option<bool>,
-        output_patch_json: bool,
-        output_merged_json: bool,
-        output_merged_xml: bool,
+        hack_options: Option<HackOptions>,
+        debug: Option<DebugOptions>,
         skyrim_data_dir_glob: Option<String>,
         generate_fnis_esp: Option<bool>,
     ) -> Self {
-        Config {
+        Self {
             resource_dir,
             output_dir,
             output_target,
-            hack_options: Some(HackOptions {
-                cast_ragdoll_event: cast_ragdoll_event.unwrap_or_default(),
-                bone_weight_outside_hkparam: bone_weight_outside_hkparam.unwrap_or_default(),
-            }),
-            debug: DebugOptions { output_patch_json, output_merged_json, output_merged_xml },
+            hack_options,
+            debug: debug.unwrap_or_default(),
             skyrim_data_dir_glob,
             generate_fnis_esp,
         }
@@ -167,19 +210,21 @@ impl Config {
 }
 
 impl Config {
-    pub fn try_into_rust(self, status_report: Option<Py<PyAny>>) -> PyResult<RustConfig> {
+    fn try_into_rust(self, status_report: Option<Py<PyAny>>) -> PyResult<RustConfig> {
         // intended:
         // rust closure |status| {
         //     py_fn(status)
         // }
         let status_report = status_report.map(|cb| {
-            Box::new(move |status: RustStatus| {
-                Python::attach(|py| {
-                    if let Err(e) = cb.call1(py, (PatchStatus::from(status),)) {
-                        e.print(py);
-                    }
+            let f: Box<dyn Fn(RustStatus) + Send + Sync + 'static> =
+                Box::new(move |status: RustStatus| {
+                    Python::attach(|py| {
+                        if let Err(e) = cb.call1(py, (PatchStatus::from(status),)) {
+                            tracing::error!("Failed to call status report callback: {e}");
+                        }
+                    });
                 });
-            }) as Box<dyn Fn(RustStatus) + Send + Sync + 'static>
+            f
         });
 
         Ok(RustConfig {
@@ -210,7 +255,7 @@ impl Config {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass_complex_enum]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object, get_all, str)]
 /// Represents the status of a patching process.
 ///
 /// This struct is used to report the current state of the process. Depending on the `event`,
@@ -262,14 +307,18 @@ pub enum PatchStatus {
     Error(String),
 }
 
+// pyclass(str)
+// https://github.com/PyO3/pyo3/pull/4233
+impl core::fmt::Display for PatchStatus {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", RustStatus::from(self))
+    }
+}
+
 #[pyo3_stub_gen::derive::gen_stub_pymethods]
 #[pyo3::pymethods]
 impl PatchStatus {
-    /// Returns a human-readable string representation of the status.
-    fn __str__(&self) -> String {
-        format!("{}", RustStatus::from(self))
-    }
-
     /// Returns a developer-friendly string representation of the status.
     fn __repr__(&self) -> String {
         format!("{self:?}")
@@ -280,22 +329,22 @@ impl From<&PatchStatus> for RustStatus {
     fn from(s: &PatchStatus) -> Self {
         match s.clone() {
             PatchStatus::GeneratingFnisPatches { index, total } => {
-                RustStatus::GeneratingFnisPatches { index: index as usize, total: total as usize }
+                Self::GeneratingFnisPatches { index: index as usize, total: total as usize }
             }
             PatchStatus::ReadingPatches { index, total } => {
-                RustStatus::ReadingPatches { index: index as usize, total: total as usize }
+                Self::ReadingPatches { index: index as usize, total: total as usize }
             }
             PatchStatus::ParsingPatches { index, total } => {
-                RustStatus::ParsingPatches { index: index as usize, total: total as usize }
+                Self::ParsingPatches { index: index as usize, total: total as usize }
             }
             PatchStatus::ApplyingPatches { index, total } => {
-                RustStatus::ApplyingPatches { index: index as usize, total: total as usize }
+                Self::ApplyingPatches { index: index as usize, total: total as usize }
             }
             PatchStatus::GeneratingHkxFiles { index, total } => {
-                RustStatus::GeneratingHkxFiles { index: index as usize, total: total as usize }
+                Self::GeneratingHkxFiles { index: index as usize, total: total as usize }
             }
-            PatchStatus::Done() => RustStatus::Done,
-            PatchStatus::Error(message) => RustStatus::Error(message),
+            PatchStatus::Done() => Self::Done,
+            PatchStatus::Error(message) => Self::Error(message),
         }
     }
 }
@@ -303,22 +352,22 @@ impl From<RustStatus> for PatchStatus {
     fn from(s: RustStatus) -> Self {
         match s {
             RustStatus::GeneratingFnisPatches { index, total } => {
-                PatchStatus::GeneratingFnisPatches { index: index as u32, total: total as u32 }
+                Self::GeneratingFnisPatches { index: index as u32, total: total as u32 }
             }
             RustStatus::ReadingPatches { index, total } => {
-                PatchStatus::ReadingPatches { index: index as u32, total: total as u32 }
+                Self::ReadingPatches { index: index as u32, total: total as u32 }
             }
             RustStatus::ParsingPatches { index, total } => {
-                PatchStatus::ParsingPatches { index: index as u32, total: total as u32 }
+                Self::ParsingPatches { index: index as u32, total: total as u32 }
             }
             RustStatus::ApplyingPatches { index, total } => {
-                PatchStatus::ApplyingPatches { index: index as u32, total: total as u32 }
+                Self::ApplyingPatches { index: index as u32, total: total as u32 }
             }
             RustStatus::GeneratingHkxFiles { index, total } => {
-                PatchStatus::GeneratingHkxFiles { index: index as u32, total: total as u32 }
+                Self::GeneratingHkxFiles { index: index as u32, total: total as u32 }
             }
-            RustStatus::Done => PatchStatus::Done(),
-            RustStatus::Error(message) => PatchStatus::Error(message),
+            RustStatus::Done => Self::Done(),
+            RustStatus::Error(message) => Self::Error(message),
         }
     }
 }
@@ -328,7 +377,7 @@ impl From<RustStatus> for PatchStatus {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
 /// # Note
 /// - Intended `Nemesis_Engine/mods/<id>/info.ini`
 /// - `priority`: As with MO2, lower numbers indicate lower priority, higher numbers indicate higher priority.
@@ -352,7 +401,7 @@ pub struct ModInfo {
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass_enum]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
 /// Mod type. Nemesis, FNIS
 #[derive(Debug, Clone, Copy)]
 pub enum ModType {
@@ -375,16 +424,17 @@ pub enum ModType {
 impl From<RustModType> for ModType {
     fn from(value: RustModType) -> Self {
         match value {
-            RustModType::Nemesis => ModType::Nemesis,
-            RustModType::NemesisExt => ModType::NemesisExt,
-            RustModType::Fnis => ModType::Fnis,
+            RustModType::Nemesis => Self::Nemesis,
+            RustModType::NemesisExt => Self::NemesisExt,
+            RustModType::Fnis => Self::Fnis,
         }
     }
 }
 
 impl From<RustModInfo> for ModInfo {
+    #[inline]
     fn from(m: RustModInfo) -> Self {
-        ModInfo {
+        Self {
             id: m.id,
             name: m.name,
             author: m.author,
@@ -399,19 +449,17 @@ impl From<RustModInfo> for ModInfo {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object, get_all, set_all)]
 /// Mod entries
 #[derive(Debug, Clone, Default)]
 pub struct PatchMaps {
     /// Nemesis patch path
     /// - key: path until mod_code(e.g. `<skyrim_data_dir>/meshes/Nemesis_Engine/mod/slide`)
     /// - value: priority
-    #[pyo3(get, set)]
     pub nemesis_entries: PriorityMap,
     /// FNIS patch path
     /// - key: FNIS namespace(e.g. `namespace` of `<skyrim_data_dir>/path/meshes/actors/character/animations/<namespace>`)
     /// - value: priority
-    #[pyo3(get, set)]
     pub fnis_entries: PriorityMap,
 }
 
@@ -421,13 +469,14 @@ impl PatchMaps {
     /// Create a new class.
     #[new]
     fn new() -> Self {
-        PatchMaps::default()
+        Self::default()
     }
 }
-
-#[inline]
-fn into_rust_priority_map(map: PatchMaps) -> RustPatchMaps {
-    RustPatchMaps { nemesis_entries: map.nemesis_entries, fnis_entries: map.fnis_entries }
+impl From<PatchMaps> for RustPatchMaps {
+    #[inline]
+    fn from(map: PatchMaps) -> Self {
+        Self { nemesis_entries: map.nemesis_entries, fnis_entries: map.fnis_entries }
+    }
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
@@ -450,7 +499,7 @@ pub fn behavior_gen<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     pyo3::Python::initialize();
 
-    let patches = into_rust_priority_map(patch_entries);
+    let patches = patch_entries.into();
     let config: RustConfig = config.try_into_rust(status_fn)?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
@@ -485,7 +534,7 @@ pub fn get_skyrim_data_dir(runtime: OutPutTarget) -> PyResult<String> {
 /// Collect both Nemesis and FNIS mods into a single vector.
 ///
 /// # Errors
-/// Returns [`napi::Error`] if glob expansion fails or files cannot be read.
+/// Returns an error if glob expansion fails or files cannot be read.
 pub fn load_mods_info(glob: String, is_vfs: bool) -> pyo3::PyResult<Vec<ModInfo>> {
     let infos = mod_info::get_all(&glob, is_vfs)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;

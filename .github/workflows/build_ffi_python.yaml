@@ -6,15 +6,9 @@
 name: FFI Python3
 
 on:
-  # TODO: We will consider optimizing it if there is demand
-  # push:
-  #   branches: ["main"]
-  #   paths-ignore:
-  #     - "**/*.md"
-  # pull_request:
-  #   branches: ["*"]
-  #   paths-ignore:
-  #     - "**/*.md"
+  push:
+    tags:
+      - "*"
   workflow_dispatch:
 
 permissions:
@@ -42,7 +36,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: "3.14"
           architecture: ${{ matrix.platform.target }}
 
       - name: Build wheels

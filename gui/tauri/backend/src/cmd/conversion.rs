@@ -1,5 +1,7 @@
+use core::str::FromStr as _;
+
 use rayon::prelude::*;
-use serde_hkx_for_gui::DirEntry;
+use serde_hkx_for_gui::{ConvertError, DirEntry, hkanno::Format};
 use tauri::Window;
 
 use super::sender;
@@ -15,6 +17,9 @@ pub(crate) async fn convert(
     roots: Option<Vec<String>>,
 ) -> Result<(), String> {
     let status_sender = sender(window, "d_merge://progress/convert");
+
+    let format = Format::from_str(format)
+        .map_err(|_| ConvertError::FormatParse { invalid: format.to_string() }.to_string())?;
     let result = serde_hkx_for_gui::convert(inputs, output, format, roots, status_sender).await;
 
     result.map_err(|err| {

@@ -4,7 +4,6 @@ mod par_walk_dir;
 pub mod path;
 pub mod status;
 
-use core::str::FromStr as _;
 use std::path::Path;
 
 use futures::{future::join_all, stream::FuturesUnordered};
@@ -41,12 +40,10 @@ use crate::{hash::hash_djb2, path::infer::generate_output_path};
 pub async fn convert(
     inputs: Vec<String>,
     output: Option<String>,
-    format: &str,
+    format: Format,
     roots: Option<Vec<String>>,
     status_sender: impl Fn(Payload) + Clone + Send + 'static,
 ) -> Result<(), ConvertError> {
-    let format = Format::from_str(format)
-        .map_err(|_| ConvertError::FormatParse { invalid: format.to_string() })?;
     let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
     let strip_roots = roots.unwrap_or_default();
 

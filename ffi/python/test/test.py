@@ -15,26 +15,34 @@ import asyncio
 import time
 
 from d_merge_python import (
+    behavior_gen,
+    change_log_level,
     Config,
+    DebugOptions,
+    HackOptions,
+    logger_init,
     OutPutTarget,
     PatchMaps,
     PatchStatus,
-    behavior_gen,
-    change_log_level,
-    logger_init,
 )
 
 
 def test_behavior_gen():
     config = Config(
         resource_dir="../../resource/assets/templates",
-        cast_ragdoll_event=True,
         output_dir="test/out",
         output_target=OutPutTarget.SkyrimSE,
-        output_patch_json=False,
-        output_merged_json=False,
-        output_merged_xml=False,
+        hack_options=HackOptions(
+            cast_ragdoll_event=True,
+            bone_weight_outside_hkparam=True,
+        ),
+        debug=DebugOptions(
+            # output_patch_json=True,
+            # output_merged_json=True,
+            # output_merged_xml=True,
+        ),
         skyrim_data_dir_glob="../dummy/fnis_test_mods/*",
+        generate_fnis_esp=True,
     )
 
     logger_init("./test/logs", "d_merge_python.log")
@@ -52,9 +60,8 @@ def test_behavior_gen():
     async def run():
         try:
             await behavior_gen(patches, config, status_fn=make_on_status())
-            print("✅ behavior_gen_py executed successfully.")
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"Error: {e}")
 
     asyncio.run(run())
 

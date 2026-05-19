@@ -4,11 +4,13 @@ use pyo3::prelude::*;
 use rayon::prelude::*;
 use serde_hkx_for_gui::{
     DirEntry as RustDirEntry,
+    hkanno::Format as RustFormat,
     status::{Payload as RustPayload, Status as RustStatus},
 };
 
+#[expect(clippy::use_self)]
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
 /// Represents a node in the directory structure.
 #[derive(Debug, Clone)]
 pub struct DirEntry {
@@ -26,7 +28,7 @@ pub struct DirEntry {
 
 impl From<RustDirEntry> for DirEntry {
     fn from(entry: RustDirEntry) -> Self {
-        DirEntry {
+        Self {
             id: entry.path,
             label: entry.name,
             children: entry
@@ -69,7 +71,7 @@ pub fn convert(
 
     inputs: Vec<String>,
     output: Option<String>,
-    format: String,
+    format: Format,
     roots: Option<Vec<String>>,
     #[gen_stub(override_type(type_repr="typing.Optional[collections.abc.Callable[[Payload], None]]", imports=("collections.abc", "typing")))]
     progress: Option<Py<PyAny>>,
@@ -86,23 +88,55 @@ pub fn convert(
 
             // Return a closure that clones the Arc and calls it
             move |payload: RustPayload| {
-                let arc_cb = arc_cb.clone();
+                let arc_cb = Arc::clone(&arc_cb);
                 (arc_cb)(payload);
             }
         });
+        let format = format.into();
 
         match progress {
             Some(progress) => {
-                serde_hkx_for_gui::convert(inputs, output, &format, roots, progress).await
+                serde_hkx_for_gui::convert(inputs, output, format, roots, progress).await
             }
-            None => serde_hkx_for_gui::convert(inputs, output, &format, roots, |_| {}).await,
+            None => serde_hkx_for_gui::convert(inputs, output, format, roots, |_| {}).await,
         }
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
     })
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass_enum]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
+/// Behavior Output target
+#[derive(Debug, Clone, Copy, Default)]
+pub enum Format {
+    /// 64bit hkx
+    #[default]
+    Amd64,
+    /// 32bit hkx
+    Win32,
+    /// XML
+    Xml,
+
+    /// json
+    Json,
+    /// toml
+    Toml,
+}
+impl From<Format> for RustFormat {
+    #[inline]
+    fn from(fmt: Format) -> Self {
+        match fmt {
+            Format::Amd64 => Self::Amd64,
+            Format::Win32 => Self::Win32,
+            Format::Xml => Self::Xml,
+            Format::Json => Self::Json,
+            Format::Toml => Self::Toml,
+        }
+    }
+}
+
+#[pyo3_stub_gen::derive::gen_stub_pyclass_enum]
+#[pyo3::pyclass(from_py_object)]
 /// Represents the progress status of a conversion task.
 ///
 /// The numeric representation (`u8`) is serialized and deserialized directly,
@@ -123,7 +157,7 @@ pub enum SerdeHkxStatus {
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyclass]
-#[pyo3::pyclass]
+#[pyo3::pyclass(from_py_object)]
 /// Payload for progress reporting
 #[derive(Debug, Clone)]
 pub struct Payload {
@@ -141,10 +175,10 @@ pub struct Payload {
     pub status: SerdeHkxStatus,
 }
 
-// Rust Payload → JsPayload
 impl From<RustPayload> for Payload {
+    #[inline]
     fn from(p: RustPayload) -> Self {
-        Payload {
+        Self {
             path_id: p.path_id,
             status: match p.status {
                 RustStatus::Pending => SerdeHkxStatus::Pending,
