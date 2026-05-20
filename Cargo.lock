@@ -1433,6 +1433,7 @@ dependencies = [
  "rayon",
  "rfd 0.15.4",
  "rfd 0.17.2",
+ "semver",
  "serde",
  "skyrim_data_dir",
  "snafu",

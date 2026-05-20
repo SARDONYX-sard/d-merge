@@ -33,9 +33,10 @@ open = { version = "5.3.5" }
 parking_lot = "0.12.5"
 rapidhash = { workspace = true }
 rayon = { workspace = true }
+semver = { version = "1.0.28", features = ["serde"] }
 serde = { workspace = true }
-sonic-rs = { workspace = true }
 snafu = { workspace = true }
+sonic-rs = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

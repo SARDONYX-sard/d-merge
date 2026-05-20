@@ -9,11 +9,13 @@ mod mod_item;
 mod settings;
 mod ui;
 
-use app::ModManagerApp;
+use app::App;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+pub(crate) const APP_TITLE: &str = concat!("D Merge v", env!("CARGO_PKG_VERSION"));
 
 /// Application entry point.
 ///
@@ -42,7 +44,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
-            title: Some(format!("D Merge v{}", env!("CARGO_PKG_VERSION"))),
+            title: Some(APP_TITLE.to_string()),
             app_id: Some("D Merge".to_string()),
             position: Some(egui::Pos2::new(settings.window_pos_x, settings.window_pos_y)),
             transparent: Some(true),
@@ -60,11 +62,13 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "D Merge",
+        APP_TITLE,
         options,
         Box::new(|cc| {
             fonts::setup_custom_fonts(&cc.egui_ctx, settings.font_path.as_ref());
-            Ok(Box::new(ModManagerApp::from(settings)))
+            cc.egui_ctx.set_theme(settings.theme);
+
+            Ok(Box::new(App::from_settings(settings)))
         }),
     )
 }

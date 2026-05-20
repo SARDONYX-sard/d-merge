@@ -1,6 +1,11 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use indexmap::IndexMap;
+use rayon::prelude::*;
+use snafu::ResultExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, egui_derive::I18n)]
@@ -77,6 +82,18 @@ pub(crate) enum I18nKey {
 
     /// Help
     HelpButton,
+
+    /// New I18n
+    I18nWriteNewJsonButton,
+
+    /// Write the new English translation file.
+    I18nWriteNewJsonHover,
+
+    /// Reload I18n
+    I18nReloadJsonButton,
+
+    /// Reload the translation file. This is useful for previewing translations without restarting the application.
+    I18nReloadJsonHover,
 
     /// Report Issue
     IssueReportButton,
@@ -193,10 +210,17 @@ pub(crate) enum I18nKey {
     /// Reading templates and patches...
     StatusReadingPatches,
 
+    /// Toggle between Dark, Light, and System themes.
+    /// - NOTE: Using Light theme and the transparent background feature at the same time makes the screen very hard to read.
+    ThemeHover,
+
+    /// Theme:
+    ThemeLabel,
+
     /// Transparent
     Transparent,
 
-    /// Toggle Transparent window
+    /// Enable transparent background. This makes the background of the application transparent, allowing you to see the desktop or other windows behind it.
     TransparentHover,
 
     /// VFS mode
@@ -204,12 +228,6 @@ pub(crate) enum I18nKey {
 
     /// When booting using MO2's VFS, etc.
     VfsModeHover,
-
-    /// New I18n
-    WriteNewI18nJsonButton,
-
-    /// Write the new translation file (English) to `./.d_merge/translation.json`. The changes will be loaded when you restart the application.
-    WriteNewI18nJsonHover,
 
     // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
     /// Invalid key comes here when deserializing unknown strings.
@@ -235,54 +253,52 @@ impl I18nMap {
 
     /// Try to load `./.d_merge/translation.json`.
     /// If not exists or failed to parse, fallback to `default_map()`.
-    pub(crate) fn load_translation() -> Self {
-        use std::{fs, path::Path};
+    pub(crate) fn load<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
 
-        let i18n_file = Self::FILE;
-
-        if !Path::new(i18n_file).exists() {
-            tracing::warn!("{i18n_file} does not exist. Use default translation.");
-            return Self::new();
+        if !path.exists() {
+            tracing::warn!("translation.json does not exist");
+            return Ok(Self::new());
         }
 
-        fs::read_to_string(i18n_file)
-            .map_err(|err| {
-                tracing::error!("Failed to read translation.json: {err}. Fallback to default.");
-            })
-            .ok()
-            .and_then(|content| {
-                sonic_rs::from_str::<Self>(&content)
-                    .map_err(|err| {
-                        tracing::error!(
-                            "Failed to parse translation.json: {err}. Fallback to default."
-                        );
-                    })
-                    .ok()
-            })
-            .unwrap_or_default()
+        let content = std::fs::read_to_string(path).with_context(|_| ReadFileSnafu { path })?;
+        let map: Self = sonic_rs::from_str(&content).with_context(|_| ParseJsonSnafu { path })?;
+        Ok(map)
     }
 
-    /// Try save `./.d_merge/translation.json`.
-    pub(crate) fn save_translation() -> Result<(), nemesis_merge::errors::Error> {
-        use std::{fs, path::PathBuf};
-        let i18n_file = Self::FILE;
+    /// Save translation.json
+    pub(crate) fn save<P>(path: P) -> Result<(), Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
 
-        let mut map = Self::new();
-        for key in I18nKey::ALL {
-            map.0.insert(*key, Cow::Borrowed(key.default_eng()));
-        }
+        let map = Self(
+            I18nKey::ALL.par_iter().map(|key| (*key, Cow::Borrowed(key.default_eng()))).collect(),
+        );
 
-        let text = sonic_rs::to_string_pretty(&map).map_err(|e| {
-            tracing::error!("Failed to parse translation as JSON: {e}");
-            nemesis_merge::errors::Error::JsonError { path: PathBuf::from(Self::FILE), source: e }
-        })?;
-
-        fs::write(i18n_file, text).map_err(|e| {
-            tracing::error!("Failed to save translation.json: {e}");
-            nemesis_merge::errors::Error::FailedIo { path: PathBuf::from(Self::FILE), source: e }
-        })?;
+        let text = sonic_rs::to_string_pretty(&map).context(SerializeJsonSnafu { path })?;
+        std::fs::write(path, text).context(WriteFileSnafu { path })?;
         Ok(())
     }
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub(crate) enum Error {
+    #[snafu(display("Failed to read file: {}", path.display()))]
+    ReadFile { path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to write file: {}", path.display()))]
+    WriteFile { path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to parse json: {}", path.display()))]
+    ParseJson { path: PathBuf, source: sonic_rs::Error },
+
+    #[snafu(display("Failed to serialize json: {}", path.display()))]
+    SerializeJson { path: PathBuf, source: sonic_rs::Error },
 }
 
 pub(crate) fn status_to_text(

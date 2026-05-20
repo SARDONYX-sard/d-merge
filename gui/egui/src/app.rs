@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use eframe::{App, Frame, egui};
+use eframe::{Frame, egui};
 use egui::{Checkbox, Color32, Separator};
 use parking_lot::RwLock;
 use rayon::prelude::*;
@@ -15,6 +15,7 @@ use crate::{
     i18n::{I18nKey, I18nMap},
     log::get_log_dir,
     mod_item::{ModItem, SortColumn, inherit_reorder_cast, to_patches},
+    settings::{AppSettings, Theme},
     ui::{
         confirm::{ConfirmAction, ConfirmDialog},
         dnd_table::{check_only_table_body, dnd_table_body},
@@ -71,55 +72,11 @@ pub(crate) enum FetchState {
 }
 
 /// Main application state for Mod Manager.
-pub(crate) struct ModManagerApp {
-    /// Execution mode. VFS or not
-    pub mode: DataMode,
-    /// Target Skyrim runtime when behavior generation. SE or LE
-    pub target_runtime: skyrim_data_dir::Runtime,
-
-    /// Windows users can automatically read from the registry, but Unix-based OS users need to set the path manually.
-    pub vfs_skyrim_data_dir: String,
-    /// Mod list when booting with vfs in MO2.
-    ///
-    /// (The IDs in this list do not overlap, so Settings can be reused on other PCs.)
-    pub vfs_mod_list: Vec<ModItem>,
-
-    /// Skyrim data dir(When use manually specified mode)
-    pub skyrim_data_dir: String,
-    /// Mod List when using manually.
-    ///
-    /// (The IDs in this list may be duplicated, so they are absolute paths,
-    /// and cannot be reused on other PCs unless the path, including the drive letter, is the same.)
-    pub mod_list: Vec<ModItem>,
-
-    /// The directory containing the HKX templates you want to patch.
-    ///
-    /// Typically this is a directory like `assets/templates`. The actual patch target directory
-    /// should be a subdirectory such as `assets/templates/meshes`.
-    pub template_dir: String,
-    pub output_dir: String,
-    /// Output d merge patches & merged json files.(To <Output dir>/.d_merge/patches/.debug)
-    pub enable_debug_output: bool,
-    pub auto_remove_meshes: bool,
-    /// If true, generates a FNIS.esp(dummy ESP) file.
-    pub generate_fnis_esp: bool,
-
-    /// Once the mod list has been updated, enable all mods and run the patch once.
-    pub auto_run: bool,
-    pub filter_column: Option<SortColumn>,
-    pub filter_text: String,
-    pub font_path: Option<PathBuf>,
-    pub i18n: Arc<I18nMap>,
-    pub last_window_maximized: bool,
-    pub last_window_pos: egui::Pos2,
-    pub last_window_size: egui::Vec2,
-    pub log_level: LogLevel,
-    pub sort_asc: bool,
-    pub sort_column: SortColumn,
-    pub transparent: bool,
+pub(crate) struct App {
+    pub settings: AppSettings,
 
     // ====================== Non export Settings targets =================================
-    //
+    i18n: Arc<I18nMap>,
     pub async_rt: tokio::runtime::Runtime,
     pub confirm_dialog: ConfirmDialog,
 
@@ -154,39 +111,18 @@ pub(crate) struct ModManagerApp {
     pub patch_start_time: Option<std::time::Instant>,
 }
 
-impl Default for ModManagerApp {
-    fn default() -> Self {
+impl App {
+    pub(crate) fn from_settings(settings: AppSettings) -> Self {
+        let i18n = I18nMap::load(settings.i18n_path.as_ref()).unwrap_or_else(|e| {
+            tracing::error!("Failed to load i18n map: {e}\nFallback to default");
+            I18nMap::new()
+        });
+
         Self {
-            // == For Settings targets ==
-            mode: DataMode::Vfs,
-            target_runtime: skyrim_data_dir::Runtime::Se,
-            enable_debug_output: false,
-            auto_remove_meshes: true,
-            generate_fnis_esp: false,
-
-            vfs_skyrim_data_dir: String::new(),
-            vfs_mod_list: vec![],
-
-            skyrim_data_dir: String::new(),
-            mod_list: vec![],
-
-            template_dir: String::new(),
-            output_dir: String::new(),
-            filter_text: String::new(),
-            filter_column: None,
-            sort_column: SortColumn::Priority,
-            sort_asc: true,
-            i18n: Arc::new(I18nMap::load_translation()),
-            log_level: LogLevel::Debug,
-            auto_run: false,
-            transparent: true,
-            last_window_size: egui::Vec2::ZERO,
-            last_window_pos: egui::Pos2::ZERO,
-            last_window_maximized: false,
-            font_path: None,
+            settings,
 
             // ====================== Non export Settings targets =================================
-            //
+            i18n: Arc::new(i18n),
             async_rt: tokio::runtime::Runtime::new().unwrap(),
             confirm_dialog: ConfirmDialog::default(),
 
@@ -214,7 +150,7 @@ impl Default for ModManagerApp {
     }
 }
 
-impl App for ModManagerApp {
+impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
         self.poll_fetch_result();
         self.poll_patch_result();
@@ -240,23 +176,20 @@ impl App for ModManagerApp {
         self.is_first_render = false;
     }
 
-    // Called when the app is about to close
-    //
-    // NOTE: Using mem take!
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        let settings = crate::settings::AppSettings::from(core::mem::take(self));
-        settings.save();
+        self.settings.save();
     }
 }
 
-impl ModManagerApp {
+impl App {
     /// Start watcher for Log viewer.
     fn start_log_watcher(&mut self, ctx: &egui::Context) {
         if !self.log_watcher_started {
             let log_lines = Arc::clone(&self.log_lines);
             let ctx = ctx.clone();
 
-            let log_path = crate::log::get_log_dir(&self.output_dir).join(crate::log::LOG_FILENAME);
+            let log_path = crate::log::get_log_dir(self.settings.current_output_dir())
+                .join(crate::log::LOG_FILENAME);
             if let Err(err) = crate::log::start_log_tail(&log_path, log_lines, Some(ctx)) {
                 tracing::error!("Couldn't start log watcher: {err}");
             };
@@ -275,8 +208,14 @@ impl ModManagerApp {
 
             if let Some(view_info) = i.raw.viewports.get(&egui::ViewportId::ROOT) {
                 temp_maximized = Some(view_info.maximized.unwrap_or(false));
+
+                // Use inner_rect for size (matches inner_size used at startup)
+                if let Some(inner_rect) = view_info.inner_rect {
+                    temp_size = Some(inner_rect.size());
+                }
+
+                // Use outer_rect only for position (window origin including decorations)
                 if let Some(outer_rect) = view_info.outer_rect {
-                    temp_size = Some(outer_rect.size());
                     temp_pos = Some(outer_rect.min);
                 }
             }
@@ -284,20 +223,27 @@ impl ModManagerApp {
             (temp_pos, temp_size, temp_maximized)
         });
 
-        if let Some(pos) = pos {
-            self.last_window_pos = pos;
-        }
-        if let Some(size) = size {
-            self.last_window_size = size;
+        // Only update pos/size when NOT maximized, to avoid saving
+        // the restored-but-not-yet-settled geometry on minimize/restore cycles.
+        let is_maximized = self.settings.window_maximized;
+        if !is_maximized {
+            if let Some(pos) = pos {
+                self.settings.window_pos_x = pos.x;
+                self.settings.window_pos_y = pos.y;
+            }
+            if let Some(size) = size {
+                self.settings.window_width = size.x;
+                self.settings.window_height = size.y;
+            }
         }
         if let Some(max) = maximized {
-            self.last_window_maximized = max;
+            self.settings.window_maximized = max;
         }
     }
 
     fn ui_execution_mode(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_execution_mode");
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -310,14 +256,14 @@ impl ModManagerApp {
 
                 ui.label(self.t(I18nKey::ExecutionModeLabel));
                 if ui
-                    .radio_value(&mut self.mode, DataMode::Vfs, vfs_mode_label)
+                    .radio_value(&mut self.settings.mode, DataMode::Vfs, vfs_mode_label)
                     .on_hover_text(vfs_mode_hover)
                     .clicked()
                 {
                     self.update_mod_list();
                 };
                 if ui
-                    .radio_value(&mut self.mode, DataMode::Manual, manual_mode_label)
+                    .radio_value(&mut self.settings.mode, DataMode::Manual, manual_mode_label)
                     .on_hover_text(manual_mode_hover)
                     .clicked()
                 {
@@ -330,30 +276,53 @@ impl ModManagerApp {
 
                 let debug_output_label = self.t(I18nKey::DebugOutput).to_string();
                 let debug_output_hover = self.t(I18nKey::DebugOutputHover).to_string();
-                ui.checkbox(&mut self.enable_debug_output, debug_output_label)
+                ui.checkbox(&mut self.settings.enable_debug_output, debug_output_label)
                     .on_hover_text(debug_output_hover);
 
                 let auto_remove_meshes_label = self.t(I18nKey::AutoRemoveMeshes).to_string();
                 let auto_remove_meshes_hover = self.t(I18nKey::AutoRemoveMeshesHover).to_string();
-                ui.checkbox(&mut self.auto_remove_meshes, auto_remove_meshes_label)
+                ui.checkbox(&mut self.settings.auto_remove_meshes, auto_remove_meshes_label)
                     .on_hover_text(auto_remove_meshes_hover);
 
                 let generate_fnis_esp_label = self.t(I18nKey::GenerateFnisEspLabel).to_string();
                 let generate_fnis_esp_hover = self.t(I18nKey::GenerateFnisEspHover).to_string();
-                ui.checkbox(&mut self.generate_fnis_esp, generate_fnis_esp_label)
+                ui.checkbox(&mut self.settings.generate_fnis_esp, generate_fnis_esp_label)
                     .on_hover_text(generate_fnis_esp_hover);
 
                 ui.add_space(30.0);
 
                 let transparent_label = self.t(I18nKey::Transparent).to_string();
                 let transparent_hover = self.t(I18nKey::TransparentHover).to_string();
-                ui.checkbox(&mut self.transparent, transparent_label)
+                ui.checkbox(&mut self.settings.transparent, transparent_label)
                     .on_hover_text(transparent_hover);
 
                 let auto_run_label = self.t(I18nKey::AutoRun).to_string();
                 let auto_run_hover = self.t(I18nKey::AutoRunHover).to_string();
-                ui.checkbox(&mut self.auto_run, auto_run_label).on_hover_text(auto_run_hover);
+                ui.checkbox(&mut self.settings.auto_run, auto_run_label)
+                    .on_hover_text(auto_run_hover);
+                self.ui_theme_box(ui);
             });
+        });
+    }
+
+    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(self.t(I18nKey::ThemeLabel)).on_hover_text(self.t(I18nKey::ThemeHover));
+
+            egui::ComboBox::from_id_salt("theme")
+                .selected_text(self.settings.theme.as_str())
+                .show_ui(ui, |ui| {
+                    let themes: [Theme; 3] = [Theme::System, Theme::Dark, Theme::Light];
+
+                    for theme in themes {
+                        if ui
+                            .selectable_value(&mut self.settings.theme, theme, theme.as_str())
+                            .changed()
+                        {
+                            ui.ctx().set_theme(self.settings.theme);
+                        }
+                    }
+                });
         });
     }
 
@@ -363,7 +332,7 @@ impl ModManagerApp {
                 .on_hover_text(self.t(I18nKey::RuntimeTargetHover));
 
             egui::ComboBox::from_id_salt("skyrim_runtime_target")
-                .selected_text(self.target_runtime.as_str())
+                .selected_text(self.settings.target_runtime.as_str())
                 .show_ui(ui, |ui| {
                     let runtimes = [
                         (skyrim_data_dir::Runtime::Le, "SkyrimLE"),
@@ -371,8 +340,10 @@ impl ModManagerApp {
                         (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
                     ];
                     for (runtime, label) in runtimes {
-                        if ui.selectable_value(&mut self.target_runtime, runtime, label).changed()
-                            && self.mode == DataMode::Vfs
+                        if ui
+                            .selectable_value(&mut self.settings.target_runtime, runtime, label)
+                            .changed()
+                            && self.settings.mode == DataMode::Vfs
                         {
                             #[cfg(target_os = "windows")]
                             self.update_vfs_skyrim_data_dir_by_reg();
@@ -385,14 +356,15 @@ impl ModManagerApp {
     /// Skyrim data directory selection panel.
     fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_data_dir");
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
-                    && let Err(err) = open_existing_dir_or_ancestor(self.current_skyrim_data_dir())
+                    && let Err(err) =
+                        open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
                 {
                     self.set_colored_notify(err, Color32::RED);
                 };
@@ -401,7 +373,7 @@ impl ModManagerApp {
 
                 // NOTE: Due to the need to read the registry, it only works on Windows and is meaningless unless in VFS state.
                 #[cfg(target_os = "windows")]
-                if self.mode == DataMode::Vfs
+                if self.settings.mode == DataMode::Vfs
                     && ui
                         .add_sized(
                             [60.0, 40.0],
@@ -417,20 +389,21 @@ impl ModManagerApp {
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
                     .clicked()
                 {
-                    let dialog = match find_existing_dir_or_ancestor(self.current_skyrim_data_dir())
-                    {
+                    let dialog = match find_existing_dir_or_ancestor(
+                        self.settings.current_skyrim_data_dir(),
+                    ) {
                         Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                         Err(_) => rfd::FileDialog::new(),
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        match self.mode {
+                        match self.settings.mode {
                             DataMode::Vfs => {
-                                self.vfs_skyrim_data_dir = dir.display().to_string();
+                                self.settings.vfs_skyrim_data_dir = dir.display().to_string();
                                 self.update_mod_list();
                             }
                             DataMode::Manual => {
-                                self.skyrim_data_dir = dir.display().to_string();
+                                self.settings.skyrim_data_dir = dir.display().to_string();
                                 self.update_mod_list();
                             }
                         };
@@ -442,8 +415,9 @@ impl ModManagerApp {
 
     /// Output directory selection panel.
     fn ui_output_dir(&mut self, ctx: &egui::Context) {
+        let use_transparent = self.settings.transparent; // To avoid ownership
         let mut panel = egui::TopBottomPanel::top("top_output_dir");
-        if self.transparent {
+        if use_transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -451,12 +425,13 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 let output_dir_label = self.t(I18nKey::OutputDirLabel);
                 if ui.button(output_dir_label).clicked()
-                    && let Err(err) = open_existing_dir_or_ancestor(Path::new(&self.output_dir))
+                    && let Err(err) =
+                        open_existing_dir_or_ancestor(Path::new(self.settings.current_output_dir()))
                 {
                     self.set_colored_notify(err, Color32::RED);
                 };
-                let text_line = egui::TextEdit::singleline(&mut self.output_dir);
-                let text_line = if self.transparent {
+                let text_line = egui::TextEdit::singleline(self.settings.current_output_dir_mut());
+                let text_line = if use_transparent {
                     text_line.background_color(egui::Color32::TRANSPARENT)
                 } else {
                     text_line
@@ -467,9 +442,9 @@ impl ModManagerApp {
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
                     .clicked()
                 {
-                    let dialog = if !self.output_dir.is_empty() {
+                    let dialog = if !self.settings.current_output_dir().is_empty() {
                         // NOTE: For some reason, we can't reach the path correctly without using canonicalize.
-                        match find_existing_dir_or_ancestor(&self.output_dir) {
+                        match find_existing_dir_or_ancestor(self.settings.current_output_dir()) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
                                 let err = format!("Couldn't find output dir or ancestor: {err}");
@@ -482,7 +457,7 @@ impl ModManagerApp {
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        self.output_dir = dir.display().to_string();
+                        *self.settings.current_output_dir_mut() = dir.display().to_string();
                     }
                 }
             });
@@ -492,7 +467,7 @@ impl ModManagerApp {
     /// Search & lock panel.
     fn ui_search_panel(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_panel");
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -500,8 +475,8 @@ impl ModManagerApp {
             ui.horizontal(|ui| {
                 ui.label(self.t(I18nKey::SearchLabel));
 
-                let text_line = egui::TextEdit::singleline(&mut self.filter_text);
-                let text_line = if self.transparent {
+                let text_line = egui::TextEdit::singleline(&mut self.settings.filter_text);
+                let text_line = if self.settings.transparent {
                     text_line.background_color(egui::Color32::TRANSPARENT)
                 } else {
                     text_line
@@ -512,7 +487,7 @@ impl ModManagerApp {
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::ClearButton)))
                     .clicked()
                 {
-                    self.filter_text.clear();
+                    self.settings.filter_text.clear();
                 }
 
                 // Pre-fetch labels to avoid simultaneous borrow of self
@@ -523,7 +498,7 @@ impl ModManagerApp {
                 let site_label = self.t(I18nKey::ColumnSite).to_string();
                 let priority_label = self.t(I18nKey::ColumnPriority).to_string();
 
-                let selected_text = match self.filter_column {
+                let selected_text = match self.settings.filter_column {
                     None => all_label.clone(),
                     Some(SortColumn::Id) => id_label.clone(),
                     Some(SortColumn::Name) => name_label.clone(),
@@ -535,29 +510,29 @@ impl ModManagerApp {
                 egui::ComboBox::from_id_salt("filter_column").selected_text(selected_text).show_ui(
                     ui,
                     |ui| {
-                        ui.selectable_value(&mut self.filter_column, None, &all_label);
+                        ui.selectable_value(&mut self.settings.filter_column, None, &all_label);
                         ui.selectable_value(
-                            &mut self.filter_column,
+                            &mut self.settings.filter_column,
                             Some(SortColumn::Id),
                             &id_label,
                         );
                         ui.selectable_value(
-                            &mut self.filter_column,
+                            &mut self.settings.filter_column,
                             Some(SortColumn::Name),
                             &name_label,
                         );
                         ui.selectable_value(
-                            &mut self.filter_column,
+                            &mut self.settings.filter_column,
                             Some(SortColumn::ModType),
                             &mod_type_label,
                         );
                         ui.selectable_value(
-                            &mut self.filter_column,
+                            &mut self.settings.filter_column,
                             Some(SortColumn::Site),
                             &site_label,
                         );
                         ui.selectable_value(
-                            &mut self.filter_column,
+                            &mut self.settings.filter_column,
                             Some(SortColumn::Priority),
                             &priority_label,
                         );
@@ -579,7 +554,7 @@ impl ModManagerApp {
     /// Notification bar at bottom.
     fn ui_notification(&self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::bottom("notification_panel");
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -591,7 +566,7 @@ impl ModManagerApp {
     /// Bottom panel with buttons (Log, Patch).
     fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::bottom("bottom_panel");
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -600,7 +575,9 @@ impl ModManagerApp {
                 self.ui_log_level_box(ui);
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
-                    if let Err(err) = open_existing_dir_or_ancestor(get_log_dir(&s.output_dir)) {
+                    if let Err(err) =
+                        open_existing_dir_or_ancestor(get_log_dir(s.settings.current_output_dir()))
+                    {
                         s.set_colored_notify(err, Color32::RED);
                     }
                 });
@@ -655,7 +632,7 @@ impl ModManagerApp {
             ui.label(self.t(I18nKey::LogLevelLabel));
 
             egui::ComboBox::from_id_salt("log_level")
-                .selected_text(self.log_level.as_str())
+                .selected_text(self.settings.log_level.as_str())
                 .show_ui(ui, |ui| {
                     let levels: [(LogLevel, &'static str); 5] = [
                         (LogLevel::Error, "Error"),
@@ -666,7 +643,8 @@ impl ModManagerApp {
                     ];
 
                     for (level, label) in levels {
-                        if ui.selectable_value(&mut self.log_level, level, label).changed() {
+                        if ui.selectable_value(&mut self.settings.log_level, level, label).changed()
+                        {
                             tracing_rotation::change_level(level.as_str()).unwrap();
                         }
                     }
@@ -723,7 +701,7 @@ impl ModManagerApp {
 }
 
 // help modal
-impl ModManagerApp {
+impl App {
     fn ui_help_window(&mut self, ctx: &egui::Context) {
         if !self.show_help {
             return;
@@ -734,13 +712,24 @@ impl ModManagerApp {
         let window_title = self.t(I18nKey::HelpButton).to_string();
         let issue_report_label = self.t(I18nKey::IssueReportButton).to_string();
         let issue_report_hover = self.t(I18nKey::IssueReportHover).to_string();
-        let write_i18n_label = self.t(I18nKey::WriteNewI18nJsonButton).to_string();
-        let write_i18n_hover = self.t(I18nKey::WriteNewI18nJsonHover).to_string();
-        let issue_url = crate::app::create_issue_link(self);
+
+        let select_button = self.t(I18nKey::SelectButton).to_string();
+        let i18n_write_label = self.t(I18nKey::I18nWriteNewJsonButton).to_string();
+        let i18n_write_hover = format!(
+            "{}(path: {})",
+            self.t(I18nKey::I18nWriteNewJsonHover),
+            self.settings.i18n_path
+        );
+        let i18n_reload_label = self.t(I18nKey::I18nReloadJsonButton).to_string();
+        let i18n_reload_hover =
+            format!("{}(path: {})", self.t(I18nKey::I18nReloadJsonHover), self.settings.i18n_path);
+        let issue_url = self.settings.create_issue_link();
 
         let mut show = true;
         let mut issue_clicked = false;
+        let mut selected_i18n_path = self.settings.i18n_path.clone();
         let mut write_i18n_clicked = false;
+        let mut reload_i18n_clicked = false;
 
         egui::Window::new(window_title)
             .open(&mut show)
@@ -750,7 +739,7 @@ impl ModManagerApp {
             .show(ctx, |ui| {
                 // ── App info ──────────────────────────────────────────
                 ui.vertical_centered(|ui| {
-                    ui.heading(format!("D Merge v{}", env!("CARGO_PKG_VERSION")));
+                    ui.heading(crate::APP_TITLE);
                 });
                 ui.add_space(8.0);
 
@@ -826,10 +815,36 @@ impl ModManagerApp {
 
                 ui.label("Tooling:");
                 ui.add_space(4.0);
-                if ui.button(&write_i18n_label).on_hover_text(&write_i18n_hover).clicked() {
-                    write_i18n_clicked = true;
-                }
-                ui.add_space(8.0);
+
+                ui.horizontal(|ui| {
+                    ui.label("I18n Path: ");
+                    ui.text_edit_singleline(&mut selected_i18n_path);
+
+                    if ui.button(select_button).clicked()
+                        && let Some(path) = {
+                            let path = Path::new(self.settings.i18n_path.as_ref());
+                            match path.parent() {
+                                Some(parent) if parent.exists() => {
+                                    rfd::FileDialog::new().set_directory(parent)
+                                }
+                                _ => rfd::FileDialog::new(),
+                            }
+                            .add_filter("translation.json", &["json"])
+                            .pick_file()
+                        }
+                    {
+                        selected_i18n_path = path.display().to_string().into();
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    if ui.button(&i18n_write_label).on_hover_text(&i18n_write_hover).clicked() {
+                        write_i18n_clicked = true;
+                    }
+                    if ui.button(&i18n_reload_label).on_hover_text(&i18n_reload_hover).clicked() {
+                        reload_i18n_clicked = true;
+                    }
+                });
             });
 
         // Apply deferred mutations after the closure has released its borrow
@@ -839,8 +854,30 @@ impl ModManagerApp {
         if issue_clicked {
             ctx.open_url(egui::OpenUrl { url: issue_url, new_tab: true });
         }
+        if self.settings.i18n_path != selected_i18n_path {
+            self.settings.i18n_path = selected_i18n_path;
+            self.reload_i18n();
+        }
         if write_i18n_clicked {
-            self.confirm_dialog.open(write_i18n_hover, ConfirmAction::WriteI18nJson);
+            self.confirm_dialog.open(i18n_write_hover, ConfirmAction::WriteI18nJson);
+        }
+        if reload_i18n_clicked {
+            self.reload_i18n();
+        }
+    }
+
+    fn reload_i18n(&mut self) {
+        match I18nMap::load(self.settings.i18n_path.as_ref()) {
+            Ok(i18n) => {
+                self.i18n = Arc::new(i18n);
+                self.set_colored_notify(
+                    format!("Reloaded {}", self.settings.i18n_path),
+                    Color32::GREEN,
+                );
+            }
+            Err(err) => {
+                self.set_colored_notify(format!("Failed to reload: {err}"), Color32::RED);
+            }
         }
     }
 
@@ -855,21 +892,25 @@ impl ModManagerApp {
         };
         if let Some(action) = confirmed_action {
             match action {
-                ConfirmAction::WriteI18nJson => match I18nMap::save_translation() {
-                    Ok(()) => self
-                        .set_colored_notify(format!("OK. Wrote {}", I18nMap::FILE), Color32::GREEN),
-                    Err(err) => self.set_colored_notify(err.to_string(), Color32::RED),
-                },
+                ConfirmAction::WriteI18nJson => {
+                    match I18nMap::save(self.settings.i18n_path.as_ref()) {
+                        Ok(()) => self.set_colored_notify(
+                            format!("OK. Wrote {}", self.settings.i18n_path),
+                            Color32::GREEN,
+                        ),
+                        Err(err) => self.set_colored_notify(err.to_string(), Color32::RED),
+                    }
+                }
             }
         }
     }
 }
 
-impl ModManagerApp {
+impl App {
     /// Central panel with mod list table.
     fn ui_mod_list(&mut self, ctx: &egui::Context) {
         let mut panel = egui::CentralPanel::default();
-        if self.transparent {
+        if self.settings.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
@@ -882,7 +923,7 @@ impl ModManagerApp {
                     .on_hover_text(self.t(I18nKey::NormalizeHover))
                     .clicked()
                 {
-                    crate::mod_item::reorder_mods_priorities(self.mod_list_mut());
+                    crate::mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
                 }
 
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
@@ -912,15 +953,15 @@ impl ModManagerApp {
         });
     }
 
-    /// Filter cloned  mods according to current search text.
+    /// Filter cloned mods according to current search text.
     fn filtered_mod_ids(&self) -> Vec<ModItem> {
-        if self.filter_text.trim().is_empty() {
-            return self.mod_list().par_iter().cloned().collect(); // unused when DnD grid
+        if self.settings.filter_text.trim().is_empty() {
+            return self.settings.mod_list().par_iter().cloned().collect(); // unused when DnD grid
         }
 
         // read only(but checkable grid)
-        let text = self.filter_text.trim().to_lowercase();
-        let matches_filter = |m: &&ModItem| match self.filter_column {
+        let text = self.settings.filter_text.trim().to_lowercase();
+        let matches_filter = |m: &&ModItem| match self.settings.filter_column {
             None => {
                 m.id.to_lowercase().contains(&text)
                     || m.name.to_lowercase().contains(&text)
@@ -932,32 +973,32 @@ impl ModManagerApp {
             Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
             Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
         };
-        self.mod_list().par_iter().filter(matches_filter).cloned().collect()
+        self.settings.mod_list().par_iter().filter(matches_filter).cloned().collect()
     }
 
     /// Sort mods according to current sort settings.
     fn sort_filtered_mods(&self, mods: &mut [ModItem]) {
         mods.par_sort_unstable_by(|a, b| {
-            let ord = match self.sort_column {
+            let ord = match self.settings.sort_column {
                 SortColumn::Id => a.id.cmp(&b.id),
                 SortColumn::Name => a.name.cmp(&b.name),
                 SortColumn::ModType => a.mod_type.cmp(&b.mod_type),
                 SortColumn::Site => a.site.cmp(&b.site),
                 SortColumn::Priority => a.priority.cmp(&b.priority),
             };
-            if self.sort_asc { ord } else { ord.reverse() }
+            if self.settings.sort_asc { ord } else { ord.reverse() }
         });
     }
 
     /// Returns true if drag-and-drop reordering is currently allowed.
     fn is_dnd_allowed(&self) -> bool {
-        self.filter_text.trim().is_empty()
-            && self.sort_column == SortColumn::Priority
-            && self.sort_asc
+        self.settings.filter_text.trim().is_empty()
+            && self.settings.sort_column == SortColumn::Priority
+            && self.settings.sort_asc
     }
 }
 
-impl ModManagerApp {
+impl App {
     /// Render mods table (with headers + rows).
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
         let table_max_height = ui.available_height() * 0.97;
@@ -988,7 +1029,7 @@ impl ModManagerApp {
                         let mod_list = if self.last_fetch_was_empty {
                             &mut vec![] // Apply dummy to preserve check state.
                         } else {
-                            self.mod_list_mut()
+                            self.settings.mod_list_mut()
                         };
 
                         if editable {
@@ -1043,7 +1084,7 @@ impl ModManagerApp {
                 // If nothing has been searched for, everything is displayed, so everything is subject to checking.
                 let is_empty_filtered_ids = filtered_ids.is_empty();
 
-                self.mod_list_mut().par_iter_mut().for_each(|item| {
+                self.settings.mod_list_mut().par_iter_mut().for_each(|item| {
                     if is_empty_filtered_ids || filtered_ids.contains(&item.id) {
                         item.enabled = check_all;
                     }
@@ -1063,9 +1104,13 @@ impl ModManagerApp {
             ui.with_layout(
                 egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
                 |ui| {
-                    let text = match self.sort_column {
-                        _ if self.sort_column == column && self.sort_asc => format!("{label} ▲"),
-                        _ if self.sort_column == column && !self.sort_asc => format!("{label} ▼"),
+                    let text = match self.settings.sort_column {
+                        _ if self.settings.sort_column == column && self.settings.sort_asc => {
+                            format!("{label} ▲")
+                        }
+                        _ if self.settings.sort_column == column && !self.settings.sort_asc => {
+                            format!("{label} ▼")
+                        }
                         _ => label.to_string(),
                     };
 
@@ -1079,62 +1124,35 @@ impl ModManagerApp {
 }
 
 // mod info loader
-impl ModManagerApp {
-    /// - vfs -> self.vfs_skyrim_data_dir
-    /// - others -> self.skyrim_data_dir
-    const fn current_skyrim_data_dir(&self) -> &str {
-        match self.mode {
-            DataMode::Vfs => self.vfs_skyrim_data_dir.as_str(),
-            DataMode::Manual => self.skyrim_data_dir.as_str(),
-        }
-    }
-
-    /// - vfs -> vfs_mod_list
-    /// - others -> mod_list
-    const fn mod_list(&self) -> &Vec<ModItem> {
-        match self.mode {
-            DataMode::Vfs => &self.vfs_mod_list,
-            DataMode::Manual => &self.mod_list,
-        }
-    }
-
-    /// - vfs -> vfs_mod_list
-    /// - others -> mod_list
-    const fn mod_list_mut(&mut self) -> &mut Vec<ModItem> {
-        match self.mode {
-            DataMode::Vfs => &mut self.vfs_mod_list,
-            DataMode::Manual => &mut self.mod_list,
-        }
-    }
-
+impl App {
     /// Unlocks the table for editing.(Asc Priority & Clear filter)
     fn unlock_readonly_table(&mut self) {
-        self.sort_asc = true;
-        self.sort_column = SortColumn::Priority;
-        self.filter_text.clear();
+        self.settings.sort_asc = true;
+        self.settings.sort_column = SortColumn::Priority;
+        self.settings.filter_text.clear();
     }
 
     #[inline]
     fn toggle_sort(&mut self, column: SortColumn) {
-        if self.sort_column == column {
-            self.sort_asc = !self.sort_asc;
+        if self.settings.sort_column == column {
+            self.settings.sort_asc = !self.settings.sort_asc;
         } else {
-            self.sort_column = column;
-            self.sort_asc = true;
-            self.filter_text.clear();
+            self.settings.sort_column = column;
+            self.settings.sort_asc = true;
+            self.settings.filter_text.clear();
         }
     }
 
     fn draw_skyrim_dir_ui(&mut self, ui: &mut egui::Ui) {
-        let changed = match self.mode {
+        let changed = match self.settings.mode {
             DataMode::Vfs => {
-                if self.is_first_render && self.vfs_skyrim_data_dir.trim().is_empty() {
+                if self.is_first_render && self.settings.vfs_skyrim_data_dir.trim().is_empty() {
                     self.update_vfs_skyrim_data_dir_by_reg();
                     return;
                 }
 
-                let line = egui::TextEdit::singleline(&mut self.vfs_skyrim_data_dir);
-                let line = if self.transparent {
+                let line = egui::TextEdit::singleline(&mut self.settings.vfs_skyrim_data_dir);
+                let line = if self.settings.transparent {
                     line.background_color(egui::Color32::TRANSPARENT)
                 } else {
                     line
@@ -1143,9 +1161,9 @@ impl ModManagerApp {
                 ui.add_sized([ui.available_width() * 0.85, 40.0], line).changed()
             }
             DataMode::Manual => {
-                let line = egui::TextEdit::singleline(&mut self.skyrim_data_dir)
+                let line = egui::TextEdit::singleline(&mut self.settings.skyrim_data_dir)
                     .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*");
-                let line = if self.transparent {
+                let line = if self.settings.transparent {
                     line.background_color(egui::Color32::TRANSPARENT)
                 } else {
                     line
@@ -1165,11 +1183,11 @@ impl ModManagerApp {
     /// # Note
     /// Window only.
     fn update_vfs_skyrim_data_dir_by_reg(&mut self) {
-        match skyrim_data_dir::get_skyrim_data_dir(self.target_runtime) {
+        match skyrim_data_dir::get_skyrim_data_dir(self.settings.target_runtime) {
             Ok(dir) => {
                 let new_vfs_skyrim_data_dir = dir.display().to_string();
-                if self.vfs_skyrim_data_dir != new_vfs_skyrim_data_dir {
-                    self.vfs_skyrim_data_dir = new_vfs_skyrim_data_dir;
+                if self.settings.vfs_skyrim_data_dir != new_vfs_skyrim_data_dir {
+                    self.settings.vfs_skyrim_data_dir = new_vfs_skyrim_data_dir;
                     self.update_mod_list();
                 }
             }
@@ -1200,8 +1218,8 @@ impl ModManagerApp {
         *self.fetch_state.write() = FetchState::Fetching;
 
         let start_time = std::time::Instant::now();
-        let dir = self.current_skyrim_data_dir().to_owned();
-        let use_vfs = self.mode == DataMode::Vfs;
+        let dir = self.settings.current_skyrim_data_dir().to_owned();
+        let use_vfs = self.settings.mode == DataMode::Vfs;
 
         let state = Arc::clone(&self.fetch_state);
         let fetched_mod_info = Arc::clone(&self.fetched_mod_info);
@@ -1243,9 +1261,9 @@ impl ModManagerApp {
                 drop(state);
 
                 let mod_info = core::mem::take(&mut *self.fetched_mod_info.write());
-                let new_mods = inherit_reorder_cast(self.mod_list(), mod_info);
+                let new_mods = inherit_reorder_cast(self.settings.mod_list(), mod_info);
                 self.check_all = new_mods.par_iter().all(|m| m.enabled);
-                *self.mod_list_mut() = new_mods;
+                *self.settings.mod_list_mut() = new_mods;
 
                 *self.fetch_state.write() = FetchState::Idle; // NOTE: If we don't include this, it will go here every time, and the mod list will be overwritten unintentionally.
                 self.last_fetch_was_empty = false;
@@ -1255,8 +1273,8 @@ impl ModManagerApp {
                     Color32::GREEN,
                 );
 
-                if self.auto_run {
-                    self.mod_list_mut().par_iter_mut().for_each(|m| m.enabled = true);
+                if self.settings.auto_run {
+                    self.settings.mod_list_mut().par_iter_mut().for_each(|m| m.enabled = true);
                     self.patch();
                 }
             }
@@ -1288,7 +1306,7 @@ impl ModManagerApp {
     }
 }
 
-impl ModManagerApp {
+impl App {
     /// Set message to notification
     pub(crate) fn set_notify<S: Into<String>>(&mut self, msg: S) {
         self.set_colored_notify(msg, Color32::WHITE);
@@ -1308,7 +1326,7 @@ impl ModManagerApp {
 }
 
 // i18n
-impl ModManagerApp {
+impl App {
     /// Translate given key or fallback to default English.
     #[inline]
     fn t(&self, key: I18nKey) -> &str {
@@ -1316,18 +1334,22 @@ impl ModManagerApp {
     }
 }
 
-impl ModManagerApp {
+impl App {
     fn patch(&mut self) {
         self.patch_start_time = Some(std::time::Instant::now());
         *self.patch_status.write() = None;
 
-        let patches = match self.mode {
-            DataMode::Vfs => to_patches(&self.vfs_skyrim_data_dir, true, &self.vfs_mod_list),
-            DataMode::Manual => to_patches(&self.skyrim_data_dir, false, &self.mod_list),
+        let patches = match self.settings.mode {
+            DataMode::Vfs => {
+                to_patches(&self.settings.vfs_skyrim_data_dir, true, &self.settings.vfs_mod_list)
+            }
+            DataMode::Manual => {
+                to_patches(&self.settings.skyrim_data_dir, false, &self.settings.mod_list)
+            }
         };
-        let is_debug_mode = self.enable_debug_output;
+        let is_debug_mode = self.settings.enable_debug_output;
 
-        if self.auto_remove_meshes {
+        if self.settings.auto_remove_meshes {
             self.remove_meshes_dir_all();
         }
 
@@ -1336,9 +1358,9 @@ impl ModManagerApp {
         self.async_rt.spawn(nemesis_merge::behavior_gen(
             patches,
             nemesis_merge::Config {
-                resource_dir: self.template_dir.clone().into(),
-                output_dir: self.output_dir.clone().into(),
-                output_target: match self.target_runtime {
+                resource_dir: self.settings.template_dir.clone().into(),
+                output_dir: self.settings.current_output_dir().to_owned().into(),
+                output_target: match self.settings.target_runtime {
                     skyrim_data_dir::Runtime::Le => nemesis_merge::OutPutTarget::SkyrimLe,
                     skyrim_data_dir::Runtime::Se | skyrim_data_dir::Runtime::Vr => {
                         nemesis_merge::OutPutTarget::SkyrimSe
@@ -1356,16 +1378,16 @@ impl ModManagerApp {
                     output_merged_json: is_debug_mode,
                     output_merged_xml: is_debug_mode,
                 },
-                skyrim_data_dir_glob: Some(self.current_skyrim_data_dir().to_string()),
-                generate_fnis_esp: self.generate_fnis_esp,
+                skyrim_data_dir_glob: Some(self.settings.current_skyrim_data_dir().to_string()),
+                generate_fnis_esp: self.settings.generate_fnis_esp,
             },
         ));
     }
 
     /// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories with a safety warning if output_dir equals Skyrim data dir.
     fn remove_meshes_dir_all(&mut self) {
-        let output_dir = self.output_dir.clone();
-        let skyrim_data_directory = self.current_skyrim_data_dir();
+        let output_dir = self.settings.current_output_dir().to_owned();
+        let skyrim_data_directory = self.settings.current_skyrim_data_dir();
 
         if nemesis_merge::cache_remover::is_dangerous_remove(&output_dir, skyrim_data_directory) {
             tracing::warn!(
@@ -1445,36 +1467,4 @@ where
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir)
         .map_err(|e| format!("Failed to open directory({}: {e}", dir.display()))
-}
-
-fn create_issue_link(app: &ModManagerApp) -> String {
-    use std::borrow::Cow;
-
-    let skyrim_runtime = match app.target_runtime {
-        skyrim_data_dir::Runtime::Le => gh_issue_link::SkyrimRuntime::Le,
-        skyrim_data_dir::Runtime::Se => gh_issue_link::SkyrimRuntime::Se,
-        skyrim_data_dir::Runtime::Vr => gh_issue_link::SkyrimRuntime::Vr,
-    };
-
-    let skyrim_data_dir: Option<Cow<'_, Path>> = if app.vfs_skyrim_data_dir.trim().is_empty() {
-        skyrim_data_dir::get_skyrim_data_dir(app.target_runtime).ok().map(Cow::Owned)
-    } else {
-        Some(Path::new(&app.vfs_skyrim_data_dir).into())
-    };
-
-    let skyrim_version = skyrim_data_dir.and_then(|skyrim_data_dir| {
-        let exe = match skyrim_runtime {
-            gh_issue_link::SkyrimRuntime::Le => "TESV.exe",
-            gh_issue_link::SkyrimRuntime::Se => "SkyrimSE.exe",
-            gh_issue_link::SkyrimRuntime::Vr => "SkyrimVR.exe",
-        };
-        let exe_path = skyrim_data_dir.parent()?.join(exe);
-
-        gh_issue_link::version::get_file_version(exe_path).map(|ver| ver.to_string()).ok()
-    });
-    gh_issue_link::new_gh_issue_link(
-        env!("CARGO_PKG_VERSION"),
-        skyrim_runtime,
-        skyrim_version.as_deref(),
-    )
 }
