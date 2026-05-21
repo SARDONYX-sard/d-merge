@@ -44,11 +44,11 @@ pub(crate) enum LogLevel {
 impl LogLevel {
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
-            Self::Error => "error",
-            Self::Warn => "warn",
-            Self::Info => "info",
-            Self::Debug => "debug",
-            Self::Trace => "trace",
+            Self::Error => "Error",
+            Self::Warn => "Warn",
+            Self::Info => "Info",
+            Self::Debug => "Debug",
+            Self::Trace => "Trace",
         }
     }
 }
@@ -636,16 +636,18 @@ impl App {
             egui::ComboBox::from_id_salt("log_level")
                 .selected_text(self.settings.log_level.as_str())
                 .show_ui(ui, |ui| {
-                    let levels: [(LogLevel, &'static str); 5] = [
-                        (LogLevel::Error, "Error"),
-                        (LogLevel::Warn, "Warn"),
-                        (LogLevel::Info, "Info"),
-                        (LogLevel::Debug, "Debug"),
-                        (LogLevel::Trace, "Trace"),
+                    let levels: [LogLevel; 5] = [
+                        LogLevel::Error,
+                        LogLevel::Warn,
+                        LogLevel::Info,
+                        LogLevel::Debug,
+                        LogLevel::Trace,
                     ];
 
-                    for (level, label) in levels {
-                        if ui.selectable_value(&mut self.settings.log_level, level, label).changed()
+                    for level in levels {
+                        if ui
+                            .selectable_value(&mut self.settings.log_level, level, level.as_str())
+                            .changed()
                         {
                             tracing_rotation::change_level(level.as_str()).unwrap();
                         }
