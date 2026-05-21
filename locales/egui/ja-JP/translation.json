@@ -17,7 +17,7 @@
   "execute_button": "実行",
   "execution_mode_label": "実行モード:",
   "filter_text_all": "全て",
-  "generate_fnis_esp_hover": "ダミーのFNIS.espを生成します。(元のFNIS SEのFNIS.espを使いたくないがFNIS.espが必要なModを使う場合に使用します)",
+  "generate_fnis_esp_hover": "ダミーのFNIS.espを生成します。\n\nこの機能は以下の時に必要になります。\n- FNIS.esp依存modを使用しているがオリジナルのFNIS.espを使っていない場合",
   "generate_fnis_esp_label": "FNIS.esp生成",
   "help_button": "ヘルプ",
   "i18n_reload_json_button": "翻訳再読み込み",

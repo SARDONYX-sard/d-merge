@@ -74,7 +74,10 @@ pub(crate) enum I18nKey {
     /// All
     FilterTextAll,
 
-    /// Generates a dummy FNIS.esp file. (Use this when you want to use a mod that requires FNIS.esp but do not want to use the original FNIS.esp from FNIS SE.)
+    /// Generates a dummy FNIS.esp file.
+    ///
+    /// This feature is required in the following situations:
+    /// - You are using mods that depend on FNIS.esp but are not using the original FNIS.esp
     GenerateFnisEspHover,
 
     /// Gen FNIS.esp
