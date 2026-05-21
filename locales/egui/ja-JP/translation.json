@@ -60,7 +60,7 @@
   "status_generating_hkx_files": "hkxファイルを生成しています...",
   "status_parsing_patches": "Nemesisパッチを解析しています...",
   "status_reading_patches": "Nemesisパッチとテンプレートファイルを読み込んでいます...",
-  "theme_hover": "Dark、Light、Systemテーマを切り替えます。\n- 注意: Lightテーマと透明背景機能を同時に使用すると画面が視認性が著しく低下します。",
+  "theme_hover": "Dark、Light、Systemテーマを切り替えます。\n注意: Lightテーマと背景透過機能を同時に使用すると画面が視認性が著しく低下します。",
   "theme_label": "テーマ: ",
   "transparent": "透過表示",
   "transparent_hover": "ウィンドウの背景を透過させます",

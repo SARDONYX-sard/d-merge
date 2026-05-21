@@ -289,7 +289,7 @@ impl App {
                 ui.checkbox(&mut self.settings.generate_fnis_esp, generate_fnis_esp_label)
                     .on_hover_text(generate_fnis_esp_hover);
 
-                ui.add_space(30.0);
+                ui.add_space(60.0);
 
                 let transparent_label = self.t(I18nKey::Transparent).to_string();
                 let transparent_hover = self.t(I18nKey::TransparentHover).to_string();
@@ -300,6 +300,8 @@ impl App {
                 let auto_run_hover = self.t(I18nKey::AutoRunHover).to_string();
                 ui.checkbox(&mut self.settings.auto_run, auto_run_label)
                     .on_hover_text(auto_run_hover);
+                ui.separator();
+
                 self.ui_theme_box(ui);
             });
         });
