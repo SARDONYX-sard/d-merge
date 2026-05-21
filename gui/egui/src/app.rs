@@ -858,7 +858,7 @@ impl App {
         }
         if self.settings.i18n_path != selected_i18n_path {
             self.settings.i18n_path = selected_i18n_path;
-            self.reload_i18n();
+            // Since the i18n is reloaded when the user chooses, it won't be reloaded automatically here.
         }
         if write_i18n_clicked {
             self.confirm_dialog.open(i18n_write_hover, ConfirmAction::WriteI18nJson);
