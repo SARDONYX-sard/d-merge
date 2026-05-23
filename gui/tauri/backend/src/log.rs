@@ -12,5 +12,5 @@ pub(crate) fn init(app: &tauri::App) -> Result<()> {
     let log_dir = &resolver.app_log_dir().context(NotFoundLogDirSnafu)?;
     let log_name = format!("{}.log", app.package_info().name);
 
-    Ok(tracing_rotation::init(log_dir, &log_name)?)
+    Ok(tracing_rotation::global::init(log_dir, &log_name, 5)?)
 }

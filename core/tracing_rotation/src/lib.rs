@@ -1,141 +1,452 @@
+//! # tracing-rotation
+//!
+//! A [`tracing_subscriber::Layer`] that writes to rotating log files, with
+//! runtime-adjustable log level and log-file path.
+//!
+//! Two APIs are provided:
+//!
+//! ## Layer API (composable)
+//!
+//! ```rust,no_run
+//! use tracing_rotation::RotationLayer;
+//! use tracing_subscriber::prelude::*;
+//!
+//! let (layer, handle) = RotationLayer::builder()
+//!     .log_dir("/var/log/myapp")
+//!     .log_stem("app.log")
+//!     .max_files(5)
+//!     .build()
+//!     .expect("failed to create rotation layer");
+//!
+//! tracing_subscriber::registry()
+//!     .with(layer)   // compose freely with other layers
+//!     .init();
+//!
+//! handle.set_level("debug").unwrap();
+//! handle.set_path("/tmp/myapp", "app.log").unwrap();
+//! ```
+//!
+//! ## Global API (drop-in replacement for the original interface)
+//!
+//! ```rust,no_run
+//! use tracing_rotation::global;
+//!
+//! global::init("/var/log/myapp", "app.log", 5).expect("logger init failed");
+//!
+//! global::change_level("debug").unwrap();
+//! global::change_log_path("/tmp/myapp", "app.log").unwrap();
+//! ```
+
 pub mod error;
+pub mod global;
+pub mod rotate;
 
 use std::{
-    fs::{self, DirEntry, File},
-    path::Path,
-    str::FromStr as _,
-    time::SystemTime,
-};
-
-use chrono::Local;
-use once_cell::sync::OnceCell;
-use tracing_subscriber::{
-    Registry,
-    filter::LevelFilter,
     fmt,
-    prelude::*,
-    reload::{self, Handle},
+    fs::File,
+    io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
 };
 
-use crate::error::{Error, Result};
+use parking_lot::Mutex;
+use tracing::{Event, Level, Subscriber, metadata::LevelFilter};
+use tracing_subscriber::{Layer, fmt as fmt_layer, layer::Context, registry::LookupSpan, reload};
 
-/// Global variable to allow dynamic level changes in logger.
-static RELOAD_HANDLE: OnceCell<Handle<LevelFilter, Registry>> = OnceCell::new();
+use crate::{
+    error::{Error, Result},
+    rotate::rotate_files,
+};
 
-/// Initializes rotation logger.
-///
-/// # Errors
-/// Double init
-pub fn init<D>(log_dir: D, log_name: &str) -> Result<(), Error>
-where
-    D: AsRef<Path>,
-{
-    let log_dir = log_dir.as_ref();
+// ────────────────────────────────────────────────────────────────────────────
+// SwappableWriter
+// ────────────────────────────────────────────────────────────────────────────
 
-    // Unable `pretty()` & `with_ansi(false)` combination in `#[tracing::instrument]`
-    // ref: https://github.com/tokio-rs/tracing/issues/1310
-    let fmt_layer = fmt::layer()
-        .compact()
-        .with_ansi(false)
-        .with_file(true)
-        .with_line_number(true)
-        .with_target(false)
-        .with_writer(create_rotate_log(log_dir, log_name, 4)?);
+/// An [`io::Write`] + [`fmt_layer::MakeWriter`] whose underlying [`File`] can
+/// be replaced at runtime without rebuilding the subscriber stack.
+#[derive(Clone)]
+#[expect(missing_debug_implementations)]
+pub struct SwappableWriter(Arc<Mutex<BufWriter<File>>>);
 
-    let (filter, reload_handle) = reload::Layer::new(LevelFilter::TRACE);
-    tracing_subscriber::registry().with(filter).with(fmt_layer).init();
+impl SwappableWriter {
+    #[inline]
+    fn new(file: File) -> Self {
+        Self(Arc::new(Mutex::new(BufWriter::new(file))))
+    }
 
-    RELOAD_HANDLE.set(reload_handle).map_err(|_e| Error::FailedInitLog)
-}
-
-/// Change log level
-///
-/// # Errors
-/// If logger uninitialized.
-///
-/// # Note
-/// - If unknown log level. fallback to `error`.
-/// - log_level: "trace" | "debug" | "info" | "warn" | "error" otherwise "error".
-pub fn change_level(log_level: &str) -> Result<()> {
-    let new_filter = LevelFilter::from_str(log_level).unwrap_or_else(|_e| {
-        tracing::warn!("Unknown log level: {log_level}. Fallback to `error`");
-        LevelFilter::ERROR
-    });
-    match RELOAD_HANDLE.get() {
-        Some(log) => Ok(log.modify(|filter| *filter = new_filter)?),
-        None => Err(Error::UninitLog),
+    #[inline]
+    pub(crate) fn swap(&self, file: File) -> Result<()> {
+        let mut guard = self.0.lock();
+        guard.flush().ok();
+        *guard = BufWriter::new(file);
+        drop(guard);
+        Ok(())
     }
 }
 
-/// Rotation Logger File Creator.
-/// - When the maximum count is reached, delete the descending ones first and create a new log file.
-///
-/// # Why did you make this?
-/// Because `tracing_appender` must be executed in the **root function** to work.
-/// In this case where the log location is obtained with tauri, the logger cannot be initialized with the root function.
-fn create_rotate_log(
-    log_dir: impl AsRef<Path>,
-    log_name: &str,
-    max_log_count: usize,
-) -> Result<File> {
-    fs::create_dir_all(&log_dir)?;
+impl io::Write for SwappableWriter {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.lock().write(buf)
+    }
 
-    let mut log_files = fs::read_dir(&log_dir)?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.starts_with(log_name)))
-        .collect::<Vec<_>>();
-
-    let log_file = log_dir.as_ref().join(log_name);
-    if log_files.len() >= max_log_count {
-        // modify sort
-        log_files.sort_by(|a, b| {
-            fn get_modify_time(dir: &DirEntry) -> Result<SystemTime, bool> {
-                dir.metadata()
-                    .as_ref()
-                    .map_or(Err(false), |meta| meta.modified().map_err(|_| false))
-            }
-            get_modify_time(a).cmp(&get_modify_time(b))
-        });
-        if let Some(oldest_file) = log_files.first() {
-            fs::remove_file(oldest_file.path())?;
-        }
-    };
-
-    let old_file =
-        log_dir.as_ref().join(format!("{log_name}_{}.log", Local::now().format("%F_%H-%M-%S")));
-    if log_file.exists() {
-        fs::rename(&log_file, old_file)?;
-    };
-
-    Ok(File::create(log_file)?)
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.lock().flush()
+    }
 }
+
+impl<'a> fmt_layer::MakeWriter<'a> for SwappableWriter {
+    type Writer = Self;
+
+    #[inline]
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Type alias for the reload handle
+// ────────────────────────────────────────────────────────────────────────────
+
+// The key insight from the original working code:
+//
+//   registry().with(reload::Layer<LevelFilter>).with(fmt_layer)
+//
+// `reload::Layer<LevelFilter>` sits as a *sibling* layer directly on the
+// registry, NOT inside fmt via with_filter().  This is what makes
+// rebuild_interest_cache() fire correctly when the handle is modified.
+//
+// We type-erase the subscriber S with a boxed trait object so that
+// RotationHandle can remain S-free and Clone-able.
+
+trait LevelReloader: Send + Sync + 'static {
+    fn reload(&self, filter: LevelFilter) -> Result<()>;
+}
+
+struct HandleReloader<S>(reload::Handle<LevelFilter, S>);
+
+impl<S: 'static + Send + Sync> LevelReloader for HandleReloader<S> {
+    #[inline]
+    fn reload(&self, filter: LevelFilter) -> Result<()> {
+        self.0.modify(|f| *f = filter).map_err(|e| Error::Reload { source: e })
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RotationHandle
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Runtime control surface for a [`RotationLayer`].
+///
+/// Cheap to clone; every clone shares the same internal state.
+#[derive(Clone)]
+pub struct RotationHandle {
+    reloader: Arc<dyn LevelReloader>,
+    writer: SwappableWriter,
+    max_files: usize,
+}
+
+impl RotationHandle {
+    /// Change the minimum log level at runtime.
+    ///
+    /// `level` is matched case-insensitively.  Unrecognized strings fall back
+    /// to `ERROR` with a warning log.
+    ///
+    /// # Errors
+    /// [`Error::NotInit`] if the handle was not properly initialized via
+    /// [`global::init`] or [`Builder::build`].
+    #[inline]
+    pub fn set_level(&self, level: &str) -> Result<()> {
+        let new = LevelFilter::from_str(level).unwrap_or_else(|_| {
+            tracing::warn!("Unknown log level `{level}`, falling back to ERROR");
+            LevelFilter::ERROR
+        });
+        self.reloader.reload(new)
+    }
+
+    /// Redirect log output to a freshly rotated file inside `log_dir`.
+    ///
+    /// Files are rotated (renamed + oldest deleted) before the new file is
+    /// opened, identical to what happens on startup.
+    /// Redirect log output to a freshly rotated file inside `log_dir`.
+    ///
+    ///# Errors
+    /// - [`Error::NotInit`] if the handle was not properly initialized via
+    ///   [`global::init`] or [`Builder::build`].
+    /// - Any I/O error encountered during rotation or file creation
+    #[inline]
+    pub fn set_path(&self, log_dir: impl AsRef<Path>, log_stem: &str) -> Result<()> {
+        let file = rotate_files(log_dir, log_stem, self.max_files)?;
+        self.writer.swap(file)
+    }
+}
+
+impl fmt::Debug for RotationHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RotationHandle").field("max_files", &self.max_files).finish_non_exhaustive()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RotationLayer
+// ────────────────────────────────────────────────────────────────────────────
+
+/// A pair of layers to be registered together on the subscriber.
+///
+/// Because `reload::Layer<LevelFilter>` must be a **sibling** of the fmt layer
+/// (not nested inside it via `with_filter`) for level changes to take effect,
+/// `RotationLayer` is itself a thin delegating [`Layer`] that carries both
+/// the reload filter and the fmt writer internally.
+///
+/// When you call `.with(rotation_layer)` the single `with()` call registers
+/// this delegating shell, which internally applies both filter and formatting.
+pub struct RotationLayer<S> {
+    /// The level-filter half.  Lives as a sibling, not inside the fmt layer.
+    filter: Arc<Mutex<reload::Layer<LevelFilter, S>>>,
+    /// The fmt writer half.
+    fmt: Box<dyn Layer<S> + Send + Sync + 'static>,
+}
+
+impl<S> fmt::Debug for RotationLayer<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RotationLayer").finish_non_exhaustive()
+    }
+}
+
+impl<S> Layer<S> for RotationLayer<S>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    #[inline]
+    fn enabled(&self, metadata: &tracing::Metadata<'_>, ctx: Context<'_, S>) -> bool {
+        // Check the reload filter first (cheap atomic read inside reload::Layer),
+        // then delegate to the fmt layer.
+        self.filter.lock().enabled(metadata, ctx.clone()) && self.fmt.enabled(metadata, ctx)
+    }
+
+    #[inline]
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        self.fmt.on_event(event, ctx);
+    }
+
+    #[inline]
+    fn on_enter(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+        self.fmt.on_enter(id, ctx);
+    }
+
+    #[inline]
+    fn on_exit(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+        self.fmt.on_exit(id, ctx);
+    }
+
+    #[inline]
+    fn on_close(&self, id: tracing::span::Id, ctx: Context<'_, S>) {
+        self.fmt.on_close(id, ctx);
+    }
+
+    #[inline]
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        self.fmt.on_new_span(attrs, id, ctx);
+    }
+
+    #[inline]
+    fn on_record(
+        &self,
+        span: &tracing::span::Id,
+        values: &tracing::span::Record<'_>,
+        ctx: Context<'_, S>,
+    ) {
+        self.fmt.on_record(span, values, ctx);
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Builder
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Builder for [`RotationLayer`].
+#[derive(Debug)]
+pub struct Builder {
+    log_dir: PathBuf,
+    log_file: String,
+    max_files: usize,
+    initial_level: LevelFilter,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            log_dir: PathBuf::from("."),
+            log_file: "app.log".into(),
+            max_files: 4,
+            initial_level: LevelFilter::TRACE,
+        }
+    }
+}
+
+impl Builder {
+    /// Directory in which log files are stored (created if absent).
+    #[inline]
+    pub fn log_dir<P>(mut self, dir: P) -> Self
+    where
+        P: Into<PathBuf>,
+    {
+        self.log_dir = dir.into();
+        self
+    }
+
+    /// Base file name with extension.
+    /// The live file keeps this exact name; rotated copies are stored as `{stem}_{YYYY-MM-DD_HH-MM-SS}.{ext}`.
+    #[inline]
+    pub fn log_file_name<S: Into<String>>(mut self, name: S) -> Self {
+        self.log_file = name.into();
+        self
+    }
+
+    /// Maximum number of files (live + archived) retained on disk.
+    /// Values below 1 are silently clamped to 1.
+    #[inline]
+    pub fn max_files(mut self, n: usize) -> Self {
+        self.max_files = n.max(1);
+        self
+    }
+
+    /// Initial [`LevelFilter`].  Defaults to `TRACE`.
+    #[inline]
+    pub fn level(mut self, level: impl Into<Level>) -> Self {
+        self.initial_level = level.into().into();
+        self
+    }
+
+    /// Consume the builder and produce a `(layer, handle)` pair.
+    ///
+    /// The produced [`RotationLayer`] replicates the structure of the original
+    /// working code:
+    ///
+    /// ```text
+    /// registry
+    ///   └── RotationLayer
+    ///         ├── reload::Layer<LevelFilter>   ← sibling, not nested in fmt
+    ///         └── fmt::Layer<SwappableWriter>
+    /// ```
+    ///
+    /// Placing `reload::Layer` as a sibling (not inside `with_filter()`) is
+    /// what allows `Handle::modify()` to correctly invalidate tracing's
+    /// call-site interest cache so level changes take effect immediately.
+    ///
+    /// # Errors
+    /// Fails if the log directory cannot be created or the initial file cannot
+    /// be opened.
+    pub fn build<S>(self) -> Result<(RotationLayer<S>, RotationHandle)>
+    where
+        S: Subscriber + for<'a> LookupSpan<'a> + Send + Sync + 'static,
+    {
+        let file = rotate_files(&self.log_dir, &self.log_file, self.max_files)?;
+        let writer = SwappableWriter::new(file);
+
+        // NOTE: It is important to keep `reload` and `fmt` separate. Otherwise, the level changer will not work.
+        let (reload_layer, reload_handle) = reload::Layer::new(self.initial_level);
+
+        let fmt = fmt_layer::layer::<S>()
+            .compact()
+            .with_ansi(false)
+            .with_file(true)
+            .with_line_number(true)
+            .with_target(false)
+            .with_writer(writer.clone());
+
+        let handle = RotationHandle {
+            reloader: Arc::new(HandleReloader(reload_handle)),
+            writer,
+            max_files: self.max_files,
+        };
+
+        let layer =
+            RotationLayer { filter: Arc::new(Mutex::new(reload_layer)), fmt: Box::new(fmt) };
+
+        Ok((layer, handle))
+    }
+}
+
+impl RotationLayer<()> {
+    /// Create a [`Builder`] with sensible defaults.
+    #[inline]
+    pub fn builder() -> Builder {
+        Builder::default()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tests
+// ────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
+    use std::{fs, path::Path};
+
+    use tracing_subscriber::{Registry, prelude::*};
 
     use super::*;
 
+    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    fn file_count(dir: &Path) -> usize {
+        fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_ok_and(|t| !t.is_dir()))
+            .count()
+    }
+
     #[test]
-    fn should_rotate_log() -> Result<()> {
-        let log_dir = temp_dir::TempDir::new()?;
-        let log_dir = log_dir.path();
-        for _ in 0..5 {
-            create_rotate_log(log_dir, "log.log", 3)?;
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
+    fn layer_composes_with_registry() -> TestResult {
+        let tmp = temp_dir::TempDir::new()?;
+        let (layer, _handle): (RotationLayer<_>, _) = RotationLayer::builder()
+            .log_dir(tmp.path())
+            .log_file_name("test.log")
+            .max_files(3)
+            .build()?;
 
-        fn get_files_in_dir(dir_path: impl AsRef<Path>) -> Result<Vec<DirEntry>> {
-            let dir = fs::read_dir(dir_path)?;
-            let files = dir
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| entry.file_type().is_ok_and(|ft| !ft.is_dir()))
-                .collect::<Vec<DirEntry>>();
-            Ok(files)
-        }
+        let _ = tracing_subscriber::registry().with(layer);
+        Ok(())
+    }
 
-        let files = get_files_in_dir(log_dir)?;
-        assert_eq!(files.len(), 3);
+    #[test]
+    fn handle_set_level_and_set_path() -> TestResult {
+        let tmp1 = temp_dir::TempDir::new()?;
+        let tmp2 = temp_dir::TempDir::new()?;
+
+        let (layer, handle): (RotationLayer<_>, _) = RotationLayer::builder()
+            .log_dir(tmp1.path())
+            .log_file_name("app.log")
+            .max_files(4)
+            .build()?;
+
+        let _guard = tracing_subscriber::registry().with(layer).set_default();
+
+        handle.set_level("info")?;
+        handle.set_path(tmp2.path(), "app.log")?;
+
+        tracing::info!("written to the new path");
+        assert_eq!(file_count(tmp2.path()), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn handle_is_clone_and_debug() -> TestResult {
+        let tmp = temp_dir::TempDir::new()?;
+        let (_, handle): (RotationLayer<Registry>, _) =
+            RotationLayer::builder().log_dir(tmp.path()).log_file_name("app.log").build()?;
+
+        let cloned = handle;
+        let _ = format!("{cloned:?}");
         Ok(())
     }
 }

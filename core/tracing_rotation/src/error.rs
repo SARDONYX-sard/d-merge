@@ -1,29 +1,34 @@
-//! errors of `This crate`
+//! Error types for `tracing-rotation`.
+
 use std::io;
 
-/// `tracing_rotation` Error
-#[derive(Debug, snafu::Snafu)]
-#[snafu(visibility(pub))]
+use snafu::Snafu;
+use tracing_subscriber::reload;
+
+/// Alias for `std::result::Result<T, Error>`.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// All errors that can be produced by this crate.
+#[derive(Debug, Snafu)]
 pub enum Error {
-    /// Standard io error
+    /// An I/O error while creating, renaming, or deleting log files.
     #[snafu(transparent)]
-    FailedIo { source: io::Error },
+    Io { source: io::Error },
 
-    /// Failed to initialize logger.
-    FailedInitLog,
+    /// The reload handle's subscriber was dropped before the modify call.
+    #[snafu(display("failed to reload log level: {source}"))]
+    Reload { source: reload::Error },
 
-    /// Uninitialized logger.
-    UninitLog,
+    /// The `SwappableWriter`'s mutex was poisoned.
+    #[snafu(display("internal log writer lock is poisoned"))]
+    LockPoisoned,
 
-    /// Tracing log error
-    #[snafu(transparent)]
-    FailedSetTracing { source: tracing::subscriber::SetGlobalDefaultError },
+    /// [`global::init`](crate::global::init) was called more than once.
+    #[snafu(display("global logger is already initialized"))]
+    AlreadyInit,
 
-    /// Tracing subscriber reload error
-    #[snafu(transparent)]
-    FailedReloadTracingSub { source: tracing_subscriber::reload::Error },
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// A [`global`](crate::global) function was called before
+    /// [`global::init`](crate::global::init).
+    #[snafu(display("global logger has not been initialized yet"))]
+    NotInit,
 }
-
-/// `Result` for this crate.
-pub type Result<T, E = Error> = core::result::Result<T, E>;

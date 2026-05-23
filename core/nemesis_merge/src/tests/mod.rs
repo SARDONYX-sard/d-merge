@@ -10,7 +10,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::remove_dir_all("../../dummy/behavior_gen/output")?; // remove prev output
 
-    tracing_rotation::init("../../dummy/behavior_gen", "merge_test.log")?;
+    tracing_rotation::global::init("../../dummy/behavior_gen", "merge_test.log", 5)?;
 
     let patches = {
         let string = std::fs::read_to_string("../../dummy/ids.ini")?;

@@ -13,7 +13,7 @@ use rayon::prelude::*;
 
 use crate::{
     i18n::{I18nKey, I18nMap},
-    log::get_log_dir,
+    log::LogLevel,
     mod_item::{ModItem, SortColumn, inherit_reorder_cast, to_patches},
     settings::{AppSettings, Theme},
     ui::{
@@ -29,28 +29,6 @@ pub(crate) enum DataMode {
     Vfs,
     /// Manual mode.
     Manual,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum LogLevel {
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
-}
-
-impl LogLevel {
-    pub(crate) const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Error => "Error",
-            Self::Warn => "Warn",
-            Self::Info => "Info",
-            Self::Debug => "Debug",
-            Self::Trace => "Trace",
-        }
-    }
 }
 
 /// Represents the state of a mod list fetching task.
@@ -188,8 +166,7 @@ impl App {
             let log_lines = Arc::clone(&self.log_lines);
             let ctx = ctx.clone();
 
-            let log_path = crate::log::get_log_dir(self.settings.current_output_dir())
-                .join(crate::log::LOG_FILENAME);
+            let log_path = Path::new(&self.settings.log_dir_path).join(crate::log::LOG_FILENAME);
             if let Err(err) = crate::log::start_log_tail(&log_path, log_lines, Some(ctx)) {
                 tracing::error!("Couldn't start log watcher: {err}");
             };
@@ -438,7 +415,7 @@ impl App {
                 } else {
                     text_line
                 };
-                let _ = ui.add_sized([ui.available_width() * 0.9, 40.0], text_line);
+                ui.add_sized([ui.available_width() * 0.9, 40.0], text_line);
 
                 if ui
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
@@ -459,7 +436,14 @@ impl App {
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        *self.settings.current_output_dir_mut() = dir.display().to_string();
+                        let new_output_dir = dir.display().to_string();
+
+                        // skip same path
+                        let old_output_dir = self.settings.current_output_dir_mut();
+                        if new_output_dir == *old_output_dir {
+                            return;
+                        }
+                        *old_output_dir = new_output_dir;
                     }
                 }
             });
@@ -577,9 +561,7 @@ impl App {
                 self.ui_log_level_box(ui);
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
-                    if let Err(err) =
-                        open_existing_dir_or_ancestor(get_log_dir(s.settings.current_output_dir()))
-                    {
+                    if let Err(err) = open_existing_dir_or_ancestor(&s.settings.log_dir_path) {
                         s.set_colored_notify(err, Color32::RED);
                     }
                 });
@@ -649,7 +631,7 @@ impl App {
                             .selectable_value(&mut self.settings.log_level, level, level.as_str())
                             .changed()
                         {
-                            tracing_rotation::change_level(level.as_str()).unwrap();
+                            tracing_rotation::global::change_level(level.as_str()).unwrap();
                         }
                     }
                 });
@@ -731,6 +713,7 @@ impl App {
 
         let mut show = true;
         let mut issue_clicked = false;
+        let mut selected_log_dir_path = self.settings.log_dir_path.clone();
         let mut selected_i18n_path = self.settings.i18n_path.clone();
         let mut write_i18n_clicked = false;
         let mut reload_i18n_clicked = false;
@@ -821,10 +804,33 @@ impl App {
                 ui.add_space(4.0);
 
                 ui.horizontal(|ui| {
+                    ui.label("Log dir path: ").on_hover_text(
+                        "NOTE: You'll need to restart the app for the changes to take effect.",
+                    );
+                    ui.text_edit_singleline(&mut selected_log_dir_path);
+
+                    if ui.button(&select_button).clicked()
+                        && let Some(path) = {
+                            let path = Path::new(&self.settings.log_dir_path);
+                            match path.canonicalize() {
+                                Ok(canonical_path) => {
+                                    rfd::FileDialog::new().set_directory(canonical_path)
+                                }
+                                _ => rfd::FileDialog::new(),
+                            }
+                            .pick_folder()
+                        }
+                    {
+                        selected_log_dir_path = path.display().to_string();
+                    }
+                });
+                ui.add_space(4.0);
+
+                ui.horizontal(|ui| {
                     ui.label("I18n Path: ");
                     ui.text_edit_singleline(&mut selected_i18n_path);
 
-                    if ui.button(select_button).clicked()
+                    if ui.button(&select_button).clicked()
                         && let Some(path) = {
                             let path = Path::new(self.settings.i18n_path.as_ref());
                             match path.parent() {
@@ -840,6 +846,7 @@ impl App {
                         selected_i18n_path = path.display().to_string().into();
                     }
                 });
+                ui.add_space(4.0);
 
                 ui.horizontal(|ui| {
                     if ui.button(&i18n_write_label).on_hover_text(&i18n_write_hover).clicked() {
@@ -857,6 +864,9 @@ impl App {
         }
         if issue_clicked {
             ctx.open_url(egui::OpenUrl { url: issue_url, new_tab: true });
+        }
+        if self.settings.log_dir_path != selected_log_dir_path {
+            self.settings.log_dir_path = selected_log_dir_path;
         }
         if self.settings.i18n_path != selected_i18n_path {
             self.settings.i18n_path = selected_i18n_path;
