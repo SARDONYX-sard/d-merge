@@ -27,8 +27,12 @@ fn main() -> Result<(), eframe::Error> {
         Err(e) => (settings::AppSettings::default(), Some(e)),
     };
 
-    let _ = tracing_rotation::init(log::get_log_dir(&settings.output_dir), log::LOG_FILENAME);
-    let _ = tracing_rotation::change_level(settings.log_level.as_str());
+    let _ = tracing_rotation::global::init_with_level(
+        &settings.log_dir_path,
+        log::LOG_FILENAME,
+        5,
+        settings.log_level,
+    );
 
     std::panic::set_hook(Box::new(|info| {
         tracing::error!(?info);

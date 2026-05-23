@@ -29,8 +29,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .as_deref()
         .map(|path| (path.parent(), path.file_name().and_then(|f| f.to_str())))
     {
-        tracing_rotation::init(parent, file_name)?;
-        tracing_rotation::change_level(cli.log_level.as_str())?;
+        tracing_rotation::global::init_with_level(parent, file_name, 5, cli.log_level)?;
     };
 
     match cli.command {

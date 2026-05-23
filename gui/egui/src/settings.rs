@@ -52,7 +52,7 @@ pub(crate) struct AppSettings {
     pub generate_fnis_esp: bool,
 
     /// Minimum log severity level written to the rotating log file.
-    pub log_level: crate::app::LogLevel,
+    pub log_level: crate::log::LogLevel,
 
     // ---------------------------------------------------------------------
     // UI / appearance
@@ -71,6 +71,9 @@ pub(crate) struct AppSettings {
 
     /// Path to the i18n JSON file used for UI language translation.
     pub i18n_path: Cow<'static, str>,
+
+    /// Directory for log files.
+    pub log_dir_path: String,
 
     // ---------------------------------------------------------------------
     // Mod list UI state
@@ -205,7 +208,8 @@ impl Default for AppSettings {
             font_path: None,
             generate_fnis_esp: false,
             i18n_path: crate::i18n::I18nMap::FILE.into(),
-            log_level: crate::app::LogLevel::Debug,
+            log_dir_path: crate::log::LOG_DIR.into(),
+            log_level: crate::log::LogLevel::Debug,
             mode: crate::app::DataMode::Vfs,
             sort_asc: true,
             sort_column: SortColumn::Priority,

@@ -13,16 +13,43 @@ use std::{
 use parking_lot::RwLock;
 use snafu::ResultExt as _;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl LogLevel {
+    pub(crate) const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Error => "Error",
+            Self::Warn => "Warn",
+            Self::Info => "Info",
+            Self::Debug => "Debug",
+            Self::Trace => "Trace",
+        }
+    }
+}
+impl From<LogLevel> for tracing::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Error => Self::ERROR,
+            LogLevel::Warn => Self::WARN,
+            LogLevel::Info => Self::INFO,
+            LogLevel::Debug => Self::DEBUG,
+            LogLevel::Trace => Self::TRACE,
+        }
+    }
+}
+
 /// Maximum number of log entries to retain (older entries are automatically discarded)
 const MAX_LOG_LINES: usize = 10_000;
+pub(crate) const LOG_DIR: &str = ".d_merge/logs";
 pub(crate) const LOG_FILENAME: &str = "d_merge.log";
-
-pub(crate) fn get_log_dir<P>(output_dir: P) -> PathBuf
-where
-    P: AsRef<Path>,
-{
-    output_dir.as_ref().join(".d_merge/logs")
-}
 
 /// log file & Starts tail thread
 ///

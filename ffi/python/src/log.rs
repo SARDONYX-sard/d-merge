@@ -16,7 +16,7 @@ use tracing::{debug, error, info, trace, warn};
 /// logger_init("./test/logs", "d_merge_python.log")
 /// ```
 pub fn logger_init(log_dir: String, log_name: String) -> PyResult<()> {
-    tracing_rotation::init(log_dir, &log_name)
+    tracing_rotation::global::init(log_dir, &log_name, 5)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
 
@@ -41,7 +41,7 @@ pub fn change_log_level(
     #[gen_stub(override_type(type_repr="typing.Literal[\"trace\", \"debug\", \"info\", \"warn\", \"error\"]", imports=("typing")))]
     level: String,
 ) -> PyResult<()> {
-    tracing_rotation::change_level(&level)
+    tracing_rotation::global::change_level(&level)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
 
