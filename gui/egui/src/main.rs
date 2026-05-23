@@ -22,16 +22,16 @@ pub(crate) const APP_TITLE: &str = concat!("D Merge v", env!("CARGO_PKG_VERSION"
 /// # Errors
 /// Returns an error if the native GUI cannot be started.
 fn main() -> Result<(), eframe::Error> {
-    let (settings, err) = match settings::AppSettings::load() {
+    let (settings, err) = match settings::Settings::load() {
         Ok(s) => (s, None),
-        Err(e) => (settings::AppSettings::default(), Some(e)),
+        Err(e) => (settings::Settings::default(), Some(e)),
     };
 
     let _ = tracing_rotation::global::init_with_level(
-        &settings.log_dir_path,
+        settings.log.dir_path.as_str(),
         log::LOG_FILENAME,
         5,
-        settings.log_level,
+        settings.log.level,
     );
 
     std::panic::set_hook(Box::new(|info| {
@@ -50,10 +50,10 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder {
             title: Some(APP_TITLE.to_string()),
             app_id: Some("D Merge".to_string()),
-            position: Some(egui::Pos2::new(settings.window_pos_x, settings.window_pos_y)),
+            position: Some(egui::Pos2::new(settings.ui.window.pos_x, settings.ui.window.pos_y)),
             transparent: Some(true),
-            maximized: Some(settings.window_maximized),
-            inner_size: Some(egui::vec2(settings.window_width, settings.window_height)),
+            maximized: Some(settings.ui.window.maximized),
+            inner_size: Some(egui::vec2(settings.ui.window.width, settings.ui.window.height)),
             resizable: Some(true),
             icon: Some(std::sync::Arc::new(egui::IconData {
                 rgba: icon_rgba,
@@ -69,8 +69,8 @@ fn main() -> Result<(), eframe::Error> {
         APP_TITLE,
         options,
         Box::new(|cc| {
-            fonts::setup_custom_fonts(&cc.egui_ctx, settings.font_path.as_ref());
-            cc.egui_ctx.set_theme(settings.theme);
+            fonts::setup_custom_fonts(&cc.egui_ctx, settings.ui.font_path.as_ref());
+            cc.egui_ctx.set_theme(settings.ui.theme);
 
             Ok(Box::new(App::from_settings(settings)))
         }),
