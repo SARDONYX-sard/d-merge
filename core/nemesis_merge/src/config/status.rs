@@ -6,7 +6,7 @@ pub(crate) type StatusReporterFn = Option<Box<dyn Fn(Status) + Send + Sync>>;
 ///
 /// This enum is used to track and report the current state of an ongoing process, such as
 /// reading templates, applying patches, generating files, or completing the task.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts_serde", serde(tag = "type", content = "content"))]
 pub enum Status {
     /// Status when generating FNIS patches.
