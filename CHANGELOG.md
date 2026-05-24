@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-24
+### :sparkles: New Features
+- [`8f3d15c`](https://github.com/SARDONYX-sard/d-merge/commit/8f3d15cd39df41451a834d8751c8245d149be3b6) - **egui**: toggle help button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`b3db7d6`](https://github.com/SARDONYX-sard/d-merge/commit/b3db7d66831b9b6d40cb05a4d9541365326123a9) - **ffi_python**: update gen *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`5871b96`](https://github.com/SARDONYX-sard/d-merge/commit/5871b96237673bd8d704543c671be8555f6d9f54) - **egui**: more flexible settings *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`cb30fd5`](https://github.com/SARDONYX-sard/d-merge/commit/cb30fd5a79c3b4cc6fc1f873ba8928a7ffa72ce2) - **egui**: add separator(theme box) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`766d975`](https://github.com/SARDONYX-sard/d-merge/commit/766d9754be338adba9470bc4ca89c3e2a2142b36) - **egui**: remove auto reload i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`554b492`](https://github.com/SARDONYX-sard/d-merge/commit/554b4923874ea4f10a1df1a106dc180775b838f3) - **egui**: change i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`1093e9a`](https://github.com/SARDONYX-sard/d-merge/commit/1093e9ae56a0688af888c9d6cbaad9eb112c530d) - **log**: standardize log level string capitalization *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2b4c1d5`](https://github.com/SARDONYX-sard/d-merge/commit/2b4c1d5ea224ab10d7a083a2c1aa204c7357145c) - **logger**: change to layer rotate logger *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`b25459f`](https://github.com/SARDONYX-sard/d-merge/commit/b25459f712dac648a62d4f654ce094d2b76d31e6) - **egui**: refactor egui settings v2.0 *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [1.8.0] - 2026-05-17
 ### :sparkles: New Features
 - [`b33a458`](https://github.com/SARDONYX-sard/d-merge/commit/b33a458c8a4528443d72122c451c44d5740e108b) - **egui**: implement help modal *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -479,3 +492,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.6.2]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.1...1.6.2
 [1.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.2...1.7.0
 [1.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.7.0...1.8.0
+[2.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.8.0...2.0.0
