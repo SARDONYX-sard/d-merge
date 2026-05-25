@@ -73,6 +73,8 @@ export const Tabs = () => {
           <BackupExportButton parserMode='tauri' />
           <BackupImportButton parserMode='egui' />
           <BackupExportButton parserMode='egui' />
+          <BackupImportButton parserMode='egui_v2' />
+          <BackupExportButton parserMode='egui_v2' />
         </TabPanel>
       </TabContext>
     </Box>

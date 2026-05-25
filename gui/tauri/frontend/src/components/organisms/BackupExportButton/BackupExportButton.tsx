@@ -4,13 +4,13 @@ import { useTranslation } from '@/components/hooks/useTranslation';
 import { BackupButton } from '@/components/organisms/BackupButton';
 import { NOTIFY } from '@/lib/notify';
 import { STORAGE } from '@/lib/storage';
-import { BACKUP } from '@/services/api/backup';
+import { BACKUP, ParserMode } from '@/services/api/backup';
 import { TAURI_KEYS_USED_BY_EGUI } from '@/services/api/backup/egui_support';
 
 import type { DialogClickHandler } from '@/components/organisms/BackupMenuDialog';
 
 type Props = {
-  parserMode: 'egui' | 'tauri';
+  parserMode: ParserMode;
 };
 
 export const BackupExportButton = ({ parserMode }: Props) => {
@@ -26,7 +26,17 @@ export const BackupExportButton = ({ parserMode }: Props) => {
     });
   };
 
-  const namePostfix = parserMode === 'egui' ? '(egui)' : '';
+  const namePostfix = ((parserMode: ParserMode) => {
+    switch (parserMode) {
+      case 'egui':
+        return '(egui)';
+      case 'egui_v2':
+        return '(egui v2)';
+      case 'tauri':
+      default:
+        return '(tauri)';
+    }
+  })(parserMode);
 
   return (
     <BackupButton

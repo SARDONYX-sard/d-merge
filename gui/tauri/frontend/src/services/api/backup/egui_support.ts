@@ -19,7 +19,7 @@ const EguiModItemSchema = z.object({
   name: z.string(),
   site: z.string(),
   priority: z.number(),
-  mod_type: z.enum(['nemesis', 'fnis']),
+  mod_type: z.enum(['nemesis', 'fnis', 'nemesis_ext']),
 });
 const EguiModListSchema = z.array(EguiModItemSchema);
 
@@ -126,25 +126,23 @@ const jsonString = <T extends z.ZodTypeAny>(schema: T) =>
     }
   }, schema);
 
-const TauriCacheForEguiSchema = z
-  .object({
-    [PUB_CACHE_OBJ.patchOptions]: jsonString(patchOptionsSchema).optional(),
+const TauriCacheForEguiSchema = z.looseObject({
+  [PUB_CACHE_OBJ.patchOptions]: jsonString(patchOptionsSchema).optional(),
 
-    [PRIVATE_CACHE_OBJ.patchVfsModList]: jsonString(EguiModListSchema).optional(),
+  [PRIVATE_CACHE_OBJ.patchVfsModList]: jsonString(EguiModListSchema).optional(),
 
-    [PRIVATE_CACHE_OBJ.patchModList]: jsonString(EguiModListSchema).optional(),
+  [PRIVATE_CACHE_OBJ.patchModList]: jsonString(EguiModListSchema).optional(),
 
-    [PUB_CACHE_OBJ.isVfsMode]: jsonString(z.boolean()).optional(),
+  [PUB_CACHE_OBJ.isVfsMode]: jsonString(z.boolean()).optional(),
 
-    [PRIVATE_CACHE_OBJ.patchOutput]: jsonString(z.string()).optional(),
+  [PRIVATE_CACHE_OBJ.patchOutput]: jsonString(z.string()).optional(),
 
-    [PUB_CACHE_OBJ.logLevel]: jsonString(logLevelSchema).optional(),
+  [PUB_CACHE_OBJ.logLevel]: jsonString(logLevelSchema).optional(),
 
-    [PRIVATE_CACHE_OBJ.patchVfsSkyrimDataDir]: jsonString(z.string()).optional(),
+  [PRIVATE_CACHE_OBJ.patchVfsSkyrimDataDir]: jsonString(z.string()).optional(),
 
-    [PRIVATE_CACHE_OBJ.patchSkyrimDataDir]: jsonString(z.string()).optional(),
-  })
-  .passthrough();
+  [PRIVATE_CACHE_OBJ.patchSkyrimDataDir]: jsonString(z.string()).optional(),
+});
 
 const TauriToEguiSchema = TauriCacheForEguiSchema.transform((cache): EguiSettings => {
   const patchOptions = cache[PUB_CACHE_OBJ.patchOptions];
@@ -152,16 +150,7 @@ const TauriToEguiSchema = TauriCacheForEguiSchema.transform((cache): EguiSetting
   return {
     mode: cache[PUB_CACHE_OBJ.isVfsMode] ? 'vfs' : 'manual',
 
-    target_runtime: patchOptions
-      ? ((runtime: PatchOptions['outputTarget']) => {
-          switch (runtime) {
-            case 'SkyrimSE':
-              return 'SE';
-            case 'SkyrimLE':
-              return 'LE';
-          }
-        })(patchOptions.outputTarget)
-      : undefined,
+    target_runtime: patchOptions ? convertOutputTargetToRuntime(patchOptions.outputTarget) : undefined,
 
     auto_remove_meshes: patchOptions?.autoRemoveMeshes,
     enable_debug_output:
@@ -190,3 +179,22 @@ const TauriToEguiSchema = TauriCacheForEguiSchema.transform((cache): EguiSetting
 export function convertToEguiSettings(cache: Cache): EguiSettings {
   return TauriToEguiSchema.parse(cache);
 }
+
+export const convertOutputTargetToRuntime = (runtime: PatchOptions['outputTarget']) => {
+  switch (runtime) {
+    case 'SkyrimSE':
+      return 'SE';
+    case 'SkyrimLE':
+      return 'LE';
+  }
+};
+
+export const convertRuntimeToOutputTarget = (runtime: 'SE' | 'LE' | 'VR'): PatchOptions['outputTarget'] => {
+  switch (runtime) {
+    case 'SE':
+    case 'VR':
+      return 'SkyrimSE';
+    case 'LE':
+      return 'SkyrimLE';
+  }
+};

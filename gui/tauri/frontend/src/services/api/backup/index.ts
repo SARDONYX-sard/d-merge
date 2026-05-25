@@ -1,6 +1,7 @@
 import { save } from '../dialog';
 import { readFileWithDialog, writeFile } from '../fs';
 import { convertEguiSettings, convertToEguiSettings, parseEguiSettings } from './egui_support';
+import { cacheToV2, V2ConfigSchema, v2ToCache } from './egui_v2';
 import { NOTIFY } from '@/lib/notify';
 import { CACHE_KEYS, type Cache, STORAGE } from '@/lib/storage';
 import { PRIVATE_CACHE_OBJ } from '@/lib/storage/cacheKeys';
@@ -10,7 +11,7 @@ const SETTINGS_FILE_NAME = 'settings';
 
 export const BACKUP = {
   /** @throws Error | JsonParseError */
-  async import(parserMode: 'egui' | 'tauri'): Promise<Cache | undefined> {
+  async import(parserMode: ParserMode): Promise<Cache | undefined> {
     const settings = await readFileWithDialog(PRIVATE_CACHE_OBJ.importSettingsPath, SETTINGS_FILE_NAME);
     if (settings === null) {
       return undefined;
@@ -20,6 +21,8 @@ export const BACKUP = {
       return this.fromStr(settings);
     } else if (parserMode === 'egui') {
       return convertEguiSettings(parseEguiSettings(settings) ?? {});
+    } else if (parserMode === 'egui_v2') {
+      return v2ToCache(V2ConfigSchema.parse(settings) ?? {});
     }
 
     const eguiSettings = parseEguiSettings(settings);
@@ -61,7 +64,7 @@ export const BACKUP = {
   },
 
   /** @throws SaveError */
-  async export(settings: Cache, parserMode: 'egui' | 'tauri' = 'tauri'): Promise<string | null> {
+  async export(settings: Cache, parserMode: ParserMode = 'tauri'): Promise<string | null> {
     const cachedPath = STORAGE.get(PRIVATE_CACHE_OBJ.exportSettingsPath);
     const path = await save({
       defaultPath: cachedPath ?? 'settings.json',
@@ -82,12 +85,17 @@ export const BACKUP = {
    * - If `mode` is 'egui', throws if settings cannot be converted to egui format.
    * - SaveError
    */
-  async exportRaw(path: string, settings: Cache, mode: 'tauri' | 'egui' = 'tauri') {
+  async exportRaw(path: string, settings: Cache, mode: ParserMode = 'tauri') {
     if (mode === 'egui') {
       const eguiSettings = convertToEguiSettings(settings);
       await writeFile(path, `${JSON.stringify(eguiSettings, null, 2)}\n`);
+    } else if (mode === 'egui_v2') {
+      const v2Config = cacheToV2(settings);
+      await writeFile(path, `${JSON.stringify(v2Config, null, 2)}\n`);
     } else {
       await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
     }
   },
 } as const;
+
+export type ParserMode = 'egui' | 'tauri' | 'egui_v2';
