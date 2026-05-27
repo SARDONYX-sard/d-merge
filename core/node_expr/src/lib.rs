@@ -50,27 +50,17 @@ pub fn build_dir_tree<const N: usize>(
                 let entry = entry.ok()?; // Skip entries that failed to read
                 let child_path = entry.path();
 
-                // Check if the file has an allowed extension if it's a file
+                // Skip files with disallowed extensions
                 if child_path.is_file() {
-                    if let Some(extension) = child_path.extension().and_then(|ext| ext.to_str()) {
-                        if !allowed_extensions
-                            .par_iter()
-                            .any(|&ext| ext.eq_ignore_ascii_case(extension))
-                        {
-                            return None; // Skip files with disallowed extensions
-                        }
-                    } else {
-                        return None; // Skip files without an extension
+                    let extension = child_path.extension()?;
+                    if !allowed_extensions.iter().any(|&ext| extension.eq_ignore_ascii_case(ext)) {
+                        return None;
                     }
                 }
 
-                build_dir_tree(&child_path, allowed_extensions).ok().and_then(|child_node| {
-                    if child_node.children.is_some() || child_path.is_file() {
-                        Some(child_node)
-                    } else {
-                        None // Skip empty directories
-                    }
-                })
+                build_dir_tree(&child_path, allowed_extensions)
+                    .ok()
+                    .filter(|child_node| child_node.children.is_some() || child_path.is_file())
             })
             .collect();
 

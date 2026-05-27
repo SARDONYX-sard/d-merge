@@ -41,7 +41,7 @@ pub(super) fn new_kill_patches<'a>(
 
     let duration = paired_and_kill_animation.flag_set.duration;
     let anim_file =
-        format!("Animations\\{}\\{}", &owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
+        format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
 
     let player_root_state_name = format!("Player_FNISkm{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
     let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml

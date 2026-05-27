@@ -44,7 +44,7 @@ pub async fn convert(
     roots: Option<Vec<String>>,
     status_sender: impl Fn(Payload) + Clone + Send + 'static,
 ) -> Result<(), ConvertError> {
-    let output = output.and_then(|o| if o.is_empty() { None } else { Some(o) });
+    let output = output.filter(|o| !o.is_empty());
     let strip_roots = roots.unwrap_or_default();
 
     let tasks = inputs
