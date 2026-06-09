@@ -27,7 +27,7 @@ use crate::mod_item::ModItem;
 /// Serialized under `"vfs"` and `"manual"` in `settings.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub(crate) struct ModListSettings {
+pub struct ModListSettings {
     /// Skyrim data directory for this mode.
     ///
     /// Must be set before a patch can run.  An empty string is treated as

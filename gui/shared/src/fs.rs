@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// Returns `Err(String)` when:
 /// - No ancestor exists (reached the filesystem root without a hit).
 /// - [`std::fs::canonicalize`] fails on the found path.
-pub(crate) fn find_existing_dir_or_ancestor<P>(dir: P) -> Result<PathBuf, String>
+pub fn find_existing_dir_or_ancestor<P>(dir: P) -> Result<PathBuf, String>
 where
     P: AsRef<Path>,
 {
@@ -55,7 +55,7 @@ where
 /// # Errors
 /// Returns `Err(String)` when no existing ancestor is found or the OS
 /// fails to open the directory.
-pub(crate) fn open_existing_dir_or_ancestor<P>(dir: P) -> Result<(), String>
+pub fn open_existing_dir_or_ancestor<P>(dir: P) -> Result<(), String>
 where
     P: AsRef<Path>,
 {

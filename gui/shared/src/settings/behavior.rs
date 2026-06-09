@@ -14,7 +14,7 @@ use skyrim_data_dir::Runtime;
 /// Serialized under the `"behavior"` key in `settings.json`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
-pub(crate) struct BehaviorSettings {
+pub struct BehaviorSettings {
     /// Execution mode: VFS (MO2) or Manual directory.
     ///
     /// Determines which [`super::ModeSettings`] block is active and how mod
@@ -80,7 +80,7 @@ impl Default for BehaviorSettings {
 /// Selects how mod directories are discovered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum DataMode {
+pub enum DataMode {
     /// Virtual File System mode (MO2, Vortex, etc.).
     ///
     /// The mod list is derived from the VFS root; mod IDs are the bare

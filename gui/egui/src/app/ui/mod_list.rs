@@ -29,13 +29,17 @@
 //! works around this by briefly switching to `exact` width for the single
 //! frame on which the available width changes, then returning to `initial`.
 
+use d_merge_gui_shared::{
+    fetch::FetchState,
+    i18n::I18nKey,
+    mod_item::{self, ModItem},
+    settings::mod_list_ui::SortColumn,
+};
 use egui::Button;
 use rayon::prelude::*;
 
 use crate::{
     app::App,
-    i18n::I18nKey,
-    mod_item::{ModItem, SortColumn},
     ui::dnd_table::{check_only_table_body, dnd_table_body},
 };
 
@@ -69,11 +73,10 @@ impl App {
                     .on_hover_text(self.t(I18nKey::NormalizeHover))
                     .clicked()
                 {
-                    crate::mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
+                    mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
                 }
 
-                let is_fetching =
-                    matches!(*self.fetch_state.read(), crate::app::state::FetchState::Fetching);
+                let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
                 if ui
                     .add_enabled_ui(!is_fetching, |ui| {
                         ui.add_sized(

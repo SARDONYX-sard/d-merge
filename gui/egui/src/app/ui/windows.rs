@@ -14,13 +14,10 @@
 
 use std::path::Path;
 
+use d_merge_gui_shared::i18n::{I18nKey, I18nMap};
 use egui::Color32;
 
-use crate::{
-    app::App,
-    i18n::{I18nKey, I18nMap},
-    ui::confirm::ConfirmAction,
-};
+use crate::{app::App, ui::confirm::ConfirmAction};
 
 impl App {
     /// Renders the deferred log-viewer viewport.

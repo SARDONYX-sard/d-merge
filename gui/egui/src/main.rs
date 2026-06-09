@@ -3,19 +3,28 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
 mod fonts;
-mod i18n;
-mod log;
-mod mod_item;
-mod settings;
 mod ui;
 
-use app::App;
+use d_merge_gui_shared::{
+    log::LOG_FILENAME,
+    settings::{self, ui::Theme},
+};
+
+use self::app::App;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub(crate) const APP_TITLE: &str = concat!("D Merge v", env!("CARGO_PKG_VERSION"));
+
+pub(crate) const fn to_egui_theme(theme: Theme) -> egui::ThemePreference {
+    match theme {
+        Theme::System => egui::ThemePreference::System,
+        Theme::Dark => egui::ThemePreference::Dark,
+        Theme::Light => egui::ThemePreference::Light,
+    }
+}
 
 /// Application entry point.
 ///
@@ -29,7 +38,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let _ = tracing_rotation::global::init_with_level(
         settings.log.dir_path.as_str(),
-        log::LOG_FILENAME,
+        LOG_FILENAME,
         5,
         settings.log.level,
     );
@@ -44,7 +53,7 @@ fn main() -> Result<(), eframe::Error> {
         tracing::info!("[Settings loader] Loaded settings.json");
     };
 
-    let (icon_rgba, icon_size) = ico_to_rgba(include_bytes!("../../tauri/backend/icons/icon.ico"));
+    let (icon_rgba, [icon_width, icon_height]) = d_merge_gui_shared::d_merge_icon();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
@@ -57,8 +66,8 @@ fn main() -> Result<(), eframe::Error> {
             resizable: Some(true),
             icon: Some(std::sync::Arc::new(egui::IconData {
                 rgba: icon_rgba,
-                width: icon_size[0],
-                height: icon_size[1],
+                width: icon_width,
+                height: icon_height,
             })),
             ..Default::default()
         },
@@ -70,19 +79,9 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|cc| {
             fonts::setup_custom_fonts(&cc.egui_ctx, settings.ui.font_path.as_ref());
-            cc.egui_ctx.set_theme(settings.ui.theme);
+            cc.egui_ctx.set_theme(to_egui_theme(settings.ui.theme));
 
             Ok(Box::new(App::from_settings(settings)))
         }),
     )
-}
-
-fn ico_to_rgba(bytes: &[u8]) -> (Vec<u8>, [u32; 2]) {
-    let cursor = std::io::Cursor::new(bytes);
-    let ico = ico::IconDir::read(cursor).unwrap();
-    let entry = ico.entries().first().unwrap();
-    let image = entry.decode().unwrap();
-    let width = image.width();
-    let height = image.height();
-    (image.rgba_data().to_vec(), [width, height])
 }

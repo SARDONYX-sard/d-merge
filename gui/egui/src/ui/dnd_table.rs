@@ -1,8 +1,8 @@
+use d_merge_gui_shared::mod_item::ModItem;
 use eframe::egui::{self};
 use rayon::prelude::*;
 
 use super::label_ext::{ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
-use crate::mod_item::ModItem;
 
 /// Handle drag-and-drop reordering of mods.
 pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {

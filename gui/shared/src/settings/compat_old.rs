@@ -2,10 +2,10 @@ use std::{borrow::Cow, path::PathBuf};
 
 use crate::{
     log::LogLevel,
-    mod_item::{ModItem, SortColumn},
+    mod_item::ModItem,
     settings::{
         BehaviorSettings, DataMode, LogSettings, ModListSettings, ModListUiSettings, Settings,
-        UiSettings, ui::WindowGeometry,
+        UiSettings, mod_list_ui::SortColumn, ui::WindowGeometry,
     },
 };
 
