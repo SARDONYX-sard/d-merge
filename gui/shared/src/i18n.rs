@@ -20,8 +20,16 @@ pub enum I18nKey {
     /// Auto remove `meshes`
     AutoRemoveMeshes,
 
-    /// Delete `<output dir>/meshes`, `<output dir>/.d_merge/.debug` immediately before running the patch.
-    /// Note: If the output directory is the same as Skyrim's data directory, the process will be skipped because deleting the mesh could potentially destroy all mods.
+    /// Deletes previous output before patch execution.
+    ///
+    /// Targets:
+    /// - `<output directory>/meshes`
+    /// - `<output directory>/.d_merge/.debug`
+    /// - `<output directory>/SKSE/Plugins/fnis_aa/config.json`
+    ///
+    /// Note:
+    /// To avoid accidental mod corruption caused by deleting `meshes`,
+    /// deletion is skipped when the output directory is the same as the Skyrim Data directory.
     AutoRemoveMeshesHover,
 
     /// Auto run
@@ -60,6 +68,39 @@ pub enum I18nKey {
 
     /// Debug output
     DebugOutput,
+
+    /// Bug Report:
+    BugReportLabel,
+
+    /// See Issues
+    BugReportSeeIssues,
+
+    /// Tooling:
+    ToolingLabel,
+
+    /// Log Path:
+    LogDirPathLabel,
+
+    /// I18n Path:
+    I18nPathLabel,
+
+    /// NOTE: Need to restart the app for changes to take effect.
+    RestartRequiredNote,
+
+    /// Author:
+    AuthorLabel,
+
+    /// License:
+    LicenseLabel,
+
+    /// Source Code:
+    SourceCodeLabel,
+
+    /// Change Log:
+    ChangeLogLabel,
+
+    /// Mod Test Status:
+    ModTestStatusLabel,
 
     /// Output d merge patches & merged json files.
     /// (To `<Output dir>/.d_merge/.debug/patches`)
@@ -102,8 +143,8 @@ pub enum I18nKey {
     IssueReportButton,
 
     /// Report a bug on GitHub.
-    ///  This will auto-fill version info and some hardware.
-    ///  GitHub account required.
+    /// This will auto-fill version info and some hardware.
+    /// GitHub account required.
     IssueReportHover,
 
     /// 🔒Locked
@@ -131,10 +172,13 @@ pub enum I18nKey {
 
     /// Updated mod list
     ModsListFetchStateDone,
+
     /// No mods found
     ModsListFetchStateEmpty,
+
     /// Failed to update mod list
     ModsListFetchStateError,
+
     /// Fetching mod list...
     ModsListFetchStateFetching,
 

@@ -94,18 +94,17 @@ impl App {
             picker: impl FnOnce() -> Option<String>,
         ) {
             ui.horizontal(|ui| {
-                let response = ui.label(label);
-
-                if let Some(hover) = hover {
-                    response.on_hover_text(hover);
+                let r = ui.label(label);
+                if let Some(h) = hover {
+                    r.on_hover_text(h);
                 }
 
                 ui.text_edit_singleline(value);
 
                 if ui.button(select_label).clicked()
-                    && let Some(path) = picker()
+                    && let Some(p) = picker()
                 {
-                    *value = path;
+                    *value = p;
                 }
 
                 if ui.button(clear_label).clicked() {
@@ -114,36 +113,39 @@ impl App {
             });
         }
 
-        // ── Pre-extract strings ───────────────────────────────────────────────
         let window_title = self.t(I18nKey::HelpButton).to_string();
 
         let issue_report_label = self.t(I18nKey::IssueReportButton).to_string();
         let issue_report_hover = self.t(I18nKey::IssueReportHover).to_string();
 
         let select_button = self.t(I18nKey::SelectButton).to_string();
-        let clear_button = "Clear".to_string();
+        let clear_button = self.t(I18nKey::ClearButton).to_string();
+
+        let bug_report_label = self.t(I18nKey::BugReportLabel).to_string();
+        let see_issues_label = self.t(I18nKey::BugReportSeeIssues).to_string();
+        let tooling_label = self.t(I18nKey::ToolingLabel).to_string();
+
+        let log_dir_label = self.t(I18nKey::LogDirPathLabel).to_string();
+        let i18n_path_label = self.t(I18nKey::I18nPathLabel).to_string();
+        let restart_note = self.t(I18nKey::RestartRequiredNote).to_string();
 
         let i18n_write_label = self.t(I18nKey::I18nWriteNewJsonButton).to_string();
-
         let i18n_write_hover = format!(
-            "{} (path: {})",
+            "{} (-> {})",
             self.t(I18nKey::I18nWriteNewJsonHover),
             self.settings.ui.i18n_path,
         );
 
         let i18n_reload_label = self.t(I18nKey::I18nReloadJsonButton).to_string();
-
         let i18n_reload_hover = format!(
-            "{} (path: {})",
+            "{} (-> {})",
             self.t(I18nKey::I18nReloadJsonHover),
             self.settings.ui.i18n_path,
         );
 
         let issue_url = self.settings.create_issue_link();
 
-        // ── Deferred mutations ────────────────────────────────────────────────
         let mut show = true;
-
         let mut issue_clicked = false;
         let mut write_i18n_clicked = false;
         let mut reload_i18n_clicked = false;
@@ -157,59 +159,61 @@ impl App {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
-                // ── App info ──────────────────────────────────────────────────
                 ui.vertical_centered(|ui| {
                     ui.heading(crate::APP_TITLE);
                 });
 
                 ui.add_space(8.0);
 
-                // ── Links grid ───────────────────────────────────────────────
                 ui.separator();
-                ui.add_space(4.0);
-
-                const LICENSE_URL: &str = concat!(
-                    env!("CARGO_PKG_REPOSITORY"),
-                    "/blob/",
-                    env!("CARGO_PKG_VERSION"),
-                    "/LICENSE",
-                );
-
-                const SOURCE_CODE_URL: &str =
-                    concat!(env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("CARGO_PKG_VERSION"),);
-
-                const CHANGELOG_URL: &str =
-                    concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md");
-
-                const MOD_TEST_URL: &str = concat!(
-                    env!("CARGO_PKG_REPOSITORY"),
-                    "/blob/",
-                    env!("CARGO_PKG_VERSION"),
-                    "/docs/test_status.md",
-                );
 
                 let rows = [
-                    ("Author:", env!("CARGO_PKG_AUTHORS"), None),
-                    ("License:", env!("CARGO_PKG_LICENSE"), Some(LICENSE_URL)),
-                    ("Source Code:", "GitHub", Some(SOURCE_CODE_URL)),
-                    ("Change Log:", "CHANGELOG.md", Some(CHANGELOG_URL)),
-                    ("Mod Test Status:", "test_status.md", Some(MOD_TEST_URL)),
+                    (self.t(I18nKey::AuthorLabel).to_string(), env!("CARGO_PKG_AUTHORS"), None),
+                    (
+                        self.t(I18nKey::LicenseLabel).to_string(),
+                        env!("CARGO_PKG_LICENSE"),
+                        Some(concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/blob/",
+                            env!("CARGO_PKG_VERSION"),
+                            "/LICENSE"
+                        )),
+                    ),
+                    (
+                        self.t(I18nKey::SourceCodeLabel).to_string(),
+                        "GitHub",
+                        Some(concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/tree/",
+                            env!("CARGO_PKG_VERSION")
+                        )),
+                    ),
+                    (
+                        self.t(I18nKey::ChangeLogLabel).to_string(),
+                        "CHANGELOG.md",
+                        Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md")),
+                    ),
+                    (
+                        self.t(I18nKey::ModTestStatusLabel).to_string(),
+                        "test_status.md",
+                        Some(concat!(
+                            env!("CARGO_PKG_REPOSITORY"),
+                            "/blob/",
+                            env!("CARGO_PKG_VERSION"),
+                            "/docs/test_status.md"
+                        )),
+                    ),
                 ];
 
                 egui::Grid::new("help_info_grid").num_columns(2).spacing([8.0, 6.0]).show(
                     ui,
                     |ui| {
-                        for (label, value, url) in rows {
-                            ui.label(label);
-
+                        for (l, v, url) in rows {
+                            ui.label(l);
                             match url {
-                                Some(url) => {
-                                    ui.hyperlink_to(value, url).on_hover_text(url);
-                                }
-                                None => {
-                                    ui.label(value);
-                                }
-                            }
+                                Some(url) => ui.hyperlink_to(v, url).on_hover_text(url),
+                                None => ui.label(v),
+                            };
 
                             ui.end_row();
                         }
@@ -218,17 +222,15 @@ impl App {
 
                 ui.add_space(8.0);
 
-                // ── Bug report ────────────────────────────────────────────────
                 ui.separator();
                 ui.add_space(4.0);
 
-                ui.label("Bug Report:");
-                ui.add_space(4.0);
+                ui.label(&bug_report_label);
 
                 ui.horizontal(|ui| {
                     const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
 
-                    ui.hyperlink_to("See Issues", ISSUE_URL).on_hover_text(ISSUE_URL);
+                    ui.hyperlink_to(&see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
 
                     if ui.button(&issue_report_label).on_hover_text(&issue_report_hover).clicked() {
                         issue_clicked = true;
@@ -237,29 +239,26 @@ impl App {
 
                 ui.add_space(8.0);
 
-                // ── Tooling ───────────────────────────────────────────────────
                 ui.separator();
                 ui.add_space(4.0);
 
-                ui.label("Tooling:");
+                ui.label(&tooling_label);
+
                 ui.add_space(4.0);
 
                 path_selector_row(
                     ui,
-                    "Log dir path:",
+                    &log_dir_label,
                     &mut selected_log_dir_path,
                     &select_button,
                     &clear_button,
-                    Some("NOTE: You'll need to restart the app for changes to take effect."),
+                    Some(&restart_note),
                     || {
                         let p = Path::new(self.settings.log.dir_path.as_str());
-
-                        match p.canonicalize() {
-                            Ok(cp) => rfd::FileDialog::new().set_directory(cp),
-                            Err(_) => rfd::FileDialog::new(),
-                        }
-                        .pick_folder()
-                        .map(|p| p.display().to_string())
+                        rfd::FileDialog::new()
+                            .set_directory(p)
+                            .pick_folder()
+                            .map(|p| p.display().to_string())
                     },
                 );
 
@@ -267,23 +266,18 @@ impl App {
 
                 path_selector_row(
                     ui,
-                    "I18n Path:",
+                    &i18n_path_label,
                     &mut selected_i18n_path,
                     &select_button,
                     &clear_button,
                     None,
                     || {
                         let p = Path::new(&self.settings.ui.i18n_path);
-
-                        match p.parent() {
-                            Some(parent) if parent.exists() => {
-                                rfd::FileDialog::new().set_directory(parent)
-                            }
-                            _ => rfd::FileDialog::new(),
-                        }
-                        .add_filter("translation.json", &["json"])
-                        .pick_file()
-                        .map(|p| p.display().to_string())
+                        rfd::FileDialog::new()
+                            .set_directory(p)
+                            .add_filter("translation.json", &["json"])
+                            .pick_file()
+                            .map(|p| p.display().to_string())
                     },
                 );
 
@@ -300,7 +294,6 @@ impl App {
                 });
             });
 
-        // ── Apply deferred mutations ──────────────────────────────────────────
         if !show {
             self.show_help = false;
         }
