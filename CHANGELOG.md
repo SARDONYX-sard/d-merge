@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-09
+### :sparkles: New Features
+- [`de3ba96`](https://github.com/SARDONYX-sard/d-merge/commit/de3ba96c7a923710201aa1a9042da6201c541899) - **tauri**: support v2 egui settings *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`caaaad0`](https://github.com/SARDONYX-sard/d-merge/commit/caaaad0b7f748dae831e917a4ddfa91b438c915d) - **cli**: remove cli(unused crate) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8b1ff15`](https://github.com/SARDONYX-sard/d-merge/commit/8b1ff15906d835ccce684c50c1e05a006887ffcf) - remove override FNIS AA config *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6caaf49`](https://github.com/SARDONYX-sard/d-merge/commit/6caaf495813e547ac8cde31ab515a5d0e6a91ff2) - **gui_i18n**: fix i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`973a400`](https://github.com/SARDONYX-sard/d-merge/commit/973a400a74d782adc9e7ac89b5672b45ed0f8fc9) - **gui**: fix empty list crash *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`029777c`](https://github.com/SARDONYX-sard/d-merge/commit/029777ca8b5868de88d956c241e4b3f389a021d2) - **egui**: separate module shared *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`b4304c5`](https://github.com/SARDONYX-sard/d-merge/commit/b4304c5289371d5007fd58011e021b5be39a1283) - **merge**: private inner field *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.0.0] - 2026-05-24
 ### :sparkles: New Features
 - [`8f3d15c`](https://github.com/SARDONYX-sard/d-merge/commit/8f3d15cd39df41451a834d8751c8245d149be3b6) - **egui**: toggle help button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -493,3 +508,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.6.2...1.7.0
 [1.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.7.0...1.8.0
 [2.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.8.0...2.0.0
+[2.0.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.0...2.0.1
