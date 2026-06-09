@@ -14,7 +14,6 @@ rust-version = "1.95"
 
 [workspace]
 members = [
-  "cli",
   "core/fnis_list",
   "core/gh_issue_link",
   "core/json_patch",

@@ -1,5 +1,4 @@
 use pyo3::prelude::*;
-use tracing::{debug, error, info, trace, warn};
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
 #[pyo3::pyfunction]
@@ -57,7 +56,7 @@ pub fn change_log_level(
 /// log_trace('This is a trace message');
 /// ```
 pub fn log_trace(msg: String) {
-    trace!("{msg}");
+    tracing::trace!("{msg}");
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
@@ -72,7 +71,7 @@ pub fn log_trace(msg: String) {
 /// log_debug('This is a debug message');
 /// ```
 pub fn log_debug(msg: String) {
-    debug!("{msg}");
+    tracing::debug!("{msg}");
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
@@ -87,7 +86,7 @@ pub fn log_debug(msg: String) {
 /// log_info('This is an info message');
 /// ```
 pub fn log_info(msg: String) {
-    info!("{msg}");
+    tracing::info!("{msg}");
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
@@ -102,7 +101,7 @@ pub fn log_info(msg: String) {
 /// log_warn('This is a warning message');
 /// ```
 pub fn log_warn(msg: String) {
-    warn!("{msg}");
+    tracing::warn!("{msg}");
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]
@@ -117,5 +116,5 @@ pub fn log_warn(msg: String) {
 /// log_error('This is an error message');
 /// ```
 pub fn log_error(msg: String) {
-    error!("{msg}");
+    tracing::error!("{msg}");
 }
