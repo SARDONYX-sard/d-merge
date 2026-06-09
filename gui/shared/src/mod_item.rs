@@ -4,7 +4,7 @@ use rayon::{iter::Either, prelude::*};
 
 /// Represents a single mod entry.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)] // Need hash to dnd
-pub(crate) struct ModItem {
+pub struct ModItem {
     /// Whether the mod is enabled.
     pub enabled: bool,
     /// - Nemesis/FNIS(vfs): e.g. `aaaa`
@@ -23,21 +23,10 @@ pub(crate) struct ModItem {
     pub mod_type: ModType,
 }
 
-/// Columns that can be used for sorting mods.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum SortColumn {
-    Id,
-    Name,
-    ModType,
-    Site,
-    Priority,
-}
-
 /// Inherit priority/enabled from old list.
 /// New items are appended in alphabetical order.
 /// Final priorities are always normalized.
-pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
+pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
     let old_map: rapidhash::fast::RapidHashMap<&str, (bool, usize)> =
         old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
@@ -79,7 +68,7 @@ pub(crate) fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<Mo
 }
 
 /// Convert `ModItem` into `PatchMaps`.
-pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
+pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
     // - Nemesis/FNIS(vfs): e.g. `aaaa`
     // - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
     // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
@@ -119,7 +108,7 @@ pub(crate) fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModIt
 ///
 /// Inside each mod type, mods are ordered by `id` alphabetically.
 /// After sorting, priorities are reassigned sequentially starting from 0.
-pub(crate) fn reorder_mods_priorities(mods: &mut [ModItem]) {
+pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
     use mod_info::ModType;
 
     const fn mod_type_rank(mod_type: &ModType) -> u8 {

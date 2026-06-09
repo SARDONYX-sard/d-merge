@@ -30,8 +30,11 @@ members = [
   "core/skyrim_esp",
   "core/tracing_rotation",
   "ffi/python",
+
   "gui/egui",
-  "gui/egui_derive",
+  # "gui/gpui",
+  "gui/shared",
+  "gui/shared_derive",
   "gui/tauri/backend",
 ]
 resolver = "3"
@@ -89,6 +92,8 @@ skyrim_crc = { path = "./core/skyrim_crc" }
 skyrim_data_dir = { path = "./core/skyrim_data_dir" }
 skyrim_esp = { path = "./core/skyrim_esp" }
 tracing_rotation = { path = "./core/tracing_rotation" }
+
+d_merge_gui_shared = { path = "./gui/shared" }
 
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.

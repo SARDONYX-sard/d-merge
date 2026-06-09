@@ -27,27 +27,24 @@
 //! that egui requires (top panels → bottom panels → central panel →
 //! floating windows).  No rendering logic lives here.
 
-pub(crate) mod dir_utils;
 pub(crate) mod fetch;
+pub(crate) mod log;
 pub(crate) mod notify;
 pub(crate) mod patch;
-pub(crate) mod state;
 pub(crate) mod ui;
 
-use std::{
-    path::Path,
-    sync::{Arc, atomic::AtomicBool},
-};
+use std::sync::{Arc, atomic::AtomicBool};
 
+use d_merge_gui_shared::{
+    fetch::FetchState,
+    i18n::{I18nKey, I18nMap},
+    patch::PatchProgress,
+    settings::Settings,
+};
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::{
-    app::state::PatchProgress,
-    i18n::{I18nKey, I18nMap},
-    settings::Settings,
-    ui::confirm::ConfirmDialog,
-};
+use crate::ui::confirm::ConfirmDialog;
 
 /// Central application state.
 ///
@@ -116,7 +113,7 @@ pub(crate) struct App {
     // ── Fetch state ───────────────────────────────────────────────────────────
     /// Current phase of the background mod-list fetch.
     /// Written by the worker thread, read by the UI thread every frame.
-    pub fetch_state: Arc<RwLock<state::FetchState>>,
+    pub fetch_state: Arc<RwLock<FetchState>>,
 
     /// Staging buffer: the worker writes here before transitioning to `Done`.
     pub fetched_mod_info: Arc<RwLock<Vec<mod_info::ModInfo>>>,
@@ -166,7 +163,7 @@ impl App {
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
 
-            fetch_state: Arc::new(RwLock::new(state::FetchState::Idle)),
+            fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
             fetched_mod_info: Arc::new(RwLock::new(Vec::new())),
             last_fetch_was_empty: false,
 
@@ -234,28 +231,6 @@ impl eframe::App for App {
 }
 
 impl App {
-    /// Starts the log-tail watcher on the first frame.
-    ///
-    /// Subsequent calls are no-ops (`log_watcher_started` guards the spawn).
-    /// The watcher writes to [`App::log_lines`] and requests a repaint via
-    /// the cloned [`egui::Context`].
-    fn start_log_watcher(&mut self, ctx: &egui::Context) {
-        if self.log_watcher_started {
-            return;
-        }
-
-        let log_dir = self.settings.log.dir_path.as_str();
-        let log_path = Path::new(log_dir).join(crate::log::LOG_FILENAME);
-
-        let log_lines = Arc::clone(&self.log_lines);
-        let ctx = ctx.clone();
-        if let Err(err) = crate::log::start_log_tail(&log_path, log_lines, Some(ctx)) {
-            tracing::error!("Couldn't start log watcher: {err}");
-        }
-
-        self.log_watcher_started = true;
-    }
-
     /// Reads the current window geometry from egui and persists it to
     /// [`AppSettings`] so the window reopens in the same position and size.
     ///

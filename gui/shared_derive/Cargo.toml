@@ -1,5 +1,5 @@
 [package]
-name = "egui_derive"
+name = "d_merge_gui_shared_derive"
 version.workspace = true
 description = "egui ver. derive attr"
 

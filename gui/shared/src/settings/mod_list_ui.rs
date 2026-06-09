@@ -6,15 +6,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::mod_item::SortColumn;
-
 /// Filter and sort state for the mod-list table.
 ///
 /// # JSON key
 /// Serialized under the `"mod_list_ui"` key in `settings.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub(crate) struct ModListUiSettings {
+pub struct ModListUiSettings {
     /// Current text in the mod-list search box.
     ///
     /// Matched case-insensitively against the column selected by
@@ -52,4 +50,15 @@ impl Default for ModListUiSettings {
             sort_asc: true,
         }
     }
+}
+
+/// Columns that can be used for sorting mods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SortColumn {
+    Id,
+    Name,
+    ModType,
+    Site,
+    Priority,
 }

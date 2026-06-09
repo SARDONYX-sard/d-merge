@@ -5,7 +5,7 @@ use crate::log::LogLevel;
 /// Options that logging.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
-pub(crate) struct LogSettings {
+pub struct LogSettings {
     /// Directory where rotating log files are written.
     ///
     /// Changes require an application restart to take effect (the log

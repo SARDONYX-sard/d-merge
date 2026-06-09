@@ -10,13 +10,15 @@
 //! repeated per panel because [`egui::TopBottomPanel`] consumes `self` on
 //! each builder call and cannot be stored across the branch.
 
-use egui::Separator;
-
-use crate::{
-    app::{App, state::FetchState},
+use d_merge_gui_shared::{
+    fetch::FetchState,
+    fs::{find_existing_dir_or_ancestor, open_existing_dir_or_ancestor},
     i18n::I18nKey,
     settings::{DataMode, ui::Theme},
 };
+use egui::Separator;
+
+use crate::app::App;
 
 impl App {
     /// Renders the execution-mode radio buttons and global option checkboxes.
@@ -113,7 +115,7 @@ impl App {
                             .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
                             .changed()
                         {
-                            ui.ctx().set_theme(self.settings.ui.theme);
+                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
                         }
                     }
                 });
@@ -166,9 +168,8 @@ impl App {
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
-                    && let Err(err) = crate::app::dir_utils::open_existing_dir_or_ancestor(
-                        self.settings.current_skyrim_data_dir(),
-                    )
+                    && let Err(err) =
+                        open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
                 {
                     self.notify_error(err);
                 }
@@ -192,7 +193,7 @@ impl App {
                     .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
                     .clicked()
                 {
-                    let dialog = match crate::app::dir_utils::find_existing_dir_or_ancestor(
+                    let dialog = match find_existing_dir_or_ancestor(
                         self.settings.current_skyrim_data_dir(),
                     ) {
                         Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
@@ -227,9 +228,9 @@ impl App {
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button(self.t(I18nKey::OutputDirLabel)).clicked()
-                    && let Err(err) = crate::app::dir_utils::open_existing_dir_or_ancestor(
-                        std::path::Path::new(self.settings.current_output_dir()),
-                    )
+                    && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
+                        self.settings.current_output_dir(),
+                    ))
                 {
                     self.notify_error(err);
                 }
@@ -247,9 +248,7 @@ impl App {
                     .clicked()
                 {
                     let dialog = if !self.settings.current_output_dir().is_empty() {
-                        match crate::app::dir_utils::find_existing_dir_or_ancestor(
-                            self.settings.current_output_dir(),
-                        ) {
+                        match find_existing_dir_or_ancestor(self.settings.current_output_dir()) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
                                 self.notify_error(format!(

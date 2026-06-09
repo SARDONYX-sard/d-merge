@@ -28,16 +28,16 @@
 //! centralize the VFS / Manual branch so call-sites never write
 //! `match self.behavior.mode { … }` by hand.
 
-pub(crate) mod behavior;
+pub mod behavior;
 mod compat_old;
-pub(crate) mod log;
-pub(crate) mod mod_list;
-pub(crate) mod mod_list_ui;
-pub(crate) mod ui;
+pub mod log;
+pub mod mod_list;
+pub mod mod_list_ui;
+pub mod ui;
 
 use semver::Version;
 
-pub(crate) use self::{
+pub use self::{
     behavior::{BehaviorSettings, DataMode},
     log::LogSettings,
     mod_list::ModListSettings,
@@ -47,14 +47,14 @@ pub(crate) use self::{
 use crate::mod_item::ModItem;
 
 /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
-const SETTINGS_PATH: &str = "./.d_merge/d_merge_settings.json";
+pub const SETTINGS_PATH: &str = "./.d_merge/d_merge_settings.json";
 
 /// Top-level settings written to and read from `settings.json`.
 ///
 /// Each field group is a dedicated struct so that a call-site only borrows
 /// the sub-struct it needs, rather than all of `AppSettings`.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct Settings {
+pub struct Settings {
     /// Schema version written by the last save.
     ///
     /// Since this option was not available until version 1.8.0, we will use this as the basis for migrating the old settings.
@@ -109,7 +109,10 @@ impl Settings {
     /// Returns [`Default`] when the file is absent.  Returns an error when
     /// the file exists but cannot be parsed, so the caller can surface a
     /// diagnostic rather than silently overwriting valid data.
-    pub(crate) fn load() -> Result<Self, String> {
+    ///
+    /// # Errors
+    /// failed to read json
+    pub fn load() -> Result<Self, String> {
         let path = std::path::Path::new(SETTINGS_PATH);
 
         if !path.exists() {
@@ -119,30 +122,43 @@ impl Settings {
         let text = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {SETTINGS_PATH}: {e}"))?;
 
-        let settings: Self = if let Ok(settings) = sonic_rs::from_str(&text) {
+        let mut settings: Self = if let Ok(settings) = sonic_rs::from_str(&text) {
             settings
         } else {
             let old: compat_old::OldSettings = sonic_rs::from_str(&text)
                 .map_err(|e| format!("Failed to parse {SETTINGS_PATH}: {e}"))?;
             old.into()
         };
+        settings.app_version =
+            Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or(Self::default_version());
 
         Ok(settings)
     }
 
+    /// To json.
+    ///
+    /// # Errors
+    ///
+    /// Serialization can fail if `T`'s implementation of `Serialize` decides to fail, or if `T` contains a map with non-string keys.
+    #[inline]
+    pub fn to_string_pretty(&self) -> Result<String, sonic_rs::Error> {
+        sonic_rs::to_string_pretty(self)
+    }
+
     /// Writes settings to `settings.json`, stamping [`AppSettings::app_version`]
     /// with the current crate version before serializing.
-    pub(crate) fn save(&mut self) {
-        self.app_version =
-            Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or(Self::default_version());
-
+    pub fn save(&self) {
         match sonic_rs::to_string_pretty(self) {
             Ok(text) => {
-                if let Err(e) = std::fs::write(SETTINGS_PATH, text) {
-                    tracing::error!("Failed to save settings: {e}");
+                if let Err(_e) = std::fs::write(SETTINGS_PATH, text) {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!("Failed to save settings: {_e}");
                 }
             }
-            Err(e) => tracing::error!("Failed to serialize settings: {e}"),
+            Err(_e) => {
+                #[cfg(feature = "tracing")]
+                tracing::error!("Failed to serialize settings: {_e}");
+            }
         }
     }
 }
@@ -157,7 +173,7 @@ impl Settings {
     /// Centralizes the `match self.behavior.mode { … }` branch so
     /// call-sites never repeat it.
     #[inline]
-    pub(crate) const fn current_mode(&self) -> &ModListSettings {
+    pub const fn current_mode(&self) -> &ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &self.vfs,
             DataMode::Manual => &self.manual,
@@ -166,7 +182,7 @@ impl Settings {
 
     /// Returns a mutable reference to the active [`ModeSettings`].
     #[inline]
-    pub(crate) const fn current_mode_mut(&mut self) -> &mut ModListSettings {
+    pub const fn current_mode_mut(&mut self) -> &mut ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &mut self.vfs,
             DataMode::Manual => &mut self.manual,
@@ -175,38 +191,38 @@ impl Settings {
 
     /// Skyrim data directory for the active mode.
     #[inline]
-    pub(crate) fn current_skyrim_data_dir(&self) -> &str {
+    pub fn current_skyrim_data_dir(&self) -> &str {
         &self.current_mode().skyrim_data_dir
     }
 
     /// Output directory for the active mode.
     #[inline]
-    pub(crate) fn current_output_dir(&self) -> &str {
+    pub fn current_output_dir(&self) -> &str {
         &self.current_mode().output_dir
     }
 
     /// Mutable output directory for the active mode.
     #[inline]
-    pub(crate) const fn current_output_dir_mut(&mut self) -> &mut String {
+    pub const fn current_output_dir_mut(&mut self) -> &mut String {
         &mut self.current_mode_mut().output_dir
     }
 
     /// Mod list for the active mode (immutable).
     #[inline]
-    pub(crate) fn mod_list(&self) -> &[ModItem] {
+    pub fn mod_list(&self) -> &[ModItem] {
         &self.current_mode().mod_list
     }
 
     /// Mod list for the active mode (mutable).
     #[inline]
-    pub(crate) const fn mod_list_mut(&mut self) -> &mut Vec<ModItem> {
+    pub const fn mod_list_mut(&mut self) -> &mut Vec<ModItem> {
         &mut self.current_mode_mut().mod_list
     }
 
     /// Constructs a GitHub issue URL pre-filled with system information.
     ///
     /// Included in the help window's bug-report section.
-    pub(crate) fn create_issue_link(&self) -> String {
+    pub fn create_issue_link(&self) -> String {
         use std::{borrow::Cow, path::Path};
 
         use gh_issue_link::{SkyrimRuntime, new_gh_issue_link, version::get_file_version};

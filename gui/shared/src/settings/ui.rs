@@ -12,7 +12,7 @@ use crate::settings::ModListUiSettings;
 /// Serialized under the `"ui"` key in `settings.json`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
-pub(crate) struct UiSettings {
+pub struct UiSettings {
     /// Color theme preference.
     ///
     /// Applied on startup via `egui::Context::set_theme` and whenever the
@@ -73,21 +73,12 @@ pub enum Theme {
 }
 
 impl Theme {
-    pub(crate) const fn as_str(&self) -> &'static str {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::System => "💻 System",
             Self::Dark => "🌙 Dark",
             Self::Light => "☀ Light",
-        }
-    }
-}
-
-impl From<Theme> for egui::ThemePreference {
-    fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::System => Self::System,
-            Theme::Dark => Self::Dark,
-            Theme::Light => Self::Light,
         }
     }
 }
@@ -105,7 +96,7 @@ impl From<Theme> for egui::ThemePreference {
 /// Serialized under `"ui"."window"` in `settings.json`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
-pub(crate) struct WindowGeometry {
+pub struct WindowGeometry {
     /// X coordinate of the window's top-left corner (outer rect).
     pub pos_x: f32,
 

@@ -8,9 +8,9 @@ use rayon::prelude::*;
 use snafu::ResultExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(serde::Serialize, serde::Deserialize, egui_derive::I18n)]
+#[derive(serde::Serialize, serde::Deserialize, d_merge_gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum I18nKey {
+pub enum I18nKey {
     /// Auto Detect
     AutoDetectButton,
 
@@ -239,30 +239,34 @@ pub(crate) enum I18nKey {
 }
 
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub(crate) struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, rapidhash::fast::RandomState>);
+pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, rapidhash::fast::RandomState>);
 
 impl I18nMap {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self(IndexMap::default())
     }
 
     /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
-    pub(crate) const FILE: &'static str = "./.d_merge/translation.json";
+    pub const FILE: &'static str = "./.d_merge/translation.json";
 
     /// Translate given key or fallback to default English.
-    pub(crate) fn t(&self, key: I18nKey) -> &str {
+    pub fn t(&self, key: I18nKey) -> &str {
         self.0.get(&key).map_or_else(|| key.default_eng(), |s| s.as_ref())
     }
 
     /// Try to load `./.d_merge/translation.json`.
     /// If not exists or failed to parse, fallback to `default_map()`.
-    pub(crate) fn load<P>(path: P) -> Result<Self, Error>
+    ///
+    /// # Errors
+    /// failed to read json
+    pub fn load<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
 
         if !path.exists() {
+            #[cfg(feature = "tracing")]
             tracing::warn!("translation.json does not exist");
             return Ok(Self::new());
         }
@@ -273,7 +277,9 @@ impl I18nMap {
     }
 
     /// Save translation.json
-    pub(crate) fn save<P>(path: P) -> Result<(), Error>
+    /// # Errors
+    /// failed to write json
+    pub fn save<P>(path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {
@@ -290,7 +296,7 @@ impl I18nMap {
 }
 
 #[derive(Debug, snafu::Snafu)]
-pub(crate) enum Error {
+pub enum Error {
     #[snafu(display("Failed to read file: {}", path.display()))]
     ReadFile { path: PathBuf, source: std::io::Error },
 

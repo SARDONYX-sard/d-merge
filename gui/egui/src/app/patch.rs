@@ -18,14 +18,14 @@
 
 use std::sync::{Arc, atomic::Ordering};
 
-use skyrim_data_dir::Runtime;
-
-use crate::{
-    app::App,
+use d_merge_gui_shared::{
     i18n::I18nKey,
     mod_item::to_patches,
     settings::{BehaviorSettings, DataMode},
 };
+use skyrim_data_dir::Runtime;
+
+use crate::app::App;
 
 impl App {
     /// Assembles patch configuration from current settings and starts
@@ -49,7 +49,7 @@ impl App {
                 (&self.settings.manual.skyrim_data_dir, false, &self.settings.manual.mod_list)
             }
         };
-        let patches = { to_patches(skyrim_data_dir, is_vfs, mod_list) };
+        let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
 
         let BehaviorSettings {
             target_runtime,
@@ -138,3 +138,78 @@ impl App {
 }
 
 pub(crate) const EGUI_RIGHT_BLUE: egui::Color32 = egui::Color32::from_rgb(120, 220, 255);
+
+pub(crate) trait EguiDisplay {
+    fn apply(&self, status: nemesis_merge::Status, ctx: &egui::Context);
+    fn color(&self) -> egui::Color32;
+}
+
+impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
+    /// Applies a new patch-generation status emitted by
+    /// `nemesis_merge::behavior_gen`.
+    ///
+    /// High-frequency progress updates are written into atomics so the egui
+    /// render loop can poll them without lock contention.
+    ///
+    /// Terminal states:
+    /// - `Done`
+    /// - `Error`
+    ///
+    /// are stored separately because they occur rarely compared to normal
+    /// progress updates.
+    fn apply(&self, status: nemesis_merge::Status, ctx: &egui::Context) {
+        let old_phase = self.phase.load(Ordering::Relaxed);
+
+        let new_phase = match &status {
+            nemesis_merge::Status::GeneratingFnisPatches { .. } => 1,
+            nemesis_merge::Status::ReadingPatches { .. } => 2,
+            nemesis_merge::Status::ParsingPatches { .. } => 3,
+            nemesis_merge::Status::ApplyingPatches { .. } => 4,
+            nemesis_merge::Status::GeneratingHkxFiles { .. } => 5,
+            nemesis_merge::Status::Done => 6,
+            nemesis_merge::Status::Error(_) => 7,
+        };
+
+        self.phase.store(new_phase, Ordering::Relaxed);
+
+        match status {
+            nemesis_merge::Status::GeneratingFnisPatches { index, total }
+            | nemesis_merge::Status::ReadingPatches { index, total }
+            | nemesis_merge::Status::ParsingPatches { index, total }
+            | nemesis_merge::Status::ApplyingPatches { index, total }
+            | nemesis_merge::Status::GeneratingHkxFiles { index, total } => {
+                self.index.store(index, Ordering::Relaxed);
+                self.total.store(total, Ordering::Relaxed);
+            }
+
+            nemesis_merge::Status::Done => {}
+
+            nemesis_merge::Status::Error(err) => {
+                *self.error.write() = Some(err);
+            }
+        }
+
+        // NOTE: Request a UI repaint when the phase changes or reaches a terminal state.
+        // - If we do not do this, notifications that the patch has been applied may be significantly delayed.
+        // - Comparing the status with the `old` phase is also important; without this, the UI will freeze.
+        if old_phase != new_phase || matches!(new_phase, 6 | 7) {
+            ctx.request_repaint();
+        }
+    }
+
+    /// Returns the current UI color associated with the active patch phase.
+    fn color(&self) -> egui::Color32 {
+        let snapshot = self.snapshot();
+
+        match snapshot.phase {
+            1 => egui::Color32::from_rgb(120, 170, 255),
+            2 => super::patch::EGUI_RIGHT_BLUE,
+            3 => egui::Color32::from_rgb(140, 200, 255),
+            4 => egui::Color32::from_rgb(255, 170, 120),
+            5 => egui::Color32::from_rgb(200, 140, 255),
+            6 => egui::Color32::GREEN,
+            7 => egui::Color32::RED,
+            _ => egui::Color32::WHITE,
+        }
+    }
+}

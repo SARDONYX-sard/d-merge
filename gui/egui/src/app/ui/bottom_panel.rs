@@ -10,11 +10,11 @@
 //! `notification_panel` is registered first so it sits below `bottom_panel`
 //! visually (egui stacks bottom panels innermost-first).
 
-use crate::{
-    app::{App, dir_utils::open_existing_dir_or_ancestor, state::FetchState},
-    i18n::I18nKey,
-    log::LogLevel,
+use d_merge_gui_shared::{
+    fetch::FetchState, fs::open_existing_dir_or_ancestor, i18n::I18nKey, log::LogLevel,
 };
+
+use crate::app::App;
 
 impl App {
     /// Renders the main bottom panel (log controls, patch button, help toggle).

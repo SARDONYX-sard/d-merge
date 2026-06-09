@@ -1,6 +1,3 @@
-//! Start a log file watcher thread.
-//!
-//! This continuously updates `log_lines` with the latest contents of the log file.
 use std::{
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Read as _, Seek as _, SeekFrom},
@@ -13,49 +10,40 @@ use std::{
 use parking_lot::RwLock;
 use snafu::ResultExt as _;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum LogLevel {
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
-}
+use crate::app::App;
 
-impl LogLevel {
-    pub(crate) const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Error => "Error",
-            Self::Warn => "Warn",
-            Self::Info => "Info",
-            Self::Debug => "Debug",
-            Self::Trace => "Trace",
+impl App {
+    /// Starts the log-tail watcher on the first frame.
+    ///
+    /// Subsequent calls are no-ops (`log_watcher_started` guards the spawn).
+    /// The watcher writes to [`App::log_lines`] and requests a repaint via
+    /// the cloned [`egui::Context`].
+    pub(crate) fn start_log_watcher(&mut self, ctx: &egui::Context) {
+        if self.log_watcher_started {
+            return;
         }
-    }
-}
-impl From<LogLevel> for tracing::Level {
-    fn from(level: LogLevel) -> Self {
-        match level {
-            LogLevel::Error => Self::ERROR,
-            LogLevel::Warn => Self::WARN,
-            LogLevel::Info => Self::INFO,
-            LogLevel::Debug => Self::DEBUG,
-            LogLevel::Trace => Self::TRACE,
+
+        let log_dir = self.settings.log.dir_path.as_str();
+        let log_path = Path::new(log_dir).join(d_merge_gui_shared::log::LOG_FILENAME);
+
+        let log_lines = Arc::clone(&self.log_lines);
+        let ctx = ctx.clone();
+        if let Err(err) = start_log_tail(&log_path, log_lines, Some(ctx)) {
+            tracing::error!("Couldn't start log watcher: {err}");
         }
+
+        self.log_watcher_started = true;
     }
 }
 
 /// Maximum number of log entries to retain (older entries are automatically discarded)
 const MAX_LOG_LINES: usize = 10_000;
-pub(crate) const LOG_DIR: &str = ".d_merge/logs";
-pub(crate) const LOG_FILENAME: &str = "d_merge.log";
 
 /// log file & Starts tail thread
 ///
 /// # Errors
 /// If fail to canonicalize log path.
-pub(crate) fn start_log_tail(
+fn start_log_tail(
     log_path: &Path,
     log_lines: Arc<RwLock<Vec<String>>>,
     ctx: Option<egui::Context>,
