@@ -24,6 +24,7 @@ schemars = { version = "1.2.1", optional = true }
 serde = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["extra_fmt", "serde_default"] }
+serde_path_to_error = { version = "0.1.20", optional = true }
 simd-json = { workspace = true }
 snafu = { workspace = true }
 sonic-rs = { workspace = true }
@@ -43,8 +44,12 @@ skyrim_esp = { workspace = true }
 
 [dev-dependencies]
 havok_classes = { workspace = true }
-# quick_tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
+# quick_tracing = { version = "*" }
+
+# workspace members
+jwalk_glob = { workspace = true }
+mod_info = { workspace = true }
 tracing_rotation = { workspace = true }
 
 [lints]
@@ -52,8 +57,10 @@ workspace = true
 
 [features]
 default = ["tracing"]
+# default = ["tracing", "json_error_path"] # For debug
 
-tracing = ["dep:tracing", "json_patch/tracing", "jwalk_glob/tracing", "serde_hkx_features/dedup_tracing"]
+tracing = ["dep:tracing", "json_patch/tracing", "serde_hkx_features/dedup_tracing"]
+
 
 # Enables TypeScript-compatible serialization for the `Status` enum.
 # This feature modifies the `Status` enum to use Serde's externally tagged representation
@@ -68,3 +75,6 @@ ts_serde = []
 
 # FNIS Alternate Animation SKSE config schema
 schema = ["dep:schemars"]
+
+# Debug simd_json error path location
+json_error_path = ["dep:serde_path_to_error"]

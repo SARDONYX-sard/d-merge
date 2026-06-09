@@ -60,7 +60,6 @@ pub(crate) mod aa_config;
 pub(crate) mod generated_group_table;
 pub(crate) mod group_names;
 pub(crate) mod oar_json;
-pub(crate) mod override_config;
 
 use std::{
     path::{Path, PathBuf},
@@ -70,10 +69,7 @@ use std::{
 use fnis_list::patterns::alt_anim::AlternateAnimation;
 use rayon::prelude::*;
 
-use self::{
-    group_names::AAGroupName,
-    override_config::{FnisToOarConfig, SlotConfig},
-};
+use self::group_names::AAGroupName;
 use crate::{
     Config,
     behaviors::tasks::fnis::{
@@ -104,8 +100,6 @@ pub(crate) struct FnisAASlotConfigJob {
     /// 0-based slot index within this mod's group.
     pub slot: u64,
 
-    /// Optional user-defined per-slot overrides (rename, priority, conditions).
-    pub slot_config: Option<Arc<SlotConfig>>, // owned copy
     /// The directory name shown in OAR GUI (already resolved by caller).
     pub group_config_dir: String,
 }
@@ -122,24 +116,6 @@ pub(super) fn alt_anim_to_oar<'a>(
 
     let mut errors = vec![];
 
-    let override_config = owned_data.alt_anim_config.as_deref().and_then(|data|
-        match sonic_rs::from_slice::<FnisToOarConfig>(data) {
-            Ok(cfg) => Some(cfg),
-            Err(err) => {
-                let override_config_path = owned_data.to_fnis_aa_override_config_path();
-                errors.push(Error::Custom {
-                    msg: format!(
-                        "Failed to parse FNIS alternate animation override config file '{}': {err}. Using default settings.",
-                        override_config_path.display(),
-                    ),
-                });
-                None
-            }
-        }
-    );
-    #[cfg(feature = "tracing")]
-    tracing::debug!("Using FNIS to OAR override config: {override_config:#?}");
-
     let output_dir = {
         let base_dir = owned_data.behavior_entry.base_dir;
         let output_dir = &config.output_dir;
@@ -149,22 +125,19 @@ pub(super) fn alt_anim_to_oar<'a>(
         output_dir.push(base_dir);
         output_dir.push("animations");
         output_dir.push("OpenAnimationReplacer");
-        output_dir
-            .push(override_config.as_ref().and_then(|c| c.name.as_deref()).unwrap_or(namespace));
+        output_dir.push(namespace);
         output_dir
     };
 
     let mut ret_jobs = vec![];
     ret_jobs.push(AnimIoJob::FnisAANamespaceConfig(FnisAANamespaceConfigJob {
         output_path: output_dir.join("config.json"),
-        config: oar_json::prepare_namespace_json(namespace, &override_config),
+        config: oar_json::prepare_namespace_json(namespace),
     }));
 
     for set in &alt_anim.set {
         let registered_slots_count = set.slots;
         let group_name = set.group;
-
-        let group_config = override_config.as_ref().and_then(|c| c.groups.get(group_name));
 
         // Validate group
         let Ok(group_aa_name) = group_name.parse::<AAGroupName>() else {
@@ -179,18 +152,8 @@ pub(super) fn alt_anim_to_oar<'a>(
         };
 
         let group_jobs = (0..registered_slots_count).into_par_iter().flat_map(|slot| {
-            // each FNIS alt group output directory.(can rename by override config)
-            let slot_config =
-                group_config.and_then(|group_cfg| group_cfg.slots.get(&slot).map(Arc::clone));
-
             // NOTE: group_config_dir will ultimately own the directory. It’s fine to clone it here.
-            let group_config_dir = match slot_config.as_deref().and_then(|s| s.rename_to.as_deref())
-            {
-                Some(name) => name.to_string(),
-                // Include the prefix. Otherwise, if two `group_name`s are declared, they will conflict.
-                None => format!("{prefix}{group_name}_{}", slot + 1), // Honestly, there’s no need to start from 1 (for compatibility reasons, I’ll keep the rules I established in the past).
-            };
-
+            let group_config_dir = format!("{prefix}{group_name}_{}", slot + 1); // Honestly, there’s no need to start from 1 (for compatibility reasons, I’ll keep the rules I established in the past).
             let slot_output_dir = output_dir.join(&group_config_dir);
 
             // hkx jobs
@@ -220,7 +183,6 @@ pub(super) fn alt_anim_to_oar<'a>(
                 group_name: group_aa_name,
                 prefix: Arc::clone(&prefix),
                 slot,
-                slot_config,
                 group_config_dir,
             }));
 

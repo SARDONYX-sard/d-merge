@@ -39,9 +39,10 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
                 tracing::info!("Time: {elapsed:.2?}");
                 println!("{CLEAR_LINE}{GREEN_BOLD}{status}{RESET} Time: {elapsed:.2?}");
             }
-            Status::Error(_) => {
+            Status::Error(e) => {
                 tracing::info!("Time: {:.2?}", start.elapsed());
                 println!("{CLEAR_LINE}{RED_BOLD}{status}{RESET}");
+                tracing::error!(e);
             }
         }
     })
@@ -51,7 +52,6 @@ pub(crate) fn new_color_status_reporter() -> Box<dyn Fn(Status) + Send + Sync> {
 pub(crate) fn fastest_config() -> Config {
     Config {
         resource_dir: "../../resource/assets/templates".into(),
-        // resource_dir: "../../dummy/templates/bins".into(),
         output_dir: "../../dummy/behavior_gen/output".into(),
         status_report: None,
         hack_options: Some(HackOptions::enable_all()),
@@ -62,7 +62,7 @@ pub(crate) fn fastest_config() -> Config {
         },
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
-        ..Default::default()
+        generate_fnis_esp: true,
     }
 }
 
@@ -70,7 +70,6 @@ pub(crate) fn fastest_config() -> Config {
 pub(crate) fn slow_debug_config() -> Config {
     Config {
         resource_dir: "../../resource/assets/templates".into(),
-        // resource_dir: "../../dummy/templates/bins".into(),
         output_dir: "../../dummy/behavior_gen/output".into(),
         status_report: Some(new_color_status_reporter()), // +2s
         // status_report: None,
@@ -78,10 +77,10 @@ pub(crate) fn slow_debug_config() -> Config {
         debug: DebugOptions {
             output_patch_json: true,
             output_merged_json: true,
-            output_merged_xml: false,
+            output_merged_xml: true,
         },
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
-        ..Default::default()
+        generate_fnis_esp: true,
     }
 }

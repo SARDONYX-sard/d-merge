@@ -123,7 +123,6 @@ pub(crate) struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
-    pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
 impl OwnedFnisInjection {
@@ -178,15 +177,6 @@ impl OwnedFnisInjection {
         let inner_path = Path::new("meshes").join(behavior_entry.base_dir).join(&behavior_path);
 
         Ok((parent_dir.join(behavior_path), inner_path))
-    }
-
-    /// Return FNIS Alternate Animation to OAR config path
-    ///
-    /// # Returns
-    /// - humanoid: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`,
-    /// - creature: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`
-    pub(crate) fn to_fnis_aa_override_config_path(&self) -> PathBuf {
-        override_config_path(&self.animations_mod_dir, self.behavior_entry, &self.namespace)
     }
 
     /// Increments the index and returns the full `name` attribute
@@ -257,12 +247,6 @@ where
     let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
-    let alt_anim_config = if list_content.contains("AAprefix") {
-        load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
-    } else {
-        None
-    };
-
     Ok(OwnedFnisInjection {
         animations_mod_dir,
         behavior_entry,
@@ -272,39 +256,7 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
-        alt_anim_config,
     })
-}
-
-fn override_config_path(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> PathBuf {
-    let filename = if behavior_entry.is_humanoid() {
-        format!("FNIS_{namespace}_toOAR.json")
-    } else {
-        format!(
-            "FNIS_{namespace}_{}_toOAR.json",
-            behavior_entry.behavior_object // e.g, "dog", "horse"
-        )
-    };
-    animations_mod_dir.join(filename)
-}
-
-fn load_to_oar_file(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> Option<Vec<u8>> {
-    let override_config_path = override_config_path(animations_mod_dir, behavior_entry, namespace);
-    std::fs::read(&override_config_path)
-        .map_err(|e| {
-            #[cfg(feature = "tracing")]
-            tracing::info!(%e, ?override_config_path);
-            e
-        })
-        .ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.

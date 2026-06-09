@@ -5,7 +5,6 @@ use std::borrow::Cow;
 use serde::Serialize;
 use simd_json::owned::Object;
 
-use super::override_config::{FnisToOarConfig, SlotConfig};
 use crate::behaviors::tasks::fnis::patch_gen::alternate::group_names::AAGroupName;
 
 /// Represents the configuration structure for the 'config.json' namespace.
@@ -24,19 +23,8 @@ struct NamespaceConfig<'config> {
     pub author: &'config str,
 }
 
-pub(crate) fn prepare_namespace_json(
-    namespace: &str,
-    override_config: &Option<FnisToOarConfig<'_>>,
-) -> String {
-    let (name, description, author) = if let Some(c) = override_config {
-        (
-            c.name.as_deref().unwrap_or(namespace),
-            c.description.as_deref().unwrap_or_default(),
-            c.author.as_deref().unwrap_or_default(),
-        )
-    } else {
-        (namespace, "", "")
-    };
+pub(crate) fn prepare_namespace_json(namespace: &str) -> String {
+    let (name, description, author) = (namespace, "", "");
     let config = NamespaceConfig { name, description, author };
 
     match sonic_rs::to_string_pretty(&config) {
@@ -109,21 +97,11 @@ pub(crate) fn new_fnis_aa_slot_config_json(
     slot: u64,
     base: u64,
     fallback_priority: i32,
-    slot_config: Option<&SlotConfig>,
 ) -> String {
-    let user_conditions = slot_config.map(|s| s.conditions.as_slice()).unwrap_or_default();
-
     // Always prepend the FNISaa condition, then append user-defined conditions.
-    let conditions: Vec<_> = core::iter::once(fnis_aa_condition(group_name, base + slot))
-        .chain(user_conditions.iter().cloned())
-        .collect();
-
-    let description = match slot_config.and_then(|s| s.description.as_deref()) {
-        Some(desc) => Cow::Borrowed(desc),
-        None => Cow::Owned(format!("base({base}) + value({slot})")),
-    };
-
-    let priority = slot_config.and_then(|s| s.priority).map_or(fallback_priority, |p| p as i32);
+    let conditions: Vec<_> = core::iter::once(fnis_aa_condition(group_name, base + slot)).collect();
+    let description = Cow::Owned(format!("base({base}) + value({slot})"));
+    let priority = fallback_priority;
 
     let config = ConditionsConfig {
         name: Cow::Borrowed(group_config_dir),

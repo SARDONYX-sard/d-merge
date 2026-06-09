@@ -184,11 +184,7 @@ pub enum Error {
     },
 
     /// (De)Serialize json error
-    #[snafu(display("[json -> ClassMap Error] {}:\n {source}\n
-To users: This error may be caused by an issue with the d_merge developer. It is an error that should not normally occur.
-An unknown error is occurring during the conversion from JSON to the data type immediately preceding hkx.
-We need to verify the conditions under which this occurs in a minimal environment.
-    ", path.display()))]
+    #[snafu(display( "[JSON -> ClassMap Error] {}:\n{source}\n\n{}", path.display(), JSON_TO_CLASSMAP_HELP))]
     JsonToClassMapError {
         /// input path
         path: PathBuf,
@@ -236,6 +232,26 @@ We need to verify the conditions under which this occurs in a minimal environmen
     #[snafu(transparent)]
     JoinError { source: tokio::task::JoinError },
 }
+
+const JSON_TO_CLASSMAP_HELP: &str = "\
+To users:
+Failed to convert the patched JSON into the internal HKX representation.
+
+Technical details:
+Multiple HKX classes were assigned to the same pointer ID.
+A single pointer is expected to reference only one class.
+
+Example:
+- Add: #tkuc$148/hkbClipGenerator
+- Add: #tkuc$148/hkbStateMachineStateInfo
+
+Common cause:
+This often indicates that patches for different versions of the same mod
+were applied simultaneously. For example, different TkDodge versions may
+reuse the same pointer IDs while defining different HKX classes.
+
+Please verify that only patches matching your installed mod version is present.
+";
 
 #[derive(Debug, Clone)]
 pub enum AnimPatchErrKind {
