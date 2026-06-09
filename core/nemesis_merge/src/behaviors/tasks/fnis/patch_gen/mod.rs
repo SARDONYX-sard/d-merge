@@ -185,7 +185,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
 
                 // Insert patches for FNIS_*_List.txt
                 // additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
-                entry.one.0.par_extend(one_master_patches);
+                entry.one.par_extend(one_master_patches);
                 for (path, patch) in seq_master_patches {
                     entry.seq.insert(path, patch);
                 }
@@ -269,7 +269,6 @@ pub(crate) fn collect_borrowed_patches<'a>(
             .or_default()
             // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
             .one
-            .0
             .par_extend(new_global_master_patch(0));
     }
 
@@ -278,7 +277,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         let mut entry = borrowed_patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
         // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
-        entry.one.0.par_extend(one);
+        entry.one.par_extend(one);
         for (path, patch) in seq {
             entry.seq.insert(path, patch);
         }

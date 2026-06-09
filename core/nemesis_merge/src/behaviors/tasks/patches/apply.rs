@@ -91,7 +91,7 @@ fn apply_to_one_template<'a, 'b: 'a>(
 
     // NOTE: Why not use par_iter here?
     // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
-    for (path, patch) in one_patch_map.0 {
+    for (path, patch) in one_patch_map.into_inner() {
         let result = apply_one_field(template_value, path, patch)
             .with_context(|_| PatchSnafu { template_name: key.to_string() });
         status_reporter.increment();

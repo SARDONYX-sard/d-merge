@@ -76,7 +76,7 @@ impl<'a> BehaviorPatchesMap<'a> {
             .par_iter()
             .map(|pair| {
                 let HkxPatchMaps { one, seq } = pair.value();
-                one.0.len() + seq.0.len()
+                one.len() + seq.0.len()
             })
             .sum()
     }
