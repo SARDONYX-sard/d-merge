@@ -3941,6 +3941,7 @@ dependencies = [
 name = "mod_info"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
  "jwalk_glob",
  "pretty_assertions",
  "rayon",
@@ -4100,8 +4101,10 @@ dependencies = [
  "json_patch",
  "jwalk",
  "jwalk_glob",
+ "mod_info",
  "nemesis_xml",
  "phf 0.13.1",
+ "quick_tracing",
  "rapidhash",
  "rayon",
  "rmp-serde",
@@ -4109,6 +4112,7 @@ dependencies = [
  "serde",
  "serde_hkx",
  "serde_hkx_features",
+ "serde_path_to_error",
  "simd-json",
  "skyrim_anim_parser",
  "skyrim_esp",
@@ -5452,6 +5456,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick_tracing"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad66124d69ce8125da5c9dacbc92a07b94d12c98003bef061bfdb5bb6d33bcec"
+dependencies = [
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6348,6 +6363,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_path_to_error"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10a9ff822e371bb5403e391ecd83e182e0e77ba7f6fe0160b795797109d1b457"
+dependencies = [
+ "itoa",
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_repr"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6902,6 +6928,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "symlink"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7973cce6668464ea31f176d85b13c7ab3bba2cb3b77a2ed26abd7801688010a"
 
 [[package]]
 name = "syn"
@@ -7805,6 +7837,19 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-appender"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "050686193eb999b4bb3bc2acfa891a13da00f79734704c4b8b4ef1a10b368a3c"
+dependencies = [
+ "crossbeam-channel",
+ "symlink",
+ "thiserror 2.0.18",
+ "time",
+ "tracing-subscriber",
 ]
 
 [[package]]

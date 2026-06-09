@@ -13,6 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+dashmap = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true } # Implement (De)Serializer
 serde_ini = "0.2.0"

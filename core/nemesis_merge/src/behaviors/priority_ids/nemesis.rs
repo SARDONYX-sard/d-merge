@@ -1,0 +1,93 @@
+use winnow::{
+    ascii::Caseless,
+    combinator::{alt, repeat},
+    error::{StrContext::*, StrContextValue::*},
+    prelude::*,
+    seq,
+    token::{any, take_while},
+};
+use winnow_ext::ReadableError;
+
+/// Parses a string path to extract the mod ID in the format:
+/// `.../Nemesis_Engine/mod/<mod_code>/...`
+///
+/// # Errors
+///
+/// Returns a [`ReadableError`] if the input string does not contain the expected
+/// `Nemesis_Engine/mod/<mod_code>` pattern.
+///
+/// # Examples
+///
+/// ```txt
+/// `D:\\...\\Nemesis_Engine\\mod\\abc\\somefile.txt` -> `D:\\...\\Nemesis_Engine\\mod\\abc`
+/// ```
+///
+/// - Ext
+/// ```txt
+/// `D:\\...\\Nemesis_EngineExt\\mod\\abc\\meshes\\somefile.txt` -> `D:\\...\\Nemesis_EngineExt\\mod\\abc`
+/// ```
+pub(crate) fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
+    alt((_get_nemesis_id, _get_nemesis_ext_id))
+        .parse(input)
+        .map_err(|e| ReadableError::from_parse(e))
+}
+
+fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    // Match either '/' or '\\' as path separator
+    let mut sep =
+        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
+
+    // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
+    let mut parser = seq! {
+        winnow_ext::take_until_ext(0.., Caseless("Nemesis_Engine")).context(Expected(StringLiteral("Nemesis_Engine"))),
+        Caseless("Nemesis_Engine"),
+        sep,
+        "mod".context(Expected(StringLiteral("mod"))),
+        sep,
+        take_while(1.., |c: char| c != '/' && c != '\\').context(Expected(Description("mod code"))),
+    }
+    .take();
+
+    let id = parser.parse_next(input)?;
+    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?; // consume remaining input
+    Ok(id)
+}
+
+fn _get_nemesis_ext_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+    // Match either '/' or '\\' as path separator
+    let mut sep =
+        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
+
+    // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
+    let mut parser = seq! {
+        winnow_ext::take_until_ext(0.., Caseless("Nemesis_EngineExt")).context(Expected(StringLiteral("Nemesis_EngineExt"))),
+        Caseless("Nemesis_EngineExt"),
+        sep,
+        "mod".context(Expected(StringLiteral("mod"))),
+        sep,
+        take_while(1.., |c: char| c != '/' && c != '\\').context(Expected(Description("mod code"))),
+    }
+    .take();
+
+    let id = parser.parse_next(input)?;
+    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?; // consume remaining input
+    Ok(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_nemesis_id() {
+        let input = r"D:\GAME\ModOrganizer Skyrim SE\mods\SomeMod\Nemesis_Engine\mod\abc\0_master\#0001.txt";
+        let id = _get_nemesis_id.parse(input).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(id, r"D:\GAME\ModOrganizer Skyrim SE\mods\SomeMod\Nemesis_Engine\mod\abc");
+    }
+
+    #[test]
+    fn test_invalid_path() {
+        let input = r"D:\Invalid\Path\To\Something";
+        assert!(get_nemesis_id(input).is_err());
+    }
+}

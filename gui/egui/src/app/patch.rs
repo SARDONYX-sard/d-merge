@@ -82,7 +82,6 @@ impl App {
             })),
             hack_options: Some(nemesis_merge::HackOptions::enable_all()),
             debug,
-            skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
         };
 

@@ -7,7 +7,6 @@ use std::{
 use rayon::prelude::*;
 use serde_hkx::{EventIdMap, HavokSort as _, VariableIdMap, bytes::serde::hkx_header::HkxHeader};
 use serde_hkx_features::{ClassMap, id_maker::create_maps};
-use simd_json::serde::from_borrowed_value;
 use snafu::ResultExt;
 
 use crate::{
@@ -51,7 +50,20 @@ pub(crate) fn generate_hkx_files(
                     write_patched_json(&debug_path, &template_json)?;
                 }
 
-                let mut class_map: ClassMap = from_borrowed_value(template_json)
+                #[cfg(feature = "json_error_path")]
+                let mut class_map: ClassMap = serde_path_to_error::deserialize(template_json)
+                    .map_err(|e| {
+                        #[cfg(feature = "tracing")]
+                        tracing::error!(
+                            "template_path = {}\nerr_path = {:?}",
+                            output_path.display(),
+                            e.path()
+                        );
+                        e.into_inner()
+                    })
+                    .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
+                #[cfg(not(feature = "json_error_path"))]
+                let mut class_map: ClassMap = simd_json::serde::from_borrowed_value(template_json)
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
 
                 let mut event_id_map = None;

@@ -82,7 +82,7 @@ pub(crate) struct OwnedFnisInjection {
     /// # About duplicated list
     /// When animations for dog and wolf exist simultaneously in the same path, multiple List.txt files may exist at the same level,
     /// but they should be processed separately.
-    /// - e.g. `FNIS Zoo 5.0.1/Meshes/actors/canine/animations/FNISZoo/FNIS_FNISZoo_{dog|wolf}_List.txt`
+    /// - e.g. `FNIS Zoo 5.0.1/Meshes/actors/canine/animations/FNISZoo/FNIS_FNISZoo_wolf_List.txt`
     pub list_content: String,
 
     /// Relative path to the behavior file.
@@ -123,7 +123,6 @@ pub(crate) struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
-    pub(crate) alt_anim_config: Option<Vec<u8>>,
 }
 
 impl OwnedFnisInjection {
@@ -178,15 +177,6 @@ impl OwnedFnisInjection {
         let inner_path = Path::new("meshes").join(behavior_entry.base_dir).join(&behavior_path);
 
         Ok((parent_dir.join(behavior_path), inner_path))
-    }
-
-    /// Return FNIS Alternate Animation to OAR config path
-    ///
-    /// # Returns
-    /// - humanoid: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`,
-    /// - creature: `<skyrim data dir>/meshes/actors/character/behavior/FNIS_<namespace>_toOAR.json`
-    pub(crate) fn to_fnis_aa_override_config_path(&self) -> PathBuf {
-        override_config_path(&self.animations_mod_dir, self.behavior_entry, &self.namespace)
     }
 
     /// Increments the index and returns the full `name` attribute
@@ -248,20 +238,15 @@ pub(crate) async fn collect_fnis_injection<P>(
     behavior_entry: &'static BehaviorEntry,
     namespace: &str,
     priority: usize,
+    list_path: PathBuf,
 ) -> Result<OwnedFnisInjection, FnisError>
 where
     P: Into<PathBuf>,
 {
     let animations_mod_dir = animations_mod_dir.into();
 
-    let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
+    let list_content = load_fnis_list_file(&list_path).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
-
-    let alt_anim_config = if list_content.contains("AAprefix") {
-        load_to_oar_file(&animations_mod_dir, behavior_entry, namespace)
-    } else {
-        None
-    };
 
     Ok(OwnedFnisInjection {
         animations_mod_dir,
@@ -272,39 +257,7 @@ where
         behavior_path,
         current_class_index: AtomicUsize::new(0),
         current_adsf_index: AtomicUsize::new(0),
-        alt_anim_config,
     })
-}
-
-fn override_config_path(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> PathBuf {
-    let filename = if behavior_entry.is_humanoid() {
-        format!("FNIS_{namespace}_toOAR.json")
-    } else {
-        format!(
-            "FNIS_{namespace}_{}_toOAR.json",
-            behavior_entry.behavior_object // e.g, "dog", "horse"
-        )
-    };
-    animations_mod_dir.join(filename)
-}
-
-fn load_to_oar_file(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> Option<Vec<u8>> {
-    let override_config_path = override_config_path(animations_mod_dir, behavior_entry, namespace);
-    std::fs::read(&override_config_path)
-        .map_err(|e| {
-            #[cfg(feature = "tracing")]
-            tracing::info!(%e, ?override_config_path);
-            e
-        })
-        .ok()
 }
 
 /// Load all FNIS list files for a given namespace using glob.
@@ -317,22 +270,11 @@ fn load_to_oar_file(
 ///
 /// # Errors
 /// Returns an error if no file is found.
-async fn load_fnis_list_file(
-    animations_mod_dir: &Path,
-    behavior_entry: &'static BehaviorEntry,
-    namespace: &str,
-) -> Result<String, FnisError> {
-    let list_path_string = if behavior_entry.is_humanoid() {
-        format!("{}/FNIS_{namespace}_List.txt", animations_mod_dir.display())
-    } else {
-        let creature_object_name = behavior_entry.behavior_object;
-        format!("{}/FNIS_{namespace}_{creature_object_name}_List.txt", animations_mod_dir.display())
-    };
-
+async fn load_fnis_list_file(list_path: &Path) -> Result<String, FnisError> {
     // NOTE: Since there are mod files that are not UTF-8, we need to support them.
     let content =
-        fs::read(&list_path_string).await.and_then(auto_charset::decode_to_utf8).map_err(|e| {
-            FnisError::FailedReadingListFile { expected: list_path_string.clone(), source: e }
+        fs::read(list_path).await.and_then(auto_charset::decode_to_utf8).map_err(|e| {
+            FnisError::FailedReadingListFile { list_path: list_path.to_path_buf(), source: e }
         })?;
 
     Ok(content)
@@ -403,8 +345,8 @@ pub enum FnisError {
     EmptyAnimPaths { animations_mod_dir: PathBuf },
 
     /// Expected list file at `{expected}`, but couldn't read this path.
-    #[snafu(display("Expected list file at {expected}, but couldn't read this path.: {source}"))]
-    FailedReadingListFile { expected: String, source: io::Error },
+    #[snafu(display("Expected list file at {}, but couldn't read this path.: {source}", list_path.display()))]
+    FailedReadingListFile { list_path: PathBuf, source: io::Error },
 
     /// Failed to get the parent directory of the animations mod directory.
     /// This indicates that the provided `animations_mod_dir` is too shallow in the filesystem hierarchy.
@@ -432,7 +374,7 @@ mod tests {
 
         let input = "../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
         let behavior_entry = HUMANOID.get("character").unwrap();
-        let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0)
+        let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0, "".into())
             .await
             .unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);

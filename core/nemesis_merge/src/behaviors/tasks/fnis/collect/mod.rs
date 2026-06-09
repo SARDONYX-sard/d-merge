@@ -1,104 +1,89 @@
 pub(crate) mod owned;
 
-use std::sync::LazyLock;
-
 use crate::{
     PriorityMap,
-    behaviors::tasks::fnis::{
-        collect::owned::{OwnedFnisInjection, collect_fnis_injection},
-        patch_gen::generated_behaviors::{
-            AUXBONES, BehaviorEntry, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
+    behaviors::{
+        priority_ids::parse_fnis_list_path,
+        tasks::fnis::{
+            collect::owned::{OwnedFnisInjection, collect_fnis_injection},
+            patch_gen::generated_behaviors::{
+                AUXBONES, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
+            },
         },
     },
     errors::Error,
 };
 
-static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
-    HUMANOID
-        .values()
-        .chain(CREATURES.values())
-        .chain(SKELETONS.values().filter(|e| e.behavior_object != "draugr"))
-        .chain(AUXBONES.values())
-        .chain(PLANTS_ACTIVATORS.values())
-        .collect()
-});
-
+/// Collect all [`OwnedFnisInjection`]s from the given FNIS priority map.
+///
+/// Each entry in `fnis_entries` is a `(list_path, priority)` pair where
+/// `list_path` is the absolute path to a `FNIS_*_List.txt` file.
+/// The path is parsed to extract the [`BehaviorEntry`] and namespace,
+/// then [`collect_fnis_injection`] is spawned as a Tokio task per entry.
+///
+/// # Returns
+/// A tuple of `(succeeded, failed)` — errors are collected rather than
+/// propagated so that a single bad entry does not abort the whole collection.
 pub(crate) async fn collect_all_fnis_injections(
-    skyrim_data_dir: &str,
     fnis_entries: &PriorityMap,
 ) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
     #[cfg(feature = "tracing")]
-    tracing::debug!(
-        skyrim_data_dir,
-        entry_count = ALL_ENTRIES.len(),
-        "Starting FNIS injection collection"
-    );
-
-    // In manual mode, you need to search everything in the `MO2/mods/*` directory as if it were the meshes directory.
-    // That is why `data_dirs` is defined as a Vec.
-    let data_dirs = jwalk_glob::glob_dirs(skyrim_data_dir);
-
-    #[cfg(feature = "tracing")]
-    tracing::debug!(count = data_dirs.len(), "Expanded skyrim_data_dir");
+    tracing::debug!(entry_count = fnis_entries.len(), "Starting FNIS injection collection");
 
     let mut handles = tokio::task::JoinSet::new();
 
-    for data_dir in &data_dirs {
-        for entry in ALL_ENTRIES.iter() {
-            let animations_dir = data_dir.join("meshes").join(entry.base_dir).join("animations");
-
+    for (list_path, &priority) in fnis_entries {
+        let Some(parsed) = parse_fnis_list_path(list_path) else {
             #[cfg(feature = "tracing")]
-            tracing::trace!(?animations_dir, "Scanning animations directory");
+            tracing::warn!(list_path = list_path, "Failed to parse FNIS list path");
+            continue;
+        };
 
-            let read_dir = match std::fs::read_dir(&animations_dir) {
-                Ok(rd) => rd,
-                Err(_e) => {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        ?animations_dir,
-                        error = %_e,
-                        "Skipping animations directory (not found or inaccessible)"
-                    );
-                    continue;
-                }
-            };
+        let Some(entry) = (match parsed.behavior_object {
+            Some(key) => CREATURES
+                .get(key)
+                .or_else(|| SKELETONS.get(key))
+                .or_else(|| AUXBONES.get(key))
+                .or_else(|| PLANTS_ACTIVATORS.get(key)),
+            None => match parsed.is_1st_person {
+                true => HUMANOID.get("character/_1stperson"),
+                false => HUMANOID.get("character"),
+            },
+        }) else {
+            #[cfg(feature = "tracing")]
+            tracing::warn!(
+                behavior_object = parsed.behavior_object,
+                is_1st_person = parsed.is_1st_person,
+                "No BehaviorEntry matched for FNIS list path"
+            );
+            continue;
+        };
 
-            for dir_entry in read_dir.flatten() {
-                let Ok(file_type) = dir_entry.file_type() else {
-                    continue;
-                };
-                if !file_type.is_dir() {
-                    continue;
-                }
+        let list_path = std::path::Path::new(list_path);
+        let Some(animations_mod_dir) = list_path.parent().map(|p| p.to_path_buf()) else {
+            #[cfg(feature = "tracing")]
+            tracing::warn!(
+                "Failed to get parent dir of FNIS list path(path = {})",
+                list_path.display()
+            );
+            continue;
+        };
 
-                let ns_path = dir_entry.path();
-                let Some(namespace) = ns_path.file_name().and_then(|n| n.to_str()) else {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(?ns_path, "Skipping namespace dir with non-UTF8 name");
-                    continue;
-                };
-                let Some(&priority) = fnis_entries.get(namespace) else {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(namespace, "Skipping namespace not present in fnis_entries");
-                    continue;
-                };
+        let namespace = parsed.namespace.to_string();
 
-                #[cfg(feature = "tracing")]
-                tracing::debug!(
-                    namespace,
-                    priority,
-                    base_dir = entry.base_dir,
-                    "Spawning FNIS injection task"
-                );
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            namespace,
+            priority,
+            base_dir = entry.base_dir,
+            "Spawning FNIS injection task"
+        );
 
-                let namespace = namespace.to_string();
-                let entry: &'static BehaviorEntry = entry;
-
-                handles.spawn(async move {
-                    collect_fnis_injection(&ns_path, entry, &namespace, priority).await
-                });
-            }
-        }
+        let list_path = list_path.to_path_buf();
+        handles.spawn(async move {
+            collect_fnis_injection(&animations_mod_dir, entry, &namespace, priority, list_path)
+                .await
+        });
     }
 
     let mut oks = Vec::new();
@@ -135,21 +120,22 @@ pub(crate) async fn collect_all_fnis_injections(
 
 #[cfg(test)]
 mod tests {
-    use rayon::prelude::*;
-
     use super::*;
+    use crate::tests::patches_builder::{PatchMapsConfig, build_patch_maps};
 
     #[tokio::test]
     #[ignore = "local only"]
     async fn test_parse_relative_path() {
+        let _guard = quick_tracing::builder::LoggerBuilder::default()
+            .filter(tracing::level_filters::LevelFilter::WARN)
+            .build();
         let output_path = "../../dummy/debug/collect_all_fnis_injections.log";
 
-        let fnis_entries = ["BiS_WashMe", "FNISFlyer", "FNISZoo", "XPMSE", "TKDodge"]
-            .into_par_iter()
-            .enumerate()
-            .map(|(idx, namespace)| (namespace.to_string(), idx))
-            .collect();
-        let res = collect_all_fnis_injections("../../dummy/fnis_test_mods/*", &fnis_entries).await;
+        let patches = build_patch_maps(PatchMapsConfig {
+            pattern: "../../dummy/fnis_test_mods/*",
+            ..Default::default()
+        });
+        let res = collect_all_fnis_injections(&patches.fnis_entries).await;
 
         std::fs::write(output_path, format!("{res:#?}")).unwrap();
     }

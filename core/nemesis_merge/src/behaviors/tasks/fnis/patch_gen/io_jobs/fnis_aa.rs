@@ -36,7 +36,6 @@ pub(crate) fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) ->
                 job.slot,
                 base,
                 fallback_priority,
-                job.slot_config.as_deref(),
             );
             super::write_file(&job.output_path, config.as_bytes()).err()
         })

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use mod_info::{ModInfo, ModType};
 use nemesis_merge::PatchMaps;
 use rayon::{iter::Either, prelude::*};
@@ -21,6 +23,15 @@ pub struct ModItem {
     /// Mod type. Nemesis, FNIS
     #[serde(default)]
     pub mod_type: ModType,
+
+    // We can just collect this data as needed. There’s no need to save it in the settings.
+    //
+    /// Absolute paths to `FNIS_*_List.txt` files for this mod.
+    /// Only populated for `ModType::Fnis`.
+    /// Multiple entries occur when a mod targets multiple creatures
+    /// (e.g. `C:/steamapps/Skyrim Special Edition/.../FNIS_FNISZoo_dog_List.txt`).
+    #[serde(skip)]
+    pub fnis_list_paths: Vec<PathBuf>,
 }
 
 /// Inherit priority/enabled from old list.
@@ -32,23 +43,27 @@ pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> 
 
     let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =
         new.into_par_iter().partition_map(|info| {
-            if let Some(&(enabled, priority)) = old_map.get(info.id.as_str()) {
+            let ModInfo { id, name, site, mod_type, fnis_list_paths, .. } = info;
+
+            if let Some(&(enabled, priority)) = old_map.get(id.as_str()) {
                 Either::Left(ModItem {
                     enabled,
-                    id: info.id,
-                    name: info.name,
-                    site: info.site,
+                    id,
+                    name,
+                    site,
                     priority,
-                    mod_type: info.mod_type,
+                    mod_type,
+                    fnis_list_paths,
                 })
             } else {
                 Either::Right(ModItem {
                     enabled: false,
-                    id: info.id,
-                    name: info.name,
-                    site: info.site,
+                    id,
+                    name,
+                    site,
                     priority: 0, // temporary
-                    mod_type: info.mod_type,
+                    mod_type,
+                    ..Default::default()
                 })
             }
         });
@@ -71,12 +86,11 @@ pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> 
 pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
     // - Nemesis/FNIS(vfs): e.g. `aaaa`
     // - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
-    // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
-    let (nemesis_entries, fnis_entries) =
+    // - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa/FNIS_aaaa_List.txt`
+    let (nemesis_entries, fnis_groups): (_, Vec<Vec<(String, usize)>>) =
         mod_infos.par_iter().filter(|item| item.enabled).partition_map(|mod_item| {
             let ModItem { id, priority, mod_type, .. } = mod_item;
             let priority = *priority;
-
             match mod_type {
                 ModType::Nemesis => {
                     let id = if is_vfs {
@@ -94,13 +108,20 @@ pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) ->
                     };
                     Either::Left((id, priority))
                 }
-                ModType::Fnis => {
-                    let id = id.clone();
-                    Either::Right((id, priority))
-                }
+                ModType::Fnis => Either::Right(fnis_list_entries(mod_item, priority)),
             }
         });
+
+    let fnis_entries = fnis_groups.into_par_iter().flatten().collect();
     PatchMaps { nemesis_entries, fnis_entries }
+}
+
+/// Expand a single FNIS [`ModItem`] into one `(id, priority)` pair per `List.txt` path.
+///
+/// `id` is the absolute path to each `FNIS_*_List.txt` file.
+/// All entries share the same `priority` since they belong to the same mod.
+fn fnis_list_entries(mod_item: &ModItem, priority: usize) -> Vec<(String, usize)> {
+    mod_item.fnis_list_paths.iter().map(|p| (p.display().to_string(), priority)).collect()
 }
 
 /// Reorder priorities by mod type:
@@ -141,6 +162,7 @@ mod tests {
                 site: "x".into(),
                 priority: 10,
                 mod_type: ModType::Nemesis,
+                ..Default::default()
             },
             ModItem {
                 enabled: true,
@@ -149,6 +171,7 @@ mod tests {
                 site: "x".into(),
                 priority: 3,
                 mod_type: ModType::Nemesis,
+                ..Default::default()
             },
         ];
 

@@ -244,7 +244,6 @@ impl Config {
                 output_merged_xml: self.debug.output_merged_xml,
             },
             status_report,
-            skyrim_data_dir_glob: self.skyrim_data_dir_glob,
             generate_fnis_esp: self.generate_fnis_esp.unwrap_or(false),
         })
     }

@@ -1,6 +1,9 @@
 pub mod error;
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use rayon::prelude::*;
 
@@ -44,8 +47,8 @@ use crate::error::Error;
 /// ```
 pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let mut mods = Vec::new();
-    mods.par_extend(get_all_nemesis(skyrim_data_dir, is_vfs)?);
-    mods.par_extend(get_all_nemesis_ext(skyrim_data_dir, is_vfs)?);
+    mods.par_extend(get_all_nemesis(skyrim_data_dir, is_vfs));
+    mods.par_extend(get_all_nemesis_ext(skyrim_data_dir, is_vfs));
     mods.par_extend(get_all_fnis(skyrim_data_dir)?);
     Ok(mods)
 }
@@ -65,10 +68,10 @@ pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Erro
 ///
 /// # Note
 /// Priority and `id` cannot be obtained at this stage.
-fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
-    let nemesis_pattern = format!("{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini");
+fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Vec<ModInfo> {
+    let pattern = format!("{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini");
 
-    let mods = jwalk_glob::glob_files(&nemesis_pattern)
+    jwalk_glob::glob_files(&pattern)
         .par_iter()
         .filter_map(|path| {
             let id = if is_vfs {
@@ -78,15 +81,13 @@ fn get_all_nemesis(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, 
             };
             read_mod_info(path, id)
         })
-        .collect();
-
-    Ok(mods)
+        .collect()
 }
 
-fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
-    let nemesis_pattern = format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini");
+fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Vec<ModInfo> {
+    let pattern = format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini");
 
-    let mods = jwalk_glob::glob_files(&nemesis_pattern)
+    jwalk_glob::glob_files(&pattern)
         .par_iter()
         .filter_map(|path| {
             let id = if is_vfs {
@@ -99,9 +100,7 @@ fn get_all_nemesis_ext(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInf
 
             Some(mod_info)
         })
-        .collect();
-
-    Ok(mods)
+        .collect()
 }
 
 fn read_mod_info(path: &Path, id: String) -> Option<ModInfo> {
@@ -121,33 +120,33 @@ fn extract_nemesis_id_from_path(path: &Path) -> Option<&str> {
 /// # Errors
 /// If invalid glob pattern.
 fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
-    use std::collections::HashSet;
-
-    fn collect_from_fnis_list(fnis_list_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
-        let mods = jwalk_glob::glob_files(fnis_list_pattern)
-            .par_iter()
-            .filter_map(|path| {
-                // <skyrim_data_dir>/meshes/**/animations/<vfs_id>
-                let parent_dir = path.parent()?;
-
-                // get `<vfs_id>`
-                let name = parent_dir.file_name()?.display().to_string();
-                let id = name.clone();
-
-                let mod_info = ModInfo { id, name, mod_type: ModType::Fnis, ..Default::default() };
-                Some(mod_info)
-            })
-            .collect();
-
-        Ok(mods)
-    }
+    use dashmap::DashMap;
 
     // TkDodgeSE lacks FNIS_*_List.txt and consists solely of animations, making acquisition difficult.
     // It would be easier to distribute the FNIS patch separately as a Nemesis patch.
-    let fnis_list_pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
-    let mut mods: Vec<_> = collect_from_fnis_list(&fnis_list_pattern)?.into_par_iter().collect();
-    mods.par_sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    let pattern = format!("{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt");
 
+    // Group by namespace dir in parallel.
+    // DashMap allows concurrent insertion without a global lock.
+    let map: DashMap<String, ModInfo> = DashMap::new();
+
+    jwalk_glob::glob_files(&pattern).into_par_iter().for_each(|path| {
+        let Some(parent_dir) = path.parent() else { return };
+        let Some(name) = parent_dir.file_name().and_then(|n| n.to_str()) else { return };
+
+        map.entry(name.to_string())
+            .or_insert_with(|| ModInfo {
+                id: name.to_string(),
+                name: name.to_string(),
+                mod_type: ModType::Fnis,
+                ..Default::default()
+            })
+            .fnis_list_paths
+            .push(path);
+    });
+
+    let mut mods: Vec<_> = map.into_iter().map(|(_, v)| v).collect();
+    mods.par_sort_unstable_by(|a, b| a.name.cmp(&b.name));
     Ok(mods)
 }
 
@@ -182,22 +181,18 @@ pub struct ModInfo {
     /// Mod type. Nemesis, FNIS
     #[serde(default)]
     pub mod_type: ModType,
+
+    /// Absolute paths to `FNIS_*_List.txt` files for this mod.
+    /// Only populated for `ModType::Fnis`.
+    /// Multiple entries occur when a mod targets multiple creatures
+    /// (e.g. `C:/steamapps/Skyrim Special Edition/.../FNIS_FNISZoo_dog_List.txt`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fnis_list_paths: Vec<PathBuf>,
 }
 
 // NOTE: Order follows the sequence in which the tools were created. The first one created was FNIS.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModType {
     /// GUI developers must add the following to the paths array in `nemesis_merge::behavior_gen`.

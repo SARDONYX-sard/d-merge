@@ -50,9 +50,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let (owned_fnis_patches, mut fnis_errors) = if fnis_entries.is_empty() {
         (vec![], vec![])
     } else {
-        let skyrim_data_dir_glob =
-            config.skyrim_data_dir_glob.as_ref().ok_or(Error::MissingSkyrimDataDirGlob)?;
-        fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
+        fnis::collect::collect_all_fnis_injections(fnis_entries).await
     };
 
     let (fnis_hkx_patches, fnis_adsf_patches, io_job_runner) = {

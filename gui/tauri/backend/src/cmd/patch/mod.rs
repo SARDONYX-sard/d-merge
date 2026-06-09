@@ -72,7 +72,6 @@ pub(crate) async fn patch(
             hack_options: options.hack_options,
             debug: options.debug,
             output_target: options.output_target,
-            skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
         };
 
