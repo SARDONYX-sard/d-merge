@@ -66,6 +66,11 @@ pub(crate) fn check_only_table_body(
     original_items: &mut [ModItem],
     widths: [f32; 6],
 ) {
+    // If `mod_list` is empty after the fetch operation, unnecessary rendering can be avoided early on.
+    if original_items.is_empty() {
+        return;
+    }
+
     let w_checkbox = widths[0];
     let w_path = widths[1];
     let w_name = widths[2];
@@ -76,7 +81,7 @@ pub(crate) fn check_only_table_body(
         original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
 
     for filtered_mod in filtered_ids {
-        let orig_item = orig_map.get_mut(&filtered_mod.id).expect("Original item must exist");
+        let Some(orig_item) = orig_map.get_mut(&filtered_mod.id) else { continue };
 
         body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
