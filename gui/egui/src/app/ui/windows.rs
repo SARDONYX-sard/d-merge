@@ -34,7 +34,7 @@ impl App {
 
         let show_log_window = std::sync::Arc::clone(&self.show_log_window);
         let log_lines = std::sync::Arc::clone(&self.log_lines);
-        let clear_button_name = self.t(I18nKey::ClearButton).to_string();
+        let clear_button_name = self.i18n.t(I18nKey::ClearButton).to_string();
 
         ctx.show_viewport_deferred(
             egui::ViewportId::from_hash_of("log_viewer"),
@@ -84,68 +84,8 @@ impl App {
             return;
         }
 
-        fn path_selector_row(
-            ui: &mut egui::Ui,
-            label: &str,
-            value: &mut String,
-            select_label: &str,
-            clear_label: &str,
-            hover: Option<&str>,
-            picker: impl FnOnce() -> Option<String>,
-        ) {
-            ui.horizontal(|ui| {
-                let r = ui.label(label);
-                if let Some(h) = hover {
-                    r.on_hover_text(h);
-                }
-
-                ui.text_edit_singleline(value);
-
-                if ui.button(select_label).clicked()
-                    && let Some(p) = picker()
-                {
-                    *value = p;
-                }
-
-                if ui.button(clear_label).clicked() {
-                    value.clear();
-                }
-            });
-        }
-
-        let window_title = self.t(I18nKey::HelpButton).to_string();
-
-        let issue_report_label = self.t(I18nKey::IssueReportButton).to_string();
-        let issue_report_hover = self.t(I18nKey::IssueReportHover).to_string();
-
-        let select_button = self.t(I18nKey::SelectButton).to_string();
-        let clear_button = self.t(I18nKey::ClearButton).to_string();
-
-        let bug_report_label = self.t(I18nKey::BugReportLabel).to_string();
-        let see_issues_label = self.t(I18nKey::BugReportSeeIssues).to_string();
-        let tooling_label = self.t(I18nKey::ToolingLabel).to_string();
-
-        let log_dir_label = self.t(I18nKey::LogDirPathLabel).to_string();
-        let i18n_path_label = self.t(I18nKey::I18nPathLabel).to_string();
-        let restart_note = self.t(I18nKey::RestartRequiredNote).to_string();
-
-        let i18n_write_label = self.t(I18nKey::I18nWriteNewJsonButton).to_string();
-        let i18n_write_hover = format!(
-            "{} (-> {})",
-            self.t(I18nKey::I18nWriteNewJsonHover),
-            self.settings.ui.i18n_path,
-        );
-
-        let i18n_reload_label = self.t(I18nKey::I18nReloadJsonButton).to_string();
-        let i18n_reload_hover = format!(
-            "{} (-> {})",
-            self.t(I18nKey::I18nReloadJsonHover),
-            self.settings.ui.i18n_path,
-        );
-
-        let issue_url = self.settings.create_issue_link();
-
         let mut show = true;
+
         let mut issue_clicked = false;
         let mut write_i18n_clicked = false;
         let mut reload_i18n_clicked = false;
@@ -153,7 +93,9 @@ impl App {
         let mut selected_log_dir_path = self.settings.log.dir_path.clone();
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
 
-        egui::Window::new(window_title)
+        let issue_url = self.settings.create_issue_link();
+
+        egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show)
             .collapsible(false)
             .resizable(false)
@@ -164,134 +106,25 @@ impl App {
                 });
 
                 ui.add_space(8.0);
-
                 ui.separator();
 
-                let rows = [
-                    (self.t(I18nKey::AuthorLabel).to_string(), env!("CARGO_PKG_AUTHORS"), None),
-                    (
-                        self.t(I18nKey::LicenseLabel).to_string(),
-                        env!("CARGO_PKG_LICENSE"),
-                        Some(concat!(
-                            env!("CARGO_PKG_REPOSITORY"),
-                            "/blob/",
-                            env!("CARGO_PKG_VERSION"),
-                            "/LICENSE"
-                        )),
-                    ),
-                    (
-                        self.t(I18nKey::SourceCodeLabel).to_string(),
-                        "GitHub",
-                        Some(concat!(
-                            env!("CARGO_PKG_REPOSITORY"),
-                            "/tree/",
-                            env!("CARGO_PKG_VERSION")
-                        )),
-                    ),
-                    (
-                        self.t(I18nKey::ChangeLogLabel).to_string(),
-                        "CHANGELOG.md",
-                        Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md")),
-                    ),
-                    (
-                        self.t(I18nKey::ModTestStatusLabel).to_string(),
-                        "test_status.md",
-                        Some(concat!(
-                            env!("CARGO_PKG_REPOSITORY"),
-                            "/blob/",
-                            env!("CARGO_PKG_VERSION"),
-                            "/docs/test_status.md"
-                        )),
-                    ),
-                ];
-
-                egui::Grid::new("help_info_grid").num_columns(2).spacing([8.0, 6.0]).show(
-                    ui,
-                    |ui| {
-                        for (l, v, url) in rows {
-                            ui.label(l);
-                            match url {
-                                Some(url) => ui.hyperlink_to(v, url).on_hover_text(url),
-                                None => ui.label(v),
-                            };
-
-                            ui.end_row();
-                        }
-                    },
-                );
+                self.ui_help_info(ui);
 
                 ui.add_space(8.0);
-
                 ui.separator();
-                ui.add_space(4.0);
 
-                ui.label(&bug_report_label);
-
-                ui.horizontal(|ui| {
-                    const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
-
-                    ui.hyperlink_to(&see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
-
-                    if ui.button(&issue_report_label).on_hover_text(&issue_report_hover).clicked() {
-                        issue_clicked = true;
-                    }
-                });
+                self.ui_bug_report(ui, &mut issue_clicked);
 
                 ui.add_space(8.0);
-
                 ui.separator();
-                ui.add_space(4.0);
 
-                ui.label(&tooling_label);
-
-                ui.add_space(4.0);
-
-                path_selector_row(
+                self.ui_tooling(
                     ui,
-                    &log_dir_label,
                     &mut selected_log_dir_path,
-                    &select_button,
-                    &clear_button,
-                    Some(&restart_note),
-                    || {
-                        let p = Path::new(self.settings.log.dir_path.as_str());
-                        rfd::FileDialog::new()
-                            .set_directory(p)
-                            .pick_folder()
-                            .map(|p| p.display().to_string())
-                    },
-                );
-
-                ui.add_space(4.0);
-
-                path_selector_row(
-                    ui,
-                    &i18n_path_label,
                     &mut selected_i18n_path,
-                    &select_button,
-                    &clear_button,
-                    None,
-                    || {
-                        let p = Path::new(&self.settings.ui.i18n_path);
-                        rfd::FileDialog::new()
-                            .set_directory(p)
-                            .add_filter("translation.json", &["json"])
-                            .pick_file()
-                            .map(|p| p.display().to_string())
-                    },
+                    &mut write_i18n_clicked,
+                    &mut reload_i18n_clicked,
                 );
-
-                ui.add_space(4.0);
-
-                ui.horizontal(|ui| {
-                    if ui.button(&i18n_write_label).on_hover_text(&i18n_write_hover).clicked() {
-                        write_i18n_clicked = true;
-                    }
-
-                    if ui.button(&i18n_reload_label).on_hover_text(&i18n_reload_hover).clicked() {
-                        reload_i18n_clicked = true;
-                    }
-                });
             });
 
         if !show {
@@ -304,6 +137,7 @@ impl App {
 
         if self.settings.log.dir_path != selected_log_dir_path {
             self.settings.log.dir_path = selected_log_dir_path;
+
             self.set_colored_notify(
                 "Log dir path updated. Restart the app to apply changes.".to_string(),
                 Color32::YELLOW,
@@ -315,12 +149,178 @@ impl App {
         }
 
         if write_i18n_clicked {
-            self.confirm_dialog.open(i18n_write_hover, ConfirmAction::WriteI18nJson);
+            self.confirm_dialog.open(
+                format!(
+                    "{} (-> {})",
+                    self.i18n.t(I18nKey::I18nWriteNewJsonHover),
+                    self.settings.ui.i18n_path,
+                ),
+                ConfirmAction::WriteI18nJson,
+            );
         }
 
         if reload_i18n_clicked {
             self.reload_i18n();
         }
+    }
+
+    fn ui_help_info(&self, ui: &mut egui::Ui) {
+        let rows = [
+            (self.i18n.t(I18nKey::AuthorLabel).to_string(), env!("CARGO_PKG_AUTHORS"), None),
+            (
+                self.i18n.t(I18nKey::LicenseLabel).to_string(),
+                env!("CARGO_PKG_LICENSE"),
+                Some(concat!(
+                    env!("CARGO_PKG_REPOSITORY"),
+                    "/blob/",
+                    env!("CARGO_PKG_VERSION"),
+                    "/LICENSE"
+                )),
+            ),
+            (
+                self.i18n.t(I18nKey::SourceCodeLabel).to_string(),
+                "GitHub",
+                Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("CARGO_PKG_VERSION"))),
+            ),
+            (
+                self.i18n.t(I18nKey::ChangeLogLabel).to_string(),
+                "CHANGELOG.md",
+                Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md")),
+            ),
+            (
+                self.i18n.t(I18nKey::ModTestStatusLabel).to_string(),
+                "test_status.md",
+                Some(concat!(
+                    env!("CARGO_PKG_REPOSITORY"),
+                    "/blob/",
+                    env!("CARGO_PKG_VERSION"),
+                    "/docs/test_status.md"
+                )),
+            ),
+        ];
+
+        egui::Grid::new("help_info_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            for (label, value, url) in rows {
+                ui.label(label);
+
+                match url {
+                    Some(url) => {
+                        ui.hyperlink_to(value, url).on_hover_text(url);
+                    }
+                    None => {
+                        ui.label(value);
+                    }
+                }
+
+                ui.end_row();
+            }
+        });
+    }
+
+    fn ui_bug_report(&self, ui: &mut egui::Ui, issue_clicked: &mut bool) {
+        let bug_report_label = self.i18n.t(I18nKey::BugReportLabel);
+        let see_issues_label = self.i18n.t(I18nKey::BugReportSeeIssues);
+
+        let issue_report_label = self.i18n.t(I18nKey::IssueReportButton);
+        let issue_report_hover = self.i18n.t(I18nKey::IssueReportHover);
+
+        ui.label(bug_report_label);
+
+        ui.horizontal(|ui| {
+            const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
+
+            ui.hyperlink_to(see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
+
+            if ui.button(issue_report_label).on_hover_text(issue_report_hover).clicked() {
+                *issue_clicked = true;
+            }
+        });
+    }
+
+    fn ui_tooling(
+        &self,
+        ui: &mut egui::Ui,
+        selected_log_dir_path: &mut String,
+        selected_i18n_path: &mut String,
+        write_i18n_clicked: &mut bool,
+        reload_i18n_clicked: &mut bool,
+    ) {
+        let tooling_label = self.i18n.t(I18nKey::ToolingLabel);
+
+        let select_button = self.i18n.t(I18nKey::SelectButton);
+        let clear_button = self.i18n.t(I18nKey::ClearButton);
+
+        let log_dir_label = self.i18n.t(I18nKey::LogDirPathLabel);
+
+        let i18n_path_label = self.i18n.t(I18nKey::I18nPathLabel);
+        let i18n_write_label = self.i18n.t(I18nKey::I18nWriteNewJsonButton);
+        let i18n_reload_label = self.i18n.t(I18nKey::I18nReloadJsonButton);
+        let restart_note = self.i18n.t(I18nKey::RestartRequiredNote);
+
+        let i18n_write_hover = format!(
+            "{} (-> {})",
+            self.i18n.t(I18nKey::I18nWriteNewJsonHover),
+            self.settings.ui.i18n_path,
+        );
+
+        let i18n_reload_hover = format!(
+            "{} (-> {})",
+            self.i18n.t(I18nKey::I18nReloadJsonHover),
+            self.settings.ui.i18n_path,
+        );
+
+        ui.label(tooling_label);
+
+        ui.add_space(4.0);
+
+        egui::Grid::new("tooling_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            path_selector_row(
+                ui,
+                log_dir_label,
+                selected_log_dir_path,
+                select_button,
+                clear_button,
+                Some(restart_note),
+                || {
+                    let dir = Path::new(self.settings.log.dir_path.as_str());
+
+                    rfd::FileDialog::new()
+                        .set_directory(dir)
+                        .pick_folder()
+                        .map(|p| p.display().to_string())
+                },
+            );
+
+            path_selector_row(
+                ui,
+                i18n_path_label,
+                selected_i18n_path,
+                select_button,
+                clear_button,
+                None,
+                || {
+                    let dir = Path::new(&self.settings.ui.i18n_path);
+
+                    rfd::FileDialog::new()
+                        .set_directory(dir)
+                        .add_filter("translation.json", &["json"])
+                        .pick_file()
+                        .map(|p| p.display().to_string())
+                },
+            );
+        });
+
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            if ui.button(i18n_write_label).on_hover_text(&i18n_write_hover).clicked() {
+                *write_i18n_clicked = true;
+            }
+
+            if ui.button(i18n_reload_label).on_hover_text(&i18n_reload_hover).clicked() {
+                *reload_i18n_clicked = true;
+            }
+        });
     }
 
     /// Reloads the i18n map from disk and updates [`App::i18n`].
@@ -361,4 +361,36 @@ impl App {
             }
         }
     }
+}
+
+fn path_selector_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut String,
+    select_label: &str,
+    clear_label: &str,
+    hover: Option<&str>,
+    picker: impl FnOnce() -> Option<String>,
+) {
+    let r = ui.label(label);
+
+    if let Some(h) = hover {
+        r.on_hover_text(h);
+    }
+
+    ui.horizontal(|ui| {
+        ui.text_edit_singleline(value);
+
+        if ui.button(select_label).clicked()
+            && let Some(p) = picker()
+        {
+            *value = p;
+        }
+
+        if ui.button(clear_label).clicked() {
+            value.clear();
+        }
+    });
+
+    ui.end_row();
 }
