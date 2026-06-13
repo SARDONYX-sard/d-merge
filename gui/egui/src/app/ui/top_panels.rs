@@ -64,37 +64,38 @@ impl App {
 
                 self.ui_target_runtime_box(ui);
 
-                let debug_output_label = self.t(I18nKey::DebugOutput).to_string();
-                let debug_output_hover = self.t(I18nKey::DebugOutputHover).to_string();
-                ui.checkbox(&mut self.settings.behavior.enable_debug_output, debug_output_label)
-                    .on_hover_text(debug_output_hover);
-
-                let auto_remove_meshes_label = self.t(I18nKey::AutoRemoveMeshes).to_string();
-                let auto_remove_meshes_hover = self.t(I18nKey::AutoRemoveMeshesHover).to_string();
-                ui.checkbox(
-                    &mut self.settings.behavior.auto_remove_meshes,
-                    auto_remove_meshes_label,
-                )
-                .on_hover_text(auto_remove_meshes_hover);
-
-                let generate_fnis_esp_label = self.t(I18nKey::GenerateFnisEspLabel).to_string();
-                let generate_fnis_esp_hover = self.t(I18nKey::GenerateFnisEspHover).to_string();
-                ui.checkbox(&mut self.settings.behavior.generate_fnis_esp, generate_fnis_esp_label)
-                    .on_hover_text(generate_fnis_esp_hover);
+                for (value, label, hover) in [
+                    (
+                        &mut self.settings.behavior.enable_debug_output,
+                        I18nKey::DebugOutput,
+                        I18nKey::DebugOutputHover,
+                    ),
+                    (
+                        &mut self.settings.behavior.auto_remove_meshes,
+                        I18nKey::AutoRemoveMeshes,
+                        I18nKey::AutoRemoveMeshesHover,
+                    ),
+                    (
+                        &mut self.settings.behavior.generate_fnis_esp,
+                        I18nKey::GenerateFnisEspLabel,
+                        I18nKey::GenerateFnisEspHover,
+                    ),
+                    (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
+                ] {
+                    checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
+                }
 
                 ui.add_space(60.0);
-
-                let auto_run_label = self.t(I18nKey::AutoRun).to_string();
-                let auto_run_hover = self.t(I18nKey::AutoRunHover).to_string();
-                ui.checkbox(&mut self.settings.behavior.auto_run, auto_run_label)
-                    .on_hover_text(auto_run_hover);
-
-                let transparent_label = self.t(I18nKey::Transparent).to_string();
-                let transparent_hover = self.t(I18nKey::TransparentHover).to_string();
-                ui.checkbox(&mut self.settings.ui.transparent, transparent_label)
-                    .on_hover_text(transparent_hover);
-
                 ui.separator();
+
+                {
+                    let (value, label, hover) = (
+                        &mut self.settings.ui.transparent,
+                        I18nKey::Transparent,
+                        I18nKey::TransparentHover,
+                    );
+                    checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
+                }
                 self.ui_theme_box(ui);
             });
 
@@ -272,4 +273,12 @@ impl App {
             });
         });
     }
+}
+
+fn checkbox(
+    ui: &mut egui::Ui,
+    checked: &mut bool,
+    label: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.add(egui::Checkbox::new(checked, label))
 }
