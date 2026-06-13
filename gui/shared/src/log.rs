@@ -22,6 +22,41 @@ impl LogLevel {
             Self::Trace => "Trace",
         }
     }
+
+    #[inline]
+    pub const fn all() -> [Self; 5] {
+        [Self::Error, Self::Warn, Self::Info, Self::Debug, Self::Trace]
+    }
+}
+
+impl core::fmt::Display for LogLevel {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl core::str::FromStr for LogLevel {
+    type Err = String;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            _ if s.eq_ignore_ascii_case("error") => Self::Error,
+            _ if s.eq_ignore_ascii_case("warn") => Self::Warn,
+            _ if s.eq_ignore_ascii_case("info") => Self::Info,
+            _ if s.eq_ignore_ascii_case("debug") => Self::Debug,
+            _ if s.eq_ignore_ascii_case("trace") => Self::Trace,
+            unknown => return Err(format!("Invalid log level: {unknown}")),
+        })
+    }
+}
+
+impl From<LogLevel> for String {
+    #[inline]
+    fn from(value: LogLevel) -> Self {
+        value.as_str().to_string()
+    }
 }
 
 #[cfg(feature = "tracing")]

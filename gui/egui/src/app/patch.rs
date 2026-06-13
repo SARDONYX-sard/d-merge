@@ -185,6 +185,7 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
             nemesis_merge::Status::Done => {}
 
             nemesis_merge::Status::Error(err) => {
+                tracing::error!(%err);
                 *self.error.write() = Some(err);
             }
         }
