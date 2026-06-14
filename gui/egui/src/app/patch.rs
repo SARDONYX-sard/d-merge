@@ -131,7 +131,7 @@ impl App {
 
         self.notify_info(format!(
             "0/6: {} `{output_dir}/meshes`",
-            self.t(I18nKey::RemovingMeshesMessage)
+            self.i18n.t(I18nKey::RemovingMeshesMessage)
         ));
         nemesis_merge::cache_remover::remove_meshes_dir_all(output_dir);
     }
@@ -183,11 +183,7 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
             }
 
             nemesis_merge::Status::Done => {}
-
-            nemesis_merge::Status::Error(err) => {
-                tracing::error!(%err);
-                *self.error.write() = Some(err);
-            }
+            nemesis_merge::Status::Error(err) => *self.error.write() = Some(err),
         }
 
         // NOTE: Request a UI repaint when the phase changes or reaches a terminal state.

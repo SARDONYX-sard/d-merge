@@ -9,25 +9,24 @@ use crate::error::Error;
 /// Collect both Nemesis and FNIS mods into a single vector.
 ///
 /// # Nemesis
-/// | is_vfs | glob pattern                                               | id extracted as                   |
-/// |--------|------------------------------------------------------------|-----------------------------------|
-/// | true   | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
+/// | is_vfs | glob pattern                                              | id extracted as                                                               |
+/// |--------|-----------------------------------------------------------|-------------------------------------------------------------------------------|
+/// | true   | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini`                                |
 /// | false  | `{skyrim_data_dir}/Nemesis_Engine/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
 ///
 /// # NemesisExt
-/// | is_vfs | glob pattern                                               | id extracted as                   |
-/// |--------|------------------------------------------------------------|-----------------------------------|
-/// | true   | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`         | `<id>` from `Nemesis_Engine/mod/<id>/info.ini` |
-/// | false  | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`         | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
+/// | is_vfs | glob pattern                                              | id extracted as                                                               |
+/// |--------|-----------------------------------------------------------|-------------------------------------------------------------------------------|
+/// | true   | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`      | `<id>` from `Nemesis_Engine/mod/<id>/info.ini`                                |
+/// | false  | `{skyrim_data_dir}/Nemesis_EngineExt/mod/*/info.ini`      | full parent path (e.g. `MO2/mod/mod_name/meshes/.../Nemesis_Engine/mod/aaaa`) |
 ///
 /// # FNIS
-/// | is_vfs | glob pattern                                                         | id extracted as                   |
-/// |--------|----------------------------------------------------------------------|-----------------------------------|
-/// |  any   | `{skyrim_data_dir}/meshes/actors/character/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>`     |
+/// | is_vfs | glob pattern                                                         | id extracted as     |
+/// |--------|----------------------------------------------------------------------|---------------------|
+/// |  any   | `{skyrim_data_dir}/meshes/**/animations/*/FNIS_*_List.txt` | `<id>` from `animations/<id>` |
 ///
 /// - `is_vfs`:
-///   Whether the lookup is done in the virtualized `Data` directory (true) or
-///   directly under the mods directory (false).
+///   Whether the lookup is done in the virtualized `Data` directory (true) or directly under the mods directory (false).
 ///
 /// # Errors
 /// Returns [`Error`] if glob expansion fails or files cannot be read.

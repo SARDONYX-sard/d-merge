@@ -11,6 +11,9 @@ use snafu::ResultExt as _;
 #[derive(serde::Serialize, serde::Deserialize, d_merge_gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
 pub enum I18nKey {
+    /// Author:
+    AuthorLabel,
+
     /// Auto Detect
     AutoDetectButton,
 
@@ -45,8 +48,17 @@ pub enum I18nKey {
     /// - When the Skyrim data directory is changed
     AutoRunHover,
 
+    /// Bug Report:
+    BugReportLabel,
+
+    /// See Issues
+    BugReportSeeIssues,
+
     /// Cancel
     CancelButton,
+
+    /// Change Log:
+    ChangeLogLabel,
 
     /// Clear
     ClearButton,
@@ -54,11 +66,11 @@ pub enum I18nKey {
     /// ID
     ColumnId,
 
-    /// Name
-    ColumnName,
-
     /// Mod Type
     ColumnModType,
+
+    /// Name
+    ColumnName,
 
     /// Priority
     ColumnPriority,
@@ -68,39 +80,6 @@ pub enum I18nKey {
 
     /// Debug output
     DebugOutput,
-
-    /// Bug Report:
-    BugReportLabel,
-
-    /// See Issues
-    BugReportSeeIssues,
-
-    /// Tooling:
-    ToolingLabel,
-
-    /// Log Path:
-    LogDirPathLabel,
-
-    /// I18n Path:
-    I18nPathLabel,
-
-    /// NOTE: Need to restart the app for changes to take effect.
-    RestartRequiredNote,
-
-    /// Author:
-    AuthorLabel,
-
-    /// License:
-    LicenseLabel,
-
-    /// Source Code:
-    SourceCodeLabel,
-
-    /// Change Log:
-    ChangeLogLabel,
-
-    /// Mod Test Status:
-    ModTestStatusLabel,
 
     /// Output d merge patches & merged json files.
     /// (To `<Output dir>/.d_merge/.debug/patches`)
@@ -127,17 +106,17 @@ pub enum I18nKey {
     /// Help
     HelpButton,
 
+    /// I18n Path:
+    I18nPathLabel,
+
+    /// Reload the translation file. This is useful for previewing translations without restarting the application.
+    I18nReloadJsonHover,
+
     /// New I18n
     I18nWriteNewJsonButton,
 
     /// Write the new English translation file.
     I18nWriteNewJsonHover,
-
-    /// Reload I18n
-    I18nReloadJsonButton,
-
-    /// Reload the translation file. This is useful for previewing translations without restarting the application.
-    I18nReloadJsonHover,
 
     /// Report Issue
     IssueReportButton,
@@ -146,6 +125,9 @@ pub enum I18nKey {
     /// This will auto-fill version info and some hardware.
     /// GitHub account required.
     IssueReportHover,
+
+    /// License:
+    LicenseLabel,
 
     /// 🔒Locked
     LockButton,
@@ -160,6 +142,13 @@ pub enum I18nKey {
     /// Log Dir
     LogDir,
 
+    /// Log Path:
+    LogDirPathLabel,
+
+    /// Change the log directory to the specified path.
+    /// The log path will not change until you click this button.(Or restart app)
+    LogReloadHover,
+
     /// Log Level
     LogLevelLabel,
 
@@ -169,6 +158,9 @@ pub enum I18nKey {
     /// When using it completely manually.
     /// (The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)
     ManualModeHover,
+
+    /// Mod Test Status:
+    ModTestStatusLabel,
 
     /// Updated mod list
     ModsListFetchStateDone,
@@ -185,11 +177,26 @@ pub enum I18nKey {
     /// Mods
     ModsListTitle,
 
+    /// The list of mods is collected by scanning the following glob paths in the Skyrim Data directory.
+    ///
+    /// - Nemesis: Nemesis_Engine/mod/*/info.ini
+    /// - NemesisExt: Nemesis_EngineExt/mod/*/info.ini
+    /// - FNIS: meshes/**/animations/*/FNIS_*_List.txt
+    ModsListTitleHover,
+
     /// Normalize
     NormalizeButton,
 
-    /// Reorder priorities by mod type (Nemesis -> NemesisExt -> FNIS)
-    /// and sort mods alphabetically by id within each group.
+    /// Sort the mod list according to the following rules
+    ///
+    /// 1. Group mods by type in the following order:
+    ///    Nemesis -> NemesisExt -> FNIS
+    /// 2. Sort mods alphabetically within each type.
+    /// 3. Reassign priorities sequentially starting from `0`.
+    /// 4. In manual mode, disable the check for duplicate ID rows.
+    ///
+    /// # Notes
+    /// This sorting does not resolve conflicts between patches.
     NormalizeHover,
 
     /// Clear Notify
@@ -236,6 +243,9 @@ pub enum I18nKey {
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
 
+    /// Source Code:
+    SourceCodeLabel,
+
     /// Applying patches...
     StatusApplyingPatches,
 
@@ -257,12 +267,15 @@ pub enum I18nKey {
     /// Reading templates and patches...
     StatusReadingPatches,
 
+    /// Theme:
+    ThemeLabel,
+
     /// Toggle between Dark, Light, and System themes.
     /// - NOTE: Using Light theme and the transparent background feature at the same time makes the screen very hard to read.
     ThemeHover,
 
-    /// Theme:
-    ThemeLabel,
+    /// Tooling:
+    ToolingLabel,
 
     /// Transparent
     Transparent,

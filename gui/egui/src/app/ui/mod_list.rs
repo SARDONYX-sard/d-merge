@@ -33,7 +33,7 @@ use d_merge_gui_shared::{
     fetch::FetchState,
     i18n::I18nKey,
     mod_item::{self, ModItem},
-    settings::mod_list_ui::SortColumn,
+    settings::{DataMode, mod_list_ui::SortColumn},
 };
 use egui::Button;
 use rayon::prelude::*;
@@ -53,7 +53,8 @@ impl App {
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading(self.t(I18nKey::ModsListTitle));
+                ui.heading(self.i18n.t(I18nKey::ModsListTitle))
+                    .on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
 
                 ui.add_space(50.0);
                 self.ui_search_panel(ui);
@@ -69,11 +70,14 @@ impl App {
                 }
 
                 if ui
-                    .add_sized([60.0, 40.0], Button::new(self.t(I18nKey::NormalizeButton)))
-                    .on_hover_text(self.t(I18nKey::NormalizeHover))
+                    .add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::NormalizeButton)))
+                    .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
                     .clicked()
                 {
                     mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
+                    if matches!(self.settings.behavior.mode, DataMode::Manual) {
+                        mod_item::dedup_mods_by_id(self.settings.mod_list_mut());
+                    }
                 }
 
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
@@ -81,7 +85,7 @@ impl App {
                     .add_enabled_ui(!is_fetching, |ui| {
                         ui.add_sized(
                             [60.0, 40.0],
-                            Button::new(format!("🔄 {}", self.t(I18nKey::ReloadButton))),
+                            Button::new(format!("🔄 {}", self.i18n.t(I18nKey::ReloadButton))),
                         )
                     })
                     .inner
@@ -108,7 +112,7 @@ impl App {
 
     /// Renders the search bar: filter text field, column selector, and lock button.
     pub(crate) fn ui_search_panel(&mut self, ui: &mut egui::Ui) {
-        ui.label(self.t(I18nKey::SearchLabel));
+        ui.label(self.i18n.t(I18nKey::SearchLabel));
 
         let text_line = egui::TextEdit::singleline(&mut self.settings.ui.mod_list.filter_text);
         let text_line = if self.settings.ui.transparent {
@@ -118,7 +122,7 @@ impl App {
         };
         ui.add_sized([300.0, 40.0], text_line);
 
-        if ui.add_sized([60.0, 40.0], Button::new(self.t(I18nKey::ClearButton))).clicked() {
+        if ui.add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::ClearButton))).clicked() {
             self.settings.ui.mod_list.filter_text.clear();
         }
 
@@ -291,11 +295,11 @@ impl App {
 
     /// Renders the table header row with sortable column buttons.
     fn render_table_header(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
-        let path_label = self.t(I18nKey::ColumnId).to_string();
-        let name_label = self.t(I18nKey::ColumnName).to_string();
-        let mod_type_label = self.t(I18nKey::ColumnModType).to_string();
-        let site_label = self.t(I18nKey::ColumnSite).to_string();
-        let priority_label = self.t(I18nKey::ColumnPriority).to_string();
+        let path_label = self.i18n.t(I18nKey::ColumnId).to_string();
+        let name_label = self.i18n.t(I18nKey::ColumnName).to_string();
+        let mod_type_label = self.i18n.t(I18nKey::ColumnModType).to_string();
+        let site_label = self.i18n.t(I18nKey::ColumnSite).to_string();
+        let priority_label = self.i18n.t(I18nKey::ColumnPriority).to_string();
 
         self.checkbox_header_button(header);
         self.header_button(header, &path_label, SortColumn::Id);

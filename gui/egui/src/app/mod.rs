@@ -36,10 +36,7 @@ pub(crate) mod ui;
 use std::sync::{Arc, atomic::AtomicBool};
 
 use d_merge_gui_shared::{
-    fetch::FetchState,
-    i18n::{I18nKey, I18nMap},
-    patch::PatchProgress,
-    settings::Settings,
+    fetch::FetchState, i18n::I18nMap, patch::PatchProgress, settings::Settings,
 };
 use eframe::egui;
 use parking_lot::RwLock;
@@ -171,13 +168,6 @@ impl App {
             patch_start_time: None,
         }
     }
-
-    /// Translates `key` using the loaded i18n map, falling back to the
-    /// built-in English string.
-    #[inline]
-    pub(crate) fn t(&self, key: I18nKey) -> &str {
-        self.i18n.t(key)
-    }
 }
 
 impl eframe::App for App {
@@ -200,8 +190,7 @@ impl eframe::App for App {
 
         // ── Top panels (outermost → innermost) ────────────────────────────────
         self.ui_execution_mode(ctx);
-        self.ui_skyrim_dir(ctx);
-        self.ui_output_dir(ctx);
+        self.ui_paths(ctx);
 
         // ── Bottom panels (innermost → outermost) ─────────────────────────────
         // NOTE: egui stacks bottom panels in reverse registration order.

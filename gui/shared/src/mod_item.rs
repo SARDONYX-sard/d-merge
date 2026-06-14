@@ -103,11 +103,11 @@ pub fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) ->
     PatchMaps { nemesis_entries, fnis_entries }
 }
 
-/// Reorder priorities by mod type:
-/// Nemesis -> NemesisExt -> FNIS
-///
-/// Inside each mod type, mods are ordered by `id` alphabetically.
-/// After sorting, priorities are reassigned sequentially starting from 0.
+/// Reorder priorities:
+/// 1. Sort mods by type:
+///    Nemesis -> NemesisExt -> FNIS
+/// 2. Sort mods alphabetically within each type.
+/// 3. Reassign priorities sequentially starting from `0`.
 pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
     use mod_info::ModType;
 
@@ -125,6 +125,38 @@ pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
     mods.par_iter_mut().enumerate().for_each(|(priority, item)| {
         item.priority = priority;
     });
+}
+
+/// Disable duplicate mods and keep only the first occurrence enabled.
+///
+/// Duplicate detection uses:
+///
+/// 1. The full `id` for VFS mods.
+/// 2. The last path component of `id` for manual mode mods.
+///
+/// The first occurrence of a duplicate group remains unchanged.
+/// All subsequent duplicates are disabled.
+///
+/// This function does not modify mod ordering or priorities.
+///
+/// # Purpose of this function
+///
+/// In manual mode, applying patches with the same ID but different versions results in the simultaneous addition
+/// of different classes to the same pointer, causing a `tailing char 0` error. This function prevents that.
+pub fn dedup_mods_by_id(mods: &mut [ModItem]) {
+    use std::path::Path;
+
+    use rapidhash::RapidHashSet as HashSet;
+
+    let mut seen = HashSet::default();
+
+    for item in mods {
+        let key = Path::new(&item.id).file_name().and_then(|x| x.to_str()).unwrap_or(&item.id);
+
+        if !seen.insert(key) {
+            item.enabled = false;
+        }
+    }
 }
 
 #[cfg(test)]

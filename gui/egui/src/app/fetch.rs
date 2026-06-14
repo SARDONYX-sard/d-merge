@@ -48,7 +48,7 @@ impl App {
         tracing::debug!("`update_mod_list` has been called.");
 
         self.mod_list_msg = (
-            self.t(I18nKey::ModsListFetchStateFetching).to_string(),
+            self.i18n.t(I18nKey::ModsListFetchStateFetching).to_string(),
             crate::app::patch::EGUI_RIGHT_BLUE,
         );
         *self.fetch_state.write() = FetchState::Fetching;
@@ -104,7 +104,10 @@ impl App {
                 self.last_fetch_was_empty = false;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateDone)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateDone)
+                    ),
                     Color32::GREEN,
                 );
 
@@ -122,7 +125,10 @@ impl App {
                 self.last_fetch_was_empty = true;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateEmpty)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateEmpty)
+                    ),
                     Color32::WHITE,
                 );
             }
@@ -134,54 +140,15 @@ impl App {
                 *self.fetch_state.write() = FetchState::Idle;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateError)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateError)
+                    ),
                     Color32::RED,
                 );
             }
 
             FetchState::Fetching | FetchState::Idle => {}
-        }
-    }
-
-    /// Renders the Skyrim data-directory text field and triggers a mod-list
-    /// refresh when the value changes.
-    ///
-    /// Also handles the first-render auto-detect path for VFS mode: if the
-    /// stored path is empty on the very first frame, it falls through to the
-    /// registry-based auto-detect rather than rendering an empty field.
-    ///
-    /// Called from `app/ui/top_panels.rs`.
-    pub(crate) fn draw_skyrim_dir_ui(&mut self, ui: &mut egui::Ui) {
-        let changed = match self.settings.behavior.mode {
-            DataMode::Vfs => {
-                if self.is_first_render && self.settings.vfs.skyrim_data_dir.trim().is_empty() {
-                    self.update_vfs_skyrim_data_dir_by_reg();
-                    return;
-                }
-
-                let line = egui::TextEdit::singleline(&mut self.settings.vfs.skyrim_data_dir);
-                let line = if self.settings.ui.transparent {
-                    line.background_color(egui::Color32::TRANSPARENT)
-                } else {
-                    line
-                };
-                ui.add_sized([ui.available_width() * 0.85, 40.0], line).changed()
-            }
-
-            DataMode::Manual => {
-                let line = egui::TextEdit::singleline(&mut self.settings.manual.skyrim_data_dir)
-                    .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*");
-                let line = if self.settings.ui.transparent {
-                    line.background_color(egui::Color32::TRANSPARENT)
-                } else {
-                    line
-                };
-                ui.add_sized([ui.available_width() * 0.9, 40.0], line).changed()
-            }
-        };
-
-        if self.is_first_render || changed {
-            self.update_mod_list();
         }
     }
 
@@ -206,9 +173,9 @@ impl App {
             Err(err) => {
                 tracing::error!(%err);
                 #[cfg(target_os = "windows")]
-                let err_msg = self.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
+                let err_msg = self.i18n.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
                 #[cfg(not(target_os = "windows"))]
-                let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
+                let err_msg = self.i18n.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
                 self.notify_error(err_msg);
             }
         }

@@ -23,10 +23,10 @@
 
 use std::{path::Path, sync::OnceLock};
 
-use tracing_subscriber::{Registry, prelude::*};
+use tracing_subscriber::prelude::*;
 
 use crate::{
-    RotationHandle, RotationLayer,
+    RotationBuilder, RotationHandle,
     error::{Error, Result},
 };
 
@@ -56,17 +56,7 @@ pub fn init<P>(log_dir: P, log_name: &str, max_files: usize) -> Result<()>
 where
     P: AsRef<Path>,
 {
-    let log_dir = log_dir.as_ref();
-    let (layer, handle): (RotationLayer<Registry>, _) = RotationLayer::builder()
-        .log_dir(log_dir.to_path_buf())
-        .log_file_name(log_name)
-        .max_files(max_files)
-        .build()?;
-
-    HANDLE.set(handle).map_err(|_| Error::AlreadyInit)?;
-
-    tracing_subscriber::registry().with(layer).init();
-    Ok(())
+    init_with_level(log_dir, log_name, max_files, tracing::Level::TRACE)
 }
 
 /// Initialize the global rotation logger and install it as the process-wide
@@ -90,19 +80,42 @@ where
     P: AsRef<Path>,
     L: Into<tracing::Level>,
 {
-    let log_dir = log_dir.as_ref();
+    let log_dir = log_dir.as_ref().to_path_buf();
     let level = level.into();
 
-    let (layer, handle): (RotationLayer<Registry>, _) = RotationLayer::builder()
-        .log_dir(log_dir)
-        .log_file_name(log_name)
-        .max_files(max_files)
-        .level(level)
-        .build()?;
+    let handle = {
+        let this = RotationBuilder {
+            log_dir,
+            log_file: log_name.to_string(),
+            max_files,
+            initial_level: level.into(),
+        };
+
+        let file = crate::rotate::rotate_files(&this.log_dir, &this.log_file, this.max_files)?;
+        let writer = crate::SwappableWriter::new(file);
+
+        let (reload, reload_handle) = tracing_subscriber::reload::Layer::new(this.initial_level);
+        let fmt = tracing_subscriber::fmt::layer()
+            .compact()
+            .with_ansi(false)
+            .with_file(true)
+            .with_line_number(true)
+            .with_target(false)
+            .with_writer(writer.clone());
+
+        let handle = RotationHandle {
+            reloader: std::sync::Arc::new(crate::HandleReloader(reload_handle)),
+            writer,
+            max_files: this.max_files,
+        };
+
+        tracing_subscriber::registry().with(reload).with(fmt).init();
+
+        handle
+    };
 
     HANDLE.set(handle).map_err(|_| Error::AlreadyInit)?;
 
-    tracing_subscriber::registry().with(layer).init();
     Ok(())
 }
 
