@@ -12,7 +12,7 @@
 //! 2. Capture mutations in local `bool` / `String` variables.
 //! 3. Apply mutations *after* the closure returns.
 
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use d_merge_gui_shared::i18n::{I18nKey, I18nMap};
 use egui::Color32;
@@ -84,19 +84,18 @@ impl App {
             return;
         }
 
-        let mut show = true;
+        let issue_url = self.settings.create_issue_link();
 
-        let mut issue_clicked = false;
+        let mut show_help = true;
         let mut write_i18n_clicked = false;
         let mut reload_i18n_clicked = false;
+        let mut reload_log_clicked = false;
 
         let mut selected_log_dir_path = self.settings.log.dir_path.clone();
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
 
-        let issue_url = self.settings.create_issue_link();
-
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
-            .open(&mut show)
+            .open(&mut show_help)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
@@ -113,7 +112,7 @@ impl App {
                 ui.add_space(8.0);
                 ui.separator();
 
-                self.ui_bug_report(ui, &mut issue_clicked);
+                self.ui_bug_report(ui, issue_url);
 
                 ui.add_space(8.0);
                 ui.separator();
@@ -124,30 +123,27 @@ impl App {
                     &mut selected_i18n_path,
                     &mut write_i18n_clicked,
                     &mut reload_i18n_clicked,
+                    &mut reload_log_clicked,
                 );
             });
 
-        if !show {
+        if !show_help {
             self.show_help = false;
-        }
-
-        if issue_clicked {
-            ctx.open_url(egui::OpenUrl { url: issue_url, new_tab: true });
         }
 
         if self.settings.log.dir_path != selected_log_dir_path {
             self.settings.log.dir_path = selected_log_dir_path;
-
-            self.set_colored_notify(
-                "Log dir path updated. Restart the app to apply changes.".to_string(),
-                Color32::YELLOW,
-            );
+        }
+        if reload_log_clicked {
+            self.reload_log();
         }
 
         if self.settings.ui.i18n_path != selected_i18n_path {
             self.settings.ui.i18n_path = selected_i18n_path;
         }
-
+        if reload_i18n_clicked {
+            self.reload_i18n();
+        }
         if write_i18n_clicked {
             self.confirm_dialog.open(
                 format!(
@@ -157,10 +153,6 @@ impl App {
                 ),
                 ConfirmAction::WriteI18nJson,
             );
-        }
-
-        if reload_i18n_clicked {
-            self.reload_i18n();
         }
     }
 
@@ -217,8 +209,9 @@ impl App {
         });
     }
 
-    fn ui_bug_report(&self, ui: &mut egui::Ui, issue_clicked: &mut bool) {
+    fn ui_bug_report(&self, ui: &mut egui::Ui, issue_url: String) {
         let bug_report_label = self.i18n.t(I18nKey::BugReportLabel);
+
         let see_issues_label = self.i18n.t(I18nKey::BugReportSeeIssues);
 
         let issue_report_label = self.i18n.t(I18nKey::IssueReportButton);
@@ -228,11 +221,10 @@ impl App {
 
         ui.horizontal(|ui| {
             const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
-
             ui.hyperlink_to(see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
 
             if ui.button(issue_report_label).on_hover_text(issue_report_hover).clicked() {
-                *issue_clicked = true;
+                ui.ctx().open_url(egui::OpenUrl { url: issue_url, new_tab: true });
             }
         });
     }
@@ -244,62 +236,56 @@ impl App {
         selected_i18n_path: &mut String,
         write_i18n_clicked: &mut bool,
         reload_i18n_clicked: &mut bool,
+        reload_log_clicked: &mut bool,
     ) {
-        let tooling_label = self.i18n.t(I18nKey::ToolingLabel);
-
-        let select_button = self.i18n.t(I18nKey::SelectButton);
-        let clear_button = self.i18n.t(I18nKey::ClearButton);
-
-        let log_dir_label = self.i18n.t(I18nKey::LogDirPathLabel);
-
-        let i18n_path_label = self.i18n.t(I18nKey::I18nPathLabel);
-        let i18n_write_label = self.i18n.t(I18nKey::I18nWriteNewJsonButton);
-        let i18n_reload_label = self.i18n.t(I18nKey::I18nReloadJsonButton);
-        let restart_note = self.i18n.t(I18nKey::RestartRequiredNote);
-
         let i18n_write_hover = format!(
             "{} (-> {})",
             self.i18n.t(I18nKey::I18nWriteNewJsonHover),
             self.settings.ui.i18n_path,
         );
 
-        let i18n_reload_hover = format!(
-            "{} (-> {})",
-            self.i18n.t(I18nKey::I18nReloadJsonHover),
-            self.settings.ui.i18n_path,
-        );
-
-        ui.label(tooling_label);
-
+        ui.label(self.i18n.t(I18nKey::ToolingLabel));
         ui.add_space(4.0);
 
         egui::Grid::new("tooling_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            path_selector_row(
-                ui,
-                log_dir_label,
-                selected_log_dir_path,
-                select_button,
-                clear_button,
-                Some(restart_note),
+            if path_selector_row(
+                PathSelector {
+                    ui,
+                    label: self.i18n.t(I18nKey::LogDirPathLabel),
+                    value: selected_log_dir_path,
+                    select_label: self.i18n.t(I18nKey::SelectButton),
+                    reload_label: self.i18n.t(I18nKey::ReloadButton),
+                    reload_hover: self.i18n.t(I18nKey::LogReloadHover),
+                    clear_label: self.i18n.t(I18nKey::ClearButton),
+                },
                 || {
                     let dir = Path::new(self.settings.log.dir_path.as_str());
+                    // IMPORTANT: Without this, rfd cannot set dir correctly.
+                    let dir = dir.canonicalize().map(Cow::Owned).unwrap_or(Cow::Borrowed(dir));
 
                     rfd::FileDialog::new()
                         .set_directory(dir)
                         .pick_folder()
                         .map(|p| p.display().to_string())
                 },
-            );
+            ) {
+                *reload_log_clicked = true;
+            }
 
-            path_selector_row(
-                ui,
-                i18n_path_label,
-                selected_i18n_path,
-                select_button,
-                clear_button,
-                None,
+            if path_selector_row(
+                PathSelector {
+                    ui,
+                    label: self.i18n.t(I18nKey::I18nPathLabel),
+                    value: selected_i18n_path,
+                    select_label: self.i18n.t(I18nKey::SelectButton),
+                    reload_label: self.i18n.t(I18nKey::ReloadButton),
+                    reload_hover: self.i18n.t(I18nKey::I18nReloadJsonHover),
+                    clear_label: self.i18n.t(I18nKey::ClearButton),
+                },
                 || {
                     let dir = Path::new(&self.settings.ui.i18n_path);
+                    // IMPORTANT: Without this, rfd cannot set dir correctly.
+                    let dir = dir.canonicalize().map(Cow::Owned).unwrap_or(Cow::Borrowed(dir));
 
                     rfd::FileDialog::new()
                         .set_directory(dir)
@@ -307,20 +293,33 @@ impl App {
                         .pick_file()
                         .map(|p| p.display().to_string())
                 },
-            );
-        });
-
-        ui.add_space(4.0);
-
-        ui.horizontal(|ui| {
-            if ui.button(i18n_write_label).on_hover_text(&i18n_write_hover).clicked() {
-                *write_i18n_clicked = true;
-            }
-
-            if ui.button(i18n_reload_label).on_hover_text(&i18n_reload_hover).clicked() {
+            ) {
                 *reload_i18n_clicked = true;
             }
+
+            ui.horizontal(|ui| {
+                if ui
+                    .button(self.i18n.t(I18nKey::I18nWriteNewJsonButton))
+                    .on_hover_text(&i18n_write_hover)
+                    .clicked()
+                {
+                    *write_i18n_clicked = true;
+                }
+            });
+            ui.end_row();
         });
+    }
+
+    fn reload_log(&mut self) {
+        let dir = Path::new(self.settings.log.dir_path.as_str());
+        if let Err(err) =
+            tracing_rotation::global::change_log_path(dir, d_merge_gui_shared::log::LOG_FILENAME)
+        {
+            tracing::error!(%err);
+            self.notify_error(format!("Failed to reload log: {err}"));
+        } else {
+            self.set_colored_notify("Log file rotated.".to_string(), Color32::GREEN);
+        }
     }
 
     /// Reloads the i18n map from disk and updates [`App::i18n`].
@@ -363,20 +362,23 @@ impl App {
     }
 }
 
-fn path_selector_row(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut String,
-    select_label: &str,
-    clear_label: &str,
-    hover: Option<&str>,
-    picker: impl FnOnce() -> Option<String>,
-) {
-    let r = ui.label(label);
+struct PathSelector<'a> {
+    ui: &'a mut egui::Ui,
+    label: &'a str,
+    value: &'a mut String,
+    select_label: &'a str,
+    reload_label: &'a str,
+    reload_hover: &'a str,
+    clear_label: &'a str,
+}
 
-    if let Some(h) = hover {
-        r.on_hover_text(h);
-    }
+fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<String>) -> bool {
+    let PathSelector { ui, label, value, select_label, reload_label, reload_hover, clear_label } =
+        selector;
+
+    ui.label(label);
+
+    let mut reload_clicked = false;
 
     ui.horizontal(|ui| {
         ui.text_edit_singleline(value);
@@ -387,10 +389,15 @@ fn path_selector_row(
             *value = p;
         }
 
+        if ui.button(reload_label).on_hover_text(reload_hover).clicked() {
+            reload_clicked = true;
+        }
+
         if ui.button(clear_label).clicked() {
             value.clear();
         }
     });
-
     ui.end_row();
+
+    reload_clicked
 }
