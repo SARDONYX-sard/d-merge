@@ -183,11 +183,7 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
             }
 
             nemesis_merge::Status::Done => {}
-
-            nemesis_merge::Status::Error(err) => {
-                tracing::error!(%err);
-                *self.error.write() = Some(err);
-            }
+            nemesis_merge::Status::Error(err) => *self.error.write() = Some(err),
         }
 
         // NOTE: Request a UI repaint when the phase changes or reaches a terminal state.

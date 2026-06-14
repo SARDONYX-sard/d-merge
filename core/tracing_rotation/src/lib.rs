@@ -219,11 +219,15 @@ impl<S> Layer<S> for RotationLayer<S>
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
+    // NOTE: It appears to be an undocumented API(tracing-subscriber = "0.3.23"),
+    // but if we don't use it, a bug occurs that prevents errors from being logged.
+    fn max_level_hint(&self) -> Option<LevelFilter> {
+        self.filter.lock().max_level_hint()
+    }
+
     #[inline]
     fn enabled(&self, metadata: &tracing::Metadata<'_>, ctx: Context<'_, S>) -> bool {
-        // Check the reload filter first (cheap atomic read inside reload::Layer),
-        // then delegate to the fmt layer.
-        self.filter.lock().enabled(metadata, ctx.clone()) && self.fmt.enabled(metadata, ctx)
+        self.filter.lock().enabled(metadata, ctx.clone())
     }
 
     #[inline]
