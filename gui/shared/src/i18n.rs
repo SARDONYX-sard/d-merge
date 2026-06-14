@@ -28,6 +28,7 @@ pub enum I18nKey {
     /// Targets:
     /// - `<output directory>/meshes`
     /// - `<output directory>/.d_merge/.debug`
+    /// - `<output directory>/FNIS.esp`
     /// - `<output directory>/SKSE/Plugins/fnis_aa/config.json`
     ///
     /// Note:
