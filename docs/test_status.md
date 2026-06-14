@@ -51,6 +51,7 @@ SkyrimSE
 | Status | Mod Name                         | Version   | Note                                                                                             |
 | ------ | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------ |
 | ✅     | BFCO - Attack Behavior Framework | 3.3.13    |                                                                                                  |
+| ✅     | Combat Gameplay Overhaul SE      | 1.1       |                                                                                                  |
 | ✅     | Crouch Sliding                   | 1.0       | `SprintSlide.esp` must be placed after RecoverySystem (`RecoveryMechanic.esp`) or it won't work. |
 | ✅     | Eating Animations And Sounds SE  | 1.9.4     |                                                                                                  |
 | ✅     | EVGAT Framework                  | 2.0beta   |                                                                                                  |
