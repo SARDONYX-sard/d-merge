@@ -144,6 +144,7 @@ impl App {
         Self {
             settings,
             i18n,
+            #[expect(clippy::unwrap_used)]
             async_rt: tokio::runtime::Runtime::new().unwrap(),
             confirm_dialog: ConfirmDialog::default(),
 

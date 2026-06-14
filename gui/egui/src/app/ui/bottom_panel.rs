@@ -108,7 +108,7 @@ impl App {
                             .selectable_value(&mut self.settings.log.level, level, level.as_str())
                             .changed()
                         {
-                            tracing_rotation::global::change_level(level.as_str()).unwrap();
+                            let _ = tracing_rotation::global::change_level(level.as_str());
                         }
                     }
                 });
