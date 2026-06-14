@@ -144,8 +144,9 @@ pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
 /// In manual mode, applying patches with the same ID but different versions results in the simultaneous addition
 /// of different classes to the same pointer, causing a `tailing char 0` error. This function prevents that.
 pub fn dedup_mods_by_id(mods: &mut [ModItem]) {
-    use rapidhash::RapidHashSet as HashSet;
     use std::path::Path;
+
+    use rapidhash::RapidHashSet as HashSet;
 
     let mut seen = HashSet::default();
 

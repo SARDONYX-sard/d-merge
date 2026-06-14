@@ -177,6 +177,13 @@ pub enum I18nKey {
     /// Mods
     ModsListTitle,
 
+    /// The list of mods is collected by scanning the following glob paths in the Skyrim Data directory.
+    ///
+    /// - Nemesis: Nemesis_Engine/mod/*/info.ini
+    /// - NemesisExt: Nemesis_EngineExt/mod/*/info.ini
+    /// - FNIS: meshes/**/animations/*/FNIS_*_List.txt
+    ModsListTitleHover,
+
     /// Normalize
     NormalizeButton,
 

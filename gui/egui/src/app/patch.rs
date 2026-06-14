@@ -131,7 +131,7 @@ impl App {
 
         self.notify_info(format!(
             "0/6: {} `{output_dir}/meshes`",
-            self.t(I18nKey::RemovingMeshesMessage)
+            self.i18n.t(I18nKey::RemovingMeshesMessage)
         ));
         nemesis_merge::cache_remover::remove_meshes_dir_all(output_dir);
     }

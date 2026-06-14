@@ -33,17 +33,17 @@ impl App {
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.t(I18nKey::ExecutionModeLabel));
+                ui.label(self.i18n.t(I18nKey::ExecutionModeLabel));
                 let items = [
                     (
                         DataMode::Vfs,
-                        self.t(I18nKey::VfsMode).to_string(),
-                        self.t(I18nKey::VfsModeHover).to_string(),
+                        self.i18n.t(I18nKey::VfsMode).to_string(),
+                        self.i18n.t(I18nKey::VfsModeHover).to_string(),
                     ),
                     (
                         DataMode::Manual,
-                        self.t(I18nKey::ManualMode).to_string(),
-                        self.t(I18nKey::ManualModeHover).to_string(),
+                        self.i18n.t(I18nKey::ManualMode).to_string(),
+                        self.i18n.t(I18nKey::ManualModeHover).to_string(),
                     ),
                 ];
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
@@ -106,7 +106,8 @@ impl App {
     /// Renders the theme combo box (System / Dark / Light).
     fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(self.t(I18nKey::ThemeLabel)).on_hover_text(self.t(I18nKey::ThemeHover));
+            ui.label(self.i18n.t(I18nKey::ThemeLabel))
+                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
             egui::ComboBox::from_id_salt("theme")
                 .selected_text(self.settings.ui.theme.as_str())
@@ -129,8 +130,8 @@ impl App {
     /// auto-detect of the data directory (Windows only).
     fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(self.t(I18nKey::RuntimeTargetLabel))
-                .on_hover_text(self.t(I18nKey::RuntimeTargetHover));
+            ui.label(self.i18n.t(I18nKey::RuntimeTargetLabel))
+                .on_hover_text(self.i18n.t(I18nKey::RuntimeTargetHover));
 
             egui::ComboBox::from_id_salt("skyrim_runtime_target")
                 .selected_text(self.settings.behavior.target_runtime.as_str())
@@ -187,7 +188,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    egui::Button::new(self.t(I18nKey::SkyrimDataDirLabel)),
+                    egui::Button::new(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
                 )
                 .clicked()
                 && let Err(err) =
@@ -202,7 +203,7 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                        egui::Button::new(self.i18n.t(I18nKey::SelectButton)),
                     )
                     .clicked()
                 {
@@ -233,9 +234,9 @@ impl App {
                         if ui
                             .add_sized(
                                 [BUTTON_WIDTH, BUTTON_HEIGHT],
-                                egui::Button::new(self.t(I18nKey::AutoDetectButton)),
+                                egui::Button::new(self.i18n.t(I18nKey::AutoDetectButton)),
                             )
-                            .on_hover_text(self.t(I18nKey::AutoDetectHover))
+                            .on_hover_text(self.i18n.t(I18nKey::AutoDetectHover))
                             .clicked()
                         {
                             self.update_vfs_skyrim_data_dir_by_reg();
@@ -296,7 +297,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    egui::Button::new(self.t(I18nKey::OutputDirLabel)),
+                    egui::Button::new(self.i18n.t(I18nKey::OutputDirLabel)),
                 )
                 .clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
@@ -312,7 +313,7 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                        egui::Button::new(self.i18n.t(I18nKey::SelectButton)),
                     )
                     .clicked()
                 {

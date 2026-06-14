@@ -48,7 +48,7 @@ impl App {
         tracing::debug!("`update_mod_list` has been called.");
 
         self.mod_list_msg = (
-            self.t(I18nKey::ModsListFetchStateFetching).to_string(),
+            self.i18n.t(I18nKey::ModsListFetchStateFetching).to_string(),
             crate::app::patch::EGUI_RIGHT_BLUE,
         );
         *self.fetch_state.write() = FetchState::Fetching;
@@ -104,7 +104,10 @@ impl App {
                 self.last_fetch_was_empty = false;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateDone)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateDone)
+                    ),
                     Color32::GREEN,
                 );
 
@@ -122,7 +125,10 @@ impl App {
                 self.last_fetch_was_empty = true;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateEmpty)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateEmpty)
+                    ),
                     Color32::WHITE,
                 );
             }
@@ -134,7 +140,10 @@ impl App {
                 *self.fetch_state.write() = FetchState::Idle;
 
                 self.mod_list_msg = (
-                    format!("{} ({elapsed_secs:.2} s)", self.t(I18nKey::ModsListFetchStateError)),
+                    format!(
+                        "{} ({elapsed_secs:.2} s)",
+                        self.i18n.t(I18nKey::ModsListFetchStateError)
+                    ),
                     Color32::RED,
                 );
             }
@@ -164,9 +173,9 @@ impl App {
             Err(err) => {
                 tracing::error!(%err);
                 #[cfg(target_os = "windows")]
-                let err_msg = self.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
+                let err_msg = self.i18n.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
                 #[cfg(not(target_os = "windows"))]
-                let err_msg = self.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
+                let err_msg = self.i18n.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
                 self.notify_error(err_msg);
             }
         }

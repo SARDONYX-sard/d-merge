@@ -49,9 +49,9 @@ impl App {
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
                 ui.add_enabled_ui(!is_fetching, |ui| {
                     let label = if is_fetching {
-                        self.t(I18nKey::PatchFetchingButton)
+                        self.i18n.t(I18nKey::PatchFetchingButton)
                     } else {
-                        self.t(I18nKey::PatchButton)
+                        self.i18n.t(I18nKey::PatchButton)
                     };
                     if ui.add_sized([120.0, 40.0], egui::Button::new(label)).clicked() {
                         self.patch(ui.ctx());
@@ -60,7 +60,10 @@ impl App {
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add_sized([30.0, 40.0], egui::Button::new(self.t(I18nKey::HelpButton)))
+                        .add_sized(
+                            [30.0, 40.0],
+                            egui::Button::new(self.i18n.t(I18nKey::HelpButton)),
+                        )
                         .clicked()
                     {
                         self.show_help ^= true;
@@ -78,7 +81,7 @@ impl App {
     where
         F: FnOnce(&mut Self, &egui::Context),
     {
-        if ui.add_sized([120.0, 40.0], egui::Button::new(self.t(key))).clicked() {
+        if ui.add_sized([120.0, 40.0], egui::Button::new(self.i18n.t(key))).clicked() {
             f(self, ctx);
         }
     }
@@ -89,7 +92,7 @@ impl App {
     /// `tracing_rotation::global::change_level`.
     fn ui_log_level_box(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            ui.label(self.t(I18nKey::LogLevelLabel));
+            ui.label(self.i18n.t(I18nKey::LogLevelLabel));
 
             egui::ComboBox::from_id_salt("log_level")
                 .selected_text(self.settings.log.level.as_str())
