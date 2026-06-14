@@ -33,7 +33,7 @@ use d_merge_gui_shared::{
     fetch::FetchState,
     i18n::I18nKey,
     mod_item::{self, ModItem},
-    settings::mod_list_ui::SortColumn,
+    settings::{DataMode, mod_list_ui::SortColumn},
 };
 use egui::Button;
 use rayon::prelude::*;
@@ -74,6 +74,9 @@ impl App {
                     .clicked()
                 {
                     mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
+                    if matches!(self.settings.behavior.mode, DataMode::Manual) {
+                        mod_item::dedup_mods_by_id(self.settings.mod_list_mut());
+                    }
                 }
 
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);

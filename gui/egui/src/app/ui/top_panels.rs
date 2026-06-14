@@ -158,40 +158,52 @@ impl App {
         });
     }
 
-    /// Renders the Skyrim data-directory row (label button + text field +
-    /// optional auto-detect + folder picker).
-    pub(crate) fn ui_skyrim_dir(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_data_dir");
+    /// UI
+    /// ```txt
+    /// |<---label--->|<------ stretch ------>|<-60->|<-60->|
+    /// | Skyrim      | path..................| Auto | ...  |
+    /// | Output      | path..................|      | ...  |
+    /// ```
+    pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
+        let mut panel = egui::TopBottomPanel::top("top_paths");
+
         if self.settings.ui.transparent {
             panel = panel.frame(egui::Frame::new());
         }
 
         panel.show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if ui.button(self.t(I18nKey::SkyrimDataDirLabel)).clicked()
-                    && let Err(err) =
-                        open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
-                {
-                    self.notify_error(err);
-                }
+            self.ui_skyrim_dir_row(ui);
+            self.ui_output_dir_row(ui);
+        });
+    }
 
-                self.draw_skyrim_dir_ui(ui);
+    /// UI
+    /// ```txt
+    /// |<---label--->|<------ stretch ------>|<-60->|<-60->|
+    /// | Skyrim      | path..................| Auto | ...  |
+    /// ```
+    fn ui_skyrim_dir_row(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            if ui
+                .add_sized(
+                    [LABEL_WIDTH, BUTTON_HEIGHT],
+                    egui::Button::new(self.t(I18nKey::SkyrimDataDirLabel)),
+                )
+                .clicked()
+                && let Err(err) =
+                    open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
+            {
+                self.notify_error(err);
+            }
 
-                #[cfg(target_os = "windows")]
-                if self.settings.behavior.mode == DataMode::Vfs
-                    && ui
-                        .add_sized(
-                            [60.0, 40.0],
-                            egui::Button::new(self.t(I18nKey::AutoDetectButton)),
-                        )
-                        .on_hover_text(self.t(I18nKey::AutoDetectHover))
-                        .clicked()
-                {
-                    self.update_vfs_skyrim_data_dir_by_reg();
-                }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(RIGHT_MARGIN);
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
+                    .add_sized(
+                        [BUTTON_WIDTH, BUTTON_HEIGHT],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
                     let dialog = match find_existing_dir_or_ancestor(
@@ -205,50 +217,108 @@ impl App {
                         match self.settings.behavior.mode {
                             DataMode::Vfs => {
                                 self.settings.vfs.skyrim_data_dir = dir.display().to_string();
-                                self.update_mod_list();
                             }
                             DataMode::Manual => {
                                 self.settings.manual.skyrim_data_dir = dir.display().to_string();
-                                self.update_mod_list();
                             }
                         }
+
+                        self.update_mod_list();
                     }
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    if self.settings.behavior.mode == DataMode::Vfs {
+                        if ui
+                            .add_sized(
+                                [BUTTON_WIDTH, BUTTON_HEIGHT],
+                                egui::Button::new(self.t(I18nKey::AutoDetectButton)),
+                            )
+                            .on_hover_text(self.t(I18nKey::AutoDetectHover))
+                            .clicked()
+                        {
+                            self.update_vfs_skyrim_data_dir_by_reg();
+                        }
+                    } else {
+                        ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
+                    }
+                }
+
+                #[cfg(not(target_os = "windows"))]
+                {
+                    ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
+                }
+
+                let changed = match self.settings.behavior.mode {
+                    DataMode::Vfs => {
+                        if self.is_first_render
+                            && self.settings.vfs.skyrim_data_dir.trim().is_empty()
+                        {
+                            self.update_vfs_skyrim_data_dir_by_reg();
+                            return;
+                        }
+
+                        path_text_edit(
+                            ui,
+                            &mut self.settings.vfs.skyrim_data_dir,
+                            self.settings.ui.transparent,
+                            None,
+                        )
+                    }
+
+                    DataMode::Manual => path_text_edit(
+                        ui,
+                        &mut self.settings.manual.skyrim_data_dir,
+                        self.settings.ui.transparent,
+                        Some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
+                    ),
+                };
+
+                if self.is_first_render || changed {
+                    self.update_mod_list();
                 }
             });
         });
     }
 
     /// Renders the output-directory row (label button + text field + folder picker).
-    pub(crate) fn ui_output_dir(&mut self, ctx: &egui::Context) {
-        let use_transparent = self.settings.ui.transparent;
-        let mut panel = egui::TopBottomPanel::top("top_output_dir");
-        if use_transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+    ///
+    /// UI
+    /// ```txt
+    /// |<---label--->|<------ stretch ------>|<-60->|<-60->|
+    /// | Output      | path..................|      | ...  |
+    /// ```
+    fn ui_output_dir_row(&mut self, ui: &mut egui::Ui) {
+        let transparent = self.settings.ui.transparent;
 
-        panel.show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if ui.button(self.t(I18nKey::OutputDirLabel)).clicked()
-                    && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
-                        self.settings.current_output_dir(),
-                    ))
-                {
-                    self.notify_error(err);
-                }
+        ui.horizontal(|ui| {
+            if ui
+                .add_sized(
+                    [LABEL_WIDTH, BUTTON_HEIGHT],
+                    egui::Button::new(self.t(I18nKey::OutputDirLabel)),
+                )
+                .clicked()
+                && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
+                    self.settings.current_output_dir(),
+                ))
+            {
+                self.notify_error(err);
+            }
 
-                let text_line = egui::TextEdit::singleline(self.settings.current_output_dir_mut());
-                let text_line = if use_transparent {
-                    text_line.background_color(egui::Color32::TRANSPARENT)
-                } else {
-                    text_line
-                };
-                ui.add_sized([ui.available_width() * 0.9, 40.0], text_line);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(RIGHT_MARGIN);
 
                 if ui
-                    .add_sized([60.0, 40.0], egui::Button::new(self.t(I18nKey::SelectButton)))
+                    .add_sized(
+                        [BUTTON_WIDTH, BUTTON_HEIGHT],
+                        egui::Button::new(self.t(I18nKey::SelectButton)),
+                    )
                     .clicked()
                 {
-                    let dialog = if !self.settings.current_output_dir().is_empty() {
+                    let dialog = if self.settings.current_output_dir().is_empty() {
+                        rfd::FileDialog::new()
+                    } else {
                         match find_existing_dir_or_ancestor(self.settings.current_output_dir()) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
@@ -258,18 +328,16 @@ impl App {
                                 return;
                             }
                         }
-                    } else {
-                        rfd::FileDialog::new()
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        let new_output_dir = dir.display().to_string();
-                        let old_output_dir = self.settings.current_output_dir_mut();
-                        if new_output_dir != *old_output_dir {
-                            *old_output_dir = new_output_dir;
-                        }
+                        *self.settings.current_output_dir_mut() = dir.display().to_string();
                     }
                 }
+
+                ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
+
+                path_text_edit(ui, self.settings.current_output_dir_mut(), transparent, None);
             });
         });
     }
@@ -281,4 +349,29 @@ fn checkbox(
     label: impl Into<egui::WidgetText>,
 ) -> egui::Response {
     ui.add(egui::Checkbox::new(checked, label))
+}
+
+const LABEL_WIDTH: f32 = 140.0;
+const BUTTON_WIDTH: f32 = 70.0;
+const ROW_HEIGHT: f32 = 40.0;
+const BUTTON_HEIGHT: f32 = 32.0;
+const RIGHT_MARGIN: f32 = 8.0;
+
+fn path_text_edit(
+    ui: &mut egui::Ui,
+    value: &mut String,
+    transparent: bool,
+    hint: Option<&str>,
+) -> bool {
+    let mut edit = egui::TextEdit::singleline(value);
+
+    if let Some(hint) = hint {
+        edit = edit.hint_text(hint);
+    }
+
+    if transparent {
+        edit = edit.background_color(egui::Color32::TRANSPARENT);
+    }
+
+    ui.add_sized([ui.available_width(), ROW_HEIGHT], edit).changed()
 }

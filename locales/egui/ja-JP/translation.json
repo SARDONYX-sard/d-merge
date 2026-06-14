@@ -47,7 +47,7 @@
   "mods_list_fetch_state_fetching": "MODリストを取得しています...",
   "mods_list_title": "MOD 一覧",
   "normalize_button": "正規化",
-  "normalize_hover": "MODタイプごとに優先順位を並べ替えます(Nemesis -> NemesisExt -> FNIS)\nその後、各グループ内のMODはIDのアルファベット順で並べ替えます\n注意\n- この順序は常にパッチの競合解決順とは限りません",
+  "normalize_hover": "MODリストを以下のルールで並び替えます。\n\n1. MODタイプごとに次の順序でグループ化します:\n   Nemesis → NemesisExt → FNIS\n2. 各タイプ内でMODをアルファベット順に並び替えます。\n3. 優先度を `0` から順番に再割り当てします。\n4. 手動モードでは、重複ID行のチェックを無効にします。\n\n注意\n- この並び替えはパッチ同士の競合を解決するものではありません",
   "notification_clear_button": "下部通知クリア",
   "notify_err_platform_not_supported": "このプラットフォーム (Linux / macOS) ではサポートされていません。SkyrimのDataディレクトリを手動で指定してください。",
   "notify_err_windows_registry_not_found": "エラー: Windowsレジストリからパスを取得できませんでした。Steam版以外を使用している場合は、SkyrimのDataディレクトリを手動で指定してください",

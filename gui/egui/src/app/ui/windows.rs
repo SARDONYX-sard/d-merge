@@ -239,7 +239,7 @@ impl App {
         reload_log_clicked: &mut bool,
     ) {
         let i18n_write_hover = format!(
-            "{} (-> {})",
+            "{} -> {}",
             self.i18n.t(I18nKey::I18nWriteNewJsonHover),
             self.settings.ui.i18n_path,
         );

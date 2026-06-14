@@ -200,8 +200,7 @@ impl eframe::App for App {
 
         // ── Top panels (outermost → innermost) ────────────────────────────────
         self.ui_execution_mode(ctx);
-        self.ui_skyrim_dir(ctx);
-        self.ui_output_dir(ctx);
+        self.ui_paths(ctx);
 
         // ── Bottom panels (innermost → outermost) ─────────────────────────────
         // NOTE: egui stacks bottom panels in reverse registration order.

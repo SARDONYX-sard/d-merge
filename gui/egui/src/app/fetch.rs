@@ -143,48 +143,6 @@ impl App {
         }
     }
 
-    /// Renders the Skyrim data-directory text field and triggers a mod-list
-    /// refresh when the value changes.
-    ///
-    /// Also handles the first-render auto-detect path for VFS mode: if the
-    /// stored path is empty on the very first frame, it falls through to the
-    /// registry-based auto-detect rather than rendering an empty field.
-    ///
-    /// Called from `app/ui/top_panels.rs`.
-    pub(crate) fn draw_skyrim_dir_ui(&mut self, ui: &mut egui::Ui) {
-        let changed = match self.settings.behavior.mode {
-            DataMode::Vfs => {
-                if self.is_first_render && self.settings.vfs.skyrim_data_dir.trim().is_empty() {
-                    self.update_vfs_skyrim_data_dir_by_reg();
-                    return;
-                }
-
-                let line = egui::TextEdit::singleline(&mut self.settings.vfs.skyrim_data_dir);
-                let line = if self.settings.ui.transparent {
-                    line.background_color(egui::Color32::TRANSPARENT)
-                } else {
-                    line
-                };
-                ui.add_sized([ui.available_width() * 0.85, 40.0], line).changed()
-            }
-
-            DataMode::Manual => {
-                let line = egui::TextEdit::singleline(&mut self.settings.manual.skyrim_data_dir)
-                    .hint_text("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*");
-                let line = if self.settings.ui.transparent {
-                    line.background_color(egui::Color32::TRANSPARENT)
-                } else {
-                    line
-                };
-                ui.add_sized([ui.available_width() * 0.9, 40.0], line).changed()
-            }
-        };
-
-        if self.is_first_render || changed {
-            self.update_mod_list();
-        }
-    }
-
     /// Detects the Skyrim Data directory from the Windows registry and updates
     /// [`AppSettings::vfs_skyrim_data_dir`].
     ///

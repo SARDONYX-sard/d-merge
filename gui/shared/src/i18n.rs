@@ -180,8 +180,16 @@ pub enum I18nKey {
     /// Normalize
     NormalizeButton,
 
-    /// Reorder priorities by mod type (Nemesis -> NemesisExt -> FNIS)
-    /// and sort mods alphabetically by id within each group.
+    /// Sort the mod list according to the following rules
+    ///
+    /// 1. Group mods by type in the following order:
+    ///    Nemesis -> NemesisExt -> FNIS
+    /// 2. Sort mods alphabetically within each type.
+    /// 3. Reassign priorities sequentially starting from `0`.
+    /// 4. In manual mode, disable the check for duplicate ID rows.
+    ///
+    /// # Notes
+    /// This sorting does not resolve conflicts between patches.
     NormalizeHover,
 
     /// Clear Notify
