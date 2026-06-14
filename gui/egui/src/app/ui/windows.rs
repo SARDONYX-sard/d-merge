@@ -17,7 +17,7 @@ use std::{borrow::Cow, path::Path};
 use d_merge_gui_shared::i18n::{I18nKey, I18nMap};
 use egui::Color32;
 
-use crate::{app::App, ui::confirm::ConfirmAction};
+use crate::app::App;
 
 impl App {
     /// Renders the deferred log-viewer viewport.
@@ -145,14 +145,27 @@ impl App {
             self.reload_i18n();
         }
         if write_i18n_clicked {
-            self.confirm_dialog.open(
-                format!(
-                    "{} (-> {})",
-                    self.i18n.t(I18nKey::I18nWriteNewJsonHover),
-                    self.settings.ui.i18n_path,
-                ),
-                ConfirmAction::WriteI18nJson,
+            let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
+                || Cow::Borrowed(Path::new(".")),
+                |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
             );
+
+            let path = rfd::FileDialog::new()
+                .set_directory(path)
+                .set_title("Save translation.json")
+                .set_file_name("translation.json")
+                .add_filter("JSON", &["json"])
+                .save_file();
+
+            if let Some(path) = path {
+                match I18nMap::save(&path) {
+                    Ok(()) => self.set_colored_notify(
+                        format!("OK. Wrote {}", path.display()),
+                        Color32::GREEN,
+                    ),
+                    Err(err) => self.notify_error(err.to_string()),
+                }
+            }
         }
     }
 
@@ -334,29 +347,6 @@ impl App {
             }
             Err(err) => {
                 self.notify_error(format!("Failed to reload: {err}"));
-            }
-        }
-    }
-
-    /// Renders the confirmation dialog and dispatches the confirmed action.
-    pub(crate) fn ui_show_confirm(&mut self, ctx: &egui::Context) {
-        let confirmed_action = {
-            let mut result = None;
-            self.confirm_dialog.show(ctx, |action| result = Some(action));
-            result
-        };
-
-        if let Some(action) = confirmed_action {
-            match action {
-                ConfirmAction::WriteI18nJson => {
-                    match I18nMap::save(self.settings.ui.i18n_path.as_str()) {
-                        Ok(()) => self.set_colored_notify(
-                            format!("OK. Wrote {}", self.settings.ui.i18n_path),
-                            Color32::GREEN,
-                        ),
-                        Err(err) => self.notify_error(err.to_string()),
-                    }
-                }
             }
         }
     }

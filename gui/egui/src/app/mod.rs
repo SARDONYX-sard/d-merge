@@ -41,8 +41,6 @@ use d_merge_gui_shared::{
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::ui::confirm::ConfirmDialog;
-
 /// Central application state.
 ///
 /// Fields are grouped by concern.  Only fields that must survive across
@@ -68,9 +66,6 @@ pub(crate) struct App {
     pub async_rt: tokio::runtime::Runtime,
 
     // ── UI state (not persisted) ──────────────────────────────────────────────
-    /// Confirmation dialog — open/closed state + pending action.
-    pub confirm_dialog: ConfirmDialog,
-
     /// `true` only during the very first call to [`eframe::App::update`].
     /// Used to trigger auto-detection of the Skyrim data directory.
     pub is_first_render: bool,
@@ -146,7 +141,6 @@ impl App {
             i18n,
             #[expect(clippy::unwrap_used)]
             async_rt: tokio::runtime::Runtime::new().unwrap(),
-            confirm_dialog: ConfirmDialog::default(),
 
             is_first_render: true,
             show_help: false,
@@ -205,7 +199,6 @@ impl eframe::App for App {
         // ── Floating windows ───────────────────────────────────────────────────
         self.ui_log_window(ctx);
         self.ui_help_window(ctx);
-        self.ui_show_confirm(ctx);
 
         self.is_first_render = false;
     }
