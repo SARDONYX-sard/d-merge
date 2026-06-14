@@ -27,7 +27,11 @@ use crate::error::Result;
 /// # Errors
 /// Propagates any [`std::io::Error`] encountered during directory creation,
 /// file renaming, deletion, or file creation.
-pub fn rotate_files(log_dir: impl AsRef<Path>, file_name: &str, max_files: usize) -> Result<File> {
+pub(crate) fn rotate_files(
+    log_dir: impl AsRef<Path>,
+    file_name: &str,
+    max_files: usize,
+) -> Result<File> {
     let log_dir = log_dir.as_ref();
     let file_name_path = Path::new(file_name);
 
