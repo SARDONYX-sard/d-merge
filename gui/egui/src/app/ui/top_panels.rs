@@ -16,7 +16,7 @@ use d_merge_gui_shared::{
     i18n::I18nKey,
     settings::{DataMode, ui::Theme},
 };
-use egui::Separator;
+use egui::{Response, Separator};
 
 use crate::app::App;
 
@@ -215,15 +215,7 @@ impl App {
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        match self.settings.behavior.mode {
-                            DataMode::Vfs => {
-                                self.settings.vfs.skyrim_data_dir = dir.display().to_string();
-                            }
-                            DataMode::Manual => {
-                                self.settings.manual.skyrim_data_dir = dir.display().to_string();
-                            }
-                        }
-
+                        *self.settings.current_skyrim_data_dir_mut() = dir.display().to_string();
                         self.update_mod_list();
                     }
                 }
@@ -251,7 +243,7 @@ impl App {
                     ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
                 }
 
-                let changed = match self.settings.behavior.mode {
+                let response = match self.settings.behavior.mode {
                     DataMode::Vfs => {
                         if self.is_first_render
                             && self.settings.vfs.skyrim_data_dir.trim().is_empty()
@@ -276,7 +268,7 @@ impl App {
                     ),
                 };
 
-                if self.is_first_render || changed {
+                if self.is_first_render || response.changed() {
                     self.update_mod_list();
                 }
             });
@@ -363,7 +355,7 @@ fn path_text_edit(
     value: &mut String,
     transparent: bool,
     hint: Option<&str>,
-) -> bool {
+) -> Response {
     let mut edit = egui::TextEdit::singleline(value);
 
     if let Some(hint) = hint {
@@ -374,5 +366,5 @@ fn path_text_edit(
         edit = edit.background_color(egui::Color32::TRANSPARENT);
     }
 
-    ui.add_sized([ui.available_width(), ROW_HEIGHT], edit).changed()
+    ui.add_sized([ui.available_width(), ROW_HEIGHT], edit)
 }

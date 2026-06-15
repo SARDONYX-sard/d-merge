@@ -173,7 +173,7 @@ impl Settings {
     /// Centralizes the `match self.behavior.mode { … }` branch so
     /// call-sites never repeat it.
     #[inline]
-    pub const fn current_mode(&self) -> &ModListSettings {
+    pub const fn current_mod_list_settings(&self) -> &ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &self.vfs,
             DataMode::Manual => &self.manual,
@@ -182,7 +182,7 @@ impl Settings {
 
     /// Returns a mutable reference to the active [`ModeSettings`].
     #[inline]
-    pub const fn current_mode_mut(&mut self) -> &mut ModListSettings {
+    pub const fn current_mod_list_settings_mut(&mut self) -> &mut ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &mut self.vfs,
             DataMode::Manual => &mut self.manual,
@@ -192,31 +192,37 @@ impl Settings {
     /// Skyrim data directory for the active mode.
     #[inline]
     pub fn current_skyrim_data_dir(&self) -> &str {
-        &self.current_mode().skyrim_data_dir
+        &self.current_mod_list_settings().skyrim_data_dir
+    }
+
+    /// Mutable Skyrim data directory for the active mode.
+    #[inline]
+    pub const fn current_skyrim_data_dir_mut(&mut self) -> &mut String {
+        &mut self.current_mod_list_settings_mut().skyrim_data_dir
     }
 
     /// Output directory for the active mode.
     #[inline]
     pub fn current_output_dir(&self) -> &str {
-        &self.current_mode().output_dir
+        &self.current_mod_list_settings().output_dir
     }
 
     /// Mutable output directory for the active mode.
     #[inline]
     pub const fn current_output_dir_mut(&mut self) -> &mut String {
-        &mut self.current_mode_mut().output_dir
+        &mut self.current_mod_list_settings_mut().output_dir
     }
 
     /// Mod list for the active mode (immutable).
     #[inline]
     pub fn mod_list(&self) -> &[ModItem] {
-        &self.current_mode().mod_list
+        &self.current_mod_list_settings().mod_list
     }
 
     /// Mod list for the active mode (mutable).
     #[inline]
     pub const fn mod_list_mut(&mut self) -> &mut Vec<ModItem> {
-        &mut self.current_mode_mut().mod_list
+        &mut self.current_mod_list_settings_mut().mod_list
     }
 
     /// Constructs a GitHub issue URL pre-filled with system information.
