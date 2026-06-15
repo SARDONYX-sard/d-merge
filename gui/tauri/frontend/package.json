@@ -48,7 +48,7 @@
     "@types/node": "25.5.2",
     "@types/react": "*",
     "@types/react-dom": "*",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^29.0.2",
     "typescript": "6.0.3",
