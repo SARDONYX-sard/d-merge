@@ -467,9 +467,18 @@ pub struct PatchMaps {
 #[pymethods]
 impl PatchMaps {
     /// Create a new class.
+    ///
+    /// # why it takes an argument when it's new
+    ///
+    /// The following pattern is not used because it does not reliably update the underlying Rust HashMap:
+    ///
+    /// ```python
+    /// patches.fnis_entries["key"] = 0 # not work
+    /// ```
+    ///
     #[new]
-    fn new() -> Self {
-        Self::default()
+    const fn new(nemesis_entries: PriorityMap, fnis_entries: PriorityMap) -> Self {
+        Self { nemesis_entries, fnis_entries }
     }
 }
 impl From<PatchMaps> for RustPatchMaps {
@@ -509,6 +518,27 @@ pub fn behavior_gen<'py>(
 
         Ok(())
     })
+}
+
+#[pyo3_stub_gen::derive::gen_stub_pyfunction]
+#[pyo3::pyfunction]
+/// Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories.
+///
+/// # Warning!
+///
+/// Do not execute this function if the `Skyrim Data` directory is specified as the output directory.
+/// Please check this first(use `is_dangerous_remove`). Failure to do so will corrupt your game environment.
+pub fn remove_meshes_dir_all(output_dir: &str) {
+    nemesis_merge::cache_remover::remove_meshes_dir_all(output_dir);
+}
+
+#[pyo3_stub_gen::derive::gen_stub_pyfunction]
+#[pyo3::pyfunction]
+/// Is the Skyrim Data directory specified as the output directory?
+///
+/// This is to prevent the game environment from becoming corrupted.
+pub fn is_dangerous_remove(output_dir: &str, skyrim_data_dir: &str) -> bool {
+    nemesis_merge::cache_remover::is_dangerous_remove(output_dir, skyrim_data_dir)
 }
 
 #[pyo3_stub_gen::derive::gen_stub_pyfunction]

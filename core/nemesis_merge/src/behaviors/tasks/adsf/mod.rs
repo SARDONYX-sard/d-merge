@@ -121,7 +121,7 @@ pub(crate) fn apply_adsf_patches(
     sort_patches_by_priority(&mut borrowed_patches, entries);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
-    if config.debug.output_patch_json {
+    if config.debug.output_patch_json && !borrowed_patches.is_empty() {
         output_debug_patch_json(&borrowed_patches, config);
     }
 
@@ -281,6 +281,8 @@ fn write_alt_adsf_file(
     }
     std::fs::write(path, serialized)
         .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
+    #[cfg(feature = "tracing")]
+    tracing::info!("Generated: {}", path.display());
     Ok(())
 }
 
@@ -289,6 +291,7 @@ fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
     let mut adsf_path =
         config.output_dir.join(".d_merge").join(".debug").join("patches").join(ADSF_INNER_PATH);
     adsf_path.set_extension("patch.json");
+
     if let Err(_err) = write_patched_json(&adsf_path, patches) {
         #[cfg(feature = "tracing")]
         tracing::error!("{_err}");

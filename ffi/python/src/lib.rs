@@ -28,7 +28,9 @@ fn d_merge_python_patch(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<patch::PatchStatus>()?;
     m.add_function(wrap_pyfunction!(patch::behavior_gen, m)?)?;
     m.add_function(wrap_pyfunction!(patch::get_skyrim_data_dir, m)?)?;
+    m.add_function(wrap_pyfunction!(patch::is_dangerous_remove, m)?)?;
     m.add_function(wrap_pyfunction!(patch::load_mods_info, m)?)?;
+    m.add_function(wrap_pyfunction!(patch::remove_meshes_dir_all, m)?)?;
 
     m.add_class::<serde_hkx_::DirEntry>()?;
     m.add_class::<serde_hkx_::Payload>()?;

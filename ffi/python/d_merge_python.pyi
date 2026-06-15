@@ -22,6 +22,7 @@ __all__ = [
     "change_log_level",
     "convert",
     "get_skyrim_data_dir",
+    "is_dangerous_remove",
     "load_dir_node",
     "load_mods_info",
     "log_debug",
@@ -30,6 +31,7 @@ __all__ = [
     "log_trace",
     "log_warn",
     "logger_init",
+    "remove_meshes_dir_all",
 ]
 
 @typing.final
@@ -367,9 +369,17 @@ class PatchMaps:
         - key: FNIS namespace(e.g. `namespace` of `<skyrim_data_dir>/path/meshes/actors/character/animations/<namespace>`)
         - value: priority
         """
-    def __new__(cls) -> PatchMaps:
+    def __new__(cls, nemesis_entries: typing.Mapping[builtins.str, builtins.int], fnis_entries: typing.Mapping[builtins.str, builtins.int]) -> PatchMaps:
         r"""
         Create a new class.
+        
+        # why it takes an argument when it's new
+        
+        The following pattern is not used because it does not reliably update the underlying Rust HashMap:
+        
+        ```python
+        patches.fnis_entries["key"] = 0 # not work
+        ```
         """
 
 class PatchStatus:
@@ -663,6 +673,13 @@ def get_skyrim_data_dir(runtime: OutPutTarget) -> builtins.str:
     - Returns an error if the Skyrim directory cannot be found from registry.
     """
 
+def is_dangerous_remove(output_dir: builtins.str, skyrim_data_dir: builtins.str) -> builtins.bool:
+    r"""
+    Is the Skyrim Data directory specified as the output directory?
+    
+    This is to prevent the game environment from becoming corrupted.
+    """
+
 def load_dir_node(dirs: typing.Sequence[builtins.str]) -> builtins.list[DirEntry]:
     r"""
     Loads a directory structure from the specified path, filtering by allowed extensions.
@@ -744,7 +761,7 @@ def log_warn(msg: builtins.str) -> None:
     ```
     """
 
-def logger_init(log_dir: builtins.str, log_name: builtins.str) -> None:
+def logger_init(log_dir: builtins.str, log_name: builtins.str, max_files: builtins.int, level: typing.Literal["trace", "debug", "info", "warn", "error"]) -> None:
     r"""
     Initializes the logger with a specified directory and log file name.
     
@@ -756,7 +773,17 @@ def logger_init(log_dir: builtins.str, log_name: builtins.str) -> None:
     ```python
     from d_merge_python import logger_init
     
-    logger_init("./test/logs", "d_merge_python.log")
+    logger_init("./test/logs", "d_merge_python.log", 5, "debug")
     ```
+    """
+
+def remove_meshes_dir_all(output_dir: builtins.str) -> None:
+    r"""
+    Removes the auto `<output dir>/meshes` or `<output dir>/.d_merge/debug` directories.
+    
+    # Warning!
+    
+    Do not execute this function if the `Skyrim Data` directory is specified as the output directory.
+    Please check this first(use `is_dangerous_remove`). Failure to do so will corrupt your game environment.
     """
 

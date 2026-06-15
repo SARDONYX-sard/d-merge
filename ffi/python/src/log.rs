@@ -12,10 +12,19 @@ use pyo3::prelude::*;
 /// ```python
 /// from d_merge_python import logger_init
 ///
-/// logger_init("./test/logs", "d_merge_python.log")
+/// logger_init("./test/logs", "d_merge_python.log", 5, "debug")
 /// ```
-pub fn logger_init(log_dir: String, log_name: String) -> PyResult<()> {
-    tracing_rotation::global::init(log_dir, &log_name, 5)
+pub fn logger_init(
+    log_dir: String,
+    log_name: String,
+    max_files: usize,
+    #[gen_stub(override_type(type_repr="typing.Literal[\"trace\", \"debug\", \"info\", \"warn\", \"error\"]", imports=("typing")))]
+    level: &str,
+) -> PyResult<()> {
+    let level = <tracing::Level as std::str::FromStr>::from_str(level)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+    tracing_rotation::global::init_with_level(log_dir, &log_name, max_files, level)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
 

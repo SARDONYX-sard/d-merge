@@ -99,7 +99,7 @@ pub(crate) fn apply_asdsf_patches(
     sort_patches_by_priority(&mut borrowed_patches, id_order);
     let borrowed_patches = dedup_patches_by_priority_parallel(borrowed_patches);
 
-    if config.debug.output_patch_json {
+    if config.debug.output_patch_json && !borrowed_patches.is_empty() {
         output_debug_patch_json(&borrowed_patches, config);
     }
 
@@ -267,6 +267,9 @@ fn write_alt_asdsf_file(
     }
     std::fs::write(path, serialized)
         .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
+
+    #[cfg(feature = "tracing")]
+    tracing::info!("Generated: {}", path.display());
     Ok(())
 }
 

@@ -1,36 +1,45 @@
 """
-python10~13
+- python10~13
 
-$/d-merge/ffi/python
->>>
+- 1 liner
+cd ./ffi/python;python -m venv venv;pip install -U pip maturin;venv/Scripts/activate;cargo run -p d_merge_python --bin stub_gen;maturin develop;python ./test/test.py
 
-python -m venv venv;pip install -U pip maturin
-venv/Scripts/activate;
-maturin develop;python ./test/test.py
+- step run
+cd ./ffi/python;python -m venv venv;pip install -U pip maturin;venv/Scripts/activate;
+cargo run -p d_merge_python --bin stub_gen;maturin develop;
 
-cargo run --bin stub_gen
+python ./test/test.py
 """
 
+import json
+from pathlib import Path
 import asyncio
 import time
 
 from d_merge_python import (
     behavior_gen,
-    change_log_level,
     Config,
     DebugOptions,
     HackOptions,
+    load_mods_info,
     logger_init,
+    ModInfo,
+    ModType,
     OutPutTarget,
     PatchMaps,
     PatchStatus,
+    is_dangerous_remove,
+    remove_meshes_dir_all,
 )
 
 
 def test_behavior_gen():
+    skyrim_data_dir_glob = "D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"
+    output_dir = "test/out"
+
     config = Config(
         resource_dir="../../resource/assets/templates",
-        output_dir="test/out",
+        output_dir=output_dir,
         output_target=OutPutTarget.SkyrimSE,
         hack_options=HackOptions(
             cast_ragdoll_event=True,
@@ -41,21 +50,17 @@ def test_behavior_gen():
             # output_merged_json=True,
             # output_merged_xml=True,
         ),
-        skyrim_data_dir_glob="../dummy/fnis_test_mods/*",
+        skyrim_data_dir_glob=skyrim_data_dir_glob,
         generate_fnis_esp=True,
     )
 
-    logger_init("./test/logs", "d_merge_python.log")
-    change_log_level("debug")
+    logger_init("./test/logs", "d_merge_python.log", 5, "debug")
 
-    # Nemesis patch ids
-    with open("../../dummy/ids.ini", "r", encoding="utf-8") as f:
-        nemesis_paths = [
-            line.strip() for line in f if line.strip() and not line.startswith(";")
-        ]
-        nemesis_entries = {path: idx for idx, path in enumerate(nemesis_paths)}
-    patches = PatchMaps()
-    patches.nemesis_entries = nemesis_entries
+    if is_dangerous_remove(output_dir, skyrim_data_dir_glob):
+        remove_meshes_dir_all(output_dir)
+
+    patches = to_patches(load_mods_info(skyrim_data_dir_glob, False))
+    dump_patches("./test/out/patches.json", patches)
 
     async def run():
         try:
@@ -64,6 +69,41 @@ def test_behavior_gen():
             print(f"Error: {e}")
 
     asyncio.run(run())
+
+
+def to_patches(mod_info: list[ModInfo]) -> PatchMaps:
+    seen: set[str] = set()
+    fnis_entries = dict()
+    nemesis_entries = dict()
+
+    for priority, mod in enumerate(mod_info):
+        key = Path(mod.id).name  # same as file_name()
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        match mod.mod_type:
+            case ModType.Fnis:
+                fnis_entries[mod.id] = priority
+            case ModType.Nemesis | ModType.NemesisExt:
+                nemesis_entries[mod.id] = priority
+
+    return PatchMaps(fnis_entries=fnis_entries, nemesis_entries=nemesis_entries)
+
+
+def dump_patches(path: str, patches: PatchMaps) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {
+        "fnis_entries": patches.fnis_entries,
+        "nemesis_entries": patches.nemesis_entries,
+    }
+
+    with p.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def make_on_status():
@@ -76,7 +116,7 @@ def make_on_status():
             start_time = time.time()
 
         elapsed = time.time() - start_time
-        elapsed_str = f"{elapsed:.1f}s: "
+        elapsed_str = f"{elapsed:.1f}s"
 
         CYAN = "\x1b[36m"
         MAGENTA = "\x1b[35m"
@@ -98,20 +138,20 @@ def make_on_status():
         def print_status(status: PatchStatus, elapsed_str: str):
             if isinstance(status, PatchStatus.Done):
                 print(
-                    f"{CLEAR_LINE}{GREEN_BOLD}{elapsed_str}✅{status}{RESET}",
+                    f"{CLEAR_LINE}{GREEN_BOLD}{status}({elapsed_str}){RESET}",
                     flush=True,
                 )
                 return
             if isinstance(status, PatchStatus.Error):
                 print(
-                    f"{CLEAR_LINE}{RED_BOLD}{elapsed_str}❌ {status}{RESET}", flush=True
+                    f"{CLEAR_LINE}{RED_BOLD}{status}({elapsed_str}){RESET}", flush=True
                 )
                 return
 
             for class_or_tuple, color in COLOR_MAP.items():
                 if isinstance(status, class_or_tuple):
                     print(
-                        f"{CLEAR_LINE}{color}{elapsed_str}{status}{RESET}",
+                        f"{CLEAR_LINE}{color}{status}({elapsed_str}){RESET}",
                         end="",
                         flush=True,
                     )
