@@ -13,12 +13,12 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
     let w_site = widths[4];
     let priority_size = [widths[5], ROW_HEIGHT];
 
-    let row_width = widths.par_iter().sum::<f32>() + 33.0;
+    let row_width = widths.iter().sum::<f32>() + 33.0;
 
     let response =
         egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
             // Since body cannot be used, stripe must be implemented manually.
-            let mut bg_color = if state.index % 2 == 0 {
+            let mut bg_color = if state.index.is_multiple_of(2) {
                 ui.style().visuals.widgets.active.bg_fill
             } else {
                 ui.visuals().widgets.noninteractive.bg_fill // gray
@@ -38,13 +38,12 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
                     ui.add_sized(checkbox_rect, egui::Checkbox::without_text(&mut item.enabled));
                     label_with_hover(ui, &item.id, w_path);
 
-                    draggable_handle.ui(ui, |ui| {
-                        label_with_hover(ui, &item.name, w_name);
-                    });
-
+                    draggable_handle.ui(ui, |ui| label_with_hover(ui, &item.name, w_name));
                     label_with_hover(ui, item.mod_type.as_str(), w_mod_type);
                     hyperlink_with_hover(ui, &item.site, w_site);
-                    ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()));
+                    centered_ui(ui, |ui| {
+                        ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()));
+                    });
                 });
             });
         });
@@ -90,26 +89,20 @@ pub(crate) fn check_only_table_body(
                     egui::Checkbox::without_text(&mut orig_item.enabled),
                 );
             });
+            row.col(|ui| label_with_hover(ui, &orig_item.id, w_path));
+            row.col(|ui| label_with_hover(ui, &orig_item.name, w_name));
+            row.col(|ui| label_with_hover(ui, orig_item.mod_type.as_str(), w_mod_type));
+            row.col(|ui| hyperlink_with_hover(ui, &orig_item.site, w_site));
             row.col(|ui| {
-                label_with_hover(ui, &orig_item.id, w_path);
-            });
-            row.col(|ui| {
-                label_with_hover(ui, &orig_item.name, w_name);
-            });
-            row.col(|ui| {
-                label_with_hover(ui, orig_item.mod_type.as_str(), w_mod_type);
-            });
-            row.col(|ui| {
-                hyperlink_with_hover(ui, &orig_item.site, w_site);
-            });
-            row.col(|ui| {
-                ui.with_layout(
-                    egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-                    |ui| {
-                        ui.label(orig_item.priority.to_string());
-                    },
-                );
+                centered_ui(ui, |ui| ui.label(orig_item.priority.to_string()));
             });
         });
     }
+}
+
+fn centered_ui<R>(
+    ui: &mut egui::Ui,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), add_contents)
 }
