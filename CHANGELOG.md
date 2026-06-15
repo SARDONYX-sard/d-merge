@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-06-15
+### :sparkles: New Features
+- [`6fb370f`](https://github.com/SARDONYX-sard/d-merge/commit/6fb370fbbbbfe7050a521f7753fb384d99ecbdce) - **log**: add reload log path button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c5990a5`](https://github.com/SARDONYX-sard/d-merge/commit/c5990a5b68ce554c5282ebfaff95ee2ea2ba196f) - **egui**: align the path input field *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9255c8a`](https://github.com/SARDONYX-sard/d-merge/commit/9255c8aa912d0f72b5a790b76007434fd4eeda9c) - **i18n**: add mod title hover *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d35584a`](https://github.com/SARDONYX-sard/d-merge/commit/d35584abf3ddb2e1c558637f2622d70ad878c9f7) - **egui**: use rfd save to save i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a582d7f`](https://github.com/SARDONYX-sard/d-merge/commit/a582d7f86b4b205329dcce892932fcd897c06890) - **egui**: center the “priority” column *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d82a269`](https://github.com/SARDONYX-sard/d-merge/commit/d82a26930d985e2c5b3f9c2d3ed1d29762a4a0fc) - **ffi_python**: dynamic mod info loading *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`91a75de`](https://github.com/SARDONYX-sard/d-merge/commit/91a75de67cddac31fe85d7dd0d1dfda6c233dcfa) - **egui**: add forgotten err log *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a9f78a7`](https://github.com/SARDONYX-sard/d-merge/commit/a9f78a7f8985339ed2f71cb56feb7070c1052662) - **log**: fix a bug that prevents ERRORs from being written to the log *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a9603f5`](https://github.com/SARDONYX-sard/d-merge/commit/a9603f5036da3f1f161d3c1c252197487d4961b2) - **log**: fix a bug that prevents ERRORs from being written to the log *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`76238fe`](https://github.com/SARDONYX-sard/d-merge/commit/76238fefafffd0c5e04da7bd85a7828934a160df) - **egui**: use for loop *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`52b482b`](https://github.com/SARDONYX-sard/d-merge/commit/52b482b1f03c0c5e1a21545c87b572896f9db4b1) - **egui**: separate help ui *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`fe51008`](https://github.com/SARDONYX-sard/d-merge/commit/fe51008b0d9320c36d799eb09883c00d47007897) - **egui**: rename settings fn *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`e2a73ce`](https://github.com/SARDONYX-sard/d-merge/commit/e2a73cec666bde15882e0f2ce852584870347ea8) - **i18n**: add `FNIS.esp` path *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2d0c1c3`](https://github.com/SARDONYX-sard/d-merge/commit/2d0c1c35c28e9ebaf5c03af37119fb20bbc3f789) - **egui_lint**: remove allow(unwrap) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.0.1] - 2026-06-09
 ### :sparkles: New Features
 - [`de3ba96`](https://github.com/SARDONYX-sard/d-merge/commit/de3ba96c7a923710201aa1a9042da6201c541899) - **tauri**: support v2 egui settings *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -509,3 +533,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.7.0...1.8.0
 [2.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.8.0...2.0.0
 [2.0.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.0...2.0.1
+[2.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.1...2.1.0
