@@ -1,58 +1,59 @@
 use std::{
     fs::OpenOptions,
-    io::{BufRead as _, BufReader, Read as _, Seek as _, SeekFrom},
+    io::{BufRead as _, BufReader, Seek as _, SeekFrom},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::Duration,
 };
 
+use d_merge_gui_shared::log::LOG_FILENAME;
 use parking_lot::RwLock;
-use snafu::ResultExt as _;
+use snafu::prelude::*;
 
-use crate::app::App;
+static LOG_DIR_CHANGED: AtomicBool = AtomicBool::new(false);
 
-impl App {
-    /// Starts the log-tail watcher on the first frame.
-    ///
-    /// Subsequent calls are no-ops (`log_watcher_started` guards the spawn).
-    /// The watcher writes to [`App::log_lines`] and requests a repaint via
-    /// the cloned [`egui::Context`].
+impl super::App {
     pub(crate) fn start_log_watcher(&mut self, ctx: &egui::Context) {
         if self.log_watcher_started {
             return;
         }
 
-        let log_dir = self.settings.log.dir_path.as_str();
-        let log_path = Path::new(log_dir).join(d_merge_gui_shared::log::LOG_FILENAME);
+        let log_path = Path::new(self.settings.log.dir_path.as_str()).join(LOG_FILENAME);
+        self.current_log_dir = Some(Path::new(&self.settings.log.dir_path).to_path_buf());
 
         let log_lines = Arc::clone(&self.log_lines);
         let ctx = ctx.clone();
-        if let Err(err) = start_log_tail(&log_path, log_lines, Some(ctx)) {
-            tracing::error!("Couldn't start log watcher: {err}");
+
+        LOG_DIR_CHANGED.store(true, Ordering::Release);
+        if let Err(e) = start_log_tail(log_path, log_lines, ctx) {
+            tracing::error!("log watcher start failed: {e}");
         }
 
         self.log_watcher_started = true;
     }
+
+    pub(crate) fn update_log_dir(&mut self) {
+        let current = Some(PathBuf::from(self.settings.log.dir_path.clone()));
+
+        if current != self.current_log_dir {
+            self.current_log_dir = current;
+        }
+        LOG_DIR_CHANGED.store(true, Ordering::Release);
+    }
 }
 
-/// Maximum number of log entries to retain (older entries are automatically discarded)
-const MAX_LOG_LINES: usize = 10_000;
-
-/// log file & Starts tail thread
-///
-/// # Errors
-/// If fail to canonicalize log path.
 fn start_log_tail(
-    log_path: &Path,
+    log_path: PathBuf,
     log_lines: Arc<RwLock<Vec<String>>>,
-    ctx: Option<egui::Context>,
-) -> Result<()> {
-    let log_path = log_path.canonicalize().context(CanonicalizeSnafu { path: log_path })?;
-
+    ctx: egui::Context,
+) -> std::result::Result<(), LogError> {
     thread::spawn(move || {
         if let Err(e) = tail_loop(log_path, log_lines, ctx) {
-            tracing::error!("log tail thread exited with error: {e}");
+            tracing::error!("tail thread error: {e}");
         }
     });
 
@@ -62,22 +63,24 @@ fn start_log_tail(
 fn tail_loop(
     log_path: PathBuf,
     log_lines: Arc<RwLock<Vec<String>>>,
-    ctx: Option<egui::Context>,
-) -> Result<()> {
-    // #[allow(clippy::suspicious_open_options)]
-    let file = OpenOptions::new()
-        .read(true)
-        .open(&log_path)
-        .with_context(|_| OpenSnafu { path: log_path })?;
-
-    let mut reader = BufReader::new(file);
-    let mut pos = reader.seek(SeekFrom::End(0)).context(IoSnafu)?;
+    ctx: egui::Context,
+) -> std::result::Result<(), LogError> {
+    let mut reader = BufReader::new(open_file(&log_path)?);
+    let mut pos: u64 = 0;
 
     loop {
+        // dir change trigger
+        if LOG_DIR_CHANGED.load(Ordering::Acquire) {
+            reader = BufReader::new(open_file(&log_path)?);
+            pos = 0;
+            reader.seek(SeekFrom::End(pos as i64)).context(IoSnafu)?;
+            LOG_DIR_CHANGED.store(false, Ordering::Release);
+        }
         reader.seek(SeekFrom::Start(pos)).context(IoSnafu)?;
 
         let mut new_line = false;
-        for line in reader.by_ref().lines() {
+
+        for line in std::io::Read::by_ref(&mut reader).lines() {
             let line = line.context(IoSnafu)?;
             push_line(&log_lines, line);
             new_line = true;
@@ -85,7 +88,7 @@ fn tail_loop(
 
         pos = reader.stream_position().context(IoSnafu)?;
 
-        if new_line && let Some(ref ctx) = ctx {
+        if new_line {
             ctx.request_repaint();
         }
 
@@ -93,26 +96,27 @@ fn tail_loop(
     }
 }
 
-/// inner fn：ring buffer push
+fn open_file(path: &Path) -> std::result::Result<std::fs::File, LogError> {
+    OpenOptions::new().read(true).open(path).context(OpenSnafu { path: path.to_path_buf() })
+}
+
 fn push_line(log_lines: &Arc<RwLock<Vec<String>>>, line: String) {
+    const MAX_LOG_LINES: usize = 10_000;
+
     let mut lines = log_lines.write();
     lines.push(line);
-    let len = lines.len();
-    if len > MAX_LOG_LINES {
-        lines.drain(0..(len - MAX_LOG_LINES));
+
+    if lines.len() > MAX_LOG_LINES {
+        let drain_len = lines.len() - MAX_LOG_LINES;
+        lines.drain(0..drain_len);
     }
 }
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, Snafu)]
 pub(crate) enum LogError {
-    #[snafu(display("Failed to open log file at {path:?}: {source}"))]
+    #[snafu(display("open failed: {source}"))]
     Open { path: PathBuf, source: std::io::Error },
 
-    #[snafu(display("I/O error while reading log file: {source}"))]
+    #[snafu(display("io error: {source}"))]
     Io { source: std::io::Error },
-
-    #[snafu(display("Failed to canonicalize path {path:?}: {source}"))]
-    Canonicalize { path: PathBuf, source: std::io::Error },
 }
-
-type Result<T, E = LogError> = std::result::Result<T, E>;

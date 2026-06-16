@@ -93,6 +93,8 @@ pub(crate) struct App {
     pub notify: (String, egui::Color32),
 
     // ── Log viewer ────────────────────────────────────────────────────────────
+    pub current_log_dir: Option<std::path::PathBuf>,
+
     /// Accumulated log lines tailed from the log file.
     pub log_lines: Arc<RwLock<Vec<String>>>,
 
@@ -151,6 +153,7 @@ impl App {
             mod_list_msg: (String::new(), egui::Color32::WHITE),
             notify: (String::new(), egui::Color32::WHITE),
 
+            current_log_dir: None,
             log_lines: Arc::new(RwLock::new(Vec::new())),
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),

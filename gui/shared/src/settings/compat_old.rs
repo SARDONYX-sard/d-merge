@@ -5,7 +5,9 @@ use crate::{
     mod_item::ModItem,
     settings::{
         BehaviorSettings, DataMode, LogSettings, ModListSettings, ModListUiSettings, Settings,
-        UiSettings, mod_list_ui::SortColumn, ui::WindowGeometry,
+        UiSettings,
+        mod_list_ui::SortColumn,
+        ui::{FontSettings, WindowGeometry},
     },
 };
 
@@ -99,7 +101,14 @@ impl From<OldSettings> for Settings {
             ui: UiSettings {
                 theme: super::ui::Theme::Dark,
                 transparent: old.transparent,
-                font_path: old.font_path.map(|p| p.to_string_lossy().into_owned()),
+                font: old
+                    .font_path
+                    .map(|path| FontSettings {
+                        mode: super::ui::FontMode::File,
+                        name: String::new(),
+                        path: path.to_string_lossy().to_string(),
+                    })
+                    .unwrap_or_default(),
                 i18n_path: Default::default(),
                 mod_list: ModListUiSettings {
                     filter_text: old.filter_text,

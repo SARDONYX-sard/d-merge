@@ -26,10 +26,8 @@ pub struct UiSettings {
     /// be created with `transparent: true` in [`eframe::NativeOptions`].
     pub transparent: bool,
 
-    /// Path to a custom `.ttf` or `.otf` font file.
-    ///
-    /// `None` falls back to the built-in font bundled with the application.
-    pub font_path: Option<String>,
+    #[serde(default)]
+    pub font: FontSettings,
 
     /// Path to the i18n JSON file used for UI translation.
     ///
@@ -50,7 +48,7 @@ impl Default for UiSettings {
         Self {
             theme: Theme::System,
             transparent: false,
-            font_path: None,
+            font: FontSettings::default(),
             i18n_path: crate::i18n::I18nMap::FILE.into(),
             mod_list: ModListUiSettings::default(),
             window: WindowGeometry::default(),
@@ -120,4 +118,47 @@ impl Default for WindowGeometry {
     fn default() -> Self {
         Self { pos_x: 100.0, pos_y: 100.0, width: 1280.0, height: 720.0, maximized: false }
     }
+}
+
+#[derive(Debug, Clone, Default)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FontSettings {
+    /// Determines how the application resolves the UI font.
+    #[serde(default)]
+    pub mode: FontMode,
+
+    /// System font family name used when
+    /// [`FontMode::System`] is selected.
+    #[serde(default)]
+    pub name: String,
+
+    /// Font file path used when
+    /// [`FontMode::File`] is selected.
+    #[serde(default)]
+    pub path: String,
+}
+
+/// Determines how the application resolves the UI font.
+///
+/// When [`Self::System`] is selected, [`UiSettings::font_name`] is used.
+///
+/// When [`Self::File`] is selected, [`UiSettings::font_path`] is used.
+///
+/// If the selected source cannot be loaded, the application falls back
+/// to the built-in default font configuration.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FontMode {
+    /// Use the application's default font configuration.
+    #[default]
+    Default,
+
+    /// Load a font from a system font family.
+    System,
+
+    /// Load a font from a font file path.
+    ///
+    /// Path to a custom `.ttc`, `.ttf` or `.otf` font file.
+    File,
 }

@@ -14,7 +14,10 @@
 
 use std::{borrow::Cow, path::Path};
 
-use d_merge_gui_shared::i18n::{I18nKey, I18nMap};
+use d_merge_gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::ui::FontMode,
+};
 use egui::Color32;
 
 use crate::app::App;
@@ -76,23 +79,44 @@ impl App {
 
     /// Renders the help / about window.
     ///
-    /// Anchored to the viewport centre.  All mutations (issue link open,
-    /// path changes, i18n reload) are deferred to after the closure returns
-    /// to satisfy the borrow checker.
+    /// Anchored to the viewport centre.
     pub(crate) fn ui_help_window(&mut self, ctx: &egui::Context) {
         if !self.show_help {
             return;
         }
 
-        let issue_url = self.settings.create_issue_link();
+        // --- overlay (background) ---
+        if egui::Area::new("help_overlay_bg".into())
+            .order(egui::Order::Background)
+            .fixed_pos(ctx.content_rect().min)
+            .show(ctx, |ui| {
+                let rect = ui.ctx().content_rect();
+
+                let bg = egui::Color32::from_black_alpha(160);
+                ui.painter().rect_filled(rect, 0.0, bg);
+                ui.allocate_response(rect.size(), egui::Sense::click())
+            })
+            .inner
+            .clicked()
+        {
+            self.show_help = false;
+            return;
+        }
 
         let mut show_help = true;
-        let mut write_i18n_clicked = false;
-        let mut reload_i18n_clicked = false;
-        let mut reload_log_clicked = false;
+
+        // This clone, which may seem unnecessary at first glance, is a measure designed to allow the use of `&self` within the closure.
+        let mut selected_font_mode = self.settings.ui.font.mode;
+        let mut selected_font_name = self.settings.ui.font.name.clone();
+        let mut selected_font_path = self.settings.ui.font.path.clone();
+        let mut reload_font_clicked = false;
 
         let mut selected_log_dir_path = self.settings.log.dir_path.clone();
+        let mut reload_log_clicked = false;
+
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
+        let mut write_i18n_clicked = false;
+        let mut reload_i18n_clicked = false;
 
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show_help)
@@ -112,25 +136,64 @@ impl App {
                 ui.add_space(8.0);
                 ui.separator();
 
-                self.ui_bug_report(ui, issue_url);
+                self.ui_bug_report(ui);
 
                 ui.add_space(8.0);
                 ui.separator();
 
-                self.ui_tooling(
+                self.ui_tooling(UiToolingArgs {
                     ui,
-                    &mut selected_log_dir_path,
-                    &mut selected_i18n_path,
-                    &mut write_i18n_clicked,
-                    &mut reload_i18n_clicked,
-                    &mut reload_log_clicked,
-                );
+                    selected_font_mode: &mut selected_font_mode,
+                    selected_font_name: &mut selected_font_name,
+                    selected_font_path: &mut selected_font_path,
+                    reload_font_clicked: &mut reload_font_clicked,
+                    //
+                    selected_log_dir_path: &mut selected_log_dir_path,
+                    reload_log_clicked: &mut reload_log_clicked,
+                    //
+                    selected_i18n_path: &mut selected_i18n_path,
+                    reload_i18n_clicked: &mut reload_i18n_clicked,
+                    write_i18n_clicked: &mut write_i18n_clicked,
+                });
             });
 
         if !show_help {
             self.show_help = false;
         }
 
+        // Fonts actions
+        let did_font_mode_change = self.settings.ui.font.mode != selected_font_mode;
+        let did_font_name_change = self.settings.ui.font.name != selected_font_name;
+
+        if did_font_mode_change {
+            self.settings.ui.font.mode = selected_font_mode;
+        }
+        if did_font_name_change {
+            self.settings.ui.font.name = selected_font_name;
+        }
+        if self.settings.ui.font.path != selected_font_path {
+            self.settings.ui.font.path = selected_font_path;
+        }
+        // NOTE: The font path won't be applied automatically until we click the reload button. (Because it would make it harder to use.)
+        if ((did_font_mode_change
+            && matches!(selected_font_mode, FontMode::Default | FontMode::System))
+            || did_font_name_change
+            || reload_font_clicked)
+            && let Err(err) = crate::fonts::setup_fonts(ctx, &self.settings.ui.font)
+        {
+            match err {
+                crate::fonts::FontError::Warn(msg) => {
+                    tracing::warn!(msg);
+                    self.notify = (msg, egui::Color32::YELLOW);
+                }
+                crate::fonts::FontError::Error(msg) => {
+                    tracing::error!(msg);
+                    self.notify_error(msg);
+                }
+            }
+        }
+
+        // Log actions
         if self.settings.log.dir_path != selected_log_dir_path {
             self.settings.log.dir_path = selected_log_dir_path;
         }
@@ -138,6 +201,7 @@ impl App {
             self.reload_log();
         }
 
+        // i18n actions
         if self.settings.ui.i18n_path != selected_i18n_path {
             self.settings.ui.i18n_path = selected_i18n_path;
         }
@@ -222,7 +286,7 @@ impl App {
         });
     }
 
-    fn ui_bug_report(&self, ui: &mut egui::Ui, issue_url: String) {
+    fn ui_bug_report(&self, ui: &mut egui::Ui) {
         let bug_report_label = self.i18n.t(I18nKey::BugReportLabel);
 
         let see_issues_label = self.i18n.t(I18nKey::BugReportSeeIssues);
@@ -237,30 +301,40 @@ impl App {
             ui.hyperlink_to(see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
 
             if ui.button(issue_report_label).on_hover_text(issue_report_hover).clicked() {
-                ui.ctx().open_url(egui::OpenUrl { url: issue_url, new_tab: true });
+                ui.ctx().open_url(egui::OpenUrl {
+                    url: self.settings.create_issue_link(),
+                    new_tab: true,
+                });
             }
         });
     }
 
-    fn ui_tooling(
-        &self,
-        ui: &mut egui::Ui,
-        selected_log_dir_path: &mut String,
-        selected_i18n_path: &mut String,
-        write_i18n_clicked: &mut bool,
-        reload_i18n_clicked: &mut bool,
-        reload_log_clicked: &mut bool,
-    ) {
-        let i18n_write_hover = format!(
-            "{} -> {}",
-            self.i18n.t(I18nKey::I18nWriteNewJsonHover),
-            self.settings.ui.i18n_path,
-        );
+    fn ui_tooling(&self, args: UiToolingArgs) {
+        let UiToolingArgs {
+            ui,
+            selected_font_mode,
+            selected_font_name,
+            selected_font_path,
+            reload_font_clicked,
+            selected_log_dir_path,
+            reload_log_clicked,
+            selected_i18n_path,
+            reload_i18n_clicked,
+            write_i18n_clicked,
+        } = args;
 
         ui.label(self.i18n.t(I18nKey::ToolingLabel));
         ui.add_space(4.0);
 
         egui::Grid::new("tooling_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            self.font_ui(
+                ui,
+                selected_font_mode,
+                selected_font_name,
+                selected_font_path,
+                reload_font_clicked,
+            );
+
             if path_selector_row(
                 PathSelector {
                     ui,
@@ -313,7 +387,7 @@ impl App {
             ui.horizontal(|ui| {
                 if ui
                     .button(self.i18n.t(I18nKey::I18nWriteNewJsonButton))
-                    .on_hover_text(&i18n_write_hover)
+                    .on_hover_text(self.i18n.t(I18nKey::I18nWriteNewJsonHover))
                     .clicked()
                 {
                     *write_i18n_clicked = true;
@@ -321,6 +395,97 @@ impl App {
             });
             ui.end_row();
         });
+    }
+
+    fn font_ui(
+        &self,
+        ui: &mut egui::Ui,
+        selected_font_mode: &mut FontMode,
+        selected_font_name: &mut String,
+        selected_font_path: &mut String,
+        reload_font_clicked: &mut bool,
+    ) {
+        ui.label(self.i18n.t(I18nKey::FontModeLabel))
+            .on_hover_text(self.i18n.t(I18nKey::FontModeHover));
+
+        egui::ComboBox::from_id_salt("font_mode")
+            .selected_text(match selected_font_mode {
+                FontMode::Default => self.i18n.t(I18nKey::FontModeDefault),
+                FontMode::System => self.i18n.t(I18nKey::FontModeSystem),
+                FontMode::File => self.i18n.t(I18nKey::FontModeFile),
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    selected_font_mode,
+                    FontMode::Default,
+                    self.i18n.t(I18nKey::FontModeDefault),
+                );
+
+                ui.selectable_value(
+                    selected_font_mode,
+                    FontMode::System,
+                    self.i18n.t(I18nKey::FontModeSystem),
+                );
+
+                ui.selectable_value(
+                    selected_font_mode,
+                    FontMode::File,
+                    self.i18n.t(I18nKey::FontModeFile),
+                );
+            });
+
+        ui.end_row();
+
+        match selected_font_mode {
+            FontMode::Default => {}
+
+            FontMode::System => {
+                ui.label(self.i18n.t(I18nKey::FontFamily));
+
+                egui::ComboBox::from_id_salt("font_family")
+                    .selected_text(if selected_font_name.is_empty() {
+                        self.i18n.t(I18nKey::SelectButton)
+                    } else {
+                        selected_font_name.as_str()
+                    })
+                    .show_ui(ui, |ui| {
+                        for family in crate::fonts::font_families() {
+                            ui.selectable_value(selected_font_name, family.clone(), family);
+                        }
+                    });
+
+                ui.end_row();
+            }
+
+            FontMode::File => {
+                if path_selector_row(
+                    PathSelector {
+                        ui,
+                        label: self.i18n.t(I18nKey::FontFileLabel),
+                        value: selected_font_path,
+                        select_label: self.i18n.t(I18nKey::SelectButton),
+                        reload_label: self.i18n.t(I18nKey::ReloadButton),
+                        reload_hover: self.i18n.t(I18nKey::FontReloadHover),
+                        clear_label: self.i18n.t(I18nKey::ClearButton),
+                    },
+                    || {
+                        // IMPORTANT: Without this, rfd cannot set dir correctly.
+                        let dir = Path::new(&self.settings.ui.font.path).parent().map_or_else(
+                            || Cow::Borrowed(Path::new("C:/Windows/Fonts")),
+                            |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
+                        );
+
+                        rfd::FileDialog::new()
+                            .set_directory(dir)
+                            .add_filter("font.ttc", &["ttc", "ttf", "tto"])
+                            .pick_file()
+                            .map(|p| p.display().to_string())
+                    },
+                ) {
+                    *reload_font_clicked |= true;
+                }
+            }
+        }
     }
 
     fn reload_log(&mut self) {
@@ -331,6 +496,8 @@ impl App {
             tracing::error!(%err);
             self.notify_error(format!("Failed to reload log: {err}"));
         } else {
+            self.update_log_dir();
+            tracing::info!("Log file rotated.");
             self.set_colored_notify("Log file rotated.".to_string(), Color32::GREEN);
         }
     }
@@ -352,6 +519,21 @@ impl App {
     }
 }
 
+struct UiToolingArgs<'a> {
+    ui: &'a mut egui::Ui,
+    selected_font_mode: &'a mut FontMode,
+    selected_font_name: &'a mut String,
+    selected_font_path: &'a mut String,
+    reload_font_clicked: &'a mut bool,
+
+    selected_log_dir_path: &'a mut String,
+    reload_log_clicked: &'a mut bool,
+
+    selected_i18n_path: &'a mut String,
+    reload_i18n_clicked: &'a mut bool,
+    write_i18n_clicked: &'a mut bool,
+}
+
 struct PathSelector<'a> {
     ui: &'a mut egui::Ui,
     label: &'a str,
@@ -362,6 +544,7 @@ struct PathSelector<'a> {
     clear_label: &'a str,
 }
 
+/// Return reload button clicked
 fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<String>) -> bool {
     let PathSelector { ui, label, value, select_label, reload_label, reload_hover, clear_label } =
         selector;
