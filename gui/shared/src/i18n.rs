@@ -82,8 +82,12 @@ pub enum I18nKey {
     /// Debug output
     DebugOutput,
 
-    /// Output d merge patches & merged json files.
-    /// (To `<Output dir>/.d_merge/.debug/patches`)
+    /// Outputs debug JSON and XML files.
+    ///
+    /// Examples:
+    /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.xml`
+    /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.json`
+    /// - `<output directory>/.d_merge/.debug/patches/meshes/.../0_master.patch.json`
     DebugOutputHover,
 
     /// Execute
@@ -104,6 +108,44 @@ pub enum I18nKey {
     /// Gen FNIS.esp
     GenerateFnisEspLabel,
 
+    /// Font family:
+    FontFamily,
+
+    /// Font Source:
+    FontModeLabel,
+
+    /// Font loading mode configuration.
+    ///
+    /// - Default:
+    ///   Uses the application's built-in font configuration.
+    /// - System:
+    ///   Loads a font from an installed system font family.
+    /// - File:
+    ///   Loads a font from the specified font file.
+    ///
+    /// # Notes
+    /// Different fonts may alter text width and spacing, which can affect
+    /// table layouts, column alignment, and overall UI appearance.
+    FontModeHover,
+
+    /// Default
+    FontModeDefault,
+
+    /// System
+    FontModeSystem,
+
+    /// File
+    FontModeFile,
+
+    /// Font Path:
+    FontFileLabel,
+
+    /// Reloads and applies the currently selected font configuration.
+    ///
+    /// This will reinitialize the font system using the active font mode
+    /// (Default, System, or File) and apply it to the UI.
+    FontReloadHover,
+
     /// Help
     HelpButton,
 
@@ -116,7 +158,7 @@ pub enum I18nKey {
     /// New I18n
     I18nWriteNewJsonButton,
 
-    /// Write the new English translation file.
+    /// Generate a new translation JSON file initialized with English default values.
     I18nWriteNewJsonHover,
 
     /// Report Issue
@@ -147,7 +189,11 @@ pub enum I18nKey {
     LogDirPathLabel,
 
     /// Change the log directory to the specified path.
-    /// The log path will not change until you click this button.(Or restart app)
+    ///
+    /// # Notes
+    /// Logs are rotated with a maximum of 5 files retained.
+    /// The log directory will not change until this button is clicked
+    /// (or the application is restarted).
     LogReloadHover,
 
     /// Log Level
@@ -156,8 +202,11 @@ pub enum I18nKey {
     /// Manual mode
     ManualMode,
 
-    /// When using it completely manually.
-    /// (The ID uses a path to prevent errors when different versions of the mod are loaded. For this reason, it is not suitable for transferring settings to others.)
+    /// Mode for use without virtual mod managers such as MO2.
+    ///
+    /// Note:
+    /// - Conflicts may occur if multiple versions of the same mod exist.
+    /// - In manual mode, absolute paths are used as identifiers to prevent duplication. This makes configuration sharing unsuitable.
     ManualModeHover,
 
     /// Mod Test Status:
@@ -325,7 +374,7 @@ impl I18nMap {
 
         if !path.exists() {
             #[cfg(feature = "tracing")]
-            tracing::warn!("translation.json does not exist");
+            tracing::info!("{} does not exist.", path.display());
             return Ok(Self::new());
         }
 

@@ -9,21 +9,11 @@ use d_merge_gui_shared::{
     settings::{self, ui::Theme},
 };
 
-use self::app::App;
-
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub(crate) const APP_TITLE: &str = concat!("D Merge v", env!("CARGO_PKG_VERSION"));
-
-pub(crate) const fn to_egui_theme(theme: Theme) -> egui::ThemePreference {
-    match theme {
-        Theme::System => egui::ThemePreference::System,
-        Theme::Dark => egui::ThemePreference::Dark,
-        Theme::Light => egui::ThemePreference::Light,
-    }
-}
 
 /// Application entry point.
 ///
@@ -47,7 +37,7 @@ fn main() -> Result<(), eframe::Error> {
     }));
 
     if let Some(err) = err {
-        tracing::error!("[Settings loader Error] {err}\nFallback to default");
+        tracing::error!("[Settings loader] {err}\nFallback to default");
     } else {
         tracing::info!("[Settings loader] Loaded settings.json");
     };
@@ -77,10 +67,23 @@ fn main() -> Result<(), eframe::Error> {
         APP_TITLE,
         options,
         Box::new(|cc| {
-            fonts::setup_custom_fonts(&cc.egui_ctx, settings.ui.font_path.as_ref());
+            if let Err(err) = crate::fonts::setup_fonts(&cc.egui_ctx, &settings.ui.font) {
+                match err {
+                    crate::fonts::FontError::Warn(msg) => tracing::warn!(msg),
+                    crate::fonts::FontError::Error(msg) => tracing::error!(msg),
+                }
+            }
             cc.egui_ctx.set_theme(to_egui_theme(settings.ui.theme));
 
-            Ok(Box::new(App::from_settings(settings)))
+            Ok(Box::new(self::app::App::from_settings(settings)))
         }),
     )
+}
+
+pub(crate) const fn to_egui_theme(theme: Theme) -> egui::ThemePreference {
+    match theme {
+        Theme::System => egui::ThemePreference::System,
+        Theme::Dark => egui::ThemePreference::Dark,
+        Theme::Light => egui::ThemePreference::Light,
+    }
 }
