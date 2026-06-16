@@ -1,4 +1,5 @@
 name: Release GUI
+
 on:
   push:
     tags:
@@ -9,61 +10,131 @@ env:
   BUILD_PROFILE: release
 
 jobs:
-  release:
+  build:
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
+        include:
+          # --------------------
+          # Tauri
+          # --------------------
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            kind: tauri
+            art_name: d_merge-tauri-aarch64-apple-darwin
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            kind: tauri
+            art_name: d_merge-tauri-x86_64-pc-windows-msvc
+
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            kind: tauri
+            art_name: d_merge-tauri-x86_64-unknown-linux-gnu
+
+          # --------------------
+          # egui
+          # --------------------
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            kind: egui
+            art_name: d_merge-egui-aarch64-apple-darwin
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            kind: egui
+            art_name: d_merge-egui-x86_64-pc-windows-msvc
+
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            kind: egui
+            art_name: d_merge-egui-x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Setup environment
+
+      - name: Setup
         uses: ./.github/actions/setup-deps
         with:
-          platform: ${{ matrix.platform }}
+          platform: ${{ matrix.os }}
+          build_profile: ${{ env.BUILD_PROFILE }}
+          install_front_deps: ${{ matrix.kind == 'tauri' && 'true' || 'false' }}
+
+      # ----------------------------
+      # build switch
+      # ----------------------------
+      - name: Build GUI (tauri)
+        if: matrix.kind == 'tauri'
+        run: npm run build:${{ env.BUILD_PROFILE }}
+
+      - name: Build GUI (egui)
+        if: matrix.kind == 'egui'
+        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
+
+      # ----------------------------
+      # move output (existing logic)
+      # ----------------------------
+      - name: Move exe -> ./build
+        uses: ./.github/actions/setup-release
+        with:
+          app_name: ${{ matrix.kind == 'tauri' && 'd_merge' || 'd_merge_egui' }}
           build_profile: ${{ env.BUILD_PROFILE }}
 
-      - name: Update CHANGELOG
-        if: runner.os == 'Windows'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.art_name }}
+          # to include .keep file
+          include-hidden-files: true
+          path: |
+            ./build/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      # --------------------
+      # changelog
+      # --------------------
+      - name: Generate changelog
         id: changelog
         uses: requarks/changelog-action@v1.10.3
         with:
           token: ${{ github.token }}
           tag: ${{ github.ref_name }}
 
-      - name: Build GUI
-        run: npm run build:release
-
-      - name: Move exe -> ./build
-        uses: ./.github/actions/setup-release
-        with:
-          app_name: d_merge
-          build_profile: release
-
-      - name: Compress outputs(Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
+      # --------------------
+      # release
+      # --------------------
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.zip'
+          gh release create "${{ github.ref_name }}" dist/**/* \
+            --title "${{ env.APP_NAME }} v${{ github.ref_name }}" \
+            --notes "${{ steps.changelog.outputs.changes }}"
 
-      - name: Release Portable Version(Windows)
-        uses: ncipollo/release-action@v1.21.0
-        if: runner.os == 'Windows'
-        with:
-          allowUpdates: true
-          artifacts: ./*.zip
-          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
-          body: ${{ steps.changelog.outputs.changes }}
-          tag: ${{ github.ref_name }}
-
+      # --------------------
+      # commit changelog
+      # --------------------
       - name: Commit CHANGELOG.md
-        if: runner.os == 'Windows'
-        shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -72,86 +143,6 @@ jobs:
           git checkout main
           git pull origin main
 
-          # Stage only CHANGELOG.md
           git add CHANGELOG.md
-
-          # Drop Others.
-          git restore .
-          git clean -fd
-
-          git commit -m "docs: update CHANGELOG.md for ${{ github.ref_name }}" `
-            || echo "No changes to commit"
-
+          git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}" || exit 0
           git push origin main
-
-      - name: Compress outputs(MacOS/Linux)
-        shell: bash
-        if: runner.os != 'Windows'
-        run: |
-          tar -czf ./${{ env.APP_NAME }}_tauri-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
-
-      - name: Release Portable Version
-        uses: ncipollo/release-action@v1.21.0
-        if: runner.os != 'Windows'
-        with:
-          allowUpdates: true
-          artifacts: ./*.tar.gz
-          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
-          tag: ${{ github.ref_name }}
-
-  release_egui:
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-      - name: Setup environment
-        uses: ./.github/actions/setup-deps
-        with:
-          platform: ${{ matrix.platform }}
-          build_profile: ${{ env.BUILD_PROFILE }}
-
-      - name: Build GUI
-        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
-
-      - name: Move exe -> ./build
-        uses: ./.github/actions/setup-release
-        with:
-          app_name: d_merge_egui
-          build_profile: release
-
-      - name: Compress outputs(Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
-        run: |
-          Compress-Archive -Path './build/*' -DestinationPath './${{ env.APP_NAME }}_egui-${{ runner.os }}-v${{ github.ref_name }}.zip'
-      - name: Release egui Version(Windows)
-        uses: ncipollo/release-action@v1.21.0
-        if: runner.os == 'Windows'
-        with:
-          allowUpdates: true
-          artifacts: ./*.zip
-          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
-          tag: ${{ github.ref_name }}
-
-      - name: Compress outputs(MacOS/Linux)
-        shell: bash
-        if: runner.os != 'Windows'
-        run: |
-          tar -czf ./${{ env.APP_NAME }}_egui-${{ runner.os }}-v${{ github.ref_name }}.tar.gz -C ./build .
-
-      - name: Release Portable Version(MacOS/Linux)
-        uses: ncipollo/release-action@v1.21.0
-        if: runner.os != 'Windows'
-        with:
-          allowUpdates: true
-          artifacts: ./*.tar.gz
-          name: '${{ env.APP_NAME }} v${{ github.ref_name }}'
-          tag: ${{ github.ref_name }}
