@@ -218,7 +218,7 @@ impl App {
                 .set_directory(path)
                 .set_title("Save translation.json")
                 .set_file_name("translation.json")
-                .add_filter("JSON", &["json"])
+                .add_filter("translation", &["json"])
                 .save_file();
 
             if let Some(path) = path {
@@ -370,13 +370,15 @@ impl App {
                     clear_label: self.i18n.t(I18nKey::ClearButton),
                 },
                 || {
-                    let dir = Path::new(&self.settings.ui.i18n_path);
-                    // IMPORTANT: Without this, rfd cannot set dir correctly.
-                    let dir = dir.canonicalize().map(Cow::Owned).unwrap_or(Cow::Borrowed(dir));
+                    // IMPORTANT: Without canonicalize(), rfd cannot set dir correctly.
+                    let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
+                        || Cow::Borrowed(Path::new(".")),
+                        |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
+                    );
 
                     rfd::FileDialog::new()
-                        .set_directory(dir)
-                        .add_filter("translation.json", &["json"])
+                        .set_directory(path)
+                        .add_filter("translation", &["json"])
                         .pick_file()
                         .map(|p| p.display().to_string())
                 },
@@ -477,7 +479,7 @@ impl App {
 
                         rfd::FileDialog::new()
                             .set_directory(dir)
-                            .add_filter("font.ttc", &["ttc", "ttf", "tto"])
+                            .add_filter("font", &["ttc", "ttf", "tto"])
                             .pick_file()
                             .map(|p| p.display().to_string())
                     },
