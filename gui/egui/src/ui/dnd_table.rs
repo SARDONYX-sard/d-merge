@@ -2,7 +2,7 @@ use d_merge_gui_shared::mod_item::ModItem;
 use eframe::egui::{self};
 use rayon::prelude::*;
 
-use super::label_ext::{ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
+use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
 
 /// Handle drag-and-drop reordering of mods.
 pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
@@ -18,12 +18,12 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
     let response =
         egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
             // Since body cannot be used, stripe must be implemented manually.
-            let mut bg_color = if state.index.is_multiple_of(2) {
+            let bg_color = if state.index.is_multiple_of(2) {
                 ui.style().visuals.widgets.active.bg_fill
             } else {
                 ui.visuals().widgets.noninteractive.bg_fill // gray
-            };
-            bg_color = bg_color.gamma_multiply(0.5);
+            }
+            .gamma_multiply(0.5);
 
             let row_rect = ui
                 .allocate_rect(
@@ -36,13 +36,14 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
             ui.scope_builder(egui::UiBuilder::new().max_rect(row_rect), |ui| {
                 ui.horizontal(|ui| {
                     ui.add_sized(checkbox_rect, egui::Checkbox::without_text(&mut item.enabled));
-                    label_with_hover(ui, &item.id, w_path);
+                    label_with_hover(ui, &item.id, w_path, CellAlign::Left);
+                    draggable_handle
+                        .ui(ui, |ui| label_with_hover(ui, &item.name, w_name, CellAlign::Center));
 
-                    draggable_handle.ui(ui, |ui| label_with_hover(ui, &item.name, w_name));
-                    label_with_hover(ui, item.mod_type.as_str(), w_mod_type);
+                    label_with_hover(ui, item.mod_type.as_str(), w_mod_type, CellAlign::Center);
                     hyperlink_with_hover(ui, &item.site, w_site);
                     centered_ui(ui, |ui| {
-                        ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()));
+                        ui.add_sized(priority_size, egui::Label::new(item.priority.to_string()))
                     });
                 });
             });
@@ -70,7 +71,7 @@ pub(crate) fn check_only_table_body(
         return;
     }
 
-    let w_checkbox = widths[0];
+    let checkbox_size = [widths[0], ROW_HEIGHT];
     let w_path = widths[1];
     let w_name = widths[2];
     let w_mod_type = widths[3];
@@ -80,29 +81,34 @@ pub(crate) fn check_only_table_body(
         original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
 
     for filtered_mod in filtered_ids {
-        let Some(orig_item) = orig_map.get_mut(&filtered_mod.id) else { continue };
+        let Some(&mut &mut ModItem {
+            ref mut id,
+            ref mut name,
+            ref mut mod_type,
+            ref mut site,
+            ref mut priority,
+            mut enabled,
+        }) = orig_map.get_mut(&filtered_mod.id)
+        else {
+            continue;
+        };
 
         body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
-                ui.add_sized(
-                    [w_checkbox, ROW_HEIGHT],
-                    egui::Checkbox::without_text(&mut orig_item.enabled),
-                );
+                ui.add_sized(checkbox_size, egui::Checkbox::without_text(&mut enabled));
             });
-            row.col(|ui| label_with_hover(ui, &orig_item.id, w_path));
-            row.col(|ui| label_with_hover(ui, &orig_item.name, w_name));
-            row.col(|ui| label_with_hover(ui, orig_item.mod_type.as_str(), w_mod_type));
-            row.col(|ui| hyperlink_with_hover(ui, &orig_item.site, w_site));
-            row.col(|ui| {
-                centered_ui(ui, |ui| ui.label(orig_item.priority.to_string()));
-            });
+            row.col(|ui| label_with_hover(ui, id, w_path, CellAlign::Left));
+            row.col(|ui| label_with_hover(ui, name, w_name, CellAlign::Center));
+            row.col(|ui| label_with_hover(ui, mod_type.as_str(), w_mod_type, CellAlign::Center));
+            row.col(|ui| hyperlink_with_hover(ui, site, w_site));
+            row.col(|ui| centered_ui(ui, |ui| ui.label(priority.to_string())));
         });
     }
 }
 
-fn centered_ui<R>(
-    ui: &mut egui::Ui,
-    add_contents: impl FnOnce(&mut egui::Ui) -> R,
-) -> egui::InnerResponse<R> {
-    ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), add_contents)
+fn centered_ui<R>(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui) -> R) {
+    ui.with_layout(
+        egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+        add_contents,
+    );
 }
