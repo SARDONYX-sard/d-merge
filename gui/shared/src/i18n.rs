@@ -277,6 +277,15 @@ pub enum I18nKey {
     /// Removing the `<output_dir>/meshes` directory...
     RemovingMeshesMessage,
 
+    /// Reports status
+    ReportStatusLabel,
+
+    /// Reports behavior-generation phase changes to the GUI.
+    ///
+    /// Disable this if maximum patch-generation performance is preferred
+    /// over progress feedback.
+    ReportStatusHover,
+
     /// Output format for hkx. LE: win32, SE, VR: amd64
     /// NOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
     RuntimeTargetHover,

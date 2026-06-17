@@ -91,6 +91,7 @@ impl From<OldSettings> for Settings {
             app_version: semver::Version::new(1, 0, 0),
             behavior: BehaviorSettings {
                 auto_run: old.auto_run,
+                report_status: true,
                 target_runtime: old.target_runtime,
                 auto_remove_meshes: old.auto_remove_meshes,
                 enable_debug_output: old.enable_debug_output,

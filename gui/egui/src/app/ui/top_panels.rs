@@ -25,7 +25,7 @@ impl App {
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, transparent, auto-run, theme.
-    pub(crate) fn ui_execution_mode(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_behavior_options(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_execution_mode");
         if self.settings.ui.transparent {
             panel = panel.frame(egui::Frame::new());
@@ -81,6 +81,11 @@ impl App {
                         I18nKey::GenerateFnisEspHover,
                     ),
                     (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
+                    (
+                        &mut self.settings.behavior.report_status,
+                        I18nKey::ReportStatusLabel,
+                        I18nKey::ReportStatusHover,
+                    ),
                 ] {
                     checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
                 }
@@ -100,27 +105,6 @@ impl App {
             });
 
             ui.add_space(8.0);
-        });
-    }
-
-    /// Renders the theme combo box (System / Dark / Light).
-    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label(self.i18n.t(I18nKey::ThemeLabel))
-                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
-
-            egui::ComboBox::from_id_salt("theme")
-                .selected_text(self.settings.ui.theme.as_str())
-                .show_ui(ui, |ui| {
-                    for theme in [Theme::System, Theme::Dark, Theme::Light] {
-                        if ui
-                            .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
-                            .changed()
-                        {
-                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
-                        }
-                    }
-                });
         });
     }
 
@@ -153,6 +137,27 @@ impl App {
                         {
                             #[cfg(target_os = "windows")]
                             self.update_vfs_skyrim_data_dir_by_reg();
+                        }
+                    }
+                });
+        });
+    }
+
+    /// Renders the theme combo box (System / Dark / Light).
+    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(self.i18n.t(I18nKey::ThemeLabel))
+                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
+
+            egui::ComboBox::from_id_salt("theme")
+                .selected_text(self.settings.ui.theme.as_str())
+                .show_ui(ui, |ui| {
+                    for theme in [Theme::System, Theme::Dark, Theme::Light] {
+                        if ui
+                            .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
+                            .changed()
+                        {
+                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
                         }
                     }
                 });

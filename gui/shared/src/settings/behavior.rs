@@ -36,6 +36,15 @@ pub struct BehaviorSettings {
     /// directory-change that yields a different mod list.
     pub auto_run: bool,
 
+    /// Reports behavior-generation progress to the GUI.
+    ///
+    /// When enabled, progress updates are sent through the
+    /// `status_report` callback and displayed in the notification area.
+    ///
+    /// Disabling this removes nearly all progress-reporting overhead and
+    /// only reports the final success or failure result.
+    pub report_status: bool,
+
     /// Delete `<output_dir>/meshes` immediately before each patch run.
     ///
     /// Skipped with a warning when `output_dir` equals the Skyrim data
@@ -69,6 +78,7 @@ impl Default for BehaviorSettings {
             mode: DataMode::Vfs,
             target_runtime: Runtime::Se,
             auto_run: false,
+            report_status: true,
             auto_remove_meshes: false,
             enable_debug_output: false,
             generate_fnis_esp: false,

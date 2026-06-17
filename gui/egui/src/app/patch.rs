@@ -56,21 +56,33 @@ impl App {
             output_merged_xml: enable_debug_output,
         };
 
-        let ctx = ctx.clone();
-        let config = nemesis_merge::Config {
+        let mut config = nemesis_merge::Config {
             resource_dir: template_dir.to_string().into(),
             output_dir: self.settings.current_output_dir().to_owned().into(),
             output_target,
-            status_report: Some(Box::new(move |status| {
-                patch_status.apply(status, &ctx);
-            })),
+            status_report: None,
             hack_options: Some(nemesis_merge::HackOptions::enable_all()),
             debug,
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
         };
 
-        self.async_rt.spawn(nemesis_merge::behavior_gen(patches, config));
+        let ctx = ctx.clone();
+        if self.settings.behavior.report_status {
+            config.status_report = Some(Box::new(move |status| {
+                patch_status.apply(status, &ctx);
+            }));
+            self.async_rt.spawn(nemesis_merge::behavior_gen(patches, config));
+        } else {
+            self.async_rt.spawn(async move {
+                match nemesis_merge::behavior_gen(patches, config).await {
+                    Ok(()) => patch_status.apply(nemesis_merge::Status::Done, &ctx),
+                    Err(err) => {
+                        patch_status.apply(nemesis_merge::Status::Error(err.to_string()), &ctx);
+                    }
+                }
+            });
+        }
     }
 
     /// Polls the patch status written by the `status_report` callback and
