@@ -21,6 +21,7 @@ use crate::{
             collect::{collect_borrowed_patches, collect_owned_patches},
             types::{OwnedPatchMap, OwnedPatches, PatchCollection},
         },
+        templates::collect::{borrowed, owned},
     },
     config::{Config, Status},
     errors::{BehaviorGenerationError, Error, Result, writer::write_errors},
@@ -166,8 +167,6 @@ fn apply_and_gen_patched_hkx<'a>(
 
     let mut template_error_len;
     let owned_templates = {
-        use self::tasks::templates::collect::owned;
-
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
         let needed_template_names =
             borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
@@ -179,44 +178,36 @@ fn apply_and_gen_patched_hkx<'a>(
         owned_templates
     };
 
-    {
-        // NOTE: Without this seemingly meaningless move, an lifetime error is made.
-        // Need `'owned_templates`: `'variable_class_map` & `'borrowed_patches`. So let's move here and shrink these lifetimes.
-        let variable_class_map = variable_class_map;
-        let borrowed_patches = borrowed_patches;
+    let mut templates = {
+        let (templates, errors) = borrowed::collect_templates(&owned_templates);
+        template_error_len += errors.len();
+        all_errors.par_extend(errors);
+        templates
+    };
 
-        let mut templates = {
-            use self::tasks::templates::collect::borrowed;
-            let (templates, errors) = borrowed::collect_templates(&owned_templates);
-            template_error_len += errors.len();
-            all_errors.par_extend(errors);
-            templates
-        };
+    #[cfg(feature = "tracing")]
+    tracing::debug!(
+        "owned_templates_keys(Things that actually exist) = {:#?}",
+        owned_templates.keys()
+    );
 
-        #[cfg(feature = "tracing")]
-        tracing::debug!(
-            "owned_templates_keys(Things that actually exist) = {:#?}",
-            owned_templates.keys()
-        );
+    // 2/3: Apply patches & Replace variables to indexes
+    let mut apply_errors_len = template_error_len;
+    if let Err(errors) = apply_patches(&mut templates, borrowed_patches, config) {
+        apply_errors_len = errors.len();
+        all_errors.par_extend(errors);
+    };
 
-        // 2/3: Apply patches & Replace variables to indexes
-        let mut apply_errors_len = template_error_len;
-        if let Err(errors) = apply_patches(&mut templates, borrowed_patches, config) {
-            apply_errors_len = errors.len();
-            all_errors.par_extend(errors);
-        };
+    // 3/3: Generate hkx files.
+    let hkx_errors_len = {
+        if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
+            let errors_len = hkx_errors.len();
+            all_errors.par_extend(hkx_errors);
+            errors_len
+        } else {
+            0
+        }
+    };
 
-        // 3/3: Generate hkx files.
-        let hkx_errors_len = {
-            if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
-                let errors_len = hkx_errors.len();
-                all_errors.par_extend(hkx_errors);
-                errors_len
-            } else {
-                0
-            }
-        };
-
-        Errors { patch_errors_len, apply_errors_len, hkx_errors_len, hkx_errors: all_errors }
-    }
+    Errors { patch_errors_len, apply_errors_len, hkx_errors_len, hkx_errors: all_errors }
 }
