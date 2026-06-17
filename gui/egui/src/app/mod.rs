@@ -1,10 +1,10 @@
 //! Root of the application module.
 
-pub(crate) mod fetch;
-pub(crate) mod log;
-pub(crate) mod notify;
-pub(crate) mod patch;
-pub(crate) mod ui;
+mod fetch;
+mod log;
+mod notify;
+mod patch;
+mod ui;
 
 use std::sync::{Arc, atomic::AtomicBool};
 

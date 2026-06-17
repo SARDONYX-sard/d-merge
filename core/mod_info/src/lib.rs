@@ -231,6 +231,22 @@ impl ModType {
             Self::Fnis => "FNIS",
         }
     }
+
+    /// Get the lower `&static str` corresponding to `ModType`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// assert_eq!(mod_info::ModType::Nemesis.as_str(), "nemesis");
+    /// assert_eq!(mod_info::ModType::Fnis.as_str(), "fnis");
+    /// ```
+    pub const fn as_lower_str(&self) -> &'static str {
+        match self {
+            Self::Nemesis => "nemesis",
+            Self::NemesisExt => "nemesisext",
+            Self::Fnis => "fnis",
+        }
+    }
 }
 
 /// Remove `null` string

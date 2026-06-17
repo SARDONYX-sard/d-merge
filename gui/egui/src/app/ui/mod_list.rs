@@ -1,33 +1,4 @@
 //! Mod list central panel: table rendering, sorting, and filtering.
-//!
-//! # Layout
-//! The entire remaining window area below the top panels is a single
-//! [`egui::CentralPanel`] containing a [`egui_extras::TableBuilder`] with
-//! six columns:
-//!
-//! | # | content       | default width |
-//! |---|---------------|---------------|
-//! | 1 | checkbox      | auto          |
-//! | 2 | id            | 20 %          |
-//! | 3 | name          | 30 %          |
-//! | 4 | mod type      |  7 %          |
-//! | 5 | site          | 30 %          |
-//! | 6 | priority      |  3 %          |
-//!
-//! # DnD vs read-only mode
-//! Drag-and-drop reordering is only active when all three conditions hold:
-//! - no filter text is entered,
-//! - sort column is [`SortColumn::Priority`],
-//! - sort direction is ascending.
-//!
-//! When DnD is inactive the table falls back to a checkbox-only view via
-//! [`crate::ui::dnd_table::check_only_table_body`], and [`App::is_locked`]
-//! is set so the lock button appears in the search panel.
-//!
-//! # Column auto-resize
-//! [`egui_extras::Column`] does not support simultaneous `initial` width  when the window is resized.  [`App::resizable_column`]
-//! works around this by briefly switching to `exact` width for the single
-//! frame on which the available width changes, then returning to `initial`.
 
 use d_merge_gui_shared::{
     fetch::FetchState,
@@ -187,7 +158,6 @@ impl App {
     /// Returns the subset of mods that match the current filter text and column.
     ///
     /// When the filter is empty the full list is returned (cloned in parallel).
-    /// Filtering uses `par_iter` so large lists do not block the frame.
     fn filtered_mod_ids(&self) -> Vec<ModItem> {
         if self.settings.ui.mod_list.filter_text.trim().is_empty() {
             return self.settings.mod_list().par_iter().cloned().collect();
@@ -198,11 +168,12 @@ impl App {
             None => {
                 m.id.to_lowercase().contains(&text)
                     || m.name.to_lowercase().contains(&text)
+                    || m.mod_type.as_lower_str().contains(&text)
                     || m.site.to_lowercase().contains(&text)
             }
             Some(SortColumn::Id) => m.id.to_lowercase().contains(&text),
             Some(SortColumn::Name) => m.name.to_lowercase().contains(&text),
-            Some(SortColumn::ModType) => m.mod_type.as_str().contains(&text),
+            Some(SortColumn::ModType) => m.mod_type.as_lower_str().contains(&text),
             Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
             Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
         };
@@ -250,12 +221,12 @@ impl App {
             .show(ui, |ui| {
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
-                    .column(egui_extras::Column::auto().resizable(true))
-                    .column(Self::resizable_column(total_width, 0.20, changed_width))
-                    .column(Self::resizable_column(total_width, 0.30, changed_width))
-                    .column(Self::resizable_column(total_width, 0.07, changed_width))
-                    .column(Self::resizable_column(total_width, 0.30, changed_width))
-                    .column(Self::resizable_column(total_width, 0.03, changed_width))
+                    .column(egui_extras::Column::auto().resizable(true)) // checkbox
+                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // id
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // name
+                    .column(Self::resizable_column(total_width, 0.07, changed_width)) // mod type
+                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // site
+                    .column(Self::resizable_column(total_width, 0.03, changed_width)) // priority
                     .header(20.0, |mut header| self.render_table_header(&mut header))
                     .body(|mut body| {
                         let mut widths = [0.0_f32; 6];
