@@ -150,7 +150,7 @@ impl eframe::App for App {
         self.start_log_watcher(ctx);
 
         // ── Top panels (outermost → innermost) ────────────────────────────────
-        self.ui_execution_mode(ctx);
+        self.ui_top_options(ctx);
         self.ui_paths(ctx);
 
         // ── Bottom panels (innermost → outermost) ─────────────────────────────

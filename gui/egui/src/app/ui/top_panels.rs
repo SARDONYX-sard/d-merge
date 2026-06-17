@@ -16,7 +16,6 @@ use d_merge_gui_shared::{
     i18n::I18nKey,
     settings::{DataMode, ui::Theme},
 };
-use egui::{Response, Separator};
 
 use crate::app::App;
 
@@ -24,8 +23,8 @@ impl App {
     /// Renders the execution-mode radio buttons and global option checkboxes.
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
-    /// auto-remove meshes, generate FNIS ESP, transparent, auto-run, theme.
-    pub(crate) fn ui_execution_mode(&mut self, ctx: &egui::Context) {
+    /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
+    pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
         let mut panel = egui::TopBottomPanel::top("top_execution_mode");
         if self.settings.ui.transparent {
             panel = panel.frame(egui::Frame::new());
@@ -33,57 +32,12 @@ impl App {
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.i18n.t(I18nKey::ExecutionModeLabel));
-                let items = [
-                    (
-                        DataMode::Vfs,
-                        self.i18n.t(I18nKey::VfsMode).to_string(),
-                        self.i18n.t(I18nKey::VfsModeHover).to_string(),
-                    ),
-                    (
-                        DataMode::Manual,
-                        self.i18n.t(I18nKey::ManualMode).to_string(),
-                        self.i18n.t(I18nKey::ManualModeHover).to_string(),
-                    ),
-                ];
-                let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
+                self.ui_execution_mode(ui);
 
-                ui.add_enabled_ui(!is_fetching, |ui| {
-                    for (mode, label, hover) in items {
-                        if ui
-                            .radio_value(&mut self.settings.behavior.mode, mode, label)
-                            .on_hover_text(hover)
-                            .clicked()
-                        {
-                            self.update_mod_list();
-                        }
-                    }
-                });
-
-                ui.add(Separator::default().vertical());
+                ui.separator();
 
                 self.ui_target_runtime_box(ui);
-
-                for (value, label, hover) in [
-                    (
-                        &mut self.settings.behavior.enable_debug_output,
-                        I18nKey::DebugOutput,
-                        I18nKey::DebugOutputHover,
-                    ),
-                    (
-                        &mut self.settings.behavior.auto_remove_meshes,
-                        I18nKey::AutoRemoveMeshes,
-                        I18nKey::AutoRemoveMeshesHover,
-                    ),
-                    (
-                        &mut self.settings.behavior.generate_fnis_esp,
-                        I18nKey::GenerateFnisEspLabel,
-                        I18nKey::GenerateFnisEspHover,
-                    ),
-                    (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
-                ] {
-                    checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
-                }
+                self.ui_behavior_options(ui);
 
                 ui.add_space(60.0);
                 ui.separator();
@@ -103,24 +57,29 @@ impl App {
         });
     }
 
-    /// Renders the theme combo box (System / Dark / Light).
-    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label(self.i18n.t(I18nKey::ThemeLabel))
-                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
+    fn ui_execution_mode(&mut self, ui: &mut egui::Ui) {
+        ui.label(self.i18n.t(I18nKey::ExecutionModeLabel));
 
-            egui::ComboBox::from_id_salt("theme")
-                .selected_text(self.settings.ui.theme.as_str())
-                .show_ui(ui, |ui| {
-                    for theme in [Theme::System, Theme::Dark, Theme::Light] {
-                        if ui
-                            .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
-                            .changed()
-                        {
-                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
-                        }
-                    }
-                });
+        let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
+        ui.add_enabled_ui(!is_fetching, |ui| {
+            let items = [
+                (DataMode::Vfs, self.i18n.t(I18nKey::VfsMode), self.i18n.t(I18nKey::VfsModeHover)),
+                (
+                    DataMode::Manual,
+                    self.i18n.t(I18nKey::ManualMode),
+                    self.i18n.t(I18nKey::ManualModeHover),
+                ),
+            ];
+
+            for (mode, label, hover) in items {
+                if ui
+                    .radio_value(&mut self.settings.behavior.mode, mode, label)
+                    .on_hover_text(hover)
+                    .clicked()
+                {
+                    self.update_mod_list();
+                }
+            }
         });
     }
 
@@ -153,6 +112,51 @@ impl App {
                         {
                             #[cfg(target_os = "windows")]
                             self.update_vfs_skyrim_data_dir_by_reg();
+                        }
+                    }
+                });
+        });
+    }
+
+    /// debug output, auto-remove meshes, generate FNIS ESP, auto-run,
+    fn ui_behavior_options(&mut self, ui: &mut egui::Ui) {
+        for (value, label, hover) in [
+            (
+                &mut self.settings.behavior.enable_debug_output,
+                I18nKey::DebugOutput,
+                I18nKey::DebugOutputHover,
+            ),
+            (
+                &mut self.settings.behavior.auto_remove_meshes,
+                I18nKey::AutoRemoveMeshes,
+                I18nKey::AutoRemoveMeshesHover,
+            ),
+            (
+                &mut self.settings.behavior.generate_fnis_esp,
+                I18nKey::GenerateFnisEspLabel,
+                I18nKey::GenerateFnisEspHover,
+            ),
+            (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
+        ] {
+            checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
+        }
+    }
+
+    /// Renders the theme combo box (System / Dark / Light).
+    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(self.i18n.t(I18nKey::ThemeLabel))
+                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
+
+            egui::ComboBox::from_id_salt("theme")
+                .selected_text(self.settings.ui.theme.as_str())
+                .show_ui(ui, |ui| {
+                    for theme in [Theme::System, Theme::Dark, Theme::Light] {
+                        if ui
+                            .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
+                            .changed()
+                        {
+                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
                         }
                     }
                 });
@@ -355,7 +359,7 @@ fn path_text_edit(
     value: &mut String,
     transparent: bool,
     hint: Option<&str>,
-) -> Response {
+) -> egui::Response {
     let mut edit = egui::TextEdit::singleline(value);
 
     if let Some(hint) = hint {

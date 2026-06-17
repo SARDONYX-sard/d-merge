@@ -15,25 +15,17 @@ impl App {
     /// then spawns a worker thread.  Any in-flight fetch is implicitly
     /// superseded — the worker always writes to the same shared state, so only
     /// the last result matters.
-    ///
-    /// # Panics
-    /// Never panics; errors inside the worker are logged and surfaced as
-    /// [`FetchState::Error`].
-    pub(crate) fn update_mod_list(&mut self) {
+    pub(crate) fn update_mod_list(&self) {
         tracing::debug!("`update_mod_list` has been called.");
 
-        self.mod_list_msg = (
-            self.i18n.t(I18nKey::ModsListFetchStateFetching).to_string(),
-            crate::app::patch::EGUI_RIGHT_BLUE,
-        );
         *self.fetch_state.write() = FetchState::Fetching;
 
-        let start_time = std::time::Instant::now();
         let dir = self.settings.current_skyrim_data_dir().to_owned();
         let use_vfs = self.settings.behavior.mode == DataMode::Vfs;
-
         let state = Arc::clone(&self.fetch_state);
         let fetched_mod_info = Arc::clone(&self.fetched_mod_info);
+
+        let start_time = std::time::Instant::now();
 
         std::thread::spawn(move || {
             // NOTE: If rayon saturates all CPU threads the UI freezes.
@@ -65,6 +57,12 @@ impl App {
         };
 
         match *state {
+            FetchState::Fetching => {
+                self.mod_list_msg = (
+                    self.i18n.t(I18nKey::ModsListFetchStateFetching).to_string(),
+                    crate::app::patch::EGUI_RIGHT_BLUE,
+                );
+            }
             FetchState::Done { elapsed } => {
                 let elapsed_secs = elapsed.as_secs_f32();
                 drop(state);
@@ -123,7 +121,7 @@ impl App {
                 );
             }
 
-            FetchState::Fetching | FetchState::Idle => {}
+            FetchState::Idle => {}
         }
     }
 
