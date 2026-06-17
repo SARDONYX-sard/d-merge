@@ -1,29 +1,4 @@
 //! Background mod-list fetcher.
-//!
-//! # Responsibilities
-//! - [`App::update_mod_list`] — spawns a worker thread that calls
-//!   `mod_info::get_all` and writes the result into shared state.
-//! - [`App::poll_fetch_result`] — called every frame; consumes terminal
-//!   [`FetchState`] variants and applies them to [`App`].
-//! - [`App::draw_skyrim_dir_ui`] — the text-edit + first-render trigger
-//!   that lives alongside fetch logic because it is the primary call-site
-//!   for `update_mod_list`.
-//!
-//! # Threading model
-//! ```text
-//! UI thread                         worker thread
-//! ─────────────────────────────     ──────────────────────────────
-//! update_mod_list()
-//!   write FetchState::Fetching
-//!   std::thread::spawn ──────────▶  mod_info::get_all(dir)
-//!                                     write FetchState::Done | Empty | Error
-//! poll_fetch_result()  ◀── every frame
-//!   try_read FetchState
-//!   if terminal → consume + write Idle
-//! ```
-//!
-//! The worker never touches `App` directly; all communication goes through
-//! `Arc<RwLock<FetchState>>` and `Arc<RwLock<Vec<ModInfo>>>`.
 
 use std::sync::Arc;
 

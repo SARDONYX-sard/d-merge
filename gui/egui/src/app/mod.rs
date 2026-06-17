@@ -1,31 +1,4 @@
 //! Root of the application module.
-//!
-//! This file contains exactly three things:
-//!
-//! 1. **[`App`] struct** — the single source of truth for all runtime state.
-//! 2. **[`App::from_settings`]** — the only constructor.
-//! 3. **[`eframe::App`] impl** — the egui frame loop entry point (`update`)
-//!    and shutdown hook (`on_exit`).
-//!
-//! Everything else is delegated to sub-modules:
-//!
-//! | module              | responsibility                                  |
-//! |---------------------|-------------------------------------------------|
-//! | [`state`]           | `FetchState`, `DataMode` type definitions       |
-//! | [`fetch`]           | mod-list background fetch + poll                |
-//! | [`patch`]           | behavior-gen task + poll + mesh removal         |
-//! | [`notify`]          | notification bar helpers                        |
-//! | [`dir_utils`]       | path-walking / OS open utilities                |
-//! | [`ui::top_panels`]  | execution mode, directory rows, search bar      |
-//! | [`ui::bottom_panel`]| notification bar, action buttons, log level     |
-//! | [`ui::mod_list`]    | central table, sorting, filtering, DnD          |
-//! | [`ui::windows`]     | log viewer, help dialog, confirm dialog         |
-//!
-//! # Frame loop
-//! [`eframe::App::update`] is called once per frame.  Its only job is to
-//! poll background tasks and dispatch to the `ui_*` methods in the order
-//! that egui requires (top panels → bottom panels → central panel →
-//! floating windows).  No rendering logic lives here.
 
 pub(crate) mod fetch;
 pub(crate) mod log;
@@ -42,16 +15,6 @@ use eframe::egui;
 use parking_lot::RwLock;
 
 /// Central application state.
-///
-/// Fields are grouped by concern.  Only fields that must survive across
-/// frames (i.e. cannot be recomputed from [`AppSettings`] alone) live here.
-///
-/// # Ownership conventions
-/// - Fields wrapped in `Arc<RwLock<_>>` are shared with background threads.
-///   The UI thread always uses `try_read` / non-blocking access.
-/// - Fields wrapped in `Arc<AtomicBool>` are shared with the deferred log
-///   viewport closure, which cannot hold a `&mut App` reference.
-/// - All other fields are owned exclusively by the UI thread.
 pub(crate) struct App {
     // ── Persisted settings ────────────────────────────────────────────────────
     /// All user-configurable settings; serialized to disk on exit.
@@ -181,10 +144,10 @@ impl eframe::App for App {
         // ── Background task polling ───────────────────────────────────────────
         self.poll_fetch_result(ctx);
         self.poll_patch_result();
+        self.update_window_info(ctx);
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
         self.start_log_watcher(ctx);
-        self.update_window_info(ctx);
 
         // ── Top panels (outermost → innermost) ────────────────────────────────
         self.ui_execution_mode(ctx);

@@ -1,20 +1,4 @@
 //! Behavior-generation (patch) runner.
-//!
-//! # Responsibilities
-//! - [`App::patch`] — assembles [`nemesis_merge::Config`] from current
-//!   settings and spawns the async task on [`App::async_rt`].
-//! - [`App::poll_patch_result`] — called every frame; reads the latest
-//!   [`nemesis_merge::Status`] and forwards it to the notification bar.
-//! - [`App::remove_meshes_dir_all`] — optional pre-patch cleanup of the
-//!   output `meshes/` directory, with a safety guard against accidental
-//!   deletion inside the Skyrim data directory.
-//!
-//! # Async model
-//! `nemesis_merge::behavior_gen` is a `Future` driven by the dedicated
-//! `tokio` runtime stored in [`App::async_rt`].  Progress is reported
-//! through a `status_report` callback that writes into
-//! `Arc<RwLock<Option<nemesis_merge::Status>>>`.  The UI thread reads this
-//! every frame via `try_read` — never blocking.
 
 use std::sync::{Arc, atomic::Ordering};
 

@@ -1,14 +1,4 @@
-// app/notify.rs
-
-//! Notification bar helpers.
-//!
-//! The notification bar is the single-line [`egui::TopBottomPanel`] pinned to
-//! the very bottom of the window.  It shows the most recent status message
-//! with an associated color (white = info, green = success, red = error).
-//!
-//! These methods live here rather than in `app/mod.rs` to keep each file
-//! focused on one concern.  The actual *rendering* of the bar is in
-//! `app/ui/bottom_panel.rs`.
+//! Notification bar
 
 use egui::Color32;
 

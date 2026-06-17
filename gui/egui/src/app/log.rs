@@ -1,3 +1,4 @@
+//! Logging ui
 use std::{
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Seek as _, SeekFrom},
