@@ -15,6 +15,7 @@
 use std::{borrow::Cow, path::Path};
 
 use d_merge_gui_shared::{
+    fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
     settings::ui::FontMode,
 };
@@ -551,7 +552,11 @@ fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<Str
     let PathSelector { ui, label, value, select_label, reload_label, reload_hover, clear_label } =
         selector;
 
-    ui.label(label);
+    if ui.button(label).on_hover_text(value.as_str()).clicked()
+        && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(value))
+    {
+        tracing::error!(err);
+    }
 
     let mut reload_clicked = false;
 
