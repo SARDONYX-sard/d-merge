@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-06-18
+### :sparkles: New Features
+- [`5012f2c`](https://github.com/SARDONYX-sard/d-merge/commit/5012f2c4d5254543f8297a8ba4df1cfa99c180a3) - **egui**: add font selector & help overlay *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`92d2737`](https://github.com/SARDONYX-sard/d-merge/commit/92d2737fad3b5c5b19e8cb40aae7d9db8e03c173) - **egui**: change label to button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`81769b9`](https://github.com/SARDONYX-sard/d-merge/commit/81769b9255ee3e9fd3180bca77b2bb4b4d01ae21) - fix mod type searcher *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4b6ad9e`](https://github.com/SARDONYX-sard/d-merge/commit/4b6ad9e736c882ab77c636eb2fa131990c93b7b7) - **egui**: fix an issue where the priority column shifts to the right when selecting a Ming typeface *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4bff367`](https://github.com/SARDONYX-sard/d-merge/commit/4bff3677839a2cccb850aaf9c0fe1d852f3beeb1) - **egui**: fix rfd i18n path dir *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`3ae623a`](https://github.com/SARDONYX-sard/d-merge/commit/3ae623a86333d59511e49f25a21fe604a53c1dc2) - refactor imports *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2aa0f7f`](https://github.com/SARDONYX-sard/d-merge/commit/2aa0f7f46fcb036655304e4ea88ae500cb279c3f) - **egui**: separate top options *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`8b84ea6`](https://github.com/SARDONYX-sard/d-merge/commit/8b84ea6fb2907fe345b95eb3f1e8f290f60b9c2e) - **egui**: remove unnecessary comments after refactoring *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a26a864`](https://github.com/SARDONYX-sard/d-merge/commit/a26a86430dd0f76fc0cb416c1aac860c2b4c4ba9) - **cargo**: bump up pyo3 *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.1.0] - 2026-06-15
 ### :sparkles: New Features
 - [`6fb370f`](https://github.com/SARDONYX-sard/d-merge/commit/6fb370fbbbbfe7050a521f7753fb384d99ecbdce) - **log**: add reload log path button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -534,3 +553,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.0.0]: https://github.com/SARDONYX-sard/d-merge/compare/1.8.0...2.0.0
 [2.0.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.0...2.0.1
 [2.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.1...2.1.0
+[2.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.1.0...2.2.0
