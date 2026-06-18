@@ -3,7 +3,7 @@ name: Release GUI
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 env:
   APP_NAME: d_merge
@@ -96,6 +96,33 @@ jobs:
           path: |
             ./build/
 
+  # --------------------------------------------------------------------------------------------------------------------
+  translations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build translations artifact
+        shell: bash
+        run: |
+          mkdir -p build
+
+          for file in locales/egui/*/translation.json; do
+            lang=$(basename "$(dirname "$file")")
+
+            mkdir -p "build/$lang/.d_merge"
+            cp "$file" "build/$lang/.d_merge/translation.json"
+          done
+
+      - name: Upload translations
+        uses: actions/upload-artifact@v7
+        with:
+          name: translations
+          include-hidden-files: true
+          path: build/
+
+  # --------------------------------------------------------------------------------------------------------------------
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -108,6 +135,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
+          skip-decompress: true
           path: dist
 
       # --------------------
@@ -127,9 +155,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" dist/**/* \
+          cat > release_notes.md <<'EOF'
+          ${{ steps.changelog.outputs.changes }}
+          EOF
+
+          gh release create "${{ github.ref_name }}" dist/*.zip \
             --title "${{ env.APP_NAME }} v${{ github.ref_name }}" \
-            --notes "${{ steps.changelog.outputs.changes }}"
+            --notes-file release_notes.md
 
       # --------------------
       # commit changelog
