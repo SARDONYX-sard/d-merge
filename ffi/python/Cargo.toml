@@ -18,9 +18,9 @@ name = "d_merge_python"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = "0.28.3"
-pyo3-async-runtimes = { version = "0.28.0", features = ["attributes", "tokio-runtime"] }
-pyo3-stub-gen = "0.22.3"
+pyo3 = "0.29.0"
+pyo3-async-runtimes = { version = "0.29.0", features = ["attributes", "tokio-runtime"] }
+pyo3-stub-gen = "0.23.0"
 
 rayon = { workspace = true }
 tracing = { workspace = true }
