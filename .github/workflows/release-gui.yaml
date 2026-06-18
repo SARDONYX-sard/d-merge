@@ -159,7 +159,7 @@ jobs:
           ${{ steps.changelog.outputs.changes }}
           EOF
 
-          gh release create "${{ github.ref_name }}" dist/*.zip \
+          gh release create "${{ github.ref_name }}" dist/**/*.zip \
             --title "${{ env.APP_NAME }} v${{ github.ref_name }}" \
             --notes-file release_notes.md
 

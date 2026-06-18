@@ -1296,7 +1296,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -1321,7 +1321,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_egui"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "d_merge_gui_shared",
  "dashmap",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_gui_shared"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "d_merge_gui_shared_derive",
  "gh_issue_link",
@@ -1370,7 +1370,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_gui_shared_derive"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "quote",
  "syn 2.0.118",
@@ -1378,7 +1378,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_python"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -2197,7 +2197,7 @@ checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
 
 [[package]]
 name = "fnis_list"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "bitflags 2.13.0",
  "skyrim_anim_parser",
@@ -3628,7 +3628,7 @@ dependencies = [
 
 [[package]]
 name = "jwalk_glob"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "jwalk",
  "num_cpus",
