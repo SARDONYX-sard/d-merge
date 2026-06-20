@@ -6,42 +6,46 @@ use d_merge_gui_shared::{
     mod_item::{self, ModItem},
     settings::{DataMode, mod_list_ui::SortColumn},
 };
-use egui::Button;
 use rayon::prelude::*;
 
 use crate::{
     app::App,
-    ui::dnd_table::{check_only_table_body, dnd_table_body},
+    ui::{
+        dnd_table::{check_only_table_body, dnd_table_body},
+        shadcn_compat::{button, button_with_icon, enum_options, heading, icon, lock_button, text},
+    },
 };
 
 impl App {
     /// Renders the central panel containing the mod list table.
     pub(crate) fn ui_mod_list(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::CentralPanel::default();
-        if self.settings.ui.transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+        let panel = super::themed_central_panel(
+            egui::CentralPanel::default(),
+            self.settings.ui.theme,
+            self.settings.ui.transparent,
+        );
 
         panel.show(ctx, |ui| {
+            ui.add_space(20.0);
+
             ui.horizontal(|ui| {
-                ui.heading(self.i18n.t(I18nKey::ModsListTitle))
+                ui.add(heading(self.i18n.t(I18nKey::ModsListTitle)))
                     .on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
 
-                ui.add_space(50.0);
-                self.ui_search_panel(ui);
+                ui.separator();
+                self.ui_search_bar(ui);
+
                 ui.separator();
 
-                if self.is_locked {
-                    let button = Button::new(self.i18n.t(I18nKey::LockButton));
-                    let hover_text = self.i18n.t(I18nKey::LockButtonHover);
-
-                    if ui.add_sized([60.0, 40.0], button).on_hover_text(hover_text).clicked() {
-                        self.unlock_readonly_table();
-                    }
-                }
-
+                // -- Normalize Button
                 if ui
-                    .add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::NormalizeButton)))
+                    .add_sized(
+                        [90.0, 40.0],
+                        button_with_icon(
+                            self.i18n.t(I18nKey::NormalizeButton),
+                            egui_shadcn::LucideIcon::TextAlignJustify,
+                        ),
+                    )
                     .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
                     .clicked()
                 {
@@ -51,25 +55,24 @@ impl App {
                     }
                 }
 
-                let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
-                if ui
-                    .add_enabled_ui(!is_fetching, |ui| {
-                        ui.add_sized(
-                            [60.0, 40.0],
-                            Button::new(format!("🔄 {}", self.i18n.t(I18nKey::ReloadButton))),
-                        )
-                    })
-                    .inner
-                    .clicked()
-                {
-                    self.update_mod_list();
+                // -- Lock Button
+                if self.is_locked {
+                    let button = lock_button(self.i18n.t(I18nKey::LockButton));
+                    let hover_text = self.i18n.t(I18nKey::LockButtonHover);
+
+                    if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
+                        self.unlock_readonly_table();
+                    }
+                } else {
+                    ui.add_space(98.0);
                 }
 
-                ui.add_visible(is_fetching, egui::Spinner::new());
+                ui.separator();
+                if self.reload_button(ui) {
+                    ui.add(egui::Spinner::new());
+                }
                 ui.colored_label(self.mod_list_msg.1, self.mod_list_msg.0.clone());
             });
-
-            ui.separator();
 
             let mut filtered = self.filtered_mod_ids();
             self.sort_filtered_mods(&mut filtered);
@@ -81,37 +84,52 @@ impl App {
         });
     }
 
-    /// Renders the search bar: filter text field, column selector, and lock button.
-    pub(crate) fn ui_search_panel(&mut self, ui: &mut egui::Ui) {
-        ui.label(self.i18n.t(I18nKey::SearchLabel));
+    pub(crate) fn handle_shortcuts(&self, ctx: &egui::Context) {
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::R)) {
+            self.update_mod_list();
+        }
+    }
 
-        let text_line = egui::TextEdit::singleline(&mut self.settings.ui.mod_list.filter_text);
-        let text_line = if self.settings.ui.transparent {
-            text_line.background_color(egui::Color32::TRANSPARENT)
+    fn reload_button(&self, ui: &mut egui::Ui) -> bool {
+        // -- Reload Button
+        let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
+        if is_fetching {
+            egui_shadcn::Button::icon_only(egui_shadcn::LucideIcon::RefreshCwOff)
+                .enabled(false)
+                .variant(egui_shadcn::ButtonVariant::Outline)
+                .size(egui_shadcn::ComponentSize::Lg)
+                .show(ui);
         } else {
-            text_line
-        };
-        ui.add_sized([300.0, 40.0], text_line);
+            if egui_shadcn::Button::icon_only(egui_shadcn::LucideIcon::RefreshCcw)
+                .variant(egui_shadcn::ButtonVariant::Outline)
+                .size(egui_shadcn::ComponentSize::Lg)
+                .show(ui)
+                .on_hover_text(format!("{} (Ctrl + R)", self.i18n.t(I18nKey::ReloadButton)))
+                .clicked()
+            {
+                self.update_mod_list();
+            }
+        }
 
-        if ui.add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::ClearButton))).clicked() {
+        is_fetching
+    }
+
+    /// Renders the search bar: filter text field, column selector
+    fn ui_search_bar(&mut self, ui: &mut egui::Ui) {
+        icon(ui, &egui_shadcn::LucideIcon::Search);
+        let search_hint = format!("{}...", self.i18n.t(I18nKey::SearchLabel));
+        text(ui, &mut self.settings.ui.mod_list.filter_text, Some(&search_hint), 300.0);
+
+        if ui.add_sized([60.0, 40.0], button(self.i18n.t(I18nKey::ClearButton))).clicked() {
             self.settings.ui.mod_list.filter_text.clear();
         }
 
-        let all_label = self.i18n.t(I18nKey::FilterTextAll);
-        let id_label = self.i18n.t(I18nKey::ColumnId);
-        let name_label = self.i18n.t(I18nKey::ColumnName);
-        let mod_type_label = self.i18n.t(I18nKey::ColumnModType);
-        let site_label = self.i18n.t(I18nKey::ColumnSite);
-        let priority_label = self.i18n.t(I18nKey::ColumnPriority);
-
-        let selected_text = match self.settings.ui.mod_list.filter_column {
-            None => all_label,
-            Some(SortColumn::Id) => id_label,
-            Some(SortColumn::Name) => name_label,
-            Some(SortColumn::ModType) => mod_type_label,
-            Some(SortColumn::Site) => site_label,
-            Some(SortColumn::Priority) => priority_label,
-        };
+        let all_label = self.i18n.t(I18nKey::FilterTextAll).to_string();
+        let id_label = self.i18n.t(I18nKey::ColumnId).to_string();
+        let name_label = self.i18n.t(I18nKey::ColumnName).to_string();
+        let mod_type_label = self.i18n.t(I18nKey::ColumnModType).to_string();
+        let site_label = self.i18n.t(I18nKey::ColumnSite).to_string();
+        let priority_label = self.i18n.t(I18nKey::ColumnPriority).to_string();
 
         let items = [
             (None, all_label),
@@ -122,20 +140,13 @@ impl App {
             (Some(SortColumn::Priority), priority_label),
         ];
 
-        egui::ComboBox::from_id_salt("filter_column").selected_text(selected_text).show_ui(
-            ui,
-            |ui| {
-                for (value, label) in items {
-                    ui.selectable_value(&mut self.settings.ui.mod_list.filter_column, value, label);
-                }
-            },
-        );
+        enum_options(ui, &mut self.settings.ui.mod_list.filter_column, &items, Some([100.0, 30.0]));
     }
 
     /// Toggles or changes the active sort column.
     ///
     /// Clicking the same column reverses direction; clicking a different column resets to ascending..
-    pub(crate) fn toggle_sort(&mut self, column: SortColumn) {
+    fn toggle_sort(&mut self, column: SortColumn) {
         if self.settings.ui.mod_list.sort_column == column {
             self.settings.ui.mod_list.sort_asc = !self.settings.ui.mod_list.sort_asc;
         } else {
@@ -219,31 +230,39 @@ impl App {
             .max_width(total_width)
             .scroll_bar_rect(egui::Rect::everything_above(20.0))
             .show(ui, |ui| {
-                egui_extras::TableBuilder::new(ui)
-                    .striped(true)
-                    .column(egui_extras::Column::auto().resizable(true)) // checkbox
-                    .column(Self::resizable_column(total_width, 0.20, changed_width)) // id
-                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // name
-                    .column(Self::resizable_column(total_width, 0.07, changed_width)) // mod type
-                    .column(Self::resizable_column(total_width, 0.30, changed_width)) // site
-                    .column(Self::resizable_column(total_width, 0.03, changed_width)) // priority
-                    .header(20.0, |mut header| self.render_table_header(&mut header))
-                    .body(|mut body| {
-                        let mut widths = [0.0_f32; 6];
-                        widths.clone_from_slice(body.widths());
+                ui.add_space(8.0);
+                let margin = 8.0;
+                ui.add_space(margin);
+                let table_width = ui.available_width() - margin;
+                let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(margin, 0.0));
 
-                        let mod_list = if self.last_fetch_was_empty {
-                            &mut vec![]
-                        } else {
-                            self.settings.mod_list_mut()
-                        };
+                ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                    egui_extras::TableBuilder::new(ui)
+                        .striped(true)
+                        .column(egui_extras::Column::auto().resizable(true)) // checkbox
+                        .column(Self::resizable_column(table_width, 0.20, changed_width)) // id
+                        .column(Self::resizable_column(table_width, 0.30, changed_width)) // name
+                        .column(Self::resizable_column(table_width, 0.07, changed_width)) // mod type
+                        .column(Self::resizable_column(table_width, 0.30, changed_width)) // site
+                        .column(Self::resizable_column(table_width, 0.03, changed_width)) // priority
+                        .header(20.0, |mut header| self.render_table_header(&mut header))
+                        .body(|mut body| {
+                            let mut widths = [0.0_f32; 6];
+                            widths.clone_from_slice(body.widths());
 
-                        if editable {
-                            dnd_table_body(body.ui_mut(), mod_list, widths);
-                        } else {
-                            check_only_table_body(&mut body, filtered_mods, mod_list, widths);
-                        }
-                    });
+                            let mod_list = if self.last_fetch_was_empty {
+                                &mut vec![]
+                            } else {
+                                self.settings.mod_list_mut()
+                            };
+
+                            if editable {
+                                dnd_table_body(&mut body, mod_list, widths);
+                            } else {
+                                check_only_table_body(&mut body, filtered_mods, mod_list, widths);
+                            }
+                        });
+                });
             });
     }
 

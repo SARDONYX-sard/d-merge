@@ -1,11 +1,14 @@
 use d_merge_gui_shared::mod_item::ModItem;
 use eframe::egui::{self};
+use egui_extras::TableBody;
 use rayon::prelude::*;
 
 use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
 
 /// Handle drag-and-drop reordering of mods.
-pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [f32; 6]) {
+pub(crate) fn dnd_table_body(body: &mut TableBody, items: &mut [ModItem], widths: [f32; 6]) {
+    let ui = body.ui_mut();
+
     let checkbox_rect = [widths[0], ROW_HEIGHT];
     let w_path = widths[1];
     let w_name = widths[2];
@@ -13,25 +16,27 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
     let w_site = widths[4];
     let priority_size = [widths[5], ROW_HEIGHT];
 
-    let row_width = widths.iter().sum::<f32>() + 33.0;
+    let row_width = widths.iter().sum::<f32>() + 38.0;
 
     let response =
         egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
-            // Since body cannot be used, stripe must be implemented manually.
-            let bg_color = if state.index.is_multiple_of(2) {
-                ui.style().visuals.widgets.active.bg_fill
-            } else {
-                ui.visuals().widgets.noninteractive.bg_fill // gray
-            }
-            .gamma_multiply(0.5);
-
             let row_rect = ui
                 .allocate_rect(
                     egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(row_width, ROW_HEIGHT)),
                     egui::Sense::hover(),
                 )
                 .rect;
-            ui.painter().rect_filled(row_rect, 0.0, bg_color);
+
+            // Stripe must be implemented manually.
+            let bg_color = if state.index.is_multiple_of(2) {
+                // ui.visuals().faint_bg_color // default table stripe
+                ui.style().visuals.widgets.active.bg_fill.gamma_multiply(0.5) // gray
+            } else if state.dragged {
+                ui.style().visuals.widgets.active.bg_fill
+            } else {
+                egui::Color32::TRANSPARENT
+            };
+            ui.painter().rect_filled(row_rect, egui::CornerRadius::ZERO, bg_color);
 
             ui.scope_builder(egui::UiBuilder::new().max_rect(row_rect), |ui| {
                 ui.horizontal(|ui| {
@@ -61,7 +66,7 @@ pub(crate) fn dnd_table_body(ui: &mut egui::Ui, items: &mut [ModItem], widths: [
 /// This table is read-only for all fields except the `enabled` checkbox.
 /// Useful for displaying filtered or sorted items where drag-and-drop is disabled.
 pub(crate) fn check_only_table_body(
-    body: &mut egui_extras::TableBody,
+    body: &mut TableBody,
     filtered_ids: &[ModItem],
     original_items: &mut [ModItem],
     widths: [f32; 6],

@@ -73,17 +73,39 @@ fn main() -> Result<(), eframe::Error> {
                     crate::fonts::FontError::Error(msg) => tracing::error!(msg),
                 }
             }
-            cc.egui_ctx.set_theme(to_egui_theme(settings.ui.theme));
+            set_theme(&cc.egui_ctx, settings.ui.theme, settings.ui.transparent);
 
             Ok(Box::new(self::app::App::from_settings(settings)))
         }),
     )
 }
 
-pub(crate) const fn to_egui_theme(theme: Theme) -> egui::ThemePreference {
-    match theme {
+pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, transparent: bool) {
+    ctx.set_theme(match theme {
         Theme::System => egui::ThemePreference::System,
         Theme::Dark => egui::ThemePreference::Dark,
         Theme::Light => egui::ThemePreference::Light,
-    }
+    });
+
+    // NOTE: I made a few changes to the code for fine-tuning the theme because it was hard to read when viewed in the GUI.
+    let theme = match theme {
+        Theme::System | Theme::Dark => {
+            let mut theme = egui_shadcn::theme::shadcn_theme_dark::dark();
+            theme.foreground = egui::Color32::from_rgb(200, 200, 200);
+            if transparent {
+                theme.background = egui::Color32::from_rgb(46, 46, 46).gamma_multiply(0.8); // button bg
+                theme.muted = egui::Color32::from_rgb(20, 20, 20).gamma_multiply(0.8); // button hover
+            }
+            theme
+        }
+        Theme::Light => {
+            let mut theme = egui_shadcn::theme::shadcn_theme_light::light();
+            if !transparent {
+                theme.muted = egui::Color32::from_rgb(190, 190, 190).gamma_multiply(0.8); // button hover
+            }
+            theme
+        }
+    };
+
+    egui_shadcn::ShadcnThemeExt::set_shadcn_theme(ctx, theme);
 }

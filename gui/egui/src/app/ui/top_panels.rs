@@ -1,14 +1,4 @@
 //! Top-panel UI: execution mode, directory pickers, and search bar.
-//!
-//! All four panels are [`egui::TopBottomPanel::top`] and must be registered
-//! before the [`egui::CentralPanel`] in [`eframe::App::update`].
-//!
-//! # Transparent mode
-//! When [`AppSettings::transparent`] is `true` every panel is built with
-//! [`egui::Frame::new()`] (no background fill) so the OS window chrome shows
-//! through.  The pattern `if transparent { panel.frame(Frame::new()) }` is
-//! repeated per panel because [`egui::TopBottomPanel`] consumes `self` on
-//! each builder call and cannot be stored across the branch.
 
 use d_merge_gui_shared::{
     fetch::FetchState,
@@ -16,8 +6,13 @@ use d_merge_gui_shared::{
     i18n::I18nKey,
     settings::{DataMode, ui::Theme},
 };
+use egui::Label;
 
-use crate::app::App;
+use crate::{
+    app::App,
+    set_theme,
+    ui::shadcn_compat::{button, button_with_icon, enum_select, radio_value},
+};
 
 impl App {
     /// Renders the execution-mode radio buttons and global option checkboxes.
@@ -25,10 +20,11 @@ impl App {
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
     pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_execution_mode");
-        if self.settings.ui.transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+        let panel = super::themed_top_bottom_panel(
+            egui::TopBottomPanel::top("ui_top_options"),
+            self.settings.ui.theme,
+            self.settings.ui.transparent,
+        );
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -42,23 +38,26 @@ impl App {
                 ui.add_space(60.0);
                 ui.separator();
 
+                if checkbox(
+                    ui,
+                    &mut self.settings.ui.transparent,
+                    self.i18n.t(I18nKey::Transparent),
+                )
+                .on_hover_text(self.i18n.t(I18nKey::TransparentHover))
+                .changed()
                 {
-                    let (value, label, hover) = (
-                        &mut self.settings.ui.transparent,
-                        I18nKey::Transparent,
-                        I18nKey::TransparentHover,
-                    );
-                    checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
+                    set_theme(ui.ctx(), self.settings.ui.theme, self.settings.ui.transparent);
                 }
-                self.ui_theme_box(ui);
-            });
 
-            ui.add_space(8.0);
+                self.ui_theme_box(ui);
+
+                ui.add_space(8.0);
+            });
         });
     }
 
     fn ui_execution_mode(&mut self, ui: &mut egui::Ui) {
-        ui.label(self.i18n.t(I18nKey::ExecutionModeLabel));
+        ui.add(Label::new(self.i18n.t(I18nKey::ExecutionModeLabel)));
 
         let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
         ui.add_enabled_ui(!is_fetching, |ui| {
@@ -72,8 +71,7 @@ impl App {
             ];
 
             for (mode, label, hover) in items {
-                if ui
-                    .radio_value(&mut self.settings.behavior.mode, mode, label)
+                if radio_value(ui, &mut self.settings.behavior.mode, mode, label)
                     .on_hover_text(hover)
                     .clicked()
                 {
@@ -89,32 +87,26 @@ impl App {
     /// auto-detect of the data directory (Windows only).
     fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(self.i18n.t(I18nKey::RuntimeTargetLabel))
+            ui.add(Label::new(self.i18n.t(I18nKey::RuntimeTargetLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::RuntimeTargetHover));
 
-            egui::ComboBox::from_id_salt("skyrim_runtime_target")
-                .selected_text(self.settings.behavior.target_runtime.as_str())
-                .show_ui(ui, |ui| {
-                    let runtimes = [
-                        (skyrim_data_dir::Runtime::Le, "SkyrimLE"),
-                        (skyrim_data_dir::Runtime::Se, "SkyrimSE"),
-                        (skyrim_data_dir::Runtime::Vr, "SkyrimVR"),
-                    ];
-                    for (runtime, label) in runtimes {
-                        if ui
-                            .selectable_value(
-                                &mut self.settings.behavior.target_runtime,
-                                runtime,
-                                label,
-                            )
-                            .changed()
-                            && self.settings.behavior.mode == DataMode::Vfs
-                        {
-                            #[cfg(target_os = "windows")]
-                            self.update_vfs_skyrim_data_dir_by_reg();
-                        }
-                    }
-                });
+            const RUNTIMES: [(skyrim_data_dir::Runtime, &str); 3] = [
+                (skyrim_data_dir::Runtime::Le, skyrim_data_dir::Runtime::Le.as_str()),
+                (skyrim_data_dir::Runtime::Se, skyrim_data_dir::Runtime::Se.as_str()),
+                (skyrim_data_dir::Runtime::Vr, skyrim_data_dir::Runtime::Vr.as_str()),
+            ];
+            if enum_select(
+                ui,
+                &mut self.settings.behavior.target_runtime,
+                &RUNTIMES,
+                Some([100.0, 30.0]),
+            )
+            .changed()
+                && self.settings.behavior.mode == DataMode::Vfs
+            {
+                #[cfg(target_os = "windows")]
+                self.update_vfs_skyrim_data_dir_by_reg();
+            }
         });
     }
 
@@ -145,21 +137,19 @@ impl App {
     /// Renders the theme combo box (System / Dark / Light).
     fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(self.i18n.t(I18nKey::ThemeLabel))
+            ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
-            egui::ComboBox::from_id_salt("theme")
-                .selected_text(self.settings.ui.theme.as_str())
-                .show_ui(ui, |ui| {
-                    for theme in [Theme::System, Theme::Dark, Theme::Light] {
-                        if ui
-                            .selectable_value(&mut self.settings.ui.theme, theme, theme.as_str())
-                            .changed()
-                        {
-                            ui.ctx().set_theme(crate::to_egui_theme(self.settings.ui.theme));
-                        }
-                    }
-                });
+            const THEMES: [(Theme, &str); 3] = [
+                (Theme::System, Theme::System.as_str()),
+                (Theme::Dark, Theme::Dark.as_str()),
+                (Theme::Light, Theme::Light.as_str()),
+            ];
+
+            if enum_select(ui, &mut self.settings.ui.theme, &THEMES, Some([120.0, 30.0])).changed()
+            {
+                set_theme(ui.ctx(), self.settings.ui.theme, self.settings.ui.transparent);
+            }
         });
     }
 
@@ -170,11 +160,11 @@ impl App {
     /// | Output      | path..................|      | ...  |
     /// ```
     pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::top("top_paths");
-
-        if self.settings.ui.transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+        let panel = super::themed_top_bottom_panel(
+            egui::TopBottomPanel::top("top_paths"),
+            self.settings.ui.theme,
+            self.settings.ui.transparent,
+        );
 
         panel.show(ctx, |ui| {
             self.ui_skyrim_dir_row(ui);
@@ -192,7 +182,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    egui::Button::new(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
+                    button(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
                 )
                 .clicked()
                 && let Err(err) =
@@ -207,7 +197,10 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        egui::Button::new(self.i18n.t(I18nKey::SelectButton)),
+                        button_with_icon(
+                            self.i18n.t(I18nKey::SelectButton),
+                            egui_shadcn::LucideIcon::FolderSearch,
+                        ),
                     )
                     .clicked()
                 {
@@ -230,7 +223,10 @@ impl App {
                         if ui
                             .add_sized(
                                 [BUTTON_WIDTH, BUTTON_HEIGHT],
-                                egui::Button::new(self.i18n.t(I18nKey::AutoDetectButton)),
+                                button_with_icon(
+                                    self.i18n.t(I18nKey::AutoDetectButton),
+                                    egui_shadcn::LucideIcon::ScanSearch,
+                                ),
                             )
                             .on_hover_text(self.i18n.t(I18nKey::AutoDetectHover))
                             .clicked()
@@ -293,7 +289,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    egui::Button::new(self.i18n.t(I18nKey::OutputDirLabel)),
+                    button(self.i18n.t(I18nKey::OutputDirLabel)),
                 )
                 .clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
@@ -309,7 +305,10 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        egui::Button::new(self.i18n.t(I18nKey::SelectButton)),
+                        button_with_icon(
+                            self.i18n.t(I18nKey::SelectButton),
+                            egui_shadcn::LucideIcon::FolderSearch,
+                        ),
                     )
                     .clicked()
                 {
@@ -345,11 +344,11 @@ fn checkbox(
     checked: &mut bool,
     label: impl Into<egui::WidgetText>,
 ) -> egui::Response {
-    ui.add(egui::Checkbox::new(checked, label))
+    ui.add(egui_shadcn::Checkbox::new(checked).label(label))
 }
 
 const LABEL_WIDTH: f32 = 140.0;
-const BUTTON_WIDTH: f32 = 70.0;
+const BUTTON_WIDTH: f32 = 90.0;
 const ROW_HEIGHT: f32 = 40.0;
 const BUTTON_HEIGHT: f32 = 32.0;
 const RIGHT_MARGIN: f32 = 8.0;
@@ -360,15 +359,12 @@ fn path_text_edit(
     transparent: bool,
     hint: Option<&str>,
 ) -> egui::Response {
-    let mut edit = egui::TextEdit::singleline(value);
+    let _ = transparent;
+    let mut input = egui_shadcn::Input::new(value).desired_width(ui.available_width());
 
     if let Some(hint) = hint {
-        edit = edit.hint_text(hint);
+        input = input.placeholder(hint);
     }
 
-    if transparent {
-        edit = edit.background_color(egui::Color32::TRANSPARENT);
-    }
-
-    ui.add_sized([ui.available_width(), ROW_HEIGHT], edit)
+    input.show(ui)
 }

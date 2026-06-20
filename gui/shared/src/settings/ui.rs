@@ -80,6 +80,12 @@ impl Theme {
         }
     }
 }
+impl core::fmt::Display for Theme {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
 
 /// Position and size of the main window in logical pixels.
 ///

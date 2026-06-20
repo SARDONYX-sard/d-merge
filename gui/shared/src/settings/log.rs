@@ -1,6 +1,6 @@
 //! Paths shared across both execution modes.
 
-use crate::log::LogLevel;
+use crate::{log::LogLevel, settings::ui::WindowGeometry};
 
 /// Options that logging.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -17,10 +17,16 @@ pub struct LogSettings {
     /// Changes take effect immediately (no restart required) via
     /// `tracing_rotation::global::change_level`.
     pub level: LogLevel,
+
+    pub window: WindowGeometry,
 }
 
 impl Default for LogSettings {
     fn default() -> Self {
-        Self { dir_path: crate::log::LOG_DIR.into(), level: LogLevel::Info }
+        Self {
+            dir_path: crate::log::LOG_DIR.into(),
+            level: LogLevel::Info,
+            window: WindowGeometry::default(),
+        }
     }
 }
