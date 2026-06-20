@@ -32,7 +32,12 @@ fn frame_from_theme(theme: Theme, transparent: bool) -> egui::Frame {
     };
 
     let fill = if transparent {
-        egui::Color32::from_rgb(base.r(), base.g(), base.b()).gamma_multiply(0.6)
+        let color = egui::Color32::from_rgb(base.r(), base.g(), base.b());
+        if matches!(theme, Theme::Light) {
+            color.gamma_multiply(0.6)
+        } else {
+            color.gamma_multiply(0.0)
+        }
     } else {
         base
     };
