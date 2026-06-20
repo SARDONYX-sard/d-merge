@@ -9,10 +9,15 @@ mod ui;
 use std::sync::{Arc, atomic::AtomicBool};
 
 use d_merge_gui_shared::{
-    fetch::FetchState, i18n::I18nMap, patch::PatchProgress, settings::Settings,
+    fetch::FetchState,
+    i18n::I18nMap,
+    patch::PatchProgress,
+    settings::{Settings, ui::WindowGeometry},
 };
 use eframe::egui;
 use parking_lot::RwLock;
+
+use crate::app::log::LogQueueLock;
 
 /// Central application state.
 pub(crate) struct App {
@@ -59,10 +64,13 @@ pub(crate) struct App {
     pub current_log_dir: Option<std::path::PathBuf>,
 
     /// Accumulated log lines tailed from the log file.
-    pub log_lines: Arc<RwLock<Vec<String>>>,
+    pub log_lines: LogQueueLock,
 
     /// `true` once the log-tail watcher thread has been started.
     pub log_watcher_started: bool,
+
+    /// temporary log window settings. save on exit.
+    pub log_window_info: Arc<RwLock<WindowGeometry>>,
 
     /// Shared with the deferred log-viewer viewport; toggled by the log button.
     pub show_log_window: Arc<AtomicBool>,
@@ -96,10 +104,13 @@ impl App {
     /// the built-in English strings on failure.  All background-task state
     /// starts in its idle/empty variant.
     pub(crate) fn from_settings(settings: Settings) -> Self {
-        let i18n = I18nMap::load(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
-            tracing::error!("Failed to load i18n map: {e}\nFallback to default");
-            I18nMap::new()
-        });
+        let i18n =
+            I18nMap::load_with_fallback(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
+                tracing::error!("Failed to load i18n map: {e}\nFallback to default");
+                I18nMap::new()
+            });
+
+        let log_window_info = settings.log.window.clone();
 
         Self {
             settings,
@@ -117,7 +128,8 @@ impl App {
             notify: (String::new(), egui::Color32::WHITE),
 
             current_log_dir: None,
-            log_lines: Arc::new(RwLock::new(Vec::new())),
+            log_lines: LogQueueLock::default(),
+            log_window_info: Arc::new(RwLock::new(log_window_info)),
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
 
@@ -132,28 +144,21 @@ impl App {
 }
 
 impl eframe::App for App {
-    /// Main frame loop.
-    ///
-    /// Called by eframe once per frame.  Order is strict:
-    /// - Background tasks are polled first so UI reflects the latest state.
-    /// - Top panels must be registered before the central panel.
-    /// - Bottom panels must be registered before the central panel.
-    /// - The central panel must be last.
-    /// - Floating windows (viewports, modals) are registered after all panels.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // ── Background task polling ───────────────────────────────────────────
         self.poll_fetch_result(ctx);
         self.poll_patch_result();
         self.update_window_info(ctx);
+        self.handle_shortcuts(ctx);
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
-        self.start_log_watcher(ctx);
+        self.start_log_watcher();
 
-        // ── Top panels (outermost → innermost) ────────────────────────────────
+        // ── Top panels (outermost -> innermost) ────────────────────────────────
         self.ui_top_options(ctx);
         self.ui_paths(ctx);
 
-        // ── Bottom panels (innermost → outermost) ─────────────────────────────
+        // ── Bottom panels (innermost -> outermost) ─────────────────────────────
         // NOTE: egui stacks bottom panels in reverse registration order.
         // `ui_notification` is registered first so it appears below `ui_bottom_panel`.
         self.ui_notification(ctx);
@@ -169,12 +174,8 @@ impl eframe::App for App {
         self.is_first_render = false;
     }
 
-    /// Called by eframe just before the process exits.
-    ///
-    /// Persists [`AppSettings`] to disk.  Tokio tasks and background threads
-    /// are abandoned at this point — they hold no resources that require
-    /// explicit cleanup.
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.settings.log.window = self.log_window_info.read().clone();
         self.settings.save();
     }
 }
@@ -187,39 +188,50 @@ impl App {
     /// maximized, to avoid saving the transient geometry produced during
     /// minimize/restore cycles.
     fn update_window_info(&mut self, ctx: &egui::Context) {
-        let (pos, size, maximized) = ctx.input(|i| {
-            // NOTE: Writing directly to `self` inside this closure would
-            // deadlock (egui holds an internal lock during `input()`).
-            let mut temp_pos = None;
-            let mut temp_size = None;
-            let mut temp_maximized = None;
+        update_window_geometry(ctx, egui::ViewportId::ROOT, &mut self.settings.ui.window);
+    }
+}
 
-            if let Some(info) = i.raw.viewports.get(&egui::ViewportId::ROOT) {
-                temp_maximized = Some(info.maximized.unwrap_or(false));
+pub(crate) fn update_window_geometry(
+    ctx: &egui::Context,
+    viewport_id: egui::ViewportId,
+    geometry: &mut WindowGeometry,
+) {
+    // NOTE: Writing directly to `geometry` inside this closure would
+    // deadlock (egui holds an internal lock during `input()`).
+    let (pos, size, maximized) = ctx.input(|i| {
+        let mut temp_pos = None;
+        let mut temp_size = None;
+        let mut temp_maximized = None;
 
-                if let Some(inner_rect) = info.inner_rect {
-                    temp_size = Some(inner_rect.size());
-                }
-                if let Some(outer_rect) = info.outer_rect {
-                    temp_pos = Some(outer_rect.min);
-                }
+        if let Some(info) = i.raw.viewports.get(&viewport_id) {
+            temp_maximized = Some(info.maximized.unwrap_or(false));
+
+            if let Some(inner_rect) = info.inner_rect {
+                temp_size = Some(inner_rect.size());
             }
 
-            (temp_pos, temp_size, temp_maximized)
-        });
-
-        if !self.settings.ui.window.maximized {
-            if let Some(pos) = pos {
-                self.settings.ui.window.pos_x = pos.x;
-                self.settings.ui.window.pos_y = pos.y;
-            }
-            if let Some(size) = size {
-                self.settings.ui.window.width = size.x;
-                self.settings.ui.window.height = size.y;
+            if let Some(outer_rect) = info.outer_rect {
+                temp_pos = Some(outer_rect.min);
             }
         }
-        if let Some(max) = maximized {
-            self.settings.ui.window.maximized = max;
+
+        (temp_pos, temp_size, temp_maximized)
+    });
+
+    if !geometry.maximized {
+        if let Some(pos) = pos {
+            geometry.pos_x = pos.x;
+            geometry.pos_y = pos.y;
         }
+
+        if let Some(size) = size {
+            geometry.width = size.x;
+            geometry.height = size.y;
+        }
+    }
+
+    if let Some(maximized) = maximized {
+        geometry.maximized = maximized;
     }
 }

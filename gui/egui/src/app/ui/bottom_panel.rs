@@ -1,20 +1,13 @@
 //! Bottom-panel UI: notification bar, action buttons, log-level selector.
-//!
-//! Two [`egui::TopBottomPanel::bottom`] panels are rendered:
-//!
-//! | id                   | content                                      |
-//! |----------------------|----------------------------------------------|
-//! | `notification_panel` | Single-line coloured status message          |
-//! | `bottom_panel`       | Log dir · Log viewer · Patch · Help buttons  |
-//!
-//! `notification_panel` is registered first so it sits below `bottom_panel`
-//! visually (egui stacks bottom panels innermost-first).
 
 use d_merge_gui_shared::{
     fetch::FetchState, fs::open_existing_dir_or_ancestor, i18n::I18nKey, log::LogLevel,
 };
 
-use crate::app::App;
+use crate::{
+    app::App,
+    ui::shadcn_compat::{button_with_icon, enum_select, patch_button},
+};
 
 impl App {
     /// Renders the main bottom panel (log controls, patch button, help toggle).
@@ -22,10 +15,11 @@ impl App {
     /// The patch button is disabled while a fetch is in progress to prevent
     /// launching a patch against a stale mod list.
     pub(crate) fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::bottom("bottom_panel");
-        if self.settings.ui.transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+        let panel = super::themed_top_bottom_panel(
+            egui::TopBottomPanel::bottom("bottom_panel"),
+            self.settings.ui.theme,
+            self.settings.ui.transparent,
+        );
 
         panel.show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -53,7 +47,7 @@ impl App {
                     } else {
                         self.i18n.t(I18nKey::PatchButton)
                     };
-                    if ui.add_sized([120.0, 40.0], egui::Button::new(label)).clicked() {
+                    if ui.add_sized([120.0, 40.0], patch_button(label)).clicked() {
                         self.patch(ui.ctx());
                     }
                 });
@@ -61,8 +55,11 @@ impl App {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
                         .add_sized(
-                            [30.0, 40.0],
-                            egui::Button::new(self.i18n.t(I18nKey::HelpButton)),
+                            [100.0, 40.0],
+                            button_with_icon(
+                                self.i18n.t(I18nKey::HelpButton),
+                                egui_shadcn::LucideIcon::Toolbox,
+                            ),
                         )
                         .clicked()
                     {
@@ -81,7 +78,13 @@ impl App {
     where
         F: FnOnce(&mut Self, &egui::Context),
     {
-        if ui.add_sized([120.0, 40.0], egui::Button::new(self.i18n.t(key))).clicked() {
+        if ui
+            .add_sized(
+                [120.0, 40.0],
+                button_with_icon(self.i18n.t(key), egui_shadcn::LucideIcon::Logs),
+            )
+            .clicked()
+        {
             f(self, ctx);
         }
     }
@@ -94,24 +97,18 @@ impl App {
         ui.vertical(|ui| {
             ui.label(self.i18n.t(I18nKey::LogLevelLabel));
 
-            egui::ComboBox::from_id_salt("log_level")
-                .selected_text(self.settings.log.level.as_str())
-                .show_ui(ui, |ui| {
-                    for level in [
-                        LogLevel::Error,
-                        LogLevel::Warn,
-                        LogLevel::Info,
-                        LogLevel::Debug,
-                        LogLevel::Trace,
-                    ] {
-                        if ui
-                            .selectable_value(&mut self.settings.log.level, level, level.as_str())
-                            .changed()
-                        {
-                            let _ = tracing_rotation::global::change_level(level.as_str());
-                        }
-                    }
-                });
+            const LEVELS: [(LogLevel, &str); 5] = [
+                (LogLevel::Error, LogLevel::Error.as_str()),
+                (LogLevel::Warn, LogLevel::Warn.as_str()),
+                (LogLevel::Info, LogLevel::Info.as_str()),
+                (LogLevel::Debug, LogLevel::Debug.as_str()),
+                (LogLevel::Trace, LogLevel::Trace.as_str()),
+            ];
+
+            if enum_select(ui, &mut self.settings.log.level, &LEVELS, Some([120.0, 30.0])).changed()
+            {
+                let _ = tracing_rotation::global::change_level(self.settings.log.level.as_str());
+            }
         });
     }
 
@@ -120,10 +117,12 @@ impl App {
     /// The message and color are set by [`App::set_colored_notify`] and
     /// cleared by [`App::clear_notification`].
     pub(crate) fn ui_notification(&self, ctx: &egui::Context) {
-        let mut panel = egui::TopBottomPanel::bottom("notification_panel");
-        if self.settings.ui.transparent {
-            panel = panel.frame(egui::Frame::new());
-        }
+        let panel = super::themed_top_bottom_panel(
+            egui::TopBottomPanel::bottom("notification_panel"),
+            self.settings.ui.theme,
+            self.settings.ui.transparent,
+        );
+
         panel.show(ctx, |ui| {
             ui.colored_label(self.notify.1, &self.notify.0);
         });

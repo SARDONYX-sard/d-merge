@@ -73,6 +73,7 @@
     "runforward",
     "rustflags",
     "serde",
+    "shadcn",
     "simd",
     "SKSE",
     "Skyrim",

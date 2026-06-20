@@ -89,7 +89,7 @@ pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
         // Draw underline when hovered
         if hovered {
             let text_width = galley.size().x.min(width);
-            let underline_y = text_pos.y + galley.size().y / 2.0 + 1.0;
+            let underline_y = text_pos.y + 5.0;
             painter.line_segment(
                 [
                     egui::pos2(rect.left(), underline_y),

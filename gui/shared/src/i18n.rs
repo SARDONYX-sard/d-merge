@@ -172,7 +172,7 @@ pub enum I18nKey {
     /// License:
     LicenseLabel,
 
-    /// 🔒Locked
+    /// Locked
     LockButton,
 
     /// Row reordering is locked unless sorting by Priority ascending.
@@ -278,13 +278,15 @@ pub enum I18nKey {
     RemovingMeshesMessage,
 
     /// Output format for hkx. LE: win32, SE, VR: amd64
-    /// NOTE(For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
+    ///
+    /// Note:
+    /// - (For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
     RuntimeTargetHover,
 
     /// Output format
     RuntimeTargetLabel,
 
-    /// Search:
+    /// Search
     SearchLabel,
 
     /// Select
@@ -361,12 +363,28 @@ impl I18nMap {
         self.0.get(&key).map_or_else(|| key.default_eng(), |s| s.as_ref())
     }
 
+    /// Try to load path & parse i18n map.
+    ///
+    /// # Errors
+    /// failed to read json
+    #[inline]
+    pub fn load<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
+        let content = std::fs::read_to_string(path).with_context(|_| ReadFileSnafu { path })?;
+        let map: Self = sonic_rs::from_str(&content).with_context(|_| ParseJsonSnafu { path })?;
+        Ok(map)
+    }
+
     /// Try to load `./.d_merge/translation.json`.
     /// If not exists or failed to parse, fallback to `default_map()`.
     ///
     /// # Errors
     /// failed to read json
-    pub fn load<P>(path: P) -> Result<Self, Error>
+    pub fn load_with_fallback<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -378,9 +396,7 @@ impl I18nMap {
             return Ok(Self::new());
         }
 
-        let content = std::fs::read_to_string(path).with_context(|_| ReadFileSnafu { path })?;
-        let map: Self = sonic_rs::from_str(&content).with_context(|_| ParseJsonSnafu { path })?;
-        Ok(map)
+        Self::load(path)
     }
 
     /// Save translation.json

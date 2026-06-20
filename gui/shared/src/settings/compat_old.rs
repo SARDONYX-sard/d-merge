@@ -127,6 +127,7 @@ impl From<OldSettings> for Settings {
             log: LogSettings {
                 dir_path: format!("{}/.d_merge/logs", old.output_dir),
                 level: LogLevel::Debug,
+                ..Default::default()
             },
             vfs: ModListSettings {
                 skyrim_data_dir: old.vfs_skyrim_data_dir,

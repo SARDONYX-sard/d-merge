@@ -1,5 +1,6 @@
 //! Logging ui
 use std::{
+    collections::VecDeque,
     fs::OpenOptions,
     io::{BufRead as _, BufReader, Seek as _, SeekFrom},
     path::{Path, PathBuf},
@@ -17,8 +18,10 @@ use snafu::prelude::*;
 
 static LOG_DIR_CHANGED: AtomicBool = AtomicBool::new(false);
 
+pub(crate) type LogQueueLock = Arc<RwLock<VecDeque<LogLine>>>;
+
 impl super::App {
-    pub(crate) fn start_log_watcher(&mut self, ctx: &egui::Context) {
+    pub(crate) fn start_log_watcher(&mut self) {
         if self.log_watcher_started {
             return;
         }
@@ -27,10 +30,9 @@ impl super::App {
         self.current_log_dir = Some(Path::new(&self.settings.log.dir_path).to_path_buf());
 
         let log_lines = Arc::clone(&self.log_lines);
-        let ctx = ctx.clone();
 
         LOG_DIR_CHANGED.store(true, Ordering::Release);
-        if let Err(e) = start_log_tail(log_path, log_lines, ctx) {
+        if let Err(e) = start_log_tail(log_path, log_lines) {
             tracing::error!("log watcher start failed: {e}");
         }
 
@@ -47,13 +49,9 @@ impl super::App {
     }
 }
 
-fn start_log_tail(
-    log_path: PathBuf,
-    log_lines: Arc<RwLock<Vec<String>>>,
-    ctx: egui::Context,
-) -> std::result::Result<(), LogError> {
+fn start_log_tail(log_path: PathBuf, log_lines: LogQueueLock) -> std::result::Result<(), LogError> {
     thread::spawn(move || {
-        if let Err(e) = tail_loop(log_path, log_lines, ctx) {
+        if let Err(e) = tail_loop(log_path, log_lines) {
             tracing::error!("tail thread error: {e}");
         }
     });
@@ -61,39 +59,43 @@ fn start_log_tail(
     Ok(())
 }
 
-fn tail_loop(
-    log_path: PathBuf,
-    log_lines: Arc<RwLock<Vec<String>>>,
-    ctx: egui::Context,
-) -> std::result::Result<(), LogError> {
+fn tail_loop(log_path: PathBuf, log_lines: LogQueueLock) -> std::result::Result<(), LogError> {
     let mut reader = BufReader::new(open_file(&log_path)?);
     let mut pos: u64 = 0;
 
     loop {
-        // dir change trigger
         if LOG_DIR_CHANGED.load(Ordering::Acquire) {
             reader = BufReader::new(open_file(&log_path)?);
             pos = 0;
-            reader.seek(SeekFrom::End(pos as i64)).context(IoSnafu)?;
+            reader.seek(SeekFrom::End(0)).context(IoSnafu)?;
             LOG_DIR_CHANGED.store(false, Ordering::Release);
         }
+
         reader.seek(SeekFrom::Start(pos)).context(IoSnafu)?;
 
-        let mut new_line = false;
+        let mut buf = String::new();
 
-        for line in std::io::Read::by_ref(&mut reader).lines() {
-            let line = line.context(IoSnafu)?;
-            push_line(&log_lines, line);
-            new_line = true;
+        loop {
+            buf.clear();
+
+            if reader.read_line(&mut buf).context(IoSnafu)? == 0 {
+                break;
+            }
+
+            if buf.ends_with('\n') {
+                buf.pop();
+
+                if buf.ends_with('\r') {
+                    buf.pop();
+                }
+            }
+
+            push_line(&log_lines, buf.clone());
         }
+        // NOTE: Pausing for 1 second prevents the process from freezing due to an excessively high refresh rate
+        thread::sleep(Duration::from_secs(1));
 
         pos = reader.stream_position().context(IoSnafu)?;
-
-        if new_line {
-            ctx.request_repaint();
-        }
-
-        thread::sleep(Duration::from_millis(100));
     }
 }
 
@@ -101,16 +103,74 @@ fn open_file(path: &Path) -> std::result::Result<std::fs::File, LogError> {
     OpenOptions::new().read(true).open(path).context(OpenSnafu { path: path.to_path_buf() })
 }
 
-fn push_line(log_lines: &Arc<RwLock<Vec<String>>>, line: String) {
-    const MAX_LOG_LINES: usize = 10_000;
+fn push_line(log_lines: &LogQueueLock, line: String) {
+    const MAX_LOG_LINES: usize = 600;
 
-    let mut lines = log_lines.write();
-    lines.push(line);
+    let log_line = LogLine { layout: log_layout(&line), raw: line };
 
-    if lines.len() > MAX_LOG_LINES {
-        let drain_len = lines.len() - MAX_LOG_LINES;
-        lines.drain(0..drain_len);
+    log_lines.write().push_back(log_line);
+
+    while log_lines.read().len() > MAX_LOG_LINES {
+        log_lines.write().pop_front();
     }
+}
+
+pub(crate) struct LogLine {
+    pub raw: String,
+    pub layout: egui::text::LayoutJob,
+}
+
+fn log_layout(line: &str) -> egui::text::LayoutJob {
+    use egui::{Color32, FontId, TextFormat, text::LayoutJob};
+
+    fn tracing_level_color(level: &str) -> egui::Color32 {
+        match level {
+            "TRACE" => egui::Color32::from_rgb(180, 0, 255),
+            "DEBUG" => egui::Color32::from_rgb(80, 160, 255),
+            "INFO" => egui::Color32::from_rgb(0, 200, 83),
+            "WARN" => egui::Color32::from_rgb(255, 193, 7),
+            "ERROR" => egui::Color32::from_rgb(244, 67, 54),
+            _ => egui::Color32::WHITE,
+        }
+    }
+
+    let mut job = LayoutJob::default();
+
+    let mut parts = line.splitn(3, ' ');
+    let time_stamp = parts.next().unwrap_or("");
+    let level = parts.next().unwrap_or("");
+    let rest = parts.next().unwrap_or("");
+
+    let font_id = FontId::monospace(13.0);
+    let normal =
+        TextFormat { font_id: font_id.clone(), color: Color32::GRAY, ..Default::default() };
+
+    let tracing_color = TextFormat {
+        font_id: font_id.clone(),
+        color: tracing_level_color(level),
+        ..Default::default()
+    };
+
+    job.append(time_stamp, 0.0, tracing_color.clone());
+    job.append(" ", 0.0, normal.clone());
+    job.append(level, 0.0, tracing_color);
+    job.append(" ", 0.0, normal);
+
+    // path:line:
+    let gray = TextFormat { font_id: font_id.clone(), color: Color32::GRAY, ..Default::default() };
+    if let Some(pos) = rest.find(": ") {
+        let (location, message) = rest.split_at(pos + 1);
+        let location_color =
+            TextFormat { font_id, color: Color32::LIGHT_GREEN, ..Default::default() };
+
+        job.append(location, 0.0, location_color);
+        job.append(" ", 0.0, gray.clone());
+        job.append(message.trim_start(), 0.0, gray);
+    } else {
+        job.append(rest, 0.0, gray);
+    }
+
+    job
 }
 
 #[derive(Debug, Snafu)]
