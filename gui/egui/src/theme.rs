@@ -14,10 +14,13 @@ fn new_shadcn_light() -> egui_shadcn::ShadcnTheme {
 }
 
 pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<&ThemePreset>) {
-    let (theme, shadcn_theme) = match theme {
-        Theme::System => (egui::ThemePreference::System, new_shadcn_dark()),
-        Theme::Dark => (egui::ThemePreference::Dark, new_shadcn_dark()),
-        Theme::Light => (egui::ThemePreference::Light, new_shadcn_light()),
+    let (visuals, shadcn_theme) = match theme {
+        Theme::System => match dark_light::detect() {
+            Ok(dark_light::Mode::Light) => (egui::Visuals::light(), new_shadcn_light()),
+            _ => (egui::Visuals::dark(), new_shadcn_dark()),
+        },
+        Theme::Dark => (egui::Visuals::dark(), new_shadcn_dark()),
+        Theme::Light => (egui::Visuals::light(), new_shadcn_light()),
         Theme::Custom => {
             if let Some(theme_preset) = theme_preset {
                 crate::ui::theme::apply(theme_preset, ctx);
@@ -26,7 +29,7 @@ pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<
         }
     };
 
-    ctx.set_theme(theme);
+    ctx.set_style(egui::Style { visuals, ..Default::default() });
     egui_shadcn::ShadcnThemeExt::set_shadcn_theme(ctx, shadcn_theme);
 }
 
@@ -53,10 +56,19 @@ pub(crate) fn themed_central_panel(
 }
 
 fn frame_from_theme(theme: Theme, bg_color: Option<&Rgba>) -> egui::Frame {
-    let fill = match theme {
+    let effective_theme = match theme {
+        Theme::System => match dark_light::detect() {
+            Ok(dark_light::Mode::Light) => Theme::Light,
+            _ => Theme::Dark,
+        },
+        other => other,
+    };
+
+    let fill = match effective_theme {
         Theme::Light => egui::Color32::WHITE,
-        Theme::System | Theme::Dark => egui::Color32::from_rgba_unmultiplied(30, 30, 30, 255),
+        Theme::Dark => egui::Color32::from_rgba_unmultiplied(30, 30, 30, 255),
         Theme::Custom => bg_color.map(|c| c.to_egui_color32()).unwrap_or_default(),
+        Theme::System => unreachable!(),
     };
 
     egui::Frame::NONE.fill(fill)
