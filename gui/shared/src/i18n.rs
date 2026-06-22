@@ -322,18 +322,11 @@ pub enum I18nKey {
     /// Theme:
     ThemeLabel,
 
-    /// Toggle between Dark, Light, and System themes.
-    /// - NOTE: Using Light theme and the transparent background feature at the same time makes the screen very hard to read.
+    /// Toggle between System, Dark, Light and Custom themes.
     ThemeHover,
 
     /// Tooling:
     ToolingLabel,
-
-    /// Transparent
-    Transparent,
-
-    /// Enable transparent background. This makes the background of the application transparent, allowing you to see the desktop or other windows behind it.
-    TransparentHover,
 
     /// VFS mode
     VfsMode,

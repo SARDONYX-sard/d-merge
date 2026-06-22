@@ -99,8 +99,8 @@ impl From<OldSettings> for Settings {
                 mode: old.mode,
             },
             ui: UiSettings {
-                theme: super::ui::Theme::Dark,
-                transparent: old.transparent,
+                theme: super::ui::theme::Theme::Dark,
+                custom_theme: super::ui::theme::CustomTheme::default(),
                 font: old
                     .font_path
                     .map(|path| FontSettings {

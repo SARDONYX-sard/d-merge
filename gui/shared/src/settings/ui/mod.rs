@@ -3,8 +3,9 @@
 //! Split into two structs so that transient geometry (`window`) can be
 //! updated every frame without touching the appearance fields, and vice
 //! versa.
+pub mod theme;
 
-use crate::settings::ModListUiSettings;
+use crate::settings::{ModListUiSettings, ui::theme::CustomTheme};
 
 /// Appearance and window settings persisted across sessions.
 ///
@@ -14,76 +15,36 @@ use crate::settings::ModListUiSettings;
 #[serde(default)]
 pub struct UiSettings {
     /// Color theme preference.
-    ///
-    /// Applied on startup via `egui::Context::set_theme` and whenever the
-    /// user changes it in the execution-mode panel.
-    pub theme: Theme,
+    pub theme: theme::Theme,
 
-    /// Whether the main window background is transparent.
-    ///
-    /// When `true`, all panels are built with [`egui::Frame::new()`] (no
-    /// fill) so the OS window chrome shows through.  Requires the window to
-    /// be created with `transparent: true` in [`eframe::NativeOptions`].
-    pub transparent: bool,
+    /// User-defined theme customizations.
+    /// Name of the currently active preset (matches the stem of a JSON file
+    /// inside the `themes/` directory next to the settings file).
+    pub custom_theme: CustomTheme,
 
     #[serde(default)]
     pub font: FontSettings,
 
     /// Path to the i18n JSON file used for UI translation.
-    ///
-    /// Defaults to the built-in English strings when absent or invalid.
-    /// Can be hot-reloaded via the help window without restarting.
     pub i18n_path: String,
 
     /// Mod-list filter and sort state.
     pub mod_list: ModListUiSettings,
 
-    /// Last-known window geometry, updated every frame and restored on
-    /// startup.
+    /// Last-known window geometry, updated every frame and restored on startup.
     pub window: WindowGeometry,
 }
 
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
-            theme: Theme::System,
-            transparent: false,
+            theme: theme::Theme::System,
+            custom_theme: CustomTheme::default(),
             font: FontSettings::default(),
             i18n_path: crate::i18n::I18nMap::FILE.into(),
             mod_list: ModListUiSettings::default(),
             window: WindowGeometry::default(),
         }
-    }
-}
-
-/// Theme color
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Theme {
-    /// System default: follows the OS theme setting. This is the default if `theme` is `None`.
-    System,
-
-    /// Dark background.
-    Dark,
-
-    /// Light background.
-    Light,
-}
-
-impl Theme {
-    #[inline]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::System => "💻 System",
-            Self::Dark => "🌙 Dark",
-            Self::Light => "☀ Light",
-        }
-    }
-}
-impl core::fmt::Display for Theme {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.as_str())
     }
 }
 
@@ -95,9 +56,6 @@ impl core::fmt::Display for Theme {
 /// Position and size are **only** updated when the window is not maximized,
 /// to avoid saving the transient geometry produced during minimize/restore
 /// cycles.
-///
-/// # JSON key
-/// Serialized under `"ui"."window"` in `settings.json`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct WindowGeometry {
@@ -114,9 +72,6 @@ pub struct WindowGeometry {
     pub height: f32,
 
     /// Whether the window was maximized when the application last closed.
-    ///
-    /// When `true`, the stored `pos_*` / `width` / `height` values are
-    /// ignored at startup and the window is maximized immediately.
     pub maximized: bool,
 }
 

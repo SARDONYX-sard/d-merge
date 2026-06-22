@@ -4,13 +4,17 @@ use d_merge_gui_shared::{
     fetch::FetchState,
     fs::{find_existing_dir_or_ancestor, open_existing_dir_or_ancestor},
     i18n::I18nKey,
-    settings::{DataMode, ui::Theme},
+    settings::{
+        DataMode,
+        ui::theme::{CustomTheme, Theme},
+    },
 };
 use egui::Label;
 
 use crate::{
     app::App,
     set_theme,
+    theme::themed_top_bottom_panel,
     ui::shadcn_compat::{button, button_with_icon, enum_select, radio_value},
 };
 
@@ -20,10 +24,10 @@ impl App {
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
     pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
-        let panel = super::themed_top_bottom_panel(
+        let panel = themed_top_bottom_panel(
             egui::TopBottomPanel::top("ui_top_options"),
             self.settings.ui.theme,
-            self.settings.ui.transparent,
+            self.theme_manager.current_bg_color(),
         );
 
         panel.show(ctx, |ui| {
@@ -38,20 +42,9 @@ impl App {
                 ui.add_space(60.0);
                 ui.separator();
 
-                if checkbox(
-                    ui,
-                    &mut self.settings.ui.transparent,
-                    self.i18n.t(I18nKey::Transparent),
-                )
-                .on_hover_text(self.i18n.t(I18nKey::TransparentHover))
-                .changed()
-                {
-                    set_theme(ui.ctx(), self.settings.ui.theme, self.settings.ui.transparent);
-                }
-
                 self.ui_theme_box(ui);
 
-                ui.add_space(8.0);
+                self.ui_bg_color_picker(ui);
             });
         });
     }
@@ -140,17 +133,41 @@ impl App {
             ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
-            const THEMES: [(Theme, &str); 3] = [
+            const THEMES: [(Theme, &str); 4] = [
                 (Theme::System, Theme::System.as_str()),
                 (Theme::Dark, Theme::Dark.as_str()),
                 (Theme::Light, Theme::Light.as_str()),
+                (Theme::Custom, Theme::Custom.as_str()),
             ];
 
             if enum_select(ui, &mut self.settings.ui.theme, &THEMES, Some([120.0, 30.0])).changed()
             {
-                set_theme(ui.ctx(), self.settings.ui.theme, self.settings.ui.transparent);
+                set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
         });
+    }
+
+    fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {
+        if matches!(self.settings.ui.theme, Theme::Custom) {
+            ui.checkbox(&mut self.show_theme_editor, "Theme Editor");
+        }
+
+        if matches!(self.settings.ui.theme, Theme::Custom)
+            && self.show_theme_editor
+            && let Some(update) = self.theme_manager.show(ui.ctx())
+        {
+            // Persist only the name.
+            self.settings.ui.custom_theme = CustomTheme {
+                selected_theme: Some(update.selected_name.clone()),
+                themes_dir: self.theme_manager.cache.dir.to_string_lossy().to_string(),
+            };
+
+            // Live-apply whenever colors changed or a new preset was loaded.
+            if let Some(preset) = &update.preset {
+                crate::ui::theme::apply(preset, ui.ctx());
+                set_theme(ui.ctx(), self.settings.ui.theme, Some(preset));
+            }
+        }
     }
 
     /// UI
@@ -160,10 +177,10 @@ impl App {
     /// | Output      | path..................|      | ...  |
     /// ```
     pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
-        let panel = super::themed_top_bottom_panel(
+        let panel = themed_top_bottom_panel(
             egui::TopBottomPanel::top("top_paths"),
             self.settings.ui.theme,
-            self.settings.ui.transparent,
+            self.theme_manager.current_bg_color(),
         );
 
         panel.show(ctx, |ui| {
@@ -252,18 +269,12 @@ impl App {
                             return;
                         }
 
-                        path_text_edit(
-                            ui,
-                            &mut self.settings.vfs.skyrim_data_dir,
-                            self.settings.ui.transparent,
-                            None,
-                        )
+                        path_text_edit(ui, &mut self.settings.vfs.skyrim_data_dir, None)
                     }
 
                     DataMode::Manual => path_text_edit(
                         ui,
                         &mut self.settings.manual.skyrim_data_dir,
-                        self.settings.ui.transparent,
                         Some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
                     ),
                 };
@@ -283,8 +294,6 @@ impl App {
     /// | Output      | path..................|      | ...  |
     /// ```
     fn ui_output_dir_row(&mut self, ui: &mut egui::Ui) {
-        let transparent = self.settings.ui.transparent;
-
         ui.horizontal(|ui| {
             if ui
                 .add_sized(
@@ -333,7 +342,7 @@ impl App {
 
                 ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
 
-                path_text_edit(ui, self.settings.current_output_dir_mut(), transparent, None);
+                path_text_edit(ui, self.settings.current_output_dir_mut(), None);
             });
         });
     }
@@ -353,13 +362,7 @@ const ROW_HEIGHT: f32 = 40.0;
 const BUTTON_HEIGHT: f32 = 32.0;
 const RIGHT_MARGIN: f32 = 8.0;
 
-fn path_text_edit(
-    ui: &mut egui::Ui,
-    value: &mut String,
-    transparent: bool,
-    hint: Option<&str>,
-) -> egui::Response {
-    let _ = transparent;
+fn path_text_edit(ui: &mut egui::Ui, value: &mut String, hint: Option<&str>) -> egui::Response {
     let mut input = egui_shadcn::Input::new(value).desired_width(ui.available_width());
 
     if let Some(hint) = hint {

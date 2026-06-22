@@ -3,7 +3,7 @@ name: Release GUI
 on:
   push:
     tags:
-      - "*"
+      - '*'
 
 env:
   APP_NAME: d_merge

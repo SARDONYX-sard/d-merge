@@ -1,0 +1,85 @@
+{
+  "name": "ocean_glass",
+  "visuals": {
+    "dark_mode": true,
+    "override_text_color": "#D6F0FF",
+    "hyperlink_color": "#3DB7FF",
+    "faint_bg_color": "#00000000",
+    "extreme_bg_color": "#06131A80",
+    "text_edit_bg_color": "#0E1F2A80",
+    "code_bg_color": "#102A3A",
+    "warn_fg_color": "#EBCB8B",
+    "error_fg_color": "#FF6B6B",
+    "window_fill": "#071A2388",
+    "window_stroke": {
+      "width": 1.0,
+      "color": "#1F3A4A"
+    },
+    "panel_fill": "#06131A80",
+    "window_corner_radius": 10,
+    "menu_corner_radius": 8,
+    "button_frame": true,
+    "striped": false,
+    "slider_trailing_fill": true,
+    "disabled_alpha": 0.65,
+    "widgets": {
+      "noninteractive": {
+        "bg_fill": "#0F2A3A40",
+        "weak_bg_fill": "#0F2A3A80",
+        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#A6D6F0" },
+        "corner_radius": 4
+      },
+      "inactive": {
+        "bg_fill": "#102A3A80",
+        "weak_bg_fill": "#102A3A80",
+        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#D6F0FF" },
+        "corner_radius": 4
+      },
+      "hovered": {
+        "bg_fill": "#1A3B4D88",
+        "weak_bg_fill": "#1A3B4D88",
+        "bg_stroke": { "width": 1.0, "color": "#3DB7FF" },
+        "fg_stroke": { "width": 1.5, "color": "#FFFFFF" },
+        "corner_radius": 6
+      },
+      "active": {
+        "bg_fill": "#24506688",
+        "weak_bg_fill": "#24506688",
+        "bg_stroke": { "width": 1.5, "color": "#3DB7FF" },
+        "fg_stroke": { "width": 2.0, "color": "#FFFFFF" },
+        "corner_radius": 6
+      },
+      "open": {
+        "bg_fill": "#102A3A88",
+        "weak_bg_fill": "#1A3B4D88",
+        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#E6F7FF" },
+        "corner_radius": 4
+      }
+    }
+  },
+  "shadcn": {
+    "background": "#071A2380",
+    "foreground": "#D6F0FF",
+    "card": "#0E1F2A90",
+    "card_foreground": "#E6F7FF",
+    "popover": "#122B3CE8",
+    "popover_foreground": "#FFFFFF",
+    "primary": "#3DB7FF",
+    "primary_foreground": "#000000",
+    "secondary": "#102A3A",
+    "secondary_foreground": "#E6F7FF",
+    "muted": "#0D1A22",
+    "muted_foreground": "#A6D6F0",
+    "accent": "#1A3B4D",
+    "accent_foreground": "#FFFFFF",
+    "destructive": "#FF6B6B",
+    "destructive_foreground": "#FFFFFF",
+    "border": "#3DB7FF22",
+    "input": "#102A3A60",
+    "ring": "#3DB7FF",
+    "radius": 20.0
+  }
+}

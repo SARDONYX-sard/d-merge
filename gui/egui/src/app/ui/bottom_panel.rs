@@ -6,6 +6,7 @@ use d_merge_gui_shared::{
 
 use crate::{
     app::App,
+    theme::themed_top_bottom_panel,
     ui::shadcn_compat::{button_with_icon, enum_select, patch_button},
 };
 
@@ -15,10 +16,10 @@ impl App {
     /// The patch button is disabled while a fetch is in progress to prevent
     /// launching a patch against a stale mod list.
     pub(crate) fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
-        let panel = super::themed_top_bottom_panel(
+        let panel = themed_top_bottom_panel(
             egui::TopBottomPanel::bottom("bottom_panel"),
             self.settings.ui.theme,
-            self.settings.ui.transparent,
+            self.theme_manager.current_bg_color(),
         );
 
         panel.show(ctx, |ui| {
@@ -117,10 +118,10 @@ impl App {
     /// The message and color are set by [`App::set_colored_notify`] and
     /// cleared by [`App::clear_notification`].
     pub(crate) fn ui_notification(&self, ctx: &egui::Context) {
-        let panel = super::themed_top_bottom_panel(
+        let panel = themed_top_bottom_panel(
             egui::TopBottomPanel::bottom("notification_panel"),
             self.settings.ui.theme,
-            self.settings.ui.transparent,
+            self.theme_manager.current_bg_color(),
         );
 
         panel.show(ctx, |ui| {

@@ -40,14 +40,15 @@ impl App {
             log_viewer_id,
             egui::ViewportBuilder {
                 title: Some("Log viewer".to_string()),
-                inner_size,
-                maximized: Some(self.settings.log.window.maximized),
+                transparent: Some(false), // Cannot now: https://github.com/emilk/egui/issues/3632
                 position,
+                maximized: Some(self.settings.log.window.maximized),
+                inner_size,
                 resizable: Some(true),
                 ..Default::default()
             },
             move |ctx, class| {
-                assert!(
+                debug_assert!(
                     class == egui::ViewportClass::Deferred,
                     "This egui backend doesn't support multiple viewports"
                 );
