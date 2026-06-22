@@ -79,11 +79,9 @@
   "status_generating_hkx_files": "hkxファイルを生成しています...",
   "status_parsing_patches": "Nemesisパッチを解析しています...",
   "status_reading_patches": "Nemesisパッチとテンプレートファイルを読み込んでいます...",
-  "theme_hover": "Dark・Light・Systemテーマを切り替えます\n\n注意\n- Lightテーマと背景透過を同時に有効にすると画面の視認性が著しく低下します",
+  "theme_hover": "System・Dark・Light・Custom テーマを切り替えます",
   "theme_label": "テーマ:",
   "tooling_label": "ツール設定:",
-  "transparent": "透過表示",
-  "transparent_hover": "ウィンドウの背景を透過させます",
   "vfs_mode": "VFSモード",
   "vfs_mode_hover": "MO2などの仮想環境を使用して起動する場合に使用します"
 }

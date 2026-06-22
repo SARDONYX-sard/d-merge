@@ -1,0 +1,85 @@
+{
+  "name": "amethyst_glass",
+  "visuals": {
+    "dark_mode": true,
+    "override_text_color": "#E6D9FF",
+    "hyperlink_color": "#B892FF",
+    "faint_bg_color": "#00000000",
+    "extreme_bg_color": "#140A1F80",
+    "text_edit_bg_color": "#1E123080",
+    "code_bg_color": "#2A1C3A",
+    "warn_fg_color": "#E0C36A",
+    "error_fg_color": "#E26A8A",
+    "window_fill": "#1A0F2A88",
+    "window_stroke": {
+      "width": 1.0,
+      "color": "#3A2A4A"
+    },
+    "panel_fill": "#140A2080",
+    "window_corner_radius": 10,
+    "menu_corner_radius": 8,
+    "button_frame": true,
+    "striped": false,
+    "slider_trailing_fill": true,
+    "disabled_alpha": 0.65,
+    "widgets": {
+      "noninteractive": {
+        "bg_fill": "#22143340",
+        "weak_bg_fill": "#22143380",
+        "bg_stroke": { "width": 1.0, "color": "#3A2A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#C8B6E8" },
+        "corner_radius": 4
+      },
+      "inactive": {
+        "bg_fill": "#2A1C3A80",
+        "weak_bg_fill": "#2A1C3A80",
+        "bg_stroke": { "width": 1.0, "color": "#3A2A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#E6D9FF" },
+        "corner_radius": 4
+      },
+      "hovered": {
+        "bg_fill": "#3A2A5288",
+        "weak_bg_fill": "#3A2A5288",
+        "bg_stroke": { "width": 1.0, "color": "#B892FF" },
+        "fg_stroke": { "width": 1.5, "color": "#FFFFFF" },
+        "corner_radius": 6
+      },
+      "active": {
+        "bg_fill": "#4A336A88",
+        "weak_bg_fill": "#4A336A88",
+        "bg_stroke": { "width": 1.5, "color": "#B892FF" },
+        "fg_stroke": { "width": 2.0, "color": "#FFFFFF" },
+        "corner_radius": 6
+      },
+      "open": {
+        "bg_fill": "#2A1C3A88",
+        "weak_bg_fill": "#3A2A5288",
+        "bg_stroke": { "width": 1.0, "color": "#3A2A4A" },
+        "fg_stroke": { "width": 1.0, "color": "#EDE3FF" },
+        "corner_radius": 4
+      }
+    }
+  },
+  "shadcn": {
+    "background": "#140A1F80",
+    "foreground": "#E6D9FF",
+    "card": "#1E123090",
+    "card_foreground": "#F3ECFF",
+    "popover": "#241634E8",
+    "popover_foreground": "#FFFFFF",
+    "primary": "#B892FF",
+    "primary_foreground": "#000000",
+    "secondary": "#2A1C3A",
+    "secondary_foreground": "#F3ECFF",
+    "muted": "#1E1528",
+    "muted_foreground": "#C8B6E8",
+    "accent": "#3A2A52",
+    "accent_foreground": "#FFFFFF",
+    "destructive": "#E26A8A",
+    "destructive_foreground": "#FFFFFF",
+    "border": "#B892FF22",
+    "input": "#2A1C3A60",
+    "ring": "#B892FF",
+    "radius": 20.0
+  }
+}

@@ -17,7 +17,7 @@ use d_merge_gui_shared::{
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::app::log::LogQueueLock;
+use crate::{app::log::LogQueueLock, ui::theme::ThemeManager};
 
 /// Central application state.
 pub(crate) struct App {
@@ -52,6 +52,13 @@ pub(crate) struct App {
     /// Last observed table width; used to detect window resize and reset
     /// column widths for one frame.
     pub prev_table_available_width: f32,
+
+    // ── Custom theme panel  ──────────────────────────────────────────────────────
+    /// Custom theme editor window state.
+    pub theme_manager: ThemeManager,
+
+    /// Whether the theme editor window is open.
+    pub show_theme_editor: bool,
 
     // ── Notification bar ──────────────────────────────────────────────────────
     /// `(message, color)` shown in the mod-list status line.
@@ -103,14 +110,13 @@ impl App {
     /// Loads the i18n map from `i18n_path`, falling back to
     /// the built-in English strings on failure.  All background-task state
     /// starts in its idle/empty variant.
-    pub(crate) fn from_settings(settings: Settings) -> Self {
+    pub(crate) fn new(settings: Settings, theme_manager: ThemeManager) -> Self {
+        let log_window_info = settings.log.window.clone();
         let i18n =
             I18nMap::load_with_fallback(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
                 tracing::error!("Failed to load i18n map: {e}\nFallback to default");
                 I18nMap::new()
             });
-
-        let log_window_info = settings.log.window.clone();
 
         Self {
             settings,
@@ -123,6 +129,9 @@ impl App {
             is_locked: false,
             check_all: false,
             prev_table_available_width: 0.0,
+
+            theme_manager,
+            show_theme_editor: false,
 
             mod_list_msg: (String::new(), egui::Color32::WHITE),
             notify: (String::new(), egui::Color32::WHITE),

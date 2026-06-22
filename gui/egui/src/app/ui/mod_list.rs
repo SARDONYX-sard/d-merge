@@ -10,6 +10,7 @@ use rayon::prelude::*;
 
 use crate::{
     app::App,
+    theme::themed_central_panel,
     ui::{
         dnd_table::{check_only_table_body, dnd_table_body},
         shadcn_compat::{button, button_with_icon, enum_options, heading, icon, lock_button, text},
@@ -19,10 +20,10 @@ use crate::{
 impl App {
     /// Renders the central panel containing the mod list table.
     pub(crate) fn ui_mod_list(&mut self, ctx: &egui::Context) {
-        let panel = super::themed_central_panel(
+        let panel = themed_central_panel(
             egui::CentralPanel::default(),
             self.settings.ui.theme,
-            self.settings.ui.transparent,
+            self.theme_manager.current_bg_color(),
         );
 
         panel.show(ctx, |ui| {

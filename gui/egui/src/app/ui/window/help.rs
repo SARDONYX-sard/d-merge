@@ -60,7 +60,8 @@ impl App {
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show_help)
             .collapsible(false)
-            .resizable(false)
+            .resizable(true)
+            .movable(true)
             .fixed_size(egui::Vec2::new(
                 self.settings.ui.window.width * 0.5,
                 self.settings.ui.window.height * 0.75,
