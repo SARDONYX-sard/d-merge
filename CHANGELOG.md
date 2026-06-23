@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-06-23
+### :sparkles: New Features
+- [`677b6f3`](https://github.com/SARDONYX-sard/d-merge/commit/677b6f3ec5b27ffc0facc7325ad637372092d349) - **egui**: change bg aplha *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`49cbb53`](https://github.com/SARDONYX-sard/d-merge/commit/49cbb538f6170ab60c718521d9f37e9dd7cab2a9) - **egui**: implement custom theme *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d6782ff`](https://github.com/SARDONYX-sard/d-merge/commit/d6782ffdbca436187e0014e1b40e06fe18f8e3e6) - **egui**: add `dark-light` crate *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ed952fc`](https://github.com/SARDONYX-sard/d-merge/commit/ed952fc20921161fec4d616466a89874cc6374a9) - **egui**: add custom theme delete button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`df87ade`](https://github.com/SARDONYX-sard/d-merge/commit/df87ade72e81307d240b36b6cd7e2ab51641008d) - **egui**: remove delete button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c15629e`](https://github.com/SARDONYX-sard/d-merge/commit/c15629e50803d8e4e7c212d5d0cc7248b97752f5) - **egui**: use grid for theme loader *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`eb1af6f`](https://github.com/SARDONYX-sard/d-merge/commit/eb1af6fe2379273cbbec4a38597c37a21c176d85) - **egui**: modify i18n *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.3.0] - 2026-06-20
 ### :sparkles: New Features
 - [`8f920c6`](https://github.com/SARDONYX-sard/d-merge/commit/8f920c627c39bce32faaf652886419e27ff7db69) - **egui**: use shadcn *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -560,3 +571,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.1.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.0.1...2.1.0
 [2.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.1.0...2.2.0
 [2.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.2.0...2.3.0
+[2.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.3.0...2.4.0
