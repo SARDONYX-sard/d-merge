@@ -98,7 +98,7 @@ SkyrimSE
 | ✅     | POISE - Stagger Overhaul SE                  | 1.02             |                                                    |
 | ✅     | Poisebreaker -SE                             | 0.7              |                                                    |
 | ✅     | Precision                                    | 2.0.4            |                                                    |
-| ✅     | Precision Creatures                          | 2.4              | Need `Precision Creatures d_merge_patch`           |
+| ✅     | Precision Creatures                          | 2.4              | For the full text, please refer to the note below. |
 | ✅     | Project Impact SE                            | 2.72             |                                                    |
 | ✅     | SCAR - Skyrim Combos AI Revolution           | 1.06b            | With SCAR AE Support(v1.6.1)                       |
 | ✅     | SkyParkour v3                                | 3.2.1            |                                                    |
@@ -117,6 +117,10 @@ SkyrimSE
     `Nemesis_Engine\mod\hpmhr\animationsetdatasinglefile\HorseProjectData~HorseProject\horseproject.txt`
   - Turning and jumping have been confirmed to be possible.
   - It might be because I'm using TDM, Poisebreaker, and MCO, but attacks and stagger didn't work.
+
+- **Precision Creatures**
+  - d_merge < v1.4.0: `Precision Creatures d_merge_patch` is required.
+  - d_merge >= v1.4.0: Since the patch hack itself is now built into the exe, `Precision Creatures d_merge_patch` is no longer needed.
 
 - **TkDodgeUltimateCombat Nemesis patch**
   - Tested with TK Dodge SE (v3.18) + TK Dodge RE (v0.55-rc3)
