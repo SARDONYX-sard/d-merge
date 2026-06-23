@@ -1366,7 +1366,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -1391,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_egui"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "d_merge_gui_shared",
  "dark-light",
@@ -1420,7 +1420,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_gui_shared"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "d_merge_gui_shared_derive",
  "gh_issue_link",
@@ -1442,7 +1442,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_gui_shared_derive"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "quote",
  "syn 2.0.118",
@@ -1450,7 +1450,7 @@ dependencies = [
 
 [[package]]
 name = "d_merge_python"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "mod_info",
  "nemesis_merge",
@@ -2307,7 +2307,7 @@ checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
 
 [[package]]
 name = "fnis_list"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "bitflags 2.13.0",
  "skyrim_anim_parser",
@@ -3750,7 +3750,7 @@ dependencies = [
 
 [[package]]
 name = "jwalk_glob"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "jwalk",
  "num_cpus",
@@ -4044,9 +4044,9 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "memmap2"
-version = "0.9.10"
+version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
+checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
 dependencies = [
  "libc",
 ]
@@ -6167,9 +6167,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.40"
+version = "0.23.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef86cd5876211988985292b91c96a8f2d298df24e75989a43a3c73f2d4d8168b"
+checksum = "6b92b125634d9b795e7beca796cc790df15a7fb38323bf3196fda83292d06b1f"
 dependencies = [
  "once_cell",
  "rustls-pki-types",
