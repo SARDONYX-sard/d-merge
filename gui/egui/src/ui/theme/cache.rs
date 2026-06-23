@@ -83,6 +83,7 @@ impl ThemeCache {
         Ok(preset)
     }
 
+    #[expect(unused)]
     pub(crate) fn delete(&self, name: &str) -> Result<(), Error> {
         let path = self.path_for(name);
 

@@ -34,7 +34,7 @@ use egui_shadcn::ShadcnThemeExt;
 use crate::{
     theme::EguiColorExt as _,
     ui::{
-        shadcn_compat::{button, checkbox, destructive_button_with_icon, small_button},
+        shadcn_compat::{button, checkbox, small_button},
         theme::cache::ThemeCache,
     },
 };
@@ -98,10 +98,6 @@ pub(crate) struct ThemeManager {
 
     /// Non-fatal status message (shown for one or two seconds, then cleared).
     status: Option<StatusMsg>,
-
-    // Delete theme
-    show_delete_theme_alert: bool,
-    pending_delete: Option<String>,
 }
 
 struct StatusMsg {
@@ -127,9 +123,6 @@ impl ThemeManager {
             save_name: selected.unwrap_or("Custom").to_string(),
             widget_tab: WidgetTab::Noninteractive,
             status: None,
-
-            show_delete_theme_alert: false,
-            pending_delete: None,
         }
     }
 
@@ -261,38 +254,6 @@ impl ThemeManager {
                 self.load_selected();
             }
 
-            // Delete
-            if let Some(selected_name) = self.selected_name()
-                && ui
-                    .add(destructive_button_with_icon("Delete", egui_shadcn::LucideIcon::Delete))
-                    .on_hover_text(format!("Delete \"{selected_name}\" theme"))
-                    .clicked()
-            {
-                self.pending_delete = Some(selected_name.to_owned());
-                self.show_delete_theme_alert = true;
-            }
-            if self.show_delete_theme_alert {
-                let result =
-                    egui_shadcn::AlertDialog::new("Delete theme?", "This action cannot be undone.")
-                        .destructive()
-                        .show(ui.ctx(), &mut self.show_delete_theme_alert);
-
-                match result {
-                    egui_shadcn::AlertDialogResult::Open => {}
-                    egui_shadcn::AlertDialogResult::Cancelled => {
-                        self.pending_delete = None;
-                    }
-                    egui_shadcn::AlertDialogResult::Confirmed => {
-                        if let Some(name) = self.pending_delete.take()
-                            && let Err(err) = self.cache.delete(&name)
-                        {
-                            self.set_error(err.to_string());
-                        }
-                    }
-                }
-            }
-
-            ui.add_space(10.0);
             if ui.add(button("⟳")).on_hover_text("Reload themes directory").clicked() {
                 self.reload_dir();
             }
