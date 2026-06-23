@@ -1,5 +1,5 @@
 {
-  "name": "light_glass",
+  "name": "light",
   "visuals": {
     "dark_mode": false,
     "override_text_color": null,
@@ -15,7 +15,7 @@
       "width": 1.0,
       "color": "#BEBEBE"
     },
-    "panel_fill": "#B4B4B4B9",
+    "panel_fill": "#F8F8F8",
     "window_corner_radius": 6,
     "menu_corner_radius": 6,
     "button_frame": true,
@@ -91,7 +91,7 @@
     }
   },
   "shadcn": {
-    "background": "#D8D8D8D8",
+    "background": "#FFFFFF",
     "foreground": "#0A0A0A",
     "card": "#FFFFFF",
     "card_foreground": "#0A0A0A",

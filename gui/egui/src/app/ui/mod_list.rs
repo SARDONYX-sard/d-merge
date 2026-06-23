@@ -13,7 +13,10 @@ use crate::{
     theme::themed_central_panel,
     ui::{
         dnd_table::{check_only_table_body, dnd_table_body},
-        shadcn_compat::{button, button_with_icon, enum_options, heading, icon, lock_button, text},
+        shadcn_compat::{
+            button, button_with_icon, destructive_button_with_icon, enum_options, heading, icon,
+            text,
+        },
     },
 };
 
@@ -58,7 +61,10 @@ impl App {
 
                 // -- Lock Button
                 if self.is_locked {
-                    let button = lock_button(self.i18n.t(I18nKey::LockButton));
+                    let button = destructive_button_with_icon(
+                        self.i18n.t(I18nKey::LockButton),
+                        egui_shadcn::LucideIcon::Lock,
+                    );
                     let hover_text = self.i18n.t(I18nKey::LockButtonHover);
 
                     if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {

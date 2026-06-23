@@ -91,7 +91,7 @@
     }
   },
   "shadcn": {
-    "background": "#161B2280",
+    "background": "#161B22ED",
     "foreground": "#D8DEE9",
     "card": "#1F253090",
     "card_foreground": "#ECEFF4",

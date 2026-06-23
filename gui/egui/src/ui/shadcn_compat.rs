@@ -131,10 +131,19 @@ pub(crate) fn button(text: impl Into<egui::WidgetText>) -> impl egui::Widget {
     egui_shadcn::Button::new(text).variant(egui_shadcn::ButtonVariant::Outline)
 }
 
-pub(crate) fn lock_button(text: impl Into<egui::WidgetText>) -> impl egui::Widget {
+pub(crate) fn small_button(text: impl Into<egui::WidgetText>) -> impl egui::Widget {
+    egui_shadcn::Button::new(text)
+        .size(egui_shadcn::ComponentSize::Xs)
+        .variant(egui_shadcn::ButtonVariant::Outline)
+}
+
+pub(crate) fn destructive_button_with_icon(
+    text: impl Into<egui::WidgetText>,
+    icon: egui_shadcn::LucideIcon,
+) -> impl egui::Widget {
     egui_shadcn::Button::new(text)
         .full_width()
-        .icon(egui_shadcn::LucideIcon::Lock)
+        .icon(icon)
         .variant(egui_shadcn::ButtonVariant::Destructive)
 }
 
@@ -183,4 +192,12 @@ pub(crate) fn icon(ui: &mut egui::Ui, icon: &egui_shadcn::LucideIcon) {
         icon,
         egui_shadcn::ShadcnThemeExt::shadcn_theme(ui.ctx()).foreground,
     );
+}
+
+pub(crate) fn checkbox(
+    ui: &mut egui::Ui,
+    checked: &mut bool,
+    label: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.add(egui_shadcn::Checkbox::new(checked).label(label))
 }

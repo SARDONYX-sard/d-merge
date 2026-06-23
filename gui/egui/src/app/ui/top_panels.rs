@@ -15,7 +15,7 @@ use crate::{
     app::App,
     set_theme,
     theme::themed_top_bottom_panel,
-    ui::shadcn_compat::{button, button_with_icon, enum_select, radio_value},
+    ui::shadcn_compat::{button, button_with_icon, checkbox, enum_select, radio_value},
 };
 
 impl App {
@@ -149,7 +149,7 @@ impl App {
 
     fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {
         if matches!(self.settings.ui.theme, Theme::Custom) {
-            ui.checkbox(&mut self.show_theme_editor, "Theme Editor");
+            checkbox(ui, &mut self.show_theme_editor, "Theme Editor");
         }
 
         if matches!(self.settings.ui.theme, Theme::Custom)
@@ -346,14 +346,6 @@ impl App {
             });
         });
     }
-}
-
-fn checkbox(
-    ui: &mut egui::Ui,
-    checked: &mut bool,
-    label: impl Into<egui::WidgetText>,
-) -> egui::Response {
-    ui.add(egui_shadcn::Checkbox::new(checked).label(label))
 }
 
 const LABEL_WIDTH: f32 = 140.0;

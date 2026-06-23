@@ -126,7 +126,7 @@ impl Theme {
             Self::System => "💻 System",
             Self::Dark => "🌙 Dark",
             Self::Light => "☀ Light",
-            Self::Custom => "Custom",
+            Self::Custom => "🎨 Custom",
         }
     }
 }

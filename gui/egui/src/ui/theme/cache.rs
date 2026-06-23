@@ -83,6 +83,26 @@ impl ThemeCache {
         Ok(preset)
     }
 
+    pub(crate) fn delete(&self, name: &str) -> Result<(), Error> {
+        let path = self.path_for(name);
+
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(err) => {
+                return Err(Error::Io { path, source: err });
+            }
+        }
+
+        self.entries.remove(name);
+
+        {
+            let mut names = self.names.write();
+            names.retain(|n| n != name);
+        }
+
+        Ok(())
+    }
+
     // ── Write ─────────────────────────────────────────────────────────────────
 
     /// Serialize `preset` to `<dir>/<preset.name>.json` and upsert the cache.
