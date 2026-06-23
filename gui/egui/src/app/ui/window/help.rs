@@ -292,6 +292,7 @@ impl App {
 
                     searchable_string_select(
                         ui,
+                        "font_family",
                         selected_font_name,
                         crate::fonts::font_families(),
                         format!("{}...", self.i18n.t(I18nKey::SearchLabel)),

@@ -75,6 +75,7 @@ where
 
 pub(crate) fn searchable_string_select(
     ui: &mut egui::Ui,
+    id: impl std::hash::Hash,
     selected: &mut String,
     items: &[String],
     hint: impl Into<String>,
@@ -83,7 +84,7 @@ pub(crate) fn searchable_string_select(
 
     let mut index = items.iter().position(|item| item == selected);
 
-    let mut response = super::combo_box::Combobox::new("font_family", items.to_vec())
+    let mut response = super::combo_box::Combobox::new(id, items.to_vec())
         .search_hint(hint)
         .width(ui.available_width())
         .show(ui, &mut index);
@@ -96,6 +97,33 @@ pub(crate) fn searchable_string_select(
 
     if *selected != before {
         // egui_shadcn::Combobox does not correctly report changes.
+        response.mark_changed();
+    }
+
+    response
+}
+
+pub(crate) fn searchable_index_select(
+    ui: &mut egui::Ui,
+    id: impl std::hash::Hash,
+    selected: &mut usize,
+    items: &[String],
+    hint: impl Into<String>,
+) -> egui::Response {
+    let before = *selected;
+
+    let mut index = Some(*selected);
+
+    let mut response = super::combo_box::Combobox::new(id, items.to_vec())
+        .width(220.0)
+        .search_hint(hint)
+        .show(ui, &mut index);
+
+    if let Some(index) = index {
+        *selected = index;
+    }
+
+    if *selected != before {
         response.mark_changed();
     }
 

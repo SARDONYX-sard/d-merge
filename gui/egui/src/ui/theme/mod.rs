@@ -34,7 +34,7 @@ use egui_shadcn::ShadcnThemeExt;
 use crate::{
     theme::EguiColorExt as _,
     ui::{
-        shadcn_compat::{button, checkbox, small_button},
+        shadcn_compat::{button, checkbox, searchable_index_select, small_button, text},
         theme::cache::ThemeCache,
     },
 };
@@ -226,61 +226,64 @@ impl ThemeManager {
         let mut visuals_changed = false;
         let mut selection_changed = false;
 
-        // ── Preset row ────────────────────────────────────────────────────────
-        ui.horizontal(|ui| {
-            if ui.add(button("Preset:")).on_hover_text("Open them theme directory").clicked()
+        egui::Grid::new("theme_manager_grid").num_columns(2).spacing([8.0, 8.0]).show(ui, |ui| {
+            // ── Preset row ────────────────────────────────────────────────────────
+            if ui.add(button("Preset:")).on_hover_text("Open theme directory").clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(&self.cache.dir)
             {
                 self.set_error(err);
-            };
-
-            let label = self.names.get(self.selected_index).cloned().unwrap_or_else(|| "—".into());
-
-            egui::ComboBox::from_id_salt("theme_preset_combo")
-                .selected_text(&label)
-                .width(160.0)
-                .show_ui(ui, |ui| {
-                    for (i, name) in self.names.iter().enumerate() {
-                        if ui.selectable_value(&mut self.selected_index, i, name).clicked() {
-                            selection_changed = true;
-                        }
-                    }
-                });
-
-            if ui.add(button("load")).clicked() {
-                selection_changed = true;
             }
-            if selection_changed {
-                self.load_selected();
-            }
+            ui.horizontal(|ui| {
+                if searchable_index_select(
+                    ui,
+                    "theme_preset_combo",
+                    &mut self.selected_index,
+                    &self.names,
+                    "Search...",
+                )
+                .changed()
+                {
+                    selection_changed = true;
+                    self.load_selected();
+                }
 
-            if ui.add(button("⟳")).on_hover_text("Reload themes directory").clicked() {
-                self.reload_dir();
+                if ui.add(button("Load")).clicked() {
+                    selection_changed = true;
+                    self.load_selected();
+                }
+
+                if ui.add(button("⟳")).on_hover_text("Reload themes directory").clicked() {
+                    self.reload_dir();
+                }
+            });
+            ui.end_row();
+
+            // ── Save-as row ───────────────────────────────────────────────────────
+            label("Save as:", ui);
+            ui.horizontal(|ui| {
+                text(ui, &mut self.save_name, None, 220.0);
+
+                if ui.add(button("Save")).clicked() {
+                    self.save_current();
+                    selection_changed = true;
+                }
+            });
+            ui.end_row();
+
+            // ── Status bar ────────────────────────────────────────────────────────
+            ui.label("Status: ");
+            if let Some(msg) = &self.status {
+                let color = if msg.is_error {
+                    self.editing.as_ref().map_or(egui::Color32::from_rgb(220, 80, 80), |preset| {
+                        preset.visuals.error_fg_color.to_egui_color32()
+                    })
+                } else {
+                    egui::Color32::from_rgb(100, 200, 120)
+                };
+                ui.colored_label(color, &msg.text);
             }
+            ui.end_row();
         });
-
-        // ── Save-as row ───────────────────────────────────────────────────────
-        ui.horizontal(|ui| {
-            label("Save as", ui);
-            ui.text_edit_singleline(&mut self.save_name);
-            if ui.add(button("Save")).clicked() {
-                self.save_current();
-                // A successful save may have changed the selected name.
-                selection_changed = true;
-            }
-        });
-
-        // ── Status bar ────────────────────────────────────────────────────────
-        if let Some(msg) = &self.status {
-            let color = if msg.is_error {
-                self.editing.as_ref().map_or(egui::Color32::from_rgb(220, 80, 80), |preset| {
-                    preset.visuals.error_fg_color.to_egui_color32()
-                })
-            } else {
-                egui::Color32::from_rgb(100, 200, 120)
-            };
-            ui.colored_label(color, &msg.text);
-        }
 
         ui.separator();
 
@@ -294,11 +297,8 @@ impl ThemeManager {
                 ui.add_space(4.0);
 
                 egui::CollapsingHeader::new("Widgets").default_open(false).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        for tab in WidgetTab::ALL {
-                            ui.selectable_value(&mut self.widget_tab, *tab, tab.label());
-                        }
-                    });
+                    toggle_group_widget_tab(ui, &mut self.widget_tab);
+
                     ui.separator();
 
                     let wvc = match self.widget_tab {
@@ -602,4 +602,15 @@ fn slider_u8(
     }
 
     response
+}
+
+fn toggle_group_widget_tab(ui: &mut egui::Ui, value: &mut WidgetTab) {
+    let Some(mut idx) = WidgetTab::ALL.iter().position(|tab| *tab == *value) else { return };
+
+    egui_shadcn::ToggleGroup::new(
+        WidgetTab::ALL.iter().map(|tab| tab.label().to_owned()).collect(),
+    )
+    .show(ui, &mut idx);
+
+    *value = WidgetTab::ALL[idx];
 }

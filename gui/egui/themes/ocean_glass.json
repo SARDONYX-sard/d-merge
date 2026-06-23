@@ -15,7 +15,7 @@
       "width": 1.0,
       "color": "#1F3A4A"
     },
-    "panel_fill": "#06131AED",
+    "panel_fill": "#040B12A1",
     "window_corner_radius": 10,
     "menu_corner_radius": 8,
     "button_frame": true,
@@ -26,36 +26,66 @@
       "noninteractive": {
         "bg_fill": "#0F2A3A40",
         "weak_bg_fill": "#0F2A3A80",
-        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
-        "fg_stroke": { "width": 1.0, "color": "#A6D6F0" },
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#1F3A4A"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#A6D6F0"
+        },
         "corner_radius": 4
       },
       "inactive": {
         "bg_fill": "#102A3A80",
         "weak_bg_fill": "#102A3A80",
-        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
-        "fg_stroke": { "width": 1.0, "color": "#D6F0FF" },
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#1F3A4A"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#D6F0FF"
+        },
         "corner_radius": 4
       },
       "hovered": {
         "bg_fill": "#1A3B4D88",
         "weak_bg_fill": "#1A3B4D88",
-        "bg_stroke": { "width": 1.0, "color": "#3DB7FF" },
-        "fg_stroke": { "width": 1.5, "color": "#FFFFFF" },
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#3DB7FF"
+        },
+        "fg_stroke": {
+          "width": 1.5,
+          "color": "#FFFFFF"
+        },
         "corner_radius": 6
       },
       "active": {
         "bg_fill": "#24506688",
         "weak_bg_fill": "#24506688",
-        "bg_stroke": { "width": 1.5, "color": "#3DB7FF" },
-        "fg_stroke": { "width": 2.0, "color": "#FFFFFF" },
+        "bg_stroke": {
+          "width": 1.5,
+          "color": "#3DB7FF"
+        },
+        "fg_stroke": {
+          "width": 2.0,
+          "color": "#FFFFFF"
+        },
         "corner_radius": 6
       },
       "open": {
         "bg_fill": "#102A3A88",
         "weak_bg_fill": "#1A3B4D88",
-        "bg_stroke": { "width": 1.0, "color": "#1F3A4A" },
-        "fg_stroke": { "width": 1.0, "color": "#E6F7FF" },
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#1F3A4A"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#E6F7FF"
+        },
         "corner_radius": 4
       }
     }
