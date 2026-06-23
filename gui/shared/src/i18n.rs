@@ -25,13 +25,13 @@ pub enum I18nKey {
 
     /// Deletes previous output before patch execution.
     ///
-    /// Targets:
+    /// # Targets
     /// - `<output directory>/meshes`
     /// - `<output directory>/.d_merge/.debug`
     /// - `<output directory>/FNIS.esp`
     /// - `<output directory>/SKSE/Plugins/fnis_aa/config.json`
     ///
-    /// Note:
+    /// # Notes
     /// To avoid accidental mod corruption caused by deleting `meshes`,
     /// deletion is skipped when the output directory is the same as the Skyrim Data directory.
     AutoRemoveMeshesHover,
@@ -40,13 +40,15 @@ pub enum I18nKey {
     AutoRun,
 
     /// Once the mod list has been updated, enable all mods and run the patch once.
-    /// (You must close the window manually to prevent the auto-run option from becoming disabled.)
     ///
     /// # Mod list update triggers
     /// - Once at startup
     /// - When the reload button is pressed
     /// - When switching between vfs and manual environments
     /// - When the Skyrim data directory is changed
+    ///
+    /// # Notes
+    /// You must close the window manually to prevent the auto-run option from becoming disabled.
     AutoRunHover,
 
     /// Bug Report:
@@ -84,7 +86,7 @@ pub enum I18nKey {
 
     /// Outputs debug JSON and XML files.
     ///
-    /// Examples:
+    /// # Examples
     /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.xml`
     /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.json`
     /// - `<output directory>/.d_merge/.debug/patches/meshes/.../0_master.patch.json`
@@ -101,7 +103,8 @@ pub enum I18nKey {
 
     /// Generates a dummy FNIS.esp file.
     ///
-    /// This feature is required in the following situations:
+    /// # Notes
+    /// This feature is required in the following situations.
     /// - You are using mods that depend on FNIS.esp but are not using the original FNIS.esp
     GenerateFnisEspHover,
 
@@ -140,10 +143,7 @@ pub enum I18nKey {
     /// Font Path:
     FontFileLabel,
 
-    /// Reloads and applies the currently selected font configuration.
-    ///
-    /// This will reinitialize the font system using the active font mode
-    /// (Default, System, or File) and apply it to the UI.
+    /// Reloads and applies the currently selected font path.
     FontReloadHover,
 
     /// Help
@@ -158,7 +158,7 @@ pub enum I18nKey {
     /// New I18n
     I18nWriteNewJsonButton,
 
-    /// Generate a new translation JSON file initialized with English default values.
+    /// Create a new translation JSON file for the current application version with English default values.
     I18nWriteNewJsonHover,
 
     /// Report Issue
@@ -166,6 +166,8 @@ pub enum I18nKey {
 
     /// Report a bug on GitHub.
     /// This will auto-fill version info and some hardware.
+    ///
+    /// # Notes
     /// GitHub account required.
     IssueReportHover,
 
@@ -204,7 +206,7 @@ pub enum I18nKey {
 
     /// Mode for use without virtual mod managers such as MO2.
     ///
-    /// Note:
+    /// # Notes
     /// - Conflicts may occur if multiple versions of the same mod exist.
     /// - In manual mode, absolute paths are used as identifiers to prevent duplication. This makes configuration sharing unsuitable.
     ManualModeHover,
@@ -277,10 +279,12 @@ pub enum I18nKey {
     /// Removing the `<output_dir>/meshes` directory...
     RemovingMeshesMessage,
 
-    /// Output format for hkx. LE: win32, SE, VR: amd64
+    /// Output format for hkx.
+    /// - SkyrimLE: win32
+    /// - SkyrimSE/SkyrimVR: amd64
     ///
-    /// Note:
-    /// - (For Windows ver. user): When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
+    /// # Notes
+    /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
     RuntimeTargetHover,
 
     /// Output format
@@ -319,11 +323,29 @@ pub enum I18nKey {
     /// Reading templates and patches...
     StatusReadingPatches,
 
+    /// 🎨 Edit
+    ThemeEditorButton,
+
+    /// Open the theme editor to customize the app's appearance and color scheme
+    ThemeEditorButtonHover,
+
+    /// Change the application's overall appearance and color scheme
+    ThemeHover,
+
     /// Theme:
     ThemeLabel,
 
-    /// Toggle between System, Dark, Light and Custom themes.
-    ThemeHover,
+    /// 💻 System
+    ThemeSelectSystem,
+
+    /// 🌙 Dark
+    ThemeSelectDark,
+
+    /// ☀ Light
+    ThemeSelectLight,
+
+    /// 🎨 Custom
+    ThemeSelectCustom,
 
     /// Tooling:
     ToolingLabel,

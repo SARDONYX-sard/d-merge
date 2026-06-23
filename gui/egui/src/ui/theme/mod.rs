@@ -138,7 +138,7 @@ impl ThemeManager {
     fn load_by_name(&mut self, name: &str) {
         match self.cache.get(name) {
             Ok(preset) => {
-                self.save_name = preset.name.clone();
+                self.save_name = name.to_string();
                 self.editing = Some(preset);
                 self.status = None;
             }
@@ -160,10 +160,9 @@ impl ThemeManager {
             return;
         };
 
-        editing.name = self.save_name.clone();
         let preset = editing.clone();
 
-        match self.cache.save(preset) {
+        match self.cache.save(self.save_name.clone(), preset) {
             Ok(_) => {
                 // Refresh the local name snapshot in case a new entry was added.
                 self.names = self.cache.names();

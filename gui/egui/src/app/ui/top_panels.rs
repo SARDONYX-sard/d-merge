@@ -133,14 +133,14 @@ impl App {
             ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
-            const THEMES: [(Theme, &str); 4] = [
-                (Theme::System, Theme::System.as_str()),
-                (Theme::Dark, Theme::Dark.as_str()),
-                (Theme::Light, Theme::Light.as_str()),
-                (Theme::Custom, Theme::Custom.as_str()),
+            let themes: [(Theme, &str); 4] = [
+                (Theme::System, self.i18n.t(I18nKey::ThemeSelectSystem)),
+                (Theme::Dark, self.i18n.t(I18nKey::ThemeSelectDark)),
+                (Theme::Light, self.i18n.t(I18nKey::ThemeSelectLight)),
+                (Theme::Custom, self.i18n.t(I18nKey::ThemeSelectCustom)),
             ];
 
-            if enum_select(ui, &mut self.settings.ui.theme, &THEMES, Some([120.0, 30.0])).changed()
+            if enum_select(ui, &mut self.settings.ui.theme, &themes, Some([120.0, 30.0])).changed()
             {
                 set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
@@ -149,7 +149,15 @@ impl App {
 
     fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {
         if matches!(self.settings.ui.theme, Theme::Custom) {
-            checkbox(ui, &mut self.show_theme_editor, "Theme Editor");
+            fn toggle_value(
+                ui: &mut egui::Ui,
+                pressed: &mut bool,
+                text: impl Into<egui::WidgetText>,
+            ) -> egui::Response {
+                egui_shadcn::Toggle::new(pressed, text).show(ui)
+            }
+            toggle_value(ui, &mut self.show_theme_editor, self.i18n.t(I18nKey::ThemeEditorButton))
+                .on_hover_text(self.i18n.t(I18nKey::ThemeEditorButtonHover));
         }
 
         if matches!(self.settings.ui.theme, Theme::Custom)

@@ -160,9 +160,6 @@ impl Default for CustomTheme {
 /// Serializable application theme.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThemePreset {
-    /// Theme display name.
-    pub name: String,
-
     /// egui visuals configuration.
     pub visuals: VisualsConfig,
 

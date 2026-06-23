@@ -1,5 +1,4 @@
 {
-  "name": "dark",
   "visuals": {
     "dark_mode": true,
     "override_text_color": null,

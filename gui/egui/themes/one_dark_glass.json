@@ -1,5 +1,4 @@
 {
-  "name": "one_dark_glass",
   "visuals": {
     "dark_mode": true,
     "override_text_color": "#ABB2BF",

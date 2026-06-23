@@ -109,8 +109,7 @@ impl ThemeCache {
     /// Serialize `preset` to `<dir>/<preset.name>.json` and upsert the cache.
     ///
     /// Creates the themes directory if it does not exist.
-    pub(crate) fn save(&self, preset: ThemePreset) -> Result<PathBuf, Error> {
-        let name = preset.name.clone();
+    pub(crate) fn save(&self, name: String, preset: ThemePreset) -> Result<PathBuf, Error> {
         let path = self.path_for(&name);
 
         save_preset(&preset, &path)?;
