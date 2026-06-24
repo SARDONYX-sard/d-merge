@@ -110,7 +110,8 @@ impl ThemeManager {
     pub(crate) fn new(themes_dir: impl Into<std::path::PathBuf>, selected: Option<&str>) -> Self {
         let themes_dir = themes_dir.into();
         let cache = cache::ThemeCache::new(&themes_dir);
-        let preset = selected.and_then(|name| cache.get(name).ok());
+        // If we don't fall back to a default theme, we won't be able to edit anything when the Theme directory is empty.
+        let preset = selected.and_then(|name| cache.get(name).ok()).unwrap_or_else(dark_preset);
 
         let names = cache.names();
         let selected_index = names.iter().position(|n| Some(n.as_str()) == selected).unwrap_or(0);
@@ -119,7 +120,7 @@ impl ThemeManager {
             cache,
             names,
             selected_index,
-            editing: preset,
+            editing: Some(preset),
             save_name: selected.unwrap_or("Custom").to_string(),
             widget_tab: WidgetTab::Noninteractive,
             status: None,
@@ -612,4 +613,19 @@ fn toggle_group_widget_tab(ui: &mut egui::Ui, value: &mut WidgetTab) {
     .show(ui, &mut idx);
 
     *value = WidgetTab::ALL[idx];
+}
+
+fn dark_preset() -> ThemePreset {
+    ThemePreset {
+        visuals: preset::from_egui_visuals(&egui::Visuals::dark(), 1.0),
+        shadcn: preset::from_shadcn_theme(&egui_shadcn::theme::shadcn_theme_dark::dark()),
+    }
+}
+
+#[expect(unused)]
+fn light_preset() -> ThemePreset {
+    ThemePreset {
+        visuals: preset::from_egui_visuals(&egui::Visuals::light(), 1.0),
+        shadcn: preset::from_shadcn_theme(&egui_shadcn::theme::shadcn_theme_light::light()),
+    }
 }

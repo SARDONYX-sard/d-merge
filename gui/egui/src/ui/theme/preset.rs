@@ -102,7 +102,6 @@ pub(super) fn to_shadcn_theme(shadcn_theme: &ShadcnThemeConfig) -> egui_shadcn::
     }
 }
 
-#[expect(unused)]
 pub(super) fn from_egui_visuals(visuals: &egui::Visuals, disabled_alpha: f32) -> VisualsConfig {
     let map_wvc = |wvc: &egui::style::WidgetVisuals| WidgetVisualsConfig {
         bg_fill: Rgba::from_egui_color32(wvc.bg_fill),
@@ -154,7 +153,6 @@ pub(super) fn from_egui_visuals(visuals: &egui::Visuals, disabled_alpha: f32) ->
     }
 }
 
-#[expect(unused)]
 pub(super) fn from_shadcn_theme(theme: &egui_shadcn::ShadcnTheme) -> ShadcnThemeConfig {
     ShadcnThemeConfig {
         background: Rgba::from_egui_color32(theme.background),
