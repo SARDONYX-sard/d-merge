@@ -207,11 +207,11 @@ impl ThemeManager {
     /// Returns `Some(name)` when the caller should persist a new
     /// `selected_theme` in `settings.json` **and** re-apply the visuals.
     /// Returns `None` on frames with no actionable change.
-    pub(crate) fn show(&mut self, ctx: &egui::Context) -> Option<SettingsUpdate> {
+    pub(crate) fn show(&mut self, ctx: &egui::Context, open: &mut bool) -> Option<SettingsUpdate> {
         let mut update: Option<SettingsUpdate> = None;
 
         egui::Window::new("Theme Editor")
-            // .default_pos()
+            .open(open)
             .default_width(380.0)
             .min_width(300.0)
             .resizable(true)

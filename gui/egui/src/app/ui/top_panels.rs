@@ -162,7 +162,7 @@ impl App {
 
         if matches!(self.settings.ui.theme, Theme::Custom)
             && self.show_theme_editor
-            && let Some(update) = self.theme_manager.show(ui.ctx())
+            && let Some(update) = self.theme_manager.show(ui.ctx(), &mut self.show_theme_editor)
         {
             // Persist only the name.
             self.settings.ui.custom_theme = CustomTheme {
