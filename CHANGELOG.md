@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-06-29
+### :sparkles: New Features
+- [`b1a0b29`](https://github.com/SARDONYX-sard/d-merge/commit/b1a0b2965d11baf57159651f9f066fef1b7b3edb) - **egui**: add a close button to the Theme Editor *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`bbd58ce`](https://github.com/SARDONYX-sard/d-merge/commit/bbd58ce47f35d414b7a837bdd26c851abce6ccf2) - **egui**: fall back to a default theme *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`9c7614d`](https://github.com/SARDONYX-sard/d-merge/commit/9c7614d3851240088c54dd462a601d1c42ea9e24) - **egui**: icon to fn *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`68df073`](https://github.com/SARDONYX-sard/d-merge/commit/68df073ba37a842210ca1a9027a8b2d2f5cbaf40) - **theme**: add egui theme(violet_black_glass) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.4.0] - 2026-06-23
 ### :sparkles: New Features
 - [`677b6f3`](https://github.com/SARDONYX-sard/d-merge/commit/677b6f3ec5b27ffc0facc7325ad637372092d349) - **egui**: change bg aplha *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -572,3 +586,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.2.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.1.0...2.2.0
 [2.3.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.2.0...2.3.0
 [2.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.3.0...2.4.0
+[2.4.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.0...2.4.1
