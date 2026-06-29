@@ -24,7 +24,7 @@
     "@mui/material": "9.0.0",
     "@mui/x-data-grid": "9.0.2",
     "@mui/x-tree-view": "9.0.2",
-    "@tanstack/react-router": "^1.168.10",
+    "@tanstack/react-router": "^1.170.16",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-fs": "^2.5.0",
