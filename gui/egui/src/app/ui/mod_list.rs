@@ -14,8 +14,8 @@ use crate::{
     ui::{
         dnd_table::{check_only_table_body, dnd_table_body},
         shadcn_compat::{
-            button, button_with_icon, destructive_button_with_icon, enum_options, heading, icon,
-            text,
+            button, button_with_icon, destructive_button_with_icon, disabled_icon_only,
+            enum_options, heading, icon, icon_only, text,
         },
     },
 };
@@ -101,16 +101,9 @@ impl App {
         // -- Reload Button
         let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
         if is_fetching {
-            egui_shadcn::Button::icon_only(egui_shadcn::LucideIcon::RefreshCwOff)
-                .enabled(false)
-                .variant(egui_shadcn::ButtonVariant::Outline)
-                .size(egui_shadcn::ComponentSize::Lg)
-                .show(ui);
+            disabled_icon_only(ui, egui_shadcn::LucideIcon::RefreshCwOff);
         } else {
-            if egui_shadcn::Button::icon_only(egui_shadcn::LucideIcon::RefreshCcw)
-                .variant(egui_shadcn::ButtonVariant::Outline)
-                .size(egui_shadcn::ComponentSize::Lg)
-                .show(ui)
+            if icon_only(ui, egui_shadcn::LucideIcon::RefreshCcw)
                 .on_hover_text(format!("{} (Ctrl + R)", self.i18n.t(I18nKey::ReloadButton)))
                 .clicked()
             {

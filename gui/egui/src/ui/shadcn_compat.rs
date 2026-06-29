@@ -222,6 +222,24 @@ pub(crate) fn icon(ui: &mut egui::Ui, icon: &egui_shadcn::LucideIcon) {
     );
 }
 
+pub(crate) fn icon_only(ui: &mut egui::Ui, icon: egui_shadcn::LucideIcon) -> egui::Response {
+    egui_shadcn::Button::icon_only(icon)
+        .variant(egui_shadcn::ButtonVariant::Outline)
+        .size(egui_shadcn::ComponentSize::Lg)
+        .show(ui)
+}
+
+pub(crate) fn disabled_icon_only(
+    ui: &mut egui::Ui,
+    icon: egui_shadcn::LucideIcon,
+) -> egui::Response {
+    egui_shadcn::Button::icon_only(icon)
+        .enabled(false)
+        .variant(egui_shadcn::ButtonVariant::Outline)
+        .size(egui_shadcn::ComponentSize::Lg)
+        .show(ui)
+}
+
 pub(crate) fn checkbox(
     ui: &mut egui::Ui,
     checked: &mut bool,
