@@ -2,7 +2,7 @@ pub mod deserializer;
 pub mod diff;
 pub mod error;
 
-mod line_parsers;
+pub(crate) mod line_parsers;
 mod raw_diff;
 
 pub use diff::*;

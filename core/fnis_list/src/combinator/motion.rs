@@ -22,17 +22,26 @@ pub(crate) fn parse_md_data<'a>(input: &mut &'a str) -> ModalResult<Translation<
                 "Float value (e.g. 1.5, 2.9333)"
             ))),
         _: space1,
-        x: f32_parser.context(StrContext::Label("delta_x: f32")),
-        _: space1,
-        y: f32_parser.context(StrContext::Label("delta_y: f32")),
-        _: space1,
-        z: f32_parser.context(StrContext::Label("delta_z: f32")),
+        text: translation_parser.context(StrContext::Label("translation: f32")),
         _: skip_ws_and_comments0,
     })
     .context(StrContext::Label("MotionData"))
     .context(StrContext::Expected(StrContextValue::Description(
         "Format: MD <time: float> <dx: int> <dy: int> <dz: int>",
     )))
+    .parse_next(input)
+}
+
+fn translation_parser<'a>(input: &mut &'a str) -> ModalResult<Cow<'a, str>> {
+    seq! {
+        float::<_, f32, _>.context(StrContext::Label("delta_x: f32")),
+        space1,
+        float::<_, f32, _>.context(StrContext::Label("delta_y: f32")),
+        space1,
+        float::<_, f32, _>.context(StrContext::Label("delta_z: f32")),
+    }
+    .take()
+    .map(Cow::Borrowed)
     .parse_next(input)
 }
 
@@ -48,12 +57,8 @@ mod tests {
     #[test]
     fn test_parse_md_data_valid() {
         let parsed = must_parse(parse_md_data, "MD 2.5 0 0 30");
-        const EXPECTED: Translation = Translation {
-            time: Cow::Borrowed("2.5"),
-            x: Cow::Borrowed("0"),
-            y: Cow::Borrowed("0"),
-            z: Cow::Borrowed("30"),
-        };
+        const EXPECTED: Translation =
+            Translation { time: Cow::Borrowed("2.5"), text: Cow::Borrowed("0 0 30") };
 
         assert_eq!(parsed, EXPECTED);
     }

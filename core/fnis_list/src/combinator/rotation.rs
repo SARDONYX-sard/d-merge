@@ -34,35 +34,20 @@ impl<'a> RotationData<'a> {
         let time = Cow::Borrowed(time);
 
         match format {
-            RotationFormat::Quaternion { quat_x, quat_y, quat_z, quat_w } => Rotation {
-                time,
-                x: Cow::Borrowed(quat_x),
-                y: Cow::Borrowed(quat_y),
-                z: Cow::Borrowed(quat_z),
-                w: Cow::Borrowed(quat_w),
-            },
+            RotationFormat::Quaternion { text } => Rotation { time, text: Cow::Borrowed(text) },
             RotationFormat::DeltaZAngle { delta_z_angle } => {
                 // Heap alloc optimization
                 if delta_z_angle == 0.0 {
                     return Rotation {
                         time,
-                        x: Cow::Borrowed("0"),
-                        y: Cow::Borrowed("0"),
-                        z: Cow::Borrowed("0.000000"),
-                        // NOTE: This is a quaternion. For zero rotation, the identity quaternion is (0, 0, 0, 1),
-                        //       so w must be 1.0.
-                        w: Cow::Borrowed("1.000000"),
+                        // NOTE: This is a quaternion. For zero rotation, the identity quaternion is (0, 0, 0, 1), so w must be 1.0.
+                        text: Cow::Borrowed("0 0 0.000000 1.000000"),
                     };
                 }
 
                 let (x, y, z, w) = quat_from_z(delta_z_angle);
-                Rotation {
-                    time,
-                    x: Cow::Owned(x.to_string()),
-                    y: Cow::Owned(y.to_string()),
-                    z: Cow::Owned(z.to_string()),
-                    w: Cow::Owned(w.to_string()),
-                }
+                let text = Cow::Owned(format!("{x} {y} {z} {w}"));
+                Rotation { time, text }
             }
         }
     }
@@ -80,7 +65,7 @@ fn quat_from_z(deg: f32) -> (f32, f32, f32, f32) {
 #[derive(Debug, PartialEq)]
 pub enum RotationFormat<'a> {
     /// Quaternion-based rotation
-    Quaternion { quat_x: &'a str, quat_y: &'a str, quat_z: &'a str, quat_w: &'a str },
+    Quaternion { text: &'a str },
     /// Single-axis Z rotation
     DeltaZAngle { delta_z_angle: f32 },
 }
@@ -107,19 +92,20 @@ pub(crate) fn parse_rd_data<'a>(input: &mut &'a str) -> ModalResult<RotationData
 
 /// Parse quaternion-based rotation: RD <time> <quat_x> <quat_y> <quat_z> <quat_w>
 fn parse_rd_data1<'a>(input: &mut &'a str) -> ModalResult<RotationFormat<'a>> {
-    let mut f32_parser = float::<_, f32, _>.take();
+    Ok(RotationFormat::Quaternion { text: quaternion_parser.parse_next(input)? })
+}
 
+fn quaternion_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     seq! {
-        RotationFormat::Quaternion {
-            quat_x: f32_parser,
-            _: space1,
-            quat_y: f32_parser,
-            _: space1,
-            quat_z: f32_parser,
-            _: space1,
-            quat_w: f32_parser,
-        }
+        float::<_, f32, _>.context(StrContext::Label("quaternion_x: f32")),
+        space1,
+        float::<_, f32, _>.context(StrContext::Label("quaternion_y: f32")),
+        space1,
+        float::<_, f32, _>.context(StrContext::Label("quaternion_z: f32")),
+        space1,
+        float::<_, f32, _>.context(StrContext::Label("quaternion_z: f32")),
     }
+    .take()
     .parse_next(input)
 }
 
@@ -143,12 +129,7 @@ mod tests {
         let input = "RD 1.5 0.0 0.0 0.0 1.0\n";
         let expected = RotationData {
             time: "1.5",
-            format: RotationFormat::Quaternion {
-                quat_x: "0.0",
-                quat_y: "0.0",
-                quat_z: "0.0",
-                quat_w: "1.0",
-            },
+            format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" },
         };
         let parsed = must_parse(parse_rd_data, input);
         assert_eq!(parsed, expected);
@@ -176,12 +157,7 @@ mod tests {
         let input1 = "RD 1.5 0.0 0.0 0.0 1.0\n";
         let expected1 = RotationData {
             time: "1.5",
-            format: RotationFormat::Quaternion {
-                quat_x: "0.0",
-                quat_y: "0.0",
-                quat_z: "0.0",
-                quat_w: "1.0",
-            },
+            format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" },
         };
         let parsed1 = must_parse(parse_rd_data, input1);
         assert_eq!(parsed1, expected1);
