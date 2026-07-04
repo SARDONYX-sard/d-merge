@@ -1,16 +1,21 @@
 use json_patch::JsonPath;
 use winnow::{
     Parser,
-    ascii::multispace0,
+    ascii::{multispace0, space1},
     combinator::opt,
-    error::{ContextError, ErrMode},
+    error::{ContextError, ErrMode, StrContext, StrContextValue},
 };
 use winnow_ext::ReadableError;
 
 use super::raw_diff::RawDiff;
 use crate::{
-    adsf::patch::{ClipMotionDiffPatch, de::others::clip_motion::raw_diff::Op},
-    asdsf::patch::de::error::{Error, Result},
+    adsf::patch::{
+        ClipMotionDiffPatch,
+        de::{
+            error::{Error, Result},
+            others::clip_motion::raw_diff::Op,
+        },
+    },
     common_parser::{
         comment::close_comment_line,
         lines::{one_line, parse_one_line},
@@ -28,7 +33,6 @@ pub fn parse_clip_motion_diff_patch(
     let mut patcher_de = PatchDeserializer::new(adsf_patch);
     patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
 
-    dbg!(&patcher_de.raw_diffs);
     super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
 }
 
@@ -97,7 +101,7 @@ impl<'de> PatchDeserializer<'de> {
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
-        parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
+        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Convert Visitor errors to position-assigned errors.
@@ -107,12 +111,12 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::ContextError { err } => ReadableError::from_context(
+            Error::Context { err } => ReadableError::from_context(
                 err,
                 self.original,
                 self.original.len() - self.input.len(),
             ),
-            Error::ReadableError { source } => source,
+            Error::Readable { source } => source,
             err => ReadableError::from_display(
                 err,
                 self.original,
@@ -120,7 +124,18 @@ impl<'de> PatchDeserializer<'de> {
             ),
         };
 
-        Error::ReadableError { source: readable }
+        Error::Readable { source: readable }
+    }
+
+    #[cold]
+    fn message_to_readable_err(&self, err: impl core::fmt::Display) -> Error {
+        Error::Readable {
+            source: ReadableError::from_display(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+        }
     }
 
     /// Capture a raw diff block if present at the current position.
@@ -160,13 +175,19 @@ impl<'de> PatchDeserializer<'de> {
     fn parse_array(&mut self, inner_type: ArrayType) -> Result<()> {
         self.category = inner_type;
 
+        match inner_type {
+            ArrayType::Translation => self.path.push("translations_len".into()),
+            ArrayType::Rotation => self.path.push("rotations_len".into()),
+        }
         let len = self.parse_len_line()?;
+        self.path.pop();
+
         for index in 0..len {
             self.seq_index = Some(index);
-
-            // seq inner
-            match inner_type {
-                ArrayType::Translation | ArrayType::Rotation => self.parse_annotation()?,
+            if let Err(Error::Context { .. }) = self.parse_annotation() {
+                return Err(self.message_to_readable_err(format!(
+                    "Invalid Translation.\n\nExpected {len} vanilla translation entries, but found only {index}."
+                )));
             }
         }
 
@@ -216,11 +237,17 @@ impl<'de> PatchDeserializer<'de> {
     /// parse `<time: f32> <text: str>\n`
     fn parse_annotation(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        self.parse_next(winnow::ascii::float::<_, f32, _>.context(
-            winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("f32")),
-        ))?;
+        self.parse_next(
+            winnow::ascii::float::<_, f32, _>
+                .context(StrContext::Expected(StrContextValue::Description("f32"))),
+        )?;
+        self.parse_next(space1.context(StrContext::Expected(StrContextValue::Description(
+            "space between time & text",
+        ))))?;
 
-        let _s = self.parse_next(one_line)?;
+        let _s = self.parse_next(winnow::ascii::till_line_ending)?;
+        // In the case of patches, this may not be present, so `opt`
+        self.parse_next(opt(winnow::ascii::line_ending))?; // skip line end
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_s);
 
@@ -297,6 +324,7 @@ fn take_raw_diff<'a>(
 #[cfg(test)]
 mod tests {
     use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
+    use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::{
@@ -306,7 +334,7 @@ mod tests {
 
     // #[quick_tracing::init]
     #[test]
-    fn test_patch_modes_extended() {
+    fn test_patch_replace_translations() {
         // 100                    // clip_id
         // <!-- ORIGINAL -->
         // 93                     // clip_id
@@ -374,9 +402,83 @@ mod tests {
         assert_eq!(patches, expected);
     }
 
+    #[test]
+    fn test_patch_ignore_translation_len_only() {
+        let input = "
+100
+2
+<!-- MOD_CODE ~test~ OPEN -->
+3
+<!-- ORIGINAL -->
+2
+0 0 0 0 1
+0 0 0 0 1
+<!-- CLOSE -->
+2
+0 0 0 0 1
+0 0 0 0 1
+";
+
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        let expected = ClipMotionDiffPatch {
+            clip_id: None,
+            duration: None,
+            translations_patches: NonNestedArrayDiff::default(),
+            rotations_patches: NonNestedArrayDiff::default(),
+        };
+        assert_eq!(patches, expected);
+    }
+
+    /// These are the requirements for supporting `Precision Creatures (v2.4)`.
+    #[test]
+    fn test_patch_replace_translation_from_len_line() {
+        let input = "
+200
+3
+<!-- MOD_CODE ~test~ OPEN -->
+2
+0.25 10 20 30
+0.75 40 50 60
+<!-- ORIGINAL -->
+1
+0.50 1 2 3
+<!-- CLOSE -->
+1
+9.99 7 8 9 10";
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        let expected = ClipMotionDiffPatch {
+            clip_id: None,
+            duration: None,
+            translations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Replace, range: 0..2 },
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "time": "0.25",
+                                "text": "10 20 30",
+                            },
+                            {
+                                "time": "0.75",
+                                "text": "40 50 60",
+                            },
+                        ]),
+                    },
+                    priority: 0,
+                }],
+            },
+            rotations_patches: NonNestedArrayDiff::default(),
+        };
+
+        assert_eq!(patches, expected);
+    }
+
     // #[quick_tracing::init]
     #[test]
-    fn test_patch_modes() {
+    fn test_patch_remove_rotations() {
         let input = "
 99
 <!-- MOD_CODE ~test~ OPEN -->

@@ -35,6 +35,19 @@ pub enum Error {
     /// Human readable XML parsing error
     #[snafu(transparent)]
     Readable { source: winnow_ext::ReadableError },
+
+    //////////////////////////////////////////////////////////////////////
+    /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.
+    NotFoundApplyTarget { kind: String },
+
+    // merge
+    #[snafu(transparent)]
+    SimdJson {
+        /// simd_json error
+        source: simd_json::Error,
+    },
+    #[snafu(transparent)]
+    JsonPatch { source: json_patch::JsonPatchError },
 }
 
 /// `Result` for this crate.

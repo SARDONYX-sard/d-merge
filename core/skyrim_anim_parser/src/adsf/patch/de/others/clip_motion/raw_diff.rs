@@ -4,7 +4,7 @@ use json_patch::{JsonPath, ValueWithPriority};
 use winnow::{
     ModalResult, Parser as _,
     ascii::{float, multispace0, space0, space1},
-    combinator::{opt, repeat},
+    combinator::{alt, opt, repeat},
     error::{StrContext::*, StrContextValue::*},
 };
 use winnow_ext::ReadableError;
@@ -12,9 +12,14 @@ use winnow_ext::ReadableError;
 use crate::{
     adsf::{
         normal::{Rotation, Translation},
-        patch::{ClipMotionDiffPatch, de::others::clip_motion::deserializer::ArrayType},
+        patch::{
+            ClipMotionDiffPatch,
+            de::{
+                error::{Error, Result},
+                others::clip_motion::deserializer::ArrayType,
+            },
+        },
     },
-    asdsf::patch::de::error::Result,
     common_parser::{
         delete_line::delete_this_line,
         lines::{one_line, verify_line_parses_to},
@@ -99,16 +104,12 @@ pub(crate) fn into_patch_map(
             // Translation sequence
             // -------------------------
             (ArrayType::Translation, Op::Remove, None) => {
-                let start = raw.seq_index.ok_or_else(|| {
-                    crate::asdsf::patch::de::error::Error::NotFoundApplyTarget {
-                        kind: "translation remove requires seq_index".to_owned(),
-                    }
+                let start = raw.seq_index.ok_or_else(|| Error::NotFoundApplyTarget {
+                    kind: "translation remove requires seq_index".to_owned(),
                 })?;
 
-                let original_len = raw.original_len.ok_or_else(|| {
-                    crate::asdsf::patch::de::error::Error::NotFoundApplyTarget {
-                        kind: "translation remove requires original_len".to_owned(),
-                    }
+                let original_len = raw.original_len.ok_or_else(|| Error::NotFoundApplyTarget {
+                    kind: "translation remove requires original_len".to_owned(),
                 })?;
 
                 patches.translations_patches.seq.push(ValueWithPriority {
@@ -122,17 +123,36 @@ pub(crate) fn into_patch_map(
                     priority,
                 });
             }
-            (ArrayType::Translation, _, None) => {
-                let (v, delete_len) =
-                    translation.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            (ArrayType::Translation, _, last) => {
+                // There are two variations of this pattern.
+                // - A diff that changes only `len`
+                // - A diff that replaces both `len` and `translations`.
+                //
+                // Therefore, we need to adjust it here.
+                let input = if last == Some("translations_len") {
+                    let mut input = raw.text;
+                    verify_line_parses_to::<usize>
+                        .context(Expected(Description("translations_len: usize")))
+                        .parse_next(&mut input)
+                        .map_err(|err| {
+                            ReadableError::from_display(err, raw.text, raw.text.len() - input.len())
+                        })?;
 
-                let range =
-                    raw.seq_index.map(|start| Range { start, end: start + v.len() + delete_len });
+                    // If `len` is the only parameter, then the patch consists only of the difference in `len`.
+                    // Since `len` can be automatically determined using `Vec::len`, this is unnecessary.
+                    if input.trim().is_empty() {
+                        continue;
+                    }
 
-                let action = match range {
-                    None => json_patch::Action::SeqPush,
-                    Some(range) => json_patch::Action::Seq { op: to_json_patch_op(op), range },
+                    input
+                } else {
+                    raw.text
                 };
+
+                let (v, delete_len) =
+                    translation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
+                let action =
+                    make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
 
                 patches.translations_patches.seq.push(ValueWithPriority {
                     patch: json_patch::JsonPatch { action, value: v.into() },
@@ -144,16 +164,12 @@ pub(crate) fn into_patch_map(
             // Rotation sequence
             // -------------------------
             (ArrayType::Rotation, Op::Remove, None) => {
-                let start = raw.seq_index.ok_or_else(|| {
-                    crate::asdsf::patch::de::error::Error::NotFoundApplyTarget {
-                        kind: "rotation remove requires seq_index".to_owned(),
-                    }
+                let start = raw.seq_index.ok_or_else(|| Error::NotFoundApplyTarget {
+                    kind: "rotation remove requires seq_index".to_owned(),
                 })?;
 
-                let original_len = raw.original_len.ok_or_else(|| {
-                    crate::asdsf::patch::de::error::Error::NotFoundApplyTarget {
-                        kind: "rotation remove requires original_len".to_owned(),
-                    }
+                let original_len = raw.original_len.ok_or_else(|| Error::NotFoundApplyTarget {
+                    kind: "rotation remove requires original_len".to_owned(),
                 })?;
 
                 patches.rotations_patches.seq.push(ValueWithPriority {
@@ -168,16 +184,36 @@ pub(crate) fn into_patch_map(
                 });
             }
             (ArrayType::Rotation, _, None) => {
-                let (v, delete_len) =
-                    rotation.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+                // There are two variations of this pattern.
+                // - A diff that changes only `len`
+                // - A diff that replaces both `len` and `rotations`.
+                //
+                // Therefore, we need to adjust it here.
+                let input = if last == Some("rotations_len") {
+                    let mut input = raw.text;
 
-                let range =
-                    raw.seq_index.map(|start| Range { start, end: start + v.len() + delete_len });
+                    verify_line_parses_to::<usize>
+                        .context(Expected(Description("rotations_len: usize")))
+                        .parse_next(&mut input)
+                        .map_err(|err| {
+                            ReadableError::from_display(err, raw.text, raw.text.len() - input.len())
+                        })?;
 
-                let action = match range {
-                    None => json_patch::Action::SeqPush,
-                    Some(range) => json_patch::Action::Seq { op: to_json_patch_op(op), range },
+                    // If `len` is the only parameter, then the patch consists only of the difference in `len`.
+                    // Since `len` can be automatically determined using `Vec::len`, this is unnecessary.
+                    if input.trim().is_empty() {
+                        continue;
+                    }
+
+                    input
+                } else {
+                    raw.text
                 };
+
+                let (v, delete_len) =
+                    rotation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
+                let action =
+                    make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
 
                 patches.rotations_patches.seq.push(ValueWithPriority {
                     patch: json_patch::JsonPatch { action, value: v.into() },
@@ -189,7 +225,7 @@ pub(crate) fn into_patch_map(
                 #[cfg(feature = "tracing")]
                 tracing::debug!("unknown pattern: {failure:?}");
 
-                return Err(crate::asdsf::patch::de::error::Error::NotFoundApplyTarget {
+                return Err(Error::NotFoundApplyTarget {
                     kind: format!("unknown pattern: {failure:?}"),
                 });
             }
@@ -199,38 +235,66 @@ pub(crate) fn into_patch_map(
     Ok(patches)
 }
 
-/// # Panics
-/// `SeqPush`
+const fn make_seq_action(
+    op: Op,
+    seq_index: Option<usize>,
+    original_len: Option<usize>,
+    new_len: usize,
+) -> json_patch::Action {
+    match (seq_index, original_len) {
+        (Some(start), _) => json_patch::Action::Seq {
+            op: to_json_patch_op(op),
+            range: Range { start, end: start + new_len },
+        },
+        // Diff starts from `*_len`, meaning the whole array is replaced.
+        (None, Some(_)) => json_patch::Action::Seq {
+            op: to_json_patch_op(op),
+            range: Range { start: 0, end: new_len },
+        },
+        (None, None) => json_patch::Action::SeqPush,
+    }
+}
+
 const fn to_json_patch_op(op: Op) -> json_patch::Op {
     match op {
-        Op::Add => json_patch::Op::Add,
         Op::Replace => json_patch::Op::Replace,
         Op::Remove => json_patch::Op::Remove,
-        Op::SeqPush => unreachable!(),
+        Op::Add | Op::SeqPush => json_patch::Op::Add, // unreachable Op::SeqPush
     }
 }
 
 /// parse `<time: f32> <text: str>\n` or `//* delete this line *//`
 fn translation<'a>(input: &mut &'a str) -> ModalResult<(Vec<Translation<'a>>, usize)> {
     multispace0.parse_next(input)?;
+
     let mut delete_count = 0;
     while opt(delete_this_line).parse_next(input)?.is_some() {
         delete_count += 1;
     }
 
-    let diff=     repeat(
+    // In `Precision Creatures (v2.4)`, there may be a `delete this line` statement in the middle.
+    let diff = repeat(
         1..,
-        winnow::seq! {
-            Translation {
-                _: space0,
-                time: float::<_, f32, _>.take().map(Cow::Borrowed).context(Expected(Description("time: f32"))),
-                _: space1,
-                text: one_line.context(Expected(Description("text: str"))),
-                _: multispace0,
+        alt((
+            delete_this_line.map(|_| {
+                delete_count += 1;
+                None
+            }),
+            winnow::seq! {
+                Translation {
+                    _: space0,
+                    time: float::<_, f32, _>.take().map(Cow::Borrowed)
+                        .context(Expected(Description("time: f32"))),
+                    _: space1,
+                    text: one_line.context(Expected(Description("text: str"))),
+                    _: multispace0,
+                }
             }
-        }
-        .context(Label("TranslationDiff")),
+            .context(Label("TranslationDiff"))
+            .map(Some),
+        )),
     )
+    .map(|items: Vec<Option<Translation>>| items.into_iter().flatten().collect::<Vec<_>>())
     .context(Label("TranslationsDiff"))
     .parse_next(input)?;
 
@@ -250,19 +314,29 @@ fn rotation<'a>(input: &mut &'a str) -> ModalResult<(Vec<Rotation<'a>>, usize)> 
         delete_count += 1;
     }
 
+    // In `Precision Creatures (v2.4)`, there may be a `delete this line` statement in the middle.
     let diff = repeat(
         1..,
-        winnow::seq! {
-            Rotation {
-                _: space0,
-                time: float::<_, f32, _>.take().map(Cow::Borrowed).context(Expected(Description("time: f32"))),
-                _: space1,
-                text: one_line.context(Expected(Description("text: str"))),
-                _: multispace0,
+        alt((
+            delete_this_line.map(|_| {
+                delete_count += 1;
+                None
+            }),
+            winnow::seq! {
+                Rotation {
+                    _: space0,
+                    time: float::<_, f32, _>.take().map(Cow::Borrowed)
+                        .context(Expected(Description("time: f32"))),
+                    _: space1,
+                    text: one_line.context(Expected(Description("text: str"))),
+                    _: multispace0,
+                }
             }
-        }
-        .context(Label("RotationDiff")),
+            .context(Label("RotationDiff"))
+            .map(Some),
+        )),
     )
+    .map(|items: Vec<Option<Rotation>>| items.into_iter().flatten().collect::<Vec<_>>())
     .context(Label("RotationsDiff"))
     .parse_next(input)?;
 
@@ -284,13 +358,14 @@ mod tests {
 //* delete this line *//
 //* delete this line *//
 0.10 1 2 3
+//* delete this line *//
 0.20 4 5 6
 //* delete this line *//
 ";
 
         let (diff, delete_count) = translation.parse(input).unwrap();
 
-        assert_eq!(delete_count, 3);
+        assert_eq!(delete_count, 4);
 
         assert_eq!(diff.len(), 2);
 

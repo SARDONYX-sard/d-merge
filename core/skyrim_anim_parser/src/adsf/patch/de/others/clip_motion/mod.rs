@@ -8,8 +8,8 @@ use rayon::prelude::*;
 use simd_json::{base::ValueTryAsArrayMut as _, borrowed::Value, serde::from_borrowed_value};
 
 use crate::{
-    adsf::normal::ClipMotionBlock,
-    asdsf::patch::de::{NonNestedArrayDiff, error::Error},
+    adsf::{normal::ClipMotionBlock, patch::de::error::Error},
+    asdsf::patch::de::NonNestedArrayDiff,
 };
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
