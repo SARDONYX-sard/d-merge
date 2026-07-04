@@ -179,9 +179,13 @@ fn translations<'a>(
         for _ in 0..line_len {
             let translation = seq! {Translation {
                 time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
-                z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
+                text: till_line_ending.verify(|s: &str| {
+                            let mut it = s.split_ascii_whitespace();
+                            it.next().and_then(|v| v.parse::<f32>().ok()).is_some()        // x
+                                && it.next().and_then(|v| v.parse::<f32>().ok()).is_some() // y
+                                && it.next().and_then(|v| v.parse::<f32>().ok()).is_some() // z
+                                && it.next().is_none()
+                    }).context(Expected(Description("<x:f32> <y:f32> <z:f32>"))).map(Into::into),
                 _: opt(line_ending),
             }}
             .context(Label("Translation"))
@@ -202,10 +206,14 @@ fn rotations<'a>(
         for _ in 0..line_len {
             let rotation = seq! {Rotation {
                 time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
-                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))),
-                w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
+                text: till_line_ending.verify(|s: &str| {
+                            let mut it = s.split_ascii_whitespace();
+                            it.next().and_then(|v| v.parse::<f32>().ok()).is_some()        // x
+                                && it.next().and_then(|v| v.parse::<f32>().ok()).is_some() // y
+                                && it.next().and_then(|v| v.parse::<f32>().ok()).is_some() // z
+                                && it.next().and_then(|v| v.parse::<f32>().ok()).is_some() // w
+                                && it.next().is_none()
+                    }).context(Expected(Description("<x:f32> <y:f32> <z:f32> <w:f32>"))).map(Into::into),
                 _: opt(line_ending), // In the case of patches, this may not be present, so opt
             }}
             .context(Label("Rotation"))

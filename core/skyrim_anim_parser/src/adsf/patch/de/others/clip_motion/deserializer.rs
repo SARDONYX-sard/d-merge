@@ -1,82 +1,107 @@
-use json_patch::Op;
+use json_patch::JsonPath;
 use winnow::{
     Parser,
-    ascii::{line_ending, multispace0, till_line_ending},
-    combinator::{eof, opt},
-    error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
+    ascii::{multispace0, space1},
+    combinator::opt,
+    error::{ContextError, ErrMode, StrContext, StrContextValue},
 };
 use winnow_ext::ReadableError;
 
+use super::raw_diff::RawDiff;
 use crate::{
-    adsf::{
-        normal::{Rotation, Translation, de::from_word_and_space},
-        patch::de::{
+    adsf::patch::{
+        ClipMotionDiffPatch,
+        de::{
             error::{Error, Result},
-            others::clip_motion::{
-                ClipMotionDiffPatch, DiffRotations, DiffTransitions, LineKind,
-                current_state::{CurrentState, PartialRotations, PartialTranslations},
-            },
+            others::clip_motion::raw_diff::Op,
         },
     },
     common_parser::{
-        comment::{CommentKind, open_comment, original_or_close_comment, take_till_close},
-        delete_line::delete_this_line,
-        lines::{one_line, verify_line_parses_to},
+        comment::close_comment_line,
+        lines::{one_line, parse_one_line},
     },
 };
 
-/// Parse animationdatasinglefile.txt clip motion block patch.
+/// Parse `animationdatasinglefile.txt` clip motion patch.
 ///
 /// # Errors
 /// Parse failed.
-pub fn parse_clip_motion_diff_patch(input: &str) -> Result<ClipMotionDiffPatch<'_>, Error> {
-    let mut deserializer = Deserializer::new(input);
-    deserializer.root().map_err(|err| deserializer.to_readable_err(err))?;
-    Ok(deserializer.output_patches)
+pub fn parse_clip_motion_diff_patch(
+    adsf_patch: &str,
+    priority: usize,
+) -> Result<ClipMotionDiffPatch<'_>> {
+    let mut patcher_de = PatchDeserializer::new(adsf_patch);
+    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
+
+    super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
 }
 
 /// Nemesis patch deserializer
-#[derive(Debug)]
-struct Deserializer<'a> {
+#[derive(Debug, Clone)]
+struct PatchDeserializer<'a> {
     /// mutable pointer to str
     input: &'a str,
     /// This is readonly for error report. Not move position.
     original: &'a str,
 
-    /// Output
-    output_patches: ClipMotionDiffPatch<'a>,
+    /// Raw diff blocks captured during parsing.
+    raw_diffs: Vec<RawDiff<'a>>,
 
-    /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
-    /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
-    pub current: CurrentState<'a>,
+    ///When an `ORIGINAL` comment arrives,
+    /// we need to parse it for the number of len elements, but we don't treat it as a diff until CLOSE.
+    /// This is the flag for that purpose.
+    ignore_close: bool,
+
+    /// Indicates the current json position during one patch file.
+    ///
+    /// e.g. `["attack", "[9]", "clip_names", "clip_name"]`
+    path: JsonPath<'a>,
+
+    /// Array end push Operation?
+    op: Op,
+
+    /// Parsed category.
+    ///
+    /// But that doesn't necessarily mean it's correct.
+    /// For example, an addition at the end of a category might actually be a diff for the next category.
+    category: ArrayType,
+
+    /// The index of the array being processed.
+    /// Since patching the entire array does not output the index to path, we store it here.
+    seq_index: Option<usize>,
 }
 
-impl<'de> Deserializer<'de> {
-    fn new(input: &'de str) -> Self {
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ArrayType {
+    /// `Array<Translation>`
+    Translation,
+
+    /// `Array<Rotation>`
+    Rotation,
+}
+
+impl<'de> PatchDeserializer<'de> {
+    const fn new(input: &'de str) -> Self {
         Self {
             input,
             original: input,
-            output_patches: ClipMotionDiffPatch::DEFAULT,
-            current: CurrentState::new(),
+            raw_diffs: Vec::new(),
+            path: JsonPath::new(),
+            op: Op::Add,
+            ignore_close: false,
+            category: ArrayType::Translation,
+            seq_index: None,
         }
     }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Parser methods
 
     fn parse_next<O>(
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
     ) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
-    }
-
-    /// Parse by argument parser no consume.
-    ///
-    /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
-        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
-        Ok(res)
     }
 
     /// Convert Visitor errors to position-assigned errors.
@@ -102,260 +127,214 @@ impl<'de> Deserializer<'de> {
         Error::Readable { source: readable }
     }
 
+    #[cold]
+    fn message_to_readable_err(&self, err: impl core::fmt::Display) -> Error {
+        Error::Readable {
+            source: ReadableError::from_display(
+                err,
+                self.original,
+                self.original.len() - self.input.len(),
+            ),
+        }
+    }
+
+    /// Capture a raw diff block if present at the current position.
+    ///
+    /// The diff block is associated with the current JsonPath.
+    fn maybe_capture_diff(&mut self) -> Result<()> {
+        if self.ignore_close && self.parse_next(opt(close_comment_line))?.is_some() {
+            self.ignore_close = false;
+        };
+
+        if let Some((raw, has_original, original_len)) = self.parse_next(take_raw_diff)? {
+            let path = self.path.clone();
+
+            let op = match (has_original, raw.is_empty()) {
+                (true, true) => Op::Remove,
+                (true, false) => Op::Replace,
+                (false, true) => Op::Add,
+                (false, false) => self.op,
+            };
+
+            if has_original {
+                self.ignore_close = true;
+            }
+
+            self.raw_diffs.push(RawDiff {
+                path,
+                text: raw,
+                op,
+                seq_index: self.seq_index,
+                seq_type: self.category,
+                original_len,
+            });
+        }
+        Ok(())
+    }
+
+    fn parse_array(&mut self, inner_type: ArrayType) -> Result<()> {
+        self.category = inner_type;
+
+        match inner_type {
+            ArrayType::Translation => self.path.push("translations_len".into()),
+            ArrayType::Rotation => self.path.push("rotations_len".into()),
+        }
+        let len = self.parse_len_line()?;
+        self.path.pop();
+
+        for index in 0..len {
+            self.seq_index = Some(index);
+            if let Err(Error::Context { .. }) = self.parse_annotation() {
+                return Err(self.message_to_readable_err(format!(
+                    "Invalid Translation.\n\nExpected {len} vanilla translation entries, but found only {index}."
+                )));
+            }
+        }
+
+        // capture array push
+        self.op = Op::SeqPush;
+        self.seq_index = None;
+        self.maybe_capture_diff()?;
+        self.op = Op::Add;
+
+        Ok(())
+    }
+
+    /// Any length info from 1 line.
+    fn parse_len_line(&mut self) -> Result<usize> {
+        use winnow::error::{StrContext::Expected, StrContextValue::Description};
+
+        self.maybe_capture_diff()?;
+        let len = self.parse_next(
+            parse_one_line::<usize>.context(Expected(Description("length_line: usize"))),
+        )?;
+        #[cfg(feature = "tracing")]
+        tracing::trace!("{:?}, line Length = {len}", self.path);
+        Ok(len)
+    }
+
+    /// Parse 1 line(but ignore new line)
+    fn parse_str_line(&mut self) -> Result<()> {
+        self.maybe_capture_diff()?;
+        let _s = self.parse_next(one_line)?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(?self.path, ?_s);
+
+        Ok(())
+    }
+
+    fn parse_line_f32(&mut self) -> Result<()> {
+        self.maybe_capture_diff()?;
+        let _value = self.parse_next(parse_one_line::<f32>.context(
+            winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("f32")),
+        ))?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(?self.path, ?_value);
+
+        Ok(())
+    }
+
+    /// parse `<time: f32> <text: str>\n`
+    fn parse_annotation(&mut self) -> Result<()> {
+        self.maybe_capture_diff()?;
+        self.parse_next(
+            winnow::ascii::float::<_, f32, _>
+                .context(StrContext::Expected(StrContextValue::Description("f32"))),
+        )?;
+        self.parse_next(space1.context(StrContext::Expected(StrContextValue::Description(
+            "space between time & text",
+        ))))?;
+
+        let _s = self.parse_next(winnow::ascii::till_line_ending)?;
+        // In the case of patches, this may not be present, so `opt`
+        self.parse_next(opt(winnow::ascii::line_ending))?; // skip line end
+        #[cfg(feature = "tracing")]
+        tracing::debug!(?self.path, ?_s);
+
+        Ok(())
+    }
+
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// Parse 1 file patch
-    fn root(&mut self) -> Result<()> {
+    /// Parse 1 asdsf patch
+    fn root_class(&mut self) -> Result<()> {
         self.parse_next(multispace0)?;
+        self.parse_clip_id()?;
+        self.parse_duration()?;
 
-        while let Some(line_kind) = self.current.next() {
-            match line_kind {
-                LineKind::ClipId => {
-                    let should_take = self.parse_opt_start_comment()?;
+        self.parse_array(ArrayType::Translation)?; // triggers
+        self.parse_array(ArrayType::Rotation)?;
 
-                    let clip_id =
-                        self.parse_next(one_line.context(Expected(Description("clip_id: Str"))))?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("clip_id = {clip_id:#?}");
-
-                    if should_take {
-                        self.current.replace_one(clip_id)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                }
-                LineKind::Duration => {
-                    let should_take = self.parse_opt_start_comment()?;
-                    self.parse_next(multispace0)?;
-
-                    let duration = self.parse_next(
-                        verify_line_parses_to::<f32>
-                            .context(Expected(Description("duration: f32"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("duration = {duration:#?}");
-
-                    if should_take {
-                        self.current.replace_one(duration)?;
-                        self.parse_opt_close_comment()?;
-                    }
-                    self.parse_next(multispace0)?;
-                }
-                LineKind::TranslationLen | LineKind::RotationLen => {
-                    let diff_start = self.parse_opt_start_comment()?;
-                    if diff_start {
-                        self.current.set_range_start(0)?;
-                    }
-                    let _len = self.parse_next(
-                        verify_line_parses_to::<usize>
-                            .context(Expected(Description("length: usize"))),
-                    )?;
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("{line_kind:#?} = {_len:#?}");
-                }
-                LineKind::Translation => {
-                    // until rotation length line
-                    let mut start_index = 0;
-                    while self.parse_peek(opt(verify_line_parses_to::<usize>))?.is_none() {
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-
-                        if self.parse_next(opt(delete_this_line))?.is_some() {
-                            start_index += 1;
-                            self.current.increment_translations_range();
-                        } else {
-                            self.transition()?;
-                        }
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-                        start_index += 1;
-                    }
-                }
-                LineKind::Rotation => {
-                    let mut start_index = 0;
-                    while self.parse_peek(opt(eof))?.is_none() {
-                        let diff_start = self.parse_opt_start_comment()?;
-                        if diff_start {
-                            self.current.set_range_start(start_index)?;
-                        }
-
-                        if self.parse_next(opt(delete_this_line))?.is_some() {
-                            start_index += 1;
-                            self.current.increment_rotations_range();
-                        } else {
-                            self.rotation()?;
-                        }
-
-                        self.parse_opt_close_comment()?;
-                        self.parse_next(multispace0)?;
-                        start_index += 1;
-                    }
-                    break;
-                }
-            };
-        }
-
-        self.parse_next(multispace0)?;
-        if !self.input.is_empty() {
-            return Err(Error::IncompleteParse);
-        }
-
-        Ok(())
-    }
-
-    fn transition(&mut self) -> Result<()> {
-        let time = self
-            .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
-        let x =
-            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("x: f32"))))?;
-        let y =
-            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("y: f32"))))?;
-        let z = {
-            let w_parser = till_line_ending
-                .verify(|s: &str| s.parse::<f32>().is_ok())
-                .context(Expected(Description("z: f32")));
-            self.parse_next(w_parser)?
-        }
-        .into();
-        self.parse_next(opt(line_ending))?;
-
-        if self.current.mode_code.is_some() {
-            self.current.push_as_translation(Translation { time, x, y, z })?;
-        }
-
-        Ok(())
-    }
-
-    fn rotation(&mut self) -> Result<()> {
-        let time = self
-            .parse_next(from_word_and_space::<f32>.context(Expected(Description("time: f32"))))?;
-        let x =
-            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("x: f32"))))?;
-        let y =
-            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("y: f32"))))?;
-        let z =
-            self.parse_next(from_word_and_space::<f32>.context(Expected(Description("z: f32"))))?;
-
-        let w = {
-            let w_parser = till_line_ending
-                .verify(|s: &str| s.parse::<f32>().is_ok())
-                .context(Expected(Description("w: f32")));
-            self.parse_next(w_parser)?
-        }
-        .into();
-        self.parse_next(opt(line_ending))?;
-
-        let rotation = Rotation { time, x, y, z, w };
         #[cfg(feature = "tracing")]
-        tracing::trace!("rotation = {rotation:?}");
-
-        if self.current.mode_code.is_some() {
-            self.current.push_as_rotation(rotation)?;
-        }
+        tracing::debug!("{:#?}", self.raw_diffs);
         Ok(())
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    fn parse_clip_id(&mut self) -> Result<()> {
+        self.path.push("clip_id".into());
+        self.parse_str_line()?; // e.g., 100, $aaaa
+        self.path.pop();
 
-    /// Can parse `MOD_CODE ~<mod code>~ OPEN`?
-    ///
-    /// # Return
-    /// Is the mode code comment?
-    fn parse_opt_start_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(open_comment))? {
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?comment_ty);
-            match comment_ty {
-                CommentKind::ModCode(id) => {
-                    self.current.mode_code = Some(id);
-                    // When there are no additional differences, it is 100% Remove.
-                    let found_end_diff_sym = self.parse_opt_close_comment()?;
-                    if found_end_diff_sym {
-                        self.current.force_removed = true;
-                    };
-                    return Ok(true);
-                }
-                _ => return Ok(false),
-            }
-        }
-        Ok(false)
+        Ok(())
     }
 
-    /// Processes the close comment (`ORIGINAL` or `CLOSE`) depending on whether it was encountered,
-    /// and returns whether it was encountered or not.
-    fn parse_opt_close_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(original_or_close_comment))? {
-            #[cfg(feature = "tracing")]
-            tracing::debug!(?comment_ty);
-            match comment_ty {
-                CommentKind::Original => {
-                    self.current.set_is_passed_original();
-                    let op = self.current.judge_operation();
-                    if op != Op::Remove {
-                        self.parse_next(take_till_close)?;
-                        self.merge_to_output()?;
-                    }
-                    return Ok(true);
-                }
-                CommentKind::Close => {
-                    self.merge_to_output()?;
-                    return Ok(true);
-                }
-                _ => {}
-            }
-        }
-        Ok(false)
-    }
-
-    /// This is the method that is called when a single differential change comment pair finishes calling.
-    fn merge_to_output(&mut self) -> Result<(), Error> {
-        let op = self.current.judge_operation();
-        if let Some(mut partial_patch) = self.current.patch.take() {
-            match self.current.current_kind()? {
-                LineKind::ClipId => {
-                    if let Some(clip_id) = partial_patch.clip_id.take() {
-                        self.output_patches.clip_id.replace(clip_id);
-                    }
-                }
-                LineKind::Duration => {
-                    if let Some(duration) = partial_patch.duration.take() {
-                        self.output_patches.duration.replace(duration);
-                    }
-                }
-                LineKind::TranslationLen | LineKind::RotationLen => {}
-                LineKind::Translation => {
-                    if let Some(transitions) = partial_patch.translations.take() {
-                        let PartialTranslations { range, values } = transitions;
-                        let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.translations =
-                            Some(DiffTransitions { op, range, values });
-                    }
-                }
-                LineKind::Rotation => {
-                    if let Some(rotations) = partial_patch.rotations.take() {
-                        let PartialRotations { range, values } = rotations;
-                        let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.rotations = Some(DiffRotations { op, range, values });
-                    }
-                }
-            }
-
-            self.current.clear_flags(); // new patch is generated so clear flags.
-        }
+    fn parse_duration(&mut self) -> Result<()> {
+        self.path.push("duration".into());
+        self.parse_line_f32()?;
+        self.path.pop();
 
         Ok(())
     }
 }
 
+/// Returns
+/// (diff, has_original, original_len)
+fn take_raw_diff<'a>(
+    input: &mut &'a str,
+) -> winnow::ModalResult<Option<(&'a str, bool, Option<usize>)>> {
+    use crate::common_parser::comment::{open_comment, take_till_close};
+
+    // Fast path: no OPEN comment ahead
+    if opt(open_comment).parse_next(input)?.is_none() {
+        return Ok(None);
+    }
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("Open diff");
+
+    let (diff, has_original, original_len) = if let Some(diff) =
+        opt(crate::common_parser::comment::take_till_original).parse_next(input)?
+    {
+        let (_remain, original) = opt(take_till_close).parse_peek(input)?;
+
+        let original = original.unwrap_or("");
+
+        (diff, true, Some(original.lines().filter(|l| !l.trim().is_empty()).count()))
+    } else {
+        let diff = take_till_close.parse_next(input)?;
+        (diff, false, None)
+    };
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!(?diff, has_original, original_len);
+
+    Ok(Some((diff, has_original, original_len)))
+}
+
 #[cfg(test)]
 mod tests {
+    use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
+    use pretty_assertions::assert_eq;
+
     use super::*;
+    use crate::{
+        adsf::patch::de::others::clip_motion::ClipMotionDiffPatch,
+        asdsf::patch::de::NonNestedArrayDiff,
+    };
 
     // #[quick_tracing::init]
     #[test]
-    fn test_patch_modes_extended() {
+    fn test_patch_replace_translations() {
         // 100                    // clip_id
         // <!-- ORIGINAL -->
         // 93                     // clip_id
@@ -390,47 +369,116 @@ mod tests {
 <!-- CLOSE -->
 ";
 
-        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            patches,
-            ClipMotionDiffPatch {
-                clip_id: Some("100".into()),
-                duration: None,
-                translations: None,
-                rotations: Some(DiffRotations {
-                    op: Op::Replace,
-                    range: 0..3,
-                    values: vec![
-                        Rotation {
-                            time: "6".into(),
-                            x: "0".into(),
-                            y: "0".into(),
-                            z: "0".into(),
-                            w: "5".into()
-                        },
-                        Rotation {
-                            time: "6".into(),
-                            x: "0".into(),
-                            y: "0".into(),
-                            z: "0".into(),
-                            w: "5".into()
-                        },
-                        Rotation {
-                            time: "6".into(),
-                            x: "0".into(),
-                            y: "0".into(),
-                            z: "0".into(),
-                            w: "5".into()
-                        },
-                    ],
-                })
-            }
-        );
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+        let expected = ClipMotionDiffPatch {
+            clip_id: Some("100".into()),
+            duration: None,
+            translations_patches: NonNestedArrayDiff::default(),
+            rotations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Replace, range: 0..3 },
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "time": "6",
+                                "text": "0 0 0 5",
+                            },
+                            {
+                                "time": "6",
+                                "text": "0 0 0 5",
+                            },
+                            {
+                                "time": "6",
+                                "text": "0 0 0 5",
+                            },
+                        ]),
+                    },
+                    priority: 0,
+                }],
+            },
+        };
+
+        assert_eq!(patches, expected);
+    }
+
+    #[test]
+    fn test_patch_ignore_translation_len_only() {
+        let input = "
+100
+2
+<!-- MOD_CODE ~test~ OPEN -->
+3
+<!-- ORIGINAL -->
+2
+0 0 0 0 1
+0 0 0 0 1
+<!-- CLOSE -->
+2
+0 0 0 0 1
+0 0 0 0 1
+";
+
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        let expected = ClipMotionDiffPatch {
+            clip_id: None,
+            duration: None,
+            translations_patches: NonNestedArrayDiff::default(),
+            rotations_patches: NonNestedArrayDiff::default(),
+        };
+        assert_eq!(patches, expected);
+    }
+
+    /// These are the requirements for supporting `Precision Creatures (v2.4)`.
+    #[test]
+    fn test_patch_replace_translation_from_len_line() {
+        let input = "
+200
+3
+<!-- MOD_CODE ~test~ OPEN -->
+2
+0.25 10 20 30
+0.75 40 50 60
+<!-- ORIGINAL -->
+1
+0.50 1 2 3
+<!-- CLOSE -->
+1
+9.99 7 8 9 10";
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        let expected = ClipMotionDiffPatch {
+            clip_id: None,
+            duration: None,
+            translations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Replace, range: 0..2 },
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "time": "0.25",
+                                "text": "10 20 30",
+                            },
+                            {
+                                "time": "0.75",
+                                "text": "40 50 60",
+                            },
+                        ]),
+                    },
+                    priority: 0,
+                }],
+            },
+            rotations_patches: NonNestedArrayDiff::default(),
+        };
+
+        assert_eq!(patches, expected);
     }
 
     // #[quick_tracing::init]
     #[test]
-    fn test_patch_modes() {
+    fn test_patch_remove_rotations() {
         let input = "
 99
 <!-- MOD_CODE ~test~ OPEN -->
@@ -446,42 +494,53 @@ mod tests {
 <!-- ORIGINAL -->
 2 0 0 0
 <!-- CLOSE -->
-1
+4
+2 0 0 0 1
 <!-- MOD_CODE ~test~ OPEN -->
 <!-- ORIGINAL -->
 2 0 0 0 1
+2 0 0 0 1
 <!-- CLOSE -->
+2 0 0 0 1
 ";
 
-        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
         let expected = ClipMotionDiffPatch {
+            clip_id: None,
             duration: Some("1.25".into()),
-            translations: Some(DiffTransitions {
-                op: Op::Replace,
-                range: 0..3,
-                values: vec![
-                    Translation {
-                        time: "0.43".into(),
-                        x: "0".into(),
-                        y: "0".into(),
-                        z: "0".into(),
+            translations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Replace, range: 0..3 },
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "time": "0.43",
+                                "text": "0 0 0",
+                            },
+                            {
+                                "time": "0.50",
+                                "text": "0 0 0",
+                            },
+                            {
+                                "time": "1.32",
+                                "text": "0 0 0",
+                            },
+                        ]),
                     },
-                    Translation {
-                        time: "0.50".into(),
-                        x: "0".into(),
-                        y: "0".into(),
-                        z: "0".into(),
+                    priority: 0,
+                }],
+            },
+            rotations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Remove, range: 1..3 },
+                        value: simd_json::json_typed!(borrowed, null),
                     },
-                    Translation {
-                        time: "1.32".into(),
-                        x: "0".into(),
-                        y: "0".into(),
-                        z: "0".into(),
-                    },
-                ],
-            }),
-            rotations: Some(DiffRotations { op: Op::Remove, range: 0..1, values: vec![] }),
-            ..Default::default()
+                    priority: 0,
+                }],
+            },
         };
 
         assert_eq!(patches, expected);
@@ -492,7 +551,7 @@ mod tests {
         let input = "
 152
 3
-10
+9
 <!-- MOD_CODE ~test~ OPEN -->
 0.0 0 0 0
 0.34 0 72 0
@@ -516,40 +575,39 @@ mod tests {
 <!-- CLOSE -->
 2
 2 0 0 0 1
+2 0 0 0 1
 ";
 
-        let patches = parse_clip_motion_diff_patch(input).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(
-            patches,
-            ClipMotionDiffPatch {
-                clip_id: None,
-                duration: None,
-                translations: Some(DiffTransitions {
-                    op: Op::Replace,
-                    range: 0..9,
-                    values: vec![
-                        Translation {
-                            time: "0.0".into(),
-                            x: "0".into(),
-                            y: "0".into(),
-                            z: "0".into()
-                        },
-                        Translation {
-                            time: "0.34".into(),
-                            x: "0".into(),
-                            y: "72".into(),
-                            z: "0".into()
-                        },
-                        Translation {
-                            time: "0.49".into(),
-                            x: "0".into(),
-                            y: "153".into(),
-                            z: "0".into()
-                        }
-                    ]
-                }),
-                rotations: None
-            }
-        );
+        let patches = parse_clip_motion_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+        let expected = ClipMotionDiffPatch {
+            clip_id: None,
+            duration: None,
+            translations_patches: NonNestedArrayDiff {
+                one: Default::default(),
+                seq: vec![ValueWithPriority {
+                    patch: JsonPatch {
+                        action: Action::Seq { op: Op::Replace, range: 0..9 },
+                        value: simd_json::json_typed!(borrowed, [
+                            {
+                                "time": "0.0",
+                                "text": "0 0 0",
+                            },
+                            {
+                                "time": "0.34",
+                                "text": "0 72 0",
+                            },
+                            {
+                                "time": "0.49",
+                                "text": "0 153 0",
+                            },
+                        ]),
+                    },
+                    priority: 0,
+                }],
+            },
+            rotations_patches: NonNestedArrayDiff::default(),
+        };
+
+        assert_eq!(patches, expected);
     }
 }

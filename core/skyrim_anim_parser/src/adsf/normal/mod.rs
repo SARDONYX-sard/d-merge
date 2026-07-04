@@ -242,37 +242,91 @@ impl ClipMotionBlock<'_> {
     }
 }
 
-/// Represents the rotation data using a quaternion,
-/// where time indicates the moment of the rotation,
-/// and x, y, z, w represent the quaternion components.
+/// Represents a rotation record.
+///
+/// # Background
+///
+/// Originally this structure represented quaternion rotation data in the form:
+///
+/// ```text
+/// <time:f32> <x:f32> <y:f32> <z:f32> <w:f32>
+/// ```
+///
+/// However, `animationdatasinglefile.txt` is also extended by Animation Motion
+/// Revolution (AMR), where rotation records may instead contain arbitrary text
+/// after the timestamp.
+///
+/// To remain compatible with both formats, the parser stores the second field
+/// as `Str<'a>` rather than requiring quaternion components. Consumers that
+/// require quaternion values are responsible for parsing the text accordingly.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Rotation<'a> {
-    /// The timestamp in seconds at which this rotation occurs.
+    /// The timestamp in seconds at which this record occurs.
     /// - type: [`f32`]
     pub time: Str<'a>,
 
-    /// The x component of the quaternion, representing the rotation axis.
-    /// - type: [`f32`]
-    pub x: Str<'a>,
-
-    /// The y component of the quaternion, representing the rotation axis.
-    /// - type: [`f32`]
-    pub y: Str<'a>,
-
-    /// The z component of the quaternion, representing the rotation axis.
-    /// - type: [`f32`]
-    pub z: Str<'a>,
-
-    /// The w component of the quaternion, representing the cosine of half the rotation angle.
-    /// A value of `1.0` means no rotation (identity quaternion).
-    /// - type: [`f32`]
-    pub w: Str<'a>,
+    /// In principle, x, y, z, and w should appear here, but there is a possibility of AMR annotation.
+    ///
+    /// # Normal
+    /// ```txt
+    /// 0.3 0.0 0.0 0.0 1.0
+    /// ```
+    ///
+    /// # AMR Example
+    /// ```txt
+    /// 0.3 animrotation 0.0 0.0 0.0 1.0
+    /// ```
+    pub text: Str<'a>,
 }
 
-/// Represents the translation data (movement in space),
-/// where time indicates the moment of translation,
-/// and x, y, z represent the movement along the respective axes.
+impl<'a> From<Rotation<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: Rotation<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("time".into(), value.time.into());
+        obj.insert("text".into(), value.text.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
+}
+
+/// Represents a translation record.
+///
+/// # Background
+///
+/// This type originally represented translation records in the form:
+///
+/// ```text
+/// <time:f32> <x:f32> <y:f32> <z:f32>
+/// ```
+///
+/// Therefore the parser originally expected every field after `time` to be a
+/// floating-point value.
+///
+/// During development of d_merge v2.4.1, it was discovered that
+/// `animationdatasinglefile.txt` is also used by Animation Motion Revolution
+/// (AMR), which extends the format with annotation records:
+///
+/// ```text
+/// <time:f32> <text>
+/// ```
+///
+/// Internally these records originate from:
+///
+/// ```text
+/// hkaAnimation.annotationTracks:
+///     hkaAnnotationTrack.annotations[n].time
+///     hkaAnnotationTrack.annotations[n].text
+/// ```
+///
+/// A strict `f32` parser therefore rejects valid AMR data (for example,
+/// `0.066667 animmotion ...`), while both Pandora and the game ecosystem
+/// already accept this format.
+///
+/// To remain compatible with both the original translation format and the AMR
+/// extension, parsing is intentionally deferred by storing the fields as
+/// `Str<'a>`. Numeric conversion is performed only by consumers that require
+/// numeric translation values.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Translation<'a> {
@@ -280,15 +334,26 @@ pub struct Translation<'a> {
     /// - type: [`f32`]
     pub time: Str<'a>,
 
-    /// The amount of movement along the x-axis.
-    /// - type: [`f32`]
-    pub x: Str<'a>,
+    /// In principle, x, y, z should appear here, but there is a possibility of AMR annotation.
+    ///
+    /// # Normal
+    /// ```txt
+    /// 0.3 0.0 0.0 0.0
+    /// ```
+    ///
+    /// # AMR Example
+    /// ```txt
+    /// 0.3 animmotion 0.0 0.0 0.0
+    /// ```
+    pub text: Str<'a>,
+}
 
-    /// The amount of movement along the y-axis.
-    /// - type: [`f32`]
-    pub y: Str<'a>,
-
-    /// The amount of movement along the z-axis.
-    /// - type: [`f32`]
-    pub z: Str<'a>,
+impl<'a> From<Translation<'a>> for simd_json::borrowed::Value<'a> {
+    #[inline]
+    fn from(value: Translation<'a>) -> Self {
+        let mut obj = simd_json::borrowed::Object::new();
+        obj.insert("time".into(), value.time.into());
+        obj.insert("text".into(), value.text.into());
+        simd_json::borrowed::Value::Object(Box::new(obj))
+    }
 }

@@ -1,25 +1,36 @@
-mod current_state;
 pub mod deserializer;
+mod raw_diff;
 
-use std::{borrow::Cow, ops::Range};
+use std::borrow::Cow;
 
-use json_patch::Op;
+use json_patch::{JsonPatchError, apply_seq_array_directly};
+use rayon::prelude::*;
+use simd_json::{base::ValueTryAsArrayMut as _, borrowed::Value, serde::from_borrowed_value};
 
-use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation};
+use crate::{
+    adsf::{normal::ClipMotionBlock, patch::de::error::Error},
+    asdsf::patch::de::NonNestedArrayDiff,
+};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipMotionDiffPatch<'a> {
     clip_id: Option<Cow<'a, str>>,
     duration: Option<Cow<'a, str>>,
-    translations: Option<DiffTransitions<'a>>,
-    rotations: Option<DiffRotations<'a>>,
+
+    #[cfg_attr(
+        feature = "serde",
+        serde(borrow, bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>"))
+    )]
+    translations_patches: NonNestedArrayDiff<'a>,
+    #[cfg_attr(
+        feature = "serde",
+        serde(borrow, bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>"))
+    )]
+    rotations_patches: NonNestedArrayDiff<'a>,
 }
 
 impl ClipMotionDiffPatch<'_> {
-    const DEFAULT: Self =
-        Self { clip_id: None, duration: None, translations: None, rotations: None };
-
     pub fn merge(&mut self, other: Self) {
         if other.clip_id.is_some() {
             self.clip_id = other.clip_id;
@@ -27,17 +38,21 @@ impl ClipMotionDiffPatch<'_> {
         if other.duration.is_some() {
             self.duration = other.duration;
         }
-        if other.translations.is_some() {
-            self.translations = other.translations;
-        }
-        if other.rotations.is_some() {
-            self.rotations = other.rotations;
-        }
+
+        self.translations_patches.one.merge(other.translations_patches.one);
+        self.translations_patches.seq.par_extend(other.translations_patches.seq);
+
+        self.rotations_patches.one.merge(other.rotations_patches.one);
+        self.rotations_patches.seq.par_extend(other.rotations_patches.seq);
     }
 }
 
 impl<'a> ClipMotionDiffPatch<'a> {
-    pub fn into_apply(self, motion_block: &mut ClipMotionBlock<'a>) {
+    /// Apply the patches to the given `AnimData`.
+    ///
+    /// # Errors
+    /// If the patches cannot be applied due to a mismatch in types or other issues.
+    pub fn into_apply(mut self, motion_block: &mut ClipMotionBlock<'a>) -> Result<(), Error> {
         if let Some(clip_id) = self.clip_id {
             motion_block.clip_id = clip_id;
         }
@@ -46,125 +61,48 @@ impl<'a> ClipMotionDiffPatch<'a> {
             motion_block.duration = duration;
         }
 
-        if let Some(translations) = self.translations {
-            let op = translations.op;
-            let range = translations.range.clone();
-            match op {
-                Op::Add => {
-                    if range.start >= motion_block.translations.len() {
-                        // Out-of-bounds → append at the end
-                        motion_block.translations.extend(translations.values);
-                    } else {
-                        // In-bounds → insert at the middle
-                        motion_block
-                            .translations
-                            .splice(range.start..range.start, translations.values);
-                    }
-                }
-                Op::Replace => {
-                    let vec_len = motion_block.translations.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
+        // translations
+        {
+            let mut template: Value = core::mem::take(&mut motion_block.translations).into();
 
-                    let (replace_vals, append_vals) = {
-                        let replace_count = end.saturating_sub(start);
-                        let mut values = translations.values.into_iter();
-                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
-                        let append_vals: Vec<_> = values.collect();
-                        (replace_vals, append_vals)
-                    };
-
-                    // Replace within the valid range
-                    motion_block.translations.splice(start..end, replace_vals);
-
-                    // Append any remaining values (out-of-range)
-                    if !append_vals.is_empty() {
-                        motion_block.translations.extend(append_vals);
-                    }
-                }
-                Op::Remove => {
-                    let vec_len = motion_block.translations.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
-                    if start < end {
-                        motion_block.translations.drain(start..end);
-                    }
-                }
+            for (path, patch) in self.translations_patches.one.0 {
+                json_patch::apply_one_field(&mut template, path, patch)?;
             }
+
+            if !self.translations_patches.seq.is_empty() {
+                let patches = core::mem::take(&mut self.translations_patches.seq);
+                let template_array = template.try_as_array_mut().map_err(|_| {
+                    JsonPatchError::unsupported_range_kind_from(
+                        &json_patch::json_path!["translations"],
+                        &patches,
+                    )
+                })?;
+                apply_seq_array_directly(template_array, patches)?;
+            }
+            motion_block.translations = from_borrowed_value(template)?;
         }
 
-        if let Some(rotations) = self.rotations {
-            let op = rotations.op;
-            let range = rotations.range.clone();
-            match op {
-                Op::Add => {
-                    if range.start >= motion_block.rotations.len() {
-                        // Out-of-bounds → append at the end
-                        motion_block.rotations.extend(rotations.values);
-                    } else {
-                        // In-bounds → insert at the middle
-                        motion_block.rotations.splice(range.start..range.start, rotations.values);
-                    }
-                }
-                Op::Replace => {
-                    let vec_len = motion_block.rotations.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
+        // rotations
+        {
+            let mut template: Value = core::mem::take(&mut motion_block.rotations).into();
 
-                    let (replace_vals, append_vals) = {
-                        let replace_count = end.saturating_sub(start);
-                        let mut values = rotations.values.into_iter();
-                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
-                        let append_vals: Vec<_> = values.collect();
-                        (replace_vals, append_vals)
-                    };
-
-                    // Replace within the valid range
-                    motion_block.rotations.splice(start..end, replace_vals);
-
-                    // Append any remaining values (out-of-range)
-                    if !append_vals.is_empty() {
-                        motion_block.rotations.extend(append_vals);
-                    }
-                }
-                Op::Remove => {
-                    let vec_len = motion_block.rotations.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
-                    if start < end {
-                        motion_block.rotations.drain(start..end);
-                    }
-                }
+            for (path, patch) in self.rotations_patches.one.0 {
+                json_patch::apply_one_field(&mut template, path, patch)?;
             }
+
+            if !self.rotations_patches.seq.is_empty() {
+                let patches = core::mem::take(&mut self.rotations_patches.seq);
+                let template_array = template.try_as_array_mut().map_err(|_| {
+                    JsonPatchError::unsupported_range_kind_from(
+                        &json_patch::json_path!["rotations"],
+                        &patches,
+                    )
+                })?;
+                apply_seq_array_directly(template_array, patches)?;
+            }
+            motion_block.rotations = from_borrowed_value(template)?;
         }
+
+        Ok(())
     }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub struct DiffTransitions<'a> {
-    op: Op,
-    range: Range<usize>,
-    values: Vec<Translation<'a>>,
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub struct DiffRotations<'a> {
-    op: Op,
-    range: Range<usize>,
-    values: Vec<Rotation<'a>>,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-enum LineKind {
-    #[default]
-    ClipId,
-    Duration,
-
-    TranslationLen,
-    Translation,
-
-    RotationLen,
-    Rotation,
 }

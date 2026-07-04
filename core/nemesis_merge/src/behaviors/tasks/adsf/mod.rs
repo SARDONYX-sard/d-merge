@@ -33,7 +33,8 @@ use crate::{
     errors::{
         AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
         FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
-        FailedParseAdsfTemplateSnafu, FailedParseEditAdsfPatchSnafu, FailedSerializeAdsfSnafu,
+        FailedParseAdsfTemplateSnafu, FailedParseEditAdsfClipAnimPatchSnafu,
+        FailedParseEditAdsfClipMotionPatchSnafu, FailedSerializeAdsfSnafu,
     },
 };
 
@@ -173,7 +174,9 @@ pub(crate) fn apply_adsf_patches(
             }
             PatchKind::EditMotion(edit_motion) => {
                 if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id) {
-                    edit_motion.patch.into_apply(motion);
+                    bail!(edit_motion.patch.into_apply(motion).with_context(|_| {
+                        FailedParseEditAdsfClipMotionPatchSnafu { path: edit_motion.clip_id }
+                    }));
                 }
             }
         }
@@ -225,7 +228,7 @@ fn parse_anim_data_patch<'a>(
         ),
         ParserType::EditAnim(index) => {
             let patch = parse_clip_anim_diff_patch(adsf_patch)
-                .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
+                .with_context(|_| FailedParseEditAdsfClipAnimPatchSnafu { path: path.clone() })?;
             PatchKind::EditAnim(EditAnim { patch, priority, name_clip: index })
         }
 
@@ -234,8 +237,8 @@ fn parse_anim_data_patch<'a>(
                 .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
         ),
         ParserType::EditMotion(index) => {
-            let patch = parse_clip_motion_diff_patch(adsf_patch)
-                .with_context(|_| FailedParseEditAdsfPatchSnafu { path: path.clone() })?;
+            let patch = parse_clip_motion_diff_patch(adsf_patch, priority)
+                .with_context(|_| FailedParseEditAdsfClipMotionPatchSnafu { path: path.clone() })?;
             PatchKind::EditMotion(EditMotion { patch, priority, clip_id: index })
         }
     };

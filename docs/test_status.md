@@ -101,7 +101,7 @@ SkyrimSE
 | ✅     | Precision Creatures                          | 2.4              | For the full text, please refer to the note below. |
 | ✅     | Project Impact SE                            | 2.72             |                                                    |
 | ✅     | SCAR - Skyrim Combos AI Revolution           | 1.06b            | With SCAR AE Support(v1.6.1)                       |
-| ✅     | SkyParkour v3                                | 3.2.1            |                                                    |
+| ✅     | SkyParkour v3                                | 3.2.1, 3.5.4     | There is a note regarding v3.5.4.                  |
 | ✅     | TkDodgeUltimateCombat Nemesis patch          | Nemesis0.84-beta | For the full text, please refer to the note below. |
 | ✅     | True Directional Movement -SE, AE            | 2.2.5            |                                                    |
 
@@ -121,6 +121,23 @@ SkyrimSE
 - **Precision Creatures**
   - d_merge < v1.4.0: `Precision Creatures d_merge_patch` is required.
   - d_merge >= v1.4.0: Since the patch hack itself is now built into the exe, `Precision Creatures d_merge_patch` is no longer needed.
+
+- **SkyParkour v3**
+  In v3.5.4, the `translation_len` value listed at the following path is 29, but the correct value is 28.
+  Since the tool parses the text based on this line count, the tool cannot automatically correct it. Therefore, you need to fix this manually.
+
+  `Nemesis_Engine/mod/sppffp/animationdatasinglefile/FirstPerson~1/sppffp$0.txt`
+
+  Change the number from 29 to 28
+
+  ```txt
+  sppffp$0
+  0.966667
+  28
+  ```
+
+  Also, up to d_merge v2.4.1, the program performs a strict analysis of the `animationdatasinglefile.txt` patch, so it fails because it cannot parse the extended annotations in AMR(e.g., `0.01 animmotion 0.0 0.0 0.0`).
+  Please use a version later than v2.4.1
 
 - **TkDodgeUltimateCombat Nemesis patch**
   - Tested with TK Dodge SE (v3.18) + TK Dodge RE (v0.55-rc3)

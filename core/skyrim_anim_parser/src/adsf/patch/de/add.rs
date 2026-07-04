@@ -124,9 +124,7 @@ fn translations<'a>(
         for _ in 0..line_len {
             let translation = seq! {Translation {
                 time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
-                z: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("z: f32"))).map(|s:&str| s.into()),
+                text: till_line_ending.context(Expected(Description("text: str"))).map(|s:&str| s.into()),
                 _: opt(line_ending),
             }}
             .context(Label("Translation"))
@@ -147,10 +145,7 @@ fn rotations<'a>(
         for _ in 0..line_len {
             let rotation = seq! {Rotation {
                 time: from_word_and_space::<f32>.context(Expected(Description("time: f32"))),
-                x: from_word_and_space::<f32>.context(Expected(Description("x: f32"))),
-                y: from_word_and_space::<f32>.context(Expected(Description("y: f32"))),
-                z: from_word_and_space::<f32>.context(Expected(Description("z: f32"))),
-                w: till_line_ending.verify(|s:&str| s.parse::<f32>().is_ok()).context(Expected(Description("w: f32"))).map(|s:&str| s.into()),
+                text: till_line_ending.context(Expected(Description("text: str"))).map(|s:&str| s.into()),
                 _: opt(line_ending), // In the case of patches, this may not be present, so opt
             }}
             .context(Label("Rotation"))
@@ -183,20 +178,9 @@ mod tests {
                 clip_id: "amco$0".into(),
                 duration: "1.33".into(),
                 translation_len: 1,
-                translations: vec![Translation {
-                    time: "1.33".into(),
-                    x: "0".into(),
-                    y: "0".into(),
-                    z: "0".into(),
-                },],
+                translations: vec![Translation { time: "1.33".into(), text: "0 0 0".into() }],
                 rotation_len: 1,
-                rotations: vec![Rotation {
-                    time: "1".into(),
-                    x: "0".into(),
-                    y: "0".into(),
-                    z: "0".into(),
-                    w: "1".into(),
-                },],
+                rotations: vec![Rotation { time: "1".into(), text: "0 0 0 1".into() }],
             }
         );
     }

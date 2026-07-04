@@ -188,31 +188,21 @@ pub(crate) fn serialize_clip_motion_block(
 
 /// Serializes a translation into a string.
 fn serialize_translation(ser: &mut String, translation: &Translation) {
-    let Translation { time, x, y, z } = translation;
+    let Translation { time, text } = translation;
 
     ser.push_str(time.as_ref());
     ser.push(' ');
-    ser.push_str(x.as_ref());
-    ser.push(' ');
-    ser.push_str(y.as_ref());
-    ser.push(' ');
-    ser.push_str(z.as_ref());
+    ser.push_str(text.as_ref());
     ser.push_str("\r\n");
 }
 
 /// Serializes a rotation into a string.
 fn serialize_rotation(ser: &mut String, rotation: &Rotation) {
-    let Rotation { time, x, y, z, w } = rotation;
+    let Rotation { time, text } = rotation;
 
     ser.push_str(time.as_ref());
     ser.push(' ');
-    ser.push_str(x.as_ref());
-    ser.push(' ');
-    ser.push_str(y.as_ref());
-    ser.push(' ');
-    ser.push_str(z.as_ref());
-    ser.push(' ');
-    ser.push_str(w.as_ref());
+    ser.push_str(text.as_ref());
     ser.push_str("\r\n");
 }
 
