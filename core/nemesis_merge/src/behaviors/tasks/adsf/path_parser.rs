@@ -7,7 +7,7 @@
 //!
 //! anim block header:
 //! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/$header$.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/<target>~<index>/$header$.txt)
+//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/$header$.txt)
 //!
 //! add anim block path:
 //! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<anim_data_clip_id>.txt
@@ -249,6 +249,18 @@ mod tests {
                 id: "/some/mods/Nemesis_Engine/mod/slide",
                 target: "Default~1",
                 parser_type: ParserType::EditAnim("Jump~42"),
+            }
+        );
+
+        let parsed = parse(
+            "/some/mods/Nemesis_Engine/mod/tkuc/animationdatasinglefile/FirstPerson~1/TKDodgeForward~791.txt",
+        );
+        assert_eq!(
+            parsed,
+            ParsedAdsfPatchPath {
+                id: "/some/mods/Nemesis_Engine/mod/tkuc",
+                target: "FirstPerson~1",
+                parser_type: ParserType::EditAnim("TKDodgeForward~791"),
             }
         );
     }

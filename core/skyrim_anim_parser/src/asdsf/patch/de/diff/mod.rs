@@ -91,6 +91,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             let mut template: Vec<Value> = triggers.into_iter().map(Into::into).collect();
             apply_seq_array_directly(&mut template, patches)?;
             anim_set_data.triggers = from_borrowed_value(template.into())?;
+            anim_set_data.triggers_len = anim_set_data.triggers.len();
         }
 
         // Conditions
@@ -112,6 +113,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
                 apply_seq_array_directly(template_array, patches)?;
             }
             anim_set_data.conditions = from_borrowed_value(template_value)?;
+            anim_set_data.conditions_len = anim_set_data.conditions.len();
         }
 
         // Attacks
@@ -140,6 +142,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             }
 
             anim_set_data.attacks = from_borrowed_value(template_value)?;
+            anim_set_data.attacks_len = anim_set_data.attacks.len();
         }
 
         // Anim Infos
@@ -161,6 +164,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
                 apply_seq_array_directly(template_array, patches)?;
             }
             anim_set_data.anim_infos = from_borrowed_value(template_value)?;
+            anim_set_data.anim_infos_len = anim_set_data.anim_infos.len();
         }
 
         Ok(())

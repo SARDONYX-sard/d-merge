@@ -113,6 +113,10 @@ mod tests {
         assert!(is_adsf_patch_file(Path::new(
             r"/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt"
         )));
+
+        assert!(is_adsf_patch_file(Path::new(
+            r"Nemesis_Engine/mod/tkuc/animationdatasinglefile/FirstPerson~1/TKDodgeForward~791.txt"
+        )));
     }
 
     #[test]

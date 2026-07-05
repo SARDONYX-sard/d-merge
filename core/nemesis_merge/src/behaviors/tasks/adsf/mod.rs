@@ -2,7 +2,10 @@ pub(crate) mod path_parser;
 mod sort;
 pub(crate) mod types;
 
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use rayon::{iter::Either, prelude::*};
 pub(crate) use skyrim_anim_parser::adsf::patch::de::{
@@ -165,19 +168,31 @@ pub(crate) fn apply_adsf_patches(
                 anim_data.add_clip_anim_blocks.push(clip_anim_data_block);
             }
             PatchKind::EditAnim(edit_anim) => {
-                if let Some(anim) = anim_data.clip_anim_blocks.get_mut(edit_anim.name_clip) {
-                    edit_anim.patch.into_apply(anim);
-                }
+                // NOTE: If it's not there, add it at the end. This step is required for the Nemesis patch for TkDodge.
+                // It's important that it's not an `add_clip_anim_blocks`.
+                // That's because if we put it there, a new `clip_id` will be automatically assigned.
+                let anim =
+                    match anim_data.clip_anim_blocks.entry(Cow::Borrowed(edit_anim.name_clip)) {
+                        Entry::Occupied(entry) => entry.into_mut(),
+                        Entry::Vacant(entry) => entry.insert(Default::default()),
+                    };
+                bail!(edit_anim.patch.into_apply(anim).with_context(|_| {
+                    FailedParseEditAdsfClipAnimPatchSnafu { path: edit_anim.name_clip }
+                }));
             }
             PatchKind::AddMotion(clip_motion_block) => {
                 anim_data.add_clip_motion_blocks.push(clip_motion_block);
             }
             PatchKind::EditMotion(edit_motion) => {
-                if let Some(motion) = anim_data.clip_motion_blocks.get_mut(edit_motion.clip_id) {
-                    bail!(edit_motion.patch.into_apply(motion).with_context(|_| {
-                        FailedParseEditAdsfClipMotionPatchSnafu { path: edit_motion.clip_id }
-                    }));
-                }
+                // If it's not there, add it at the end. This step is required for the Nemesis patch for TkDodge.
+                let motion =
+                    match anim_data.clip_motion_blocks.entry(Cow::Borrowed(edit_motion.clip_id)) {
+                        Entry::Occupied(entry) => entry.into_mut(),
+                        Entry::Vacant(entry) => entry.insert(Default::default()),
+                    };
+                bail!(edit_motion.patch.into_apply(motion).with_context(|_| {
+                    FailedParseEditAdsfClipMotionPatchSnafu { path: edit_motion.clip_id }
+                }));
             }
         }
     }
@@ -227,7 +242,7 @@ fn parse_anim_data_patch<'a>(
                 .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
         ),
         ParserType::EditAnim(index) => {
-            let patch = parse_clip_anim_diff_patch(adsf_patch)
+            let patch = parse_clip_anim_diff_patch(adsf_patch, priority)
                 .with_context(|_| FailedParseEditAdsfClipAnimPatchSnafu { path: path.clone() })?;
             PatchKind::EditAnim(EditAnim { patch, priority, name_clip: index })
         }

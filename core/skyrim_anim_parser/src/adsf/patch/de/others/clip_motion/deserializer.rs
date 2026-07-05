@@ -7,15 +7,12 @@ use winnow::{
 };
 use winnow_ext::ReadableError;
 
-use super::raw_diff::RawDiff;
+use super::{
+    ClipMotionDiffPatch,
+    raw_diff::{Op, RawDiff},
+};
 use crate::{
-    adsf::patch::{
-        ClipMotionDiffPatch,
-        de::{
-            error::{Error, Result},
-            others::clip_motion::raw_diff::Op,
-        },
-    },
+    adsf::patch::de::error::{Error, Result},
     common_parser::{
         comment::close_comment_line,
         lines::{one_line, parse_one_line},
@@ -305,7 +302,7 @@ impl<'de> PatchDeserializer<'de> {
 
 /// Returns
 /// (diff, has_original, original_len)
-fn take_raw_diff<'a>(
+pub(crate) fn take_raw_diff<'a>(
     input: &mut &'a str,
 ) -> winnow::ModalResult<Option<(&'a str, bool, Option<usize>)>> {
     use crate::common_parser::comment::{open_comment, take_till_close, take_till_original};
