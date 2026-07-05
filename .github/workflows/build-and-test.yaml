@@ -116,7 +116,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [
+            macos-latest,
+            ubuntu-22.04, # To dyn link glibc v2.35
+            windows-latest,
+          ]
         features: ['']
     runs-on: ${{ matrix.platform }}
     steps:
