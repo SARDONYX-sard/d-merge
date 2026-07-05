@@ -92,6 +92,7 @@
     "usvfs",
     "viewports",
     "weapequip",
+    "wgpu",
     "xorout"
   ]
 }

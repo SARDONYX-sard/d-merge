@@ -50,6 +50,9 @@ rfd = { version = "0.17.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rfd = { version = "0.15.4", features = ["xdg-portal"] }
+wgpu = { version = "27.0.1", default-features = true, features = [
+  "fragile-send-sync-non-atomic-wasm",
+], optional = true } # https://github.com/emilk/egui/issues/4885#issuecomment-2256316573
 
 
 [features]
@@ -57,6 +60,9 @@ default = ["mimalloc"]
 
 # The patch time was reduced by 4secs.
 mimalloc = ["dep:mimalloc"]
+
+# Use WebGPU
+wgpu = ["eframe/wgpu", "dep:wgpu"]
 
 
 [lints]

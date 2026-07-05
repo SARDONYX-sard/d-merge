@@ -13,6 +13,20 @@ fn new_shadcn_light() -> egui_shadcn::ShadcnTheme {
     theme
 }
 
+/// A theme setup routine that runs only once before the GUI app is launched
+pub(crate) fn setup_theme(
+    ctx: &egui::Context,
+    settings: &d_merge_gui_shared::settings::Settings,
+) -> crate::ui::theme::ThemeManager {
+    let theme_manager = crate::ui::theme::ThemeManager::new(
+        &settings.ui.custom_theme.themes_dir,
+        settings.ui.custom_theme.selected_theme.as_deref(),
+    );
+    set_theme(ctx, settings.ui.theme, theme_manager.editing.as_ref());
+
+    theme_manager
+}
+
 pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<&ThemePreset>) {
     let (visuals, shadcn_theme) = match theme {
         Theme::System => match dark_light::detect() {

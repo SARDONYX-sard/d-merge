@@ -203,3 +203,24 @@ Please ensure that your usage and redistribution of this software complies with 
 - [monaco-react](https://github.com/suren-atoyan/monaco-react/releases): If we don't properly override the available Monaco Editor version, the build will fail.
 
   Using monaco-editor versions like 0.52.0 causes monaco-vim to become unresponsive. Pin 0.49.0
+
+# egui version on The Windows Subsystem for Linux (WSL)
+
+Notes
+
+- For some reason, WSL crashes unless we set the window to width: 640, height: 320.
+- With the above settings and wgpu features enabled, it seems we can adjust the window size after a short while. (If we change the size immediately after startup, it will crash.)
+
+Deps
+
+```shell
+sudo apt update
+
+sudo apt install -y \
+  libfontconfig1 \ # font rendering (system fallback fonts)
+  libwayland-client0 libwayland-cursor0 libwayland-egl1 \ # Wayland EGL window backend
+  libxkbcommon0 libxkbcommon-x11-0 \ # keyboard/input handling (winit dependency)
+  libegl1 libgl1 libgles2 libglx-mesa0 mesa-utils \ # OpenGL / EGL graphics stack
+  xclip xsel \ # clipboard integration (X11 fallback)
+  zenity # file dialog fallback (rfd backend)
+```

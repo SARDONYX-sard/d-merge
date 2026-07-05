@@ -42,14 +42,38 @@ fn main() -> Result<(), eframe::Error> {
         tracing::info!("[Settings loader] Loaded settings.json");
     };
 
+    let options = create_native_options(&settings);
+    eframe::run_native(
+        APP_TITLE,
+        options,
+        Box::new(|cc| {
+            crate::fonts::setup_fonts(&cc.egui_ctx, &settings.ui.font);
+            let theme_manager = crate::theme::setup_theme(&cc.egui_ctx, &settings);
+            Ok(Box::new(self::app::App::new(settings, theme_manager)))
+        }),
+    )
+}
+
+/// Create native window options.
+fn create_native_options(settings: &settings::Settings) -> eframe::NativeOptions {
     let (icon_rgba, [icon_width, icon_height]) = d_merge_gui_shared::d_merge_icon();
 
-    let options = eframe::NativeOptions {
+    eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
             title: Some(APP_TITLE.to_string()),
             app_id: Some("D Merge".to_string()),
             position: Some(egui::Pos2::new(settings.ui.window.pos_x, settings.ui.window.pos_y)),
-            transparent: Some(true),
+            // Avoid `NoGlutinConfigs` on Linux.
+            transparent: Some({
+                #[cfg(target_os = "linux")]
+                {
+                    false
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    true
+                }
+            }),
             maximized: Some(settings.ui.window.maximized),
             inner_size: Some(egui::vec2(settings.ui.window.width, settings.ui.window.height)),
             resizable: Some(true),
@@ -61,26 +85,5 @@ fn main() -> Result<(), eframe::Error> {
             ..Default::default()
         },
         ..Default::default()
-    };
-
-    eframe::run_native(
-        APP_TITLE,
-        options,
-        Box::new(|cc| {
-            if let Err(err) = crate::fonts::setup_fonts(&cc.egui_ctx, &settings.ui.font) {
-                match err {
-                    crate::fonts::FontError::Warn(msg) => tracing::warn!(msg),
-                    crate::fonts::FontError::Error(msg) => tracing::error!(msg),
-                }
-            }
-
-            let theme_manager = ui::theme::ThemeManager::new(
-                &settings.ui.custom_theme.themes_dir,
-                settings.ui.custom_theme.selected_theme.as_deref(),
-            );
-            set_theme(&cc.egui_ctx, settings.ui.theme, theme_manager.editing.as_ref());
-
-            Ok(Box::new(self::app::App::new(settings, theme_manager)))
-        }),
-    )
+    }
 }

@@ -62,6 +62,16 @@ pub(crate) fn font_families() -> &'static [String] {
     })
 }
 
+/// A font setup routine that runs only once before the GUI app is launched
+pub(crate) fn setup_fonts(ctx: &Context, font: &FontSettings) {
+    if let Err(err) = crate::fonts::set_fonts(ctx, font) {
+        match err {
+            FontError::Warn(msg) => tracing::warn!(msg),
+            FontError::Error(msg) => tracing::error!(msg),
+        }
+    }
+}
+
 /// Applies the configured UI font.
 ///
 /// The active font source is determined by [`FontSettings::mode`].
@@ -70,7 +80,7 @@ pub(crate) fn font_families() -> &'static [String] {
 ///
 /// Returns a [`FontError`] when the selected font cannot be resolved or
 /// loaded.
-pub(crate) fn setup_fonts(ctx: &Context, font: &FontSettings) -> Result<(), FontError> {
+pub(crate) fn set_fonts(ctx: &Context, font: &FontSettings) -> Result<(), FontError> {
     match font.mode {
         FontMode::Default => apply_default_font(ctx),
 

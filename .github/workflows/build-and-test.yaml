@@ -116,27 +116,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-            macos-latest,
-            ubuntu-22.04, # To dyn link glibc v2.35
-            windows-latest,
-          ]
-        features: ['']
+        include:
+          - platform: ubuntu-22.04 # To dyn link glibc v2.35
+            features: wgpu # To Avoid `WaylandError` in WSL2
+
+          # - platform: macos-latest # unused
+          #   features: ''
+
+          - platform: windows-latest
+            features: ''
+
     runs-on: ${{ matrix.platform }}
+
     steps:
       - uses: actions/checkout@v6.0.2
         with:
           submodules: true
+
       - name: Setup environment
         uses: ./.github/actions/setup-deps
         with:
           platform: ${{ matrix.platform }}
           build_profile: release
-          cache_key_suffix: 'egui-${{ matrix.features }}'
+          cache_key_suffix: egui-${{ matrix.features }}
           install_front_deps: false
 
       - name: Build GUI
         run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }} ${{ matrix.features != '' && format('--features {0}', matrix.features) || '' }}
+
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
         with:

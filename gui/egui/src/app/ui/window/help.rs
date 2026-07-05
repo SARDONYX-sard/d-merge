@@ -129,7 +129,7 @@ impl App {
             && matches!(selected_font_mode, FontMode::Default | FontMode::System))
             || did_font_name_change
             || reload_font_clicked)
-            && let Err(err) = crate::fonts::setup_fonts(ctx, &self.settings.ui.font)
+            && let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font)
         {
             match err {
                 crate::fonts::FontError::Warn(msg) => {
