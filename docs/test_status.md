@@ -102,7 +102,7 @@ SkyrimSE
 | ✅     | Project Impact SE                            | 2.72         |                                                    |
 | ✅     | SCAR - Skyrim Combos AI Revolution           | 1.06b        | With SCAR AE Support(v1.6.1)                       |
 | ✅     | SkyParkour v3                                | 3.2.1, 3.5.4 | There is a note regarding v3.5.4.                  |
-| ✅     | TkDodgeU SE                                  | 3.18         | For the full text, please refer to the note below. |
+| ✅     | TKDodge SE                                   | 3.18         | For the full text, please refer to the note below. |
 | ✅     | True Directional Movement -SE, AE            | 2.2.5        |                                                    |
 
 ### Notes
@@ -139,19 +139,20 @@ SkyrimSE
   Also, up to d_merge v2.4.1, the program performs a strict analysis of the `animationdatasinglefile.txt` patch, so it fails because it cannot parse the extended annotations in AMR(e.g., `0.01 animmotion 0.0 0.0 0.0`).
   Please use a version later than v2.4.1
 
-- **TkDodge SE**
-  This is an extremely unique mod even within the FNIS community. (There is no FNIS_*_List.txt or behavior.hkx file for FNIS.)
+- **TKDodge SE**
+  This is an extremely unique mod even within the FNIS. (Normally, the required `FNIS__*List.txt` and `FNIS*__behavior.hkx` are missing.)
 
-  Therefore, use the `TkDodge and UltimateCombat Nemesis patch` (modified to make the _1stperson patch easier to parse) available at the D_merge Nexus URL.
+  Therefore, use the `TKDodge and UltimateCombat Nemesis patch` (modified to make the _1stperson patch easier to parse).
+  It's available at the d_merge Nexus URL.
 
   This alone will not work in AE.
   In load orders such as MO2, combine and use the following in this order:
   - [TK Dodge AE (v3.18)](https://www.nexusmods.com/skyrimspecialedition/mods/15309)
-  - [TkDodgeUltimateCombat Nemesis patch (v1.0.0)](https://www.nexusmods.com/skyrimspecialedition/mods/152190)
+  - [TKDodgeUltimateCombat Nemesis patch (v1.0.0)](https://www.nexusmods.com/skyrimspecialedition/mods/152190)
   - [TK Dodge RE (v0.55-rc3)](https://www.nexusmods.com/skyrimspecialedition/mods/56956)
   - [TK Dodge NG(v1.1.0)](https://www.nexusmods.com/skyrimspecialedition/mods/115408)
 
-  I didn't realize until d_merge v2.5.0 that this existing Nemesis patch was unique, which is why first-person TK Dodge wasn't working.
+  I didn't realize until d_merge v2.5.0 that this existing Nemesis patch was unique, which is why `_1stperson` TKDodge wasn't working.
 
 ## FNIS
 
