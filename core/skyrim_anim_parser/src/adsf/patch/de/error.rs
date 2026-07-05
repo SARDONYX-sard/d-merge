@@ -9,12 +9,6 @@ pub enum Error {
     /// Mismatched type. Expected array, but got one replacer type.
     ExpectedArray,
 
-    /// Mismatched type. Expected transitions, but got other type
-    ExpectedTransition,
-
-    /// Mismatched type. Expected rotations, but got other type
-    ExpectedRotation,
-
     /// Iterator end. The following parsing target is required but could not be found.
     EndOfLineKind,
 
@@ -37,7 +31,7 @@ pub enum Error {
     Readable { source: winnow_ext::ReadableError },
 
     //////////////////////////////////////////////////////////////////////
-    /// {kind} entry in AnimSetData was expected to be modified, but no target for modification was found.
+    /// {kind} entry in AnimData was expected to be modified, but no target for modification was found.
     NotFoundApplyTarget { kind: String },
 
     // merge

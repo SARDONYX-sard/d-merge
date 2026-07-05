@@ -1,33 +1,42 @@
-mod current_state;
 pub mod deserializer;
+mod raw_diff;
 
-use std::{borrow::Cow, ops::Range};
+use std::borrow::Cow;
 
-use json_patch::Op;
+use json_patch::{JsonPatchError, apply_seq_array_directly};
+use rayon::prelude::*;
+use simd_json::{base::ValueTryAsArrayMut as _, borrowed::Value, serde::from_borrowed_value};
 
-use crate::adsf::normal::ClipAnimDataBlock;
+use crate::{
+    adsf::{normal::ClipAnimDataBlock, patch::de::error::Error},
+    asdsf::patch::de::NonNestedArrayDiff,
+};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ClipAnimDiffPatch<'a> {
+    /// str
     name: Option<Cow<'a, str>>,
+    /// str
     clip_id: Option<Cow<'a, str>>,
+
+    /// f32
     play_back_speed: Option<Cow<'a, str>>,
+
+    /// f32
     crop_start_local_time: Option<Cow<'a, str>>,
+
+    /// f32
     crop_end_local_time: Option<Cow<'a, str>>,
-    trigger_names: Option<DiffTriggerNames<'a>>,
+
+    #[cfg_attr(
+        feature = "serde",
+        serde(borrow, bound(deserialize = "NonNestedArrayDiff<'a>: serde::Deserialize<'de>"))
+    )]
+    trigger_names_patches: NonNestedArrayDiff<'a>,
 }
 
 impl ClipAnimDiffPatch<'_> {
-    const DEFAULT: Self = Self {
-        name: None,
-        clip_id: None,
-        play_back_speed: None,
-        crop_start_local_time: None,
-        crop_end_local_time: None,
-        trigger_names: None,
-    };
-
     pub fn merge(&mut self, other: Self) {
         if other.name.is_some() {
             self.name = other.name;
@@ -44,108 +53,56 @@ impl ClipAnimDiffPatch<'_> {
         if other.crop_end_local_time.is_some() {
             self.crop_end_local_time = other.crop_end_local_time;
         }
-        if other.trigger_names.is_some() {
-            self.trigger_names = other.trigger_names;
-        }
+
+        self.trigger_names_patches.one.merge(other.trigger_names_patches.one);
+        self.trigger_names_patches.seq.par_extend(other.trigger_names_patches.seq);
     }
 }
 
 impl<'a> ClipAnimDiffPatch<'a> {
-    pub fn into_apply(self, anim_block: &mut ClipAnimDataBlock<'a>) {
-        if let Some(name) = self.name {
-            anim_block.name = name;
+    /// Apply the patches to the given `AnimData`.
+    ///
+    /// # Errors
+    /// If the patches cannot be applied due to a mismatch in types or other issues.
+    pub fn into_apply(mut self, clip_anim_block: &mut ClipAnimDataBlock<'a>) -> Result<(), Error> {
+        if let Some(duration) = self.name {
+            clip_anim_block.name = duration;
         }
-
         if let Some(clip_id) = self.clip_id {
-            anim_block.clip_id = clip_id;
+            clip_anim_block.clip_id = clip_id;
         }
-
         if let Some(play_back_speed) = self.play_back_speed {
-            anim_block.play_back_speed = play_back_speed;
+            clip_anim_block.play_back_speed = play_back_speed;
         }
-
         if let Some(crop_start_local_time) = self.crop_start_local_time {
-            anim_block.crop_start_local_time = crop_start_local_time;
+            clip_anim_block.crop_start_local_time = crop_start_local_time;
         }
-
         if let Some(crop_end_local_time) = self.crop_end_local_time {
-            anim_block.crop_end_local_time = crop_end_local_time;
+            clip_anim_block.crop_end_local_time = crop_end_local_time;
         }
 
-        if let Some(trigger_patch) = self.trigger_names {
-            let op = trigger_patch.op;
-            let range = trigger_patch.range.clone();
-            match op {
-                Op::Add => {
-                    if range.start >= anim_block.trigger_names.len() {
-                        // Out-of-bounds → append at the end
-                        anim_block.trigger_names.extend(trigger_patch.values);
-                    } else {
-                        // In-bounds → insert at the middle
-                        anim_block
-                            .trigger_names
-                            .splice(range.start..range.start, trigger_patch.values);
-                    }
-                }
-                Op::Replace => {
-                    let vec_len = anim_block.trigger_names.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
+        // trigger_names
+        {
+            let mut template: Value = core::mem::take(&mut clip_anim_block.trigger_names).into();
 
-                    let (replace_vals, append_vals) = {
-                        let replace_count = end.saturating_sub(start);
-                        let mut values = trigger_patch.values.into_iter();
-                        let replace_vals: Vec<_> = values.by_ref().take(replace_count).collect();
-                        let append_vals: Vec<_> = values.collect();
-                        (replace_vals, append_vals)
-                    };
-
-                    // Replace within the valid range
-                    anim_block.trigger_names.splice(start..end, replace_vals);
-
-                    // Append any remaining values (out-of-range)
-                    if !append_vals.is_empty() {
-                        anim_block.trigger_names.extend(append_vals);
-                    }
-                }
-                Op::Remove => {
-                    let vec_len = anim_block.trigger_names.len();
-                    let start = range.start.min(vec_len);
-                    let end = range.end.min(vec_len);
-                    if start < end {
-                        anim_block.trigger_names.drain(start..end);
-                    }
-                }
+            for (path, patch) in self.trigger_names_patches.one.0 {
+                json_patch::apply_one_field(&mut template, path, patch)?;
             }
+
+            if !self.trigger_names_patches.seq.is_empty() {
+                let patches = core::mem::take(&mut self.trigger_names_patches.seq);
+                let template_array = template.try_as_array_mut().map_err(|_| {
+                    JsonPatchError::unsupported_range_kind_from(
+                        &json_patch::json_path!["trigger_names"],
+                        &patches,
+                    )
+                })?;
+                apply_seq_array_directly(template_array, patches)?;
+            }
+            clip_anim_block.trigger_names = from_borrowed_value(template)?;
+            clip_anim_block.trigger_names_len = clip_anim_block.trigger_names.len();
         }
+
+        Ok(())
     }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub struct DiffTriggerNames<'a> {
-    op: Op,
-    range: Range<usize>,
-    values: Vec<Cow<'a, str>>,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub(super) enum LineKind {
-    /// Str
-    #[default]
-    Name,
-    /// Str
-    ClipId,
-    /// f32
-    PlayBackSpeed,
-
-    /// f32
-    CropStartLocalTime,
-    /// f32
-    CropEndLocalTime,
-
-    /// usize
-    TriggerNamesLen,
-    /// Vec<Str>
-    TriggerNames,
 }

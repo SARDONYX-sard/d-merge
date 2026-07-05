@@ -80,6 +80,7 @@ impl<'a> ClipMotionDiffPatch<'a> {
                 apply_seq_array_directly(template_array, patches)?;
             }
             motion_block.translations = from_borrowed_value(template)?;
+            motion_block.translation_len = motion_block.translations.len();
         }
 
         // rotations
@@ -101,6 +102,7 @@ impl<'a> ClipMotionDiffPatch<'a> {
                 apply_seq_array_directly(template_array, patches)?;
             }
             motion_block.rotations = from_borrowed_value(template)?;
+            motion_block.rotation_len = motion_block.rotations.len();
         }
 
         Ok(())
