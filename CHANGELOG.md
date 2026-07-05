@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-07-05
+### :bug: Bug Fixes
+- [`e7c7cce`](https://github.com/SARDONYX-sard/d-merge/commit/e7c7cceb543bce03c1e81f9ba91f89c647225afc) - **asdf**: fix broken handling of consecutive diff blocks parsing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`625165b`](https://github.com/SARDONYX-sard/d-merge/commit/625165b97d1b696f9d51667fe9694bdee56852d9) - **adsf**: fix adsf clip anim block parser *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`b284c61`](https://github.com/SARDONYX-sard/d-merge/commit/b284c617eb7885d701bf14097f0026939e6e8e69) - use `wgpu`(dummy) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.5.0] - 2026-07-04
 ### :sparkles: New Features
 - [`ca675bb`](https://github.com/SARDONYX-sard/d-merge/commit/ca675bbe747df89ea86495a85fccae2fbfcfbbe1) - **adsf**: support AMR annotation *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -595,3 +604,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.4.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.3.0...2.4.0
 [2.4.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.0...2.4.1
 [2.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.1...2.5.0
+[2.5.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.0...2.5.1
