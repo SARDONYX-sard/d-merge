@@ -13,8 +13,7 @@ use egui::Label;
 
 use crate::{
     app::App,
-    set_theme,
-    theme::themed_top_bottom_panel,
+    theme::{set_theme, themed_top_bottom_panel},
     ui::shadcn_compat::{button, button_with_icon, checkbox, enum_select, radio_value},
 };
 
