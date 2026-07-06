@@ -32,7 +32,7 @@
     "allotment": "^1.20.5",
     "i18next": "26.2.0",
     "immer": "^11.1.4",
-    "monaco-editor": "*",
+    "monaco-editor": "^0.54.0",
     "monaco-vim": "^0.4.4",
     "notistack": "3.0.2",
     "react": "*",
