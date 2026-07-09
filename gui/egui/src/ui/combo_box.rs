@@ -131,7 +131,7 @@ impl Combobox {
             ui.painter().rect_stroke(
                 trigger_rect,
                 cr,
-                egui::Stroke::new(1.0, theme.input),
+                egui::Stroke::new(1.0_f32, theme.input),
                 egui::epaint::StrokeKind::Inside,
             );
 
@@ -173,7 +173,7 @@ impl Combobox {
             .fill(theme.popover)
             .inner_margin(egui::Margin::same(8))
             .corner_radius(egui::CornerRadius::same(cr))
-            .stroke(egui::Stroke::new(1.0, theme.border))
+            .stroke(egui::Stroke::new(1.0_f32, theme.border))
             .shadow(egui::Shadow {
                 offset: [0, 4],
                 blur: 12,

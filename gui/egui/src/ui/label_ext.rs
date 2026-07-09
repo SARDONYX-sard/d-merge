@@ -95,7 +95,7 @@ pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
                     egui::pos2(rect.left(), underline_y),
                     egui::pos2(rect.left() + text_width, underline_y),
                 ],
-                egui::Stroke::new(1.0, color),
+                egui::Stroke::new(1.0_f32, color),
             );
         }
     }
