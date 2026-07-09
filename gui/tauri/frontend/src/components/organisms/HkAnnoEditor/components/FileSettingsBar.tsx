@@ -7,9 +7,9 @@ export const FileSettingsBar = () => {
   const { t } = useTranslation();
 
   const [state, dispatch] = useEditorContext();
-  const tab = state.tabs[state.active];
+  const tab = state.tabs.at(state.active);
 
-  if (!tab) return null;
+  if (tab === undefined) return null;
 
   return (
     <Box

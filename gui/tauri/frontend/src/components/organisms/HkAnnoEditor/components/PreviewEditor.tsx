@@ -44,7 +44,7 @@ export const PreviewEditor = ({
 
 const usePreviewXml = (updateBaseLine: (left: string, right: string) => void) => {
   const [state, _dispatch] = useEditorContext();
-  const tab = state.tabs[state.active];
+  const tab = state.tabs.at(state.active);
   const [previewXml, setPreviewXml] = useState('');
   const [error, setError] = useState<string | null>(null);
 

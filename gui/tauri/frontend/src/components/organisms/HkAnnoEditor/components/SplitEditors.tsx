@@ -12,7 +12,7 @@ export const SplitEditors = () => {
   const [state, _] = useEditorContext();
   const tab = state.tabs[state.active];
 
-  if (!tab) {
+  if (tab === undefined) {
     return <EmptyDragPoint />;
   }
 

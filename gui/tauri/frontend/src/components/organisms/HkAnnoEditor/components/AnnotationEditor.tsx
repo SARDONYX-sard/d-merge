@@ -11,7 +11,7 @@ import { MonacoEditor } from '@/components/organisms/MonacoEditor';
 export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
   const [state, dispatch] = useEditorContext();
   const isVimMode = useEditorModeContext().editorMode === 'vim';
-  const tab = state.tabs[state.active];
+  const tab = state.tabs.at(state.active);
   const { t } = useTranslation();
   const handleOnMountLsp = useHkAnnoLsp(state.lspOptions);
 
@@ -26,7 +26,7 @@ export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
     handleOnMountLsp(editor, monaco);
 
     // Restore cursorPos in FileTab
-    if (tab.cursorPos) {
+    if (tab?.cursorPos) {
       editor.setPosition(tab.cursorPos);
       editor.revealPositionInCenter(tab.cursorPos);
       editor.focus();
@@ -49,16 +49,19 @@ export const AnnotationEditor = ({ onMount }: { onMount: OnMount }) => {
       <Typography variant='subtitle2' sx={{ px: 2, pt: 1, color: '#aaa' }}>
         {t('hkanno.editor.annotation')}
       </Typography>
-      <MonacoEditor
-        key={tab.id + tab.dirty}
-        defaultLanguage='hkanno'
-        height='90%'
-        value={tab.text}
-        vimMode={isVimMode}
-        options={MONACO_OPTIONS}
-        onChange={handleOnChange}
-        onMount={handleOnMount}
-      />
+
+      {tab ? (
+        <MonacoEditor
+          key={tab.id + tab.dirty}
+          defaultLanguage='hkanno'
+          height='90%'
+          value={tab.text}
+          vimMode={isVimMode}
+          options={MONACO_OPTIONS}
+          onChange={handleOnChange}
+          onMount={handleOnMount}
+        />
+      ) : null}
     </>
   );
 };

@@ -11,7 +11,7 @@ export const HeaderToolbar = () => {
   const { t } = useTranslation();
   const [state, dispatch] = useEditorContext();
   const { saveCurrent } = useHkannoCommands();
-  const tab = state.tabs[state.active];
+  const tab = state.tabs.at(state.active);
   const hasTab = Boolean(tab);
 
   return (
@@ -30,7 +30,7 @@ export const HeaderToolbar = () => {
         {t('hkanno.toolbar.save')}
       </Button>
 
-      <RevertButton hasTab={hasTab} originalText={hkannoToText(tab.hkanno)} />
+      {tab ? <RevertButton hasTab={hasTab} originalText={hkannoToText(tab.hkanno)} /> : null}
 
       <LspOptionDialogButton />
 
