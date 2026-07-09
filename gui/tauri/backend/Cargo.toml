@@ -18,7 +18,7 @@ dist = false # To run CI and build separately from CLI (cargo dist)
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.5.6", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 once_cell = { workspace = true }
@@ -30,10 +30,10 @@ self_update = { version = "0.44.0", features = [
 ] } # Since tauri-updater only supports installers, use this.
 serde = { workspace = true } # Implement (De)Serializer
 snafu = { workspace = true } # Implement error types
-tauri = { version = "2.11.1", features = ["devtools"] } # For GUI
-tauri-plugin-dialog = "2.7.0" # https://github.com/tauri-apps/plugins-workspace
-tauri-plugin-fs = "2.5.0"
-tauri-plugin-opener = "2.5.3"
+tauri = { version = "2.11.5", features = ["devtools"] } # For GUI
+tauri-plugin-dialog = "2.7.1" # https://github.com/tauri-apps/plugins-workspace
+tauri-plugin-fs = "2.5.1"
+tauri-plugin-opener = "2.5.4"
 tauri-plugin-window-state = "2.4.1"
 tokio = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
