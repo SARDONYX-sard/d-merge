@@ -62,6 +62,7 @@ const ThemeResponsiveSnackbar = memo(
 
     // HACK: Convert whitespace to a special Unicode space equal to the numeric width to alleviate whitespace misalignment.
     // - ref: https://www.fileformat.info/info/unicode/char/2007/index.htm
+    // oxlint-disable-next-line typescript/no-base-to-string
     const errMsg = message?.toString().replaceAll(' ', '\u2007');
 
     return (

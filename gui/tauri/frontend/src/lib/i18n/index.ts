@@ -59,7 +59,6 @@ export const LANG = {
    * - ref: https://react.i18next.com/guides/quick-start#configure-i18next
    */
   init() {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     use(initReactI18next) // passes i18n down to react-i18next
       .init({
         resources: RESOURCES,
@@ -68,7 +67,8 @@ export const LANG = {
         interpolation: {
           escapeValue: false, // react already safes from xss
         },
-      });
+      })
+      .catch((e) => console.error(e));
   },
 
   normalize,

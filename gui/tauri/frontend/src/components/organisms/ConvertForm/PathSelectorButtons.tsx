@@ -28,7 +28,6 @@ export const PathSelectorButtons = () => {
     switch (selectionType) {
       case 'dir':
         return selectedDirs.at(0);
-        break;
       case 'files':
         return selectedFiles.at(0);
       case 'tree':

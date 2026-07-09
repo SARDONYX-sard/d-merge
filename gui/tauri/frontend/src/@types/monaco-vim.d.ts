@@ -190,7 +190,7 @@ declare module 'monaco-vim' {
     unmap(key: string, options?: any): void;
   }
 
-  declare var VimMode: {
+  var VimMode: {
     Pos: (e: any, t?: any) => void;
     StringStream: {
       eol(): boolean;

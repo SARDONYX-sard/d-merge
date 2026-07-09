@@ -31,25 +31,21 @@ const useAutoImportBackup = () => {
       }
       sessionStorage.setItem(key, 'true');
 
-      try {
-        if (!(await exists(settingsPath))) {
-          LOG.log('info', `No backup found at ${settingsPath}. Skipping auto import.`);
-          return;
-        }
-        LOG.log('info', `Backups are being automatically loaded from ${settingsPath}...`);
+      if (!(await exists(settingsPath))) {
+        LOG.log('info', `No backup found at ${settingsPath}. Skipping auto import.`);
+        return;
+      }
+      LOG.log('info', `Backups are being automatically loaded from ${settingsPath}...`);
 
-        const newSettings = BACKUP.fromStr(await readFile(settingsPath));
-        if (newSettings) {
-          newSettings['last-path'] = '/';
-          STORAGE.setAll(newSettings);
-          window.location.reload();
-        }
-      } catch (e) {
-        NOTIFY.warn(`Import backup error ${e}.`);
+      const newSettings = BACKUP.fromStr(await readFile(settingsPath));
+      if (newSettings) {
+        newSettings['last-path'] = '/';
+        STORAGE.setAll(newSettings);
+        window.location.reload();
       }
     };
 
-    doImport();
+    doImport().catch((e) => NOTIFY.warn(`Import backup error ${e}.`));
   }, [modInfoDir, settingsPath]);
 };
 
@@ -64,29 +60,31 @@ const useAutoExportBackup = () => {
      * Register close listener for auto backup.
      */
     const registerCloseListener = async () => {
-      try {
-        if (!isTauri()) {
-          return;
-        }
-
-        const unlistenFn = await listen('tauri://close-requested', async () => {
-          try {
-            LOG.log('info', `Backups are being automatically written to ${settingsPath}...`);
-            await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
-          } catch (e) {
-            NOTIFY.error(`${e}`);
-          } finally {
-            await destroyCurrentWindow();
-          }
-        });
-
-        unlisten = unlistenFn;
-      } catch (e) {
-        NOTIFY.error(`Failed to register close listener for auto backup. Error: ${e}`);
+      if (!isTauri()) {
+        return;
       }
+
+      const eventHandler = async () => {
+        try {
+          LOG.log('info', `Backups are being automatically written to ${settingsPath}...`);
+          await BACKUP.exportRaw(settingsPath, STORAGE.getAll());
+        } catch (e) {
+          if (e instanceof Error) {
+            NOTIFY.error(e.message);
+          } else if (typeof e === 'string') {
+            NOTIFY.error(e);
+          }
+        } finally {
+          await destroyCurrentWindow();
+        }
+      };
+
+      unlisten = await listen('tauri://close-requested', eventHandler);
     };
 
-    registerCloseListener();
+    registerCloseListener().catch((e) =>
+      NOTIFY.error(`Failed to register close listener for auto backup. Error: ${e}`),
+    );
 
     return () => {
       unlisten?.();
