@@ -1,32 +1,4 @@
 //! Application settings: persistence, migration, and mode-dispatch helpers.
-//!
-//! # File layout
-//!
-//! ```text
-//! settings/
-//! ├── mod.rs          ← AppSettings, load/save, current_mode helpers
-//! ├── behavior.rs     ← BehaviorSettings
-//! ├── log.rs          ← LogSettings
-//! ├── ui.rs           ← UiSettings, WindowGeometry
-//! ├── mod_list_ui.rs  ← ModListUiSettings
-//! └── mode.rs         ← ModeSettings  (VFS / Manual share the same shape)
-//! ```
-//!
-//! # Persistence
-//! Settings are stored in a single `settings.json` next to the executable.
-//! The file is written on [`eframe::App::on_exit`] and read at startup.
-//! A missing file silently produces [`Default`] values.
-//!
-//! # Migration
-//! Breaking schema changes are handled in [`AppSettings::migrate`].
-//! The `app_version` field records which version of the application wrote
-//! the file; `migrate` is called once after deserialization and before the
-//! settings are used.
-//!
-//! # Mode dispatch
-//! [`AppSettings::current_mode`] and [`AppSettings::current_mode_mut`]
-//! centralize the VFS / Manual branch so call-sites never write
-//! `match self.behavior.mode { … }` by hand.
 
 pub mod behavior;
 mod compat_old;
