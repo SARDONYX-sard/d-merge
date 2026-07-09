@@ -142,7 +142,7 @@ SkyrimSE
 - **TKDodge SE**
   This is an extremely unique mod even within the FNIS. (Normally, the required `FNIS__*List.txt` and `FNIS*__behavior.hkx` are missing.)
 
-  Therefore, use the `TKDodge and UltimateCombat Nemesis patch` (modified to make the _1stperson patch easier to parse).
+  Therefore, use the `TKDodge and UltimateCombat Nemesis patch` (modified to make the `_1stperson` patch easier to parse).
   It's available at the d_merge Nexus URL.
 
   This alone will not work in AE.
