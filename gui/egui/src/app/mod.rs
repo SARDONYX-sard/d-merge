@@ -1,5 +1,6 @@
 //! Root of the application module.
 
+mod background_image;
 mod fetch;
 mod log;
 mod notify;
@@ -59,6 +60,8 @@ pub(crate) struct App {
 
     /// Whether the theme editor window is open.
     pub show_theme_editor: bool,
+
+    pub bg_img_handle: Option<egui::TextureHandle>,
 
     // ── Notification bar ──────────────────────────────────────────────────────
     /// `(message, color)` shown in the mod-list status line.
@@ -133,6 +136,8 @@ impl App {
             theme_manager,
             show_theme_editor: false,
 
+            bg_img_handle: None,
+
             mod_list_msg: (String::new(), egui::Color32::WHITE),
             notify: (String::new(), egui::Color32::WHITE),
 
@@ -155,6 +160,7 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // ── Background task polling ───────────────────────────────────────────
+        self.paint_background(ctx);
         self.poll_fetch_result(ctx);
         self.poll_patch_result();
         self.update_window_info(ctx);

@@ -22,7 +22,10 @@ pub struct UiSettings {
     /// inside the `themes/` directory next to the settings file).
     pub custom_theme: CustomTheme,
 
-    #[serde(default)]
+    /// background image settings
+    pub background: BackgroundSettings,
+
+    /// font settings
     pub font: FontSettings,
 
     /// Path to the i18n JSON file used for UI translation.
@@ -40,6 +43,7 @@ impl Default for UiSettings {
         Self {
             theme: theme::Theme::System,
             custom_theme: CustomTheme::default(),
+            background: BackgroundSettings::default(),
             font: FontSettings::default(),
             i18n_path: crate::i18n::I18nMap::FILE.into(),
             mod_list: ModListUiSettings::default(),
@@ -83,19 +87,17 @@ impl Default for WindowGeometry {
 
 #[derive(Debug, Clone, Default)]
 #[derive(serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct FontSettings {
     /// Determines how the application resolves the UI font.
-    #[serde(default)]
     pub mode: FontMode,
 
     /// System font family name used when
     /// [`FontMode::System`] is selected.
-    #[serde(default)]
     pub name: String,
 
     /// Font file path used when
     /// [`FontMode::File`] is selected.
-    #[serde(default)]
     pub path: String,
 }
 
@@ -122,4 +124,15 @@ pub enum FontMode {
     ///
     /// Path to a custom `.ttc`, `.ttf` or `.otf` font file.
     File,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct BackgroundSettings {
+    /// Whether the background image is shown.
+    pub enabled: bool,
+
+    /// background image path
+    pub path: String,
 }

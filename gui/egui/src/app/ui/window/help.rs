@@ -11,7 +11,7 @@ use egui::Color32;
 
 use crate::{
     app::App,
-    ui::shadcn_compat::{button, enum_select, heading, searchable_string_select},
+    ui::shadcn_compat::{button, checkbox, enum_select, heading, searchable_string_select},
 };
 
 impl App {
@@ -57,6 +57,10 @@ impl App {
         let mut write_i18n_clicked = false;
         let mut load_default_i18n_clicked = false;
 
+        let mut selected_background_path = self.settings.ui.background.path.clone();
+        let mut reload_background_clicked = false;
+        let mut background_enabled = self.settings.ui.background.enabled;
+
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show_help)
             .collapsible(false)
@@ -79,8 +83,6 @@ impl App {
                 ui.separator();
 
                 self.ui_bug_report(ui);
-
-                ui.add_space(8.0);
                 ui.separator();
 
                 self.ui_font_section(
@@ -102,6 +104,15 @@ impl App {
                     &mut write_i18n_clicked,
                     &mut load_default_i18n_clicked,
                 );
+                ui.separator();
+
+                self.ui_background_section(
+                    ui,
+                    &mut selected_background_path,
+                    &mut reload_background_clicked,
+                    &mut background_enabled,
+                );
+                ui.separator();
 
                 // NOTE: Since it shrinks automatically, extend it to the `height`. (To create space for potential font heights.)
                 ui.add_space(ui.available_height());
@@ -183,6 +194,15 @@ impl App {
                     Err(err) => self.notify_error(err.to_string()),
                 }
             }
+        }
+
+        if self.settings.ui.background.path != selected_background_path {
+            self.settings.ui.background.path = selected_background_path;
+        }
+        self.settings.ui.background.enabled = background_enabled;
+        if reload_background_clicked {
+            self.settings.ui.background.enabled = true;
+            self.reload_background(ctx);
         }
     }
 
@@ -422,6 +442,47 @@ impl App {
                 }
             });
 
+            ui.end_row();
+        });
+    }
+
+    fn ui_background_section(
+        &self,
+        ui: &mut egui::Ui,
+        selected_background_path: &mut String,
+        reload_background_clicked: &mut bool,
+        background_enabled: &mut bool,
+    ) {
+        egui::Grid::new("background_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            if path_selector_row(
+                PathSelector {
+                    ui,
+                    label: self.i18n.t(I18nKey::BackgroundImageLabel),
+                    value: selected_background_path,
+                    select_label: self.i18n.t(I18nKey::SelectButton),
+                    reload_label: self.i18n.t(I18nKey::ReloadButton),
+                    reload_hover: self.i18n.t(I18nKey::BackgroundImageReloadHover),
+                    clear_label: self.i18n.t(I18nKey::ClearButton),
+                },
+                || {
+                    let dir = Path::new(&self.settings.ui.background.path).parent().map_or_else(
+                        || Cow::Borrowed(Path::new(".")),
+                        |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
+                    );
+
+                    rfd::FileDialog::new()
+                        .set_directory(dir)
+                        .add_filter("image", &["png", "jpg", "jpeg"])
+                        .pick_file()
+                        .map(|p| p.display().to_string())
+                },
+            ) {
+                *reload_background_clicked = true;
+            }
+            ui.end_row();
+
+            checkbox(ui, background_enabled, self.i18n.t(I18nKey::BackgroundImageEnabled))
+                .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
             ui.end_row();
         });
     }
