@@ -101,6 +101,7 @@ impl From<OldSettings> for Settings {
             ui: UiSettings {
                 theme: super::ui::theme::Theme::Dark,
                 custom_theme: super::ui::theme::CustomTheme::default(),
+                background: super::ui::BackgroundSettings::default(),
                 font: old
                     .font_path
                     .map(|path| FontSettings {

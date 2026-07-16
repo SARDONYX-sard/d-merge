@@ -51,6 +51,23 @@ pub enum I18nKey {
     /// You must close the window manually to prevent the auto-run option from becoming disabled.
     AutoRunHover,
 
+    /// Background Image:
+    BackgroundImageLabel,
+
+    /// Reload background image.
+    ///
+    /// # Notes
+    /// When you click this button, the `Enabled` checkbox will also be checked.
+    BackgroundImageReloadHover,
+
+    /// Enabled
+    BackgroundImageEnabled,
+
+    /// Whether the background image is shown.
+    ///
+    /// This feature exists to allow you to toggle the setting on and off while keeping the background image path specified.
+    BackgroundImageEnabledHover,
+
     /// Bug Report:
     BugReportLabel,
 

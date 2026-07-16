@@ -25,6 +25,7 @@ egui = { version = "0.33.3", features = ["rayon"] }
 egui_dnd = "0.14.0"
 egui_extras = "0.33.0"
 egui-shadcn = { git = "https://github.com/SARDONYX-forks/egui-shadcn.git", rev = "fa5ceee" }
+image = { version = "0.25.10", features = ["jpeg", "png"] }
 # ---
 
 dashmap = { workspace = true }
