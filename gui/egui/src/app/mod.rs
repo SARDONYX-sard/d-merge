@@ -155,6 +155,16 @@ impl App {
             patch_start_time: None,
         }
     }
+
+    /// Reads the current window geometry from egui and persists it to
+    /// [`AppSettings`] so the window reopens in the same position and size.
+    ///
+    /// Position and size are only updated when the window is **not**
+    /// maximized, to avoid saving the transient geometry produced during
+    /// minimize/restore cycles.
+    fn update_window_info(&mut self, ctx: &egui::Context) {
+        update_window_geometry(ctx, egui::ViewportId::ROOT, &mut self.settings.ui.window);
+    }
 }
 
 impl eframe::App for App {
@@ -192,18 +202,6 @@ impl eframe::App for App {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.settings.log.window = self.log_window_info.read().clone();
         self.settings.save();
-    }
-}
-
-impl App {
-    /// Reads the current window geometry from egui and persists it to
-    /// [`AppSettings`] so the window reopens in the same position and size.
-    ///
-    /// Position and size are only updated when the window is **not**
-    /// maximized, to avoid saving the transient geometry produced during
-    /// minimize/restore cycles.
-    fn update_window_info(&mut self, ctx: &egui::Context) {
-        update_window_geometry(ctx, egui::ViewportId::ROOT, &mut self.settings.ui.window);
     }
 }
 

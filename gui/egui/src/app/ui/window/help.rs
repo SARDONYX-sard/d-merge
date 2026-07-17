@@ -14,6 +14,41 @@ use crate::{
     ui::shadcn_compat::{button, checkbox, enum_select, heading, searchable_string_select},
 };
 
+bitflags::bitflags! {
+    /// Actions requested by the widgets inside the help dialog during a single frame.
+    ///
+    /// Each section function (`ui_font_section`, `ui_log_section`, ...) only ever
+    /// receives a `&mut HelpDialogActions` instead of a handful of separate `bool`s,
+    /// and sets the relevant bits once it knows what happened. `ui_help_window`
+    /// drains this single value after the window closes and dispatches side effects.
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+    struct HelpDialogActions: u32 {
+        /// "Reload" button clicked in the font section.
+        const FONT_RELOAD_CLICKED        = 1 << 0;
+        /// A new font file was picked via the `rfd` file dialog.
+        const FONT_PATH_SELECTED         = 1 << 1;
+
+        /// "Reload" button clicked in the log section.
+        const LOG_RELOAD_CLICKED         = 1 << 2;
+        /// A new log directory was picked via the `rfd` file dialog.
+        const LOG_PATH_SELECTED          = 1 << 3;
+
+        /// "Reload" button clicked in the i18n section.
+        const I18N_RELOAD_CLICKED        = 1 << 4;
+        /// A new translation file was picked via the `rfd` file dialog.
+        const I18N_PATH_SELECTED         = 1 << 5;
+        /// "Write new translation.json" button clicked.
+        const I18N_WRITE_CLICKED         = 1 << 6;
+        /// "Default" (force English) button clicked.
+        const I18N_LOAD_DEFAULT_CLICKED  = 1 << 7;
+
+        /// "Reload" button clicked in the background section.
+        const BACKGROUND_RELOAD_CLICKED  = 1 << 8;
+        /// A new background image was picked via the `rfd` file dialog.
+        const BACKGROUND_PATH_SELECTED   = 1 << 9;
+    }
+}
+
 impl App {
     /// Renders the help / about window.
     ///
@@ -47,19 +82,16 @@ impl App {
         let mut selected_font_mode = self.settings.ui.font.mode;
         let mut selected_font_name = self.settings.ui.font.name.clone();
         let mut selected_font_path = self.settings.ui.font.path.clone();
-        let mut reload_font_clicked = false;
 
         let mut selected_log_dir_path = self.settings.log.dir_path.clone();
-        let mut reload_log_clicked = false;
 
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
-        let mut reload_i18n_clicked = false;
-        let mut write_i18n_clicked = false;
-        let mut load_default_i18n_clicked = false;
 
         let mut selected_background_path = self.settings.ui.background.path.clone();
-        let mut reload_background_clicked = false;
         let mut background_enabled = self.settings.ui.background.enabled;
+
+        // Single carrier for every widget-triggered action in this frame.
+        let mut actions = HelpDialogActions::empty();
 
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show_help)
@@ -90,27 +122,21 @@ impl App {
                     &mut selected_font_mode,
                     &mut selected_font_name,
                     &mut selected_font_path,
-                    &mut reload_font_clicked,
+                    &mut actions,
                 );
                 ui.separator();
 
-                self.ui_log_section(ui, &mut selected_log_dir_path, &mut reload_log_clicked);
+                self.ui_log_section(ui, &mut selected_log_dir_path, &mut actions);
                 ui.separator();
 
-                self.ui_translation_section(
-                    ui,
-                    &mut selected_i18n_path,
-                    &mut reload_i18n_clicked,
-                    &mut write_i18n_clicked,
-                    &mut load_default_i18n_clicked,
-                );
+                self.ui_translation_section(ui, &mut selected_i18n_path, &mut actions);
                 ui.separator();
 
                 self.ui_background_section(
                     ui,
                     &mut selected_background_path,
-                    &mut reload_background_clicked,
                     &mut background_enabled,
+                    &mut actions,
                 );
                 ui.separator();
 
@@ -122,7 +148,7 @@ impl App {
             self.show_help = false;
         }
 
-        // Fonts actions
+        // --- Font actions ---
         let did_font_mode_change = self.settings.ui.font.mode != selected_font_mode;
         let did_font_name_change = self.settings.ui.font.name != selected_font_name;
 
@@ -135,11 +161,15 @@ impl App {
         if self.settings.ui.font.path != selected_font_path {
             self.settings.ui.font.path = selected_font_path;
         }
-        // NOTE: The font path won't be applied automatically until we click the reload button. (Because it would make it harder to use.)
+        // NOTE: The font path won't be applied automatically until we click the reload button
+        // or actually pick a new file. (Because auto-applying on every keystroke would make it
+        // harder to use.)
         if ((did_font_mode_change
             && matches!(selected_font_mode, FontMode::Default | FontMode::System))
             || did_font_name_change
-            || reload_font_clicked)
+            || actions.intersects(
+                HelpDialogActions::FONT_RELOAD_CLICKED | HelpDialogActions::FONT_PATH_SELECTED,
+            ))
             && let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font)
         {
             match err {
@@ -154,53 +184,41 @@ impl App {
             }
         }
 
-        // Log actions
+        // --- Log actions ---
         if self.settings.log.dir_path != selected_log_dir_path {
             self.settings.log.dir_path = selected_log_dir_path;
         }
-        if reload_log_clicked {
+        if actions.intersects(
+            HelpDialogActions::LOG_RELOAD_CLICKED | HelpDialogActions::LOG_PATH_SELECTED,
+        ) {
             self.reload_log();
         }
 
-        // i18n actions
+        // --- i18n actions ---
         if self.settings.ui.i18n_path != selected_i18n_path {
             self.settings.ui.i18n_path = selected_i18n_path;
         }
-        if reload_i18n_clicked {
+        if actions.intersects(
+            HelpDialogActions::I18N_RELOAD_CLICKED | HelpDialogActions::I18N_PATH_SELECTED,
+        ) {
             self.reload_i18n();
         }
-        if load_default_i18n_clicked {
+        if actions.contains(HelpDialogActions::I18N_LOAD_DEFAULT_CLICKED) {
             self.i18n = d_merge_gui_shared::i18n::I18nMap::new();
         }
-        if write_i18n_clicked {
-            let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
-                || Cow::Borrowed(Path::new(".")),
-                |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-            );
-
-            let path = rfd::FileDialog::new()
-                .set_directory(path)
-                .set_title("Save translation.json")
-                .set_file_name("translation.json")
-                .add_filter("translation", &["json"])
-                .save_file();
-
-            if let Some(path) = path {
-                match I18nMap::save(&path) {
-                    Ok(()) => self.set_colored_notify(
-                        format!("OK. Wrote {}", path.display()),
-                        Color32::GREEN,
-                    ),
-                    Err(err) => self.notify_error(err.to_string()),
-                }
-            }
+        if actions.contains(HelpDialogActions::I18N_WRITE_CLICKED) {
+            self.write_new_i18n();
         }
 
+        // --- Background actions ---
         if self.settings.ui.background.path != selected_background_path {
             self.settings.ui.background.path = selected_background_path;
         }
         self.settings.ui.background.enabled = background_enabled;
-        if reload_background_clicked {
+        if actions.intersects(
+            HelpDialogActions::BACKGROUND_RELOAD_CLICKED
+                | HelpDialogActions::BACKGROUND_PATH_SELECTED,
+        ) {
             self.settings.ui.background.enabled = true;
             self.reload_background(ctx);
         }
@@ -208,9 +226,9 @@ impl App {
 
     fn ui_help_info(&self, ui: &mut egui::Ui) {
         let rows = [
-            (self.i18n.t(I18nKey::AuthorLabel).to_string(), env!("CARGO_PKG_AUTHORS"), None),
+            (self.i18n.t(I18nKey::AuthorLabel), env!("CARGO_PKG_AUTHORS"), None),
             (
-                self.i18n.t(I18nKey::LicenseLabel).to_string(),
+                self.i18n.t(I18nKey::LicenseLabel),
                 env!("CARGO_PKG_LICENSE"),
                 Some(concat!(
                     env!("CARGO_PKG_REPOSITORY"),
@@ -220,17 +238,17 @@ impl App {
                 )),
             ),
             (
-                self.i18n.t(I18nKey::SourceCodeLabel).to_string(),
+                self.i18n.t(I18nKey::SourceCodeLabel),
                 "GitHub",
                 Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("CARGO_PKG_VERSION"))),
             ),
             (
-                self.i18n.t(I18nKey::ChangeLogLabel).to_string(),
+                self.i18n.t(I18nKey::ChangeLogLabel),
                 "CHANGELOG.md",
                 Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/main/CHANGELOG.md")),
             ),
             (
-                self.i18n.t(I18nKey::ModTestStatusLabel).to_string(),
+                self.i18n.t(I18nKey::ModTestStatusLabel),
                 "test_status.md",
                 Some(concat!(
                     env!("CARGO_PKG_REPOSITORY"),
@@ -246,13 +264,9 @@ impl App {
                 ui.label(label);
 
                 match url {
-                    Some(url) => {
-                        ui.hyperlink_to(value, url).on_hover_text(url);
-                    }
-                    None => {
-                        ui.label(value);
-                    }
-                }
+                    Some(url) => ui.hyperlink_to(value, url).on_hover_text(url),
+                    None => ui.label(value),
+                };
 
                 ui.end_row();
             }
@@ -288,7 +302,7 @@ impl App {
         selected_font_mode: &mut FontMode,
         selected_font_name: &mut String,
         selected_font_path: &mut String,
-        reload_font_clicked: &mut bool,
+        actions: &mut HelpDialogActions,
     ) {
         egui::Grid::new("font_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
             ui.label(self.i18n.t(I18nKey::FontModeLabel))
@@ -322,7 +336,10 @@ impl App {
                 }
 
                 FontMode::File => {
-                    if path_selector_row(
+                    // Local flags for this section only; folded into `actions` at the end.
+                    let mut path_selected = false;
+
+                    let reload_clicked = path_selector_row(
                         PathSelector {
                             ui,
                             label: self.i18n.t(I18nKey::FontFileLabel),
@@ -343,11 +360,15 @@ impl App {
                                 .set_directory(dir)
                                 .add_filter("font", &["ttc", "ttf", "tto"])
                                 .pick_file()
-                                .map(|p| p.display().to_string())
+                                .map(|p| {
+                                    path_selected = true;
+                                    p.display().to_string()
+                                })
                         },
-                    ) {
-                        *reload_font_clicked |= true;
-                    }
+                    );
+
+                    actions.set(HelpDialogActions::FONT_RELOAD_CLICKED, reload_clicked);
+                    actions.set(HelpDialogActions::FONT_PATH_SELECTED, path_selected);
                 }
             }
             ui.end_row();
@@ -358,10 +379,12 @@ impl App {
         &self,
         ui: &mut egui::Ui,
         selected_log_dir_path: &mut String,
-        reload_log_clicked: &mut bool,
+        actions: &mut HelpDialogActions,
     ) {
         egui::Grid::new("log_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            if path_selector_row(
+            let mut path_selected = false;
+
+            let reload_clicked = path_selector_row(
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::LogDirPathLabel),
@@ -375,14 +398,15 @@ impl App {
                     let dir = Path::new(self.settings.log.dir_path.as_str());
                     let dir = dir.canonicalize().map(Cow::Owned).unwrap_or(Cow::Borrowed(dir));
 
-                    rfd::FileDialog::new()
-                        .set_directory(dir)
-                        .pick_folder()
-                        .map(|p| p.display().to_string())
+                    rfd::FileDialog::new().set_directory(dir).pick_folder().map(|p| {
+                        path_selected = true;
+                        p.display().to_string()
+                    })
                 },
-            ) {
-                *reload_log_clicked = true;
-            }
+            );
+
+            actions.set(HelpDialogActions::LOG_RELOAD_CLICKED, reload_clicked);
+            actions.set(HelpDialogActions::LOG_PATH_SELECTED, path_selected);
 
             ui.end_row();
         });
@@ -392,12 +416,12 @@ impl App {
         &self,
         ui: &mut egui::Ui,
         selected_i18n_path: &mut String,
-        reload_i18n_clicked: &mut bool,
-        write_i18n_clicked: &mut bool,
-        load_default_i18n_clicked: &mut bool,
+        actions: &mut HelpDialogActions,
     ) {
         egui::Grid::new("i18n_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            if path_selector_row(
+            let mut path_selected = false;
+
+            let reload_clicked = path_selector_row(
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::I18nPathLabel),
@@ -417,11 +441,15 @@ impl App {
                         .set_directory(path)
                         .add_filter("translation", &["json"])
                         .pick_file()
-                        .map(|p| p.display().to_string())
+                        .map(|p| {
+                            path_selected = true;
+                            p.display().to_string()
+                        })
                 },
-            ) {
-                *reload_i18n_clicked = true;
-            }
+            );
+
+            actions.set(HelpDialogActions::I18N_RELOAD_CLICKED, reload_clicked);
+            actions.set(HelpDialogActions::I18N_PATH_SELECTED, path_selected);
 
             ui.label("English:");
             ui.horizontal(|ui| {
@@ -430,7 +458,7 @@ impl App {
                     .on_hover_text(self.i18n.t(I18nKey::I18nWriteNewJsonHover))
                     .clicked()
                 {
-                    *write_i18n_clicked = true;
+                    actions.insert(HelpDialogActions::I18N_WRITE_CLICKED);
                 }
 
                 if ui
@@ -438,7 +466,7 @@ impl App {
                     .on_hover_text("Temporarily force a switch to English mode (for debugging)")
                     .clicked()
                 {
-                    *load_default_i18n_clicked = true;
+                    actions.insert(HelpDialogActions::I18N_LOAD_DEFAULT_CLICKED);
                 }
             });
 
@@ -450,11 +478,13 @@ impl App {
         &self,
         ui: &mut egui::Ui,
         selected_background_path: &mut String,
-        reload_background_clicked: &mut bool,
         background_enabled: &mut bool,
+        actions: &mut HelpDialogActions,
     ) {
         egui::Grid::new("background_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            if path_selector_row(
+            let mut path_selected = false;
+
+            let reload_clicked = path_selector_row(
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::BackgroundImageLabel),
@@ -474,12 +504,14 @@ impl App {
                         .set_directory(dir)
                         .add_filter("image", &["png", "jpg", "jpeg"])
                         .pick_file()
-                        .map(|p| p.display().to_string())
+                        .map(|p| {
+                            path_selected = true;
+                            p.display().to_string()
+                        })
                 },
-            ) {
-                *reload_background_clicked = true;
-            }
-            ui.end_row();
+            );
+            actions.set(HelpDialogActions::BACKGROUND_RELOAD_CLICKED, reload_clicked);
+            actions.set(HelpDialogActions::BACKGROUND_PATH_SELECTED, path_selected);
 
             checkbox(ui, background_enabled, self.i18n.t(I18nKey::BackgroundImageEnabled))
                 .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
@@ -516,6 +548,32 @@ impl App {
             }
         }
     }
+
+    fn write_new_i18n(&mut self) {
+        let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
+            || Cow::Borrowed(Path::new(".")),
+            |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
+        );
+
+        let path = rfd::FileDialog::new()
+            .set_directory(path)
+            .set_title("Save translation.json")
+            .set_file_name("translation.json")
+            .add_filter("translation", &["json"])
+            .save_file();
+
+        if let Some(path) = path {
+            match I18nMap::save(&path) {
+                Ok(()) => {
+                    self.set_colored_notify(
+                        format!("OK. Wrote {}", path.display()),
+                        Color32::GREEN,
+                    );
+                }
+                Err(err) => self.notify_error(err.to_string()),
+            }
+        }
+    }
 }
 
 struct PathSelector<'a> {
@@ -528,7 +586,7 @@ struct PathSelector<'a> {
     clear_label: &'a str,
 }
 
-/// Return reload button clicked
+/// Return whether the "reload" button was clicked.
 fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<String>) -> bool {
     let PathSelector { ui, label, value, select_label, reload_label, reload_hover, clear_label } =
         selector;

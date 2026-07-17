@@ -28,6 +28,7 @@ egui-shadcn = { git = "https://github.com/SARDONYX-forks/egui-shadcn.git", rev =
 image = { version = "0.25.10", features = ["jpeg", "png"] }
 # ---
 
+bitflags = "2.13.1"
 dashmap = { workspace = true }
 dark-light = "2.0.0"
 font-kit = "0.14.3"
