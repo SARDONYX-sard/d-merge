@@ -2,11 +2,11 @@ use eframe::egui::{ColorImage, TextureOptions};
 
 impl super::App {
     pub(crate) fn reload_background(&mut self, ctx: &egui::Context) {
-        if self.settings.ui.background.path.is_empty() {
+        if self.settings.ui.background_image.path.is_empty() {
             return;
         }
 
-        let image = match image::open(&self.settings.ui.background.path) {
+        let image = match image::open(&self.settings.ui.background_image.path) {
             Ok(v) => v.to_rgba8(),
             Err(e) => {
                 let err = format!("{e}");
@@ -23,7 +23,7 @@ impl super::App {
     }
 
     pub(crate) fn paint_background(&mut self, ctx: &egui::Context) {
-        if !self.settings.ui.background.enabled {
+        if !self.settings.ui.background_image.enabled {
             return;
         }
 

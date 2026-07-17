@@ -42,10 +42,10 @@ bitflags::bitflags! {
         /// "Default" (force English) button clicked.
         const I18N_LOAD_DEFAULT_CLICKED  = 1 << 7;
 
-        /// "Reload" button clicked in the background section.
-        const BACKGROUND_RELOAD_CLICKED  = 1 << 8;
+        /// "Reload" button clicked in the background image section.
+        const BACKGROUND_IMG_RELOAD_CLICKED  = 1 << 8;
         /// A new background image was picked via the `rfd` file dialog.
-        const BACKGROUND_PATH_SELECTED   = 1 << 9;
+        const BACKGROUND_IMG_PATH_SELECTED   = 1 << 9;
     }
 }
 
@@ -87,8 +87,8 @@ impl App {
 
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
 
-        let mut selected_background_path = self.settings.ui.background.path.clone();
-        let mut background_enabled = self.settings.ui.background.enabled;
+        let mut selected_background_img_path = self.settings.ui.background_image.path.clone();
+        let mut background_img_enabled = self.settings.ui.background_image.enabled;
 
         // Single carrier for every widget-triggered action in this frame.
         let mut actions = HelpDialogActions::empty();
@@ -134,8 +134,8 @@ impl App {
 
                 self.ui_background_section(
                     ui,
-                    &mut selected_background_path,
-                    &mut background_enabled,
+                    &mut selected_background_img_path,
+                    &mut background_img_enabled,
                     &mut actions,
                 );
                 ui.separator();
@@ -211,15 +211,15 @@ impl App {
         }
 
         // --- Background actions ---
-        if self.settings.ui.background.path != selected_background_path {
-            self.settings.ui.background.path = selected_background_path;
+        if self.settings.ui.background_image.path != selected_background_img_path {
+            self.settings.ui.background_image.path = selected_background_img_path;
         }
-        self.settings.ui.background.enabled = background_enabled;
+        self.settings.ui.background_image.enabled = background_img_enabled;
         if actions.intersects(
-            HelpDialogActions::BACKGROUND_RELOAD_CLICKED
-                | HelpDialogActions::BACKGROUND_PATH_SELECTED,
+            HelpDialogActions::BACKGROUND_IMG_RELOAD_CLICKED
+                | HelpDialogActions::BACKGROUND_IMG_PATH_SELECTED,
         ) {
-            self.settings.ui.background.enabled = true;
+            self.settings.ui.background_image.enabled = true;
             self.reload_background(ctx);
         }
     }
@@ -495,10 +495,11 @@ impl App {
                     clear_label: self.i18n.t(I18nKey::ClearButton),
                 },
                 || {
-                    let dir = Path::new(&self.settings.ui.background.path).parent().map_or_else(
-                        || Cow::Borrowed(Path::new(".")),
-                        |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-                    );
+                    let dir =
+                        Path::new(&self.settings.ui.background_image.path).parent().map_or_else(
+                            || Cow::Borrowed(Path::new(".")),
+                            |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
+                        );
 
                     rfd::FileDialog::new()
                         .set_directory(dir)
@@ -510,8 +511,8 @@ impl App {
                         })
                 },
             );
-            actions.set(HelpDialogActions::BACKGROUND_RELOAD_CLICKED, reload_clicked);
-            actions.set(HelpDialogActions::BACKGROUND_PATH_SELECTED, path_selected);
+            actions.set(HelpDialogActions::BACKGROUND_IMG_RELOAD_CLICKED, reload_clicked);
+            actions.set(HelpDialogActions::BACKGROUND_IMG_PATH_SELECTED, path_selected);
 
             checkbox(ui, background_enabled, self.i18n.t(I18nKey::BackgroundImageEnabled))
                 .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));

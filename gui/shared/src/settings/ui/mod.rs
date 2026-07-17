@@ -23,7 +23,7 @@ pub struct UiSettings {
     pub custom_theme: CustomTheme,
 
     /// background image settings
-    pub background: BackgroundSettings,
+    pub background_image: BackgroundImageSettings,
 
     /// font settings
     pub font: FontSettings,
@@ -43,7 +43,7 @@ impl Default for UiSettings {
         Self {
             theme: theme::Theme::System,
             custom_theme: CustomTheme::default(),
-            background: BackgroundSettings::default(),
+            background_image: BackgroundImageSettings::default(),
             font: FontSettings::default(),
             i18n_path: crate::i18n::I18nMap::FILE.into(),
             mod_list: ModListUiSettings::default(),
@@ -129,7 +129,7 @@ pub enum FontMode {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(default)]
-pub struct BackgroundSettings {
+pub struct BackgroundImageSettings {
     /// Whether the background image is shown.
     pub enabled: bool,
 
