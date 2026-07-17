@@ -30,7 +30,7 @@ pub(crate) enum PopupSide {
 
 impl Combobox {
     /// Creates a new combobox.
-    pub(crate) fn new(id: impl std::hash::Hash, items: Vec<String>) -> Self {
+    pub(crate) fn new(id: impl egui::AsId, items: Vec<String>) -> Self {
         Self {
             id: egui::Id::new(id),
             items,

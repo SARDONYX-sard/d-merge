@@ -168,51 +168,51 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // ── Background task polling ───────────────────────────────────────────
-        self.paint_background(ctx);
-        self.poll_fetch_result(ctx);
+        self.paint_background(ui);
+        self.poll_fetch_result(ui);
         self.poll_patch_result();
-        self.update_window_info(ctx);
-        self.handle_shortcuts(ctx);
+        self.update_window_info(ui);
+        self.handle_shortcuts(ui);
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
         self.start_log_watcher();
 
         // ── Top panels (outermost -> innermost) ────────────────────────────────
-        self.ui_top_options(ctx);
-        self.ui_paths(ctx);
+        self.ui_top_options(ui);
+        self.ui_paths(ui);
 
         // ── Bottom panels (innermost -> outermost) ─────────────────────────────
         // NOTE: egui stacks bottom panels in reverse registration order.
         // `ui_notification` is registered first so it appears below `ui_bottom_panel`.
-        self.ui_notification(ctx);
-        self.ui_bottom_panel(ctx);
+        self.ui_notification(ui);
+        self.ui_bottom_panel(ui);
 
         // ── Central panel (must be last among panels) ──────────────────────────
-        self.ui_mod_list(ctx);
+        self.ui_mod_list(ui);
 
         // ── Floating windows ───────────────────────────────────────────────────
-        self.ui_log_window(ctx);
-        self.ui_help_window(ctx);
+        self.ui_log_window(ui);
+        self.ui_help_window(ui);
 
         self.is_first_render = false;
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self) {
         self.settings.log.window = self.log_window_info.read().clone();
         self.settings.save();
     }
 }
 
 pub(crate) fn update_window_geometry(
-    ctx: &egui::Context,
+    ui: &egui::Context,
     viewport_id: egui::ViewportId,
     geometry: &mut WindowGeometry,
 ) {
     // NOTE: Writing directly to `geometry` inside this closure would
     // deadlock (egui holds an internal lock during `input()`).
-    let (pos, size, maximized) = ctx.input(|i| {
+    let (pos, size, maximized) = ui.input(|i| {
         let mut temp_pos = None;
         let mut temp_size = None;
         let mut temp_maximized = None;

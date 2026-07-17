@@ -15,29 +15,29 @@ impl App {
     ///
     /// The patch button is disabled while a fetch is in progress to prevent
     /// launching a patch against a stale mod list.
-    pub(crate) fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_bottom_panel(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("bottom_panel"),
+            egui::Panel::bottom("bottom_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
-                self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
+                self.add_button(ui, I18nKey::LogDir, |s, _| {
                     if let Err(err) =
                         open_existing_dir_or_ancestor(s.settings.log.dir_path.as_str())
                     {
                         s.notify_error(err);
                     }
                 });
-                self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
+                self.add_button(ui, I18nKey::LogButton, |s, _| {
                     use std::sync::atomic::Ordering;
                     s.show_log_window.fetch_xor(true, Ordering::Relaxed);
                 });
-                self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
+                self.add_button(ui, I18nKey::NotificationClearButton, |s, _| {
                     s.clear_notification();
                 });
 
@@ -75,7 +75,7 @@ impl App {
     ///
     /// Reduces boilerplate in [`ui_bottom_panel`] where every button follows
     /// the same `add_sized` + `clicked` + closure pattern.
-    fn add_button<F>(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, key: I18nKey, f: F)
+    fn add_button<F>(&mut self, ui: &mut egui::Ui, key: I18nKey, f: F)
     where
         F: FnOnce(&mut Self, &egui::Context),
     {
@@ -86,7 +86,7 @@ impl App {
             )
             .clicked()
         {
-            f(self, ctx);
+            f(self, ui.ctx());
         }
     }
 
@@ -117,14 +117,14 @@ impl App {
     ///
     /// The message and color are set by [`App::set_colored_notify`] and
     /// cleared by [`App::clear_notification`].
-    pub(crate) fn ui_notification(&self, ctx: &egui::Context) {
+    pub(crate) fn ui_notification(&self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("notification_panel"),
+            egui::Panel::bottom("notification_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.colored_label(self.notify.1, &self.notify.0);
         });
     }

@@ -13,29 +13,8 @@ rust-version = "1.95"
 
 
 [workspace]
-members = [
-  "core/fnis_list",
-  "core/gh_issue_link",
-  "core/json_patch",
-  "core/jwalk_glob",
-  "core/mod_info",
-  "core/nemesis_merge",
-  "core/nemesis_xml",
-  "core/node_expr",
-  "core/serde_hkx_for_gui",
-  "core/skyrim_anim_parser",
-  "core/skyrim_crc",
-  "core/skyrim_data_dir",
-  "core/skyrim_esp",
-  "core/tracing_rotation",
-  "ffi/python",
-
-  "gui/egui",
-  # "gui/gpui",
-  "gui/shared",
-  "gui/shared_derive",
-  "gui/tauri/backend",
-]
+members = ["core/*", "ffi/*", "gui/egui", "gui/shared", "gui/shared_derive", "gui/tauri/backend"]
+default-members = ["gui/egui"]
 resolver = "3"
 
 

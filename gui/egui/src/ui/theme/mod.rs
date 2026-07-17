@@ -537,10 +537,10 @@ fn stroke_edit(ui: &mut egui::Ui, stroke: &mut StrokeConfig) -> bool {
 /// Apply this preset to an egui `Context`.
 pub(crate) fn apply(preset: &ThemePreset, ctx: &egui::Context) {
     ctx.set_visuals(preset::to_egui_visuals(&preset.visuals));
-    ctx.set_style(egui::Style {
-        visuals: preset::to_egui_visuals(&preset.visuals),
-        ..Default::default()
-    });
+    ctx.set_style_of(
+        ctx.theme(),
+        egui::Style { visuals: preset::to_egui_visuals(&preset.visuals), ..Default::default() },
+    );
 
     ctx.set_shadcn_theme(preset::to_shadcn_theme(&preset.shadcn));
 }

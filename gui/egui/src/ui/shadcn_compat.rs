@@ -75,7 +75,7 @@ where
 
 pub(crate) fn searchable_string_select(
     ui: &mut egui::Ui,
-    id: impl std::hash::Hash,
+    id: impl egui::AsId,
     selected: &mut String,
     items: &[String],
     hint: impl Into<String>,
@@ -105,7 +105,7 @@ pub(crate) fn searchable_string_select(
 
 pub(crate) fn searchable_index_select(
     ui: &mut egui::Ui,
-    id: impl std::hash::Hash,
+    id: impl egui::AsId,
     selected: &mut usize,
     items: &[String],
     hint: impl Into<String>,

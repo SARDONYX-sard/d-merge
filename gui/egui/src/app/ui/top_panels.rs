@@ -22,14 +22,14 @@ impl App {
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
-    pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_top_options(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("ui_top_options"),
+            egui::Panel::top("ui_top_options"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_execution_mode(ui);
 
@@ -141,7 +141,7 @@ impl App {
 
             if enum_select(ui, &mut self.settings.ui.theme, &themes, Some([120.0, 30.0])).changed()
             {
-                set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
+                set_theme(ui, self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
         });
     }
@@ -171,8 +171,8 @@ impl App {
 
             // Live-apply whenever colors changed or a new preset was loaded.
             if let Some(preset) = &update.preset {
-                crate::ui::theme::apply(preset, ui.ctx());
-                set_theme(ui.ctx(), self.settings.ui.theme, Some(preset));
+                crate::ui::theme::apply(preset, ui);
+                set_theme(ui, self.settings.ui.theme, Some(preset));
             }
         }
     }
@@ -183,14 +183,14 @@ impl App {
     /// | Skyrim      | path..................| Auto | ...  |
     /// | Output      | path..................|      | ...  |
     /// ```
-    pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_paths(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("top_paths"),
+            egui::Panel::top("top_paths"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             self.ui_skyrim_dir_row(ui);
             self.ui_output_dir_row(ui);
         });

@@ -22,14 +22,14 @@ use crate::{
 
 impl App {
     /// Renders the central panel containing the mod list table.
-    pub(crate) fn ui_mod_list(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let panel = themed_central_panel(
             egui::CentralPanel::default(),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.add_space(20.0);
 
             ui.horizontal(|ui| {
@@ -91,8 +91,8 @@ impl App {
         });
     }
 
-    pub(crate) fn handle_shortcuts(&self, ctx: &egui::Context) {
-        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::R)) {
+    pub(crate) fn handle_shortcuts(&self, ui: &egui::Ui) {
+        if ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::R)) {
             self.update_mod_list();
         }
     }

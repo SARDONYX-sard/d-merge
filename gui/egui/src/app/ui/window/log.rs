@@ -15,7 +15,7 @@ impl App {
     /// Opens as a separate OS window (egui deferred viewport) so it can be
     /// moved independently.  Visibility is toggled via the atomic bool
     /// [`App::show_log_window`]; closing the window sets it to `false`.
-    pub(crate) fn ui_log_window(&self, ctx: &egui::Context) {
+    pub(crate) fn ui_log_window(&self, ui: &egui::Ui) {
         use std::sync::atomic::Ordering;
 
         if !self.show_log_window.load(Ordering::Relaxed) {
@@ -36,7 +36,7 @@ impl App {
         let log_viewer_id = egui::ViewportId::from_hash_of("log_viewer");
         let clear_button_name = self.i18n.t(I18nKey::ClearButton).to_string();
 
-        ctx.show_viewport_deferred(
+        ui.show_viewport_deferred(
             log_viewer_id,
             egui::ViewportBuilder {
                 title: Some("Log viewer".to_string()),
@@ -47,14 +47,14 @@ impl App {
                 resizable: Some(true),
                 ..Default::default()
             },
-            move |ctx, class| {
+            move |ui, class| {
                 debug_assert!(
                     class == egui::ViewportClass::Deferred,
                     "This egui backend doesn't support multiple viewports"
                 );
 
-                egui::CentralPanel::default().frame(egui::Frame::new()).show(ctx, |ui| {
-                    update_window_geometry(ctx, log_viewer_id, &mut log_window_info.write());
+                egui::CentralPanel::default().frame(egui::Frame::new()).show(ui, |ui| {
+                    update_window_geometry(ui, log_viewer_id, &mut log_window_info.write());
 
                     ui.horizontal(|ui| {
                         if ui.add(button(&clear_button_name)).clicked() {
@@ -67,7 +67,7 @@ impl App {
                                 .map(|log| log.raw.as_str())
                                 .collect::<Vec<_>>()
                                 .join("\n");
-                            ui.ctx().copy_text(text);
+                            ui.copy_text(text);
                         }
                     });
 
@@ -79,7 +79,7 @@ impl App {
                     });
                 });
 
-                if ctx.input(|i| i.viewport().close_requested()) {
+                if ui.input(|i| i.viewport().close_requested()) {
                     show_log_window.store(false, Ordering::Relaxed);
                 }
             },

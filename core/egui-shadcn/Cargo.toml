@@ -1,0 +1,24 @@
+[package]
+name = "egui-shadcn"
+version = "0.1.0"
+edition = "2024"
+authors = ["Pawel Jankiewicz <pjankiewicz@gmail.com>"]
+description = "shadcn/ui-inspired widget library for egui — buttons, inputs, selects, dialogs, and 50+ more components with light/dark theming"
+license = "MIT"
+repository = "https://github.com/pjankiewicz/egui-shadcn"
+homepage = "https://github.com/pjankiewicz/egui-shadcn"
+keywords = ["egui", "ui", "widgets", "shadcn", "gui"]
+categories = ["gui", "rendering"]
+readme = "README.md"
+include = ["/src/**/*", "/assets/**/*", "/Cargo.toml", "/LICENSE", "/README.md"]
+
+[lib]
+name = "egui_shadcn"
+path = "src/lib.rs"
+
+[dependencies]
+egui = "0.35"
+egui_flex = "0.7"
+
+[dev-dependencies]
+eframe = "0.35"
