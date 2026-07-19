@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-07-19
+### :sparkles: New Features
+- [`c3bd472`](https://github.com/SARDONYX-sard/d-merge/commit/c3bd47241543cab7f04b4185c2c4018b8cae98c7) - **egui**: allow users to specify a background image *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`05ac7f2`](https://github.com/SARDONYX-sard/d-merge/commit/05ac7f20e732bfc72f488557b5d699ebc9aa1c3f) - **egui**: separate the triggers for `input` and `rfd` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6ee0449`](https://github.com/SARDONYX-sard/d-merge/commit/6ee0449253981006c7dece124ab371f490311eaa) - **egui**: rename `background` to `background_image` settings key *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`4f7610e`](https://github.com/SARDONYX-sard/d-merge/commit/4f7610ec858d6e6a023da541d7030b6d2430738b) - **tauri**: fix the issue where the hkanno page crashes when the tab is empty *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.5.1] - 2026-07-05
 ### :bug: Bug Fixes
 - [`e7c7cce`](https://github.com/SARDONYX-sard/d-merge/commit/e7c7cceb543bce03c1e81f9ba91f89c647225afc) - **asdf**: fix broken handling of consecutive diff blocks parsing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -605,3 +615,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.4.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.0...2.4.1
 [2.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.1...2.5.0
 [2.5.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.0...2.5.1
+[2.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.1...2.6.0
