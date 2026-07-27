@@ -1582,7 +1582,7 @@ name = "d_merge_gui_shared_derive"
 version = "2.6.0"
 dependencies = [
  "quote",
- "syn 2.0.119",
+ "syn 3.0.0",
 ]
 
 [[package]]
