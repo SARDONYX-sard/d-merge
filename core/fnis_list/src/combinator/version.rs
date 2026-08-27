@@ -26,10 +26,11 @@ pub(crate) fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
             major: digit1.parse_to(),
             _: space0,
             minor: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)),
+            _: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)), // NOTE: Handle situations where people enter the wrong version.
             _: skip_ws_and_comments0,
         }
     }
-    .context(StrContext::Label("Version"))
+    .context(StrContext::Label("Minimum Version Requirement for FNIS"))
     .context(StrContext::Expected(StrContextValue::Description(
         "Format: Version V<n>.<m> (e.g. Version V7.3)",
     )))
