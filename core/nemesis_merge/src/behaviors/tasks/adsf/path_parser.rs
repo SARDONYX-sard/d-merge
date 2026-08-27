@@ -14,15 +14,15 @@
 //!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt)
 //!
 //! replace anim block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~1/<name>~<array index>.txt
+//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<array index>.txt
 //!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/MT_Jump~50.txt)
 //!
 //! add motion block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~1/<anim_data_clip_id>.txt
+//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<anim_data_clip_id>.txt
 //!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt)
 //!
 //! replace motion block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~1/<array index>.txt
+//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<array index>.txt
 //!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/50.txt)
 //!
 //! Parses an adsf path and returns target, id, and parser type.
