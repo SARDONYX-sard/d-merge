@@ -5,7 +5,7 @@ use core::str::FromStr;
 use winnow::{
     ModalResult, Parser,
     ascii::{line_ending, multispace0, till_line_ending},
-    combinator::opt,
+    combinator::{eof, opt, repeat},
     error::{ContextError, ErrMode, StrContext::*, StrContextValue::*},
     seq,
 };
@@ -24,16 +24,6 @@ fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     // In the case of patches, this may not be present, so `opt`
     opt(line_ending).parse_next(input)?; // skip line end
     Ok(line.into())
-}
-
-fn lines<'a>(read_len: usize) -> impl Parser<&'a str, Vec<Str<'a>>, ErrMode<ContextError>> {
-    move |input: &mut &'a str| {
-        let mut lines = vec![];
-        for _ in 0..read_len {
-            lines.push(one_line.parse_next(input)?);
-        }
-        Ok(lines)
-    }
 }
 
 /// Parse one line and then parse to T.
@@ -78,8 +68,9 @@ fn clip_anim_block_patch<'a>(input: &mut &'a str) -> ModalResult<ClipAnimDataBlo
         crop_start_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))),
         crop_end_local_time: verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))),
         trigger_names_len: parse_one_line.context(Expected(Description("trigger_names_len: usize"))),
-        trigger_names: lines(trigger_names_len).context(Expected(Description("trigger_names: Vec<str>"))),
+        trigger_names: repeat(trigger_names_len, one_line).context(Expected(Description("trigger_names: Vec<str>"))),
         _: multispace0,
+        _: eof.context(Expected(Description("There are more trigger names than the specified number."))),
     }}
     .context(Label("ClipAnimDataBlock"))
     .parse_next(input)?;
@@ -183,5 +174,23 @@ mod tests {
                 rotations: vec![Rotation { time: "1".into(), text: "0 0 0 1".into() }],
             }
         );
+    }
+
+    #[test]
+    fn test_clip_anim_data() {
+        let input = "PowerRight
+aaaa$1
+1
+0
+0
+3
+AttackStart:0
+SoundPlay.Fire:0.700000
+PowerAttackStop:1.666667
+AttackEnd:2.466667";
+
+        let block = parse_clip_anim_block_patch(input);
+        // .unwrap_or_else(|err| panic!("{err}")); //  eof err msg check
+        assert!(block.is_err());
     }
 }
