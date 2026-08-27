@@ -117,6 +117,7 @@ SkyrimSE
     `Nemesis_Engine\mod\hpmhr\animationsetdatasinglefile\HorseProjectData~HorseProject\horseproject.txt`
   - Turning and jumping have been confirmed to be possible.
   - It might be because I'm using TDM, Poisebreaker, and MCO, but attacks and stagger didn't work.
+  - Please do not use `Horsepower - Pandora Cache`. This is for Pandora only, and D Merge can read the AnimSetData patch for Nemesis, it is unnecessary.
 
 - **Precision Creatures**
   - d_merge < v1.4.0: `Precision Creatures d_merge_patch` is required.
