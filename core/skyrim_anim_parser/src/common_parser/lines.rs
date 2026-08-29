@@ -10,7 +10,7 @@ use winnow::{
 
 pub(crate) type Str<'a> = Cow<'a, str>;
 
-/// Parse 1 line.
+/// Parse 1 line. Not include line ending
 pub(crate) fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     let line = till_line_ending.parse_next(input)?;
     // In the case of patches, this may not be present, so `opt`

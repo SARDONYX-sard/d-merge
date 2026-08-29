@@ -84,6 +84,7 @@ export type PatchOptions = {
     outputMergedXml: boolean;
   };
   outputTarget: 'SkyrimSE' | 'SkyrimLE';
+  parserMode?: 'strict' | 'lenient';
   /** Delete the meshes in the output destination each time the patch is run. */
   autoRemoveMeshes: boolean;
   /** Report progress status +2s */
@@ -116,6 +117,8 @@ export const patchOptionsSchema = z
     useProgressReporter: z.boolean(),
     skyrimDataDirGlob: z.optional(z.string()),
     generateFnisEsp: z.optional(z.boolean()),
+
+    parserMode: z.optional(z.union([z.literal('strict'), z.literal('lenient')])),
   })
   .catch({
     hackOptions: {
@@ -131,6 +134,7 @@ export const patchOptionsSchema = z
     autoRemoveMeshes: true,
     useProgressReporter: true,
     generateFnisEsp: false,
+    parserMode: 'strict',
   } as const satisfies PatchOptions);
 
 /**

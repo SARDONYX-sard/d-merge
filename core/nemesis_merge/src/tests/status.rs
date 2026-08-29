@@ -1,4 +1,4 @@
-use crate::{Config, DebugOptions, HackOptions, OutPutTarget, Status};
+use crate::*;
 
 // =======================
 // ANSI Color Constants
@@ -60,6 +60,7 @@ pub(crate) fn fastest_config() -> Config {
             output_merged_json: false,
             output_merged_xml: false,
         },
+        parser_mode: ParserMode::Strict,
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
         generate_fnis_esp: true,
@@ -73,6 +74,7 @@ pub(crate) fn slow_debug_config() -> Config {
         output_dir: "../../dummy/behavior_gen/output".into(),
         status_report: Some(new_color_status_reporter()), // +2s
         // status_report: None,
+        parser_mode: ParserMode::Strict,
         hack_options: Some(HackOptions::enable_all()),
         debug: DebugOptions {
             output_patch_json: true,

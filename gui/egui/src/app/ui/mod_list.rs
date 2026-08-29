@@ -30,7 +30,7 @@ impl App {
         );
 
         panel.show(ctx, |ui| {
-            ui.add_space(20.0);
+            ui.add_space(10.0);
 
             ui.horizontal(|ui| {
                 ui.add(heading(self.i18n.t(I18nKey::ModsListTitle)))

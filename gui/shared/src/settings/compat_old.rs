@@ -6,6 +6,7 @@ use crate::{
     settings::{
         BehaviorSettings, DataMode, LogSettings, ModListSettings, ModListUiSettings, Settings,
         UiSettings,
+        behavior::ParserMode,
         mod_list_ui::SortColumn,
         ui::{FontSettings, WindowGeometry},
     },
@@ -90,13 +91,14 @@ impl From<OldSettings> for Settings {
         Self {
             app_version: semver::Version::new(1, 0, 0),
             behavior: BehaviorSettings {
-                auto_run: old.auto_run,
-                target_runtime: old.target_runtime,
                 auto_remove_meshes: old.auto_remove_meshes,
+                auto_run: old.auto_run,
                 enable_debug_output: old.enable_debug_output,
                 generate_fnis_esp: old.generate_fnis_esp,
-                template_dir: old.template_dir,
                 mode: old.mode,
+                parser_mode: ParserMode::Strict,
+                target_runtime: old.target_runtime,
+                template_dir: old.template_dir,
             },
             ui: UiSettings {
                 theme: super::ui::theme::Theme::Dark,

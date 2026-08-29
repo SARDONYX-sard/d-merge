@@ -55,7 +55,7 @@ fn parse_components<'a>(input: &mut &'a str) -> ModalResult<NemesisPath<'a>> {
 
 /// `/` or `\`
 fn path_separator(input: &mut &str) -> ModalResult<()> {
-    alt(('/', '\\')).parse_next(input)?;
+    take_while(1..=1, |c: char| c == '/' || c == '\\').void().parse_next(input)?;
     Ok(())
 }
 

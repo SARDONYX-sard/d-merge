@@ -6,6 +6,7 @@ use d_merge_gui_shared::{
     i18n::I18nKey,
     settings::{
         DataMode,
+        behavior::ParserMode,
         ui::theme::{CustomTheme, Theme},
     },
 };
@@ -36,6 +37,7 @@ impl App {
                 ui.separator();
 
                 self.ui_target_runtime_box(ui);
+                self.ui_parser_mode(ui);
                 self.ui_behavior_options(ui);
 
                 ui.add_space(60.0);
@@ -45,6 +47,8 @@ impl App {
 
                 self.ui_bg_color_picker(ui);
             });
+
+            ui.add_space(6.0);
         });
     }
 
@@ -78,7 +82,7 @@ impl App {
     /// In VFS mode, changing the runtime triggers a registry-based
     /// auto-detect of the data directory (Windows only).
     fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.add(Label::new(self.i18n.t(I18nKey::RuntimeTargetLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::RuntimeTargetHover));
 
@@ -99,6 +103,23 @@ impl App {
                 #[cfg(target_os = "windows")]
                 self.update_vfs_skyrim_data_dir_by_reg();
             }
+        });
+    }
+
+    fn ui_parser_mode(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_top(|ui| {
+            ui.label(self.i18n.t(I18nKey::ParserModeLabel))
+                .on_hover_text(self.i18n.t(I18nKey::ParserModeHover));
+
+            enum_select(
+                ui,
+                &mut self.settings.behavior.parser_mode,
+                &[
+                    (ParserMode::Strict, self.i18n.t(I18nKey::ParserModeStrict)),
+                    (ParserMode::Lenient, self.i18n.t(I18nKey::ParserModeLenient)),
+                ],
+                Some([100.0, 30.0]),
+            );
         });
     }
 
@@ -128,7 +149,7 @@ impl App {
 
     /// Renders the theme combo box (System / Dark / Light).
     fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
@@ -139,7 +160,7 @@ impl App {
                 (Theme::Custom, self.i18n.t(I18nKey::ThemeSelectCustom)),
             ];
 
-            if enum_select(ui, &mut self.settings.ui.theme, &themes, Some([120.0, 30.0])).changed()
+            if enum_select(ui, &mut self.settings.ui.theme, &themes, Some([100.0, 30.0])).changed()
             {
                 set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
@@ -192,7 +213,9 @@ impl App {
 
         panel.show(ctx, |ui| {
             self.ui_skyrim_dir_row(ui);
+            ui.add_space(3.0);
             self.ui_output_dir_row(ui);
+            ui.add_space(8.0);
         });
     }
 

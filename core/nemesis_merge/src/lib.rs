@@ -6,7 +6,9 @@ mod results;
 
 pub use crate::{
     behaviors::{PatchMaps, PriorityMap, behavior_gen, create_bin_templates},
-    config::{Config, DebugOptions, HackOptions, OutPutTarget, Status},
+    config::{
+        Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, Status, StatusReporterFn,
+    },
 };
 
 #[cfg(test)]

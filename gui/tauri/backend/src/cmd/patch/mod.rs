@@ -3,7 +3,7 @@ pub(crate) mod mod_info_loader;
 use std::path::PathBuf;
 
 use nemesis_merge::{
-    Config, DebugOptions, HackOptions, OutPutTarget, PatchMaps, Status, behavior_gen,
+    Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, PatchMaps, Status, behavior_gen,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt as _;
@@ -35,6 +35,8 @@ pub(crate) struct GuiPatchOptions {
 
     /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
     pub generate_fnis_esp: Option<bool>,
+
+    parser_mode: Option<ParserMode>,
 }
 
 // TODO: To prevent emit failures, use AppHandle instead of Window. (However, the validity of this has not been tested.)
@@ -74,6 +76,7 @@ pub(crate) async fn patch(
             output_target: options.output_target,
             skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
+            parser_mode: options.parser_mode.unwrap_or_default(),
         };
 
         let _ = time!("[patch]", behavior_gen(patches, config).await);

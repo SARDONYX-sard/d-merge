@@ -61,9 +61,8 @@ impl App {
             resource_dir: template_dir.to_string().into(),
             output_dir: self.settings.current_output_dir().to_owned().into(),
             output_target,
-            status_report: Some(Box::new(move |status| {
-                patch_status.apply(status, &ctx);
-            })),
+            status_report: Some(Box::new(move |status| patch_status.apply(status, &ctx))),
+            parser_mode: self.settings.behavior.parser_mode.into(),
             hack_options: Some(nemesis_merge::HackOptions::enable_all()),
             debug,
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
