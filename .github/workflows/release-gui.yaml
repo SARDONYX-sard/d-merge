@@ -99,28 +99,37 @@ jobs:
   # --------------------------------------------------------------------------------------------------------------------
   translations:
     runs-on: ubuntu-latest
-
+  
     steps:
       - uses: actions/checkout@v6
-
-      - name: Build translations artifact
+  
+      - name: Build translations archive
         shell: bash
         run: |
-          mkdir -p build
-
+          mkdir -p build/archives
+  
           for file in locales/egui/*/translation.json; do
             lang=$(basename "$(dirname "$file")")
-
+  
             mkdir -p "build/$lang/.d_merge"
             cp "$file" "build/$lang/.d_merge/translation.json"
+  
+            (
+              cd "build/$lang"
+              zip -qr "../archives/translation_${lang}_v${{ github.ref_name }}.zip" .d_merge
+            )
           done
-
+  
+          (
+            cd build/archives
+            zip -qr "../translations_v${version}.zip" .
+          )
+  
       - name: Upload translations
         uses: actions/upload-artifact@v7
         with:
           name: translations
-          include-hidden-files: true
-          path: build/
+          path: build/translations_v*.zip
 
   # --------------------------------------------------------------------------------------------------------------------
   release:
