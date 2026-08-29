@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-08-29
+### :sparkles: New Features
+- [`f60c135`](https://github.com/SARDONYX-sard/d-merge/commit/f60c1351f593eb9ef7550f2211e7f2a634287c0a) - **anim_data**: more flexible version *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`cc4ec80`](https://github.com/SARDONYX-sard/d-merge/commit/cc4ec80cd51b33f05c5caeb6c22b405bc6d8b386) - add err msg *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`13a4fbb`](https://github.com/SARDONYX-sard/d-merge/commit/13a4fbbf47ca8f7dd72962ffc6d96bab3bc4de8c) - implement `Lenient` parser mode *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`235ab9a`](https://github.com/SARDONYX-sard/d-merge/commit/235ab9a43b7505c5a1958096d3d9fb3d667ee56f) - remove ffi python *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.6.0] - 2026-07-19
 ### :sparkles: New Features
 - [`c3bd472`](https://github.com/SARDONYX-sard/d-merge/commit/c3bd47241543cab7f04b4185c2c4018b8cae98c7) - **egui**: allow users to specify a background image *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -616,3 +626,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.5.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.4.1...2.5.0
 [2.5.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.0...2.5.1
 [2.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.1...2.6.0
+[2.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.6.0...2.7.0
