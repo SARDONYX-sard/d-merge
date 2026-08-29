@@ -56,6 +56,10 @@ pub struct BehaviorSettings {
     /// behavior files.
     pub generate_fnis_esp: bool,
 
+    /// Controls how parser input is validated and whether recoverable
+    /// inconsistencies are automatically repaired.
+    pub parser_mode: ParserMode,
+
     /// Directory containing the HKX template files to patch.
     ///
     /// Typically `./assets/templates`.  The actual merge target is the
@@ -72,6 +76,7 @@ impl Default for BehaviorSettings {
             auto_remove_meshes: false,
             enable_debug_output: false,
             generate_fnis_esp: false,
+            parser_mode: ParserMode::Strict,
             template_dir: "./assets/templates".into(),
         }
     }
@@ -93,4 +98,33 @@ pub enum DataMode {
     /// directories can share a Nemesis ID, the full path up to the ID
     /// segment is used as the key to avoid collisions.
     Manual,
+}
+
+/// Controls how input data is validated and handled when parsing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ParserMode {
+    /// Requires input data to conform to the expected format.
+    ///
+    /// Invalid lengths, inconsistent values, and other malformed input are
+    /// rejected instead of being inferred or corrected.
+    #[default]
+    Strict,
+
+    /// Allows known recoverable inconsistencies to be automatically repaired.
+    ///
+    /// The parser may infer the intended value from the actual input when
+    /// the intended interpretation is unambiguous. Data that cannot be
+    /// safely repaired is still rejected.
+    Lenient,
+}
+
+impl From<ParserMode> for nemesis_merge::ParserMode {
+    #[inline]
+    fn from(value: ParserMode) -> Self {
+        match value {
+            ParserMode::Strict => Self::Strict,
+            ParserMode::Lenient => Self::Lenient,
+        }
+    }
 }

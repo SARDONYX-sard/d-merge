@@ -115,7 +115,7 @@ pub(crate) fn apply_adsf_patches(
     let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
         .0
         .par_iter()
-        .partition_map(|path| match parse_anim_data_patch(path) {
+        .partition_map(|entry| match parse_anim_data_patch(entry, config) {
             Ok(v) => Either::Left(v),
             Err(e) => Either::Right(e),
         });
@@ -213,6 +213,7 @@ pub(crate) fn apply_adsf_patches(
 
 fn parse_anim_data_patch<'a>(
     (path, (adsf_patch, priority)): (&'a PathBuf, &'a (String, usize)),
+    config: &Config,
 ) -> Result<AdsfPatch<'a>, Error> {
     let priority = *priority;
 
@@ -237,20 +238,28 @@ fn parse_anim_data_patch<'a>(
                 .with_context(|_| FailedParseAdsfAnimDataHeaderPatchSnafu { path: path.clone() })?,
         ),
 
-        ParserType::AddAnim => PatchKind::AddAnim(
-            parse_clip_anim_block_patch(adsf_patch)
-                .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
-        ),
+        ParserType::AddAnim => {
+            let patch = match config.parser_mode {
+                crate::ParserMode::Strict => parse_clip_anim_block_patch::<true>(adsf_patch),
+                crate::ParserMode::Lenient => parse_clip_anim_block_patch::<false>(adsf_patch),
+            }
+            .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?;
+            PatchKind::AddAnim(patch)
+        }
         ParserType::EditAnim(index) => {
             let patch = parse_clip_anim_diff_patch(adsf_patch, priority)
                 .with_context(|_| FailedParseEditAdsfClipAnimPatchSnafu { path: path.clone() })?;
             PatchKind::EditAnim(EditAnim { patch, priority, name_clip: index })
         }
 
-        ParserType::AddMotion => PatchKind::AddMotion(
-            parse_clip_motion_block_patch(adsf_patch)
-                .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?,
-        ),
+        ParserType::AddMotion => {
+            let patch = match config.parser_mode {
+                crate::ParserMode::Strict => parse_clip_motion_block_patch::<true>(adsf_patch),
+                crate::ParserMode::Lenient => parse_clip_motion_block_patch::<false>(adsf_patch),
+            }
+            .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?;
+            PatchKind::AddMotion(patch)
+        }
         ParserType::EditMotion(index) => {
             let patch = parse_clip_motion_diff_patch(adsf_patch, priority)
                 .with_context(|_| FailedParseEditAdsfClipMotionPatchSnafu { path: path.clone() })?;

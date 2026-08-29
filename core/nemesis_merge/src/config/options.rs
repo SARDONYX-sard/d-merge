@@ -29,6 +29,10 @@ pub struct Config {
     /// progress, errors, or other runtime events.
     pub status_report: StatusReporterFn,
 
+    /// Controls how parser input is validated and whether recoverable
+    /// inconsistencies are automatically repaired.
+    pub parser_mode: ParserMode,
+
     /// Enables lenient parsing for known issues in unofficial or modded patches.
     ///
     /// This setting allows the parser to work around common community patch errors
@@ -189,4 +193,23 @@ pub enum OutPutTarget {
     /// Win32
     #[serde(rename = "SkyrimLE")]
     SkyrimLe,
+}
+
+/// Controls how input data is validated and handled when parsing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+pub enum ParserMode {
+    /// Requires input data to conform to the expected format.
+    ///
+    /// Invalid lengths, inconsistent values, and other malformed input are
+    /// rejected instead of being inferred or corrected.
+    #[default]
+    Strict,
+
+    /// Allows known recoverable inconsistencies to be automatically repaired.
+    ///
+    /// The parser may infer the intended value from the actual input when
+    /// the intended interpretation is unambiguous. Data that cannot be
+    /// safely repaired is still rejected.
+    Lenient,
 }

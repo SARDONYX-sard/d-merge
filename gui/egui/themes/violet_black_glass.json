@@ -14,7 +14,7 @@
       "width": 4.0,
       "color": "#3B4048"
     },
-    "panel_fill": "#08090C2D",
+    "panel_fill": "#131314E5",
     "window_corner_radius": 24,
     "menu_corner_radius": 9,
     "button_frame": true,
@@ -96,7 +96,7 @@
     "card_foreground": "#E6EAF0",
     "popover": "#1C2025C9",
     "popover_foreground": "#FAFAFA",
-    "primary": "#2F324A92",
+    "primary": "#60609B",
     "primary_foreground": "#FFFFFF",
     "secondary": "#2C313C",
     "secondary_foreground": "#E6EAF0",

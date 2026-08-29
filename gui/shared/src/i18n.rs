@@ -109,9 +109,6 @@ pub enum I18nKey {
     /// - `<output directory>/.d_merge/.debug/patches/meshes/.../0_master.patch.json`
     DebugOutputHover,
 
-    /// Execute
-    ExecuteButton,
-
     /// Execution mode:
     ExecutionModeLabel,
 
@@ -218,7 +215,7 @@ pub enum I18nKey {
     /// Log Level
     LogLevelLabel,
 
-    /// Manual mode
+    /// Manual
     ManualMode,
 
     /// Mode for use without virtual mod managers such as MO2.
@@ -284,6 +281,41 @@ pub enum I18nKey {
     /// Output dir:
     OutputDirLabel,
 
+    /// Controls how parser input is validated and how invalid patch data is handled.
+    ///
+    /// - Strict:
+    ///   Rejects inconsistent or invalid input. This is the traditional behavior
+    ///   used before v2.6.0.
+    /// - Lenient:
+    ///   Behaves similarly to Nemesis by attempting to recover from known input
+    ///   mistakes when the intended value can be inferred from the input.
+    ///
+    /// # Notes
+    /// - A patch that requires Lenient mode contains invalid or potentially
+    ///   undefined input. Even if the parser can recover from it, the resulting
+    ///   behavior is not guaranteed to match the mod author's intent.
+    /// - Incorrect length values may cause unintended behavior. Lenient mode only
+    ///   allows the parser to continue based on the available input; it does not
+    ///   guarantee that the recovered data is correct.
+    /// - Lenient mode is not a convenience mode. It is a fallback for users who
+    ///   cannot reasonably fix the original patch themselves.
+    /// - Input that cannot be reasonably recovered, or whose intended value cannot
+    ///   be inferred, still fails in Lenient mode.
+    ///
+    /// Examples of mods with `trigger_names_len` errors that require Lenient mode:
+    /// - Unarmed Behaviors Expanded (v2.0.1)
+    /// - BFCO (v3.100.7)
+    ParserModeHover,
+
+    /// Parser:
+    ParserModeLabel,
+
+    /// Strict
+    ParserModeStrict,
+
+    /// Lenient
+    ParserModeLenient,
+
     /// Patch
     PatchButton,
 
@@ -304,7 +336,7 @@ pub enum I18nKey {
     /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
     RuntimeTargetHover,
 
-    /// Output format
+    /// Output format:
     RuntimeTargetLabel,
 
     /// Search
@@ -367,7 +399,7 @@ pub enum I18nKey {
     /// Tooling:
     ToolingLabel,
 
-    /// VFS mode
+    /// VFS
     VfsMode,
 
     /// When booting using MO2's VFS, etc.

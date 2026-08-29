@@ -12,6 +12,14 @@ export const PatchModeOptionHeader = () => {
     },
     [setIsVfsMode],
   );
+  const handleParserModeChange = useCallback(
+    (_: React.ChangeEvent<HTMLInputElement>, value: string) => {
+      if (value === 'strict' || value === 'lenient') {
+        setPatchOptions((prev) => ({ ...prev, parserMode: value }));
+      }
+    },
+    [setPatchOptions],
+  );
 
   const handleGenerateFnisEsp = useCallback(
     (_: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
@@ -26,6 +34,12 @@ export const PatchModeOptionHeader = () => {
         <RadioGroup row value={isVfsMode ? 'vfs' : 'manual'} onChange={handleChange}>
           <FormControlLabel value='vfs' control={<Radio />} label={'VFS'} />
           <FormControlLabel value='manual' control={<Radio />} label={'Manual'} />
+        </RadioGroup>
+
+        <RadioGroup row value={patchOptions.parserMode ?? 'strict'} onChange={handleParserModeChange}>
+          {' '}
+          <FormControlLabel value='strict' control={<Radio />} label='Strict' />{' '}
+          <FormControlLabel value='lenient' control={<Radio />} label='Lenient' />{' '}
         </RadioGroup>
 
         <FormControlLabel

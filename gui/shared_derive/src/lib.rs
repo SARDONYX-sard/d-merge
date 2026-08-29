@@ -90,7 +90,7 @@ pub fn derive_i18n(input: TokenStream) -> TokenStream {
                 && let syn::Expr::Lit(expr) = &meta.value
                 && let syn::Lit::Str(lit) = &expr.lit
             {
-                docs.push(lit.value().trim().to_string());
+                docs.push(normalize_doc_line(&lit.value()).to_string());
             }
         }
 
@@ -126,4 +126,8 @@ pub fn derive_i18n(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+fn normalize_doc_line(line: &str) -> &str {
+    line.strip_prefix(' ').unwrap_or(line)
 }
