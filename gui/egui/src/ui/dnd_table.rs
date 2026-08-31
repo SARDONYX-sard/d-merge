@@ -87,12 +87,12 @@ pub(crate) fn check_only_table_body(
 
     for filtered_mod in filtered_ids {
         let Some(&mut &mut ModItem {
-            ref mut id,
-            ref mut name,
-            ref mut mod_type,
-            ref mut site,
-            ref mut priority,
-            mut enabled,
+            ref id,
+            ref name,
+            ref mod_type,
+            ref site,
+            priority,
+            ref mut enabled,
         }) = orig_map.get_mut(&filtered_mod.id)
         else {
             continue;
@@ -100,7 +100,7 @@ pub(crate) fn check_only_table_body(
 
         body.row(ROW_HEIGHT, |mut row| {
             row.col(|ui| {
-                ui.add_sized(checkbox_size, egui::Checkbox::without_text(&mut enabled));
+                ui.add_sized(checkbox_size, egui::Checkbox::without_text(enabled));
             });
             row.col(|ui| label_with_hover(ui, id, w_path, CellAlign::Left));
             row.col(|ui| label_with_hover(ui, name, w_name, CellAlign::Center));
