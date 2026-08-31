@@ -159,20 +159,22 @@ Please use a version later than v2.4.1
 
 ### TKDodge SE
 
-This is an extremely unique mod even within the FNIS. (Normally, the required `FNIS__*List.txt` and `FNIS*__behavior.hkx` are missing.)
+This is an extremely unusual mod, even within the FNIS mod. Normally, the required `FNIS__*List.txt` and `FNIS*__behavior.hkx` files are missing.
 
-Therefore, use the `TKDodge and UltimateCombat Nemesis patch` (modified to make the `_1stperson` patch easier to parse).
-It's available at the d_merge Nexus URL.
+In load orders such as MO2, combine and use the following mods in this order:
 
-This alone will not work in AE.
-In load orders such as MO2, combine and use the following in this order:
+1. [TK Dodge AE (v3.18)](https://www.nexusmods.com/skyrimspecialedition/mods/15309)
+   Only the meshes are required. Do not install the scripts or other components, as they can cause unintended behavior and may expose an unusable button-menu MCM.
 
-- [TK Dodge AE (v3.18)](https://www.nexusmods.com/skyrimspecialedition/mods/15309)
-- [TKDodgeUltimateCombat Nemesis patch (v1.0.0)](https://www.nexusmods.com/skyrimspecialedition/mods/152190)
-- [TK Dodge RE (v0.55-rc3)](https://www.nexusmods.com/skyrimspecialedition/mods/56956)
-- [TK Dodge NG(v1.1.0)](https://www.nexusmods.com/skyrimspecialedition/mods/115408)
+2. [TKDodgeUltimateCombat Nemesis patch](https://www.nexusmods.com/skyrimspecialedition/mods/152190)
+   This patch is **not required when using the Standalone** version of TK Dodge RE.
 
-I didn't realize until d_merge v2.5.0 that this existing Nemesis patch was unique, which is why `_1stperson` TKDodge wasn't working.
+3. [TK Dodge RE (v0.55-rc3)](https://www.nexusmods.com/skyrimspecialedition/mods/56956)
+
+The existing TK Dodge extension and the Standalone version appear to be alternative options. Therefore, you should choose one category rather than using both.
+
+- [TK Dodge NG (v1.1.0)](https://www.nexusmods.com/skyrimspecialedition/mods/115408)
+  This was required to run TK Dodge on AE `v1.6.1170.0`. Be aware that it appears to use a different INI file, so the configuration file being loaded must be checked carefully.
 
 ## FNIS
 
