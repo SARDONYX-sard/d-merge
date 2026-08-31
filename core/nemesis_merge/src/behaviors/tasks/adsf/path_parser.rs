@@ -1,96 +1,151 @@
 //! Parses an adsf path and returns target and id as &str references.
 //!
-//! rule:
-//! txt projects:
-//! - format: <any>/<id>/animationdatasinglefile/$header$/$header$.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/$header$/$header$.txt)
+//! # Path rules
 //!
-//! anim block header:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/$header$.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/$header$.txt)
+//! ## Project names header
 //!
-//! add anim block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<anim_data_clip_id>.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt)
+//! ```text
+//! <any>/<id>/animationdatasinglefile/$header$/$header$.txt
+//! ```
 //!
-//! replace anim block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<array index>.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/MT_Jump~50.txt)
+//! ## Animation data header
 //!
-//! add motion block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<anim_data_clip_id>.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt)
+//! ```text
+//! <any>/<id>/animationdatasinglefile/<target>~<index>/$header$.txt
+//! ```
 //!
-//! replace motion block path:
-//! - format: <any>/<id>/animationdatasinglefile/<target>~<index>/<array index>.txt
-//!   (e.g. D:/mod/slide/animationdatasinglefile/DefaultFemale~1/50.txt)
+//! ## Add animation
 //!
-//! Parses an adsf path and returns target, id, and parser type.
-use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
+//! ```text
+//! <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<anim_data_clip_id>.txt
+//! ```
+//!
+//! Example:
+//!
+//! ```text
+//! DefaultFemale~1/SprintSlide~slide$0.txt
+//! ```
+//!
+//! ## Indexed animation
+//!
+//! ```text
+//! <any>/<id>/animationdatasinglefile/<target>~<index>/<name>~<clip_id>.txt
+//! ```
+//!
+//! Example:
+//!
+//! ```text
+//! FirstPerson~1/TKDodgeRight~348.txt
+//! ```
+//!
+//! An indexed animation path may represent either an edit or an addition.
+//! The presence of `MOD_CODE` in the patch content determines which operation
+//! is performed.
+//!
+//! ## Add motion
+//!
+//! ```text
+//! <any>/<id>/animationdatasinglefile/<target>~<index>/<anim_data_clip_id>.txt
+//! ```
+//!
+//! Example:
+//!
+//! ```text
+//! DefaultFemale~1/slide$10.txt
+//! ```
+//!
+//! ## Indexed motion
+//!
+//! ```text
+//! <any>/<id>/animationdatasinglefile/<target>~<index>/<index>.txt
+//! ```
+//!
+//! Example:
+//!
+//! ```text
+//! DefaultFemale~1/50.txt
+//! ```
+//!
+//! An indexed motion path may also represent either an edit or an addition.
+//! The presence of `MOD_CODE` in the patch content determines which operation
+//! is performed.
 
-use snafu::ResultExt;
+use std::path::{Path, PathBuf};
 
-use super::path_parser::parse_error::IndexMustBeNumberSnafu;
 use crate::behaviors::priority_ids::get_nemesis_id;
 
 /// Represents the type of parser required for a given animation patch path.
 #[derive(Debug, PartialEq)]
 pub(crate) enum ParserType<'a> {
-    /// Indicates the special `$header$/$header$.txt`override
+    /// Indicates the special `$header$/$header$.txt` override.
     TxtProjectHeader,
 
-    /// Indicates the special `<target>~<index>/$header$.txt`override
+    /// Indicates the special `<target>~<index>/$header$.txt` override.
     AnimHeader,
 
-    /// Indicates an individual animation (e.g., `Run~slide.txt`)
+    /// Indicates an animation block whose clip ID is assigned during
+    /// serialization.
     AddAnim,
 
-    /// `<Name>~<clip_id>`
-    /// - e.g. `Jump~42`
+    /// Indicates an animation block with an explicitly specified clip ID.
     ///
-    /// NOTE: Unlike Motion, Anim sometimes references the same clip_id, so it cannot be used as an id.
-    /// Therefore, Name is used instead
-    EditAnim(&'a str),
+    /// The presence of `MOD_CODE` is checked later to determine whether this
+    /// is an edit or an addition.
+    IndexedAnim {
+        /// Animation name.
+        name_clip: &'a str,
+    },
 
-    /// Indicates a motion ID add(e.g., `slide$10.txt`)
+    /// Indicates a motion block whose clip ID is assigned during
+    /// serialization.
     AddMotion,
 
-    /// Indicates a motion ID replacement or override (e.g., `10.txt` 10 is AnimInfo index)
-    /// - include 1-based index
-    EditMotion(&'a str),
+    /// Indicates a motion block with an explicitly specified index.
+    ///
+    /// The presence of `MOD_CODE` is checked later to determine whether this
+    /// is an edit or an addition.
+    IndexedMotion {
+        /// Explicitly specified motion index.
+        index: &'a str,
+    },
 }
 
 /// Represents the parsed result of an animation patch path.
 ///
-/// This contains the mod ID, the animation target (e.g., `Default` or `$header$`),
-/// the type of data being patched, and whether it's an add or replace operation.
+/// This contains the mod ID, the animation target, and the type of data being
+/// patched.
 #[derive(Debug, PartialEq)]
 pub(crate) struct ParsedAdsfPatchPath<'a> {
-    /// Unique ID corresponding to the mod(e.g. `slide`)
-    pub id: &'a str,
-    /// `project_name~index` (e.g. `DefaultMale~1`)
+    /// Unique ID corresponding to the mod.
     ///
-    /// # What is meant by index here is
-    /// project_names ends with `.txt` and it is sometimes a duplicate name. So, it seems to make the index be specified.
+    /// Examples:
+    ///
+    /// - `slide`
+    /// - `/some/Nemesis_Engine/mod/slide`
+    pub id: &'a str,
+
+    /// `project_name~index`.
+    ///
+    /// Example: `DefaultMale~1`.
     pub target: &'a str,
-    /// Type of parser logic required
+
+    /// Type of parser logic required.
     pub parser_type: ParserType<'a>,
 }
 
-/// Parses an ADSF(`animationdatasinglefile`) patch path and extracts the relevant metadata.
+/// Parses an ADSF (`animationdatasinglefile`) patch path.
 ///
-/// # Returns
-/// Returns a [`ParsedAdsfPatchPath`] with extracted metadata or a [`ParseError`] if the format is invalid.
+/// # Errors
+///
+/// Returns [`ParseError`] when the path does not contain the required ADSF
+/// structure or when the Nemesis mod ID cannot be extracted.
 pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
     let components: Vec<&'a str> =
-        path.components().filter_map(|c| c.as_os_str().to_str()).collect();
+        path.components().filter_map(|component| component.as_os_str().to_str()).collect();
 
     let anim_data_index = components
         .iter()
-        .position(|comp| comp.eq_ignore_ascii_case("animationdatasinglefile"))
+        .position(|component| component.eq_ignore_ascii_case("animationdatasinglefile"))
         .ok_or_else(|| ParseError::MissingAnimationData { path: path.to_path_buf() })?;
 
     if anim_data_index < 1 || components.len() <= anim_data_index + 2 {
@@ -99,9 +154,11 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
 
     let path_str =
         path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
+
     let id = get_nemesis_id(path_str)?;
 
     let target_component = components[anim_data_index + 1];
+
     let target = if target_component.eq_ignore_ascii_case("$header$") {
         "$header$"
     } else if target_component.contains('~') {
@@ -112,8 +169,9 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
 
     let file_stem = path
         .file_stem()
-        .and_then(|s| s.to_str())
+        .and_then(|stem| stem.to_str())
         .ok_or_else(|| ParseError::TooShortPathFormat { path: path.to_path_buf() })?;
+
     let is_header_file = file_stem.eq_ignore_ascii_case("$header$");
 
     let parser_type = if target == "$header$" && is_header_file {
@@ -121,31 +179,33 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
     } else if is_header_file {
         ParserType::AnimHeader
     } else if file_stem.contains('~') {
-        // e.g. Jump~42
         let mut parts = file_stem.rsplitn(2, '~');
-        // rsplitn is reverse getter. -> 42, jump
-        if let (Some(index_str), Some(_name)) = (parts.next(), parts.next()) {
-            match index_str.parse::<usize>() {
-                Ok(_) => ParserType::EditAnim(file_stem),
-                Err(_) => ParserType::AddAnim,
+
+        let clip_id = parts.next();
+        let name_clip = parts.next();
+
+        match (name_clip, clip_id) {
+            (Some(name_clip), Some(clip_id)) if !name_clip.is_empty() && !clip_id.is_empty() => {
+                if clip_id.contains('$') {
+                    ParserType::AddAnim
+                } else {
+                    ParserType::IndexedAnim { name_clip: file_stem }
+                }
             }
-        } else {
-            ParserType::AddAnim
+            _ => ParserType::AddAnim,
         }
     } else if file_stem.contains('$') {
         ParserType::AddMotion
+    } else if !file_stem.is_empty() {
+        ParserType::IndexedMotion { index: file_stem }
     } else {
-        let _index: usize = file_stem.parse().with_context(|_| IndexMustBeNumberSnafu {
-            index_str: (*file_stem).to_string(),
-            path,
-        })?;
-        ParserType::EditMotion(file_stem)
+        return Err(ParseError::TooShortPathFormat { path: path.to_path_buf() });
     };
 
     Ok(ParsedAdsfPatchPath { target, id, parser_type })
 }
 
-/// Represents parsing errors from `parse_adsf_path`.
+/// Represents parsing errors from [`parse_adsf_path`].
 #[derive(Debug, snafu::Snafu)]
 #[snafu(module)]
 #[allow(clippy::enum_variant_names)]
@@ -153,36 +213,34 @@ pub enum ParseError {
     #[snafu(transparent)]
     MissingID { source: winnow_ext::ReadableError },
 
+    /// The path is not valid UTF-8.
     #[snafu(display("Non-UTF-8 path: {}", path.display()))]
     NonUtf8Path { path: PathBuf },
 
-    /// "animationdatasinglefile" not found in path
+    /// `animationdatasinglefile` was not found in the path.
     #[snafu(display(
         "The path '{}' does not contain the required 'animationdatasinglefile' directory.\n\
-Expected a structure like: D:/mod/<id>/animationdatasinglefile/...",
+         Expected a structure like: D:/mod/<id>/animationdatasinglefile/...",
         path.display()
     ))]
     MissingAnimationData { path: PathBuf },
 
-    /// Path does not have enough segments to extract data
+    /// The path does not contain enough segments to extract the mod ID and
+    /// target.
     #[snafu(display(
         "The path '{}' is too short to extract the mod ID and target.\n\
-Expected format: D:/mod/<id>/animationdatasinglefile/<target>~1/...",
+         Expected format: D:/mod/<id>/animationdatasinglefile/<target>~1/...",
         path.display()
     ))]
     TooShortPathFormat { path: PathBuf },
 
-    /// Target component doesn't follow the expected `Target~1` format
+    /// The target component does not follow the expected `Target~1` format.
     #[snafu(display(
-        "The target segment in path '{}' does not follow the expected '<target>~1' format.\
-        Example: 'DefaultFemale~1'\n",
+        "The target segment in path '{}' does not follow the expected '<target>~1' format. \
+         Example: 'DefaultFemale~1'",
         path.display()
     ))]
     SplitTilde { path: PathBuf },
-
-    /// Target component doesn't follow the expected `Target~1` format
-    #[snafu(display( "Replace/Remove Edit patches expect index, i.e., numeric filenames. However, this {index_str} of path is different. {}", path.display()))]
-    IndexMustBeNumber { source: ParseIntError, index_str: String, path: PathBuf },
 }
 
 #[cfg(test)]
@@ -198,6 +256,7 @@ mod tests {
         let parsed = parse(
             "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/$header$/$header$.txt",
         );
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
@@ -213,6 +272,7 @@ mod tests {
         let parsed = parse(
             "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultMale~3/$header$.txt",
         );
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
@@ -228,6 +288,7 @@ mod tests {
         let parsed = parse(
             "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/RunForward~slide$2.txt",
         );
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
@@ -239,28 +300,33 @@ mod tests {
     }
 
     #[test]
-    fn test_anim_replace() {
+    fn test_anim_indexed() {
         let parsed = parse(
             "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/Jump~42.txt",
         );
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
                 id: "/some/mods/Nemesis_Engine/mod/slide",
                 target: "Default~1",
-                parser_type: ParserType::EditAnim("Jump~42"),
+                parser_type: ParserType::IndexedAnim { name_clip: "Jump~42" },
             }
         );
+    }
 
+    #[test]
+    fn test_tk_dodge_indexed_anim() {
         let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/tkuc/animationdatasinglefile/FirstPerson~1/TKDodgeForward~791.txt",
+            "/some/mods/Nemesis_Engine/mod/tkds/animationdatasinglefile/FirstPerson~1/TKDodgeRight~348.txt",
         );
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
-                id: "/some/mods/Nemesis_Engine/mod/tkuc",
+                id: "/some/mods/Nemesis_Engine/mod/tkds",
                 target: "FirstPerson~1",
-                parser_type: ParserType::EditAnim("TKDodgeForward~791"),
+                parser_type: ParserType::IndexedAnim { name_clip: "TKDodgeRight~348" },
             }
         );
     }
@@ -269,6 +335,7 @@ mod tests {
     fn test_motion_add() {
         let parsed =
             parse("Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/slide$10.txt");
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
@@ -280,14 +347,15 @@ mod tests {
     }
 
     #[test]
-    fn test_motion_replace() {
+    fn test_motion_indexed() {
         let parsed = parse("Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/10.txt");
+
         assert_eq!(
             parsed,
             ParsedAdsfPatchPath {
                 id: "Nemesis_Engine/mod/slide",
                 target: "Default~1",
-                parser_type: ParserType::EditMotion("10"),
+                parser_type: ParserType::IndexedMotion { index: "10" },
             }
         );
     }
@@ -296,7 +364,8 @@ mod tests {
     fn test_invalid_missing_animationdatasinglefile() {
         let err = parse_adsf_path(Path::new("Nemesis_Engine/mod/slide/invalid_path/file.txt"))
             .unwrap_err();
-        matches!(err, ParseError::MissingAnimationData { .. });
+
+        assert!(matches!(err, ParseError::MissingAnimationData { .. }));
     }
 
     #[test]
@@ -305,6 +374,7 @@ mod tests {
             "Nemesis_Engine/mod/slide/animationdatasinglefile/BadTarget/file.txt",
         ))
         .unwrap_err();
-        matches!(err, ParseError::SplitTilde { .. });
+
+        assert!(matches!(err, ParseError::SplitTilde { .. }));
     }
 }
