@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-08-31
+### :bug: Bug Fixes
+- [`3f2acd2`](https://github.com/SARDONYX-sard/d-merge/commit/3f2acd22ab4c14b7dd45aaac7a7e6305a11003de) - **egui**: allow enabled checkbox interaction in read-only table *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`26141cb`](https://github.com/SARDONYX-sard/d-merge/commit/26141cb8cb4446ca59bcb05726586fc92963abcf) - fix adsf path parsing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`ef3da9e`](https://github.com/SARDONYX-sard/d-merge/commit/ef3da9ec18cee8ed85620a6ab2a5a207a5fb4c2a) - **cargo**: update deps *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.0] - 2026-08-29
 ### :sparkles: New Features
 - [`f60c135`](https://github.com/SARDONYX-sard/d-merge/commit/f60c1351f593eb9ef7550f2211e7f2a634287c0a) - **anim_data**: more flexible version *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -627,3 +636,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.5.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.0...2.5.1
 [2.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.1...2.6.0
 [2.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.6.0...2.7.0
+[2.7.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.0...2.7.1
