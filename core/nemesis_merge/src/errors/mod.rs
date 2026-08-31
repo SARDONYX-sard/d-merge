@@ -147,6 +147,18 @@ pub enum Error {
         path: PathBuf,
     },
 
+    /// Failed to find an animation block identified by its target and clip name.
+    #[snafu(display(
+        "[animationdatasinglefile animation not found] target: {target}, name_clip: {name_clip}"
+    ))]
+    MissingAdsfAnimClip { target: String, name_clip: String },
+
+    /// Failed to find a motion block identified by its target and index.
+    #[snafu(display(
+        "[animationdatasinglefile motion not found] target: {target}, index: {index}"
+    ))]
+    MissingAdsfMotion { target: String, index: String },
+
     /// Failed to parse asdsf patch
     #[snafu(display("[animationsetdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]
     FailedParseAsdsfPatch { source: ReadableError, path: PathBuf },
