@@ -173,8 +173,7 @@ In load orders such as MO2, combine and use the following mods in this order:
 
 The existing TK Dodge extension and the Standalone version appear to be alternative options. Therefore, you should choose one category rather than using both.
 
-- [TK Dodge RE Addon (v3.2.3)](https://www.nexusmods.com/skyrimspecialedition/mods/125238)
-  This was required to run TK Dodge on AE `v1.6.1170.0`. Be aware that it appears to use a different INI file, so the configuration file being loaded must be checked carefully.
+- [TK Dodge RE Addon (v3.2.3)](https://www.nexusmods.com/skyrimspecialedition/mods/125238) This was required to run TK Dodge on AE `v1.6.1170.0`.
 
 ## FNIS
 
