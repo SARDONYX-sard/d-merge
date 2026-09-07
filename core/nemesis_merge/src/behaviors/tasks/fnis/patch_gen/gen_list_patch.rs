@@ -422,6 +422,9 @@ fn new_asdsf_patch<'a>(
         ascii_extension: Cow::Borrowed("7891816"),
     };
 
+    // It seems there's no problem with using the same ID for both players and NPCs.
+    let id = owned_data.next_asdsf_id();
+
     let make_patch = |anim_event: &'a str, player: bool| -> PatchKind<'a> {
         let event = if player {
             Cow::Owned(format!("pa_{anim_event}"))
@@ -447,7 +450,7 @@ fn new_asdsf_patch<'a>(
             file_name: {
                 // TODO: The validity of this increment rule remains unclear.
                 let prefix = if player { "Player" } else { "NPC" };
-                Cow::Owned(format!("{prefix}FNIS{}Start.txt", owned_data.next_asdsf_id()))
+                Cow::Owned(format!("{prefix}FNIS{id}Start.txt"))
             },
         }
     };
