@@ -31,9 +31,6 @@ fn build_base_map(config: &AAConfig) -> BaseMap {
 // Data model
 // =============================================================================
 
-/// JSON schema URI embedded in every generated `config.json`.
-const SCHEMA_URI: &str = "https://raw.githubusercontent.com/SARDONYX-sard/d-merge/refs/heads/main/tools/schemas/aa_config.schema.json";
-
 #[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub(crate) struct AAGroup {
@@ -114,13 +111,6 @@ pub(crate) struct AAMod {
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub(crate) struct AAConfig {
-    /// URI of the JSON schema for this file.
-    ///
-    /// Always set to the canonical schema URI. Enables schema validation in
-    /// editors such as VS Code.
-    #[serde(rename = "$schema")]
-    pub schema: Cow<'static, str>,
-
     /// CRC fingerprint of the current slot layout.
     ///
     /// Computed from mod load order and slot counts. Written to
@@ -151,7 +141,6 @@ impl AAConfig {
     pub(crate) fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
         let fnis_version = fnis_version.into();
         Self {
-            schema: Cow::Borrowed(SCHEMA_URI),
             crc: compute_crc(&mods),
             fnis_version: fnis_version.clone(),
             fnis_creature_version: fnis_version,
