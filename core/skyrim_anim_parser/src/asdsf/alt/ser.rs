@@ -207,4 +207,60 @@ mod tests {
         let bin = rmp_serde::to_vec(&alt_asdsf).unwrap();
         std::fs::write("../../dummy/debug/animationsetdatasinglefile.bin", bin).unwrap();
     }
+
+    #[cfg(feature = "alt_map")]
+    #[test]
+    fn should_write_alt_asdsf_txt_header_structure_json() {
+        use std::collections::BTreeMap;
+
+        let input = include_str!(
+            "../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
+        );
+
+        let asdsf = crate::asdsf::normal::de::parse_asdsf(input).unwrap_or_else(|err| {
+            panic!("Failed to parse asdsf:\n{err}");
+        });
+
+        let alt_asdsf: AltAsdsf = asdsf.try_into().unwrap_or_else(|err| {
+            panic!("Failed to convert asdsf to alt format:\n{err}");
+        });
+
+        // Build a human-readable representation:
+        //
+        // {
+        //   "TxtProjectHeader": [
+        //     "SubTxtHeader1",
+        //     "SubTxtHeader2"
+        //   ]
+        // }
+        //
+        // BTreeMap is used so that the generated JSON has a stable order.
+        let structure: BTreeMap<String, Vec<String>> = alt_asdsf
+            .txt_projects
+            .0
+            .iter()
+            .map(|(txt_header, anim_set_list)| {
+                let sub_txt_headers = anim_set_list
+                    .0
+                    .keys()
+                    .map(|sub_txt_header| sub_txt_header.to_string())
+                    .collect();
+
+                (txt_header.to_string(), sub_txt_headers)
+            })
+            .collect();
+
+        let json = serde_json::to_string_pretty(&structure).unwrap_or_else(|err| {
+            panic!("Failed to serialize txt header structure to JSON:\n{err}");
+        });
+
+        std::fs::create_dir_all("../../dummy/debug/").unwrap_or_else(|err| {
+            panic!("Failed to create debug directory:\n{err}");
+        });
+
+        std::fs::write("../../dummy/debug/animationsetdatasinglefile_structure.json", json)
+            .unwrap_or_else(|err| {
+                panic!("Failed to write txt header structure JSON:\n{err}");
+            });
+    }
 }
