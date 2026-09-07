@@ -2,7 +2,10 @@ pub(crate) mod path_parser;
 mod sort;
 pub(crate) mod types;
 
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use rayon::{iter::Either, prelude::*};
 use skyrim_anim_parser::{
@@ -59,7 +62,7 @@ pub(crate) enum PatchKind<'a> {
         /// mod list priority
         priority: usize,
         /// Add: AnimSetData file name (e.g., `_MTSolo.txt`)
-        file_name: &'a str,
+        file_name: Cow<'a, str>,
     },
 }
 
@@ -157,7 +160,7 @@ pub(crate) fn apply_asdsf_patches(
         if let Some(anim_data) = alt_adsf.txt_projects.0.get_mut(asdsf_patch.target) {
             match asdsf_patch.patch {
                 PatchKind::AddAnimSet { patch, file_name, .. } => {
-                    anim_data.0.insert(std::borrow::Cow::Borrowed(file_name), patch);
+                    anim_data.0.insert(file_name, patch);
                 }
                 PatchKind::EditAnimSet(edit_anim) => {
                     let file_name = edit_anim.file_name;
@@ -226,7 +229,7 @@ fn parse_anim_data_patch<'a>(
                 .parse(asdsf_patch)
                 .map_err(|err| winnow_ext::ReadableError::from_parse(err))
                 .with_context(|_| FailedParseAsdsfPatchSnafu { path: path.clone() })?;
-            PatchKind::AddAnimSet { patch, priority, file_name }
+            PatchKind::AddAnimSet { patch, priority, file_name: Cow::Borrowed(file_name) }
         }
         ParserType::EditAnimSet(file_name) => {
             let patch = parse_anim_set_diff_patch(asdsf_patch, priority)
@@ -237,20 +240,11 @@ fn parse_anim_data_patch<'a>(
     Ok(AsdsfPatch { target, id, patch })
 }
 
-/// An AnimSet patch required for the FNIS mod, which is added only once per patch.
-///
-/// Set the priority to 0. This is because it is simply being added.
-pub(crate) const FNIS_ASDSF_GLOBAL_ID: &str = "asdsf_FNIS_global_auto_gen";
-
 /// Sorts ADSF patches by mod priority.
 ///
 /// Higher-priority patches are processed after lower-priority patches.
 fn sort_patches_by_priority(patches: &mut [AsdsfPatch], id_orders: &PatchMaps) {
     patches.par_sort_by_key(|patch| {
-        if patch.id == FNIS_ASDSF_GLOBAL_ID {
-            return 0;
-        }
-
         id_orders
             .nemesis_entries
             .get(patch.id)

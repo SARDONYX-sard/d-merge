@@ -24,7 +24,7 @@ pub(crate) use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPat
 use crate::{
     behaviors::tasks::{
         adsf::AdsfPatch,
-        asdsf::{AsdsfPatch, FNIS_ASDSF_GLOBAL_ID},
+        asdsf::AsdsfPatch,
         fnis::{
             collect::owned::OwnedFnisInjection,
             patch_gen::{
@@ -325,8 +325,6 @@ pub(crate) fn collect_borrowed_patches<'a>(
         errors.push(Error::FNISGenerateEspError { source: e });
     };
 
-    new_insert_asdsf_headers_patch();
-
     (
         PatchCollection { borrowed_patches, behavior_graph_data_map },
         adsf_patches,
@@ -514,55 +512,4 @@ fn new_push_anim_seq_patch<'a>(
     tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
 
     patches.0.entry(behavior_key).or_default().seq.insert(json_path, patch);
-}
-
-/// Debugging revealed that executing `PairedAndKillMove` via `AIProcess::PlayIdle` requires the `animationsetdatasinglefile.txt` output, just as it does for FNIS.
-///
-/// Although the reason is unclear, this is likely why the `pa` format does not work in Nemesis.
-///
-/// For the debugging, I compared the actual FNIS output using `git diff`.
-fn new_insert_asdsf_headers_patch() -> [AsdsfPatch<'static>; 2] {
-    use json_patch::{Action, JsonPatch};
-
-    use crate::behaviors::tasks::asdsf::PatchKind;
-
-    const PRIORITY: usize = 0;
-
-    let headers_patch = {
-        let fnis_npc_header = ValueWithPriority {
-            patch: JsonPatch {
-                // Insert between `NPCHugAStart.txt` and `NPCTurnLeft180.txt`.
-                action: Action::Seq { op: json_patch::Op::Add, range: 310..311 },
-                value: vec!["NPCFNIS1Start.txt"].into(),
-            },
-            priority: PRIORITY,
-        };
-
-        let fnis_player_header = ValueWithPriority {
-            patch: JsonPatch {
-                // Insert between `PlayerHugAStart.txt` and `PrayCrouched.txt`.
-                action: Action::Seq { op: json_patch::Op::Add, range: 336..337 },
-                value: vec!["PlayerFNIS1Start.txt"].into(),
-            },
-            priority: PRIORITY,
-        };
-
-        PatchKind::SubTxtHeader(skyrim_anim_parser::diff_line::DiffLines(vec![
-            fnis_npc_header,
-            fnis_player_header,
-        ]))
-    };
-
-    [
-        AsdsfPatch {
-            target: "DefaultFemaleData~DefaultFemale",
-            id: FNIS_ASDSF_GLOBAL_ID, // NOTE: special 0 priority
-            patch: headers_patch.clone(),
-        },
-        AsdsfPatch {
-            target: "DefaultMaleData~DefaultMale",
-            id: FNIS_ASDSF_GLOBAL_ID,
-            patch: headers_patch,
-        },
-    ]
 }

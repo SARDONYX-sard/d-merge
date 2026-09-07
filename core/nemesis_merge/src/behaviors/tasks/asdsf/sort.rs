@@ -1,4 +1,7 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, hash_map::Entry},
+};
 
 use rayon::prelude::*;
 
@@ -13,7 +16,7 @@ enum PatchKey<'a> {
     EditAnim(&'a str, &'a str, &'a str),
 
     // (target, id, file_name)
-    AddAnim(&'a str, &'a str, &'a str),
+    AddAnim(&'a str, &'a str, Cow<'a, str>),
 }
 
 pub(super) fn dedup_patches_by_priority_parallel<'a>(
@@ -27,7 +30,7 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
                     PatchKey::EditAnim(patch.target, patch.id, edit.file_name)
                 }
                 PatchKind::AddAnimSet { file_name, .. } => {
-                    PatchKey::AddAnim(patch.target, patch.id, file_name)
+                    PatchKey::AddAnim(patch.target, patch.id, file_name.clone())
                 }
                 PatchKind::TxtProjectHeader(_) => PatchKey::TxtProjectHeader,
                 PatchKind::SubTxtHeader(_) => PatchKey::SubTxtHeader,

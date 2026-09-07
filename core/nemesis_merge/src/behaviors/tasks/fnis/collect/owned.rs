@@ -123,6 +123,9 @@ pub(crate) struct OwnedFnisInjection {
     current_class_index: AtomicUsize,
     /// New ID for adding a patch to the new `animationdatasinglefile.txt`
     current_adsf_index: AtomicUsize,
+
+    /// New ID for adding a patch to the new `animationsetdatasinglefile.txt`
+    current_asdsf_index: AtomicUsize,
 }
 
 impl OwnedFnisInjection {
@@ -189,15 +192,20 @@ impl OwnedFnisInjection {
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$2");
     /// ```
     pub(crate) fn next_class_name_attribute(&self) -> String {
-        let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire) + 1;
+        let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire);
         format!("#{}${idx}", self.namespace)
     }
 
     /// Returns a new ID for adding a patch to the new `animationdatasinglefile.txt`.
     /// - `#FNIS_{namespace}${idx}`
     pub(crate) fn next_adsf_id(&self) -> String {
-        let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire) + 1;
+        let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire);
         format!("#FNIS_{}${idx}", self.namespace)
+    }
+
+    /// Returns a new ID for adding a patch to the new `animationsetdatasinglefile.txt`.
+    pub(crate) fn next_asdsf_id(&self) -> usize {
+        self.current_asdsf_index.fetch_add(1, Ordering::Acquire)
     }
 }
 
@@ -254,8 +262,9 @@ where
         priority,
         list_content,
         behavior_path,
-        current_class_index: AtomicUsize::new(0),
-        current_adsf_index: AtomicUsize::new(0),
+        current_class_index: AtomicUsize::new(1),
+        current_adsf_index: AtomicUsize::new(1),
+        current_asdsf_index: AtomicUsize::new(1),
     })
 }
 

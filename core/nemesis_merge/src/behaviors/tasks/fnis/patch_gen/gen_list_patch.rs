@@ -444,7 +444,11 @@ fn new_asdsf_patch<'a>(
                 anim_infos: vec![anim_info.clone()],
             },
             priority,
-            file_name: if player { "PlayerFNIS1Start.txt" } else { "NPCFNIS1Start.txt" },
+            file_name: {
+                // TODO: The validity of this increment rule remains unclear.
+                let prefix = if player { "Player" } else { "NPC" };
+                Cow::Owned(format!("{prefix}FNIS{}Start.txt", owned_data.next_asdsf_id()))
+            },
         }
     };
 
