@@ -51,18 +51,19 @@ pub fn decode_crc32(target_crc: u32) -> Option<u32> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_crc32_calculations() {
-        assert_eq!(
-            calc_crc32("meshes\\actors\\dragon\\animations"),
-            3692944883,
-            "CRC32 for 'meshes\\actors\\dragon\\animations' is incorrect"
+    const _: () = {
+        assert!(
+            calc_crc32(r"meshes\actors\character\animations\animatedweddingscene") == 1633210473
         );
+        assert!(calc_crc32(r"paired_weddingringandkiss") == 292817474);
 
-        assert_eq!(
-            calc_crc32("ground_bite"), // lowercase file stem, without ".hkx"
-            3191128947,                // 0xbe34c373
-            "CRC32 for 'ground_bite' is incorrect"
-        );
-    }
+        assert!(calc_crc32(r"meshes\actors\dragon\animations") == 0xdc1dddf3); // 3692944883
+        assert!(calc_crc32("ground_bite") == 0xbe34c373); // lowercase file stem, without `.hkx` == 3191128947
+
+        // ascii hkx\0
+        let bytes = u32::to_le_bytes(7891816);
+        if bytes[0] != b'h' || bytes[1] != b'k' || bytes[2] != b'x' || bytes[3] != 0 {
+            panic!("invalid HKX magic");
+        }
+    };
 }
