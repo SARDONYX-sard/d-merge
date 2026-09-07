@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.2] - 2026-09-07
+### :sparkles: New Features
+- [`a03ede2`](https://github.com/SARDONYX-sard/d-merge/commit/a03ede269670718d43267bd9bff68c7b628cfc19) - remove unused field(`schema`) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4f46f41`](https://github.com/SARDONYX-sard/d-merge/commit/4f46f4101bfeb15da98b11cd0c31df0adf007dfc) - **fnis**: add asdsf id increment system *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`16d2509`](https://github.com/SARDONYX-sard/d-merge/commit/16d25093a4b4763098cb7d6d2bff38b2af21b55b) - **fnis**: fix wrong index *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`b8388ae`](https://github.com/SARDONYX-sard/d-merge/commit/b8388aeda9ddc329bfe6547548e981b1a1c82fe1) - **fnis_paired**: fix wrong graph injections *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9fdc7d6`](https://github.com/SARDONYX-sard/d-merge/commit/9fdc7d6cb05a78a2dc7e095098c49387a23f3629) - add missing AnimSet patch for FNIS paired *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :white_check_mark: Tests
+- [`c1ab73c`](https://github.com/SARDONYX-sard/d-merge/commit/c1ab73c7c99bc89928151e4185cc8b5d69fafa62) - change to const test *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.1] - 2026-08-31
 ### :bug: Bug Fixes
 - [`3f2acd2`](https://github.com/SARDONYX-sard/d-merge/commit/3f2acd22ab4c14b7dd45aaac7a7e6305a11003de) - **egui**: allow enabled checkbox interaction in read-only table *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -637,3 +651,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.6.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.5.1...2.6.0
 [2.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.6.0...2.7.0
 [2.7.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.0...2.7.1
+[2.7.2]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.1...2.7.2
