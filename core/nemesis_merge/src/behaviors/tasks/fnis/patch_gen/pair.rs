@@ -21,7 +21,7 @@ use crate::behaviors::tasks::fnis::{
     },
 };
 
-/// Into `meshes\actors\character\behaviors\0_master.xml`.
+/// Into `meshes\actors\character\behaviors\0_master.xml`.(Search Keyword: `FNIS Begin Paired`)
 pub(super) fn new_pair_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
@@ -29,23 +29,21 @@ pub(super) fn new_pair_patches<'a>(
     let class_indexes: [String; 22] =
         std::array::from_fn(|_| owned_data.next_class_name_attribute());
 
+    let player_event = paired_and_kill_animation.anim_event;
     let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
-    let class_index_11_id = calculate_hash(&class_indexes[11]); // Must be 1 file unique
+    let player_root_state_name = format!("Player_FNISpa{class_index_0_id}"); // Player_FNISpa$1/1$ NOTE: must be unique in 0_master.xml
 
-    let namespace = &owned_data.namespace;
+    let npc_event = format!("pa_{player_event}");
+    let npc_root_state_name = format!("NPC_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
+
+    let anim_file =
+        format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fpa$
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
-
-    let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("pa_{player_event}");
     let duration = paired_and_kill_animation.flag_set.duration;
-    let anim_file = format!("Animations\\{namespace}\\{}", paired_and_kill_animation.anim_file); // Animations\\$Fpa$
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
-
-    let player_root_state_name = format!("Player_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
-    let npc_root_state_name = format!("NPC_FNISpa{class_index_11_id}"); // NOTE: must be unique in 0_master.xml
 
     seq_patches.extend(new_push_events_seq_patch(
         &[player_event.into(), (&npc_event).into()],
@@ -58,7 +56,10 @@ pub(super) fn new_pair_patches<'a>(
         "#0725", // By Search Keyword: `FNIS Begin Paired`
         "#0111",
         [player_event, npc_event.as_str()],
-        [&player_root_state_name, &npc_root_state_name],
+        // The key point here is that `toStateId` should contain each other's IDs. (As revealed in `temporary_logs`)
+        // player_event -> npc stateMachineInfo
+        // npc_event -> player stateMachineInfo
+        [&npc_root_state_name, &player_root_state_name], // toStateId
         priority,
     ));
 
@@ -139,7 +140,7 @@ pub(super) fn new_pair_patches<'a>(
                     "__ptr": class_indexes[1],
                     "variableBindingSet": class_indexes[2],
                     "userData": 0,
-                    "name": format!("Player_FNISpa{class_index_0_id}_Behavior"),
+                    "name": format!("Player_FNISpa{class_index_0_id}_Behavior"), // Player_FNISpa$1/1$_Behavior
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -174,7 +175,7 @@ pub(super) fn new_pair_patches<'a>(
                     "bindings": [
                         {
                             "memberPath": "isActive",
-                            "variableIndex": 51,
+                            "variableIndex": 51, // bIsSynced
                             "bitIndex": -1,
                             "bindingType": "BINDING_TYPE_VARIABLE"
                         }
@@ -255,7 +256,7 @@ pub(super) fn new_pair_patches<'a>(
                     "bindings": [
                         {
                             "memberPath": "isActive",
-                            "variableIndex": 58,
+                            "variableIndex": 58, // 2_FootScuffLeft
                             "bitIndex": -1,
                             "bindingType": "BINDING_TYPE_VARIABLE"
                         }
@@ -274,14 +275,13 @@ pub(super) fn new_pair_patches<'a>(
         &class_indexes[7],
         &class_indexes[8],
         priority,
-        &npc_event, // macro: FNISpa_$1/1$ -> `pa_{event}`
+        &format!("pa_FNISpa{class_index_0_id}"), // `pa_FNISpa_$1/1$`
     ));
 
     // #$RI+7$  hkbStateMachineEventPropertyArray
-    one_patches.push({
-        // "payload": "#$:AnimObj+&ao1$"
-        new_event_property_array(flags, &active_indexes, &class_indexes[7], priority)
-    });
+    //
+    // "payload": "#$:AnimObj+&ao1$"
+    one_patches.push(new_event_property_array(flags, &active_indexes, &class_indexes[7], priority));
 
     // #$RI+8$  BSSynchronizedClipGenerator
     one_patches.push(new_npc_synchronized_clip_generator(
@@ -319,55 +319,19 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
 
-    one_patches.push({
-        let mut triggers: Vec<_> = paired_and_kill_animation
-            .flag_set
-            .triggers
-            .par_iter()
-            .map(|Trigger { event, time }| {
-                json_typed!(borrowed, {
-                    "localTime": time, // $&TT1$
-                    "event": {
-                        "id": format!("$eventID[{event}]$"), // use Nemesis eventID variable. instead of $&TAE1$
-                        "payload": "#0000"
-                    },
-                    "relativeToEndOfClip": false,
-                    "acyclic": false,
-                    "isAnnotation": false
-                })
-            })
-            .collect();
-
-        //  156: NPCPairedStop
-        //  159: PairEnd
-        // 1070: NPCPairEnd
-        triggers.par_extend([156, 1070].par_iter().map(|&id| {
-            json_typed!(borrowed, {
-                "localTime": duration, // $-D$
-                "event": {
-                    "id": id, // The details are unclear, but 159 was not used—only 1070 was being used.
-                    "payload": "#0000"
-                },
-                "relativeToEndOfClip": false,
-                "acyclic": false,
-                "isAnnotation": false
-            })
-        }));
-
-        (
-            vec![Cow::Owned(class_indexes[10].clone()), Cow::Borrowed("hkbClipTriggerArray")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[10],
-                        "triggers": triggers
-                    }),
-                },
-                priority,
-            },
-        )
-    });
+    // $RI+10
+    //
+    // The details are unclear, but 159 was not used—only 1070 was being used.
+    //  156: NPCPairedStop
+    //  159: PairEnd
+    // 1070: NPCPairEnd
+    one_patches.push(new_clip_trigger_array_patch(
+        &class_indexes[10],
+        &[156, 1070],
+        &paired_and_kill_animation.flag_set.triggers,
+        duration,
+        priority,
+    ));
 
     // $RI+11
     // NOTE: kill move player root patch same as paired NPC.
@@ -389,7 +353,7 @@ pub(super) fn new_pair_patches<'a>(
                     "__ptr": class_indexes[12],
                     "variableBindingSet": class_indexes[13],
                     "userData": 0,
-                    "name": format!("NPC_FNISpa{class_index_0_id}$_Behavior"),
+                    "name": format!("NPC_FNISpa{class_index_0_id}_Behavior"),
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -412,6 +376,8 @@ pub(super) fn new_pair_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+13
     one_patches.push((
         vec![Cow::Owned(class_indexes[13].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
@@ -422,7 +388,7 @@ pub(super) fn new_pair_patches<'a>(
                     "bindings": [
                         {
                             "memberPath": "isActive",
-                            "variableIndex": 51,
+                            "variableIndex": 51, // bIsSynced
                             "bitIndex": -1,
                             "bindingType": "BINDING_TYPE_VARIABLE"
                         }
@@ -434,6 +400,7 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
 
+    // $RI+14
     one_patches.push((
         vec![Cow::Owned(class_indexes[14].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
         ValueWithPriority {
@@ -457,6 +424,7 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
 
+    // $RI+15
     one_patches.push((
         vec![Cow::Owned(class_indexes[15].clone()), Cow::Borrowed("hkbStateMachine")],
         ValueWithPriority {
@@ -466,7 +434,7 @@ pub(super) fn new_pair_patches<'a>(
                     "__ptr": class_indexes[15],
                     "variableBindingSet": &class_indexes[16],
                     "userData": 0,
-                    "name": format!("NPC_FNISpa{class_index_0_id}_DisablePitch_Behavior"),
+                    "name": format!("NPC_FNISpa{class_index_0_id}_DiablePitch_Behavior"), // not typo: `Diable`
                     "eventToSendWhenStateOrTransitionChanges": {
                         "id": -1,
                         "payload": "#0000"
@@ -489,6 +457,8 @@ pub(super) fn new_pair_patches<'a>(
             priority,
         },
     ));
+
+    // $RI+16
     one_patches.push((
         vec![Cow::Owned(class_indexes[16].clone()), Cow::Borrowed("hkbVariableBindingSet")],
         ValueWithPriority {
@@ -499,7 +469,7 @@ pub(super) fn new_pair_patches<'a>(
                     "bindings": [
                         {
                             "memberPath": "isActive",
-                            "variableIndex": 58,
+                            "variableIndex": 58, // 2_FootScuffLeft
                             "bitIndex": -1,
                             "bindingType": "BINDING_TYPE_VARIABLE"
                         }
@@ -518,14 +488,18 @@ pub(super) fn new_pair_patches<'a>(
         &class_indexes[18],
         &class_indexes[19],
         priority,
-        &npc_event, // FNISpa_$1/1$
+        &format!("FNISpa{class_index_0_id}"), // FNISpa$1/1$
     ));
 
     // $RI+18
-    one_patches.push({
-        // "payload": "#$:AnimObj+&ao2$"
-        new_event_property_array(flags, &passive_indexes, &class_indexes[18], priority)
-    });
+    //
+    // "payload": "#$:AnimObj+&ao2$"
+    one_patches.push(new_event_property_array(
+        flags,
+        &passive_indexes,
+        &class_indexes[18],
+        priority,
+    ));
 
     // $RI+19
     one_patches.push(new_player_synchronized_clip_generator(
@@ -534,6 +508,8 @@ pub(super) fn new_pair_patches<'a>(
         &class_indexes[20],
         priority,
     ));
+
+    // $RI+20
     one_patches.push((
         vec![Cow::Owned(class_indexes[20].clone()), Cow::Borrowed("hkbClipGenerator")],
         ValueWithPriority {
@@ -543,7 +519,7 @@ pub(super) fn new_pair_patches<'a>(
                     "__ptr": class_indexes[20],
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": format!("NPC_Paired_FNISpa{class_index_0_id}"),
+                    "name": format!("NPCPaired_FNISpa{class_index_0_id}"),
                     "animationName": anim_file,
                     "triggers": &class_indexes[21],
                     "cropStartAmountLocalTime": 0.0,
@@ -561,39 +537,67 @@ pub(super) fn new_pair_patches<'a>(
         },
     ));
 
-    one_patches.push({
-        let triggers: Vec<_> = paired_and_kill_animation
-            .flag_set
-            .triggers
-            .par_iter()
-            .map(|Trigger { event, time }| {
-                json_typed!(borrowed, {
-                    "localTime": time, // $&TT2$
-                    "event": {
-                        "id": format!("$eventID[{event}]$"), // use Nemesis eventID variable. instead of $&TAE2$
-                        "payload": "#0000"
-                    },
-                    "relativeToEndOfClip": false,
-                    "acyclic": false,
-                    "isAnnotation": false
-                })
-            })
-            .collect();
-
-        (
-            vec![Cow::Owned(class_indexes[21].clone()), Cow::Borrowed("hkbClipTriggerArray")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[21],
-                        "triggers": triggers
-                    }),
-                },
-                priority,
-            },
-        )
-    });
+    // $RI+21
+    //
+    // NOTE: Although it does not exist in the template,
+    // 956(`2_pairedStop`) was included along with the duration in `temporary_logs`.(0_master_TEMPLATE.txt:5237 )
+    one_patches.push(new_clip_trigger_array_patch(
+        &class_indexes[21],
+        &[956],
+        &paired_and_kill_animation.flag_set.triggers2,
+        duration,
+        priority,
+    ));
 
     (one_patches, seq_patches)
+}
+
+fn new_clip_trigger_array_patch<'a>(
+    class_index: &str,
+    fixed_event_ids: &[u32],
+    triggers: &[Trigger],
+    duration: f32,
+    priority: usize,
+) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
+    let mut trigger_values = Vec::with_capacity(fixed_event_ids.len() + triggers.len());
+
+    trigger_values.extend(triggers.iter().map(|Trigger { event, time }| {
+        json_typed!(borrowed, {
+            "localTime": time,
+            "event": {
+                "id": format!("$eventID[{event}]$"),
+                "payload": "#0000"
+            },
+            "relativeToEndOfClip": false,
+            "acyclic": false,
+            "isAnnotation": false
+        })
+    }));
+
+    trigger_values.extend(fixed_event_ids.iter().map(|&id| {
+        json_typed!(borrowed, {
+            "localTime": duration,
+            "event": {
+                "id": id,
+                "payload": "#0000"
+            },
+            "relativeToEndOfClip": false,
+            "acyclic": false,
+            "isAnnotation": false
+        })
+    }));
+
+    (
+        vec![Cow::Owned(class_index.to_owned()), Cow::Borrowed("hkbClipTriggerArray")],
+        ValueWithPriority {
+            patch: JsonPatch {
+                action: Action::Pure { op: Op::Add },
+                value: simd_json::json_typed!(borrowed, {
+                    "__ptr": class_index,
+                    "triggers": trigger_values
+                }),
+            },
+            priority,
+        },
+    )
 }

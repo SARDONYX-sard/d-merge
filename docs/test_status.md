@@ -82,9 +82,10 @@ d_merge v1.3.x and earlier
 
   `Troll MCO-DXP\Meshes\Actors\Troll\characters\troll.hkx`
 
-- Unarmed Behaviors Expanded
-  - 2.0.1
-    Like BFCO, this also has four instances where `trigger_names_len` is specified incorrectly; while it can be patched using Lenient mode, it is unclear whether it is functioning correctly.
+### Unarmed Behaviors Expanded
+
+- 2.0.1
+  Like BFCO, this also has four instances where `trigger_names_len` is specified incorrectly; while it can be patched using Lenient mode, it is unclear whether it is functioning correctly.
 
 ## Nemesis + SKSE plugin
 
@@ -197,6 +198,7 @@ Tag Legend
 | Status | Mod Name                                  | Version | Used syntax |
 | ------ | ----------------------------------------- | ------- | ----------- |
 | ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
+| ✅     | Animated Wedding Scene (AWS) SE           | 4.0.2   | pa          |
 | ✅     | Flying Mod 2.0s                           | 1.1     | b           |
 | ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
 | ✅     | FNIS Sexy Move SE                         | 7.2     | AAPrefix    |
@@ -206,10 +208,18 @@ Tag Legend
 | ✅     | Kinoko Pose(LE Mod)                       | 1.0     | b           |
 | ⚠️     | Low-blow human-human killmoves            | 1.3.0   | km          |
 | ✅     | Ride Sharing SE                           | 0.4b    | b           |
-| ⚠️     | Support for FNIS users SSE(Rigmor Addon)  | 1.0.0   | pa          |
+| ⚠️     | Support for FNIS users SSE(Rigmor Addon)  | 1.0.0   | pa,b        |
 | ✅     | XP32 Maximum Skeleton Special Extended    | 5.06    | AAPrefix    |
 
 ### Detailed Notes
+
+### [Animated Wedding Scene (AWS) SE](https://www.nexusmods.com/skyrimspecialedition/mods/37976)
+
+~~We can apply the patch itself, but for some reason the animation in `Paired` doesn't play (it plays fine when using the `player.sae pa_WeddingRingKiss` command).~~
+
+By examining the FNIS output with `git diff`, I discovered that executing `PairedAndKillMove` via `AIProcess::PlayIdle` requires applying a patch to the `AnimSet`.
+
+[This change](https://github.com/SARDONYX-sard/d-merge/pull/242/changes) made it possible to play back paired moves in FNIS format.
 
 ### FNIS Flyer SE
 

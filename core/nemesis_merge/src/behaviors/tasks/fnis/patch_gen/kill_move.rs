@@ -31,20 +31,20 @@ pub(super) fn new_kill_patches<'a>(
     // new C++ Havok class XML name attributes
     let class_indexes: [String; 26] =
         core::array::from_fn(|_| owned_data.next_class_name_attribute());
-    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
-    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
 
-    let priority = owned_data.priority;
-    let flags = paired_and_kill_animation.flag_set.flags;
     let player_event = paired_and_kill_animation.anim_event;
-    let npc_event = format!("pa_{player_event}"); // NOTE: Since items in eventNames are inherently unique, this approach is acceptable.
+    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+    let player_root_state_name = format!("Player_FNISkm{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
 
-    let duration = paired_and_kill_animation.flag_set.duration;
+    let npc_event = format!("pa_{player_event}"); // NOTE: Since items in eventNames are inherently unique, this approach is acceptable.
+    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
+    let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
+
     let anim_file =
         format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
-
-    let player_root_state_name = format!("Player_FNISkm{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
-    let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
+    let priority = owned_data.priority;
+    let flags = paired_and_kill_animation.flag_set.flags;
+    let duration = paired_and_kill_animation.flag_set.duration;
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
@@ -701,11 +701,23 @@ pub(super) fn make_player_root_state_info_patch<'a>(
     priority: usize,
     state_name: String,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
-    let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-        true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
-        false => "#0000",
-    };
-    let exit_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraReset) {
+    // NOTE: Why contains `ac`(`FNISAnimFlags::AnimatedCamera`)?
+    // Based on the template, it doesn't seem to be enabled when -ac is used,
+    // but in the actual `temporary_logs`, it wasn't null when -ac was enabled.
+    //
+    // Therefore, either the `AnimatedCamera` flag or the corresponding
+    // `AnimatedCameraSet`/`AnimatedCameraReset` flag enables these events.
+
+    // -ac1|#2530|null
+    let enter_notify_events =
+        match flags.intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraSet) {
+            true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
+            false => "#0000",
+        };
+    // -ac0|#2532|null
+    let exit_notify_events = match flags
+        .intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraReset)
+    {
         true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
         false => "#0000",
     };
@@ -724,7 +736,7 @@ pub(super) fn make_player_root_state_info_patch<'a>(
                     "transitions": "#0000",
                     "generator": generator_index,
                     "name": state_name,
-                    "stateId": calculate_hash(&state_name),
+                    "stateId": calculate_hash(&state_name), // pa: `$171/2$` km: `$148/2$`
                     "probability": 1.0,
                     "enable": true
                 }),
@@ -853,13 +865,13 @@ pub(super) fn new_player_synchronized_clip_generator<'a>(
                     "__ptr": class_index,
                     "variableBindingSet": "#0000",
                     "userData": 0,
-                    "name": event, // $Epa$
+                    "name": event, // $Ekm$ or $Epa$
                     "pClipGenerator": generator_index,
                     "SyncAnimPrefix": "2_", // <- Important.
                     "bSyncClipIgnoreMarkPlacement": false,
                     "fGetToMarkTime": 0.0,
                     "fMarkErrorThreshold": 0.1,
-                    "bLeadCharacter": false,
+                    "bLeadCharacter": true,
                     "bReorientSupportChar": true,
                     "bApplyMotionFromRoot": false,
                     "sAnimationBindingIndex": -1

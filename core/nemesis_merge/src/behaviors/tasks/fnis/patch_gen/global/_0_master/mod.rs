@@ -5,31 +5,40 @@ use rayon::prelude::*;
 
 use crate::behaviors::tasks::fnis::patch_gen::JsonPatchPairs;
 
-/// FNIS XML(name="#2526") - `HeadTrackingOff`
+/// - FNIS XML(name="#2526") - `HeadTrackingOff`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2526: &str = "#FNIS_aa_global_auto_gen2526";
 
-/// FNIS XML(name="#2527") - `HeadTrackingOn`
+/// - FNIS XML(name="#2527") - `HeadTrackingOn`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2527: &str = "#FNIS_aa_global_auto_gen2527";
 
-/// FNIS XML(name="#2528") - `AnimObjectUnequip`
+/// - FNIS XML(name="#2528") - `AnimObjectUnequip`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2528: &str = "#FNIS_aa_global_auto_gen2528";
 
-/// FNIS XML(name="#2529") - `Multi (HeadTrackingOn + AnimObjectUnequip)`
+/// - FNIS XML(name="#2529") - `Multi (HeadTrackingOn + AnimObjectUnequip)`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2529: &str = "#FNIS_aa_global_auto_gen2529";
 
-/// FNIS XML(name="#2530") - `StartAnimatedCamera`
+/// - FNIS XML(name="#2530") - `StartAnimatedCamera`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2530: &str = "#FNIS_aa_global_auto_gen2530";
 
-/// FNIS XML(name="#2531") - `StringEventPayload (Camera3rd [Cam3])`
+/// - FNIS XML(name="#2531") - `StringEventPayload (Camera3rd [Cam3])`
+/// - Havok class: `hkbStringEventPayload`
 pub(crate) const FNIS_AA_STRING_PAYLOAD_2531: &str = "#FNIS_aa_global_auto_gen2531";
 
-/// FNIS XML(name="#2532") - `EndAnimatedCamera`
+/// - FNIS XML(name="#2532") - `EndAnimatedCamera`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2532: &str = "#FNIS_aa_global_auto_gen2532";
 
-/// FNIS XML(name="#2533") - `PairedKillTarget`
+/// - FNIS XML(name="#2533") - `PairedKillTarget`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2533: &str = "#FNIS_aa_global_auto_gen2533";
 
-/// FNIS XML(name="#2534") - `Multi (StartAnimatedCamera + PairedKillTarget)`
+/// - FNIS XML(name="#2534") - `Multi (StartAnimatedCamera + PairedKillTarget)`
+/// - Havok class: `hkbStateMachineEventPropertyArray`
 pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "#FNIS_aa_global_auto_gen2534";
 
 /// Generate the Havok class corresponding to the options flags in FNIS_*_List.txt.
@@ -42,17 +51,17 @@ pub(crate) const FNIS_AA_GLOBAL_AUTO_GEN_2534: &str = "#FNIS_aa_global_auto_gen2
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\0_master_TEMPLATE.txt`
 pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
-    // single event (#2526, #2527, #2528, #2530, #2532, #2533)
-    let single_events: [(&'static str, i32, Option<&'static str>); 6] = [
+    /// (index, payload)
+    const SINGLE_EVENTS: [(&str, i32, Option<&str>); 6] = [
         (FNIS_AA_GLOBAL_AUTO_GEN_2526, 366, None), // HeadTrackingOff
         (FNIS_AA_GLOBAL_AUTO_GEN_2527, 367, None), // HeadTrackingOn
         (FNIS_AA_GLOBAL_AUTO_GEN_2528, 543, None), // AnimObjectUnequip
-        (FNIS_AA_GLOBAL_AUTO_GEN_2530, 1061, Some("#2531")), // StartAnimatedCamera
+        (FNIS_AA_GLOBAL_AUTO_GEN_2530, 1061, Some(FNIS_AA_STRING_PAYLOAD_2531)), // StartAnimatedCamera
         (FNIS_AA_GLOBAL_AUTO_GEN_2532, 1062, None), // EndAnimatedCamera
-        (FNIS_AA_GLOBAL_AUTO_GEN_2533, 915, None), // PairedKillTarget
+        (FNIS_AA_GLOBAL_AUTO_GEN_2533, 915, None),  // PairedKillTarget
     ];
 
-    let mut patches: JsonPatchPairs<'a> = single_events
+    let mut patches: JsonPatchPairs<'a> = SINGLE_EVENTS
         .par_iter()
         .map(|&(class_index, id, payload)| {
             (

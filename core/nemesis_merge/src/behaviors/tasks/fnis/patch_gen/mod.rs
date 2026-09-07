@@ -24,6 +24,7 @@ pub(crate) use crate::behaviors::tasks::fnis::patch_gen::gen_list_patch::FnisPat
 use crate::{
     behaviors::tasks::{
         adsf::AdsfPatch,
+        asdsf::{AsdsfPatch, FNIS_ASDSF_GLOBAL_ID},
         fnis::{
             collect::owned::OwnedFnisInjection,
             patch_gen::{
@@ -53,6 +54,7 @@ struct LocalAgg<'a> {
     behavior_graph_data_map: BehaviorGraphDataMap<'a>,
 
     adsf_patches: Vec<AdsfPatch<'a>>,
+    asdsf_patches: Vec<AsdsfPatch<'a>>,
     furniture_groups: Vec<String>,
 
     conversion_jobs: Vec<AnimIoJob>,
@@ -64,6 +66,7 @@ impl<'a> LocalAgg<'a> {
             borrowed_patches: BehaviorPatchesMap::default(),
             behavior_graph_data_map: BehaviorGraphDataMap::new(),
             adsf_patches: Vec::new(),
+            asdsf_patches: Vec::new(),
             furniture_groups: Vec::new(),
             conversion_jobs: Vec::new(),
         }
@@ -74,6 +77,7 @@ impl<'a> LocalAgg<'a> {
 
         self.behavior_graph_data_map.0.par_extend(other.behavior_graph_data_map.0);
         self.adsf_patches.par_extend(other.adsf_patches);
+        self.asdsf_patches.par_extend(other.asdsf_patches);
         self.furniture_groups.par_extend(other.furniture_groups);
         self.conversion_jobs.par_extend(other.conversion_jobs);
 
@@ -90,7 +94,7 @@ impl<'a> LocalAgg<'a> {
 pub(crate) fn collect_borrowed_patches<'a>(
     mods_patches: &'a [OwnedFnisInjection],
     config: &'a Config,
-) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, FNISIoJobRunner, Vec<Error>) {
+) -> (PatchCollection<'a>, Vec<AdsfPatch<'a>>, Vec<AsdsfPatch<'a>>, FNISIoJobRunner, Vec<Error>) {
     let reporter = StatusReportCounter::new(
         &config.status_report,
         ReportType::GeneratingFnisPatches,
@@ -122,6 +126,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         borrowed_patches,
         behavior_graph_data_map,
         adsf_patches,
+        asdsf_patches,
         furniture_groups,
         conversion_jobs,
     } = patches
@@ -131,6 +136,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
                 animation_paths: animations,
                 events,
                 adsf_patches,
+                asdsf_patches,
                 one_master_patches,
                 seq_master_patches,
                 one_mt_behavior_patches,
@@ -254,9 +260,10 @@ pub(crate) fn collect_borrowed_patches<'a>(
 
             reporter.increment();
 
-            acc.adsf_patches.par_extend(adsf_patches);
-            acc.furniture_groups.par_extend(furniture_group_root_indexes);
-            acc.conversion_jobs.par_extend(conversion_jobs);
+            acc.adsf_patches.extend(adsf_patches);
+            acc.asdsf_patches.extend(asdsf_patches);
+            acc.furniture_groups.extend(furniture_group_root_indexes);
+            acc.conversion_jobs.extend(conversion_jobs);
             acc
         })
         .reduce(LocalAgg::new, |a, b| a.merge(b));
@@ -318,9 +325,12 @@ pub(crate) fn collect_borrowed_patches<'a>(
         errors.push(Error::FNISGenerateEspError { source: e });
     };
 
+    new_insert_asdsf_headers_patch();
+
     (
         PatchCollection { borrowed_patches, behavior_graph_data_map },
         adsf_patches,
+        asdsf_patches,
         FNISIoJobRunner::new(conversion_jobs, config.output_target, aa_base_map),
         errors,
     )
@@ -504,4 +514,55 @@ fn new_push_anim_seq_patch<'a>(
     tracing::debug!("FNIS Generated for animations: {json_path:?}: {patch:#?}");
 
     patches.0.entry(behavior_key).or_default().seq.insert(json_path, patch);
+}
+
+/// Debugging revealed that executing `PairedAndKillMove` via `AIProcess::PlayIdle` requires the `animationsetdatasinglefile.txt` output, just as it does for FNIS.
+///
+/// Although the reason is unclear, this is likely why the `pa` format does not work in Nemesis.
+///
+/// For the debugging, I compared the actual FNIS output using `git diff`.
+fn new_insert_asdsf_headers_patch() -> [AsdsfPatch<'static>; 2] {
+    use json_patch::{Action, JsonPatch};
+
+    use crate::behaviors::tasks::asdsf::PatchKind;
+
+    const PRIORITY: usize = 0;
+
+    let headers_patch = {
+        let fnis_npc_header = ValueWithPriority {
+            patch: JsonPatch {
+                // Insert between `NPCHugAStart.txt` and `NPCTurnLeft180.txt`.
+                action: Action::Seq { op: json_patch::Op::Add, range: 310..311 },
+                value: vec!["NPCFNIS1Start.txt"].into(),
+            },
+            priority: PRIORITY,
+        };
+
+        let fnis_player_header = ValueWithPriority {
+            patch: JsonPatch {
+                // Insert between `PlayerHugAStart.txt` and `PrayCrouched.txt`.
+                action: Action::Seq { op: json_patch::Op::Add, range: 336..337 },
+                value: vec!["PlayerFNIS1Start.txt"].into(),
+            },
+            priority: PRIORITY,
+        };
+
+        PatchKind::SubTxtHeader(skyrim_anim_parser::diff_line::DiffLines(vec![
+            fnis_npc_header,
+            fnis_player_header,
+        ]))
+    };
+
+    [
+        AsdsfPatch {
+            target: "DefaultFemaleData~DefaultFemale",
+            id: FNIS_ASDSF_GLOBAL_ID, // NOTE: special 0 priority
+            patch: headers_patch.clone(),
+        },
+        AsdsfPatch {
+            target: "DefaultMaleData~DefaultMale",
+            id: FNIS_ASDSF_GLOBAL_ID,
+            patch: headers_patch,
+        },
+    ]
 }

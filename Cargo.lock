@@ -4625,6 +4625,7 @@ dependencies = [
  "serde_path_to_error",
  "simd-json",
  "skyrim_anim_parser",
+ "skyrim_crc",
  "skyrim_esp",
  "snafu",
  "sonic-rs",

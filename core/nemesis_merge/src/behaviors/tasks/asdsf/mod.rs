@@ -24,8 +24,8 @@ use self::{
     types::OwnedAsdsfPatchMap,
 };
 use crate::{
-    Config,
-    behaviors::{priority_ids::types::PriorityMap, tasks::hkx::generate::write_patched_json},
+    Config, PatchMaps,
+    behaviors::tasks::hkx::generate::write_patched_json,
     errors::{
         AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
         FailedParseAdsfTemplateSnafu, FailedParseAsdsfPatchSnafu, FailedParseEditAsdsfPatchSnafu,
@@ -39,11 +39,11 @@ pub(crate) struct AsdsfPatch<'a> {
     pub target: &'a str,
     /// e.g. `/some/Nemesis_Engine/mod/slide`
     pub id: &'a str,
-    patch: PatchKind<'a>,
+    pub patch: PatchKind<'a>,
 }
 
 #[derive(serde::Serialize, Debug, Clone, PartialEq)]
-enum PatchKind<'a> {
+pub(crate) enum PatchKind<'a> {
     /// Indicates the special `$header$/$header$.txt`override
     TxtProjectHeader(DiffLines<'a>),
 
@@ -56,13 +56,15 @@ enum PatchKind<'a> {
     /// add patch
     AddAnimSet {
         patch: skyrim_anim_parser::asdsf::normal::AnimSetData<'a>,
+        /// mod list priority
         priority: usize,
+        /// Add: AnimSetData file name (e.g., `_MTSolo.txt`)
         file_name: &'a str,
     },
 }
 
 #[derive(serde::Serialize, Debug, Default, Clone, PartialEq)]
-struct EditAnimSet<'a> {
+pub(crate) struct EditAnimSet<'a> {
     patch: DiffPatchAnimSetData<'a>,
     /// apply ordering
     priority: usize,
@@ -83,8 +85,9 @@ const ASDSF_INNER_PATH: &str = "meshes/animationsetdatasinglefile.bin";
 /// Patch to `animationsetdatasinglefile.txt`
 pub(crate) fn apply_asdsf_patches(
     owned_anim_data_patches: OwnedAsdsfPatchMap,
-    id_order: &PriorityMap,
+    id_order: &PatchMaps,
     config: &Config,
+    fnis_asdsf_patches: Vec<AsdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse adsf patch
     let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
@@ -94,6 +97,7 @@ pub(crate) fn apply_asdsf_patches(
             Ok(v) => Either::Left(v),
             Err(e) => Either::Right(e),
         });
+    borrowed_patches.par_extend(fnis_asdsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
     sort_patches_by_priority(&mut borrowed_patches, id_order);
@@ -233,9 +237,27 @@ fn parse_anim_data_patch<'a>(
     Ok(AsdsfPatch { target, id, patch })
 }
 
-/// Sorts AdsfPatch list based on the given ID priority list.
-fn sort_patches_by_priority(patches: &mut [AsdsfPatch], id_order: &PriorityMap) {
-    patches.par_sort_by_key(|patch| id_order.get(patch.id).copied().unwrap_or(usize::MAX));
+/// An AnimSet patch required for the FNIS mod, which is added only once per patch.
+///
+/// Set the priority to 0. This is because it is simply being added.
+pub(crate) const FNIS_ASDSF_GLOBAL_ID: &str = "asdsf_FNIS_global_auto_gen";
+
+/// Sorts ADSF patches by mod priority.
+///
+/// Higher-priority patches are processed after lower-priority patches.
+fn sort_patches_by_priority(patches: &mut [AsdsfPatch], id_orders: &PatchMaps) {
+    patches.par_sort_by_key(|patch| {
+        if patch.id == FNIS_ASDSF_GLOBAL_ID {
+            return 0;
+        }
+
+        id_orders
+            .nemesis_entries
+            .get(patch.id)
+            .copied()
+            .or_else(|| id_orders.fnis_entries.get(patch.id).copied())
+            .unwrap_or(usize::MAX)
+    });
 }
 
 /// Read `animationsetdatasinglefile.txt` from the resource directory

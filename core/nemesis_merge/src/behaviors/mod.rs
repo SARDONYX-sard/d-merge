@@ -56,12 +56,12 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         fnis::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
     };
 
-    let (fnis_hkx_patches, fnis_adsf_patches, io_job_runner) = {
-        let (fnis_hkx_patches, fnis_adsf_patches, io_job_runner, errors) =
+    let (fnis_hkx_patches, fnis_adsf_patches, fnis_asdsf_patches, io_job_runner) = {
+        let (fnis_hkx_patches, fnis_adsf_patches, fnis_asdsf_patches, io_job_runner, errors) =
             fnis::patch_gen::collect_borrowed_patches(&owned_fnis_patches, &config);
         fnis_errors.par_extend(errors);
 
-        (fnis_hkx_patches, fnis_adsf_patches, io_job_runner)
+        (fnis_hkx_patches, fnis_adsf_patches, fnis_asdsf_patches, io_job_runner)
     };
 
     // Collect all patches file.
@@ -84,7 +84,8 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
                 apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
         });
         s.spawn(|_| {
-            asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, nemesis_entries, &config);
+            asdsf_errors =
+                apply_asdsf_patches(owned_asdsf_patches, &patches, &config, fnis_asdsf_patches);
         });
         s.spawn(|_| {
             patched_hkx_errors =
