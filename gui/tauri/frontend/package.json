@@ -53,6 +53,6 @@
     "jsdom": "^29.1.1",
     "typescript": "*",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.4",
-    "vite-plus": "0.2.4"
+    "vite-plus": "0.3.1"
   }
 }
