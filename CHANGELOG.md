@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.3] - 2026-09-12
+### :sparkles: New Features
+- [`f1b03c3`](https://github.com/SARDONYX-sard/d-merge/commit/f1b03c35c3062ce5ea0fb2fb35f9949217cc0e5f) - **fnis_pa/km**: share id *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`126695b`](https://github.com/SARDONYX-sard/d-merge/commit/126695b8589e9a1e0bf94cfec82a01f98d0bebdd) - **fnis**: fix wrong patch target *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.2] - 2026-09-07
 ### :sparkles: New Features
 - [`a03ede2`](https://github.com/SARDONYX-sard/d-merge/commit/a03ede269670718d43267bd9bff68c7b628cfc19) - remove unused field(`schema`) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -652,3 +660,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.7.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.6.0...2.7.0
 [2.7.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.0...2.7.1
 [2.7.2]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.1...2.7.2
+[2.7.3]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.2...2.7.3
