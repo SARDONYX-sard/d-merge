@@ -199,6 +199,7 @@ Tag Legend
 | ------ | ----------------------------------------- | ------- | ----------- |
 | ✅     | (Super Fast) Immersive Animated Looting   | 2.7     | ofa         |
 | ✅     | Animated Wedding Scene (AWS) SE           | 4.0.2   | pa          |
+| ✅     | EatingSleepingDrinking - KuNeruNomu -     | 2.3.0   | b,s,+,ch    |
 | ✅     | Flying Mod 2.0s                           | 1.1     | b           |
 | ⚠️     | FNIS Flyer SE                             | 7.0     | b,s,+       |
 | ✅     | FNIS Sexy Move SE                         | 7.2     | AAPrefix    |
@@ -220,6 +221,22 @@ Tag Legend
 By examining the FNIS output with `git diff`, I discovered that executing `PairedAndKillMove` via `AIProcess::PlayIdle` requires applying a patch to the `AnimSet`.
 
 [This change](https://github.com/SARDONYX-sard/d-merge/pull/242/changes) made it possible to play back paired moves in FNIS format.
+
+### EatingSleepingDrinking - KuNeruNomu -
+
+The `idlebook_onepage.hkx` file at the following path is an existing file included in `Animation.bsa`.
+
+- `Action Animations NG/meshes/actors/character/animations/ReadBooksNotes/fnis_ReadBooksNotes_list.txt`(Lines 7 through 8)
+
+In other words, the `k` (known flag) is required.
+You need to add `k,` as shown below.
+
+```vb
+s -a,k,o,bsa,TSoundPlay.ITMBookPageTurnForward/0.5 ESDIdleBook_OnePage ..\idlebook_onepage.hkx AnimObjectBook AnimObjectBookPage
++ -a,k,o,bsa ESDIdlebook_read ..\idlebook_read.hkx AnimObjectBook
+```
+
+Animations for beverages and food may not play unless `Activation Animations NG`(Nemesis patch) is enabled.
 
 ### FNIS Flyer SE
 

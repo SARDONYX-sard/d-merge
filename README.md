@@ -134,7 +134,7 @@ D:/MO2/mods/
 | ✅     | Arm Offset Animations           | ofa             | Tested with (Immersive Animated Looting v2.7)                 |
 | ✅     | Furniture Animations            | fu, fuo         | Tested with (Fort Knox v1.4.3)                                |
 | ✅     | Paired Animations and KillMoves | pa, km          | Tested with (Animated Wedding Scene v4.0.2)                   |
-| ⚠️     | Chair Animations                | ch              | Implemented it. Couldn't find any mods that could be tested.  |
+| ✅     | Chair Animations                | ch              | Tested with (EatingSleepingDrinking v3.2.0)                   |
 | ✅     | Alternate Animations            | AAprefix        | Automatically convert to OAR. Need: OAR and fnis_aa.          |
 
 ![patch_page](https://github.com/user-attachments/assets/a601c347-10f1-459e-bb70-ecbee5f82590)
