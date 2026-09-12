@@ -22,11 +22,7 @@ pub enum Error {
     #[snafu(display("[FNIS_*_List.txt file Parse Error]{}:\n{source}", path.display()))]
     FailedParseFnisModList { source: ReadableError, path: PathBuf },
 
-    #[snafu(display(
-            "FNIS I/O processing (read/write to config.json or hkx files) failed. This is likely due to a busy condition or lack of permission.:\n
-    path = {}, err = {source}\n",
-        path.display()
-    ))]
+    #[snafu(display( "FNIS I/O processing (read/write to config.json or hkx files) failed. This is likely due to a busy condition or lack of permission.:\npath = {}, err = {source}", path.display()))]
     FNISHkxIoError { path: PathBuf, source: io::Error },
 
     #[snafu(display(

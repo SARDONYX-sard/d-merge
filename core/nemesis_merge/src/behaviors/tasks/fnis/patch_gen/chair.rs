@@ -11,7 +11,8 @@ use simd_json::json_typed;
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        JsonPatchPairs, furniture::one_anim::new_push_values_seq_patch, kill_move::calculate_hash,
+        JsonPatchPairs, furniture::one_anim::new_push_values_seq_patch,
+        global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5222, kill_move::calculate_hash,
         new_push_events_seq_patch,
     },
 };
@@ -42,12 +43,12 @@ pub(super) fn new_chair_patches<'a>(
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
 
-    seq_patches.extend(new_push_events_seq_patch(
-        &[start_event.into()],
-        "#0083",
-        "#0085",
-        priority,
-    ));
+    seq_patches.extend({
+        let mut events = Vec::with_capacity(1 + chair.start.flag_set.triggers.len());
+        events.push(start_event.into());
+        events.extend(chair.start.flag_set.triggers.iter().map(|trigger| trigger.event.into()));
+        new_push_events_seq_patch(&events, "#0083", "#0085", priority)
+    });
     if !start_animation.flag_set.anim_vars.is_empty() {
         seq_patches.par_extend(new_push_values_seq_patch(
             &start_animation.flag_set.anim_vars,
@@ -62,30 +63,25 @@ pub(super) fn new_chair_patches<'a>(
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map =
         dashmap::DashMap::<_, _, rapidhash::fast::RandomState>::default();
-    one_patches.par_extend(start_animation.anim_objects.par_iter().enumerate().map(
-        |(index, name)| {
-            let new_anim_object_index = owned_data.next_class_name_attribute();
-            class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+    one_patches.extend(start_animation.anim_objects.iter().enumerate().map(|(index, name)| {
+        let new_anim_object_index = owned_data.next_class_name_attribute();
+        class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
 
-            // One anim object
-            (
-                vec![
-                    Cow::Owned(new_anim_object_index.clone()),
-                    Cow::Borrowed("hkbStringEventPayload"),
-                ],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
-                            "__ptr": new_anim_object_index,
-                            "data": name, // StringPtr
-                        }),
-                    },
-                    priority,
+        // One anim object
+        (
+            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: simd_json::json_typed!(borrowed, {
+                        "__ptr": new_anim_object_index,
+                        "data": name, // StringPtr
+                    }),
                 },
-            )
-        },
-    ));
+                priority,
+            },
+        )
+    }));
 
     // $RI
     one_patches.push((
@@ -187,7 +183,7 @@ pub(super) fn new_chair_patches<'a>(
                     "listeners": [],
                     "enterNotifyEvents": "#0000",
                     "exitNotifyEvents": "#0000",
-                    "transitions": "#0000",
+                    "transitions": "#1726",
                     "generator": &class_indexes[5],
                     "name": format!("FNISChairIdleStart{class_index_0_id}"), // FNISChairIdleStart$1/1$
                     "stateId": 0,
@@ -243,12 +239,12 @@ pub(super) fn new_chair_patches<'a>(
 
         triggers.extend(class_index_to_anim_object_map.iter().map(|ref_| {
             json_typed!(borrowed, {
-                "localTime": -0.2,
+                "localTime": 1.0,
                 "event": {
                     "id": 394, // AnimObjDraw
                     "payload": ref_.value(),
                 },
-                "relativeToEndOfClip": true,
+                "relativeToEndOfClip": false,
                 "acyclic": false,
                 "isAnnotation": false
             })
@@ -363,7 +359,7 @@ pub(super) fn new_chair_patches<'a>(
                     "userData": 0,
                     "name": format!("FNISChairIdleBase{class_index_0_id}"), // FNISChairIdleBase$1/1$
                     "animationName": anim_files[1], // Animations\\$chg-3$
-                    "triggers": &class_indexes[6],
+                    "triggers": "#1130",
                     "cropStartAmountLocalTime": 0.0,
                     "cropEndAmountLocalTime": 0.0,
                     "startTime": 0.0,
@@ -415,7 +411,7 @@ pub(super) fn new_chair_patches<'a>(
                     "userData": 0,
                     "name": format!("FNISChairIdleVar1_{class_index_0_id}"), // FNISChairIdleVar1_$1/1$
                     "animationName": anim_files[2], // Animations\\$chg-2$
-                    "triggers": "#5222",
+                    "triggers": FNIS_AA_MT_AUTO_GEN_5222,
                     "cropStartAmountLocalTime": 0.0,
                     "cropEndAmountLocalTime": 0.0,
                     "startTime": 0.0,
@@ -444,7 +440,7 @@ pub(super) fn new_chair_patches<'a>(
                     "enterNotifyEvents": "#1127",
                     "exitNotifyEvents": "#1126",
                     "transitions": "#0000",
-                    "generator": &class_indexes[12],
+                    "generator": &class_indexes[14],
                     "name": format!("FNISChairIdleVar2_{class_index_0_id}"), // FNISChairIdleVar2_$1/1$
                     "stateId": 2,
                     "probability": 1.0,
@@ -467,7 +463,7 @@ pub(super) fn new_chair_patches<'a>(
                     "userData": 0,
                     "name": format!("FNISChairIdleVar2_{class_index_0_id}"), // FNISChairIdleVar2_$1/1$
                     "animationName": anim_files[3], // Animations\\$chg-1$
-                    "triggers": "#5222",
+                    "triggers": FNIS_AA_MT_AUTO_GEN_5222,
                     "cropStartAmountLocalTime": 0.0,
                     "cropEndAmountLocalTime": 0.0,
                     "startTime": 0.0,
@@ -609,7 +605,7 @@ pub(super) fn new_chair_patches<'a>(
                         "toStateId": class_index_0_id, // Must match root_state
                         "fromNestedStateId": 0,
                         "toNestedStateId": 0,
-                        "priority": priority,
+                        "priority": 0,
                         "flags": "FLAG_DISABLE_CONDITION"
                     }]),
                 },
@@ -669,33 +665,67 @@ fn new_event_property_array_ri1<'a>(
 /// Builds exactly 5 animation file paths.
 ///
 /// Missing sequenced animations reuse the last available animation.
+///
+/// - [playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=88299202103d425264e60e69244cf9e9)
 fn build_anim_files(namespace: &str, chair: &FNISChairAnimation) -> [String; 5] {
     let FNISChairAnimation { start, sequenced } = chair;
     let start_anim_file = start.anim_file;
 
-    [
-        format!("Animations\\{namespace}\\{start_anim_file}"),
-        format!("Animations\\{namespace}\\{}", sequenced.first().unwrap_or(&start_anim_file)),
-        format!(
-            "Animations\\{namespace}\\{}",
-            sequenced.get(1).or_else(|| sequenced.first()).unwrap_or(&start_anim_file)
-        ),
-        format!(
-            "Animations\\{namespace}\\{}",
-            sequenced
-                .get(2)
-                .or_else(|| sequenced.get(1))
-                .or_else(|| sequenced.first())
-                .unwrap_or(&start_anim_file)
-        ),
-        format!(
-            "Animations\\{namespace}\\{}",
-            sequenced
-                .get(3)
-                .or_else(|| sequenced.get(2))
-                .or_else(|| sequenced.get(1))
-                .or_else(|| sequenced.first())
-                .unwrap_or(&start_anim_file)
-        ),
-    ]
+    core::array::from_fn(|i| {
+        let anim_file = match i {
+            0 => &start_anim_file,
+            i => sequenced
+                .get(i - 1) // get(0), get(1), ...
+                .or_else(|| sequenced.first()) // get(0)
+                .unwrap_or(&start_anim_file),
+        };
+
+        format!("Animations\\{namespace}\\{anim_file}")
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use fnis_list::combinator::{
+        anim_types::FNISAnimType,
+        flags::{FNISAnimFlagSet, FNISAnimFlags},
+        fnis_animation::FNISAnimation,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_build_anim_files() {
+        let chair = FNISChairAnimation {
+            start: FNISAnimation {
+                anim_type: FNISAnimType::Chair,
+                flag_set: FNISAnimFlagSet {
+                    flags: FNISAnimFlags::AnimObjects,
+                    blend_time: None,
+                    triggers: vec![],
+                    anim_vars: vec![],
+                },
+                anim_event: "TestStartEvent",
+                anim_file: "test_start.hkx",
+                anim_objects: vec!["TestObject"],
+                anim_vars: vec![],
+                motions: vec![],
+                rotations: vec![],
+            },
+            sequenced: vec!["test_base.hkx", "test_variant1.hkx", "test_variant2.hkx"],
+        };
+
+        let result = build_anim_files("TestNamespace", &chair);
+
+        assert_eq!(
+            result,
+            [
+                "Animations\\TestNamespace\\test_start.hkx",
+                "Animations\\TestNamespace\\test_base.hkx",
+                "Animations\\TestNamespace\\test_variant1.hkx",
+                "Animations\\TestNamespace\\test_variant2.hkx",
+                "Animations\\TestNamespace\\test_base.hkx",
+            ]
+        );
+    }
 }
