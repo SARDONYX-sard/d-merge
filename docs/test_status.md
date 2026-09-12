@@ -193,7 +193,7 @@ Tag Legend
 - **AAPrefix** : Alternate Animation — converts FNIS AA layout to OAR sub-directories.
   Requires
   - [OAR](https://www.nexusmods.com/skyrimspecialedition/mods/92109)
-  - [Dyn FNIS Functions(fnis_aa)](https://github.com/SARDONYX-sard/fnis_aa)
+  - [Dyn FNIS Functions(fnis_aa)](https://github.com/SARDONYX-sard/fnis_aa/releases/latest)
 
 | Status | Mod Name                                  | Version | Used syntax |
 | ------ | ----------------------------------------- | ------- | ----------- |
@@ -237,6 +237,8 @@ s -a,k,o,bsa,TSoundPlay.ITMBookPageTurnForward/0.5 ESDIdleBook_OnePage ..\idlebo
 ```
 
 Animations for beverages and food may not play unless `Activation Animations NG`(Nemesis patch) is enabled.
+
+Since calling functions in the FNIS scripts triggers FNIS detection and activates the MCM page, you need to install [`Dyn FNIS AA Functions`](https://github.com/SARDONYX-sard/fnis_aa/releases/latest) to trick the mod's scripts.
 
 ### FNIS Flyer SE
 
