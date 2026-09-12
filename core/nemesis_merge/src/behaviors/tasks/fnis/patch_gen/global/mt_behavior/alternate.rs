@@ -18,15 +18,15 @@ pub(crate) const FNIS_AA_MT_AUTO_GEN_5220: &str = "#FNIS_aa_global_auto_gen5220"
 pub(crate) const FNIS_AA_MT_AUTO_GEN_5221: &str = "#FNIS_aa_global_auto_gen5221";
 
 /// FNIS XML(name="#5222") - `ClipTriggerArray`
-pub(crate) const FNIS_AA_MT_CLIP_TRIGGER_5222: &str = "#FNIS_aa_global_auto_gen5222";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5222: &str = "#FNIS_aa_global_auto_gen5222";
 
 /// FNIS XML(name="#5232") - `FNIS_BlendTransition2`
 /// - duration: 1.2
-pub(crate) const FNIS_BA_BLEND_TRANSITION_5232: &str = "#FNIS_aa_global_auto_gen5232";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5232: &str = "#FNIS_aa_global_auto_gen5232";
 
 /// FNIS XML(name="#5235") - `FNIS_BlendTransition1`(`#$:BlendTransition+&bl$`)
 /// - duration: 0.6
-pub(crate) const FNIS_BA_BLEND_TRANSITION_5235: &str = "#FNIS_aa_global_auto_gen5235";
+pub(crate) const FNIS_AA_MT_AUTO_GEN_5235: &str = "#FNIS_aa_global_auto_gen5235";
 
 /// Generate the Havok class of `character/behaviors/mt_behavior.xml`.
 ///
@@ -71,12 +71,12 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
 
     // ClipTriggerArray (#5222)
     patches.push((
-        json_path![FNIS_AA_MT_CLIP_TRIGGER_5222, "hkbClipTriggerArray"],
+        json_path![FNIS_AA_MT_AUTO_GEN_5222, "hkbClipTriggerArray"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
-                    "__ptr": FNIS_AA_MT_CLIP_TRIGGER_5222,
+                    "__ptr": FNIS_AA_MT_AUTO_GEN_5222,
                     "triggers": [
                         {
                             "localTime": -0.2,
@@ -107,12 +107,12 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
     ));
 
     patches.push( (
-        json_path![FNIS_BA_BLEND_TRANSITION_5235, "hkbBlendingTransitionEffect"],
+        json_path![FNIS_AA_MT_AUTO_GEN_5235, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
-                    "__ptr": FNIS_BA_BLEND_TRANSITION_5235,
+                    "__ptr": FNIS_AA_MT_AUTO_GEN_5235,
                     "variableBindingSet": "#0000",
                     "userData": 0,
                     "name": "FNIS_BlendTransition1",
@@ -129,12 +129,12 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         },
     ));
     patches.push( (
-        json_path![FNIS_BA_BLEND_TRANSITION_5232, "hkbBlendingTransitionEffect"],
+        json_path![FNIS_AA_MT_AUTO_GEN_5232, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
                 value: simd_json::json_typed!(borrowed, {
-                    "__ptr": FNIS_BA_BLEND_TRANSITION_5232,
+                    "__ptr": FNIS_AA_MT_AUTO_GEN_5232,
                     "variableBindingSet": "#0000",
                     "userData": 0,
                     "name": "FNIS_BlendTransition2",

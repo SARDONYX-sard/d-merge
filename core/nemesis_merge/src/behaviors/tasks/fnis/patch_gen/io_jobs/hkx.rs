@@ -1,4 +1,4 @@
-//! HKX read → convert → write pipeline.
+//! HKX read -> convert -> write pipeline.
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -57,7 +57,7 @@ pub(crate) enum AnimKind {
 // Pipeline entry point
 // ---------------------------------------------------------------------------
 
-/// Runs the full HKX read → convert → write pipeline in parallel.
+/// Runs the full HKX read -> convert -> write pipeline in parallel.
 #[must_use]
 pub(crate) fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<Error> {
     // Stage 1: read
@@ -100,7 +100,7 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
             #[cfg(feature = "tracing")]
             tracing::info!(
                 path = %job.input_path.display(),
-                "Input file does not exist; skipping (FNIS AltAnim → OAR)."
+                "Input file does not exist; skipping (FNIS AltAnim -> OAR)."
             );
             return None;
         } else if let Some(found) = find_case_insensitive(&job.input_path) {

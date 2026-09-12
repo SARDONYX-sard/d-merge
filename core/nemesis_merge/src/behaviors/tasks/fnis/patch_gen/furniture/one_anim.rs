@@ -20,8 +20,8 @@ use simd_json::{borrowed::Value, json_typed};
 use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        JsonPatchPairs, global::mt_behavior::FNIS_BA_BLEND_TRANSITION_5235,
-        kill_move::calculate_hash, new_push_events_seq_patch,
+        JsonPatchPairs, global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5235, kill_move::calculate_hash,
+        new_push_events_seq_patch,
     },
 };
 
@@ -236,7 +236,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                                 "enterTime": 0.0,
                                 "exitTime": 0.0,
                             },
-                            "transition": FNIS_BA_BLEND_TRANSITION_5235, // #$:BlendTransition+&bl$
+                            "transition": FNIS_AA_MT_AUTO_GEN_5235, // #$:BlendTransition+&bl$
                             "condition": "#0000",
                             "eventId": 152, // IdleChairExitStart
 

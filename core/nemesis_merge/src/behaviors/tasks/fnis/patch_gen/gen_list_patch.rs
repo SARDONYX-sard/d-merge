@@ -124,11 +124,11 @@ pub(super) fn generate_patch<'a>(
                 if !flag_set.flags.contains(FNISAnimFlags::Known) {
                     all_anim_files.insert(*anim_file);
                 }
-                all_events.par_extend(
+                all_events.extend(
                     flag_set
                         .triggers
-                        .par_iter()
-                        .chain(flag_set.triggers2.par_iter())
+                        .iter()
+                        .chain(flag_set.triggers2.iter())
                         .map(|trigger| Cow::Borrowed(trigger.event)),
                 );
                 all_asdsf_patches.extend(new_asdsf_patch(owned_data, anim_event, anim_file)?);
@@ -141,9 +141,12 @@ pub(super) fn generate_patch<'a>(
                 seq_master_patches.par_extend(seq);
             }
             SyntaxPattern::Chair(chair_animation) => {
+                all_anim_files.insert(chair_animation.start.anim_file);
+                all_anim_files.extend(chair_animation.sequenced.as_slice());
+
                 let (one, seq) = new_chair_patches(&chair_animation, owned_data);
-                one_master_patches.par_extend(one);
-                seq_master_patches.par_extend(seq);
+                one_mt_behavior_patches.par_extend(one);
+                seq_mt_behavior_patches.par_extend(seq);
             }
             SyntaxPattern::Furniture(furniture_animation) => {
                 if !owned_data.behavior_entry.is_3rd_person_character() {
@@ -169,8 +172,8 @@ pub(super) fn generate_patch<'a>(
                 let (anim_files, events, adsf_patches) =
                     collect_seq_patch(owned_data, sequenced_animation);
 
-                all_anim_files.par_extend(anim_files);
-                all_events.par_extend(events);
+                all_anim_files.extend(anim_files);
+                all_events.extend(events);
                 all_adsf_patches.par_extend(adsf_patches);
             }
             SyntaxPattern::OffsetArm(fnis_animation) => {
@@ -202,7 +205,7 @@ pub(super) fn generate_patch<'a>(
                 // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
                 all_events.insert(anim_event_hack(&owned_data.namespace, anim_event));
 
-                all_adsf_patches.par_extend(new_adsf_patch(owned_data, fnis_animation));
+                all_adsf_patches.extend(new_adsf_patch(owned_data, fnis_animation));
             }
         };
     }
@@ -264,7 +267,7 @@ fn collect_seq_patch<'a>(
 
     let adsf_patches: Vec<AdsfPatch<'a>> = sequenced_animation
         .animations
-        .into_par_iter()
+        .into_iter()
         .flat_map(|fnis_animation| {
             let FNISAnimation { flag_set, anim_file, anim_event, .. } = &fnis_animation;
 

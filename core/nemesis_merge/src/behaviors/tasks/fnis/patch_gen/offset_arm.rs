@@ -10,7 +10,7 @@ use crate::behaviors::tasks::fnis::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
         JsonPatchPairs,
-        global::mt_behavior::{self, FNIS_BA_BLEND_TRANSITION_5235},
+        global::mt_behavior::{self, FNIS_AA_MT_AUTO_GEN_5235},
         kill_move::{calculate_hash, new_push_transitions_seq_patch},
         new_push_events_seq_patch,
     },
@@ -52,7 +52,7 @@ pub(super) fn new_offset_arm_patches<'a>(
 
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
-        FNIS_BA_BLEND_TRANSITION_5235,
+        FNIS_AA_MT_AUTO_GEN_5235,
         [animation.anim_event],
         [&class_indexes[0]],
         priority,
