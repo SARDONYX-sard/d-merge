@@ -30,7 +30,7 @@ image = { version = "0.25.10", features = ["jpeg", "png"] }
 
 bitflags = "2.13.1"
 dashmap = { workspace = true }
-dark-light = "2.0.0"
+dark-light = "3.0.0"
 font-kit = "0.14.3"
 mimalloc = { version = "0.1.50", optional = true }
 parking_lot = { workspace = true }
