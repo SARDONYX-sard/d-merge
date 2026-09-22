@@ -398,7 +398,7 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
             ui.horizontal(|ui| {
                 changed |= rgba_edit(ui, c);
 
-                if ui.add(small_button("✕")).clicked() {
+                if ui.add(small_button("X")).clicked() {
                     clear = true;
                 }
             });
@@ -420,7 +420,7 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
             ui.horizontal(|ui| {
                 changed |= rgba_edit(ui, c);
 
-                if ui.add(small_button("✕")).clicked() {
+                if ui.add(small_button("X")).clicked() {
                     clear = true;
                 }
             });
