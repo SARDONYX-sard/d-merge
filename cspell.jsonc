@@ -95,6 +95,7 @@
     "viewports",
     "weapequip",
     "wgpu",
-    "xorout"
+    "xorout",
+    "XPMSE"
   ]
 }
