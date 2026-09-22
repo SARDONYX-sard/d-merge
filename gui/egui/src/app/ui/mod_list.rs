@@ -29,64 +29,17 @@ impl App {
             self.theme_manager.current_bg_color(),
         );
 
+        let mut filtered = self.filtered_mod_ids();
+        self.sort_filtered_mods(&mut filtered);
+        let dnd_allowed = self.is_dnd_allowed();
+        self.is_locked = !dnd_allowed;
+
         panel.show(ctx, |ui| {
             ui.add_space(10.0);
 
-            ui.horizontal(|ui| {
-                ui.add(heading(self.i18n.t(I18nKey::ModsListTitle)))
-                    .on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
+            self.render_toolbar(ui);
 
-                ui.separator();
-                self.ui_search_bar(ui);
-
-                ui.separator();
-
-                // -- Normalize Button
-                if ui
-                    .add_sized(
-                        [90.0, 40.0],
-                        button_with_icon(
-                            self.i18n.t(I18nKey::NormalizeButton),
-                            egui_shadcn::LucideIcon::TextAlignJustify,
-                        ),
-                    )
-                    .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
-                    .clicked()
-                {
-                    mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
-                    if matches!(self.settings.behavior.mode, DataMode::Manual) {
-                        mod_item::dedup_mods_by_id(self.settings.mod_list_mut());
-                    }
-                }
-
-                // -- Lock Button
-                if self.is_locked {
-                    let button = destructive_button_with_icon(
-                        self.i18n.t(I18nKey::LockButton),
-                        egui_shadcn::LucideIcon::Lock,
-                    );
-                    let hover_text = self.i18n.t(I18nKey::LockButtonHover);
-
-                    if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
-                        self.unlock_readonly_table();
-                    }
-                } else {
-                    ui.add_space(98.0);
-                }
-
-                ui.separator();
-                if self.reload_button(ui) {
-                    ui.add(egui::Spinner::new());
-                }
-                ui.colored_label(self.mod_list_msg.1, self.mod_list_msg.0.clone());
-            });
-
-            let mut filtered = self.filtered_mod_ids();
-            self.sort_filtered_mods(&mut filtered);
-
-            let dnd_allowed = self.is_dnd_allowed();
-            self.is_locked = !dnd_allowed;
-
+            self.selected_label(ui);
             self.render_table(ui, &filtered, dnd_allowed);
         });
     }
@@ -95,6 +48,64 @@ impl App {
         if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::R)) {
             self.update_mod_list();
         }
+    }
+
+    fn render_toolbar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.add(heading(self.i18n.t(I18nKey::ModsListTitle)))
+                .on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
+
+            ui.separator();
+            self.ui_search_bar(ui);
+
+            ui.separator();
+
+            // -- Normalize Button
+            if ui
+                .add_sized(
+                    [90.0, 40.0],
+                    button_with_icon(
+                        self.i18n.t(I18nKey::NormalizeButton),
+                        egui_shadcn::LucideIcon::TextAlignJustify,
+                    ),
+                )
+                .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
+                .clicked()
+            {
+                mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
+                if matches!(self.settings.behavior.mode, DataMode::Manual) {
+                    mod_item::dedup_mods_by_id(self.settings.mod_list_mut());
+                }
+            }
+
+            // -- Lock Button
+            if self.is_locked {
+                let button = destructive_button_with_icon(
+                    self.i18n.t(I18nKey::LockButton),
+                    egui_shadcn::LucideIcon::Lock,
+                );
+                let hover_text = self.i18n.t(I18nKey::LockButtonHover);
+
+                if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
+                    self.unlock_readonly_table();
+                }
+            } else {
+                ui.add_space(98.0);
+            }
+
+            ui.separator();
+            if self.reload_button(ui) {
+                ui.add(egui::Spinner::new());
+            }
+            ui.colored_label(self.mod_list_msg.1, self.mod_list_msg.0.clone());
+        });
+    }
+
+    fn selected_label(&self, ui: &mut egui::Ui) {
+        let selected_count = self.settings.mod_list().iter().filter(|item| item.enabled).count();
+        let total_count = self.settings.mod_list().len();
+        let selected_label = self.i18n.t(I18nKey::SelectedLabel);
+        ui.label(format!("{selected_count} / {total_count} {selected_label}"));
     }
 
     fn reload_button(&self, ui: &mut egui::Ui) -> bool {
@@ -218,7 +229,7 @@ impl App {
     /// Renders the scroll area and [`egui_extras::TableBuilder`].
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
         let table_max_height = ui.available_height() * 0.97;
-        let total_width = ui.available_width();
+        let total_width = self.settings.ui.window.width;
 
         let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5;
         if changed_width {
@@ -230,20 +241,20 @@ impl App {
             .max_width(total_width)
             .scroll_bar_rect(egui::Rect::everything_above(20.0))
             .show(ui, |ui| {
-                ui.add_space(8.0);
-                let margin = 8.0;
-                ui.add_space(margin);
-                let table_width = ui.available_width() - margin;
-                let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(margin, 0.0));
+                const MARGIN: f32 = 8.0;
+
+                ui.add_space(MARGIN * 2.0);
+                let table_width = ui.available_width() - MARGIN;
+                let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(MARGIN, 0.0));
 
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     egui_extras::TableBuilder::new(ui)
                         .striped(true)
-                        .column(egui_extras::Column::auto().resizable(true)) // checkbox
+                        .column(egui_extras::Column::initial(table_width * 0.01)) // checkbox
                         .column(Self::resizable_column(table_width, 0.20, changed_width)) // id
                         .column(Self::resizable_column(table_width, 0.30, changed_width)) // name
                         .column(Self::resizable_column(table_width, 0.07, changed_width)) // mod type
-                        .column(Self::resizable_column(table_width, 0.30, changed_width)) // site
+                        .column(Self::resizable_column(table_width, 0.33, changed_width)) // site
                         .column(Self::resizable_column(table_width, 0.03, changed_width)) // priority
                         .header(20.0, |mut header| self.render_table_header(&mut header))
                         .body(|mut body| {
@@ -305,19 +316,24 @@ impl App {
     /// If the filter is empty, all mods are toggled.
     fn checkbox_header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
         header.col(|ui| {
-            if ui.add(egui::Checkbox::without_text(&mut self.check_all)).clicked() {
-                let check_all = self.check_all;
+            ui.with_layout(
+                egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                |ui| {
+                    if ui.add(egui::Checkbox::without_text(&mut self.check_all)).clicked() {
+                        let check_all = self.check_all;
 
-                let filtered_ids: rapidhash::fast::RapidHashSet<_> =
-                    self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
-                let is_unfiltered = filtered_ids.is_empty();
+                        let filtered_ids: rapidhash::fast::RapidHashSet<_> =
+                            self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
+                        let is_unfiltered = filtered_ids.is_empty();
 
-                self.settings.mod_list_mut().par_iter_mut().for_each(|item| {
-                    if is_unfiltered || filtered_ids.contains(&item.id) {
-                        item.enabled = check_all;
+                        self.settings.mod_list_mut().par_iter_mut().for_each(|item| {
+                            if is_unfiltered || filtered_ids.contains(&item.id) {
+                                item.enabled = check_all;
+                            }
+                        });
                     }
-                });
-            }
+                },
+            );
         });
     }
 

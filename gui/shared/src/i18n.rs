@@ -117,9 +117,10 @@ pub enum I18nKey {
 
     /// Generates a dummy FNIS.esp file.
     ///
-    /// # Notes
-    /// This feature is required in the following situations.
-    /// - You are using mods that depend on FNIS.esp but are not using the original FNIS.esp
+    /// # Examples:
+    /// - XPMSE
+    /// - FNIS Sexy Move
+    /// - EatingSleepingDrinking
     GenerateFnisEspHover,
 
     /// Gen FNIS.esp
@@ -344,6 +345,9 @@ pub enum I18nKey {
 
     /// Select
     SelectButton,
+
+    /// selected
+    SelectedLabel,
 
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
