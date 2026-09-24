@@ -36,10 +36,6 @@ use crate::{
     rotate::rotate_files,
 };
 
-// ────────────────────────────────────────────────────────────────────────────
-// SwappableWriter
-// ────────────────────────────────────────────────────────────────────────────
-
 /// NOTE: For some reason, the last data written using [`io::BufWriter`] isn't flushed properly.
 #[derive(Clone)]
 #[expect(missing_debug_implementations)]
@@ -82,21 +78,6 @@ impl<'a> fmt_layer::MakeWriter<'a> for SwappableWriter {
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Type alias for the reload handle
-// ────────────────────────────────────────────────────────────────────────────
-
-// The key insight from the original working code:
-//
-//   registry().with(reload::Layer<LevelFilter>).with(fmt_layer)
-//
-// `reload::Layer<LevelFilter>` sits as a *sibling* layer directly on the
-// registry, NOT inside fmt via with_filter().  This is what makes
-// rebuild_interest_cache() fire correctly when the handle is modified.
-//
-// We type-erase the subscriber S with a boxed trait object so that
-// RotationHandle can remain S-free and Clone-able.
-
 trait LevelReloader: Send + Sync + 'static {
     fn reload(&self, filter: LevelFilter) -> Result<()>;
 }
@@ -109,10 +90,6 @@ impl<S: 'static + Send + Sync> LevelReloader for HandleReloader<S> {
         self.0.modify(|f| *f = filter).map_err(|e| Error::Reload { source: e })
     }
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// RotationHandle
-// ────────────────────────────────────────────────────────────────────────────
 
 /// Runtime control surface for a [`RotationLayer`].
 ///
@@ -127,9 +104,6 @@ pub struct RotationHandle {
 impl RotationHandle {
     /// Change the minimum log level at runtime.
     ///
-    /// `level` is matched case-insensitively.  Unrecognized strings fall back
-    /// to `ERROR` with a warning log.
-    ///
     /// # Errors
     /// [`Error::NotInit`] if the handle was not properly initialized via
     /// [`global::init`] or [`Builder::build`].
@@ -142,10 +116,6 @@ impl RotationHandle {
         self.reloader.reload(new)
     }
 
-    /// Redirect log output to a freshly rotated file inside `log_dir`.
-    ///
-    /// Files are rotated (renamed + oldest deleted) before the new file is
-    /// opened, identical to what happens on startup.
     /// Redirect log output to a freshly rotated file inside `log_dir`.
     ///
     ///# Errors
@@ -164,10 +134,6 @@ impl fmt::Debug for RotationHandle {
         f.debug_struct("RotationHandle").field("max_files", &self.max_files).finish_non_exhaustive()
     }
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Builder
-// ────────────────────────────────────────────────────────────────────────────
 
 /// Builder for [`RotationLayer`].
 #[derive(Debug)]

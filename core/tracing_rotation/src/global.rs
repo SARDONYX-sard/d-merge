@@ -40,11 +40,6 @@ static HANDLE: OnceLock<RotationHandle> = OnceLock::new();
 /// Initialize the global rotation logger and install it as the process-wide
 /// tracing subscriber.
 ///
-/// # Parameters
-/// - `log_dir`   – directory where log files are stored (created if absent).
-/// - `log_name`  – base file name; e.g. `"app.log"`.
-/// - `max_files` – maximum number of files (live + archived) kept on disk.
-///
 /// # Errors
 /// - [`Error::AlreadyInit`] if called more than once.
 /// - Any I/O error encountered while creating the log directory or file.
@@ -61,12 +56,6 @@ where
 
 /// Initialize the global rotation logger and install it as the process-wide
 /// tracing subscriber.
-///
-/// # Parameters
-/// - `log_dir`   – directory where log files are stored (created if absent).
-/// - `log_name`  – base file name; e.g. `"app.log"`.
-/// - `max_files` – maximum number of files (live + archived) kept on disk.
-/// - `level`     – initial log level filter, e.g. `LevelFilter::INFO` or `"info"`.
 ///
 /// # Errors
 /// - [`Error::AlreadyInit`] if called more than once.
@@ -142,32 +131,19 @@ pub fn change_log_path(log_dir: impl AsRef<Path>, log_stem: &str) -> Result<()> 
     handle()?.set_path(log_dir, log_stem)
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ────────────────────────────────────────────────────────────────────────────
-
 fn handle() -> Result<&'static RotationHandle> {
     HANDLE.get().ok_or(Error::NotInit)
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Tests
-// ────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// `change_level` / `change_log_path` before `init` must return `NotInit`.
     #[test]
     fn errors_before_init() {
-        // A fresh process would have an empty OnceLock, but since tests share
-        // the same process we can only verify the path when init has NOT been
-        // called yet.  We use a standalone handle check instead.
         let result = handle();
-        // Either NotInit (OnceLock empty) or already set by a prior test run.
         match result {
-            Err(Error::NotInit) | Ok(_) => {} // another test initialized it first — that is fine
+            Err(Error::NotInit) | Ok(_) => {}
             Err(e) => panic!("unexpected error: {e}"),
         }
     }

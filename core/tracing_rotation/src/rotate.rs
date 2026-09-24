@@ -14,16 +14,6 @@ use crate::error::Result;
 /// Create a new, empty log file at `log_dir/file_name`, rotating existing
 /// files out of the way.
 ///
-/// Rotation steps:
-/// 1. Collect every file in `log_dir` whose name starts with the derived stem.
-/// 2. If the count is already at `max_files`, delete the oldest one (by
-///    modification time).
-/// 3. Rename the current active file (if present) to
-///    `{stem}_{YYYY-MM-DD_HH-MM-SS}{ext}`.
-/// 4. Create and return a fresh, empty file at `log_dir/file_name`.
-///
-/// If `file_name` has no stem, the full file name is used as the stem.
-///
 /// # Errors
 /// Propagates any [`std::io::Error`] encountered during directory creation,
 /// file renaming, deletion, or file creation.
@@ -54,7 +44,6 @@ pub(crate) fn rotate_files(
         }
     }
 
-    // Rename the currently active file so the new session gets a clean slate.
     let active_path = log_dir.join(file_name);
 
     if active_path.exists() {
@@ -67,17 +56,9 @@ pub(crate) fn rotate_files(
     Ok(File::create(active_path)?)
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────────────────────────
-
 fn modification_time(entry: &DirEntry) -> Option<SystemTime> {
     entry.metadata().ok()?.modified().ok()
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Tests
-// ────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -124,13 +105,11 @@ mod tests {
         let tmp = temp_dir::TempDir::new()?;
         let dir = tmp.path();
 
-        // First rotation: creates active file.
         rotate_files(dir, "app.log", 10)?;
         assert!(dir.join("app.log").exists());
 
         std::thread::sleep(Duration::from_secs(1));
 
-        // Second rotation: active file gets renamed.
         rotate_files(dir, "app.log", 10)?;
 
         let files: Vec<_> = fs::read_dir(dir)?
@@ -138,8 +117,6 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect();
 
-        // There must be exactly one archived file (with timestamp) plus the
-        // new active file.
         assert_eq!(files.len(), 2);
         assert!(files.iter().any(|n| n == "app.log"));
         assert!(files.iter().any(|n| n.starts_with("app_") && n != "app.log"));
