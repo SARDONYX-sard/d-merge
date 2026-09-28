@@ -27,7 +27,7 @@ pub(crate) fn parse_furniture_animation<'a>(
             r"- The first animation must be Furniture/FurnitureOptimized and acyclic (-a).
 - The last animation must be acyclic (-a).
 - The second-to-last animation should be cyclic (not -a).
-- At least 4 animations are required.
+- At least 3 animations are required.
 
 # Example
 fu -a Kneel_Enter Kneel_Enter.hkx
