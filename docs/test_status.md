@@ -224,18 +224,6 @@ By examining the FNIS output with `git diff`, I discovered that executing `Paire
 
 ### EatingSleepingDrinking - KuNeruNomu -
 
-The `idlebook_onepage.hkx` file at the following path is an existing file included in `Animation.bsa`.
-
-- `Action Animations NG/meshes/actors/character/animations/ReadBooksNotes/fnis_ReadBooksNotes_list.txt`(Lines 7 through 8)
-
-In other words, the `k` (known flag) is required.
-You need to add `k,` as shown below.
-
-```vb
-s -a,k,o,bsa,TSoundPlay.ITMBookPageTurnForward/0.5 ESDIdleBook_OnePage ..\idlebook_onepage.hkx AnimObjectBook AnimObjectBookPage
-+ -a,k,o,bsa ESDIdlebook_read ..\idlebook_read.hkx AnimObjectBook
-```
-
 Animations for beverages and food may not play unless `Activation Animations NG`(Nemesis patch) is enabled.
 
 Since calling functions in the FNIS scripts triggers FNIS detection and activates the MCM page, you need to install [`Dyn FNIS AA Functions`](https://github.com/SARDONYX-sard/fnis_aa/releases/latest) to trick the mod's scripts.

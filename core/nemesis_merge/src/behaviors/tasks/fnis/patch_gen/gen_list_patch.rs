@@ -2,7 +2,7 @@ use std::{borrow::Cow, path::PathBuf};
 
 use fnis_list::{
     FNISList, SyntaxPattern,
-    combinator::{Trigger, flags::FNISAnimFlags, fnis_animation::FNISAnimation},
+    combinator::{Trigger, fnis_animation::FNISAnimation},
     patterns::{
         pair_and_kill::{FNISPairedAndKillAnimation, FNISPairedType},
         sequenced::SequencedAnimation,
@@ -121,7 +121,7 @@ pub(super) fn generate_patch<'a>(
                 let FNISPairedAndKillAnimation { kind, flag_set, anim_file, anim_event, .. } =
                     &paired_and_kill_anim;
 
-                if !flag_set.flags.contains(FNISAnimFlags::Known) {
+                if flag_set.flags.should_check_anim_file() {
                     all_anim_files.insert(*anim_file);
                 }
                 all_events.extend(
@@ -141,6 +141,7 @@ pub(super) fn generate_patch<'a>(
                 seq_master_patches.par_extend(seq);
             }
             SyntaxPattern::Chair(chair_animation) => {
+                // NOTE: chair animation must be new file. See fnis_list
                 all_anim_files.insert(chair_animation.start.anim_file);
                 all_anim_files.extend(chair_animation.sequenced.as_slice());
 
@@ -157,9 +158,15 @@ pub(super) fn generate_patch<'a>(
                     );
                 }
 
-                all_anim_files.par_extend(
-                    furniture_animation.animations.par_iter().map(|fnis_anim| fnis_anim.anim_file),
-                );
+                all_anim_files.extend(furniture_animation.animations.iter().filter_map(
+                    |fnis_anim| {
+                        fnis_anim
+                            .flag_set
+                            .flags
+                            .should_check_anim_file()
+                            .then_some(fnis_anim.anim_file)
+                    },
+                ));
 
                 // NOTE: Based on the temporal_log, it appears Furniture does not need to register its animation with behaviors like `defaultmale.xml`.
                 let (one, seq, group_root_index) =
@@ -187,7 +194,7 @@ pub(super) fn generate_patch<'a>(
 
                 let FNISAnimation { flag_set, anim_file, .. } = &fnis_animation;
 
-                if !flag_set.flags.contains(FNISAnimFlags::Known) {
+                if flag_set.flags.should_check_anim_file() {
                     all_anim_files.insert(anim_file);
                 }
 
@@ -199,7 +206,7 @@ pub(super) fn generate_patch<'a>(
             SyntaxPattern::Basic(fnis_animation) | SyntaxPattern::AnimObject(fnis_animation) => {
                 let FNISAnimation { flag_set, anim_event, anim_file, .. } = &fnis_animation;
 
-                if !flag_set.flags.contains(FNISAnimFlags::Known) {
+                if flag_set.flags.should_check_anim_file() {
                     all_anim_files.insert(*anim_file);
                 }
                 // NOTE: According to the log, FNIS does not register events in `Basic`/`Sequenced`.
@@ -271,7 +278,7 @@ fn collect_seq_patch<'a>(
         .flat_map(|fnis_animation| {
             let FNISAnimation { flag_set, anim_file, anim_event, .. } = &fnis_animation;
 
-            if !flag_set.flags.contains(FNISAnimFlags::Known) {
+            if flag_set.flags.should_check_anim_file() {
                 files.insert(*anim_file);
             }
             events.insert(Cow::Borrowed(*anim_event));

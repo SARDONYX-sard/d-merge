@@ -74,6 +74,16 @@ bitflags::bitflags! {
     }
 }
 
+impl FNISAnimFlags {
+    /// Returns `true` when the animation file should be included in the consistency check.
+    ///
+    /// Animations marked with `BSA` or `Known` are excluded from the consistency check.
+    #[inline]
+    pub fn should_check_anim_file(&self) -> bool {
+        !self.contains(Self::BSA | Self::Known)
+    }
+}
+
 // Internal representation for parser results:
 // either a simple bitflags or a parameterized flag.
 #[derive(Debug, PartialEq)]
