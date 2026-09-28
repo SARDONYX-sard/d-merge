@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.4] - 2026-09-28
+### :sparkles: New Features
+- [`e13fd9b`](https://github.com/SARDONYX-sard/d-merge/commit/e13fd9b27624b6ed39cb130358159423b5330f22) - **egui**: add selected status *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`4dfd987`](https://github.com/SARDONYX-sard/d-merge/commit/4dfd98746b936c2d1d02ef6d59cd585ce15eb04f) - **egui**: fix garbled close button text *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6457913`](https://github.com/SARDONYX-sard/d-merge/commit/645791394cc05177380e6246de0152868f840409) - **fnis**: skip anim file addition check for `BSA` and `Known` animations *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`9da2291`](https://github.com/SARDONYX-sard/d-merge/commit/9da229173921872a37d48a40021dc7da1eaaa213) - remove unnecessary comments *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.3] - 2026-09-12
 ### :sparkles: New Features
 - [`f1b03c3`](https://github.com/SARDONYX-sard/d-merge/commit/f1b03c35c3062ce5ea0fb2fb35f9949217cc0e5f) - **fnis_pa/km**: share id *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -661,3 +673,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.7.1]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.0...2.7.1
 [2.7.2]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.1...2.7.2
 [2.7.3]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.2...2.7.3
+[2.7.4]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.3...2.7.4
