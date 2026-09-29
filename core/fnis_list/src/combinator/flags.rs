@@ -80,7 +80,7 @@ impl FNISAnimFlags {
     /// Animations marked with `BSA` or `Known` are excluded from the consistency check.
     #[inline]
     pub fn should_check_anim_file(&self) -> bool {
-        !self.contains(Self::BSA | Self::Known)
+        !self.intersects(Self::BSA | Self::Known)
     }
 }
 
@@ -181,6 +181,14 @@ pub(crate) fn parse_trigger_options<'a>(input: &mut &'a str) -> ModalResult<Trig
 mod tests {
     use super::*;
     use crate::test_helpers::{must_fail, must_parse};
+
+    #[test]
+    fn should_check_anim_file() {
+        assert!(FNISAnimFlags::empty().should_check_anim_file());
+        assert!(!FNISAnimFlags::BSA.should_check_anim_file());
+        assert!(!FNISAnimFlags::Known.should_check_anim_file());
+        assert!(!(FNISAnimFlags::BSA | FNISAnimFlags::Known).should_check_anim_file());
+    }
 
     #[test]
     fn parse_single_simple_flag() {
