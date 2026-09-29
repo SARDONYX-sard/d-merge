@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.5] - 2026-09-29
+### :bug: Bug Fixes
+- [`5444314`](https://github.com/SARDONYX-sard/d-merge/commit/5444314c7469fd527f21eadd641e27f372b8bb4f) - **fnis_list**: fix furniture err msg *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`33abe5e`](https://github.com/SARDONYX-sard/d-merge/commit/33abe5e86ce8a4b0758a87a3fa67d7d58d3a53d5) - **fnis**: fix `contains` to `intersects` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.4] - 2026-09-28
 ### :sparkles: New Features
 - [`e13fd9b`](https://github.com/SARDONYX-sard/d-merge/commit/e13fd9b27624b6ed39cb130358159423b5330f22) - **egui**: add selected status *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -674,3 +680,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.7.2]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.1...2.7.2
 [2.7.3]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.2...2.7.3
 [2.7.4]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.3...2.7.4
+[2.7.5]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.4...2.7.5
