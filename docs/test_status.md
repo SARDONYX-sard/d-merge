@@ -249,6 +249,14 @@ While both movement and animation are now possible, they seem to conflict with `
   - `meshes/actors/character/characters female/defaultfemale.hkx`
   - `meshes/animationsetdatasinglefile.txt`
 
+### XP32 Maximum Skeleton Special Extended(XPMSSE)
+
+Due to the skeleton extensions, installing this will cause the guard animation while moving to stop working. (This does not seem to occur with the Lite version.)
+
+Installing [Auto Skeleton Patch - Universal Behaviour Runtime](https://www.nexusmods.com/skyrimspecialedition/mods/176724) allows us to move while guarding, but I personally recommend the Lite version.
+
+(With the Lite version, the alternative animations included with XPMSSE cannot be used. Also, if we switch an existing save that previously used XPMSSE to the Lite version, unexpected alternative animation variables may be applied, so please be aware of this.)
+
 ## About `TrailingData at character 0` Error
 
 This occurs when converting data from a patched JSON file to a data type that can be converted to HKX.
