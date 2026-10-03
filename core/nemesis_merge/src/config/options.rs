@@ -64,6 +64,21 @@ pub struct Config {
 
     /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
     pub generate_fnis_esp: bool,
+
+    /// Read each `skeleton.xml` to determine the skeleton's bone count, then extend the corresponding character HKX with the missing bone data.
+    ///
+    /// ./meshes/actors/character/character assets/skeleton.xml
+    /// -> defaultfemale.hkx
+    ///
+    /// ./meshes/actors/character/character assets female/skeleton.xml
+    /// -> defaultmale.hkx
+    ///
+    /// - Append missing bone indices to `bonePairMap`.
+    /// - Append `0.0` / `1.0` weights for the extended bones.
+    ///
+    /// # Notes
+    /// - Equivalent to FNIS's `SKELETON arm fix` for XPMSSE (v5.06).
+    pub skeleton_arm_fix: bool,
 }
 
 impl Config {

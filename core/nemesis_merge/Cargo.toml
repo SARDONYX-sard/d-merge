@@ -43,8 +43,8 @@ skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 skyrim_crc = { workspace = true }
 skyrim_esp = { workspace = true }
 
-[dev-dependencies]
 havok_classes = { workspace = true }
+[dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
 # quick_tracing = { version = "*" }
 

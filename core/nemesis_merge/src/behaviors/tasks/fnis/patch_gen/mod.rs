@@ -10,6 +10,7 @@ mod io_jobs;
 mod kill_move;
 mod offset_arm;
 mod pair;
+mod skeleton_arm_fix;
 
 use std::borrow::Cow;
 
@@ -319,6 +320,12 @@ pub(crate) fn collect_borrowed_patches<'a>(
     #[cfg(feature = "tracing")]
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
+    if config.skeleton_arm_fix
+        && let Err(e) = self::skeleton_arm_fix::apply(config, &borrowed_patches)
+    {
+        errors.push(Error::Custom { msg: e.to_string() });
+    }
+
     if config.generate_fnis_esp
         && let Err(e) = self::dummy_esp::save_dummy_esp(&config.output_dir, config.output_target)
     {
@@ -428,7 +435,7 @@ pub(crate) fn new_push_events_seq_patch<'a>(
 ) -> [(JsonPath<'a>, ValueWithPriority<'a>); 2] {
     [
         (
-            json_path![string_data_index, "hkbBehaviorGraphStringData", "eventNames",],
+            json_path![string_data_index, "hkbBehaviorGraphStringData", "eventNames"],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::SeqPush,
