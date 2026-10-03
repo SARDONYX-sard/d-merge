@@ -33,9 +33,8 @@ pub(crate) struct GuiPatchOptions {
     /// entries will not be detected and the process will fail.
     skyrim_data_dir_glob: Option<String>,
 
-    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
-    pub generate_fnis_esp: Option<bool>,
-
+    generate_fnis_esp: Option<bool>,
+    skeleton_arm_fix: Option<bool>,
     parser_mode: Option<ParserMode>,
 }
 
@@ -76,6 +75,7 @@ pub(crate) async fn patch(
             output_target: options.output_target,
             skyrim_data_dir_glob: options.skyrim_data_dir_glob,
             generate_fnis_esp: options.generate_fnis_esp.unwrap_or(false),
+            skeleton_arm_fix: options.skeleton_arm_fix.unwrap_or(false),
             parser_mode: options.parser_mode.unwrap_or_default(),
         };
 

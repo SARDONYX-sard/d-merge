@@ -1,4 +1,6 @@
 {
+  "arm_fix_hover": "XPMSSEなどが配布する各skeleton.xmlからskeletonのbone数を取得し、その情報に基づいて対応するcharacterのhkxを拡張します。\n「Auto Skeleton Patch」やFNISの「SKELETON arm fix」と同等の機能です。\n\n以下のModを使用している場合は、この機能の有効化を推奨します(有効化しない場合、移動中の防御時に腕モーションが機能しない可能性があります)\n- XPMSSE (v5.06)などのボーン拡張Mod\n\n注意\n以下の場合、正しくパッチされない可能性があります\n- 手動モード + Skyrim Dataディレクトリ = 「MO2/mods/*」などのglobを使用\n  -> 複数のskeleton.xmlが見つかった場合、最初のファイルを使用します。\n  -> 複数のファイルが見つかった場合はwarningがログに記録されます。\n\n対象\n- <Skyrim Dataディレクトリ>/meshes/actors/character/character assets/skeleton.xml\n  -> defaultmale.hkx\n- <Skyrim Dataディレクトリ>/meshes/actors/character/character assets female/skeleton_female.xml\n  -> defaultfemale.hkx\n\n具体的な実行処理\n- 不足しているbone index -> bonePairMapを拡張\n- 不足しているbone weight -> 対応するweight配列に0.0 / 1.0を追加",
+  "arm_fix_label": "腕補正",
   "author_label": "作者:",
   "auto_detect_button": "自動検出",
   "auto_detect_hover": "出力形式に応じたSkyrimのDataディレクトリを自動検出します\n\n注意\n- Steamレジストリを参照して検出するため、Skyrimを一度でも起動していないと機能しません",
