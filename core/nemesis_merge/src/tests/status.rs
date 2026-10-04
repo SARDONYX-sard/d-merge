@@ -64,6 +64,7 @@ pub(crate) fn fastest_config() -> Config {
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
         generate_fnis_esp: true,
+        skeleton_arm_fix: true,
     }
 }
 
@@ -84,5 +85,6 @@ pub(crate) fn slow_debug_config() -> Config {
         output_target: OutPutTarget::SkyrimSe,
         skyrim_data_dir_glob: Some("../../dummy/fnis_test_mods/*".into()),
         generate_fnis_esp: true,
+        skeleton_arm_fix: true,
     }
 }

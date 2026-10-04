@@ -176,6 +176,14 @@ pub(crate) const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
 pub(crate) const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
     TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/behaviors/mt_behavior.bin"))
 };
+pub(crate) const THREAD_PERSON_DEFAULTMALE_KEY: TemplateKey<'static> = unsafe {
+    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/characters/defaultmale.bin"))
+};
+pub(crate) const THREAD_PERSON_DEFAULTFEMALE_KEY: TemplateKey<'static> = unsafe {
+    TemplateKey::new_unchecked(Cow::Borrowed(
+        "meshes/actors/character/characters female/defaultfemale.bin",
+    ))
+};
 
 /// Nemesis 1st person to meshes rel template .bin path
 #[rustfmt::skip]

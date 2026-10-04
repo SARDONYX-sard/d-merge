@@ -56,6 +56,20 @@ pub struct BehaviorSettings {
     /// behavior files.
     pub generate_fnis_esp: bool,
 
+    /// Read each `skeleton.xml` and use its bone information to apply bone extension patches to `defaultfemale.hkx`.
+    ///
+    /// ./meshes/actors/character/character assets/skeleton.xml
+    /// -> defaultfemale.hkx
+    ///
+    /// ./meshes/actors/character/character assets female/skeleton.xml
+    /// -> defaultfemale.hkx
+    ///
+    /// This enables arm animations such as guarding while moving to work correctly with XPMSSE(v5.06).
+    ///
+    /// Notes:
+    /// - Equivalent to FNIS's `SKELETON arm fix` feature.
+    pub skeleton_arm_fix: bool,
+
     /// Controls how parser input is validated and whether recoverable
     /// inconsistencies are automatically repaired.
     pub parser_mode: ParserMode,
@@ -76,6 +90,7 @@ impl Default for BehaviorSettings {
             auto_remove_meshes: false,
             enable_debug_output: false,
             generate_fnis_esp: false,
+            skeleton_arm_fix: false,
             parser_mode: ParserMode::Strict,
             template_dir: "./assets/templates".into(),
         }

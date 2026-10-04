@@ -39,6 +39,7 @@ impl App {
             target_runtime,
             enable_debug_output,
             generate_fnis_esp,
+            skeleton_arm_fix,
             template_dir,
             ..
         } = &self.settings.behavior;
@@ -67,6 +68,7 @@ impl App {
             debug,
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
+            skeleton_arm_fix: *skeleton_arm_fix,
         };
 
         self.async_rt.spawn(nemesis_merge::behavior_gen(patches, config));

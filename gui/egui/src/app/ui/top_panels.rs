@@ -141,6 +141,11 @@ impl App {
                 I18nKey::GenerateFnisEspLabel,
                 I18nKey::GenerateFnisEspHover,
             ),
+            (
+                &mut self.settings.behavior.skeleton_arm_fix,
+                I18nKey::ArmFixLabel,
+                I18nKey::ArmFixHover,
+            ),
             (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
         ] {
             checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
