@@ -5,6 +5,7 @@ use simd_json::{ValueBuilder, borrowed::Value};
 use crate::{
     JsonPath,
     apply::error::{JsonPatchError, Result},
+    range::parse::parse_index,
 };
 
 /// Remove one value.
@@ -32,7 +33,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
         return match target {
             Value::Object(map) => map.remove(last),
             Value::Array(list) => {
-                let index = last.parse::<usize>().ok()?;
+                let index = parse_index(last)?;
                 if index < list.len() { Some(list.remove(index)) } else { None }
             }
             _ => None,
@@ -42,7 +43,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
     // Navigate to the second-to-last element in the path
     let parent = path.try_fold(target, |target, token| match target {
         Value::Object(map) => map.get_mut(token),
-        Value::Array(list) => list.get_mut(last.parse::<usize>().ok()?),
+        Value::Array(list) => list.get_mut(parse_index(token)?),
         _ => None,
     })?;
 
@@ -50,7 +51,7 @@ fn remove<'value>(target: &mut Value<'value>, path: &[Cow<'value, str>]) -> Opti
     match parent {
         Value::Object(map) => map.remove(last),
         Value::Array(list) => {
-            let index = last.parse::<usize>().ok()?;
+            let index = parse_index(last)?;
             if index < list.len() { Some(list.remove(index)) } else { None }
         }
         _ => None,
@@ -166,5 +167,30 @@ mod tests {
                 value: format!("{:#?}", Value::null()),
             })
         );
+    }
+
+    #[test]
+    fn remove_through_nested_array() {
+        let mut target_json = json_typed!(borrowed, {
+            "list": [{ "a": 1, "b": 2 }, { "a": 3, "b": 4 }]
+        });
+
+        let path = json_path!["list", "[1]", "b"];
+        apply_remove(&mut target_json, path).unwrap_or_else(|err| panic!("{err}"));
+
+        let expected = json_typed!(borrowed, {
+            "list": [{ "a": 1, "b": 2 }, { "a": 3 }]
+        });
+        assert_eq!(target_json, expected);
+    }
+
+    #[test]
+    fn remove_array_element_by_bracket_index() {
+        let mut target_json = json_typed!(borrowed, { "data": [1, 2, 3] });
+
+        apply_remove(&mut target_json, json_path!["data", "[1]"])
+            .unwrap_or_else(|err| panic!("{err}"));
+
+        assert_eq!(target_json, json_typed!(borrowed, { "data": [1, 3] }));
     }
 }

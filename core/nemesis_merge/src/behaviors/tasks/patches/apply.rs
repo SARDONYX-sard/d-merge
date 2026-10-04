@@ -1,9 +1,10 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
-use json_patch::{apply_one_field, apply_seq_by_priority};
+use json_patch::{JsonPath, ValueWithPriority, apply_one_field, apply_seq_by_priority};
+use rapidhash::fast::RapidHashMap;
 use rayon::prelude::*;
-use simd_json::borrowed::Value;
+use simd_json::borrowed::{Object, Value};
 use snafu::ResultExt;
 
 use crate::{
@@ -14,7 +15,6 @@ use crate::{
     },
     config::{ReportType, StatusReportCounter},
     errors::{Error, PatchSnafu, Result},
-    results::filter_results,
 };
 
 /// Apply to hkx with merged json patch.
@@ -61,22 +61,40 @@ pub(crate) fn apply_patches<'t, 'p: 't>(
     // Step 3: Put patched templates back
     templates.par_extend(updated_templates);
 
-    // Step 4: Return aggregated results
-    let flat: Vec<_> = results.into_par_iter().flatten().collect();
-    filter_results(flat)
+    // Step 4: Return aggregated errors
+    let errors: Vec<Error> = results.into_iter().flatten().collect();
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
+}
+
+/// Patches targeting one class(`path[0]`, e.g. `#0001`).
+#[derive(Default)]
+struct ClassPatches<'a> {
+    one: Vec<(JsonPath<'a>, ValueWithPriority<'a>)>,
+    seq: Vec<(JsonPath<'a>, Vec<ValueWithPriority<'a>>)>,
 }
 
 /// Applies one-field and sequence patches to a single template.
 ///
+/// # Parallelism
+/// The top level of a template is `{ "#0001": class, ... }`, and every patch path starts with the class id.
+/// Patches for different classes are independent, so they are applied per class in parallel.
+/// (Large templates such as `0_master` used to be patched by a single thread.)
+///
+/// 1. Class-level one-field patches(`path.len() <= 2`, e.g. adding a class) change the top level keys,
+///    so they are applied first, sequentially.
+/// 2. The other patches are grouped by class id and applied in parallel. Per class: one-field -> sequence(same as before).
+/// 3. Patches for a class not found in the template are applied to the whole template as before,
+///    so they report the same errors.
+///
 /// # Returns
-/// Parallel iterator of patch results (success or error).
+/// Errors of patches.
 fn apply_to_one_template<'a, 'b: 'a>(
     config: &Config,
     key: &TemplateKey<'a>,
     template_value: &mut Value<'a>,
     patches: HkxPatchMaps<'b>,
     status_reporter: &StatusReportCounter,
-) -> Vec<Result<(), Error>> {
+) -> Vec<Error> {
     if config.debug.output_patch_json
         && let Err(err) = write_debug_json_patch(&config.output_dir, key, &patches)
     {
@@ -84,28 +102,110 @@ fn apply_to_one_template<'a, 'b: 'a>(
         tracing::error!("{err}");
     }
 
-    let patches_len = patches.len();
     let HkxPatchMaps { one: one_patch_map, seq: seq_patch_map } = patches;
 
-    let mut results = Vec::with_capacity(patches_len);
-
-    // NOTE: Why not use par_iter here?
-    // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
+    let mut class_level = ClassPatches::default();
+    let mut top_level_seq = ClassPatches::default();
+    let mut by_class: RapidHashMap<Cow<'b, str>, ClassPatches<'b>> = RapidHashMap::default();
     for (path, patch) in one_patch_map.into_inner() {
-        let result = apply_one_field(template_value, path, patch)
-            .with_context(|_| PatchSnafu { template_name: key.to_string() });
-        status_reporter.increment();
-        results.push(result);
+        match path.first() {
+            Some(class_id) if path.len() > 2 => {
+                by_class.entry(class_id.clone()).or_default().one.push((path, patch));
+            }
+            _ => class_level.one.push((path, patch)),
+        }
     }
-
     for (path, patches) in seq_patch_map.0 {
-        let result = apply_seq_by_priority(key.as_str(), template_value, path, patches)
-            .with_context(|_| PatchSnafu { template_name: key.to_string() });
-        status_reporter.increment();
-        results.push(result);
+        match path.first() {
+            Some(class_id) if path.len() > 2 => {
+                by_class.entry(class_id.clone()).or_default().seq.push((path, patches));
+            }
+            _ => top_level_seq.seq.push((path, patches)),
+        }
     }
 
-    results
+    // 1/3: Class-level patches.
+    let mut errors = apply_class_patches(key, template_value, class_level, status_reporter);
+
+    // 2/3: Per class in parallel.
+    if let Value::Object(classes) = template_value {
+        let targets: Vec<_> = classes
+            .iter_mut()
+            .filter_map(|(class_id, class)| {
+                let patches = by_class.remove(class_id.as_ref())?;
+                Some((class_id.clone(), class, patches))
+            })
+            .collect();
+
+        errors.par_extend(targets.into_par_iter().flat_map_iter(|(class_id, class, patches)| {
+            apply_to_one_class(key, class_id, class, patches, status_reporter)
+        }));
+    }
+
+    // 3/3: The rest(Missing classes, or the template is not an object).
+    for (_, patches) in by_class {
+        errors.extend(apply_class_patches(key, template_value, patches, status_reporter));
+    }
+    errors.extend(apply_class_patches(key, template_value, top_level_seq, status_reporter));
+
+    errors
+}
+
+/// Applies `patches` to one class.
+///
+/// The class is temporarily wrapped as `{ class_id: class }`, so that the patches can be applied
+/// with their full json path(the error messages stay the same as patching the whole template).
+fn apply_to_one_class<'a, 'b: 'a>(
+    key: &TemplateKey<'_>,
+    class_id: Cow<'a, str>,
+    class: &mut Value<'a>,
+    patches: ClassPatches<'b>,
+    status_reporter: &StatusReportCounter,
+) -> Vec<Error> {
+    let mut wrapper = Object::default();
+    wrapper.insert(class_id.clone(), core::mem::take(class));
+    let mut wrapper = Value::Object(Box::new(wrapper));
+
+    let errors = apply_class_patches(key, &mut wrapper, patches, status_reporter);
+
+    // NOTE: Patches for a class have `path.len() > 2`, so the class itself is never removed.
+    if let Value::Object(mut wrapper) = wrapper
+        && let Some(patched) = wrapper.remove(class_id.as_ref())
+    {
+        *class = patched;
+    }
+    errors
+}
+
+/// Applies one-field patches, then sequence patches to `json`.
+fn apply_class_patches<'a, 'b: 'a>(
+    key: &TemplateKey<'_>,
+    json: &mut Value<'a>,
+    patches: ClassPatches<'b>,
+    status_reporter: &StatusReportCounter,
+) -> Vec<Error> {
+    let ClassPatches { one, seq } = patches;
+    let mut errors = vec![];
+
+    for (path, patch) in one {
+        if let Err(err) = apply_one_field(json, path, patch)
+            .with_context(|_| PatchSnafu { template_name: key.to_string() })
+        {
+            errors.push(err);
+        }
+        status_reporter.increment();
+    }
+
+    for (path, patches) in seq {
+        if let Err(err) = apply_seq_by_priority(key.as_str(), json, path, patches)
+            .with_context(|_| PatchSnafu { template_name: key.to_string() })
+        {
+            errors.push(err);
+        }
+        status_reporter.increment();
+    }
+
+    errors
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

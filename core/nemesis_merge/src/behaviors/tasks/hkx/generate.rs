@@ -1,28 +1,37 @@
 //! Processes a list of Nemesis XML paths and generates JSON output in the specified directory.
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
 };
 
 use rayon::prelude::*;
 use serde_hkx::{EventIdMap, HavokSort as _, VariableIdMap, bytes::serde::hkx_header::HkxHeader};
 use serde_hkx_features::{ClassMap, id_maker::create_maps};
+#[cfg(not(feature = "json_error_path"))]
+use simd_json::BorrowedValue;
 use snafu::ResultExt;
 
 use crate::{
     Config, OutPutTarget,
-    behaviors::tasks::{
-        patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
+    behaviors::{
+        is_cancelled,
+        tasks::{patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap},
     },
     config::{ReportType, StatusReportCounter},
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonToClassMapSnafu, Result},
     results::filter_results,
 };
 
+/// Generates hkx files from the patched templates.
+///
+/// If `cancel` is set, the remaining templates are skipped.
 pub(crate) fn generate_hkx_files(
     config: &Config,
     templates: BorrowedTemplateMap<'_>,
     variable_class_map: BehaviorGraphDataMap<'_>,
+    cancel: &AtomicBool,
 ) -> Result<(), Vec<Error>> {
     let reporter = StatusReportCounter::new(
         &config.status_report,
@@ -30,17 +39,32 @@ pub(crate) fn generate_hkx_files(
         templates.len(),
     );
 
-    let results = templates
+    // NOTE: Many templates share the same output dir, so create each dir only once.
+    let output_dirs: HashSet<PathBuf> = templates
+        .iter()
+        .filter_map(|entry| {
+            config
+                .output_dir
+                .join(entry.key().as_meshes_inner_path())
+                .parent()
+                .map(Path::to_path_buf)
+        })
+        .collect();
+    let mut results: Vec<Result<()>> = output_dirs
+        .par_iter()
+        .map(|dir| fs::create_dir_all(dir).context(FailedIoSnafu { path: dir }))
+        .collect();
+
+    let gen_results: Vec<Result<()>> = templates
         .into_par_iter()
         .map(|(key, template_json)| {
             reporter.increment();
+            if is_cancelled(cancel) {
+                return Ok(());
+            }
+
             let inner_path = key.as_meshes_inner_path();
             let mut output_path = config.output_dir.join(inner_path);
-
-            if let Some(output_dir_all) = output_path.parent() {
-                fs::create_dir_all(output_dir_all)
-                    .context(FailedIoSnafu { path: output_dir_all })?;
-            }
 
             let hkx_bytes = {
                 // The error occurring with the following `from_borrowed_value` indicates that the intended JSON
@@ -63,7 +87,7 @@ pub(crate) fn generate_hkx_files(
                     })
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
                 #[cfg(not(feature = "json_error_path"))]
-                let mut class_map: ClassMap = simd_json::serde::from_borrowed_value(template_json)
+                let mut class_map: ClassMap = to_class_map_par(template_json)
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
 
                 let mut event_id_map = None;
@@ -123,8 +147,28 @@ pub(crate) fn generate_hkx_files(
             Ok(())
         })
         .collect();
+    results.extend(gen_results);
 
     filter_results(results)
+}
+
+/// Deserializes the template into [`ClassMap`] per class in parallel.
+///
+/// The top level of the template is `{ "#0001": class, ... }` and each class is independent,
+/// so this is equivalent to deserializing the whole map at once.
+#[cfg(not(feature = "json_error_path"))]
+fn to_class_map_par(template_json: BorrowedValue<'_>) -> Result<ClassMap<'_>, simd_json::Error> {
+    let BorrowedValue::Object(classes) = template_json else {
+        return simd_json::serde::from_borrowed_value(template_json);
+    };
+
+    let classes: Vec<_> = classes.into_iter().collect();
+    let classes: Vec<_> = classes
+        .into_par_iter()
+        .map(|(ptr, class)| Ok((ptr, simd_json::serde::from_borrowed_value(class)?)))
+        .collect::<Result<_, simd_json::Error>>()?; // NOTE: `collect` keeps the order.
+
+    Ok(classes.into_iter().collect())
 }
 
 fn debug_file_path(output_dir: &Path, inner_path: &Path) -> PathBuf {
