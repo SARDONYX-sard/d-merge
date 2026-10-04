@@ -266,11 +266,18 @@ impl App {
                             } else {
                                 self.settings.mod_list_mut()
                             };
+                            let mod_selection_anchor = &mut self.mod_selection_anchor;
 
                             if editable {
-                                dnd_table_body(&mut body, mod_list, widths);
+                                dnd_table_body(&mut body, mod_list, widths, mod_selection_anchor);
                             } else {
-                                check_only_table_body(&mut body, filtered_mods, mod_list, widths);
+                                check_only_table_body(
+                                    &mut body,
+                                    filtered_mods,
+                                    mod_list,
+                                    widths,
+                                    mod_selection_anchor,
+                                );
                             }
                         });
                 });

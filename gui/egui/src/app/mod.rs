@@ -50,6 +50,9 @@ pub(crate) struct App {
     /// Drives the "check all" header checkbox.
     pub check_all: bool,
 
+    /// ID of the mod used as the anchor for Shift-click range selection.
+    pub mod_selection_anchor: Option<String>,
+
     /// Last observed table width; used to detect window resize and reset
     /// column widths for one frame.
     pub prev_table_available_width: f32,
@@ -131,6 +134,7 @@ impl App {
             show_help: false,
             is_locked: false,
             check_all: false,
+            mod_selection_anchor: None,
             prev_table_available_width: 0.0,
 
             theme_manager,
