@@ -10,8 +10,6 @@ use std::{
 
 use rayon::{iter::Either, prelude::*};
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock};
-use snafu::ResultExt as _;
-
 pub(crate) use skyrim_anim_parser::{
     adsf::{
         alt::{AltAdsf, ser::serialize_alt_adsf},
@@ -26,7 +24,13 @@ pub(crate) use skyrim_anim_parser::{
     },
     diff_line::{DiffLines, deserializer::parse_lines_diff_patch},
 };
+use snafu::ResultExt as _;
 
+use self::{
+    path_parser::{ParserType, parse_adsf_path},
+    sort::dedup_patches_by_priority_parallel,
+    types::OwnedAdsfPatchMap,
+};
 use crate::{
     Config, PatchMaps,
     behaviors::tasks::hkx::generate::write_patched_json,
@@ -36,12 +40,6 @@ use crate::{
         FailedParseEditAdsfClipAnimPatchSnafu, FailedParseEditAdsfClipMotionPatchSnafu,
         FailedSerializeAdsfSnafu, MissingAdsfAnimClipSnafu, MissingAdsfMotionSnafu,
     },
-};
-
-use self::{
-    path_parser::{ParserType, parse_adsf_path},
-    sort::dedup_patches_by_priority_parallel,
-    types::OwnedAdsfPatchMap,
 };
 
 const ADSF_INNER_PATH: &str = "meshes/animationdatasinglefile.bin";

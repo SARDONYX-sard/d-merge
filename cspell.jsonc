@@ -96,6 +96,7 @@
     "weapequip",
     "wgpu",
     "xorout",
-    "XPMSE"
+    "XPMSE",
+    "XPMSSE"
   ]
 }

@@ -302,7 +302,8 @@ pub fn save_preset(preset: &ThemePreset, path: &Path) -> Result<(), Error> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|_| IoSnafu { path: parent })?;
     }
-    let text = sonic_rs::to_string_pretty(preset).with_context(|_| JsonSnafu { path })?;
+    let mut text = sonic_rs::to_string_pretty(preset).with_context(|_| JsonSnafu { path })?;
+    text.push('\n');
     fs::write(path, text).with_context(|_| IoSnafu { path })?;
     Ok(())
 }

@@ -9,25 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as PatchRouteImport } from './routes/patch'
-import { Route as HkannoRouteImport } from './routes/hkanno'
-import { Route as ConvertRouteImport } from './routes/convert'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConvertRouteImport } from './routes/convert'
+import { Route as HkannoRouteImport } from './routes/hkanno'
+import { Route as PatchRouteImport } from './routes/patch'
+import { Route as SettingsRouteImport } from './routes/settings'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PatchRoute = PatchRouteImport.update({
-  id: '/patch',
-  path: '/patch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HkannoRoute = HkannoRouteImport.update({
-  id: '/hkanno',
-  path: '/hkanno',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConvertRoute = ConvertRouteImport.update({
@@ -35,9 +25,19 @@ const ConvertRoute = ConvertRouteImport.update({
   path: '/convert',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const HkannoRoute = HkannoRouteImport.update({
+  id: '/hkanno',
+  path: '/hkanno',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PatchRoute = PatchRouteImport.update({
+  id: '/patch',
+  path: '/patch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -81,25 +81,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/patch': {
-      id: '/patch'
-      path: '/patch'
-      fullPath: '/patch'
-      preLoaderRoute: typeof PatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hkanno': {
-      id: '/hkanno'
-      path: '/hkanno'
-      fullPath: '/hkanno'
-      preLoaderRoute: typeof HkannoRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/convert': {
@@ -109,11 +95,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConvertRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/hkanno': {
+      id: '/hkanno'
+      path: '/hkanno'
+      fullPath: '/hkanno'
+      preLoaderRoute: typeof HkannoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/patch': {
+      id: '/patch'
+      path: '/patch'
+      fullPath: '/patch'
+      preLoaderRoute: typeof PatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

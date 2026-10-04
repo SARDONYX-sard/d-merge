@@ -6,9 +6,8 @@ use winnow::{
 };
 use winnow_ext::ReadableError;
 
-use crate::adsf::normal::ClipAnimDataBlock;
-
 use super::common::{Error, PatchDeserializer, one_line, parse_one_line, verify_line_parses_to};
+use crate::adsf::normal::ClipAnimDataBlock;
 
 /// Parses an animation data block patch.
 ///

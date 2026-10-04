@@ -95,10 +95,10 @@ export type PatchOptions = {
    * entries will not be detected and the process will fail.
    **/
   skyrimDataDirGlob?: string;
-  /**
-   * If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
-   */
+  /** If true, generates a dummy FNIS.esp file. */
   generateFnisEsp?: boolean;
+
+  skeletonArmFix?: boolean;
 };
 
 export const patchOptionsSchema = z
@@ -119,6 +119,7 @@ export const patchOptionsSchema = z
     generateFnisEsp: z.optional(z.boolean()),
 
     parserMode: z.optional(z.union([z.literal('strict'), z.literal('lenient')])),
+    skeletonArmFix: z.optional(z.boolean()),
   })
   .catch({
     hackOptions: {
@@ -134,6 +135,7 @@ export const patchOptionsSchema = z
     autoRemoveMeshes: true,
     useProgressReporter: true,
     generateFnisEsp: false,
+    skeletonArmFix: false,
     parserMode: 'strict',
   } as const satisfies PatchOptions);
 

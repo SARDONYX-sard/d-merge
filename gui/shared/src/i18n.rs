@@ -11,6 +11,37 @@ use snafu::ResultExt as _;
 #[derive(serde::Serialize, serde::Deserialize, d_merge_gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
 pub enum I18nKey {
+    /// Gets the bone count from each `skeleton.xml` distributed by mods such as
+    /// XPMSSE and extends the corresponding character hkx based on that information.
+    ///
+    /// This provides functionality equivalent to `Auto Skeleton Patch` and FNIS's `SKELETON arm fix`.
+    ///
+    /// # Recommended
+    /// The following mods are recommended to use with Arm Fix:
+    /// (Without this, arm animations such as blocking while moving may not work)
+    /// - XPMSSE (v5.06) and other bone-expanding mods
+    ///
+    /// # Notes
+    /// The following may result in incorrect patching:
+    /// - Manual mode + `Skyrim Data directory = MO2/mods/*`
+    ///   -> Multiple `skeleton.xml` files may be found.
+    ///   -> The first match is used.
+    ///   -> A warning is logged when multiple files are found.
+    ///
+    /// # Targets
+    /// - `<Skyrim Data directory>/meshes/actors/character/character assets/skeleton.xml`
+    ///   -> `defaultmale.hkx`
+    /// - `<Skyrim Data directory>/meshes/actors/character/character assets female/skeleton_female.xml`
+    ///   -> `defaultfemale.hkx`
+    ///
+    /// # Processing
+    /// - Missing bone indices -> extend `bonePairMap`.
+    /// - Missing bone weights -> append `0.0` / `1.0` to the corresponding weight arrays.
+    ArmFixHover,
+
+    /// Arm fix
+    ArmFixLabel,
+
     /// Author:
     AuthorLabel,
 
