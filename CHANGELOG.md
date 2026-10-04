@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-10-04
+### :sparkles: New Features
+- [`33ac8f2`](https://github.com/SARDONYX-sard/d-merge/commit/33ac8f2b9a1de75b41ff2d9cbfb220af9706dabc) - **fnis**: add arm fix patch(For XPMSSE) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`30a9ca4`](https://github.com/SARDONYX-sard/d-merge/commit/30a9ca47330565ea0448f6bd6e1413505d13f5b3) - **tauri**: add `Skeleton Arm Fix` option *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [2.7.5] - 2026-09-29
 ### :bug: Bug Fixes
 - [`5444314`](https://github.com/SARDONYX-sard/d-merge/commit/5444314c7469fd527f21eadd641e27f372b8bb4f) - **fnis_list**: fix furniture err msg *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -681,3 +687,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.7.3]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.2...2.7.3
 [2.7.4]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.3...2.7.4
 [2.7.5]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.4...2.7.5
+[2.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.5...2.8.0
