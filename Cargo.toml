@@ -43,7 +43,7 @@ serde_repr = "0.1.21" # C like Serialize enum into numbers.(Using progress repor
 simd-json = "0.18.1"
 snafu = "0.9.2"
 sonic-rs = "0.5.10"
-tokio = { version = "1.53.1", features = ["fs", "rt-multi-thread"] } # Async runtime
+tokio = { version = "1.53.2", features = ["fs", "rt-multi-thread"] } # Async runtime
 tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.23"
 winnow = { version = "1.0.4", features = ["simd"] }

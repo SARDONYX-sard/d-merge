@@ -36,8 +36,6 @@ fn main() {
             crate::cmd::patch::mod_info_loader::get_skyrim_data_dir,
             crate::cmd::patch::mod_info_loader::load_mods_info,
             crate::cmd::patch::patch,
-            crate::cmd::updater::fetch_versions,
-            crate::cmd::updater::update_to_version,
         ])
         .setup(|app| Ok(crate::log::init(app)?))
         .run(tauri::generate_context!())
