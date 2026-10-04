@@ -5,6 +5,7 @@ mod compat_old;
 pub mod log;
 pub mod mod_list;
 pub mod mod_list_ui;
+pub mod support_pandora;
 pub mod ui;
 
 use semver::Version;
@@ -16,7 +17,7 @@ pub use self::{
     mod_list_ui::ModListUiSettings,
     ui::UiSettings,
 };
-use crate::mod_item::ModItem;
+use crate::{mod_item::ModItem, settings::support_pandora::PandoraSupportSettings};
 
 /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
 pub const SETTINGS_PATH: &str = "./.d_merge/d_merge_settings.json";
@@ -44,6 +45,9 @@ pub struct Settings {
     #[serde(default)]
     pub log: LogSettings,
 
+    #[serde(default)]
+    pub pandora: PandoraSupportSettings,
+
     /// VFS-mode paths and mod list.
     #[serde(default)]
     pub vfs: ModListSettings,
@@ -62,6 +66,7 @@ impl Default for Settings {
             log: LogSettings::default(),
             vfs: ModListSettings::default(),
             manual: ModListSettings::default(),
+            pandora: PandoraSupportSettings::default(),
         }
     }
 }

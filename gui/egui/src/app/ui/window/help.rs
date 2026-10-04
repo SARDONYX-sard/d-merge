@@ -5,7 +5,10 @@ use std::{borrow::Cow, path::Path};
 use d_merge_gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
-    settings::ui::FontMode,
+    settings::{
+        support_pandora::{self, PandoraVersion},
+        ui::FontMode,
+    },
 };
 use egui::Color32;
 
@@ -42,10 +45,13 @@ bitflags::bitflags! {
         /// "Default" (force English) button clicked.
         const I18N_LOAD_DEFAULT_CLICKED  = 1 << 7;
 
+        const PANDORA_EXPORT_CLICKED = 1 << 8;
+        const PANDORA_IMPORT_CLICKED = 1 << 9;
+
         /// "Reload" button clicked in the background image section.
-        const BACKGROUND_IMG_RELOAD_CLICKED  = 1 << 8;
+        const BACKGROUND_IMG_RELOAD_CLICKED  = 1 << 10;
         /// A new background image was picked via the `rfd` file dialog.
-        const BACKGROUND_IMG_PATH_SELECTED   = 1 << 9;
+        const BACKGROUND_IMG_PATH_SELECTED   = 1 << 11;
     }
 }
 
@@ -87,6 +93,10 @@ impl App {
 
         let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
 
+        let mut selected_pandora_version = self.settings.pandora.version;
+        let mut selected_pandora_import_path = self.settings.pandora.import_path.clone();
+        let mut selected_pandora_export_path = self.settings.pandora.export_path.clone();
+
         let mut selected_background_img_path = self.settings.ui.background_image.path.clone();
         let mut background_img_enabled = self.settings.ui.background_image.enabled;
 
@@ -96,52 +106,62 @@ impl App {
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut show_help)
             .collapsible(false)
-            .resizable(true)
-            .movable(true)
             .fixed_size(egui::Vec2::new(
                 self.settings.ui.window.width * 0.5,
-                self.settings.ui.window.height * 0.75,
+                self.settings.ui.window.height * 0.85,
             ))
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add(heading(crate::APP_TITLE));
+                egui::ScrollArea::vertical().id_salt("help_window_scroll").show(ui, |ui| {
+                    fn section_separator(ui: &mut egui::Ui) {
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(8.0);
+                    }
+
+                    ui.vertical_centered(|ui| {
+                        ui.add(heading(crate::APP_TITLE));
+                    });
+                    section_separator(ui);
+
+                    self.ui_help_info(ui);
+                    section_separator(ui);
+
+                    self.ui_bug_report(ui);
+                    section_separator(ui);
+
+                    self.ui_font_section(
+                        ui,
+                        &mut selected_font_mode,
+                        &mut selected_font_name,
+                        &mut selected_font_path,
+                        &mut actions,
+                    );
+                    section_separator(ui);
+
+                    self.ui_log_section(ui, &mut selected_log_dir_path, &mut actions);
+                    section_separator(ui);
+
+                    self.ui_translation_section(ui, &mut selected_i18n_path, &mut actions);
+                    section_separator(ui);
+
+                    self.ui_background_section(
+                        ui,
+                        &mut selected_background_img_path,
+                        &mut background_img_enabled,
+                        &mut actions,
+                    );
+                    section_separator(ui);
+
+                    self.ui_pandora_section(
+                        ui,
+                        &mut selected_pandora_import_path,
+                        &mut selected_pandora_export_path,
+                        &mut selected_pandora_version,
+                        &mut actions,
+                    );
+                    section_separator(ui);
                 });
-
-                ui.add_space(8.0);
-                ui.separator();
-
-                self.ui_help_info(ui);
-                ui.separator();
-
-                self.ui_bug_report(ui);
-                ui.separator();
-
-                self.ui_font_section(
-                    ui,
-                    &mut selected_font_mode,
-                    &mut selected_font_name,
-                    &mut selected_font_path,
-                    &mut actions,
-                );
-                ui.separator();
-
-                self.ui_log_section(ui, &mut selected_log_dir_path, &mut actions);
-                ui.separator();
-
-                self.ui_translation_section(ui, &mut selected_i18n_path, &mut actions);
-                ui.separator();
-
-                self.ui_background_section(
-                    ui,
-                    &mut selected_background_img_path,
-                    &mut background_img_enabled,
-                    &mut actions,
-                );
-                ui.separator();
-
-                // NOTE: Since it shrinks automatically, extend it to the `height`. (To create space for potential font heights.)
-                ui.add_space(ui.available_height());
             });
 
         if !show_help {
@@ -208,6 +228,49 @@ impl App {
         }
         if actions.contains(HelpDialogActions::I18N_WRITE_CLICKED) {
             self.write_new_i18n();
+        }
+
+        // --- Pandora actions ---
+        if actions.contains(HelpDialogActions::PANDORA_IMPORT_CLICKED) {
+            match support_pandora::Pandora::import_to(
+                &selected_pandora_import_path,
+                &mut self.settings,
+                selected_pandora_version,
+            ) {
+                Ok(()) => {
+                    self.set_colored_notify(
+                        format!("Imported Pandora settings from {selected_pandora_import_path}"),
+                        Color32::GREEN,
+                    );
+                }
+                Err(err) => {
+                    self.notify_error(err);
+                }
+            }
+        }
+        if actions.contains(HelpDialogActions::PANDORA_EXPORT_CLICKED) {
+            match support_pandora::Pandora::export_from(
+                &selected_pandora_export_path,
+                &self.settings,
+                selected_pandora_version,
+            ) {
+                Ok(()) => {
+                    self.set_colored_notify(
+                        format!("Exported Pandora settings to {selected_pandora_export_path}"),
+                        Color32::GREEN,
+                    );
+                }
+                Err(err) => {
+                    self.notify_error(err);
+                }
+            }
+        }
+
+        if self.settings.pandora.import_path != selected_pandora_import_path {
+            self.settings.pandora.import_path = selected_pandora_import_path;
+        }
+        if self.settings.pandora.export_path != selected_pandora_export_path {
+            self.settings.pandora.export_path = selected_pandora_export_path;
         }
 
         // --- Background actions ---
@@ -343,6 +406,7 @@ impl App {
                         PathSelector {
                             ui,
                             label: self.i18n.t(I18nKey::FontFileLabel),
+                            label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
                             value: selected_font_path,
                             select_label: self.i18n.t(I18nKey::SelectButton),
                             reload_label: self.i18n.t(I18nKey::ReloadButton),
@@ -388,6 +452,7 @@ impl App {
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::LogDirPathLabel),
+                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
                     value: selected_log_dir_path,
                     select_label: self.i18n.t(I18nKey::SelectButton),
                     reload_label: self.i18n.t(I18nKey::ReloadButton),
@@ -425,6 +490,7 @@ impl App {
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::I18nPathLabel),
+                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
                     value: selected_i18n_path,
                     select_label: self.i18n.t(I18nKey::SelectButton),
                     reload_label: self.i18n.t(I18nKey::ReloadButton),
@@ -474,6 +540,87 @@ impl App {
         });
     }
 
+    /// Intended UI
+    /// ```txt
+    /// Pandora
+    ///
+    /// Target version:      [ 2.7.0 ▼ ]
+    /// Import path: [ path    ] [Import]
+    /// Export path: [ path    ] [Export]
+    /// ```
+    fn ui_pandora_section(
+        &self,
+        ui: &mut egui::Ui,
+        selected_import_path: &mut String,
+        selected_export_path: &mut String,
+        selected_version: &mut PandoraVersion,
+        actions: &mut HelpDialogActions,
+    ) {
+        ui.label("Pandora");
+
+        egui::Grid::new("pandora_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            ui.label(self.i18n.t(I18nKey::PandoraTargetVersionLabel))
+                .on_hover_text(self.i18n.t(I18nKey::PandoraTargetVersionHover));
+            enum_select(
+                ui,
+                selected_version,
+                &[(PandoraVersion::V4_4_0Beta, PandoraVersion::V4_4_0Beta.to_static_str())],
+                None::<egui::Vec2>,
+            );
+            ui.end_row();
+
+            if ui
+                .add(button(self.i18n.t(I18nKey::PandoraImportPathLabel)))
+                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
+                .clicked()
+                && let Err(err) = open_existing_dir_or_ancestor(Path::new(selected_import_path))
+            {
+                tracing::error!(err);
+            }
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(selected_import_path);
+
+                if ui
+                    .add(button(self.i18n.t(I18nKey::PandoraImportLabel)))
+                    .on_hover_text(self.i18n.t(I18nKey::PandoraImportHover))
+                    .clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .set_directory(selected_import_path.as_str())
+                        .pick_folder()
+                {
+                    *selected_import_path = path.display().to_string();
+                    actions.insert(HelpDialogActions::PANDORA_IMPORT_CLICKED);
+                }
+            });
+            ui.end_row();
+
+            if ui
+                .add(button(self.i18n.t(I18nKey::PandoraExportPathLabel)))
+                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
+                .clicked()
+                && let Err(err) = open_existing_dir_or_ancestor(Path::new(selected_import_path))
+            {
+                tracing::error!(err);
+            }
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(selected_export_path);
+
+                if ui
+                    .add(button(self.i18n.t(I18nKey::PandoraExportLabel)))
+                    .on_hover_text(self.i18n.t(I18nKey::PandoraExportHover))
+                    .clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .set_directory(selected_export_path.as_str())
+                        .pick_folder()
+                {
+                    *selected_export_path = path.display().to_string();
+                    actions.insert(HelpDialogActions::PANDORA_EXPORT_CLICKED);
+                }
+            });
+            ui.end_row();
+        });
+    }
+
     fn ui_background_section(
         &self,
         ui: &mut egui::Ui,
@@ -488,6 +635,7 @@ impl App {
                 PathSelector {
                     ui,
                     label: self.i18n.t(I18nKey::BackgroundImageLabel),
+                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
                     value: selected_background_path,
                     select_label: self.i18n.t(I18nKey::SelectButton),
                     reload_label: self.i18n.t(I18nKey::ReloadButton),
@@ -580,6 +728,7 @@ impl App {
 struct PathSelector<'a> {
     ui: &'a mut egui::Ui,
     label: &'a str,
+    label_hover: &'a str,
     value: &'a mut String,
     select_label: &'a str,
     reload_label: &'a str,
@@ -589,10 +738,18 @@ struct PathSelector<'a> {
 
 /// Return whether the "reload" button was clicked.
 fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<String>) -> bool {
-    let PathSelector { ui, label, value, select_label, reload_label, reload_hover, clear_label } =
-        selector;
+    let PathSelector {
+        ui,
+        label,
+        label_hover,
+        value,
+        select_label,
+        reload_label,
+        reload_hover,
+        clear_label,
+    } = selector;
 
-    if ui.add(button(label)).on_hover_text(value.as_str()).clicked()
+    if ui.add(button(label)).on_hover_text(label_hover).clicked()
         && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(value))
     {
         tracing::error!(err);
