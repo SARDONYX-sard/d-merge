@@ -236,6 +236,7 @@ impl App {
                     [LABEL_WIDTH, BUTTON_HEIGHT],
                     button(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
                 )
+                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
                 && let Err(err) =
                     open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
@@ -335,6 +336,7 @@ impl App {
                     [LABEL_WIDTH, BUTTON_HEIGHT],
                     button(self.i18n.t(I18nKey::OutputDirLabel)),
                 )
+                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
                     self.settings.current_output_dir(),

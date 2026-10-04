@@ -135,6 +135,7 @@ impl From<OldSettings> for Settings {
                 level: LogLevel::Debug,
                 ..Default::default()
             },
+            pandora: super::support_pandora::PandoraSupportSettings::default(),
             vfs: ModListSettings {
                 skyrim_data_dir: old.vfs_skyrim_data_dir,
                 mod_list: old.vfs_mod_list,

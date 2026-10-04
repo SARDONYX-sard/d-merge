@@ -310,6 +310,9 @@ pub enum I18nKey {
     /// Updating Mod list…
     NotifyInfoUpdatingModList,
 
+    /// Open selected path.
+    OpenSelectedPathHover,
+
     /// Output dir:
     OutputDirLabel,
 
@@ -353,6 +356,48 @@ pub enum I18nKey {
 
     /// Updating list...
     PatchFetchingButton,
+
+    /// Target version:
+    PandoraTargetVersionLabel,
+
+    /// Select the Pandora version used for import or export.
+    ///
+    /// - `v4.4.0-beta`: Compatible with `v5.0.0`.
+    PandoraTargetVersionHover,
+
+    /// Imports Pandora settings into the d-merge VFS configuration.
+    ///
+    /// # Targets
+    /// - `Settings.json`
+    ///   - Skyrim SE data path
+    ///   - Output path
+    /// - `ActiveMods.json`
+    ///   - Nemesis mod enabled state
+    ///   - Nemesis mod priority
+    PandoraImportHover,
+
+    /// Import
+    PandoraImportLabel,
+
+    /// Import path:
+    PandoraImportPathLabel,
+
+    /// Exports d-merge VFS settings to Pandora.
+    ///
+    /// # Targets
+    /// - `Settings.json`
+    ///   - Skyrim SE data path
+    ///   - Output path
+    /// - `ActiveMods.json`
+    ///   - Nemesis mod enabled state
+    ///   - Nemesis mod priority
+    PandoraExportHover,
+
+    /// Export
+    PandoraExportLabel,
+
+    /// Export Path:
+    PandoraExportPathLabel,
 
     /// Reload
     ReloadButton,
