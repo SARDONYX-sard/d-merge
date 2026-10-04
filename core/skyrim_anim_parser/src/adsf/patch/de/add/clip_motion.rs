@@ -7,9 +7,8 @@ use winnow::{
 };
 use winnow_ext::ReadableError;
 
-use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation, de::from_word_and_space};
-
 use super::common::{Error, PatchDeserializer, parse_one_line};
+use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation, de::from_word_and_space};
 
 /// Parses a `ClipMotionBlock` patch.
 ///
