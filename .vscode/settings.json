@@ -24,16 +24,14 @@
     "**/node_modules/**": true,
     "**/target/**": true
   },
-  "i18n-ally.keystyle": "nested",
-  "i18n-ally.sourceLanguage": "en",
   "json.schemas": [
     {
       "fileMatch": ["/dummy/convert/input/*.json", "/dummy/behavior_gen/output/.d_merge/.debug/meshes/**/*.json"],
       "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
-  "oxc.fmt.configPath": "./oxfmt.config.ts",
-  "oxc.configPath": "./oxlint.config.ts",
+  "oxc.disableNestedConfig": true,
+  "oxc.fmt.disableNestedConfig": true,
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
