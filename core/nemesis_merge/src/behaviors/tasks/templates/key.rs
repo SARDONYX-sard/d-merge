@@ -42,25 +42,70 @@ impl<'a> TemplateKey<'a> {
     ///
     /// Otherwise [`Option::None`]
     pub(crate) fn new(template_name: Cow<'a, str>) -> Option<Self> {
-        fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
-            s.len() >= prefix.len()
-                && s.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix))
-        }
-        fn ends_with_ignore_ascii(s: &str, suffix: &str) -> bool {
-            s.len() >= suffix.len()
-                && s.get(s.len() - suffix.len()..).is_some_and(|p| p.eq_ignore_ascii_case(suffix))
-        }
-
-        (starts_with_ignore_ascii(&template_name, "meshes")
-            && (ends_with_ignore_ascii(&template_name, "bin")
-                || ends_with_ignore_ascii(&template_name, "xml")))
-        .then_some(Self { template_name })
+        Self::is_valid(template_name.as_ref()).then_some(Self { template_name })
     }
 
     /// # Safety
     /// valid template path(from `meshes`)
     pub(crate) const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
         Self { template_name }
+    }
+
+    /// Creates a validated template key at compile time.
+    const fn from_static(template_name: &'static str) -> Self {
+        assert!(Self::is_valid(template_name));
+
+        Self { template_name: Cow::Borrowed(template_name) }
+    }
+
+    const fn is_valid(template_name: &str) -> bool {
+        const fn ascii_lowercase(byte: u8) -> u8 {
+            if byte >= b'A' && byte <= b'Z' { byte + (b'a' - b'A') } else { byte }
+        }
+
+        const fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
+            let s = s.as_bytes();
+            let prefix = prefix.as_bytes();
+
+            if s.len() < prefix.len() {
+                return false;
+            }
+
+            let mut i = 0;
+            while i < prefix.len() {
+                if ascii_lowercase(s[i]) != ascii_lowercase(prefix[i]) {
+                    return false;
+                }
+                i += 1;
+            }
+
+            true
+        }
+
+        const fn ends_with_ignore_ascii(s: &str, suffix: &str) -> bool {
+            let s = s.as_bytes();
+            let suffix = suffix.as_bytes();
+
+            if s.len() < suffix.len() {
+                return false;
+            }
+
+            let offset = s.len() - suffix.len();
+
+            let mut i = 0;
+            while i < suffix.len() {
+                if ascii_lowercase(s[offset + i]) != ascii_lowercase(suffix[i]) {
+                    return false;
+                }
+                i += 1;
+            }
+
+            true
+        }
+
+        starts_with_ignore_ascii(template_name, "meshes")
+            && (ends_with_ignore_ascii(template_name, "bin")
+                || ends_with_ignore_ascii(template_name, "xml"))
     }
 
     /// As utf-8
@@ -170,20 +215,14 @@ impl<'a> core::hash::Hash for TemplateKey<'a> {
     }
 }
 
-pub(crate) const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/behaviors/0_master.bin"))
-};
-pub(crate) const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/behaviors/mt_behavior.bin"))
-};
-pub(crate) const THREAD_PERSON_DEFAULTMALE_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed("meshes/actors/character/characters/defaultmale.bin"))
-};
-pub(crate) const THREAD_PERSON_DEFAULTFEMALE_KEY: TemplateKey<'static> = unsafe {
-    TemplateKey::new_unchecked(Cow::Borrowed(
-        "meshes/actors/character/characters female/defaultfemale.bin",
-    ))
-};
+pub(crate) const THREAD_PERSON_0_MASTER_KEY: TemplateKey<'static> =
+    TemplateKey::from_static("meshes/actors/character/behaviors/0_master.bin");
+pub(crate) const THREAD_PERSON_MT_BEHAVIOR_KEY: TemplateKey<'static> =
+    TemplateKey::from_static("meshes/actors/character/behaviors/mt_behavior.bin");
+pub(crate) const THREAD_PERSON_DEFAULTMALE_KEY: TemplateKey<'static> =
+    TemplateKey::from_static("meshes/actors/character/characters/defaultmale.bin");
+pub(crate) const THREAD_PERSON_DEFAULTFEMALE_KEY: TemplateKey<'static> =
+    TemplateKey::from_static("meshes/actors/character/characters female/defaultfemale.bin");
 
 /// Nemesis 1st person to meshes rel template .bin path
 #[rustfmt::skip]
