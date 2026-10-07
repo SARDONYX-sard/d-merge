@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ModListSchema, PatchOptions } from '../patch';
-import { convertOutputTargetToRuntime, convertRuntimeToOutputTarget } from './egui_support';
+import { convertOutputTargetToRuntime } from './egui_support';
 import { PRIVATE_CACHE_OBJ, PUB_CACHE_OBJ } from '@/lib/storage/cacheKeys';
 
 import type { Cache } from '@/lib/storage';
@@ -10,7 +10,7 @@ export const V2ConfigSchema = z.object({
 
   behavior: z.object({
     mode: z.enum(['vfs', 'manual']),
-    target_runtime: z.enum(['SE', 'LE', 'VR']),
+    target_runtime: z.enum(['SE', 'LE', 'VR', 'Enderal', 'EnderalSE']),
     auto_run: z.boolean(),
     auto_remove_meshes: z.boolean(),
     enable_debug_output: z.boolean(),
@@ -91,6 +91,20 @@ export function v2ToCache(v2: V2Config): Cache {
 
   return cache;
 }
+
+const convertRuntimeToOutputTarget = (
+  runtime: V2Config['behavior']['target_runtime'],
+): PatchOptions['outputTarget'] => {
+  switch (runtime) {
+    case 'SE':
+    case 'VR':
+    case 'EnderalSE':
+      return 'SkyrimSE';
+    case 'LE':
+    case 'Enderal':
+      return 'SkyrimLE';
+  }
+};
 
 function parse<T>(v: unknown): T | undefined {
   if (v == null) return undefined;

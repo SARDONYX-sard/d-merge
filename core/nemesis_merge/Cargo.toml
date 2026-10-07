@@ -14,6 +14,7 @@ rust-version.workspace = true
 
 [dependencies]
 dashmap = { workspace = true, features = ["rayon", "serde"] }
+havok_classes = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
@@ -43,7 +44,6 @@ skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }
 skyrim_crc = { workspace = true }
 skyrim_esp = { workspace = true }
 
-havok_classes = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
 # quick_tracing = { version = "*" }

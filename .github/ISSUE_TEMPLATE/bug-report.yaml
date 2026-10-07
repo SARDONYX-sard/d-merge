@@ -87,10 +87,14 @@ body:
     attributes:
       label: Skyrim Edition
       description: Enter your SkyrimEdition
+      # NOTE: This must be identical to the string in `<repo_root>/gh_issue_link/`'s' "skyrim-edition" param value`.
       options:
         - Special/Anniversary Edition(64bit)
         - VR(64bit)
         - Legendary Edition(32bit)
+
+        - Enderal Special Edition(64bit)
+        - Enderal Legendary Edition(32bit)
     validations:
       required: true
 

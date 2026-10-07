@@ -1,28 +1,6 @@
-pub mod version;
-
+pub use skyrim_data_dir::Runtime;
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use urlencoding::encode;
-
-#[derive(Debug, Clone, Copy)]
-pub enum SkyrimRuntime {
-    /// `Special/Anniversary Edition(64-bit)`
-    Se,
-    /// `VR(64bit)`
-    Vr,
-    /// `Legendary Edition(32bit)`
-    Le,
-}
-
-impl SkyrimRuntime {
-    const fn as_str(&self) -> &'static str {
-        // NOTE: This must be identical to the string in `.github/ISSUE_TEMPLATE/bug-report.yaml`.
-        match self {
-            Self::Se => "Special/Anniversary Edition(64-bit)",
-            Self::Vr => "VR(64-bit)",
-            Self::Le => "Legendary Edition(32-bit)",
-        }
-    }
-}
 
 /// Creates a `System` instance with CPU and RAM information collected.
 ///
@@ -97,13 +75,13 @@ impl<'a> EnvInfo<'a> {
 /// # Example
 ///
 /// ```
-/// use gh_issue_link::{SkyrimRuntime, new_gh_issue_link};
+/// use gh_issue_link::{Runtime, new_gh_issue_link};
 ///
-/// println!("{}", new_gh_issue_link("0.1.0", SkyrimRuntime::Se, Some("1.6.1170.0")));
+/// println!("{}", new_gh_issue_link("0.1.0", Runtime::Se, Some("1.6.1170.0")));
 /// ```
 pub fn new_gh_issue_link(
     d_merge_version: &str,
-    skyrim_runtime: SkyrimRuntime,
+    skyrim_runtime: Runtime,
     skyrim_version: Option<&str>,
 ) -> String {
     let base_url = "https://github.com/SARDONYX-sard/d-merge/issues/new";
@@ -132,10 +110,21 @@ pub fn new_gh_issue_link(
     }
     append_param("dram", &env.dram);
     append_param("os", &env.os);
-    append_param("skyrim-edition", skyrim_runtime.as_str());
     if let Some(skyrim_version) = skyrim_version {
         append_param("skyrim-version", skyrim_version);
     }
+
+    // NOTE: This must be identical to the string in `.github/ISSUE_TEMPLATE/bug-report.yaml`.
+    append_param(
+        "skyrim-edition",
+        match skyrim_runtime {
+            Runtime::Se => "Special/Anniversary Edition(64bit)",
+            Runtime::Vr => "VR(64bit)",
+            Runtime::Le => "Legendary Edition(32bit)",
+            Runtime::Enderal => "Enderal Legendary Edition(32bit)",
+            Runtime::EnderalSe => "Enderal Special Edition(64bit)",
+        },
+    );
 
     url
 }
@@ -152,7 +141,7 @@ mod tests {
 
         println!(
             "GitHub issue link:\n{}",
-            new_gh_issue_link("0.1.0", SkyrimRuntime::Se, Some("1.6.1170.0"))
+            new_gh_issue_link("0.1.0", Runtime::Se, Some("1.6.1170.0"))
         );
     }
 }

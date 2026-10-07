@@ -45,8 +45,8 @@ impl App {
         } = &self.settings.behavior;
         let enable_debug_output = *enable_debug_output;
         let output_target = match target_runtime {
-            Runtime::Le => nemesis_merge::OutPutTarget::SkyrimLe,
-            Runtime::Se | Runtime::Vr => nemesis_merge::OutPutTarget::SkyrimSe,
+            Runtime::Le | Runtime::Enderal => nemesis_merge::OutPutTarget::SkyrimLe,
+            Runtime::Se | Runtime::EnderalSe | Runtime::Vr => nemesis_merge::OutPutTarget::SkyrimSe,
         };
 
         let patch_status = Arc::clone(&self.patch_status);

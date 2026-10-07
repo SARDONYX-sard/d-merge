@@ -12,11 +12,17 @@ readme = "../../README.md"
 repository.workspace = true
 rust-version.workspace = true
 
+
 [dependencies]
-sysinfo = "0.39.1"
+sysinfo = "0.39.6"
 urlencoding = "2.1.3"
+
+# workspace members
+skyrim_data_dir = { workspace = true }
+
 
 [lints]
 workspace = true
+
 
 [features]

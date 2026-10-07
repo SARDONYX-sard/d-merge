@@ -82,15 +82,29 @@ impl App {
     /// In VFS mode, changing the runtime triggers a registry-based
     /// auto-detect of the data directory (Windows only).
     fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
+        use skyrim_data_dir::Runtime;
+
         ui.horizontal_top(|ui| {
             ui.add(Label::new(self.i18n.t(I18nKey::RuntimeTargetLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::RuntimeTargetHover));
 
-            const RUNTIMES: [(skyrim_data_dir::Runtime, &str); 3] = [
-                (skyrim_data_dir::Runtime::Le, skyrim_data_dir::Runtime::Le.as_str()),
-                (skyrim_data_dir::Runtime::Se, skyrim_data_dir::Runtime::Se.as_str()),
-                (skyrim_data_dir::Runtime::Vr, skyrim_data_dir::Runtime::Vr.as_str()),
-            ];
+            const RUNTIMES: [(Runtime, &str); Runtime::ALL.len()] = {
+                const fn make_runtimes() -> [(Runtime, &'static str); Runtime::ALL.len()] {
+                    let mut runtimes = [(Runtime::Le, ""); Runtime::ALL.len()];
+                    let mut i = 0;
+
+                    while i < Runtime::ALL.len() {
+                        let runtime = Runtime::ALL[i];
+                        runtimes[i] = (runtime, runtime.as_str());
+                        i += 1;
+                    }
+
+                    runtimes
+                }
+
+                make_runtimes()
+            };
+
             if enum_select(
                 ui,
                 &mut self.settings.behavior.target_runtime,

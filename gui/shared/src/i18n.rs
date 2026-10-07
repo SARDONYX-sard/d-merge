@@ -406,8 +406,8 @@ pub enum I18nKey {
     RemovingMeshesMessage,
 
     /// Output format for hkx.
-    /// - SkyrimLE: win32
-    /// - SkyrimSE/SkyrimVR: amd64
+    /// - SkyrimLE/Enderal: win32
+    /// - SkyrimSE/SkyrimVR/EnderalSE: amd64
     ///
     /// # Notes
     /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.

@@ -208,32 +208,20 @@ impl Settings {
     pub fn create_issue_link(&self) -> String {
         use std::{borrow::Cow, path::Path};
 
-        use gh_issue_link::{SkyrimRuntime, new_gh_issue_link, version::get_file_version};
-        use skyrim_data_dir::{Runtime, get_skyrim_data_dir};
-
-        let target_runtime = self.behavior.target_runtime;
-        let skyrim_runtime = match target_runtime {
-            Runtime::Le => SkyrimRuntime::Le,
-            Runtime::Se => SkyrimRuntime::Se,
-            Runtime::Vr => SkyrimRuntime::Vr,
-        };
-
+        let skyrim_runtime = self.behavior.target_runtime;
         let skyrim_data_dir: Option<Cow<'_, Path>> = if self.vfs.skyrim_data_dir.trim().is_empty() {
-            get_skyrim_data_dir(target_runtime).ok().map(Cow::Owned)
+            skyrim_data_dir::get_skyrim_data_dir(skyrim_runtime).ok().map(Cow::Owned)
         } else {
             Some(Path::new(&self.vfs.skyrim_data_dir).into())
         };
 
         let skyrim_version = skyrim_data_dir.and_then(|skyrim_data_dir| {
-            let exe = match skyrim_runtime {
-                SkyrimRuntime::Le => "TESV.exe",
-                SkyrimRuntime::Se => "SkyrimSE.exe",
-                SkyrimRuntime::Vr => "SkyrimVR.exe",
-            };
-            let exe_path = skyrim_data_dir.parent()?.join(exe);
-
-            get_file_version(exe_path).map(|ver| ver.to_string()).ok()
+            skyrim_runtime.get_version(skyrim_data_dir).map(|ver| ver.to_string())
         });
-        new_gh_issue_link(env!("CARGO_PKG_VERSION"), skyrim_runtime, skyrim_version.as_deref())
+        gh_issue_link::new_gh_issue_link(
+            env!("CARGO_PKG_VERSION"),
+            skyrim_runtime,
+            skyrim_version.as_deref(),
+        )
     }
 }

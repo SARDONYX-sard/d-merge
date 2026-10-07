@@ -5,6 +5,11 @@
   "[css][json][jsonc][toml][yaml]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
+  // NOTE: YAML ignores the configuration for some reason when multiple formatters are
+  // specified as a pattern, so they are specified individually.
+  "[yaml]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
   "editor.codeActionsOnSave": {
     // "source.fixAll.oxc": "explicit",
     "source.fixAll.sortJSON": "never"

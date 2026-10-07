@@ -188,13 +188,3 @@ export const convertOutputTargetToRuntime = (runtime: PatchOptions['outputTarget
       return 'LE';
   }
 };
-
-export const convertRuntimeToOutputTarget = (runtime: 'SE' | 'LE' | 'VR'): PatchOptions['outputTarget'] => {
-  switch (runtime) {
-    case 'SE':
-    case 'VR':
-      return 'SkyrimSE';
-    case 'LE':
-      return 'SkyrimLE';
-  }
-};
