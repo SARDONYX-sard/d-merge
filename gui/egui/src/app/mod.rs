@@ -3,7 +3,6 @@
 mod background_image;
 mod fetch;
 mod log;
-mod notify;
 mod patch;
 mod ui;
 
@@ -18,7 +17,10 @@ use d_merge_gui_shared::{
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::{app::log::LogQueueLock, ui::theme::ThemeManager};
+use crate::{
+    app::log::LogQueueLock,
+    ui::{notify::Notification, theme::ThemeManager},
+};
 
 /// Central application state.
 pub(crate) struct App {
@@ -67,11 +69,11 @@ pub(crate) struct App {
     pub bg_img_handle: Option<egui::TextureHandle>,
 
     // ── Notification bar ──────────────────────────────────────────────────────
-    /// `(message, color)` shown in the mod-list status line.
-    pub mod_list_msg: (String, egui::Color32),
+    /// shown in the mod-list status line.
+    pub mod_list_msg: Notification,
 
-    /// `(message, color)` shown in the notification bar at the bottom.
-    pub notify: (String, egui::Color32),
+    ///  shown in the notification bar at the bottom.
+    pub notify: Notification,
 
     // ── Log viewer ────────────────────────────────────────────────────────────
     pub current_log_dir: Option<std::path::PathBuf>,
@@ -142,8 +144,8 @@ impl App {
 
             bg_img_handle: None,
 
-            mod_list_msg: (String::new(), egui::Color32::WHITE),
-            notify: (String::new(), egui::Color32::WHITE),
+            mod_list_msg: Notification::default(),
+            notify: Notification::default(),
 
             current_log_dir: None,
             log_lines: LogQueueLock::default(),

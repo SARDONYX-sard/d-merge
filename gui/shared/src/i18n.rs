@@ -82,6 +82,9 @@ pub enum I18nKey {
     /// You must close the window manually to prevent the auto-run option from becoming disabled.
     AutoRunHover,
 
+    /// Background
+    BackgroundTitleLabel,
+
     /// Background Image:
     BackgroundImageLabel,
 
@@ -99,8 +102,8 @@ pub enum I18nKey {
     /// This feature exists to allow you to toggle the setting on and off while keeping the background image path specified.
     BackgroundImageEnabledHover,
 
-    /// Bug Report:
-    BugReportLabel,
+    /// Bug Report
+    BugReportTitleLabel,
 
     /// See Issues
     BugReportSeeIssues,
@@ -157,6 +160,9 @@ pub enum I18nKey {
     /// Gen FNIS.esp
     GenerateFnisEspLabel,
 
+    /// Font
+    FontTitleLabel,
+
     /// Font family:
     FontFamily,
 
@@ -195,6 +201,9 @@ pub enum I18nKey {
     /// Help
     HelpButton,
 
+    /// Language & Translation
+    I18nTitleLabel,
+
     /// I18n Path:
     I18nPathLabel,
 
@@ -226,6 +235,9 @@ pub enum I18nKey {
     /// Row reordering is locked unless sorting by Priority ascending.
     /// Click to unlock.
     LockButtonHover,
+
+    /// Logging
+    LoggingTitleLabel,
 
     /// Log
     LogButton,
@@ -475,9 +487,6 @@ pub enum I18nKey {
 
     /// 🎨 Custom
     ThemeSelectCustom,
-
-    /// Tooling:
-    ToolingLabel,
 
     /// VFS
     VfsMode,

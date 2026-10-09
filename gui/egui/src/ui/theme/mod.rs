@@ -34,6 +34,7 @@ use egui_shadcn::ShadcnThemeExt;
 use crate::{
     theme::EguiColorExt as _,
     ui::{
+        notify::Notification,
         shadcn_compat::{button, checkbox, searchable_index_select, small_button, text},
         theme::cache::ThemeCache,
     },
@@ -97,12 +98,7 @@ pub(crate) struct ThemeManager {
     widget_tab: WidgetTab,
 
     /// Non-fatal status message (shown for one or two seconds, then cleared).
-    status: Option<StatusMsg>,
-}
-
-struct StatusMsg {
-    text: String,
-    is_error: bool,
+    status: Notification,
 }
 
 impl ThemeManager {
@@ -123,7 +119,7 @@ impl ThemeManager {
             editing: Some(preset),
             save_name: selected.unwrap_or("Custom").to_string(),
             widget_tab: WidgetTab::Noninteractive,
-            status: None,
+            status: Notification::default(),
         }
     }
 
@@ -141,10 +137,11 @@ impl ThemeManager {
             Ok(preset) => {
                 self.save_name = name.to_string();
                 self.editing = Some(preset);
-                self.status = None;
+                self.status.clear();
+                self.status.success(format!("Loaded theme: {name}"));
             }
             Err(e) => {
-                self.set_error(format!("Load failed: {e}"));
+                self.status.error(format!("Load failed: {e}"));
             }
         }
     }
@@ -157,7 +154,7 @@ impl ThemeManager {
 
     fn save_current(&mut self) {
         let Some(editing) = &mut self.editing else {
-            self.set_error("Nothing to save — load a preset first.".into());
+            self.status.error("Nothing to save — load a preset first.");
             return;
         };
 
@@ -169,10 +166,10 @@ impl ThemeManager {
                 self.names = self.cache.names();
                 self.selected_index =
                     self.names.iter().position(|n| n == &self.save_name).unwrap_or(0);
-                self.set_ok(format!("Saved \"{}\".", self.save_name));
+                self.status.success(format!("Saved \"{}\".", self.save_name));
             }
             Err(e) => {
-                self.set_error(format!("Save failed: {e}"));
+                self.status.error(format!("Save failed: {e}"));
             }
         }
     }
@@ -189,15 +186,7 @@ impl ThemeManager {
             .and_then(|name| self.names.iter().position(|n| n == name))
             .unwrap_or(0);
 
-        self.set_ok("Directory reloaded.".into());
-    }
-
-    fn set_ok(&mut self, text: String) {
-        self.status = Some(StatusMsg { text, is_error: false });
-    }
-
-    fn set_error(&mut self, text: String) {
-        self.status = Some(StatusMsg { text, is_error: true });
+        self.status.success("Directory reloaded.");
     }
 
     // ── UI ───────────────────────────────────────────────────────────────
@@ -228,10 +217,10 @@ impl ThemeManager {
 
         egui::Grid::new("theme_manager_grid").num_columns(2).spacing([8.0, 8.0]).show(ui, |ui| {
             // ── Preset row ────────────────────────────────────────────────────────
-            if ui.add(button("Preset:")).on_hover_text("Open theme directory").clicked()
+            if ui.add(button("Preset:")).on_hover_text("Open themes directory").clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(&self.cache.dir)
             {
-                self.set_error(err);
+                self.status.error(err);
             }
             ui.horizontal(|ui| {
                 if searchable_index_select(
@@ -272,16 +261,12 @@ impl ThemeManager {
 
             // ── Status bar ────────────────────────────────────────────────────────
             ui.label("Status: ");
-            if let Some(msg) = &self.status {
-                let color = if msg.is_error {
-                    self.editing.as_ref().map_or(egui::Color32::from_rgb(220, 80, 80), |preset| {
-                        preset.visuals.error_fg_color.to_egui_color32()
-                    })
-                } else {
-                    egui::Color32::from_rgb(100, 200, 120)
-                };
-                ui.colored_label(color, &msg.text);
-            }
+            let color = {
+                self.editing.as_ref().map_or(egui::Color32::WHITE, |preset| {
+                    self.status.color.resolve(&preset::to_egui_visuals(&preset.visuals))
+                })
+            };
+            ui.colored_label(color, &self.status.message);
             ui.end_row();
         });
 

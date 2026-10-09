@@ -1,12 +1,12 @@
 //! help dialog, confirmation dialog.
 
-use std::{borrow::Cow, path::Path};
+use std::path::{Path, PathBuf};
 
 use d_merge_gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
     settings::{
-        support_pandora::{self, PandoraVersion},
+        support_pandora::{Pandora, PandoraVersion},
         ui::FontMode,
     },
 };
@@ -14,297 +14,84 @@ use egui::Color32;
 
 use crate::{
     app::App,
-    ui::shadcn_compat::{button, checkbox, enum_select, heading, searchable_string_select},
+    ui::shadcn_compat::{button, checkbox, enum_select, searchable_string_select, text},
 };
 
-bitflags::bitflags! {
-    /// Actions requested by the widgets inside the help dialog during a single frame.
-    ///
-    /// Each section function (`ui_font_section`, `ui_log_section`, ...) only ever
-    /// receives a `&mut HelpDialogActions` instead of a handful of separate `bool`s,
-    /// and sets the relevant bits once it knows what happened. `ui_help_window`
-    /// drains this single value after the window closes and dispatches side effects.
-    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-    struct HelpDialogActions: u32 {
-        /// "Reload" button clicked in the font section.
-        const FONT_RELOAD_CLICKED        = 1 << 0;
-        /// A new font file was picked via the `rfd` file dialog.
-        const FONT_PATH_SELECTED         = 1 << 1;
-
-        /// "Reload" button clicked in the log section.
-        const LOG_RELOAD_CLICKED         = 1 << 2;
-        /// A new log directory was picked via the `rfd` file dialog.
-        const LOG_PATH_SELECTED          = 1 << 3;
-
-        /// "Reload" button clicked in the i18n section.
-        const I18N_RELOAD_CLICKED        = 1 << 4;
-        /// A new translation file was picked via the `rfd` file dialog.
-        const I18N_PATH_SELECTED         = 1 << 5;
-        /// "Write new translation.json" button clicked.
-        const I18N_WRITE_CLICKED         = 1 << 6;
-        /// "Default" (force English) button clicked.
-        const I18N_LOAD_DEFAULT_CLICKED  = 1 << 7;
-
-        const PANDORA_EXPORT_CLICKED = 1 << 8;
-        const PANDORA_IMPORT_CLICKED = 1 << 9;
-
-        /// "Reload" button clicked in the background image section.
-        const BACKGROUND_IMG_RELOAD_CLICKED  = 1 << 10;
-        /// A new background image was picked via the `rfd` file dialog.
-        const BACKGROUND_IMG_PATH_SELECTED   = 1 << 11;
-    }
-}
+const GRID_SPACING: [f32; 2] = [8.0, 6.0];
 
 impl App {
-    /// Renders the help / about window.
-    ///
-    /// Anchored to the viewport centre.
+    /// Renders the help / about window anchored to the viewport centre.
     pub(crate) fn ui_help_window(&mut self, ctx: &egui::Context) {
         if !self.show_help {
             return;
         }
-
-        // --- overlay (background) ---
-        if egui::Area::new("help_overlay_bg".into())
-            .order(egui::Order::Background)
-            .fixed_pos(ctx.content_rect().min)
-            .show(ctx, |ui| {
-                let rect = ui.ctx().content_rect();
-
-                let bg = egui::Color32::from_black_alpha(160);
-                ui.painter().rect_filled(rect, 0.0, bg);
-                ui.allocate_response(rect.size(), egui::Sense::click())
-            })
-            .inner
-            .clicked()
-        {
+        if help_overlay(ctx).clicked() {
             self.show_help = false;
             return;
         }
 
-        let mut show_help = true;
+        // NOTE: `Window::open` holds `&mut bool` for the whole `show` call, which would conflict with
+        // the closure capturing `&mut self`. `bool` is `Copy`, so go through a local.
+        let mut open = true;
+        let size =
+            egui::vec2(self.settings.ui.window.width * 0.5, self.settings.ui.window.height * 0.85);
 
-        // This clone, which may seem unnecessary at first glance, is a measure designed to allow the use of `&self` within the closure.
-        let mut selected_font_mode = self.settings.ui.font.mode;
-        let mut selected_font_name = self.settings.ui.font.name.clone();
-        let mut selected_font_path = self.settings.ui.font.path.clone();
-
-        let mut selected_log_dir_path = self.settings.log.dir_path.clone();
-
-        let mut selected_i18n_path = self.settings.ui.i18n_path.clone();
-
-        let mut selected_pandora_version = self.settings.pandora.version;
-        let mut selected_pandora_import_path = self.settings.pandora.import_path.clone();
-        let mut selected_pandora_export_path = self.settings.pandora.export_path.clone();
-
-        let mut selected_background_img_path = self.settings.ui.background_image.path.clone();
-        let mut background_img_enabled = self.settings.ui.background_image.enabled;
-
-        // Single carrier for every widget-triggered action in this frame.
-        let mut actions = HelpDialogActions::empty();
-
-        egui::Window::new(self.i18n.t(I18nKey::HelpButton))
-            .open(&mut show_help)
+        egui::Window::new(self.i18n.t(I18nKey::HelpButton)) // copied into an owned WidgetText
+            .open(&mut open)
             .collapsible(false)
-            .fixed_size(egui::Vec2::new(
-                self.settings.ui.window.width * 0.5,
-                self.settings.ui.window.height * 0.85,
-            ))
+            .fixed_size(size)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().id_salt("help_window_scroll").show(ui, |ui| {
+                    fn section_title(ui: &mut egui::Ui, title: &str) {
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(title).strong().size(20.0));
+                        ui.add_space(4.0);
+                    }
+
                     fn section_separator(ui: &mut egui::Ui) {
                         ui.add_space(8.0);
                         ui.separator();
                         ui.add_space(8.0);
                     }
 
-                    ui.vertical_centered(|ui| {
-                        ui.add(heading(crate::APP_TITLE));
-                    });
-                    section_separator(ui);
-
+                    // Reordering sections = moving a block.
+                    section_title(ui, "About");
                     self.ui_help_info(ui);
                     section_separator(ui);
 
+                    section_title(ui, self.i18n.t(I18nKey::BugReportTitleLabel));
                     self.ui_bug_report(ui);
                     section_separator(ui);
 
-                    self.ui_font_section(
-                        ui,
-                        &mut selected_font_mode,
-                        &mut selected_font_name,
-                        &mut selected_font_path,
-                        &mut actions,
-                    );
+                    section_title(ui, self.i18n.t(I18nKey::FontTitleLabel));
+                    self.ui_font_section(ui);
                     section_separator(ui);
 
-                    self.ui_log_section(ui, &mut selected_log_dir_path, &mut actions);
+                    section_title(ui, self.i18n.t(I18nKey::LoggingTitleLabel));
+                    self.ui_log_section(ui);
                     section_separator(ui);
 
-                    self.ui_translation_section(ui, &mut selected_i18n_path, &mut actions);
+                    section_title(ui, self.i18n.t(I18nKey::I18nTitleLabel));
+                    self.ui_translation_section(ui);
                     section_separator(ui);
 
-                    self.ui_background_section(
-                        ui,
-                        &mut selected_background_img_path,
-                        &mut background_img_enabled,
-                        &mut actions,
-                    );
+                    section_title(ui, self.i18n.t(I18nKey::BackgroundTitleLabel));
+                    self.ui_background_section(ui);
                     section_separator(ui);
 
-                    self.ui_pandora_section(
-                        ui,
-                        &mut selected_pandora_import_path,
-                        &mut selected_pandora_export_path,
-                        &mut selected_pandora_version,
-                        &mut actions,
-                    );
+                    section_title(ui, "Pandora");
+                    self.ui_pandora_section(ui);
                     section_separator(ui);
                 });
             });
 
-        if !show_help {
-            self.show_help = false;
-        }
-
-        // --- Font actions ---
-        let did_font_mode_change = self.settings.ui.font.mode != selected_font_mode;
-        let did_font_name_change = self.settings.ui.font.name != selected_font_name;
-
-        if did_font_mode_change {
-            self.settings.ui.font.mode = selected_font_mode;
-        }
-        if did_font_name_change {
-            self.settings.ui.font.name = selected_font_name;
-        }
-        if self.settings.ui.font.path != selected_font_path {
-            self.settings.ui.font.path = selected_font_path;
-        }
-        // NOTE: The font path won't be applied automatically until we click the reload button
-        // or actually pick a new file. (Because auto-applying on every keystroke would make it
-        // harder to use.)
-        if ((did_font_mode_change
-            && matches!(selected_font_mode, FontMode::Default | FontMode::System))
-            || did_font_name_change
-            || actions.intersects(
-                HelpDialogActions::FONT_RELOAD_CLICKED | HelpDialogActions::FONT_PATH_SELECTED,
-            ))
-            && let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font)
-        {
-            match err {
-                crate::fonts::FontError::Warn(msg) => {
-                    tracing::warn!(msg);
-                    self.notify = (msg, egui::Color32::YELLOW);
-                }
-                crate::fonts::FontError::Error(msg) => {
-                    tracing::error!(msg);
-                    self.notify_error(msg);
-                }
-            }
-        }
-
-        // --- Log actions ---
-        if self.settings.log.dir_path != selected_log_dir_path {
-            self.settings.log.dir_path = selected_log_dir_path;
-        }
-        if actions.intersects(
-            HelpDialogActions::LOG_RELOAD_CLICKED | HelpDialogActions::LOG_PATH_SELECTED,
-        ) {
-            self.reload_log();
-        }
-
-        // --- i18n actions ---
-        if self.settings.ui.i18n_path != selected_i18n_path {
-            self.settings.ui.i18n_path = selected_i18n_path;
-        }
-        if actions.intersects(
-            HelpDialogActions::I18N_RELOAD_CLICKED | HelpDialogActions::I18N_PATH_SELECTED,
-        ) {
-            self.reload_i18n();
-        }
-        if actions.contains(HelpDialogActions::I18N_LOAD_DEFAULT_CLICKED) {
-            self.i18n = d_merge_gui_shared::i18n::I18nMap::new();
-        }
-        if actions.contains(HelpDialogActions::I18N_WRITE_CLICKED) {
-            self.write_new_i18n();
-        }
-
-        // --- Pandora actions ---
-        if actions.contains(HelpDialogActions::PANDORA_IMPORT_CLICKED) {
-            match support_pandora::Pandora::import_to(
-                &selected_pandora_import_path,
-                &mut self.settings,
-                selected_pandora_version,
-            ) {
-                Ok(()) => {
-                    self.set_colored_notify(
-                        format!("Imported Pandora settings from {selected_pandora_import_path}"),
-                        Color32::GREEN,
-                    );
-                }
-                Err(err) => {
-                    self.notify_error(err);
-                }
-            }
-        }
-        if actions.contains(HelpDialogActions::PANDORA_EXPORT_CLICKED) {
-            match support_pandora::Pandora::export_from(
-                &selected_pandora_export_path,
-                &self.settings,
-                selected_pandora_version,
-            ) {
-                Ok(()) => {
-                    self.set_colored_notify(
-                        format!("Exported Pandora settings to {selected_pandora_export_path}"),
-                        Color32::GREEN,
-                    );
-                }
-                Err(err) => {
-                    self.notify_error(err);
-                }
-            }
-        }
-
-        if self.settings.pandora.import_path != selected_pandora_import_path {
-            self.settings.pandora.import_path = selected_pandora_import_path;
-        }
-        if self.settings.pandora.export_path != selected_pandora_export_path {
-            self.settings.pandora.export_path = selected_pandora_export_path;
-        }
-
-        // --- Background actions ---
-        if self.settings.ui.background_image.path != selected_background_img_path {
-            self.settings.ui.background_image.path = selected_background_img_path;
-        }
-        self.settings.ui.background_image.enabled = background_img_enabled;
-        if actions.intersects(
-            HelpDialogActions::BACKGROUND_IMG_RELOAD_CLICKED
-                | HelpDialogActions::BACKGROUND_IMG_PATH_SELECTED,
-        ) {
-            self.settings.ui.background_image.enabled = true;
-            self.reload_background(ctx);
-        }
+        self.show_help &= open;
     }
 
     fn ui_help_info(&self, ui: &mut egui::Ui) {
         let rows = [
-            (self.i18n.t(I18nKey::AuthorLabel), env!("CARGO_PKG_AUTHORS"), None),
-            (
-                self.i18n.t(I18nKey::LicenseLabel),
-                env!("CARGO_PKG_LICENSE"),
-                Some(concat!(
-                    env!("CARGO_PKG_REPOSITORY"),
-                    "/blob/",
-                    env!("CARGO_PKG_VERSION"),
-                    "/LICENSE"
-                )),
-            ),
-            (
-                self.i18n.t(I18nKey::SourceCodeLabel),
-                "GitHub",
-                Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("CARGO_PKG_VERSION"))),
-            ),
+            ("D Merge Version:", env!("CARGO_PKG_VERSION"), None),
             (
                 self.i18n.t(I18nKey::ChangeLogLabel),
                 "CHANGELOG.md",
@@ -320,9 +107,25 @@ impl App {
                     "/docs/test_status.md"
                 )),
             ),
+            (
+                self.i18n.t(I18nKey::SourceCodeLabel),
+                "GitHub",
+                Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("CARGO_PKG_VERSION"))),
+            ),
+            (
+                self.i18n.t(I18nKey::LicenseLabel),
+                env!("CARGO_PKG_LICENSE"),
+                Some(concat!(
+                    env!("CARGO_PKG_REPOSITORY"),
+                    "/blob/",
+                    env!("CARGO_PKG_VERSION"),
+                    "/LICENSE"
+                )),
+            ),
+            (self.i18n.t(I18nKey::AuthorLabel), env!("CARGO_PKG_AUTHORS"), None),
         ];
 
-        egui::Grid::new("help_info_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+        egui::Grid::new("help_info_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
             for (label, value, url) in rows {
                 ui.label(label);
 
@@ -330,24 +133,18 @@ impl App {
                     Some(url) => ui.hyperlink_to(value, url).on_hover_text(url),
                     None => ui.label(value),
                 };
-
                 ui.end_row();
             }
         });
     }
 
     fn ui_bug_report(&self, ui: &mut egui::Ui) {
-        let bug_report_label = self.i18n.t(I18nKey::BugReportLabel);
-
-        let see_issues_label = self.i18n.t(I18nKey::BugReportSeeIssues);
-
-        let issue_report_label = self.i18n.t(I18nKey::IssueReportButton);
-        let issue_report_hover = self.i18n.t(I18nKey::IssueReportHover);
-
-        ui.label(bug_report_label);
-
         ui.horizontal(|ui| {
-            if ui.add(button(issue_report_label)).on_hover_text(issue_report_hover).clicked() {
+            if ui
+                .add(button(self.i18n.t(I18nKey::IssueReportButton)))
+                .on_hover_text(self.i18n.t(I18nKey::IssueReportHover))
+                .clicked()
+            {
                 ui.ctx().open_url(egui::OpenUrl {
                     url: self.settings.create_issue_link(),
                     new_tab: true,
@@ -355,167 +152,73 @@ impl App {
             }
 
             const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
-            ui.hyperlink_to(see_issues_label, ISSUE_URL).on_hover_text(ISSUE_URL);
+            ui.hyperlink_to(self.i18n.t(I18nKey::BugReportSeeIssues), ISSUE_URL)
+                .on_hover_text(ISSUE_URL);
         });
     }
 
-    fn ui_font_section(
-        &self,
-        ui: &mut egui::Ui,
-        selected_font_mode: &mut FontMode,
-        selected_font_name: &mut String,
-        selected_font_path: &mut String,
-        actions: &mut HelpDialogActions,
-    ) {
-        egui::Grid::new("font_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+    fn ui_font_section(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("font_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
             ui.label(self.i18n.t(I18nKey::FontModeLabel))
                 .on_hover_text(self.i18n.t(I18nKey::FontModeHover));
-            enum_select(
+            let mode_changed = enum_select(
                 ui,
-                selected_font_mode,
+                &mut self.settings.ui.font.mode, // disjoint field from `self.i18n`
                 &[
                     (FontMode::Default, self.i18n.t(I18nKey::FontModeDefault)),
                     (FontMode::System, self.i18n.t(I18nKey::FontModeSystem)),
                     (FontMode::File, self.i18n.t(I18nKey::FontModeFile)),
                 ],
                 None::<egui::Vec2>,
-            );
+            )
+            .changed();
             ui.end_row();
-            match selected_font_mode {
-                FontMode::Default => {}
 
+            match self.settings.ui.font.mode {
+                FontMode::Default => {
+                    if mode_changed {
+                        self.apply_font(ui.ctx());
+                    }
+                }
                 FontMode::System => {
                     ui.label(self.i18n.t(I18nKey::FontFamily));
-
-                    searchable_string_select(
+                    let name_changed = searchable_string_select(
                         ui,
                         "font_family",
-                        selected_font_name,
+                        &mut self.settings.ui.font.name,
                         crate::fonts::font_families(),
                         format!("{}...", self.i18n.t(I18nKey::SearchLabel)),
-                    );
-
+                    )
+                    .changed();
                     ui.end_row();
+
+                    if mode_changed || name_changed {
+                        self.apply_font(ui.ctx());
+                    }
                 }
-
                 FontMode::File => {
-                    // Local flags for this section only; folded into `actions` at the end.
-                    let mut path_selected = false;
-
-                    let reload_clicked = path_selector_row(
-                        PathSelector {
-                            ui,
-                            label: self.i18n.t(I18nKey::FontFileLabel),
-                            label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
-                            value: selected_font_path,
-                            select_label: self.i18n.t(I18nKey::SelectButton),
-                            reload_label: self.i18n.t(I18nKey::ReloadButton),
-                            reload_hover: self.i18n.t(I18nKey::FontReloadHover),
-                            clear_label: self.i18n.t(I18nKey::ClearButton),
-                        },
-                        || {
-                            // IMPORTANT: Without this, rfd cannot set dir correctly.
-                            let dir = Path::new(&self.settings.ui.font.path).parent().map_or_else(
-                                || Cow::Borrowed(Path::new("C:/Windows/Fonts")),
-                                |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-                            );
-
-                            rfd::FileDialog::new()
-                                .set_directory(dir)
-                                .add_filter("font", &["ttc", "ttf", "tto"])
-                                .pick_file()
-                                .map(|p| {
-                                    path_selected = true;
-                                    p.display().to_string()
-                                })
-                        },
-                    );
-
-                    actions.set(HelpDialogActions::FONT_RELOAD_CLICKED, reload_clicked);
-                    actions.set(HelpDialogActions::FONT_PATH_SELECTED, path_selected);
+                    // NOTE: File mode is applied only on reload/pick, never per keystroke.
+                    if path_row(ui, &self.i18n, &mut self.settings.ui.font.path, &FONT_ROW) {
+                        self.apply_font(ui.ctx());
+                    }
                 }
             }
-            ui.end_row();
         });
     }
 
-    fn ui_log_section(
-        &self,
-        ui: &mut egui::Ui,
-        selected_log_dir_path: &mut String,
-        actions: &mut HelpDialogActions,
-    ) {
-        egui::Grid::new("log_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            let mut path_selected = false;
-
-            let reload_clicked = path_selector_row(
-                PathSelector {
-                    ui,
-                    label: self.i18n.t(I18nKey::LogDirPathLabel),
-                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
-                    value: selected_log_dir_path,
-                    select_label: self.i18n.t(I18nKey::SelectButton),
-                    reload_label: self.i18n.t(I18nKey::ReloadButton),
-                    reload_hover: self.i18n.t(I18nKey::LogReloadHover),
-                    clear_label: self.i18n.t(I18nKey::ClearButton),
-                },
-                || {
-                    let dir = Path::new(self.settings.log.dir_path.as_str());
-                    let dir = dir.canonicalize().map(Cow::Owned).unwrap_or(Cow::Borrowed(dir));
-
-                    rfd::FileDialog::new().set_directory(dir).pick_folder().map(|p| {
-                        path_selected = true;
-                        p.display().to_string()
-                    })
-                },
-            );
-
-            actions.set(HelpDialogActions::LOG_RELOAD_CLICKED, reload_clicked);
-            actions.set(HelpDialogActions::LOG_PATH_SELECTED, path_selected);
-
-            ui.end_row();
+    fn ui_log_section(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("log_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
+            if path_row(ui, &self.i18n, &mut self.settings.log.dir_path, &LOG_ROW) {
+                self.reload_log();
+            }
         });
     }
 
-    fn ui_translation_section(
-        &self,
-        ui: &mut egui::Ui,
-        selected_i18n_path: &mut String,
-        actions: &mut HelpDialogActions,
-    ) {
-        egui::Grid::new("i18n_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            let mut path_selected = false;
-
-            let reload_clicked = path_selector_row(
-                PathSelector {
-                    ui,
-                    label: self.i18n.t(I18nKey::I18nPathLabel),
-                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
-                    value: selected_i18n_path,
-                    select_label: self.i18n.t(I18nKey::SelectButton),
-                    reload_label: self.i18n.t(I18nKey::ReloadButton),
-                    reload_hover: self.i18n.t(I18nKey::I18nReloadJsonHover),
-                    clear_label: self.i18n.t(I18nKey::ClearButton),
-                },
-                || {
-                    let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
-                        || Cow::Borrowed(Path::new(".")),
-                        |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-                    );
-
-                    rfd::FileDialog::new()
-                        .set_directory(path)
-                        .add_filter("translation", &["json"])
-                        .pick_file()
-                        .map(|p| {
-                            path_selected = true;
-                            p.display().to_string()
-                        })
-                },
-            );
-
-            actions.set(HelpDialogActions::I18N_RELOAD_CLICKED, reload_clicked);
-            actions.set(HelpDialogActions::I18N_PATH_SELECTED, path_selected);
+    fn ui_translation_section(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("i18n_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
+            if path_row(ui, &self.i18n, &mut self.settings.ui.i18n_path, &I18N_ROW) {
+                self.reload_i18n();
+            }
 
             ui.label("English:");
             ui.horizontal(|ui| {
@@ -524,148 +227,106 @@ impl App {
                     .on_hover_text(self.i18n.t(I18nKey::I18nWriteNewJsonHover))
                     .clicked()
                 {
-                    actions.insert(HelpDialogActions::I18N_WRITE_CLICKED);
+                    self.write_new_i18n();
                 }
 
                 if ui
-                    .add(button("Default"))
-                    .on_hover_text("Temporarily force a switch to English mode (for debugging)")
+                    .add(button("Force English"))
+                    .on_hover_text("Temporarily switch the UI to English, primarily for debugging.")
                     .clicked()
                 {
-                    actions.insert(HelpDialogActions::I18N_LOAD_DEFAULT_CLICKED);
+                    self.i18n = I18nMap::new();
                 }
             });
-
             ui.end_row();
         });
     }
 
-    /// Intended UI
+    fn ui_background_section(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("background_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
+            if path_row(
+                ui,
+                &self.i18n,
+                &mut self.settings.ui.background_image.path,
+                &BACKGROUND_ROW,
+            ) {
+                self.settings.ui.background_image.enabled = true;
+                self.reload_background(ui.ctx());
+            }
+
+            checkbox(
+                ui,
+                &mut self.settings.ui.background_image.enabled,
+                self.i18n.t(I18nKey::BackgroundImageEnabled),
+            )
+            .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
+            ui.end_row();
+        });
+    }
+
     /// ```txt
     /// Pandora
-    ///
-    /// Target version:      [ 2.7.0 ▼ ]
+    /// Target version:      [ 4.4.0Beta ▼ ]
     /// Import path: [ path    ] [Import]
     /// Export path: [ path    ] [Export]
     /// ```
-    fn ui_pandora_section(
-        &self,
-        ui: &mut egui::Ui,
-        selected_import_path: &mut String,
-        selected_export_path: &mut String,
-        selected_version: &mut PandoraVersion,
-        actions: &mut HelpDialogActions,
-    ) {
-        ui.label("Pandora");
-
-        egui::Grid::new("pandora_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+    fn ui_pandora_section(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("pandora_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
             ui.label(self.i18n.t(I18nKey::PandoraTargetVersionLabel))
                 .on_hover_text(self.i18n.t(I18nKey::PandoraTargetVersionHover));
             enum_select(
                 ui,
-                selected_version,
+                &mut self.settings.pandora.version,
                 &[(PandoraVersion::V4_4_0Beta, PandoraVersion::V4_4_0Beta.to_static_str())],
                 None::<egui::Vec2>,
             );
             ui.end_row();
 
-            if ui
-                .add(button(self.i18n.t(I18nKey::PandoraImportPathLabel)))
-                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
-                .clicked()
-                && let Err(err) = open_existing_dir_or_ancestor(Path::new(selected_import_path))
-            {
-                tracing::error!(err);
+            if folder_action_row(
+                ui,
+                &self.i18n,
+                &mut self.settings.pandora.import_path,
+                [
+                    I18nKey::PandoraImportPathLabel,
+                    I18nKey::PandoraImportLabel,
+                    I18nKey::PandoraImportHover,
+                ],
+            ) {
+                self.import_pandora();
             }
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(selected_import_path);
 
-                if ui
-                    .add(button(self.i18n.t(I18nKey::PandoraImportLabel)))
-                    .on_hover_text(self.i18n.t(I18nKey::PandoraImportHover))
-                    .clicked()
-                    && let Some(path) = rfd::FileDialog::new()
-                        .set_directory(selected_import_path.as_str())
-                        .pick_folder()
-                {
-                    *selected_import_path = path.display().to_string();
-                    actions.insert(HelpDialogActions::PANDORA_IMPORT_CLICKED);
-                }
-            });
-            ui.end_row();
-
-            if ui
-                .add(button(self.i18n.t(I18nKey::PandoraExportPathLabel)))
-                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
-                .clicked()
-                && let Err(err) = open_existing_dir_or_ancestor(Path::new(selected_import_path))
-            {
-                tracing::error!(err);
+            // Fixed: the old code opened `import_path` from the *export* label button.
+            if folder_action_row(
+                ui,
+                &self.i18n,
+                &mut self.settings.pandora.export_path,
+                [
+                    I18nKey::PandoraExportPathLabel,
+                    I18nKey::PandoraExportLabel,
+                    I18nKey::PandoraExportHover,
+                ],
+            ) {
+                self.export_pandora();
             }
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(selected_export_path);
-
-                if ui
-                    .add(button(self.i18n.t(I18nKey::PandoraExportLabel)))
-                    .on_hover_text(self.i18n.t(I18nKey::PandoraExportHover))
-                    .clicked()
-                    && let Some(path) = rfd::FileDialog::new()
-                        .set_directory(selected_export_path.as_str())
-                        .pick_folder()
-                {
-                    *selected_export_path = path.display().to_string();
-                    actions.insert(HelpDialogActions::PANDORA_EXPORT_CLICKED);
-                }
-            });
-            ui.end_row();
         });
     }
 
-    fn ui_background_section(
-        &self,
-        ui: &mut egui::Ui,
-        selected_background_path: &mut String,
-        background_enabled: &mut bool,
-        actions: &mut HelpDialogActions,
-    ) {
-        egui::Grid::new("background_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            let mut path_selected = false;
+    // --- side effects: plain `&mut self` methods, called directly from the widgets ---
 
-            let reload_clicked = path_selector_row(
-                PathSelector {
-                    ui,
-                    label: self.i18n.t(I18nKey::BackgroundImageLabel),
-                    label_hover: self.i18n.t(I18nKey::OpenSelectedPathHover),
-                    value: selected_background_path,
-                    select_label: self.i18n.t(I18nKey::SelectButton),
-                    reload_label: self.i18n.t(I18nKey::ReloadButton),
-                    reload_hover: self.i18n.t(I18nKey::BackgroundImageReloadHover),
-                    clear_label: self.i18n.t(I18nKey::ClearButton),
-                },
-                || {
-                    let dir =
-                        Path::new(&self.settings.ui.background_image.path).parent().map_or_else(
-                            || Cow::Borrowed(Path::new(".")),
-                            |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-                        );
-
-                    rfd::FileDialog::new()
-                        .set_directory(dir)
-                        .add_filter("image", &["png", "jpg", "jpeg"])
-                        .pick_file()
-                        .map(|p| {
-                            path_selected = true;
-                            p.display().to_string()
-                        })
-                },
-            );
-            actions.set(HelpDialogActions::BACKGROUND_IMG_RELOAD_CLICKED, reload_clicked);
-            actions.set(HelpDialogActions::BACKGROUND_IMG_PATH_SELECTED, path_selected);
-
-            checkbox(ui, background_enabled, self.i18n.t(I18nKey::BackgroundImageEnabled))
-                .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
-            ui.end_row();
-        });
+    fn apply_font(&mut self, ctx: &egui::Context) {
+        let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font) else {
+            return;
+        };
+        match err {
+            crate::fonts::FontError::Warn(msg) => {
+                tracing::warn!(msg);
+                self.notify.warn(msg);
+            }
+            crate::fonts::FontError::Error(msg) => {
+                tracing::error!(msg);
+                self.notify.error(msg);
+            }
+        }
     }
 
     fn reload_log(&mut self) {
@@ -674,11 +335,11 @@ impl App {
             tracing_rotation::global::change_log_path(dir, d_merge_gui_shared::log::LOG_FILENAME)
         {
             tracing::error!(%err);
-            self.notify_error(format!("Failed to reload log: {err}"));
+            self.notify.error(format!("Failed to reload log: {err}"));
         } else {
             self.update_log_dir();
             tracing::info!("Log file rotated.");
-            self.set_colored_notify("Log file rotated.".to_string(), Color32::GREEN);
+            self.notify.success("Log file rotated.".to_string());
         }
     }
 
@@ -687,25 +348,19 @@ impl App {
         match I18nMap::load(self.settings.ui.i18n_path.as_str()) {
             Ok(i18n) => {
                 self.i18n = i18n;
-                self.set_colored_notify(
-                    format!("Reloaded {}", self.settings.ui.i18n_path),
-                    Color32::GREEN,
-                );
+                self.notify.success(format!("Reloaded {}", self.settings.ui.i18n_path));
             }
             Err(err) => {
-                self.notify_error(format!("Failed to reload: {err}"));
+                self.notify.error(format!("Failed to reload: {err}"));
             }
         }
     }
 
     fn write_new_i18n(&mut self) {
-        let path = Path::new(&self.settings.ui.i18n_path).parent().map_or_else(
-            || Cow::Borrowed(Path::new(".")),
-            |p| p.canonicalize().map_or(Cow::Borrowed(p), Cow::Owned),
-        );
+        let dir = start_dir(&self.settings.ui.i18n_path, ".", false);
 
         let path = rfd::FileDialog::new()
-            .set_directory(path)
+            .set_directory(dir)
             .set_title("Save translation.json")
             .set_file_name("translation.json")
             .add_filter("translation", &["json"])
@@ -714,67 +369,209 @@ impl App {
         if let Some(path) = path {
             match I18nMap::save(&path) {
                 Ok(()) => {
-                    self.set_colored_notify(
-                        format!("OK. Wrote {}", path.display()),
-                        Color32::GREEN,
-                    );
+                    self.notify.success(format!("OK. Wrote {}", path.display()));
                 }
-                Err(err) => self.notify_error(err.to_string()),
+                Err(err) => self.notify.error(err.to_string()),
             }
         }
     }
+
+    fn import_pandora(&mut self) {
+        let path = self.settings.pandora.import_path.clone();
+        let version = self.settings.pandora.version;
+        match Pandora::import_to(&path, &mut self.settings, version) {
+            Ok(()) => {
+                self.notify.success(format!("Imported Pandora settings from {path}"));
+            }
+            Err(err) => self.notify.error(err),
+        }
+    }
+
+    fn export_pandora(&mut self) {
+        let path = self.settings.pandora.export_path.clone();
+        let version = self.settings.pandora.version;
+        match Pandora::export_from(&path, &self.settings, version) {
+            Ok(()) => {
+                self.notify.success(format!("Exported Pandora settings to {path}"));
+            }
+            Err(err) => self.notify.error(err),
+        }
+    }
+
+    // `reload_log` / `reload_i18n` / `write_new_i18n` / `reload_background`: unchanged.
 }
 
-struct PathSelector<'a> {
-    ui: &'a mut egui::Ui,
-    label: &'a str,
-    label_hover: &'a str,
-    value: &'a mut String,
-    select_label: &'a str,
-    reload_label: &'a str,
-    reload_hover: &'a str,
-    clear_label: &'a str,
+// ---------------------------------------------------------------------------
+// Reusable widgets: free functions, NOT `&self` methods (see the rule below).
+
+enum Picker {
+    File { filter: &'static str, exts: &'static [&'static str], fallback_dir: &'static str },
+    Folder,
 }
 
-/// Return whether the "reload" button was clicked.
-fn path_selector_row(selector: PathSelector, picker: impl FnOnce() -> Option<String>) -> bool {
-    let PathSelector {
-        ui,
-        label,
-        label_hover,
-        value,
-        select_label,
-        reload_label,
-        reload_hover,
-        clear_label,
-    } = selector;
+/// Declarative description of a path row. All `const`, so no allocation at all.
+struct PathRow {
+    label: I18nKey,
+    reload_hover: I18nKey,
+    picker: Picker,
+}
 
-    if ui.add(button(label)).on_hover_text(label_hover).clicked()
-        && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(value))
+const FONT_ROW: PathRow = PathRow {
+    label: I18nKey::FontFileLabel,
+    reload_hover: I18nKey::FontReloadHover,
+    picker: Picker::File {
+        filter: "font",
+        exts: &["ttc", "ttf", "tto"],
+        fallback_dir: "C:/Windows/Fonts",
+    },
+};
+const LOG_ROW: PathRow = PathRow {
+    label: I18nKey::LogDirPathLabel,
+    reload_hover: I18nKey::LogReloadHover,
+    picker: Picker::Folder,
+};
+const I18N_ROW: PathRow = PathRow {
+    label: I18nKey::I18nPathLabel,
+    reload_hover: I18nKey::I18nReloadJsonHover,
+    picker: Picker::File { filter: "translation", exts: &["json"], fallback_dir: "." },
+};
+const BACKGROUND_ROW: PathRow = PathRow {
+    label: I18nKey::BackgroundImageLabel,
+    reload_hover: I18nKey::BackgroundImageReloadHover,
+    picker: Picker::File { filter: "image", exts: &["png", "jpg", "jpeg"], fallback_dir: "." },
+};
+
+fn text_line_width(ui: &egui::Ui, actions: &[&str]) -> f32 {
+    let spacing = ui.spacing();
+    let button_padding = spacing.button_padding.x * 2.0;
+
+    let buttons_width = actions
+        .iter()
+        .map(|label| {
+            ui.fonts_mut(|fonts| {
+                fonts
+                    .layout_no_wrap(
+                        (*label).to_owned(),
+                        egui::TextStyle::Button.resolve(ui.style()),
+                        ui.visuals().text_color(),
+                    )
+                    .size()
+                    .x
+            }) + button_padding
+        })
+        .sum::<f32>();
+
+    let gaps = spacing.item_spacing.x * actions.len().saturating_sub(1) as f32;
+
+    (ui.available_width() - buttons_width - gaps).max(0.0)
+}
+
+/// `[label][ text edit ][Select][Reload][Clear]`
+///
+/// Returns `true` if the target should be reloaded (reload clicked or a new path picked).
+/// Like `egui::Response::clicked`, the caller consumes it immediately at the call site.
+fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow) -> bool {
+    fn pick(picker: &Picker, current: &str) -> Option<String> {
+        let picked = match picker {
+            Picker::File { filter, exts, fallback_dir } => rfd::FileDialog::new()
+                .set_directory(start_dir(current, fallback_dir, false))
+                .add_filter(*filter, exts)
+                .pick_file(),
+            Picker::Folder => {
+                rfd::FileDialog::new().set_directory(start_dir(current, ".", true)).pick_folder()
+            }
+        };
+        picked.map(|p| p.display().to_string())
+    }
+
+    if ui
+        .add(button(i18n.t(row.label)))
+        .on_hover_text(i18n.t(I18nKey::OpenSelectedPathHover))
+        .clicked()
+        && let Err(err) = open_existing_dir_or_ancestor(Path::new(value.as_str()))
     {
         tracing::error!(err);
     }
 
-    let mut reload_clicked = false;
+    let mut reload = false;
+    ui.horizontal_top(|ui| {
+        let select = i18n.t(I18nKey::SelectButton);
+        let reload_button = i18n.t(I18nKey::ReloadButton);
+        let clear = i18n.t(I18nKey::ClearButton);
 
-    ui.horizontal(|ui| {
-        ui.text_edit_singleline(value);
+        let width = text_line_width(ui, &[select, reload_button, clear]);
+        text(ui, value, None, width);
 
-        if ui.add(button(select_label)).clicked()
-            && let Some(p) = picker()
+        if ui.add(button(select)).clicked()
+            && let Some(picked) = pick(&row.picker, value)
         {
-            *value = p;
+            *value = picked;
+            reload = true;
         }
 
-        if ui.add(button(reload_label)).on_hover_text(reload_hover).clicked() {
-            reload_clicked = true;
+        if ui.add(button(reload_button)).on_hover_text(i18n.t(row.reload_hover)).clicked() {
+            reload = true;
         }
 
-        if ui.add(button(clear_label)).clicked() {
+        if ui.add(button(clear)).clicked() {
             value.clear();
         }
     });
     ui.end_row();
+    reload
+}
 
-    reload_clicked
+/// `[label][ text edit ][Action]`. Returns `true` when a folder was picked.
+fn folder_action_row(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    path: &mut String,
+    [label, action, action_hover]: [I18nKey; 3],
+) -> bool {
+    if ui.add(button(i18n.t(label))).on_hover_text(i18n.t(I18nKey::OpenSelectedPathHover)).clicked()
+        && let Err(err) = open_existing_dir_or_ancestor(Path::new(path.as_str()))
+    {
+        tracing::error!(err);
+    }
+
+    let mut picked = false;
+
+    ui.horizontal_top(|ui| {
+        let action_text = i18n.t(action);
+        let width = text_line_width(ui, &[action_text]);
+        text(ui, path, None, width);
+
+        if ui.add(button(action_text)).on_hover_text(i18n.t(action_hover)).clicked()
+            && let Some(dir) = rfd::FileDialog::new().set_directory(path.as_str()).pick_folder()
+        {
+            *path = dir.display().to_string();
+            picked = true;
+        }
+    });
+
+    ui.end_row();
+    picked
+}
+
+/// IMPORTANT: Without canonicalizing, rfd cannot set the directory correctly.
+fn start_dir(current: &str, fallback: &str, current_is_dir: bool) -> PathBuf {
+    let path = Path::new(current);
+    let base = if current_is_dir { Some(path) } else { path.parent() };
+    base.map_or_else(
+        || PathBuf::from(fallback),
+        |p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()),
+    )
+}
+
+/// Draws the dimmed backdrop; the returned response tells whether it was clicked.
+fn help_overlay(ctx: &egui::Context) -> egui::Response {
+    egui::Area::new("help_overlay_bg".into())
+        .order(egui::Order::Background)
+        .fixed_pos(ctx.content_rect().min)
+        .show(ctx, |ui| {
+            let rect = ui.ctx().content_rect();
+            ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(160));
+            ui.allocate_response(rect.size(), egui::Sense::click())
+        })
+        .inner
 }

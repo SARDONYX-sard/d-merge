@@ -1385,7 +1385,6 @@ dependencies = [
 name = "d_merge_egui"
 version = "2.8.0"
 dependencies = [
- "bitflags 2.13.2",
  "d_merge_gui_shared",
  "dark-light",
  "dashmap",

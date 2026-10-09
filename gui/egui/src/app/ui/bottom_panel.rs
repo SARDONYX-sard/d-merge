@@ -26,19 +26,19 @@ impl App {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
-                self.add_button(ui, ctx, I18nKey::LogDir, |s, _| {
+                self.add_button(ui, ctx, I18nKey::LogDir, |app, _| {
                     if let Err(err) =
-                        open_existing_dir_or_ancestor(s.settings.log.dir_path.as_str())
+                        open_existing_dir_or_ancestor(app.settings.log.dir_path.as_str())
                     {
-                        s.notify_error(err);
+                        app.notify.error(err);
                     }
                 });
-                self.add_button(ui, ctx, I18nKey::LogButton, |s, _| {
+                self.add_button(ui, ctx, I18nKey::LogButton, |app, _| {
                     use std::sync::atomic::Ordering;
-                    s.show_log_window.fetch_xor(true, Ordering::Relaxed);
+                    app.show_log_window.fetch_xor(true, Ordering::Relaxed);
                 });
-                self.add_button(ui, ctx, I18nKey::NotificationClearButton, |s, _| {
-                    s.clear_notification();
+                self.add_button(ui, ctx, I18nKey::NotificationClearButton, |app, _| {
+                    app.notify.clear();
                 });
 
                 let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
@@ -125,7 +125,7 @@ impl App {
         );
 
         panel.show(ctx, |ui| {
-            ui.colored_label(self.notify.1, &self.notify.0);
+            ui.colored_label(self.notify.color.resolve(ui.visuals()), &self.notify.message);
         });
     }
 }

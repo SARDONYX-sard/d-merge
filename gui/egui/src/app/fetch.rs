@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use d_merge_gui_shared::{fetch::FetchState, i18n::I18nKey, mod_item, settings::DataMode};
-use egui::Color32;
 use rayon::prelude::*;
 
 use crate::app::App;
@@ -58,10 +57,7 @@ impl App {
 
         match *state {
             FetchState::Fetching => {
-                self.mod_list_msg = (
-                    self.i18n.t(I18nKey::ModsListFetchStateFetching).to_string(),
-                    crate::app::patch::EGUI_RIGHT_BLUE,
-                );
+                self.mod_list_msg.info(self.i18n.t(I18nKey::ModsListFetchStateFetching));
             }
             FetchState::Done { elapsed } => {
                 let elapsed_secs = elapsed.as_secs_f32();
@@ -76,13 +72,10 @@ impl App {
                 *self.fetch_state.write() = FetchState::Idle;
                 self.last_fetch_was_empty = false;
 
-                self.mod_list_msg = (
-                    format!(
-                        "{} ({elapsed_secs:.2} s)",
-                        self.i18n.t(I18nKey::ModsListFetchStateDone)
-                    ),
-                    Color32::GREEN,
-                );
+                self.mod_list_msg.success(format!(
+                    "{} ({elapsed_secs:.2} s)",
+                    self.i18n.t(I18nKey::ModsListFetchStateDone)
+                ));
 
                 if self.settings.behavior.auto_run {
                     self.settings.mod_list_mut().par_iter_mut().for_each(|m| m.enabled = true);
@@ -97,13 +90,10 @@ impl App {
                 *self.fetch_state.write() = FetchState::Idle;
                 self.last_fetch_was_empty = true;
 
-                self.mod_list_msg = (
-                    format!(
-                        "{} ({elapsed_secs:.2} s)",
-                        self.i18n.t(I18nKey::ModsListFetchStateEmpty)
-                    ),
-                    Color32::WHITE,
-                );
+                self.mod_list_msg.info(format!(
+                    "{} ({elapsed_secs:.2} s)",
+                    self.i18n.t(I18nKey::ModsListFetchStateEmpty)
+                ));
             }
 
             FetchState::Error { elapsed } => {
@@ -112,13 +102,10 @@ impl App {
 
                 *self.fetch_state.write() = FetchState::Idle;
 
-                self.mod_list_msg = (
-                    format!(
-                        "{} ({elapsed_secs:.2} s)",
-                        self.i18n.t(I18nKey::ModsListFetchStateError)
-                    ),
-                    Color32::RED,
-                );
+                self.mod_list_msg.error(format!(
+                    "{} ({elapsed_secs:.2} s)",
+                    self.i18n.t(I18nKey::ModsListFetchStateError)
+                ));
             }
 
             FetchState::Idle => {}
@@ -149,7 +136,7 @@ impl App {
                 let err_msg = self.i18n.t(I18nKey::NotifyErrWindowsRegistryNotFound).to_string();
                 #[cfg(not(target_os = "windows"))]
                 let err_msg = self.i18n.t(I18nKey::NotifyErrPlatformNotSupported).to_string();
-                self.notify_error(err_msg);
+                self.notify.error(err_msg);
             }
         }
     }

@@ -11,7 +11,7 @@ impl super::App {
             Err(e) => {
                 let err = format!("{e}");
                 tracing::error!(err);
-                self.notify_error(err);
+                self.notify.error(err);
                 return;
             }
         };

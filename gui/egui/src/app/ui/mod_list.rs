@@ -97,7 +97,10 @@ impl App {
             if self.reload_button(ui) {
                 ui.add(egui::Spinner::new());
             }
-            ui.colored_label(self.mod_list_msg.1, self.mod_list_msg.0.clone());
+            ui.colored_label(
+                self.mod_list_msg.color.resolve(ui.visuals()),
+                &self.mod_list_msg.message,
+            );
         });
     }
 

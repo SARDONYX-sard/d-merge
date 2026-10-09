@@ -9,14 +9,9 @@ use d_merge_gui_shared::{
 };
 use skyrim_data_dir::Runtime;
 
-use crate::app::App;
+use crate::{app::App, ui::notify::NotificationColor};
 
 impl App {
-    /// Assembles patch configuration from current settings and starts
-    /// `nemesis_merge::behavior_gen` on the async runtime.
-    ///
-    /// If [`AppSettings::auto_remove_meshes`] is set, the output `meshes/`
-    /// directory is removed first (see [`App::remove_meshes_dir_all`]).
     pub(crate) fn patch(&mut self, ctx: &egui::Context) {
         self.patch_start_time = Some(std::time::Instant::now());
         self.patch_status.clear();
@@ -77,6 +72,7 @@ impl App {
     /// Polls the patch status written by the `status_report` callback and
     /// forwards it to the notification bar.
     ///
+    /// # Notes
     /// Must be called once per frame from [`eframe::App::update`].
     /// Short-circuits immediately when no patch is in progress
     /// (`patch_start_time` is `None`), keeping the happy-path cost to a
@@ -89,7 +85,7 @@ impl App {
 
         let text = self.patch_status.text(&self.i18n, start_time);
         if !text.is_empty() {
-            self.set_colored_notify(text, self.patch_status.color());
+            self.notify.set(text, self.patch_status.color());
         }
 
         if matches!(self.patch_status.phase.load(Ordering::Relaxed), 6 | 7) {
@@ -98,10 +94,6 @@ impl App {
         }
     }
 
-    /// Removes `<output_dir>/meshes` (and the debug cache) before patching.
-    ///
-    /// Skipped with a warning when the output directory equals the Skyrim data
-    /// directory, because deleting `meshes/` there would destroy installed mods.
     fn remove_meshes_dir_all(&mut self) {
         let output_dir = self.settings.current_output_dir().to_owned();
         let skyrim_data_dir = self.settings.current_skyrim_data_dir();
@@ -114,7 +106,7 @@ impl App {
             return;
         }
 
-        self.notify_info(format!(
+        self.notify.info(format!(
             "0/6: {} `{output_dir}/meshes`",
             self.i18n.t(I18nKey::RemovingMeshesMessage)
         ));
@@ -122,9 +114,7 @@ impl App {
     }
 }
 
-pub(crate) const EGUI_RIGHT_BLUE: egui::Color32 = egui::Color32::from_rgb(120, 220, 255);
-
-pub(crate) trait EguiDisplay {
+trait EguiDisplay {
     fn apply(&self, status: nemesis_merge::Status, ctx: &egui::Context);
     fn color(&self) -> egui::Color32;
 }
@@ -185,7 +175,7 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
 
         match snapshot.phase {
             1 => egui::Color32::from_rgb(120, 170, 255),
-            2 => super::patch::EGUI_RIGHT_BLUE,
+            2 => NotificationColor::RIGHT_BLUE,
             3 => egui::Color32::from_rgb(140, 200, 255),
             4 => egui::Color32::from_rgb(255, 170, 120),
             5 => egui::Color32::from_rgb(200, 140, 255),

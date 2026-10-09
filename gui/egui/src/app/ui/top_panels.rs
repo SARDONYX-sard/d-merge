@@ -255,7 +255,7 @@ impl App {
                 && let Err(err) =
                     open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
             {
-                self.notify_error(err);
+                self.notify.error(err);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -356,7 +356,7 @@ impl App {
                     self.settings.current_output_dir(),
                 ))
             {
-                self.notify_error(err);
+                self.notify.error(err);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -378,9 +378,8 @@ impl App {
                         match find_existing_dir_or_ancestor(self.settings.current_output_dir()) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
-                                self.notify_error(format!(
-                                    "Couldn't find output dir or ancestor: {err}"
-                                ));
+                                self.notify
+                                    .error(format!("Couldn't find output dir or ancestor: {err}"));
                                 return;
                             }
                         }
