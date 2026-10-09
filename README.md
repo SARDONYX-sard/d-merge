@@ -155,25 +155,25 @@ npm run build # Rich GUI by tauri
 
 ## Licenses
 
-This project includes multiple crates with different licenses. The overall license of the `backend` crate is **GPL-3.0**, due to transitive dependencies on GPL-licensed components.
+This project includes multiple crates with different licenses. The overall license of the `backend` crate is **GPL-3.0-or-later**, due to transitive dependencies on GPL-licensed components.
 
-- [GPL-3.0](./LICENSE)
+- [GPL-3.0-or-later](./LICENSE)
 - [MIT](./LICENSES/LICENSE-MIT)
 - [Apache2.0](./LICENSES/LICENSE-APACHE)
 
 ### License Tree
 
 ```txt
-cli/gui (GPL-3.0)
-├── nemesis_merge (GPL-3.0)
+cli/gui (GPL-3--or-later)
+├── nemesis_merge (GPL-3--or-later)
 │   ├── auto_charset (MIT OR Apache-2.0)
-│   ├── fnis_list (GPL-3.0)
+│   ├── fnis_list (GPL-3--or-later)
 │   ├── gh_issue_link (MIT OR Apache-2.0)
 │   ├── json_patch (MIT OR Apache-2.0)
 │   ├── jwalk_glob (MIT OR Apache-2.0)
 │   ├── nemesis_xml (MIT OR Apache-2.0)
 │   ├── serde_hkx_for_gui (MIT OR Apache-2.0)
-│   ├── skyrim_anim_parser (GPL-3.0)
+│   ├── skyrim_anim_parser (GPL-3--or-later)
 │   ├── skyrim_crc (MIT OR Apache-2.0)
 │   └── skyrim_data_dir (MIT OR Apache-2.0)
 │
@@ -186,17 +186,17 @@ cli/gui (GPL-3.0)
 #### License Propagation
 
 - **`skyrim_anim_parser`**:
-  I understood the specification of this `animationdatasinglefile.txt` file from reading pandora. Therefore, I will keep it under GPL-3.0 just in case.
+  I understood the specification of this `animationdatasinglefile.txt` file from reading pandora. Therefore, I will keep it under GPL-3--or-later just in case.
 
 - **`nemesis_merge`**:
-  This crate depends on both `skyrim_anim_parser` (GPL-3.0) and a GPL-licensed template(See `resource` dir). Thus, it is required to be **GPL-3.0**.
+  This crate depends on both `skyrim_anim_parser` (GPL-3.0-or-later) and a GPL-licensed template(See `resource` dir). Thus, it is required to be **GPL-3.0-or-later**.
 
 - **`backend`**:
-  As a GUI frontend that depends on `nemesis_merge`, it inherits the **GPL-3.0** license through transitive dependency.
+  As a GUI frontend that depends on `nemesis_merge`, it inherits the **GPL-3.0-or-later** license through transitive dependency.
 
-Other utility crates (e.g., `mod_info`, `node_expr`, `json_patch`, etc.) are licensed under **MIT OR Apache-2.0**, but the presence of GPL-licensed dependencies requires that the final binary (the GUI/backend) must be distributed under **GPL-3.0**.
+Other utility crates (e.g., `mod_info`, `node_expr`, `json_patch`, etc.) are licensed under **MIT OR Apache-2.0**, but the presence of GPL-licensed dependencies requires that the final binary (the GUI/backend) must be distributed under **GPL-3.0-or-later**.
 
-Please ensure that your usage and redistribution of this software complies with the [**GPL-3.0**](./LICENSE) license terms.
+Please ensure that your usage and redistribution of this software complies with the [**GPL-3.0-or-later**](./LICENSE) license terms.
 
 ### Deps NOTES
 
