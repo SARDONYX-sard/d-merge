@@ -13,7 +13,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-rayon = { workspace = true, optional = true }
 serde = { workspace = true, optional = true } # Implement (De)Serializer
 simd-json = { workspace = true }
 snafu = { workspace = true }
@@ -30,4 +29,5 @@ default = ["rayon"] # for debug
 # default = ["tracing", "rayon"] # for debug
 tracing = ["dep:tracing"]
 serde = ["dep:serde"]
-rayon = ["dep:rayon"]
+# NOTE: No-op. Kept only for compatibility. Parallelism is decided by the caller (outer layer).
+rayon = []

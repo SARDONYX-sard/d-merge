@@ -12,7 +12,6 @@ mod operation;
 mod patch_types;
 pub mod ptr_mut;
 pub(crate) mod range;
-pub(crate) mod vec_utils;
 
 pub use self::{
     apply::{
