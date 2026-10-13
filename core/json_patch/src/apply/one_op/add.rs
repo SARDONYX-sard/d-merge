@@ -3,6 +3,7 @@ use simd_json::{StaticNode, borrowed::Value, derived::ValueTryAsScalar as _};
 use crate::{
     JsonPath,
     apply::error::{JsonPatchError, Result},
+    range::parse::parse_index,
 };
 
 /// Adds a new key (for objects) or a new index (for arrays) if they don't exist.
@@ -38,7 +39,7 @@ pub(crate) fn apply_add<'value>(
                 }
             }
             Value::Array(list) => {
-                if let Ok(index) = token.parse::<usize>() {
+                if let Some(index) = parse_index(&token) {
                     while list.len() <= index {
                         list.push(Default::default()); // Push a placeholder to extend the array
                     }
@@ -183,5 +184,15 @@ mod tests {
             "new_key": "new_value"
         });
         assert_eq!(target, expected);
+    }
+
+    #[test]
+    fn add_to_array_by_bracket_index() {
+        let mut target = json_typed!(borrowed, { "items": [1, 2, 3] });
+
+        apply_add(&mut target, json_path!("items", "[3]"), Value::Static(StaticNode::U64(4)))
+            .unwrap_or_else(|err| panic!("{err}"));
+
+        assert_eq!(target["items"][3], 4);
     }
 }

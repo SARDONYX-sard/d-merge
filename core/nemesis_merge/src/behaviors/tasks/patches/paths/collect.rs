@@ -32,8 +32,8 @@ pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, Pa
         .par_bridge()
         .filter_map(|result| {
             let txt_path = {
-                let path = result.ok()?.path();
-                is_txt_file(&path).then_some(path)?
+                let entry = result.ok()?;
+                is_txt_entry(&entry).then(|| entry.path())?
             };
             let txt_path_str = if let Some(path) = txt_path.to_str() {
                 path
@@ -52,12 +52,20 @@ pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, Pa
         .collect()
 }
 
+/// Is this entry a `.txt` file?
+///
+/// The extension is checked first, then the file type cached by `jwalk`.
+/// This avoids a `stat` syscall per entry. Only symlinks are resolved by `stat`.
 #[inline]
-fn is_txt_file(path: &Path) -> bool {
-    let is_txt = path.extension().is_some_and(|path| path.eq_ignore_ascii_case("txt"));
-    let is_file = path.is_file();
+fn is_txt_entry(entry: &jwalk::DirEntry<((), ())>) -> bool {
+    let is_txt =
+        Path::new(&entry.file_name).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt"));
+    if !is_txt {
+        return false;
+    }
 
-    is_txt && is_file
+    let file_type = entry.file_type();
+    if file_type.is_symlink() { entry.path().is_file() } else { !file_type.is_dir() }
 }
 
 /// Check if the file name starts with a `#` and is a file.

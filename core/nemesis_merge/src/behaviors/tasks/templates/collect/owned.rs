@@ -22,12 +22,7 @@ pub(crate) fn collect_templates(
             // - `../d_merge/asserts/templates/meshes/actors/character/behaviors/0_master.xml`
             let template_path = template_root.join(template_key.as_meshes_inner_path());
 
-            if !template_path.exists() || !template_path.is_file() {
-                return Either::Right(Error::NotFoundTemplate {
-                    template_name: template_path.display().to_string(),
-                });
-            }
-
+            // NOTE: No `exists()`/`is_file()` pre-check. `read` fails for a missing file or a directory anyway.
             match std::fs::read(&template_path) {
                 Ok(bytes) => Either::Left((template_key, bytes)),
                 Err(_err) => Either::Right(Error::NotFoundTemplate {

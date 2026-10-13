@@ -69,7 +69,7 @@ fn run_conversion_jobs(
     aa_base_map: Option<&super::alternate::aa_config::BaseMap>,
 ) -> Vec<Error> {
     #[cfg(feature = "tracing")]
-    tracing::debug!("jobs to run: {:#?}", jobs);
+    tracing::trace!("jobs to run: {:#?}", jobs);
 
     let (hkx_jobs, namespace_config_jobs, slot_config_jobs) = partition_jobs(jobs);
 

@@ -29,11 +29,6 @@ pub(crate) struct HkxPatchMaps<'a> {
 
 impl<'a> HkxPatchMaps<'a> {
     #[inline]
-    pub(crate) fn len(&self) -> usize {
-        self.one.len() + self.seq.0.len()
-    }
-
-    #[inline]
     pub(crate) fn merge(&self, other: Self) {
         self.one.merge(other.one);
         self.seq.merge(other.seq);
@@ -70,21 +65,27 @@ impl<'a> OnePatchMap<'a> {
     ///
     /// This method is safe to call concurrently.
     pub(crate) fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
-        // Same-path conflict.
-        if let Some(mut existing) = self.patches.get_mut(&key) {
-            if new_value.priority > existing.priority {
-                tracing::info!(
-                    "Conflict Path {key:?}: priority {} -> {} (overwritten)",
-                    new_value.priority,
-                    existing.priority,
-                );
+        // NOTE: Lookup and insertion must be done under one shard lock(`entry`).
+        //       With `get_mut` -> `insert`, two threads inserting the same new path could both insert,
+        //       and the last writer would win regardless of priority.
+        match self.patches.entry(key) {
+            // Same-path conflict.
+            dashmap::Entry::Occupied(mut existing) => {
+                if new_value.priority > existing.get().priority {
+                    tracing::info!(
+                        "Conflict Path {:?}: priority {} -> {} (overwritten)",
+                        existing.key(),
+                        existing.get().priority,
+                        new_value.priority,
+                    );
 
-                *existing = new_value;
+                    existing.insert(new_value);
+                }
             }
-
-            return;
+            dashmap::Entry::Vacant(vacant) => {
+                vacant.insert(new_value);
+            }
         }
-        self.patches.insert(key, new_value);
     }
 
     /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
@@ -320,5 +321,38 @@ mod tests {
         assert_eq!(map.len(), 2);
         assert!(map.patches.contains_key(&path1));
         assert!(map.patches.contains_key(&path2));
+    }
+
+    /// Many threads insert the same paths concurrently with different priorities.
+    /// The highest priority must always win, regardless of the thread scheduling.
+    #[test]
+    fn concurrent_insert_keeps_highest_priority() {
+        const PATHS: usize = 64;
+        const PRIORITIES: usize = 256;
+
+        for _ in 0..20 {
+            let map = OnePatchMap::default();
+            let barrier = std::sync::Barrier::new(PRIORITIES);
+
+            std::thread::scope(|s| {
+                for priority in 0..PRIORITIES {
+                    let map = &map;
+                    let barrier = &barrier;
+                    s.spawn(move || {
+                        barrier.wait(); // Maximize contention on the first insertion.
+                        for i in 0..PATHS {
+                            let id = format!("#{i:04}");
+                            let path = vec![std::borrow::Cow::Owned(id), "ClassA".into()];
+                            map.insert(path, value(priority));
+                        }
+                    });
+                }
+            });
+
+            assert_eq!(map.len(), PATHS);
+            for entry in map.patches.iter() {
+                assert_eq!(entry.value().priority, PRIORITIES - 1, "path: {:?}", entry.key());
+            }
+        }
     }
 }

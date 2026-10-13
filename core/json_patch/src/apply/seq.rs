@@ -1,22 +1,12 @@
+#[cfg(any(feature = "tracing", test))]
 use core::ops::Range;
-use std::{
-    borrow::Cow,
-    sync::atomic::{AtomicUsize, Ordering},
-};
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
 use simd_json::borrowed::Value;
 
 use crate::{
     Action, JsonPatch, JsonPatchError, JsonPath, Op, Result, ValueWithPriority,
-    ptr_mut::PointerMut as _,
-    range::split_range::split_range_at_len,
-    vec_utils::{SmartExtend as _, SmartIntoIter as _, SmartIterMut as _},
+    ptr_mut::PointerMut as _, range::split_range::split_range_at_len,
 };
-
-const MARK_AS_REMOVED_STR: &str = "##Mark_As_Removed##"; // Separate inner str for test
-const MARK_AS_REMOVED: Value<'static> = Value::String(Cow::Borrowed(MARK_AS_REMOVED_STR));
 
 /// Replace one value.
 ///
@@ -42,12 +32,13 @@ pub fn apply_seq_by_priority<'a>(
     };
 
     sort_by_priority(patches.as_mut_slice());
+    // NOTE: The visualizer is expensive, so build it only when it is actually emitted.
     #[cfg(feature = "tracing")]
-    {
+    if tracing::enabled!(tracing::Level::TRACE) {
         let path = path.join("/");
         let target_len = template_array.len();
         let visualizer = visualize_ops(&patches, target_len);
-        tracing::debug!(
+        tracing::trace!(
             "Seq Json Patch Conflict Resolution report
  file=\"{file_name}\"
  path: {path}(len: {target_len})
@@ -56,12 +47,8 @@ pub fn apply_seq_by_priority<'a>(
         );
     }
 
-    let patch_target_vec = core::mem::take(template_array);
-    let patched_array = apply_ops_parallel(*patch_target_vec, patches)?
-        .smart_iter()
-        .filter(|v| v != &MARK_AS_REMOVED);
-
-    template_array.smart_extend(patched_array);
+    let patch_target_vec = core::mem::take(&mut **template_array);
+    **template_array = apply_ops(patch_target_vec, patches)?;
 
     Ok(())
 }
@@ -165,20 +152,17 @@ pub fn apply_seq_array_directly<'a>(
     mut patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<()> {
     #[cfg(feature = "tracing")]
-    {
+    if tracing::enabled!(tracing::Level::TRACE) {
         let visualizer = visualize_ops(&patches, target_array.len());
         let target_len = target_array.len();
-        tracing::debug!(
+        tracing::trace!(
             "Seq Json Patch Conflict Resolution\n target_len={target_len}\n ---\n{visualizer}"
         );
     }
 
     let patch_target_vec = core::mem::take(target_array);
     sort_by_priority(patches.as_mut_slice());
-    let patched_array = apply_ops_parallel(patch_target_vec, patches)?
-        .smart_iter()
-        .filter(|v| v != &MARK_AS_REMOVED);
-    target_array.smart_extend(patched_array);
+    *target_array = apply_ops(patch_target_vec, patches)?;
     Ok(())
 }
 
@@ -200,85 +184,102 @@ fn sort_by_priority<'a>(patches: &mut [ValueWithPriority<'a>]) {
         a_priority.cmp(b_priority).then(op_rank(a).cmp(&op_rank(b)))
     };
 
-    #[cfg(feature = "rayon")]
-    patches.par_sort_unstable_by(cmp_fn);
-    #[cfg(not(feature = "rayon"))]
+    // NOTE: Must be a stable sort. Patches with the same `(priority, op)` keep their input order,
+    //       which makes the result deterministic.
     patches.sort_by(cmp_fn);
 }
 
-/// - [playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=14cc7675b080133f94272b9ef3cc43ce)
+/// Applies sorted sequence patches to `base` in a single pass.
+///
+/// All positions refer to the indices of the **original** `base` array.
+///
+/// # Algorithm
+/// 1. `Replace`/`Remove` are applied in place; removal is tracked by a flag per element
+///    (the length of `base` does not change during this step).
+/// 2. `Add`/`SeqPush` are collected as `(insert position, values)` and stably sorted by position.
+///    Same-position inserts therefore keep the priority order.
+/// 3. The result is built in one pass: inserts, then kept elements, then the overflow of `Replace`.
+///
+/// This is `O(n + k log k)` instead of `O(n * k)` with repeated `Vec::splice`.
 ///
 /// # Assumptions
-/// - patches are sorted.
-fn apply_ops_parallel<'a>(
+/// - patches are sorted by [`sort_by_priority`].
+fn apply_ops<'a>(
     mut base: Vec<Value<'a>>,
     patches: Vec<ValueWithPriority<'a>>,
 ) -> Result<Vec<Value<'a>>> {
-    let (non_add_ops, mut add_ops): (Vec<_>, Vec<_>) =
-        patches.smart_iter().partition(|ValueWithPriority { patch, .. }| match &patch.action {
-            Action::Pure { op } => matches!(op, Op::Replace | Op::Remove),
-            Action::Seq { op, .. } => matches!(op, Op::Replace | Op::Remove),
-            Action::SeqPush => false,
-        });
+    let base_len = base.len();
+    let mut removed = vec![false; base_len];
+    // (insert position in original indices, values)
+    let mut inserts: Vec<(usize, Vec<Value<'a>>)> = Vec::new();
+    // Values of `Replace` that overflow past the end. These are appended last.
+    let mut overflow: Vec<Value<'a>> = Vec::new();
 
-    // Apply Replace and Remove operations
-    for ValueWithPriority { patch, priority } in non_add_ops {
+    for ValueWithPriority { patch, .. } in patches {
         let JsonPatch { action, value } = patch;
 
-        // Get sequence information if the action targets a sequence
-        let (op, range) = action.try_as_seq()?;
+        match action {
+            Action::Seq { op: Op::Replace, range } => {
+                let (in_bounds, overflow_range) = split_range_at_len(range, base_len);
+                let mut values = value_as_array(value)?.into_iter();
 
-        match op {
-            Op::Replace => {
-                let values = value_as_array(value)?;
+                if let Some(in_bounds) = in_bounds {
+                    for index in in_bounds {
+                        if let Some(value) = values.next() {
+                            base[index] = value;
+                            removed[index] = false;
+                        } else {
+                            // Fewer values than the range: the remaining elements are removed.
+                            removed[index] = true;
+                        }
+                    }
+                }
 
-                if let Some(add_patch) =
-                    apply_replace_with_overflow(&mut base, range, values, priority)?
-                {
-                    add_ops.push(add_patch);
+                // NOTE: If the range fits in bounds, surplus values are discarded (same as zip).
+                if overflow_range.is_some() {
+                    overflow.extend(values);
                 }
             }
-            Op::Remove => {
-                let Some(slice) = base.get_mut(range.clone()) else {
+            Action::Seq { op: Op::Remove, range } => {
+                let Some(flags) = removed.get_mut(range.clone()) else {
                     return Err(JsonPatchError::UnexpectedRange {
                         patch_range: range,
-                        actual_len: base.len(),
+                        actual_len: base_len,
                     });
                 };
-
-                slice.smart_iter_mut().for_each(|element| {
-                    *element = MARK_AS_REMOVED; // mark element for removal
-                });
+                flags.fill(true);
             }
-            Op::Add => {} // Add should not appear here
-        };
-    }
-
-    // Apply Add/SeqPush operations
-    let mut offset = 0;
-    for value in add_ops {
-        match &value.patch.action {
             Action::Seq { op: Op::Add, range } => {
-                let values = value_as_array(value.patch.value)?;
-                let insert_at = range.start + offset;
-
-                if insert_at < base.len() {
-                    let values_len = values.len();
-                    base.splice(insert_at..insert_at, values);
-                    offset += values_len; // Update offset for subsequent inserts
-                } else {
-                    base.smart_extend(values);
-                }
+                // Inserts past the end are appended in priority order.
+                inserts.push((range.start.min(base_len), value_as_array(value)?));
             }
-            Action::SeqPush => {
-                let values = value_as_array(value.patch.value)?;
-                base.smart_extend(values); // Always append at the end
+            Action::SeqPush => inserts.push((base_len, value_as_array(value)?)),
+            Action::Pure { op: Op::Add } => {} // Ignored as before.
+            unexpected @ Action::Pure { .. } => {
+                return Err(JsonPatchError::ExpectedSeq { unexpected });
             }
-            _ => {} // Should not appear here
         }
     }
 
-    Ok(base)
+    // NOTE: Must be a stable sort to keep the priority order at the same position.
+    inserts.sort_by_key(|(at, _)| *at);
+
+    let extra_len: usize = inserts.iter().map(|(_, values)| values.len()).sum();
+    let mut patched = Vec::with_capacity(base_len + extra_len + overflow.len());
+    let mut inserts = inserts.into_iter().peekable();
+
+    for (index, (value, is_removed)) in base.into_iter().zip(removed).enumerate() {
+        while let Some((_, values)) = inserts.next_if(|(at, _)| *at == index) {
+            patched.extend(values);
+        }
+        if !is_removed {
+            patched.push(value);
+        }
+    }
+    patched.extend(inserts.flat_map(|(_, values)| values)); // Add past the end & SeqPush
+    patched.extend(overflow);
+
+    Ok(patched)
 }
 
 /// Convert a `simd_json::Value` to a reference to an array (`Vec<Value>`).
@@ -303,96 +304,6 @@ fn value_as_array<'a>(value: Value<'a>) -> Result<Vec<Value<'a>>, JsonPatchError
             ))
         }
     }
-}
-
-type SplitValue<'a> =
-    (Option<(Range<usize>, Vec<Value<'a>>)>, Option<(Range<usize>, Vec<Value<'a>>)>);
-
-/// Splits a replacement operation into two parts:
-/// - one that applies within bounds of `base`
-/// - one that overflows and should be handled separately
-///
-/// # Returns
-/// - `(in_bounds_range, in_bounds_values)`
-/// - `(overflow_range, overflow_values)`
-fn split_for_replace<'a>(
-    range: Range<usize>,
-    base_len: usize,
-    mut values: Vec<Value<'a>>,
-) -> SplitValue<'a> {
-    let (in_range, overflow_range) = split_range_at_len(range, base_len);
-
-    match (in_range, overflow_range) {
-        (Some(in_r), Some(over_r)) => {
-            let in_len = in_r.len();
-            let overflow_vals = values.split_off(in_len);
-            (Some((in_r, values)), Some((over_r, overflow_vals)))
-        }
-        (Some(in_r), None) => (Some((in_r, values)), None),
-        (None, Some(over_r)) => (None, Some((over_r, values))),
-        (None, None) => (None, None), // unreadable
-    }
-}
-
-fn apply_replace_with_overflow<'a>(
-    base: &mut Vec<Value<'a>>,
-    range: Range<usize>,
-    values: Vec<Value<'a>>,
-    priority: usize,
-) -> Result<Option<ValueWithPriority<'a>>> {
-    let (in_bounds_opt, overflow_opt) = split_for_replace(range.clone(), base.len(), values);
-
-    if let Some((in_bounds_range, in_bounds_values)) = in_bounds_opt {
-        #[cfg(feature = "tracing")]
-        let cloned_in_bounds_range = in_bounds_range.clone();
-
-        let Some(slice) = base.get_mut(in_bounds_range) else {
-            return Err(JsonPatchError::UnexpectedRange {
-                patch_range: range,
-                actual_len: base.len(),
-            });
-        };
-
-        let written = AtomicUsize::new(0);
-        slice.smart_iter_mut().zip(in_bounds_values).for_each(|(element, patch)| {
-            *element = patch;
-            written.fetch_add(1, Ordering::Relaxed);
-        });
-
-        let written_count = written.load(Ordering::Relaxed);
-        if written_count < slice.len() {
-            let remain_range = written_count..slice.len();
-            #[cfg(feature = "tracing")]
-            tracing::info!(
-                "[Seq: Replace as Remove] Replace range {cloned_in_bounds_range:?}: only {written_count} values provided for {} elements, \
-                marking remaining {remain_range:?} elements as removed",
-                slice.len(),
-            );
-            slice[remain_range].smart_iter_mut().for_each(|element| *element = MARK_AS_REMOVED);
-        }
-    }
-
-    if let Some((_overflow_range, overflow_values)) = overflow_opt {
-        #[cfg(feature = "tracing")]
-        tracing::info!(
-            "Replace overflow: attempted to write to range {range:?} (base.len() = {}); \
-                overflowed into range {_overflow_range:?} with {} remaining values",
-            base.len(),
-            overflow_values.len()
-        );
-
-        if !overflow_values.is_empty() {
-            return Ok(Some(ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Seq { op: Op::Add, range: base.len()..base.len() },
-                    value: overflow_values.into(),
-                },
-                priority,
-            }));
-        }
-    }
-
-    Ok(None)
 }
 
 #[cfg(any(feature = "tracing", test))]
@@ -450,9 +361,9 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
     }
 
     // --- 1. convert patches to TableRow
-    let max_index = AtomicUsize::new(0);
+    let mut max_index = 0;
     let mut rows: Vec<TableRow> = patches
-        .smart_iter()
+        .iter()
         .filter_map(|patch| {
             match &patch.patch.action {
                 Action::Seq { op, range } => {
@@ -461,7 +372,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
                         Op::Replace => ActionType::Replace,
                         Op::Remove => ActionType::Remove,
                     };
-                    max_index.fetch_max(range.end, Ordering::Relaxed);
+                    max_index = max_index.max(range.end);
                     Some(TableRow {
                         op: action_type,
                         priority: patch.priority,
@@ -475,7 +386,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
 
                     let start = target_array_len;
                     let end = start + push_len;
-                    max_index.fetch_max(end, Ordering::Relaxed);
+                    max_index = max_index.max(end);
                     Some(TableRow {
                         op: ActionType::Push,
                         priority: patch.priority,
@@ -486,8 +397,6 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
             }
         })
         .collect();
-    let max_index = max_index.load(Ordering::Relaxed);
-
     if rows.is_empty() {
         return String::new();
     }
@@ -505,7 +414,7 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
         points.insert(row.range.start);
         points.insert(row.range.end);
     }
-    let points: Vec<_> = points.smart_iter().collect();
+    let points: Vec<_> = points.into_iter().collect();
 
     // --- 3. create segments
     let mut segments = Vec::new();
@@ -553,9 +462,6 @@ fn visualize_ops(patches: &[ValueWithPriority<'_>], target_array_len: usize) -> 
         let priority_sort = |a: &TableRow, b: &TableRow| {
             a.op.rank().cmp(&b.op.rank()).then(a.priority.cmp(&b.priority))
         };
-        #[cfg(feature = "rayon")]
-        rows.par_sort_unstable_by(priority_sort);
-        #[cfg(not(feature = "rayon"))]
         rows.sort_by(priority_sort);
     }
 
@@ -668,5 +574,88 @@ Push    |   1 |                     [>] |\n\
 ";
         println!("{visual}");
         assert_eq!(visual, EXPECTED_VISUAL);
+    }
+
+    fn seq(
+        op: Op,
+        range: core::ops::Range<usize>,
+        value: Value<'static>,
+        priority: usize,
+    ) -> ValueWithPriority<'static> {
+        ValueWithPriority {
+            patch: JsonPatch { action: Action::Seq { op, range }, value },
+            priority,
+        }
+    }
+
+    /// Adds are applied at their original index even if a lower-priority add targets a later index.
+    #[test]
+    fn add_positions_are_independent_of_priority_order() {
+        let patches = vec![
+            seq(Op::Add, 10..10, json_typed!(borrowed, ["A", "A", "A"]), 0),
+            seq(Op::Add, 2..2, json_typed!(borrowed, ["B"]), 1),
+        ];
+
+        let mut actual =
+            json_typed!(borrowed, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(
+            borrowed,
+            ["0", "1", "B", "2", "3", "4", "5", "6", "7", "8", "9", "A", "A", "A", "10", "11"]
+        );
+        assert_eq!(actual, expected);
+    }
+
+    /// Overflowing replace with fewer values than its in-bounds part must not panic.
+    #[test]
+    fn overflowing_replace_with_few_values_does_not_panic() {
+        let patches = vec![seq(Op::Replace, 4..10, json_typed!(borrowed, ["X"]), 0)];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "1", "2", "3", "X"]);
+        assert_eq!(actual, expected);
+    }
+
+    /// Overflow values of a replace are appended to the end.
+    #[test]
+    fn overflowing_replace_appends_rest() {
+        let patches = vec![seq(Op::Replace, 4..7, json_typed!(borrowed, ["X", "Y", "Z", "W"]), 0)];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "1", "2", "3", "X", "Y", "Z", "W"]);
+        assert_eq!(actual, expected);
+    }
+
+    /// In-bounds replace with more values than its range keeps the old behavior (surplus is discarded).
+    #[test]
+    fn in_bounds_replace_discards_surplus_values() {
+        let patches = vec![seq(Op::Replace, 1..3, json_typed!(borrowed, ["X", "Y", "Z"]), 0)];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "X", "Y", "3", "4", "5"]);
+        assert_eq!(actual, expected);
+    }
+
+    /// Same `(priority, op)` patches keep the input order (stable & deterministic).
+    #[test]
+    fn same_priority_adds_keep_input_order() {
+        let patches: Vec<_> = (0..64)
+            .map(|i| seq(Op::Add, 1..1, Value::Array(Box::new(vec![Value::from(i as u64)])), 7))
+            .collect();
+
+        let mut actual = json_typed!(borrowed, ["first", "last"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let mut expected = vec![Value::from("first")];
+        expected.extend((0..64).map(|i| Value::from(i as u64)));
+        expected.push(Value::from("last"));
+        assert_eq!(actual, Value::Array(Box::new(expected)));
     }
 }

@@ -22,6 +22,20 @@ pub fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
         .map_err(|_| RangeError::InvalidRange { range: segment.to_string() })
 }
 
+/// Parses an array index token.
+///
+/// Both the bracket form used by the json path (e.g. `[3]`, same as [`parse_range`])
+/// and the bare form (e.g. `3`) are accepted.
+///
+/// Returns `None` if the token is not a single index.
+pub(crate) fn parse_index(token: &str) -> Option<usize> {
+    match parse_range(token) {
+        Ok(Range::Index(index)) => Some(index),
+        Ok(_) => None,
+        Err(_) => token.parse().ok(),
+    }
+}
+
 fn _parse_range(input: &mut &str) -> ModalResult<Range> {
     let range = alt((
         "*".value(Range::Full),

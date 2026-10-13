@@ -3672,7 +3672,6 @@ dependencies = [
 name = "json_patch"
 version = "0.1.0"
 dependencies = [
- "rayon",
  "serde",
  "simd-json",
  "snafu",
@@ -4288,6 +4287,7 @@ version = "0.1.0"
 dependencies = [
  "json_patch",
  "phf 0.14.0",
+ "rapidhash",
  "rayon",
  "serde_hkx",
  "simd-json",
