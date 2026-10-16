@@ -17,6 +17,7 @@ members = [
   "core/*",
   #
   "gui/egui",
+  "gui/freya",
   "gui/shared",
   "gui/shared_derive",
   "gui/tauri/backend",
