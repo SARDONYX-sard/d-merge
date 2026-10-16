@@ -149,11 +149,21 @@ pub struct CustomTheme {
     /// Name of the currently active preset (matches the stem of a JSON file
     /// inside the `themes/` directory next to the settings file).
     pub selected_theme: Option<String>,
+
+    /// Name of the active preset of the freya GUI. (The stem of a JSON file inside `<themes_dir>/freya/`)
+    ///
+    /// Kept apart from [`Self::selected_theme`], because the preset format differs from the egui one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freya_selected_theme: Option<String>,
 }
 
 impl Default for CustomTheme {
     fn default() -> Self {
-        Self { themes_dir: "./.d_merge/themes".to_string(), selected_theme: Default::default() }
+        Self {
+            themes_dir: "./.d_merge/themes".to_string(),
+            selected_theme: Default::default(),
+            freya_selected_theme: None,
+        }
     }
 }
 
