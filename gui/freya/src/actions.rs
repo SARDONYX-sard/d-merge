@@ -299,8 +299,8 @@ pub(crate) fn patch(app: &AppState, shared: &Shared) {
         } = &settings.behavior;
         let enable_debug_output = *enable_debug_output;
         let output_target = match target_runtime {
-            Runtime::Le => nemesis_merge::OutPutTarget::SkyrimLe,
-            Runtime::Se | Runtime::Vr => nemesis_merge::OutPutTarget::SkyrimSe,
+            Runtime::Enderal | Runtime::Le => nemesis_merge::OutPutTarget::SkyrimLe,
+            Runtime::EnderalSe | Runtime::Se | Runtime::Vr => nemesis_merge::OutPutTarget::SkyrimSe,
         };
 
         let patch_status = Arc::clone(&shared.patch_status);

@@ -2748,6 +2748,7 @@ dependencies = [
  "freya-edit",
  "freya-engine",
  "freya-icons",
+ "freya-markdown",
  "freya-metrics-plugin",
  "freya-winit",
  "torin",
@@ -2876,6 +2877,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "freya-markdown"
+version = "0.5.0-rc.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35aea40b165894f1c0ec038671efd2f935ada0d9906c3df2f1ccbf4e9071f199"
+dependencies = [
+ "freya-components",
+ "freya-core",
+ "pulldown-cmark",
+ "torin",
+]
+
+[[package]]
 name = "freya-metrics-plugin"
 version = "0.5.0-rc.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2982,7 +2995,7 @@ dependencies = [
 [[package]]
 name = "freya_extra"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-sard/freya_extra?rev=78d7e27#78d7e27182a0d15914263e2036b774c39235223f"
+source = "git+https://github.com/SARDONYX-sard/freya_extra?rev=05c0525c#05c0525cf4a895532f54b553dad02d6d884a93a2"
 dependencies = [
  "freya",
 ]
@@ -3221,6 +3234,15 @@ checksum = "1bd49230192a3797a9a4d6abe9b3eed6f7fa4c8a8a4947977c6f80025f92cbd8"
 dependencies = [
  "rustix 1.1.5",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "getopts"
+version = "0.2.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe4fbac503b8d1f88e6676011885f34b7174f46e59956bba534ba83abded4df"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
@@ -6225,6 +6247,25 @@ dependencies = [
  "quote",
  "syn 3.0.6",
 ]
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9f068eba8e7071c5f9511831b44f32c740d5adf574e990f946ddb53db2f314e"
+dependencies = [
+ "bitflags 2.13.2",
+ "getopts",
+ "memchr",
+ "pulldown-cmark-escape",
+ "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-escape"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
 
 [[package]]
 name = "pulp"

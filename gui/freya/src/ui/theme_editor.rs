@@ -2,14 +2,16 @@
 
 use d_merge_gui_shared::i18n::I18nKey;
 use freya::prelude::*;
-use freya_extra::{dropdown_menu::DropdownMenu, floating_window::FloatingWindow, themes};
+use freya_extra::{
+    color_picker::ColorPicker, dropdown_menu::DropdownMenu, floating_window::FloatingWindow, themes,
+};
 
 use crate::{
     actions,
     state::AppState,
     theme::colors,
     theme_preset::{self, COLOR_FIELDS, CUSTOM_THEME_NAME, ThemePreset},
-    ui::{check_tile, color_picker::ColorPicker, row},
+    ui::{check_tile, row},
 };
 
 /// Start point of the editor: a built-in theme or a saved preset.

@@ -19,8 +19,8 @@ winres = "0.1.12"
 
 
 [dependencies]
-freya = { version = "0.5.0-rc.10", features = ["icons-lucide"] }
-freya_extra = { git = "https://github.com/SARDONYX-sard/freya_extra", rev = "78d7e27" }
+freya = { version = "0.5.0-rc.10", features = ["icons-lucide", "markdown"] }
+freya_extra = { git = "https://github.com/SARDONYX-sard/freya_extra", rev = "05c0525c" }
 
 dark-light = "3.0.0"
 font-kit = "0.14.3"

@@ -138,7 +138,7 @@ fn bug_report(app: &AppState) -> Element {
 
     rect()
         .spacing(6.0)
-        .child(label().text(app.t(I18nKey::BugReportLabel)))
+        .child(label().text(app.t(I18nKey::BugReportTitleLabel)))
         .child(
             row()
                 .child(with_tooltip(

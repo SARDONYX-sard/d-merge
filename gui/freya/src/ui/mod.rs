@@ -12,7 +12,6 @@
 //! | NotificationBar  |
 //! ```
 pub(crate) mod bottom_panel;
-pub(crate) mod color_picker;
 pub(crate) mod help;
 pub(crate) mod log_window;
 pub(crate) mod mod_list;
@@ -67,8 +66,8 @@ pub(crate) fn with_tooltip(child: impl Into<Element>, text: impl Into<String>) -
         return child.into();
     }
 
-    let tooltip = Tooltip::new()
-        .child(rect().max_width(Size::px(500.0)).child(label().text(text).font_size(14.0)));
+    let tooltip =
+        Tooltip::new().child(rect().max_width(Size::px(500.0)).child(MarkdownViewer::new(text)));
     TooltipContainer::new(tooltip).child(child).into_element()
 }
 
@@ -250,9 +249,9 @@ pub(crate) fn path_row(
         }
     });
 
-    let input = Input::new(value)
-        .width(Size::flex(1.0))
-        .map(placeholder, |input, placeholder| input.placeholder(placeholder));
+    let input = Input::new(value).width(Size::flex(1.0)).map(placeholder, |input, placeholder| {
+        input.color(freya_extra::themes::hex("#75757563")).placeholder(placeholder)
+    });
 
     row()
         .width(Size::fill())

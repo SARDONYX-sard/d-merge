@@ -73,7 +73,7 @@ impl Component for TargetRuntime {
         let app = use_consume::<AppState>();
         let runtime = app.settings.read().behavior.target_runtime;
 
-        let select = [Runtime::Le, Runtime::Se, Runtime::Vr]
+        let select = [Runtime::Le, Runtime::Se, Runtime::Vr, Runtime::Enderal, Runtime::EnderalSe]
             .into_iter()
             .fold(DropdownMenu::new(runtime), |menu, runtime| menu.item(runtime, runtime.as_str()))
             .on_change(move |next: Runtime| {
