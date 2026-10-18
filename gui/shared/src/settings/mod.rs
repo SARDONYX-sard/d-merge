@@ -26,7 +26,7 @@ pub const SETTINGS_PATH: &str = "./.d_merge/d_merge_settings.json";
 ///
 /// Each field group is a dedicated struct so that a call-site only borrows
 /// the sub-struct it needs, rather than all of `AppSettings`.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Settings {
     /// Schema version written by the last save.
     ///

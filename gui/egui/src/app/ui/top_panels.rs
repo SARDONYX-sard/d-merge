@@ -207,6 +207,8 @@ impl App {
             self.settings.ui.custom_theme = CustomTheme {
                 selected_theme: Some(update.selected_name.clone()),
                 themes_dir: self.theme_manager.cache.dir.to_string_lossy().to_string(),
+                // Keep the freya GUI's preset.
+                freya_selected_theme: self.settings.ui.custom_theme.freya_selected_theme.take(),
             };
 
             // Live-apply whenever colors changed or a new preset was loaded.
