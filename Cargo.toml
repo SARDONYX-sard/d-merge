@@ -22,6 +22,7 @@ members = [
   "gui/tauri/backend",
 ]
 resolver = "3"
+default-members = ["gui/egui"]
 
 
 [workspace.dependencies]

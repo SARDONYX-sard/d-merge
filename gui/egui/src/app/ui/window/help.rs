@@ -36,7 +36,7 @@ impl App {
         let size =
             egui::vec2(self.settings.ui.window.width * 0.5, self.settings.ui.window.height * 0.85);
 
-        egui::Window::new(self.i18n.t(I18nKey::HelpButton)) // copied into an owned WidgetText
+        egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut open)
             .collapsible(false)
             .fixed_size(size)
@@ -55,7 +55,6 @@ impl App {
                         ui.add_space(8.0);
                     }
 
-                    // Reordering sections = moving a block.
                     section_title(ui, "About");
                     self.ui_help_info(ui);
                     section_separator(ui);
@@ -311,8 +310,6 @@ impl App {
         });
     }
 
-    // --- side effects: plain `&mut self` methods, called directly from the widgets ---
-
     fn apply_font(&mut self, ctx: &egui::Context) {
         let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font) else {
             return;
@@ -397,12 +394,7 @@ impl App {
             Err(err) => self.notify.error(err),
         }
     }
-
-    // `reload_log` / `reload_i18n` / `write_new_i18n` / `reload_background`: unchanged.
 }
-
-// ---------------------------------------------------------------------------
-// Reusable widgets: free functions, NOT `&self` methods (see the rule below).
 
 enum Picker {
     File { filter: &'static str, exts: &'static [&'static str], fallback_dir: &'static str },
