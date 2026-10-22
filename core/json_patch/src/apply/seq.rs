@@ -43,7 +43,7 @@ pub fn apply_seq_by_priority<'a>(
 
     sort_by_priority(patches.as_mut_slice());
     #[cfg(feature = "tracing")]
-    {
+    if tracing::enabled!(tracing::Level::DEBUG) {
         let path = path.join("/");
         let target_len = template_array.len();
         let visualizer = visualize_ops(&patches, target_len);
