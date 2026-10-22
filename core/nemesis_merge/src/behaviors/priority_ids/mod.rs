@@ -55,7 +55,7 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
         winnow_ext::take_until_ext(0.., Caseless("Nemesis_Engine")).context(Expected(StringLiteral("Nemesis_Engine"))),
         Caseless("Nemesis_Engine"),
         sep,
-        "mod".context(Expected(StringLiteral("mod"))),
+        Caseless("mod").context(Expected(StringLiteral("mod"))), // Need caseless for `UnblockableAttacks` mod
         sep,
         take_while(1.., |c: char| c != '/' && c != '\\').context(Expected(Description("mod code"))),
     }
