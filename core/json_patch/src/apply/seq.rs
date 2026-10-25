@@ -324,7 +324,9 @@ fn split_for_replace<'a>(
 
     match (in_range, overflow_range) {
         (Some(in_r), Some(over_r)) => {
-            let in_len = in_r.len();
+            // NOTE: `values` may be shorter than the in-bounds range. (e.g. len 6, `Replace(4..10, ["X"])`)
+            // In that case, there is no overflow value and the rest of the in-bounds range is treated as removed.
+            let in_len = in_r.len().min(values.len());
             let overflow_vals = values.split_off(in_len);
             (Some((in_r, values)), Some((over_r, overflow_vals)))
         }
@@ -609,6 +611,42 @@ mod tests {
         apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
 
         let expected = json_typed!(borrowed, ["0", "A", "B", "4", "5"]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_replace_overflow_with_less_values_than_in_bounds_range() {
+        // range 4..10 overflows len 6, and only 1 value for in-bounds 4..6. (This used to panic.)
+        let patches: Vec<ValueWithPriority<'_>> = vec![ValueWithPriority {
+            patch: JsonPatch {
+                action: Action::Seq { op: Op::Replace, range: 4..10 },
+                value: json_typed! {borrowed, ["X"]},
+            },
+            priority: 0,
+        }];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "1", "2", "3", "X"]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_replace_overflow_with_more_values_than_in_bounds_range() {
+        // in-bounds 4..6 gets "X", "Y" and the rest is appended.
+        let patches: Vec<ValueWithPriority<'_>> = vec![ValueWithPriority {
+            patch: JsonPatch {
+                action: Action::Seq { op: Op::Replace, range: 4..10 },
+                value: json_typed! {borrowed, ["X", "Y", "Z"]},
+            },
+            priority: 0,
+        }];
+
+        let mut actual = json_typed!(borrowed, ["0", "1", "2", "3", "4", "5"]);
+        apply_seq_array_directly(actual.try_as_array_mut().unwrap(), patches).unwrap();
+
+        let expected = json_typed!(borrowed, ["0", "1", "2", "3", "X", "Y", "Z"]);
         assert_eq!(actual, expected);
     }
 
