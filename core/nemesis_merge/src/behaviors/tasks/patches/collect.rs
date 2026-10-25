@@ -4,10 +4,10 @@ use std::{
 };
 
 use json_patch::ValueWithPriority;
-use nemesis_xml::patch::parse_nemesis_patch;
-use rayon::prelude::*;
+use nemesis_xml::patch::{PatchesMap, parse_nemesis_patch};
+use rapidhash::fast::RapidHashMap;
+use rayon::{iter::Either, prelude::*};
 use snafu::{OptionExt as _, ResultExt as _};
-use tokio::fs;
 
 use super::paths::{
     collect::{Category, collect_nemesis_paths},
@@ -20,14 +20,16 @@ use crate::{
         tasks::{
             adsf::types::OwnedAdsfPatchMap,
             asdsf::types::OwnedAsdsfPatchMap,
-            patches::types::{OwnedPatchMap, OwnedPatches, PatchCollection},
+            patches::types::{
+                BehaviorPatchesMap, HkxPatchMaps, OwnedPatchMap, OwnedPatches, PatchCollection,
+            },
+            templates::key::TemplateKey,
         },
     },
     config::{ReportType, StatusReportCounter},
     errors::{
         Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
     },
-    results::filter_results,
 };
 
 struct OwnedPath {
@@ -44,7 +46,7 @@ struct OwnedPath {
 ///
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
-pub(crate) async fn collect_owned_patches(
+pub(crate) fn collect_owned_patches(
     nemesis_entries: &PriorityMap,
     config: &Config,
 ) -> OwnedPatches {
@@ -53,42 +55,41 @@ pub(crate) async fn collect_owned_patches(
         ids.get(id_str).copied()
     }
 
-    let mut handles = tokio::task::JoinSet::new();
-    for (category, path) in nemesis_entries.keys().flat_map(collect_nemesis_paths) {
-        let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or_else(|| {
-            #[cfg(feature = "tracing")]
-            tracing::warn!("Not found id from path: Path({})", path.display());
-            usize::MAX // todo error handling
-        });
+    let mut paths: Vec<_> = nemesis_entries
+        .par_iter()
+        .flat_map_iter(|(mod_dir, _)| collect_nemesis_paths(mod_dir))
+        .collect();
+    // Fix the order so that the output does not depend on the walk/hash order.
+    paths.par_sort_unstable_by(|(_, a), (_, b)| a.cmp(b));
 
-        handles.spawn(async move {
-            let content = fs::read_to_string(&path)
-                .await
-                .with_context(|_| FailedIoSnafu { path: path.clone() })?;
+    let reporter =
+        StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, paths.len());
 
-            Ok(OwnedPath { category, path, content, priority })
-        });
-    }
+    // NOTE: For thousands of small files, blocking reads on rayon are much cheaper than
+    // spawning a tokio task (+ `spawn_blocking`) per file.
+    let results: Vec<Result<OwnedPath>> = paths
+        .into_par_iter()
+        .map(|(category, path)| {
+            let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or_else(|| {
+                #[cfg(feature = "tracing")]
+                tracing::warn!("Not found id from path: Path({})", path.display());
+                usize::MAX // todo error handling
+            });
+
+            let content = std::fs::read_to_string(&path)
+                .with_context(|_| FailedIoSnafu { path: path.clone() });
+            reporter.increment();
+
+            Ok(OwnedPath { category, path, content: content?, priority })
+        })
+        .collect();
 
     let mut owned_patches = OwnedPatchMap::default();
     let mut adsf_patches = OwnedAdsfPatchMap::new();
     let mut asdsf_patches = OwnedAsdsfPatchMap::new();
     let mut errors = vec![];
 
-    let reporter =
-        StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, handles.len());
-
-    while let Some(result) = handles.join_next().await {
-        reporter.increment();
-
-        let result = match result {
-            Ok(result) => result,
-            Err(err) => {
-                errors.push(Error::JoinError { source: err });
-                continue;
-            }
-        };
-
+    for result in results {
         match result {
             Ok(OwnedPath { category, path, content, priority }) => match category {
                 Category::Nemesis => {
@@ -126,71 +127,102 @@ pub(crate) fn collect_borrowed_patches<'a>(
         owned_patches.len(),
     );
 
-    let results: Vec<Result<()>> = owned_patches
+    // 1/3: Parse each file in parallel into thread-local data (no shared map, no lock).
+    //
+    // NOTE: `partition_map` into `Vec` keeps the input order, so the later steps are deterministic.
+    let (parsed, errors): (Vec<ParsedPatch<'a>>, Vec<Error>) = owned_patches
         .par_iter()
         .map(|(path, (xml, priority))| {
             reporter.increment();
-            // Since we could not make a destructing assignment, we have to write it this way.
-            let priority = *priority;
+            parse_one_patch(path, xml, *priority, config)
+        })
+        .partition_map(|result| match result {
+            Ok(parsed) => Either::Left(parsed),
+            Err(err) => Either::Right(err),
+        });
 
-            let (json_patches, parsed_var_index) =
-                parse_nemesis_patch(xml, config.hack_options.map(Into::into))
-                    .with_context(|_| NemesisXmlErrSnafu { path })?;
+    // 2/3: Group by template (sequential: only moves `Vec`s).
+    let mut by_template: RapidHashMap<TemplateKey<'static>, TemplatePatches<'a>> =
+        RapidHashMap::default();
+    for (key, maps) in raw_borrowed_patches.0 {
+        by_template.entry(key).or_default().base = maps;
+    }
+    for ParsedPatch { key, var_index, patches, priority } in parsed {
+        // Store variable class for nemesis variable to replace
+        if let Some(var_index) = var_index {
+            variable_class_map.0.entry(key.clone()).or_insert(var_index);
+        }
+        by_template.entry(key).or_default().files.push((patches, priority));
+    }
 
-            let key = {
-                let nemesis_path = parse_nemesis_path(path)?;
-
-                let key = nemesis_path
-                    .to_template_key()
-                    .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
-
-                // Store variable class for nemesis variable to replace
-                if let Some(master_behavior_graph_index) = nemesis_path.get_variable_index() {
-                    variable_class_map
-                        .0
-                        .entry(key.clone())
-                        .or_insert(Cow::Borrowed(master_behavior_graph_index));
-                } else if let Some(parsed_var_index) = parsed_var_index {
-                    variable_class_map
-                        .0
-                        .entry(key.clone())
-                        .or_insert(Cow::Owned(parsed_var_index.to_string()));
-                }
-
-                key
-            };
-
-            json_patches.into_par_iter().for_each(|(json_path, value)| {
-                // FIXME: I think that if we lengthen the lock period, we can suppress the race condition, but that will slow down the process.
-                let entry = raw_borrowed_patches.0.entry(key.clone()).or_default();
-
-                // Overwrite to match patch structure
-                match &value.action {
-                    json_patch::Action::Pure { .. } => {
-                        let value = ValueWithPriority::new(value, priority);
-                        entry.value().one.insert(json_path, value); // Pure: no add and remove because of single value
-                    }
-                    json_patch::Action::Seq { .. } | json_patch::Action::SeqPush => {
-                        let value = ValueWithPriority::new(value, priority);
-                        entry.value().seq.insert(json_path, value);
+    // 3/3: Resolve priorities per template in parallel.
+    // Each template is owned by exactly one thread, so the inner maps are never contended.
+    let borrowed_patches = by_template
+        .into_par_iter()
+        .map(|(key, TemplatePatches { base, files })| {
+            for (patches, priority) in files {
+                for (json_path, value) in patches {
+                    let is_seq = matches!(
+                        value.action,
+                        json_patch::Action::Seq { .. } | json_patch::Action::SeqPush
+                    );
+                    let value = ValueWithPriority::new(value, priority);
+                    if is_seq {
+                        base.seq.insert(json_path, value);
+                    } else {
+                        base.one.insert(json_path, value); // Pure: no add and remove because of single value
                     }
                 }
-            });
-
-            Ok(())
+            }
+            (key, base)
         })
         .collect();
 
-    let errors = match filter_results(results) {
-        Ok(()) => vec![],
-        Err(errors) => errors,
-    };
-
     (
         PatchCollection {
-            borrowed_patches: raw_borrowed_patches,
+            borrowed_patches: BehaviorPatchesMap(borrowed_patches),
             behavior_graph_data_map: variable_class_map,
         },
         errors,
     )
+}
+
+/// One parsed Nemesis patch file.
+struct ParsedPatch<'a> {
+    key: TemplateKey<'static>,
+    /// Index(e.g. `#0000`) of `hkbBehaviorGraphData` used to replace Nemesis variables.
+    var_index: Option<Cow<'static, str>>,
+    patches: PatchesMap<'a>,
+    priority: usize,
+}
+
+/// Patches targeting one template.
+#[derive(Default)]
+struct TemplatePatches<'a> {
+    /// Already collected patches (e.g. FNIS)
+    base: HkxPatchMaps<'a>,
+    /// Parsed Nemesis patch files in input order.
+    files: Vec<(PatchesMap<'a>, usize)>,
+}
+
+fn parse_one_patch<'a>(
+    path: &Path,
+    xml: &'a str,
+    priority: usize,
+    config: &Config,
+) -> Result<ParsedPatch<'a>> {
+    let (patches, parsed_var_index) = parse_nemesis_patch(xml, config.hack_options.map(Into::into))
+        .with_context(|_| NemesisXmlErrSnafu { path })?;
+
+    let nemesis_path = parse_nemesis_path(path)?;
+    let key = nemesis_path
+        .to_template_key()
+        .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
+
+    let var_index = match nemesis_path.get_variable_index() {
+        Some(master_behavior_graph_index) => Some(Cow::Borrowed(master_behavior_graph_index)),
+        None => parsed_var_index.map(|index| Cow::Owned(index.to_string())),
+    };
+
+    Ok(ParsedPatch { key, var_index, patches, priority })
 }

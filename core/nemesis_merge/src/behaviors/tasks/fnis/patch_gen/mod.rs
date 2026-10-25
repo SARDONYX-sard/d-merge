@@ -122,7 +122,6 @@ pub(crate) fn collect_borrowed_patches<'a>(
                 }
             }
         });
-
     let LocalAgg {
         borrowed_patches,
         behavior_graph_data_map,

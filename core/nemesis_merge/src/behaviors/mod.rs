@@ -70,7 +70,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         adsf_patches: owned_adsf_patches,
         asdsf_patches: owned_asdsf_patches,
         errors: owned_file_errors,
-    } = collect_owned_patches(nemesis_entries, &config).await;
+    } = collect_owned_patches(nemesis_entries, &config);
 
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];

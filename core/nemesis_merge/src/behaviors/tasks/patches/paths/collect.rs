@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use rayon::prelude::*;
 use winnow::{
     ModalResult, Parser,
     ascii::Caseless,
@@ -26,14 +25,35 @@ pub(crate) enum Category {
 ///
 /// # Errors
 /// Returns an error if path traversal fails.
+///
+/// # Note
+/// This walks serially so that it can be called inside `rayon::par_iter` per mod directory.
+/// (jwalk's rayon mode gives up with a busy timeout when the rayon pool is occupied,
+/// which silently drops entries.)
 pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)> {
     jwalk::WalkDir::new(path)
+        .parallelism(jwalk::Parallelism::Serial)
         .into_iter()
-        .par_bridge()
         .filter_map(|result| {
             let txt_path = {
-                let path = result.ok()?.path();
-                is_txt_file(&path).then_some(path)?
+                let entry = match result {
+                    Ok(entry) => entry,
+                    Err(_err) => {
+                        #[cfg(feature = "tracing")]
+                        tracing::error!("Failed to walk dir: {_err}");
+                        return None;
+                    }
+                };
+                if !is_txt_file(&entry.file_name) {
+                    return None;
+                }
+                // NOTE: `file_type` is cached by the walker, so this avoids an extra `stat` per entry.
+                // Only symlinks need `stat` to follow the link.
+                let file_type = entry.file_type();
+                let path = entry.path();
+                let is_file =
+                    if file_type.is_symlink() { path.is_file() } else { !file_type.is_dir() };
+                is_file.then_some(path)?
             };
             let txt_path_str = if let Some(path) = txt_path.to_str() {
                 path
@@ -53,11 +73,8 @@ pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, Pa
 }
 
 #[inline]
-fn is_txt_file(path: &Path) -> bool {
-    let is_txt = path.extension().is_some_and(|path| path.eq_ignore_ascii_case("txt"));
-    let is_file = path.is_file();
-
-    is_txt && is_file
+fn is_txt_file(file_name: impl AsRef<Path>) -> bool {
+    file_name.as_ref().extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
 }
 
 /// Check if the file name starts with a `#` and is a file.
