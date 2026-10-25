@@ -123,6 +123,10 @@ pub(crate) async fn collect_all_fnis_injections(
         }
     }
 
+    // NOTE: `join_next` returns in completion order, which changes every run.
+    // Fix the order to load order(priority) because the FNIS AA slot layout and its CRC depend on it.
+    oks.sort_by_cached_key(|injection| (injection.priority, injection.to_list_path()));
+
     #[cfg(feature = "tracing")]
     tracing::debug!(
         succeeded = oks.len(),
