@@ -1,4 +1,4 @@
-use rapidhash::RapidHashSet as HashSet;
+use fast_hash::HashSet;
 use rayon::{iter::Either, prelude::*};
 
 use crate::{PatchMaps, PriorityMap};

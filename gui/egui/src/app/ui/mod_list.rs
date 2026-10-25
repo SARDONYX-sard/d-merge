@@ -332,7 +332,7 @@ impl App {
                     if ui.add(egui::Checkbox::without_text(&mut self.check_all)).clicked() {
                         let check_all = self.check_all;
 
-                        let filtered_ids: rapidhash::fast::RapidHashSet<_> =
+                        let filtered_ids: fast_hash::HashSet<_> =
                             self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
                         let is_unfiltered = filtered_ids.is_empty();
 

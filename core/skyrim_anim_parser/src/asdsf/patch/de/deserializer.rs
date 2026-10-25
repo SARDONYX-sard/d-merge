@@ -22,8 +22,7 @@ use crate::{
     },
 };
 
-pub type PatchesMap<'a> =
-    std::collections::HashMap<JsonPath<'a>, ValueWithPriority<'a>, rapidhash::fast::RandomState>;
+pub type PatchesMap<'a> = fast_hash::HashMap<JsonPath<'a>, ValueWithPriority<'a>>;
 
 /// Parse `animationsetdatasinglefile.txt` patch.
 ///

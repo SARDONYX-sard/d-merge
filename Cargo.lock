@@ -1393,13 +1393,13 @@ dependencies = [
  "egui-shadcn",
  "egui_dnd",
  "egui_extras",
+ "fast_hash",
  "font-kit",
  "image",
  "mimalloc",
  "mod_info",
  "nemesis_merge",
  "parking_lot",
- "rapidhash",
  "rayon",
  "rfd 0.15.4",
  "rfd 0.17.2",
@@ -1417,6 +1417,7 @@ name = "d_merge_gui_shared"
 version = "2.8.0"
 dependencies = [
  "d_merge_gui_shared_derive",
+ "fast_hash",
  "gh_issue_link",
  "ico",
  "indexmap 2.14.2",
@@ -1424,7 +1425,6 @@ dependencies = [
  "nemesis_merge",
  "open",
  "parking_lot",
- "rapidhash",
  "rayon",
  "semver",
  "serde",
@@ -2194,6 +2194,15 @@ dependencies = [
  "rayon-core",
  "smallvec",
  "zune-inflate",
+]
+
+[[package]]
+name = "fast_hash"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "indexmap 2.14.2",
+ "rapidhash",
 ]
 
 [[package]]
@@ -4099,6 +4108,7 @@ dependencies = [
 name = "mod_info"
 version = "0.1.0"
 dependencies = [
+ "fast_hash",
  "jwalk_glob",
  "pretty_assertions",
  "rayon",
@@ -4252,6 +4262,7 @@ version = "0.1.0"
 dependencies = [
  "auto_charset",
  "dashmap",
+ "fast_hash",
  "fnis_list",
  "havok_classes",
  "indexmap 2.14.2",
@@ -4261,7 +4272,6 @@ dependencies = [
  "mod_info",
  "nemesis_xml",
  "phf 0.14.0",
- "rapidhash",
  "rayon",
  "rmp-serde",
  "schemars 1.2.2",
@@ -4286,6 +4296,7 @@ dependencies = [
 name = "nemesis_xml"
 version = "0.1.0"
 dependencies = [
+ "fast_hash",
  "json_patch",
  "phf 0.14.0",
  "rayon",
@@ -6539,10 +6550,10 @@ version = "0.1.0"
 dependencies = [
  "bitvec",
  "diff 1.0.0",
+ "fast_hash",
  "indexmap 2.14.2",
  "json_patch",
  "pretty_assertions",
- "rapidhash",
  "rayon",
  "rmp-serde",
  "serde",

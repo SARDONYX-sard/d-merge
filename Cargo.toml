@@ -64,6 +64,7 @@ pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
+fast_hash = { path = "./core/fast_hash" }
 fnis_list = { path = "./core/fnis_list" }
 gh_issue_link = { path = "./core/gh_issue_link" }
 json_patch = { path = "./core/json_patch" }

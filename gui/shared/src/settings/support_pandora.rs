@@ -5,11 +5,9 @@
 //! Pandora's `ActiveMods.json` contains Nemesis mod IDs only. NemesisExt and
 //! FNIS entries are intentionally excluded.
 
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::path::Path;
 
+use fast_hash::{HashMap, HashSet, RandomState};
 use mod_info::ModType;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -227,7 +225,8 @@ impl Pandora {
         settings.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
         settings.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
 
-        let mut seen = HashSet::with_capacity(self.active_mods.len());
+        let mut seen =
+            HashSet::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
 
         for active_mod in &self.active_mods {
             if !seen.insert(active_mod.code.as_str()) {
@@ -235,7 +234,8 @@ impl Pandora {
             }
         }
 
-        let mut pandora_order = HashMap::with_capacity(self.active_mods.len());
+        let mut pandora_order =
+            HashMap::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
 
         for (index, active_mod) in self.active_mods.iter().enumerate() {
             pandora_order.insert(active_mod.code.as_str(), (index, active_mod.active));

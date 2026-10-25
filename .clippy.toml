@@ -4,3 +4,16 @@
 # - https://github.com/rust-lang/rust-clippy?tab=readme-ov-file#configuration
 allow-unwrap-in-tests = true # https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
 allow-expect-in-tests = true
+
+# Use the aliases of `fast_hash` crate so that the hasher can be replaced in one place.
+# https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_types
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "use `fast_hash::HashMap`" },
+  { path = "std::collections::HashSet", reason = "use `fast_hash::HashSet`" },
+  { path = "std::hash::RandomState", reason = "use `fast_hash::RandomState`" },
+  { path = "rapidhash::fast::RandomState", reason = "use `fast_hash::RandomState`" },
+  { path = "rapidhash::fast::RapidHashMap", reason = "use `fast_hash::HashMap`" },
+  { path = "rapidhash::fast::RapidHashSet", reason = "use `fast_hash::HashSet`" },
+  { path = "rapidhash::RapidHashMap", reason = "use `fast_hash::HashMap`" },
+  { path = "rapidhash::RapidHashSet", reason = "use `fast_hash::HashSet`" },
+]

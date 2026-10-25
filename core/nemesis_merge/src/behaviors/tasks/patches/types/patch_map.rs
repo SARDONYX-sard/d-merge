@@ -56,7 +56,7 @@ pub(crate) struct OnePatchMap<'a> {
     ///
     /// If multiple patches target the same path, only the patch with the
     /// highest priority is retained.
-    patches: DashMap<JsonPath<'a>, ValueWithPriority<'a>, rapidhash::fast::RandomState>,
+    patches: DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState>,
 }
 
 impl<'a> OnePatchMap<'a> {
@@ -133,7 +133,7 @@ impl<'a> OnePatchMap<'a> {
     /// Consumes this map and returns the underlying `DashMap` of patches.
     pub(crate) fn into_inner(
         self,
-    ) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, rapidhash::fast::RandomState> {
+    ) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
         self.patches
     }
 }
@@ -142,7 +142,7 @@ impl<'a> OnePatchMap<'a> {
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SeqPatchMap<'a>(
-    pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, rapidhash::fast::RandomState>,
+    pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, fast_hash::RandomState>,
 );
 
 impl<'a> SeqPatchMap<'a> {
@@ -223,7 +223,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let patches = DashMap::<_, _, rapidhash::fast::RandomState>::default();
+                let patches = DashMap::<_, _, fast_hash::RandomState>::default();
                 while let Some((key, value)) =
                     access.next_entry::<String, ValueWithPriority<'de>>()?
                 {
@@ -275,7 +275,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::<_, _, rapidhash::fast::RandomState>::default();
+                let map = DashMap::<_, _, fast_hash::RandomState>::default();
 
                 while let Some((key, value)) =
                     access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?

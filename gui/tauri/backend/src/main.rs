@@ -17,7 +17,8 @@ fn main() {
         .expect("Failed to build Tokio runtime");
     tauri::async_runtime::set(runtime.handle().clone());
 
-    #[allow(clippy::large_stack_frames)]
+    // NOTE: `tauri::generate_context!` expands to `std::collections::HashMap`.
+    #[allow(clippy::large_stack_frames, clippy::disallowed_types)]
     if let Err(err) = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

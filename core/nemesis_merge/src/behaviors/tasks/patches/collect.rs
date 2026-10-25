@@ -3,9 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use fast_hash::HashMap;
 use json_patch::ValueWithPriority;
 use nemesis_xml::patch::{PatchesMap, parse_nemesis_patch};
-use rapidhash::fast::RapidHashMap;
 use rayon::{iter::Either, prelude::*};
 use snafu::{OptionExt as _, ResultExt as _};
 
@@ -142,8 +142,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         });
 
     // 2/3: Group by template (sequential: only moves `Vec`s).
-    let mut by_template: RapidHashMap<TemplateKey<'static>, TemplatePatches<'a>> =
-        RapidHashMap::default();
+    let mut by_template: HashMap<TemplateKey<'static>, TemplatePatches<'a>> = HashMap::default();
     for (key, maps) in raw_borrowed_patches.0 {
         by_template.entry(key).or_default().base = maps;
     }

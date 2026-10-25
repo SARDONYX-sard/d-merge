@@ -32,7 +32,7 @@ pub(crate) struct OwnedPatches {
 
 /// - key: full path
 /// - value: nemesis xml
-pub(crate) type OwnedPatchMap = IndexMap<PathBuf, (String, usize), rapidhash::fast::RandomState>;
+pub(crate) type OwnedPatchMap = IndexMap<PathBuf, (String, usize), fast_hash::RandomState>;
 
 /// Collection of patches with metadata
 pub(crate) struct PatchCollection<'a> {
@@ -66,7 +66,7 @@ pub(crate) struct PatchCollection<'a> {
 /// ```
 #[derive(Debug, Default, Clone)]
 pub(crate) struct BehaviorPatchesMap<'a>(
-    pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, rapidhash::fast::RandomState>,
+    pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, fast_hash::RandomState>,
 );
 
 impl<'a> BehaviorPatchesMap<'a> {
@@ -105,7 +105,7 @@ impl<'a> BehaviorPatchesMap<'a> {
 /// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
 #[derive(Debug, Default, Clone)]
 pub(crate) struct BehaviorGraphDataMap<'a>(
-    pub DashMap<TemplateKey<'a>, Cow<'static, str>, rapidhash::fast::RandomState>,
+    pub DashMap<TemplateKey<'a>, Cow<'static, str>, fast_hash::RandomState>,
 );
 impl BehaviorGraphDataMap<'_> {
     /// Create `Self`

@@ -33,7 +33,7 @@ dark-light = "3.0.0"
 font-kit = "0.14.3"
 mimalloc = { version = "0.1.52", optional = true }
 parking_lot = { workspace = true }
-rapidhash = { workspace = true }
+fast_hash = { workspace = true }
 rayon = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }

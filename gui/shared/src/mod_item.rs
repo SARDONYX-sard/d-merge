@@ -27,7 +27,7 @@ pub struct ModItem {
 /// New items are appended in alphabetical order.
 /// Final priorities are always normalized.
 pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
-    let old_map: rapidhash::fast::RapidHashMap<&str, (bool, usize)> =
+    let old_map: fast_hash::HashMap<&str, (bool, usize)> =
         old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
     let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =
@@ -146,9 +146,9 @@ pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
 pub fn dedup_mods_by_id(mods: &mut [ModItem]) {
     use std::path::Path;
 
-    use rapidhash::RapidHashSet as HashSet;
+    use fast_hash::HashSet;
 
-    let mut seen = HashSet::default();
+    let mut seen = HashSet::<_>::default();
 
     for item in mods {
         let key = Path::new(&item.id).file_name().and_then(|x| x.to_str()).unwrap_or(&item.id);
