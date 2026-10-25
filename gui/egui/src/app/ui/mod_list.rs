@@ -6,7 +6,6 @@ use d_merge_gui_shared::{
     mod_item::{self, ModItem},
     settings::{DataMode, mod_list_ui::SortColumn},
 };
-use rayon::prelude::*;
 
 use crate::{
     app::App,
@@ -182,10 +181,10 @@ impl App {
 
     /// Returns the subset of mods that match the current filter text and column.
     ///
-    /// When the filter is empty the full list is returned (cloned in parallel).
+    /// When the filter is empty the full list is returned (cloned).
     fn filtered_mod_ids(&self) -> Vec<ModItem> {
         if self.settings.ui.mod_list.filter_text.trim().is_empty() {
-            return self.settings.mod_list().par_iter().cloned().collect();
+            return self.settings.mod_list().to_vec();
         }
 
         let text = self.settings.ui.mod_list.filter_text.trim().to_lowercase();
@@ -202,12 +201,12 @@ impl App {
             Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
             Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
         };
-        self.settings.mod_list().par_iter().filter(matches_filter).cloned().collect()
+        self.settings.mod_list().iter().filter(matches_filter).cloned().collect()
     }
 
     /// Sorts `mods` in-place according to the current sort column and direction.
     fn sort_filtered_mods(&self, mods: &mut [ModItem]) {
-        mods.par_sort_unstable_by(|a, b| {
+        mods.sort_unstable_by(|a, b| {
             let ord = match self.settings.ui.mod_list.sort_column {
                 SortColumn::Id => a.id.cmp(&b.id),
                 SortColumn::Name => a.name.cmp(&b.name),
@@ -333,10 +332,10 @@ impl App {
                         let check_all = self.check_all;
 
                         let filtered_ids: fast_hash::HashSet<_> =
-                            self.filtered_mod_ids().into_par_iter().map(|m| m.id).collect();
+                            self.filtered_mod_ids().into_iter().map(|m| m.id).collect();
                         let is_unfiltered = filtered_ids.is_empty();
 
-                        self.settings.mod_list_mut().par_iter_mut().for_each(|item| {
+                        self.settings.mod_list_mut().iter_mut().for_each(|item| {
                             if is_unfiltered || filtered_ids.contains(&item.id) {
                                 item.enabled = check_all;
                             }

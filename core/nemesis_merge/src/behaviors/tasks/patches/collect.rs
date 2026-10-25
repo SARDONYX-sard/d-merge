@@ -26,7 +26,7 @@ use crate::{
             templates::key::TemplateKey,
         },
     },
-    config::{ReportType, StatusReportCounter},
+    config::{ReportType, Status, StatusReportCounter},
     errors::{
         Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
     },
@@ -54,6 +54,10 @@ pub(crate) fn collect_owned_patches(
         let id_str = get_nemesis_id(path.to_str()?).ok()?;
         ids.get(id_str).copied()
     }
+
+    // NOTE: Report before walking the dirs because `total` is unknown until then.
+    // Otherwise, the previous status(FNIS) keeps being shown while walking. (It takes seconds when the OS file cache is cold.)
+    config.on_report_status(Status::ReadingPatches { index: 0, total: 0 });
 
     let mut paths: Vec<_> = nemesis_entries
         .par_iter()

@@ -22,7 +22,6 @@ use d_merge_gui_shared::settings::ui::{FontMode, FontSettings};
 use dashmap::DashMap;
 use egui::{Context, FontData, FontDefinitions, FontFamily};
 use font_kit::source::SystemSource;
-use rayon::prelude::*;
 
 /// Cached list of available system font families.
 static FONT_FAMILIES: OnceLock<Vec<String>> = OnceLock::new();
@@ -55,7 +54,7 @@ pub(crate) fn font_families() -> &'static [String] {
     FONT_FAMILIES.get_or_init(|| {
         let mut families = SystemSource::new().all_families().unwrap_or_default();
 
-        families.par_sort_unstable();
+        families.sort_unstable();
         families.dedup();
 
         families
