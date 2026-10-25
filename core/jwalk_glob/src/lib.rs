@@ -116,9 +116,14 @@ fn expand(pattern: &str, is_dir: bool) -> Vec<PathBuf> {
     let pat_depth = pat_after_root.components().count();
     let max_depth = if has_recursive { usize::MAX } else { pat_depth };
 
+    // NOTE: Use a dedicated pool instead of the global rayon pool.
+    // If the global pool is busy(e.g. while patching), jwalk gives up with a busy timeout
+    // and the entries are silently dropped.
+    // - `RayonNewPool(0)` means "all cores" in rayon, so clamp it to at least 1.
+    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+
     jwalk::WalkDir::new(&root)
-        // NOTE: Important: By configuring the settings below to reserve just one core for the UI, we can prevent the UI from freezing.
-        .parallelism(jwalk::Parallelism::RayonNewPool(num_cpus::get() - 1))
+        .parallelism(jwalk::Parallelism::RayonNewPool(threads))
         .max_depth(max_depth)
         .into_iter()
         .filter_map(|r| {
