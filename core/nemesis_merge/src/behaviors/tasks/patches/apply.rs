@@ -90,7 +90,14 @@ fn apply_to_one_template<'a, 'b: 'a>(
     let mut results = Vec::with_capacity(patches_len);
 
     // NOTE: Why not use par_iter here?
-    // Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
+    // - Since the template change targets overlap, locking with Arc<Mutex<T>> will likely slow things down.
+    // - Parallelizing per class(`#xxxx`) was also tried, but it had no effect.
+    //   (This whole step takes only ~30ms, and the nested rayon tasks only add stealing overhead.)
+    //
+    // NOTE: Why apply one field patches first?
+    // One field patches never remove array elements, so they never shift any index.
+    // Destructive changes to arrays(add/remove that shift indexes) are applied later as seq patches,
+    // so the paths of one field patches are always valid when they are applied.
     for (path, patch) in one_patch_map.into_inner() {
         let result = apply_one_field(template_value, path, patch)
             .with_context(|_| PatchSnafu { template_name: key.to_string() });
