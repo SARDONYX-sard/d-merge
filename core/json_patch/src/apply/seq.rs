@@ -275,7 +275,7 @@ fn apply_ops_parallel<'a>(
                 }
             }
             Action::SeqPush => tail.extend(value_as_array(value)?), // Always append at the end
-            _ => {} // Should not appear here
+            _ => {}                                                 // Should not appear here
         }
     }
 
