@@ -37,7 +37,7 @@ winnow_ext = { workspace = true }
 # workspace members
 auto_charset = { workspace = true }
 fnis_list = { workspace = true }
-json_patch = { workspace = true, features = ["rayon", "serde"] }
+json_patch = { workspace = true, features = ["serde"] }
 jwalk_glob = { workspace = true }
 nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }

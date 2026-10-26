@@ -50,6 +50,8 @@ pub(crate) enum AnimKind {
         ///
         /// I have no choice but to copy them to these respective locations.
         is_male_subdir: bool,
+        /// Priority(load order) of the mod. Used to order the mods in `aa_config.json`.
+        priority: usize,
     },
 }
 

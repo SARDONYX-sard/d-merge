@@ -41,26 +41,25 @@ impl<'a> NemesisPath<'a> {
         }
     }
 
-    /// Returns the variable class index (e.g. `#0100`) used to replace
-    /// Nemesis variables(e.g., `$variableID[variableName]$`) in `hkbBehaviorGraphStringData`.
+    /// Returns the indexes (e.g. `#0100`) of `hkbBehaviorGraphStringData` & `hkbBehaviorGraphData` used to replace
+    /// Nemesis variables(e.g., `$variableID[variableName]$`).
     ///
     /// This value is only defined for [`NemesisPath::Normal`] paths.
     ///
     /// # EngineExt behavior
     ///
     /// For [`NemesisPath::EngineExt`] paths, this method always returns `None`.
-    /// EngineExt patches do not have a fixed variable index at parse time;
+    /// EngineExt patches do not have a fixed index at parse time;
     /// instead, the index must be discovered dynamically by the patcher
     /// during graph traversal.
     ///
     /// This distinction is intentional and reflects the semantic difference
     /// between template-based Nemesis patches and free-form EngineExt patches.
-    pub(super) fn get_variable_index(&self) -> Option<&'static str> {
+    pub(super) fn get_master_index(&self) -> Option<&'static MasterIndex> {
         match self {
-            NemesisPath::Normal { template_name, is_1st_person } => Some(
-                MasterIndex::from_nemesis_file(template_name, *is_1st_person)?
-                    .master_behavior_graph_index,
-            ),
+            NemesisPath::Normal { template_name, is_1st_person } => {
+                MasterIndex::from_nemesis_file(template_name, *is_1st_person)
+            }
             NemesisPath::EngineExt { .. } => None,
         }
     }

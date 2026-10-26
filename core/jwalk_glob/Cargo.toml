@@ -1,7 +1,7 @@
 [package]
 name = "jwalk_glob"
 version.workspace = true
-description = "Glob pattern matching for jwalk. To avoid MO2 vfs error when using glob crate."
+description = "Parallel glob & dir walker. To avoid MO2 vfs error when using glob crate."
 
 authors.workspace = true
 categories.workspace = true
@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-jwalk = { workspace = true }
+rayon = { workspace = true }
 tracing = { workspace = true, optional = true }
 
 [features]

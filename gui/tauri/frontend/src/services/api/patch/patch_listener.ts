@@ -26,6 +26,7 @@ type ErrorPayload = string;
  * The backend emits these status values using `window.emit(...)` during various stages.
  */
 export type Status =
+  | { type: 'GeneratingFnisPatches'; content: StatusIndexing }
   | { type: 'ReadingPatches'; content: StatusIndexing }
   | { type: 'ParsingPatches'; content: StatusIndexing }
   | { type: 'ApplyingPatches'; content: StatusIndexing }

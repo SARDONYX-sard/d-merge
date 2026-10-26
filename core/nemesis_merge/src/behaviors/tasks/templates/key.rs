@@ -324,7 +324,6 @@ pub(crate) static NEMESIS_3RD_PERSON_MAP: phf::Map<&'static str, &'static str> =
 /// Map from full template path to actor name
 #[derive(Debug, Clone)]
 pub(crate) struct MasterIndex {
-    #[allow(unused)]
     pub master_string_data_index: &'static str,
     pub master_behavior_graph_index: &'static str,
 }
@@ -335,11 +334,16 @@ impl MasterIndex {
         template_file_stem: &str,
         is_1st_person: bool,
     ) -> Option<&'static Self> {
-        if is_1st_person {
-            FIRST_PERSON_INDEX_MAP.get(template_file_stem)
-        } else {
-            MASTER_INDEX_MAP.get(template_file_stem)
+        let map = if is_1st_person { &FIRST_PERSON_INDEX_MAP } else { &MASTER_INDEX_MAP };
+
+        if let Some(index) = map.get(template_file_stem) {
+            return Some(index);
         }
+
+        // Fallback search by ASCII ignore(For Nemesis_Engine\mod\pscd\MagicBehavior)
+        // NOTE: Without this, the index parsed from xml(`hkbBehaviorGraphStringData`, not `hkbBehaviorGraphData`)
+        // is used instead, and the hkx generation fails depending on the order of the patch files.
+        map.entries().find_map(|(k, v)| k.eq_ignore_ascii_case(template_file_stem).then_some(v))
     }
 }
 

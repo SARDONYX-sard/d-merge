@@ -8,11 +8,6 @@ pub(crate) struct OwnedAdsfPatchMap(pub IndexMap<PathBuf, (String, usize), fast_
 
 impl OwnedAdsfPatchMap {
     #[inline]
-    pub(crate) fn new() -> Self {
-        Self(IndexMap::default())
-    }
-
-    #[inline]
     pub(crate) fn insert(
         &mut self,
         path: PathBuf,

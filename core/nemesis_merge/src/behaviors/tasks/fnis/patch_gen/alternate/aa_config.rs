@@ -79,6 +79,10 @@ pub(crate) struct AAMod {
 
     /// Animation groups registered by this mod, sorted by `group_id`.
     pub groups: Vec<AAGroup>,
+
+    #[serde(skip)]
+    /// Priority of this mod. Used to sort mods into load order before assigning `mod_id`.
+    pub priority: usize,
 }
 
 /// Root configuration for the `fnis_aa` SKSE plugin.
@@ -222,7 +226,7 @@ pub(crate) fn build_aa_config_from_jobs(
 
     for job in jobs {
         let AnimIoJob::Hkx(ConversionJob {
-            kind: AnimKind::FnisAA { prefix, group_name, slot_count, .. },
+            kind: AnimKind::FnisAA { prefix, group_name, slot_count, priority, .. },
             ..
         }) = job
         else {
@@ -234,6 +238,7 @@ pub(crate) fn build_aa_config_from_jobs(
             name: Arc::clone(prefix),
             mod_id: 0, // assigned later by compute_bases()
             groups: vec![],
+            priority: *priority,
         });
 
         // Each group appears once per mod regardless of how many animation
@@ -246,6 +251,10 @@ pub(crate) fn build_aa_config_from_jobs(
             });
         }
     }
+
+    // NOTE: `jobs` come in the parallel completion order, which changes every run.
+    // Sort only the AA mods(not all jobs) into load order here, because `mod_id`/`base` and the CRC depend on it.
+    aa_mods.sort_unstable_by(|_, a, _, b| (a.priority, &a.prefix).cmp(&(b.priority, &b.prefix)));
 
     write_aa_config(aa_mods.into_values().collect(), output_dir)
 }
@@ -274,6 +283,7 @@ mod tests {
                 group_name,
                 slot_count,
                 is_male_subdir: false,
+                priority: 0,
             },
         })
     }
@@ -356,7 +366,8 @@ mod tests {
         let mut aa_mods = IndexMap::<_, _, fast_hash::RandomState>::default();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
-                kind: AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false },
+                kind:
+                    AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false, priority },
                 ..
             }) = job
             else {
@@ -367,6 +378,7 @@ mod tests {
                 name: Arc::clone(prefix),
                 mod_id: 0,
                 groups: vec![],
+                priority: *priority,
             });
             if !aa_mod.groups.iter().any(|g| g.name == *group_name) {
                 aa_mod.groups.push(AAGroup { name: *group_name, base: 0, slot_count: *slot_count });

@@ -49,15 +49,15 @@ tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.23"
 winnow = { version = "1.0.4", features = ["simd"] }
 
-auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
-diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false, features = [
+auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
+diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false, features = [
   "ignore_duplicates",
 ] }
-havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
-winnow_ext = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "a84b8e4", default-features = false }
+havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
+winnow_ext = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "ec88117", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1" # Color diff assertion

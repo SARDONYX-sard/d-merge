@@ -11,9 +11,7 @@ use snafu::ResultExt;
 
 use crate::{
     Config, OutPutTarget,
-    behaviors::tasks::{
-        patches::types::BehaviorGraphDataMap, templates::types::BorrowedTemplateMap,
-    },
+    behaviors::tasks::{patches::types::BehaviorIndexMap, templates::types::BorrowedTemplateMap},
     config::{ReportType, StatusReportCounter},
     errors::{Error, FailedIoSnafu, HkxSerSnafu, JsonToClassMapSnafu, Result},
     results::filter_results,
@@ -22,7 +20,7 @@ use crate::{
 pub(crate) fn generate_hkx_files(
     config: &Config,
     templates: BorrowedTemplateMap<'_>,
-    variable_class_map: BehaviorGraphDataMap<'_>,
+    behavior_index_map: BehaviorIndexMap<'_>,
 ) -> Result<(), Vec<Error>> {
     let reporter = StatusReportCounter::new(
         &config.status_report,
@@ -66,33 +64,31 @@ pub(crate) fn generate_hkx_files(
                 let mut class_map: ClassMap = simd_json::serde::from_borrowed_value(template_json)
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
 
-                let mut event_id_map = None;
-                let mut variable_id_map = None;
-                if let Some(pair) = variable_class_map.0.get(&key) {
-                    let master_behavior_graph_index = pair;
+                // NOTE: If the indexes are unknown, Nemesis variables are not replaced.
+                // NOTE: Clone it to release the `DashMap` lock immediately. (It's just 2 small strings.)
+                let indexes = behavior_index_map.0.get(&key).map(|indexes| indexes.clone());
 
-                    // Deduplication is prone to unexpected index misalignments, and there is no guarantee that this will not occur.
-                    // Furthermore, since values with the same name are synchronized, there are no drawbacks other than wasted resources.
-                    //
-                    // It checks whether the number of values associated with an event matches the number of default values associated with a value name.
-                    // This is done to prevent crashes before they occur.
+                // Deduplication is prone to unexpected index misalignments, and there is no guarantee that this will not occur.
+                // Furthermore, since values with the same name are synchronized, there are no drawbacks other than wasted resources.
+                //
+                // It checks whether the number of values associated with an event matches the number of default values associated with a value name.
+                // This is done to prevent crashes before they occur.
+                // - Only if the index of `hkbBehaviorGraphData` is known.(Not known from the Nemesis patch xml)
+                if let Some(behavior_graph_index) =
+                    indexes.as_ref().and_then(|indexes| indexes.behavior_graph.as_deref())
+                {
                     use serde_hkx_features::id_maker::check_len_from_map;
-                    check_len_from_map(&class_map, &master_behavior_graph_index).with_context(
-                        |_| crate::errors::DedupEventVariableSnafu { path: output_path.clone() },
-                    )?;
-
-                    // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
-                    class_map.sort_for_bytes(); // NOTE: If we don't sort hkx by dependency order, a T/A pose will occur.
-
-                    if let Some((event_map, var_map)) =
-                        create_maps(&class_map, &master_behavior_graph_index)
-                    {
-                        event_id_map = Some(event_map);
-                        variable_id_map = Some(var_map);
-                    };
-                } else {
-                    class_map.sort_for_bytes(); // NOTE: To avoid T/A pose.
+                    check_len_from_map(&class_map, behavior_graph_index).with_context(|_| {
+                        crate::errors::DedupEventVariableSnafu { path: output_path.clone() }
+                    })?;
                 }
+
+                // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
+                class_map.sort_for_bytes(); // NOTE: If we don't sort hkx by dependency order, a T/A pose will occur.
+
+                let (event_id_map, variable_id_map) = indexes
+                    .and_then(|indexes| create_maps(&class_map, &indexes.string_data))
+                    .unwrap_or_else(|| (EventIdMap::new(), VariableIdMap::new()));
 
                 // NOTE: View the debug output after removing duplicates. Otherwise, duplicate eventNames will appear.
                 if config.debug.output_merged_xml {
@@ -105,8 +101,6 @@ pub(crate) fn generate_hkx_files(
                     OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
                     OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
                 };
-                let event_id_map = event_id_map.unwrap_or_else(EventIdMap::new);
-                let variable_id_map = variable_id_map.unwrap_or_else(VariableIdMap::new);
 
                 // Output error info
                 // serialize target class, field ptr number.

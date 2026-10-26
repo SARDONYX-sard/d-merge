@@ -41,7 +41,7 @@ use crate::{
                 kill_move::calculate_hash,
             },
         },
-        patches::types::{BehaviorGraphDataMap, BehaviorPatchesMap, PatchCollection},
+        patches::types::{BehaviorIndexMap, BehaviorIndexes, BehaviorPatchesMap, PatchCollection},
         templates::key::{THREAD_PERSON_0_MASTER_KEY, THREAD_PERSON_MT_BEHAVIOR_KEY},
     },
     config::{Config, ReportType, StatusReportCounter},
@@ -52,7 +52,7 @@ pub(crate) type JsonPatchPairs<'a> = Vec<(JsonPath<'a>, ValueWithPriority<'a>)>;
 
 struct LocalAgg<'a> {
     borrowed_patches: BehaviorPatchesMap<'a>,
-    behavior_graph_data_map: BehaviorGraphDataMap<'a>,
+    behavior_index_map: BehaviorIndexMap<'a>,
 
     adsf_patches: Vec<AdsfPatch<'a>>,
     asdsf_patches: Vec<AsdsfPatch<'a>>,
@@ -65,7 +65,7 @@ impl<'a> LocalAgg<'a> {
     fn new() -> Self {
         Self {
             borrowed_patches: BehaviorPatchesMap::default(),
-            behavior_graph_data_map: BehaviorGraphDataMap::new(),
+            behavior_index_map: BehaviorIndexMap::new(),
             adsf_patches: Vec::new(),
             asdsf_patches: Vec::new(),
             furniture_groups: Vec::new(),
@@ -76,7 +76,7 @@ impl<'a> LocalAgg<'a> {
     fn merge(mut self, other: Self) -> Self {
         self.borrowed_patches.merge(other.borrowed_patches);
 
-        self.behavior_graph_data_map.0.par_extend(other.behavior_graph_data_map.0);
+        self.behavior_index_map.0.par_extend(other.behavior_index_map.0);
         self.adsf_patches.par_extend(other.adsf_patches);
         self.asdsf_patches.par_extend(other.asdsf_patches);
         self.furniture_groups.par_extend(other.furniture_groups);
@@ -124,7 +124,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         });
     let LocalAgg {
         borrowed_patches,
-        behavior_graph_data_map,
+        behavior_index_map,
         adsf_patches,
         asdsf_patches,
         furniture_groups,
@@ -146,16 +146,21 @@ pub(crate) fn collect_borrowed_patches<'a>(
             } = patches;
 
             let borrowed_patches = &mut acc.borrowed_patches;
-            let behavior_graph_data_map = &mut acc.behavior_graph_data_map;
+            let behavior_index_map = &mut acc.behavior_index_map;
 
             // Add patches to mt_behavior.xml
             if owned_data.behavior_entry.is_3rd_person_character() {
                 let entry = borrowed_patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
-                if !behavior_graph_data_map.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
-                    behavior_graph_data_map
-                        .0
-                        .insert(THREAD_PERSON_MT_BEHAVIOR_KEY, Cow::Borrowed("#0085"));
+                // Indexes of `meshes/actors/character/behaviors/mt_behavior.bin`
+                if !behavior_index_map.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
+                    behavior_index_map.0.insert(
+                        THREAD_PERSON_MT_BEHAVIOR_KEY,
+                        BehaviorIndexes {
+                            string_data: Cow::Borrowed("#0083"),
+                            behavior_graph: Some(Cow::Borrowed("#0085")),
+                        },
+                    );
                 }
 
                 for (path, patch) in one_mt_behavior_patches {
@@ -172,10 +177,17 @@ pub(crate) fn collect_borrowed_patches<'a>(
                     owned_data.behavior_entry.to_master_behavior_template_key();
 
                 // NOTE: By using `contains` instead of `.entry`, we avoid unnecessary cloning.
-                if !behavior_graph_data_map.0.contains_key(&master_template_key) {
-                    behavior_graph_data_map.0.insert(
+                if !behavior_index_map.0.contains_key(&master_template_key) {
+                    behavior_index_map.0.insert(
                         master_template_key.clone(),
-                        Cow::Borrowed(owned_data.behavior_entry.master_behavior_graph_index),
+                        BehaviorIndexes {
+                            string_data: Cow::Borrowed(
+                                owned_data.behavior_entry.master_string_data_index,
+                            ),
+                            behavior_graph: Some(Cow::Borrowed(
+                                owned_data.behavior_entry.master_behavior_graph_index,
+                            )),
+                        },
                     );
                 }
 
@@ -332,7 +344,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     };
 
     (
-        PatchCollection { borrowed_patches, behavior_graph_data_map },
+        PatchCollection { borrowed_patches, behavior_index_map },
         adsf_patches,
         asdsf_patches,
         FNISIoJobRunner::new(conversion_jobs, config.output_target, aa_base_map),

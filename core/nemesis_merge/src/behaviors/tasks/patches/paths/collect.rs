@@ -1,13 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use winnow::{
-    ModalResult, Parser,
-    ascii::Caseless,
-    combinator::{alt, fail, repeat, seq},
-    error::{StrContext, StrContextValue},
-    token::{any, take_while},
-};
-use winnow_ext::take_until_ext;
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Category {
@@ -21,55 +14,42 @@ pub(crate) enum Category {
     Asdsf,
 }
 
-/// Collects all relevant file paths within the given ID directory.
+/// Returns all patch files in one mod dir(e.g. `<data>/Nemesis_Engine/mod/<mod_code>`) with their category.
 ///
-/// # Errors
-/// Returns an error if path traversal fails.
+/// The category is decided by the dir layout, so there is no need to parse the full path:
+/// - `#*.txt`(anywhere) => [`Category::Nemesis`]
+///   - `<template>/`, `_1stperson/<template>/`, EngineExt `meshes/**/`
+/// - `animationdatasinglefile/<project>/*.txt` => [`Category::Adsf`]
+/// - `animationsetdatasinglefile/<project>/*.txt` => [`Category::Asdsf`]
 ///
 /// # Note
-/// This walks serially so that it can be called inside `rayon::par_iter` per mod directory.
-/// (jwalk's rayon mode gives up with a busy timeout when the rayon pool is occupied,
-/// which silently drops entries.)
-pub(crate) fn collect_nemesis_paths(path: impl AsRef<Path>) -> Vec<(Category, PathBuf)> {
-    jwalk::WalkDir::new(path)
-        .parallelism(jwalk::Parallelism::Serial)
-        .into_iter()
-        .filter_map(|result| {
-            let txt_path = {
-                let entry = match result {
-                    Ok(entry) => entry,
-                    Err(_err) => {
-                        #[cfg(feature = "tracing")]
-                        tracing::error!("Failed to walk dir: {_err}");
-                        return None;
-                    }
-                };
-                if !is_txt_file(&entry.file_name) {
-                    return None;
-                }
-                // NOTE: `file_type` is cached by the walker, so this avoids an extra `stat` per entry.
-                // Only symlinks need `stat` to follow the link.
-                let file_type = entry.file_type();
-                let path = entry.path();
-                let is_file =
-                    if file_type.is_symlink() { path.is_file() } else { !file_type.is_dir() };
-                is_file.then_some(path)?
-            };
-            let txt_path_str = if let Some(path) = txt_path.to_str() {
-                path
-            } else {
-                tracing::debug!(path = ?txt_path, "Skipping non-UTF-8 path");
-                return None;
-            };
+/// Sub dirs are walked in parallel, and this can also be called inside `rayon::par_iter` per mod directory.
+pub(crate) fn collect_nemesis_paths(
+    mod_dir: &Path,
+) -> impl ParallelIterator<Item = (Category, PathBuf)> + '_ {
+    jwalk_glob::walk_files(mod_dir).filter_map(move |path| {
+        let category = classify(mod_dir, &path)?;
+        Some((category, path))
+    })
+}
 
-            let category = if is_nemesis_file(&txt_path) {
-                Category::Nemesis
-            } else {
-                classify_patch_path(txt_path_str)?
-            };
-            Some((category, txt_path))
-        })
-        .collect()
+/// Classifies a file in `mod_dir`.
+fn classify(mod_dir: &Path, path: &Path) -> Option<Category> {
+    if !is_txt_file(path) {
+        return None;
+    }
+    if is_nemesis_file(path) {
+        return Some(Category::Nemesis);
+    }
+
+    let top_dir = path.strip_prefix(mod_dir).ok()?.components().next()?.as_os_str().to_str()?;
+    if top_dir.eq_ignore_ascii_case("animationdatasinglefile") {
+        Some(Category::Adsf)
+    } else if top_dir.eq_ignore_ascii_case("animationsetdatasinglefile") {
+        (!is_manifest_patch(path)).then_some(Category::Asdsf)
+    } else {
+        None
+    }
 }
 
 #[inline]
@@ -87,102 +67,49 @@ fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
         .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
 }
 
-/// Classifies a patch path.
-fn classify_patch_path(input: &str) -> Option<Category> {
-    patch_path.parse(input).ok()
-}
-
-fn patch_path(input: &mut &str) -> ModalResult<Category> {
-    // Nemesis_Engine/mod/<mod_code>/
-    seq! {
-        take_until_ext(0.., Caseless("Nemesis_Engine")),
-        Caseless("Nemesis_Engine").context(StrContext::Expected(StrContextValue::StringLiteral("Nemesis_Engine"))),
-        path_sep1,
-        Caseless("mod").context(StrContext::Expected(StrContextValue::StringLiteral("mod"))),
-        path_sep1,
-        take_while(1.., |c| !matches!(c, '/' | '\\')), // <mod_code>
-        path_sep1,
-    }
-    .parse_next(input)?;
-
-    let category = alt((
-        Caseless("animationdatasinglefile").value(Category::Adsf),
-        Caseless("animationsetdatasinglefile").value(Category::Asdsf),
-        fail,
-    ))
-    .parse_next(input)?;
-
-    path_sep1.parse_next(input)?;
-
-    if category == Category::Asdsf {
-        fail_if_manifest_patch.parse_next(input)?;
-    }
-
-    repeat::<_, _, (), _, _>(0.., any).parse_next(input)?;
-
-    Ok(category)
-}
-
-// It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
-fn fail_if_manifest_patch(input: &mut &str) -> ModalResult<()> {
-    let template_name = path_component.parse_next(input)?;
-    path_sep1.parse_next(input)?;
-
-    let file_name = path_component.parse_next(input)?;
-
-    if template_name.eq_ignore_ascii_case("HorseProjectData~HorseProject")
-        && file_name.eq_ignore_ascii_case("horseproject.txt")
-    {
-        return fail.parse_next(input);
-    }
-
-    Ok(())
-}
-
-/// Parses a single path component.
+/// It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
 ///
-/// A component cannot contain `/` or `\`.
-fn path_component<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
-    take_while(1.., |c: char| c != '/' && c != '\\').parse_next(input)
-}
+/// e.g. `animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt`
+fn is_manifest_patch(path: &Path) -> bool {
+    let name_eq = |path: Option<&Path>, expected: &str| {
+        path.and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case(expected))
+    };
 
-/// Parses 1 or more path separator.
-///
-/// Both `/` and `\` are accepted.
-fn path_sep1(input: &mut &str) -> ModalResult<()> {
-    take_while(1.., |c: char| c == '/' || c == '\\').void().parse_next(input)
+    name_eq(Some(path), "horseproject.txt")
+        && name_eq(path.parent(), "HorseProjectData~HorseProject")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const MOD_DIR: &str = "C:/MO2/mods/slide/Nemesis_Engine/mod/slide";
+
+    fn classify_in_mod(relative: &str) -> Option<Category> {
+        let mod_dir = Path::new(MOD_DIR);
+        classify(mod_dir, &mod_dir.join(relative))
+    }
+
     #[test]
     fn test_classify_nemesis_patch_file() {
-        let path = r"mod/Nemesis_engine/mod/id/shout_behavior/#id$0.txt";
-        assert!(is_nemesis_file(path));
+        assert_eq!(classify_in_mod("shout_behavior/#id$0.txt"), Some(Category::Nemesis));
+        assert_eq!(classify_in_mod("_1stperson/0_master/#0106.txt"), Some(Category::Nemesis));
+        assert_eq!(
+            classify_in_mod("meshes/actors/character/behaviors/foo/#0001.txt"),
+            Some(Category::Nemesis)
+        );
     }
 
     #[test]
     fn test_classify_anim_data_patch_files() {
         assert_eq!(
-            patch_path.parse(
-                r"Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"
-            ).unwrap_or_else(|e| panic!("{e}")),
-            Category::Adsf
-        );
-
-        assert_eq!(
-            classify_patch_path(
-                r"C:/MO2/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultFemale~1/slide$0.txt"
-            ),
+            classify_in_mod("animationdatasinglefile/DefaultFemale~1/SprintSlide~slide$0.txt"),
             Some(Category::Adsf)
         );
-
         assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine/mod/tkuc/animationdatasinglefile/FirstPerson~1/TKDodgeForward~791.txt"
-            ),
+            classify_in_mod("AnimationDataSingleFile/FirstPerson~1/TKDodgeForward~791.txt"),
             Some(Category::Adsf)
         );
     }
@@ -190,46 +117,22 @@ mod tests {
     #[test]
     fn test_classify_anim_set_data_patch_files() {
         assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine//mod/slide/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt"
-            ),
-            Some(Category::Asdsf)
-        );
-
-        assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine/mod/slide/animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt"
-            ),
+            classify_in_mod("animationsetdatasinglefile/DefaultMaleData~DefaultMale/_MTSolo.txt"),
             Some(Category::Asdsf)
         );
     }
 
     #[test]
     fn test_classify_invalid_patch_files() {
-        assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine//mod/slide/some_other_folder/DefaultFemale~1/slide$0.txt"
-            ),
-            None
-        );
-
-        assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine//mod/slide/animation_data_single_file/DefaultFemale~1/slide$0.txt"
-            ),
-            None
-        );
+        assert_eq!(classify_in_mod("some_other_folder/DefaultFemale~1/slide$0.txt"), None);
+        assert_eq!(classify_in_mod("animation_data_single_file/DefaultFemale~1/slide$0.txt"), None);
+        assert_eq!(classify_in_mod("shout_behavior/readme.txt"), None);
+        assert_eq!(classify_in_mod("info.ini"), None);
 
         // It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
         assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine/mod/hpmhr/animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt"
-            ),
-            None
-        );
-        assert_eq!(
-            classify_patch_path(
-                r"Nemesis_Engine/mod/hpmhr\animationsetdatasinglefile\HorseProjectData~HorseProject\horseproject.txt"
+            classify_in_mod(
+                "animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt"
             ),
             None
         );

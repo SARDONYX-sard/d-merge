@@ -31,49 +31,8 @@ fn match_segment_inner(p: &[char], n: &[char]) -> bool {
     }
 }
 
-/// Matches a full filesystem path against a glob pattern.
-///
-/// Pattern components are split on `/` or `\`.
-/// Path components are extracted via [`std::path::Path::components`].
-///
-/// `**` must occupy its own component and matches zero or more path components.
-pub(crate) fn match_glob_path(pattern: &str, path: &std::path::Path) -> bool {
-    let pat_components: Vec<&str> = pattern.split(['/', '\\']).filter(|s| !s.is_empty()).collect();
-    let path_components: Vec<&str> = path
-        .components()
-        .filter_map(|c| match c {
-            // Normalize RootDir (`/` or `\`) — already represented by structure, skip
-            std::path::Component::RootDir => None,
-            // Prefix (`C:`) and Normal components — keep as str
-            c => c.as_os_str().to_str(),
-        })
-        .collect();
-    match_glob_components(&pat_components, &path_components)
-}
-
-fn match_glob_components(pat: &[&str], path: &[&str]) -> bool {
-    match (pat, path) {
-        // Both exhausted — full match
-        ([], []) => true,
-        // Pattern exhausted but path remains — no match
-        ([], _) => false,
-        // Path exhausted — match only if all remaining pattern components are `**`
-        (_, []) => pat.iter().all(|&s| s == "**"),
-        // `**` matches zero or more path components
-        (["**", pat_rest @ ..], _) => {
-            (0..=path.len()).any(|i| match_glob_components(pat_rest, &path[i..]))
-        }
-        // Literal or `*`/`?` segment — match current component then recurse
-        ([p, pat_rest @ ..], [n, path_rest @ ..]) => {
-            match_segment(p, n) && match_glob_components(pat_rest, path_rest)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use super::*;
 
     // ── match_segment ────────────────────────────────────────────────────────
@@ -133,69 +92,5 @@ mod tests {
     fn segment_multiple_stars() {
         assert!(match_segment("a*b*c", "aXbYc"));
         assert!(!match_segment("a*b*c", "aXYc"));
-    }
-
-    // ── match_glob_path ──────────────────────────────────────────────────────
-
-    #[test]
-    fn glob_trailing_star() {
-        assert!(match_glob_path("mods/*", Path::new("mods/FNISFlyer")));
-        assert!(!match_glob_path("mods/*", Path::new("mods/a/b")));
-    }
-
-    #[test]
-    fn glob_mid_star() {
-        assert!(match_glob_path("mods/*/Data", Path::new("mods/FNISFlyer/Data")));
-        assert!(!match_glob_path("mods/*/Data", Path::new("mods/a/b/Data")));
-    }
-
-    #[test]
-    fn glob_partial_name() {
-        assert!(match_glob_path("mods/FNIS*/Data", Path::new("mods/FNISFlyer/Data")));
-        assert!(!match_glob_path("mods/FNIS*/Data", Path::new("mods/TKDodge/Data")));
-    }
-
-    #[test]
-    fn glob_double_star_zero_components() {
-        assert!(match_glob_path("mods/**/Data", Path::new("mods/Data")));
-    }
-
-    #[test]
-    fn glob_double_star_one_component() {
-        assert!(match_glob_path("mods/**/Data", Path::new("mods/a/Data")));
-    }
-
-    #[test]
-    fn glob_double_star_many_components() {
-        assert!(match_glob_path("mods/**/Data", Path::new("mods/a/b/c/Data")));
-        assert!(!match_glob_path("mods/**/Data", Path::new("mods/a/b/Other")));
-    }
-
-    #[test]
-    fn glob_double_star_only() {
-        assert!(match_glob_path("**", Path::new("anything/at/all")));
-        assert!(match_glob_path("**", Path::new("single")));
-    }
-
-    #[test]
-    fn glob_case_insensitive() {
-        assert!(match_glob_path("MODS/*/data", Path::new("mods/FNISFlyer/Data")));
-    }
-
-    #[test]
-    fn glob_question_mark() {
-        assert!(match_glob_path("mods/FNI?Flyer", Path::new("mods/FNISFlyer")));
-        assert!(!match_glob_path("mods/FNI?Flyer", Path::new("mods/FNISSFlyer")));
-    }
-
-    #[test]
-    fn glob_no_pattern_literal_match() {
-        assert!(match_glob_path("C:/Skyrim/Data", Path::new("C:/Skyrim/Data")));
-        assert!(!match_glob_path("C:/Skyrim/Data", Path::new("C:/Skyrim/Other")));
-    }
-
-    #[test]
-    fn glob_backslash_separator_in_pattern() {
-        assert!(match_glob_path("mods\\*\\Data", Path::new("mods/FNISFlyer/Data")));
     }
 }

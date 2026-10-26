@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, path::Path};
 
 use fast_hash::HashMap;
 use json_patch::ValueWithPriority;
@@ -16,28 +13,18 @@ use super::paths::{
 use crate::{
     Config,
     behaviors::{
-        priority_ids::{get_nemesis_id, types::PriorityMap},
+        priority_ids::types::PriorityMap,
         tasks::{
-            adsf::types::OwnedAdsfPatchMap,
-            asdsf::types::OwnedAsdsfPatchMap,
             patches::types::{
-                BehaviorPatchesMap, HkxPatchMaps, OwnedPatchMap, OwnedPatches, PatchCollection,
+                BehaviorIndexes, BehaviorPatchesMap, HkxPatchMaps, OwnedPatchMap, OwnedPatches,
+                PatchCollection,
             },
             templates::key::TemplateKey,
         },
     },
-    config::{ReportType, Status, StatusReportCounter},
-    errors::{
-        Error, FailedIoSnafu, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result,
-    },
+    config::{ReportType, StatusReportCounter},
+    errors::{Error, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result},
 };
-
-struct OwnedPath {
-    category: Category,
-    path: PathBuf,
-    content: String,
-    priority: usize,
-}
 
 /// Collects all patches from the given nemesis paths and returns a map of owned patches.
 ///
@@ -50,69 +37,66 @@ pub(crate) fn collect_owned_patches(
     nemesis_entries: &PriorityMap,
     config: &Config,
 ) -> OwnedPatches {
-    fn get_priority_by_path_id(path: &Path, ids: &PriorityMap) -> Option<usize> {
-        let id_str = get_nemesis_id(path.to_str()?).ok()?;
-        ids.get(id_str).copied()
-    }
+    // NOTE: Walking and reading take seconds when the OS file cache is cold, so report the progress per mod dir.
+    let reporter = StatusReportCounter::new(
+        &config.status_report,
+        ReportType::ReadingPatches,
+        nemesis_entries.len(),
+    );
 
-    // NOTE: Report before walking the dirs because `total` is unknown until then.
-    // Otherwise, the previous status(FNIS) keeps being shown while walking. (It takes seconds when the OS file cache is cold.)
-    config.on_report_status(Status::ReadingPatches { index: 0, total: 0 });
+    // Walk, read and sort into each category at once per mod dir. (No intermediate `Vec` of paths)
+    // - No need to sort. Conflicts are resolved by priority, not by this order.
+    // - For thousands of small files, blocking reads on rayon are much cheaper than
+    //   spawning a tokio task (+ `spawn_blocking`) per file.
+    let collect = || {
+        nemesis_entries
+            .par_iter()
+            .map(|(mod_dir, &priority)| {
+                let patches = collect_nemesis_paths(Path::new(mod_dir))
+                    .fold(OwnedPatches::default, |mut acc, (category, path)| {
+                        match std::fs::read_to_string(&path) {
+                            Ok(content) => match category {
+                                Category::Nemesis => {
+                                    acc.owned_patches.insert(path, (content, priority));
+                                }
+                                Category::Adsf => {
+                                    acc.adsf_patches.insert(path, (content, priority));
+                                }
+                                Category::Asdsf => {
+                                    acc.asdsf_patches.insert(path, (content, priority));
+                                }
+                            },
+                            Err(source) => acc.errors.push(Error::FailedIo { path, source }),
+                        }
+                        acc
+                    })
+                    .reduce(OwnedPatches::default, OwnedPatches::merge);
+                reporter.increment();
+                patches
+            })
+            .reduce(OwnedPatches::default, OwnedPatches::merge)
+    };
 
-    let mut paths: Vec<_> = nemesis_entries
-        .par_iter()
-        .flat_map_iter(|(mod_dir, _)| collect_nemesis_paths(mod_dir))
-        .collect();
-    // Fix the order so that the output does not depend on the walk/hash order.
-    paths.par_sort_unstable_by(|(_, a), (_, b)| a.cmp(b));
-
-    let reporter =
-        StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, paths.len());
-
-    // NOTE: For thousands of small files, blocking reads on rayon are much cheaper than
-    // spawning a tokio task (+ `spawn_blocking`) per file.
-    let results: Vec<Result<OwnedPath>> = paths
-        .into_par_iter()
-        .map(|(category, path)| {
-            let priority = get_priority_by_path_id(&path, nemesis_entries).unwrap_or_else(|| {
-                #[cfg(feature = "tracing")]
-                tracing::warn!("Not found id from path: Path({})", path.display());
-                usize::MAX // todo error handling
-            });
-
-            let content = std::fs::read_to_string(&path)
-                .with_context(|_| FailedIoSnafu { path: path.clone() });
-            reporter.increment();
-
-            Ok(OwnedPath { category, path, content: content?, priority })
-        })
-        .collect();
-
-    let mut owned_patches = OwnedPatchMap::default();
-    let mut adsf_patches = OwnedAdsfPatchMap::new();
-    let mut asdsf_patches = OwnedAsdsfPatchMap::new();
-    let mut errors = vec![];
-
-    for result in results {
-        match result {
-            Ok(OwnedPath { category, path, content, priority }) => match category {
-                Category::Nemesis => {
-                    owned_patches.insert(path, (content, priority));
-                }
-                Category::Adsf => {
-                    adsf_patches.insert(path, (content, priority));
-                }
-                Category::Asdsf => {
-                    asdsf_patches.insert(path, (content, priority));
-                }
-            },
-            Err(err) => {
-                errors.push(err);
-            }
+    // NOTE: With a cold OS file cache, the time is dominated by the fixed cost per file open
+    // (e.g. ~25k files, 54MB: ~1ms/file, even on SSD), not by the bandwidth.
+    // The threads mostly wait for it (e.g. antivirus scan), so more threads than cores overlap more opens.
+    match rayon::ThreadPoolBuilder::new().num_threads(io_threads()).build() {
+        Ok(pool) => pool.install(collect),
+        Err(_err) => {
+            #[cfg(feature = "tracing")]
+            tracing::warn!(
+                "Failed to build the I/O thread pool. Use the global pool instead: {_err}"
+            );
+            collect()
         }
     }
+}
 
-    OwnedPatches { owned_patches, adsf_patches, asdsf_patches, errors }
+/// Number of threads for the I/O bound file reads.
+fn io_threads() -> usize {
+    const MAX_IO_THREADS: usize = 64;
+    let cores = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+    (cores * 4).min(MAX_IO_THREADS)
 }
 
 pub(crate) fn collect_borrowed_patches<'a>(
@@ -120,10 +104,8 @@ pub(crate) fn collect_borrowed_patches<'a>(
     config: &Config,
     fnis_patches: PatchCollection<'a>,
 ) -> (PatchCollection<'a>, Vec<Error>) {
-    let PatchCollection {
-        borrowed_patches: raw_borrowed_patches,
-        behavior_graph_data_map: variable_class_map,
-    } = fnis_patches;
+    let PatchCollection { borrowed_patches: raw_borrowed_patches, behavior_index_map } =
+        fnis_patches;
 
     let reporter = StatusReportCounter::new(
         &config.status_report,
@@ -150,10 +132,10 @@ pub(crate) fn collect_borrowed_patches<'a>(
     for (key, maps) in raw_borrowed_patches.0 {
         by_template.entry(key).or_default().base = maps;
     }
-    for ParsedPatch { key, var_index, patches, priority } in parsed {
-        // Store variable class for nemesis variable to replace
-        if let Some(var_index) = var_index {
-            variable_class_map.0.entry(key.clone()).or_insert(var_index);
+    for ParsedPatch { key, indexes, patches, priority } in parsed {
+        // Store indexes for nemesis variable to replace
+        if let Some(indexes) = indexes {
+            behavior_index_map.insert(key.clone(), indexes);
         }
         by_template.entry(key).or_default().files.push((patches, priority));
     }
@@ -184,7 +166,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     (
         PatchCollection {
             borrowed_patches: BehaviorPatchesMap(borrowed_patches),
-            behavior_graph_data_map: variable_class_map,
+            behavior_index_map,
         },
         errors,
     )
@@ -193,8 +175,8 @@ pub(crate) fn collect_borrowed_patches<'a>(
 /// One parsed Nemesis patch file.
 struct ParsedPatch<'a> {
     key: TemplateKey<'static>,
-    /// Index(e.g. `#0000`) of `hkbBehaviorGraphData` used to replace Nemesis variables.
-    var_index: Option<Cow<'static, str>>,
+    /// Indexes used to replace Nemesis variables.
+    indexes: Option<BehaviorIndexes>,
     patches: PatchesMap<'a>,
     priority: usize,
 }
@@ -214,18 +196,27 @@ fn parse_one_patch<'a>(
     priority: usize,
     config: &Config,
 ) -> Result<ParsedPatch<'a>> {
-    let (patches, parsed_var_index) = parse_nemesis_patch(xml, config.hack_options.map(Into::into))
-        .with_context(|_| NemesisXmlErrSnafu { path })?;
+    // NOTE: The root class index is returned only if it is `hkbBehaviorGraphStringData`.
+    let (patches, parsed_string_data_index) =
+        parse_nemesis_patch(xml, config.hack_options.map(Into::into))
+            .with_context(|_| NemesisXmlErrSnafu { path })?;
 
     let nemesis_path = parse_nemesis_path(path)?;
     let key = nemesis_path
         .to_template_key()
         .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
 
-    let var_index = match nemesis_path.get_variable_index() {
-        Some(master_behavior_graph_index) => Some(Cow::Borrowed(master_behavior_graph_index)),
-        None => parsed_var_index.map(|index| Cow::Owned(index.to_string())),
+    let indexes = match nemesis_path.get_master_index() {
+        Some(index) => Some(BehaviorIndexes {
+            string_data: Cow::Borrowed(index.master_string_data_index),
+            behavior_graph: Some(Cow::Borrowed(index.master_behavior_graph_index)),
+        }),
+        // `hkbBehaviorGraphData` is unknown from the patch xml.
+        None => parsed_string_data_index.map(|index| BehaviorIndexes {
+            string_data: Cow::Owned(index.to_string()),
+            behavior_graph: None,
+        }),
     };
 
-    Ok(ParsedPatch { key, var_index, patches, priority })
+    Ok(ParsedPatch { key, indexes, patches, priority })
 }

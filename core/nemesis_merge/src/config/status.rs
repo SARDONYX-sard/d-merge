@@ -20,6 +20,7 @@ pub enum Status {
     ReadingPatches {
         /// 0 based index
         index: usize,
+        /// Number of mod dirs
         total: usize,
     },
 

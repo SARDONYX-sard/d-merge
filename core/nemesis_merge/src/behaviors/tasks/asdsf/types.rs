@@ -10,11 +10,6 @@ pub(crate) struct OwnedAsdsfPatchMap(
 
 impl OwnedAsdsfPatchMap {
     #[inline]
-    pub(crate) fn new() -> Self {
-        Self(IndexMap::default())
-    }
-
-    #[inline]
     pub(crate) fn insert(
         &mut self,
         path: PathBuf,

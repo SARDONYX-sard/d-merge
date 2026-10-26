@@ -10,6 +10,7 @@
   ],
   "type": "module",
   "scripts": {
+    "build:egui": "cargo build -p d_merge_egui --profile release-no-lto",
     "build": "rimraf ./gui/tauri/frontend/out && tauri build --no-bundle -- --profile release-no-lto",
     "build:release": "rimraf ./gui/tauri/frontend/out && tauri build --no-bundle -- --profile release",
     "build:front": "npm --workspace gui/tauri/frontend run build:front",
