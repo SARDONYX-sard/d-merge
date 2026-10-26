@@ -247,9 +247,7 @@ fn apply_ops_parallel<'a>(
                     });
                 };
 
-                slice.smart_iter_mut().for_each(|element| {
-                    *element = MARK_AS_REMOVED; // mark element for removal
-                });
+                slice.fill(MARK_AS_REMOVED); // mark element for removal
             }
             Op::Add => {} // Add should not appear here
         };
@@ -386,18 +384,18 @@ fn apply_replace_with_overflow<'a>(
             let remain_range = written_count..slice.len();
             #[cfg(feature = "tracing")]
             tracing::info!(
-                "[Seq: Replace as Remove] Replace range {cloned_in_bounds_range:?}: only {written_count} values provided for {} elements, \
+                "[Seq: Replace as Remove] (priority: {priority}) Replace range {cloned_in_bounds_range:?}: only {written_count} values provided for {} elements, \
                 marking remaining {remain_range:?} elements as removed",
                 slice.len(),
             );
-            slice[remain_range].smart_iter_mut().for_each(|element| *element = MARK_AS_REMOVED);
+            slice[remain_range].fill(MARK_AS_REMOVED);
         }
     }
 
     if let Some((_overflow_range, overflow_values)) = overflow_opt {
         #[cfg(feature = "tracing")]
         tracing::info!(
-            "Replace overflow: attempted to write to range {range:?} (base.len() = {}); \
+            "Replace overflow: (priority: {priority}) attempted to write to range {range:?} (base.len() = {}); \
                 overflowed into range {_overflow_range:?} with {} remaining values",
             base.len(),
             overflow_values.len()
