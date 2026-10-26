@@ -431,6 +431,9 @@ pub enum I18nKey {
     /// Search
     SearchLabel,
 
+    /// hits
+    SearchHitsLabel,
+
     /// Select
     SelectButton,
 

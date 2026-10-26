@@ -48,55 +48,52 @@ pub(crate) fn collect_owned_patches(
     // - No need to sort. Conflicts are resolved by priority, not by this order.
     // - For thousands of small files, blocking reads on rayon are much cheaper than
     //   spawning a tokio task (+ `spawn_blocking`) per file.
-    let collect = || {
-        nemesis_entries
-            .par_iter()
-            .map(|(mod_dir, &priority)| {
-                let patches = collect_nemesis_paths(Path::new(mod_dir))
-                    .fold(OwnedPatches::default, |mut acc, (category, path)| {
-                        match std::fs::read_to_string(&path) {
-                            Ok(content) => match category {
-                                Category::Nemesis => {
-                                    acc.owned_patches.insert(path, (content, priority));
-                                }
-                                Category::Adsf => {
-                                    acc.adsf_patches.insert(path, (content, priority));
-                                }
-                                Category::Asdsf => {
-                                    acc.asdsf_patches.insert(path, (content, priority));
-                                }
-                            },
-                            Err(source) => acc.errors.push(Error::FailedIo { path, source }),
-                        }
-                        acc
-                    })
-                    .reduce(OwnedPatches::default, OwnedPatches::merge);
-                reporter.increment();
-                patches
-            })
-            .reduce(OwnedPatches::default, OwnedPatches::merge)
-    };
+    #[cfg(feature = "tracing")]
+    let start = std::time::Instant::now();
+
+    let owned = nemesis_entries
+        .par_iter()
+        .map(|(mod_dir, &priority)| {
+            let patches = collect_nemesis_paths(Path::new(mod_dir))
+                .fold(OwnedPatches::default, |mut acc, (category, path)| {
+                    match std::fs::read_to_string(&path) {
+                        Ok(content) => match category {
+                            Category::Nemesis => {
+                                acc.owned_patches.insert(path, (content, priority));
+                            }
+                            Category::Adsf => {
+                                acc.adsf_patches.insert(path, (content, priority));
+                            }
+                            Category::Asdsf => {
+                                acc.asdsf_patches.insert(path, (content, priority));
+                            }
+                        },
+                        Err(source) => acc.errors.push(Error::FailedIo { path, source }),
+                    }
+                    acc
+                })
+                .reduce(OwnedPatches::default, OwnedPatches::merge);
+            reporter.increment();
+            patches
+        })
+        .reduce(OwnedPatches::default, OwnedPatches::merge);
 
     // NOTE: With a cold OS file cache, the time is dominated by the fixed cost per file open
     // (e.g. ~25k files, 54MB: ~1ms/file, even on SSD), not by the bandwidth.
-    // The threads mostly wait for it (e.g. antivirus scan), so more threads than cores overlap more opens.
-    match rayon::ThreadPoolBuilder::new().num_threads(io_threads()).build() {
-        Ok(pool) => pool.install(collect),
-        Err(_err) => {
-            #[cfg(feature = "tracing")]
-            tracing::warn!(
-                "Failed to build the I/O thread pool. Use the global pool instead: {_err}"
-            );
-            collect()
-        }
-    }
-}
+    //
+    // NOTE: Log the counts to detect silently missing files. (e.g. a walker that drops entries on a busy thread pool)
+    #[cfg(feature = "tracing")]
+    tracing::info!(
+        mod_dirs = nemesis_entries.len(),
+        nemesis = owned.owned_patches.len(),
+        adsf = owned.adsf_patches.0.len(),
+        asdsf = owned.asdsf_patches.0.len(),
+        errors = owned.errors.len(),
+        elapsed = ?start.elapsed(),
+        "Read Nemesis patch files"
+    );
 
-/// Number of threads for the I/O bound file reads.
-fn io_threads() -> usize {
-    const MAX_IO_THREADS: usize = 64;
-    let cores = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
-    (cores * 4).min(MAX_IO_THREADS)
+    owned
 }
 
 pub(crate) fn collect_borrowed_patches<'a>(

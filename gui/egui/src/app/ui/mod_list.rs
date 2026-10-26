@@ -38,7 +38,7 @@ impl App {
 
             self.render_toolbar(ui);
 
-            self.selected_label(ui);
+            self.selected_label(ui, filtered.len());
             self.render_table(ui, &filtered, dnd_allowed);
         });
     }
@@ -103,11 +103,21 @@ impl App {
         });
     }
 
-    fn selected_label(&self, ui: &mut egui::Ui) {
+    /// Shows `<selected> / <total> selected`, and `<hits> hits` while searching.
+    fn selected_label(&self, ui: &mut egui::Ui, hits_count: usize) {
         let selected_count = self.settings.mod_list().iter().filter(|item| item.enabled).count();
         let total_count = self.settings.mod_list().len();
         let selected_label = self.i18n.t(I18nKey::SelectedLabel);
-        ui.label(format!("{selected_count} / {total_count} {selected_label}"));
+
+        ui.horizontal(|ui| {
+            ui.label(format!("{selected_count} / {total_count} {selected_label}"));
+
+            if !self.settings.ui.mod_list.filter_text.trim().is_empty() {
+                ui.separator();
+                let hits_label = self.i18n.t(I18nKey::SearchHitsLabel);
+                ui.label(format!("{hits_count} {hits_label}"));
+            }
+        });
     }
 
     fn reload_button(&self, ui: &mut egui::Ui) -> bool {
