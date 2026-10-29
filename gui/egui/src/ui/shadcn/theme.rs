@@ -91,7 +91,7 @@ impl ShadcnTheme {
     /// Sets the theme for all subsequent frames.
     pub(crate) fn set(self, ctx: &egui::Context) {
         // Also set egui visuals so built-in popups (e.g. context_menu) match
-        ctx.style_mut(|style| {
+        ctx.global_style_mut(|style| {
             style.visuals.window_fill = self.popover;
             style.visuals.window_stroke = egui::Stroke::new(1.0_f32, self.border);
             style.visuals.window_shadow = popup_shadow();

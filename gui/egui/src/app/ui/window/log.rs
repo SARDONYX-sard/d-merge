@@ -47,13 +47,14 @@ impl App {
                 resizable: Some(true),
                 ..Default::default()
             },
-            move |ctx, class| {
+            move |ui, class| {
                 debug_assert!(
                     class == egui::ViewportClass::Deferred,
                     "This egui backend doesn't support multiple viewports"
                 );
 
-                egui::CentralPanel::default().frame(egui::Frame::new()).show(ctx, |ui| {
+                let ctx = &ui.ctx().clone();
+                egui::CentralPanel::default().frame(egui::Frame::new()).show(ui, |ui| {
                     update_window_geometry(ctx, log_viewer_id, &mut log_window_info.write());
 
                     ui.horizontal(|ui| {

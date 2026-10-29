@@ -18,7 +18,7 @@ use crate::{
 
 impl App {
     /// Renders the central panel containing the mod list table.
-    pub(crate) fn ui_mod_list(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let panel = themed_central_panel(
             egui::CentralPanel::default(),
             self.settings.ui.theme,
@@ -30,7 +30,7 @@ impl App {
         let dnd_allowed = self.is_dnd_allowed();
         self.is_locked = !dnd_allowed;
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.add_space(10.0);
 
             self.render_toolbar(ui);

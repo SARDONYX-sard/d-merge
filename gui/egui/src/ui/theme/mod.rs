@@ -530,7 +530,7 @@ fn stroke_edit(ui: &mut egui::Ui, stroke: &mut StrokeConfig) -> bool {
 /// Apply this preset to an egui `Context`.
 pub(crate) fn apply(preset: &ThemePreset, ctx: &egui::Context) {
     ctx.set_visuals(preset::to_egui_visuals(&preset.visuals));
-    ctx.set_style(egui::Style {
+    ctx.set_global_style(egui::Style {
         visuals: preset::to_egui_visuals(&preset.visuals),
         ..Default::default()
     });

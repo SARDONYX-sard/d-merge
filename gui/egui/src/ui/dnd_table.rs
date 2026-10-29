@@ -21,8 +21,9 @@ pub(crate) fn dnd_table_body(
     let row_width = widths.iter().sum::<f32>() + 38.0;
     let mut selection_request: Option<(bool, String, bool)> = None;
 
-    let response =
-        egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
+    let response = egui_dnd::dnd(ui, egui::Id::unique("mod_list_dnd")).show_vec(
+        items,
+        |ui, item, draggable_handle, state| {
             let row_rect = ui
                 .allocate_rect(
                     egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(row_width, ROW_HEIGHT)),
@@ -65,7 +66,8 @@ pub(crate) fn dnd_table_body(
                     });
                 });
             });
-        });
+        },
+    );
 
     if let Some((shift, clicked_id, enabled)) = selection_request {
         if shift {

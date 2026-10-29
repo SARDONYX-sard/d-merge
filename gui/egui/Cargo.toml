@@ -20,10 +20,18 @@ winres = "0.1.12"
 
 [dependencies]
 # Fixed version. To avoid scroll crash bug
-eframe = { version = "0.33.0" }
-egui = { version = "0.33.3" }
-egui_dnd = "0.14.0"
-egui_extras = "0.33.0"
+# NOTE: eframe 0.37 switched the default renderer to wgpu; keep glow as the default (wgpu is opt-in via `wgpu` feature).
+# OS-specific features are added in the `[target.'cfg(..)'.dependencies]` sections below.
+eframe = { version = "0.37.0", default-features = false, features = [
+  "accesskit",
+  "clipboard",
+  "default_fonts",
+  "glow",
+  "links",
+] }
+egui = { version = "0.37.0", features = ["monochrome_emoji_fonts"] }
+egui_dnd = "0.18.0"
+egui_extras = "0.37.0"
 image = { version = "0.25.10", features = ["jpeg", "png"] }
 # ---
 
@@ -48,8 +56,9 @@ d_merge_gui_shared = { path = "../shared", features = ["tracing"] }
 rfd = { version = "0.17.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["wayland", "x11"] }
 rfd = { version = "0.15.4", features = ["xdg-portal"] }
-wgpu = { version = "29.0.4", default-features = true, features = [
+wgpu = { version = "30.0.1", default-features = true, features = [
   "fragile-send-sync-non-atomic-wasm",
 ], optional = true } # https://github.com/emilk/egui/issues/4885#issuecomment-2256316573
 

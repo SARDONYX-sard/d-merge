@@ -15,14 +15,15 @@ impl App {
     ///
     /// The patch button is disabled while a fetch is in progress to prevent
     /// launching a patch against a stale mod list.
-    pub(crate) fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_bottom_panel(&mut self, ui: &mut egui::Ui) {
+        let ctx = &ui.ctx().clone();
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("bottom_panel"),
+            egui::Panel::bottom("bottom_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
@@ -125,14 +126,14 @@ impl App {
     ///
     /// The message and color are set by [`App::set_colored_notify`] and
     /// cleared by [`App::clear_notification`].
-    pub(crate) fn ui_notification(&self, ctx: &egui::Context) {
+    pub(crate) fn ui_notification(&self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("notification_panel"),
+            egui::Panel::bottom("notification_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.colored_label(self.notify.color.resolve(ui.visuals()), &self.notify.message);
         });
     }

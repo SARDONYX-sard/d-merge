@@ -45,7 +45,7 @@ pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<
         }
     };
 
-    ctx.set_style(egui::Style { visuals, ..Default::default() });
+    ctx.set_global_style(egui::Style { visuals, ..Default::default() });
     shadcn_theme.set(ctx);
 }
 
@@ -53,10 +53,10 @@ pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<
 ///
 /// The panel background is determined by `bg_color`.
 pub(crate) fn themed_top_bottom_panel(
-    panel: egui::TopBottomPanel,
+    panel: egui::Panel,
     theme: Theme,
     bg_color: Option<&Rgba>,
-) -> egui::TopBottomPanel {
+) -> egui::Panel {
     panel.frame(frame_from_theme(theme, bg_color))
 }
 

@@ -13,7 +13,7 @@ pub(crate) struct TextEdit<'a> {
     text: &'a mut dyn egui::TextBuffer,
     hint_text: egui::WidgetText,
     desired_width: Option<f32>,
-    id_salt: Option<egui::Id>,
+    id_salt: Option<egui::IdSalt>,
     password: bool,
     char_limit: usize,
     interactive: bool,
@@ -39,8 +39,8 @@ impl<'a> TextEdit<'a> {
     }
 
     /// A source for the unique [`egui::Id`], e.g. `.id_salt("second_text_edit_field")`.
-    pub(crate) fn id_salt(mut self, id_salt: impl std::hash::Hash) -> Self {
-        self.id_salt = Some(egui::Id::new(id_salt));
+    pub(crate) fn id_salt(mut self, id_salt: impl egui::AsIdSalt) -> Self {
+        self.id_salt = Some(egui::IdSalt::new(id_salt));
         self
     }
 
@@ -116,7 +116,7 @@ impl egui::Widget for TextEdit<'_> {
         );
 
         let mut text_edit = egui::TextEdit::singleline(self.text)
-            .frame(false)
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(4, 2)))
             .hint_text(self.hint_text)
             .text_color(theme.foreground)
             .desired_width(inner_rect.width())

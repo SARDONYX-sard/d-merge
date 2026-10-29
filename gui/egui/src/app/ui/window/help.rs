@@ -442,31 +442,6 @@ const BACKGROUND_ROW: PathRow = PathRow {
     picker: Picker::File { filter: "image", exts: &["png", "jpg", "jpeg"], fallback_dir: "." },
 };
 
-fn text_line_width(ui: &egui::Ui, actions: &[&str]) -> f32 {
-    let spacing = ui.spacing();
-    let button_padding = spacing.button_padding.x * 2.0;
-
-    let buttons_width = actions
-        .iter()
-        .map(|label| {
-            ui.fonts_mut(|fonts| {
-                fonts
-                    .layout_no_wrap(
-                        (*label).to_owned(),
-                        egui::TextStyle::Button.resolve(ui.style()),
-                        ui.visuals().text_color(),
-                    )
-                    .size()
-                    .x
-            }) + button_padding
-        })
-        .sum::<f32>();
-
-    let gaps = spacing.item_spacing.x * actions.len().saturating_sub(1) as f32;
-
-    (ui.available_width() - buttons_width - gaps).max(0.0)
-}
-
 /// `[label][ text edit ][Select][Reload][Clear]`
 ///
 /// Returns `true` if the target should be reloaded (reload clicked or a new path picked).
@@ -495,28 +470,30 @@ fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow
     }
 
     let mut reload = false;
-    ui.horizontal_top(|ui| {
-        let select = i18n.t(I18nKey::SelectButton);
-        let reload_button = i18n.t(I18nKey::ReloadButton);
-        let clear = i18n.t(I18nKey::ClearButton);
+    // Right-to-left: the buttons take their real width first, the text edit gets the rest.
+    // So the visual order is `[text edit][Select][Reload][Clear]`.
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        if ui.add(Button::new(i18n.t(I18nKey::ClearButton))).clicked() {
+            value.clear();
+        }
 
-        let width = text_line_width(ui, &[select, reload_button, clear]);
-        ui.add(TextEdit::singleline(value).desired_width(width));
+        if ui
+            .add(Button::new(i18n.t(I18nKey::ReloadButton)))
+            .on_hover_text(i18n.t(row.reload_hover))
+            .clicked()
+        {
+            reload = true;
+        }
 
-        if ui.add(Button::new(select)).clicked()
+        if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
             && let Some(picked) = pick(&row.picker, value)
         {
             *value = picked;
             reload = true;
         }
 
-        if ui.add(Button::new(reload_button)).on_hover_text(i18n.t(row.reload_hover)).clicked() {
-            reload = true;
-        }
-
-        if ui.add(Button::new(clear)).clicked() {
-            value.clear();
-        }
+        let width = ui.available_width();
+        ui.add(TextEdit::singleline(value).desired_width(width));
     });
     ui.end_row();
     reload
@@ -540,17 +517,17 @@ fn folder_action_row(
 
     let mut picked = false;
 
-    ui.horizontal_top(|ui| {
-        let action_text = i18n.t(action);
-        let width = text_line_width(ui, &[action_text]);
-        ui.add(TextEdit::singleline(path).desired_width(width));
-
-        if ui.add(Button::new(action_text)).on_hover_text(i18n.t(action_hover)).clicked()
+    // Right-to-left: see `path_row`.
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        if ui.add(Button::new(i18n.t(action))).on_hover_text(i18n.t(action_hover)).clicked()
             && let Some(dir) = rfd::FileDialog::new().set_directory(path.as_str()).pick_folder()
         {
             *path = dir.display().to_string();
             picked = true;
         }
+
+        let width = ui.available_width();
+        ui.add(TextEdit::singleline(path).desired_width(width));
     });
 
     ui.end_row();
@@ -569,7 +546,7 @@ fn start_dir(current: &str, fallback: &str, current_is_dir: bool) -> PathBuf {
 
 /// Draws the dimmed backdrop; the returned response tells whether it was clicked.
 fn help_overlay(ctx: &egui::Context) -> egui::Response {
-    egui::Area::new("help_overlay_bg".into())
+    egui::Area::new(egui::Id::unique("help_overlay_bg"))
         .order(egui::Order::Background)
         .fixed_pos(ctx.content_rect().min)
         .show(ctx, |ui| {

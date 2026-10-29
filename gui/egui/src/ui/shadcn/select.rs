@@ -50,7 +50,7 @@ impl ItemStyle {
 #[derive(Debug)]
 #[must_use = "You should call .show*"]
 pub(crate) struct ComboBox {
-    id_salt: egui::Id,
+    id_salt: egui::IdSalt,
     label: Option<egui::WidgetText>,
     selected_text: egui::WidgetText,
     width: Option<f32>,
@@ -64,7 +64,7 @@ pub(crate) struct ComboBox {
 
 impl ComboBox {
     /// Create new [`ComboBox`] with id and label
-    pub(crate) fn new(id_salt: impl std::hash::Hash, label: impl Into<egui::WidgetText>) -> Self {
+    pub(crate) fn new(id_salt: impl egui::AsIdSalt, label: impl Into<egui::WidgetText>) -> Self {
         Self { label: Some(label.into()), ..Self::from_id_salt(id_salt) }
     }
 
@@ -75,9 +75,9 @@ impl ComboBox {
     }
 
     /// Without label.
-    pub(crate) fn from_id_salt(id_salt: impl std::hash::Hash) -> Self {
+    pub(crate) fn from_id_salt(id_salt: impl egui::AsIdSalt) -> Self {
         Self {
-            id_salt: egui::Id::new(id_salt),
+            id_salt: egui::IdSalt::new(id_salt),
             label: None,
             selected_text: egui::WidgetText::default(),
             width: None,

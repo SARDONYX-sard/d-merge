@@ -23,14 +23,14 @@ impl App {
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
-    pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_top_options(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("ui_top_options"),
+            egui::Panel::top("ui_top_options"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_execution_mode(ui);
 
@@ -234,14 +234,14 @@ impl App {
     /// | Skyrim      | path..................| Auto | ...  |
     /// | Output      | path..................|      | ...  |
     /// ```
-    pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_paths(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("top_paths"),
+            egui::Panel::top("top_paths"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             self.ui_skyrim_dir_row(ui);
             ui.add_space(3.0);
             self.ui_output_dir_row(ui);

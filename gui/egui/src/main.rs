@@ -7,7 +7,8 @@ mod ui;
 
 use d_merge_gui_shared::{log::LOG_FILENAME, settings};
 // NOTE: We want to enable the internal `default-features`, but We also want to silence the linter, so We're using a dummy here.
-#[cfg(feature = "wgpu")]
+// `wgpu` is a direct dependency only on Linux (see Cargo.toml).
+#[cfg(all(feature = "wgpu", target_os = "linux"))]
 use wgpu as _;
 
 #[cfg(feature = "mimalloc")]
