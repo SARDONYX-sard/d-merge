@@ -12,10 +12,7 @@ use crate::{
     theme::themed_central_panel,
     ui::{
         dnd_table::{check_only_table_body, dnd_table_body},
-        shadcn_compat::{
-            button, button_with_icon, destructive_button_with_icon, disabled_icon_only,
-            enum_options, heading, icon, icon_only, text,
-        },
+        shadcn::{Button, ComboBox, Icon, TextEdit, theme::ShadcnTheme},
     },
 };
 
@@ -51,8 +48,11 @@ impl App {
 
     fn render_toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.add(heading(self.i18n.t(I18nKey::ModsListTitle)))
-                .on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
+            let heading = egui::RichText::new(self.i18n.t(I18nKey::ModsListTitle))
+                .color(ShadcnTheme::get(ui.ctx()).foreground)
+                .size(24.0)
+                .strong();
+            ui.label(heading).on_hover_text(self.i18n.t(I18nKey::ModsListTitleHover));
 
             ui.separator();
             self.ui_search_bar(ui);
@@ -63,10 +63,9 @@ impl App {
             if ui
                 .add_sized(
                     [90.0, 40.0],
-                    button_with_icon(
-                        self.i18n.t(I18nKey::NormalizeButton),
-                        egui_shadcn::LucideIcon::TextAlignJustify,
-                    ),
+                    Button::new(self.i18n.t(I18nKey::NormalizeButton))
+                        .icon(Icon::TextAlignJustify)
+                        .full_width(),
                 )
                 .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
                 .clicked()
@@ -79,10 +78,10 @@ impl App {
 
             // -- Lock Button
             if self.is_locked {
-                let button = destructive_button_with_icon(
-                    self.i18n.t(I18nKey::LockButton),
-                    egui_shadcn::LucideIcon::Lock,
-                );
+                let button = Button::new(self.i18n.t(I18nKey::LockButton))
+                    .icon(Icon::Lock)
+                    .full_width()
+                    .destructive();
                 let hover_text = self.i18n.t(I18nKey::LockButtonHover);
 
                 if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
@@ -124,9 +123,10 @@ impl App {
         // -- Reload Button
         let is_fetching = matches!(*self.fetch_state.read(), FetchState::Fetching);
         if is_fetching {
-            disabled_icon_only(ui, egui_shadcn::LucideIcon::RefreshCwOff);
+            ui.add_enabled(false, Button::new("").icon(Icon::RefreshCwOff).large());
         } else {
-            if icon_only(ui, egui_shadcn::LucideIcon::RefreshCcw)
+            if ui
+                .add(Button::new("").icon(Icon::RefreshCcw).large())
                 .on_hover_text(format!("{} (Ctrl + R)", self.i18n.t(I18nKey::ReloadButton)))
                 .clicked()
             {
@@ -139,31 +139,36 @@ impl App {
 
     /// Renders the search bar: filter text field, column selector
     fn ui_search_bar(&mut self, ui: &mut egui::Ui) {
-        icon(ui, &egui_shadcn::LucideIcon::Search);
+        ui.add(Icon::Search);
         let search_hint = format!("{}...", self.i18n.t(I18nKey::SearchLabel));
-        text(ui, &mut self.settings.ui.mod_list.filter_text, Some(&search_hint), 300.0);
+        ui.add(
+            TextEdit::singleline(&mut self.settings.ui.mod_list.filter_text)
+                .hint_text(search_hint)
+                .desired_width(300.0),
+        );
 
-        if ui.add_sized([60.0, 40.0], button(self.i18n.t(I18nKey::ClearButton))).clicked() {
+        if ui.add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::ClearButton))).clicked() {
             self.settings.ui.mod_list.filter_text.clear();
         }
 
-        let all_label = self.i18n.t(I18nKey::FilterTextAll).to_string();
-        let id_label = self.i18n.t(I18nKey::ColumnId).to_string();
-        let name_label = self.i18n.t(I18nKey::ColumnName).to_string();
-        let mod_type_label = self.i18n.t(I18nKey::ColumnModType).to_string();
-        let site_label = self.i18n.t(I18nKey::ColumnSite).to_string();
-        let priority_label = self.i18n.t(I18nKey::ColumnPriority).to_string();
-
         let items = [
-            (None, all_label),
-            (Some(SortColumn::Id), id_label),
-            (Some(SortColumn::Name), name_label),
-            (Some(SortColumn::ModType), mod_type_label),
-            (Some(SortColumn::Site), site_label),
-            (Some(SortColumn::Priority), priority_label),
+            (None, self.i18n.t(I18nKey::FilterTextAll)),
+            (Some(SortColumn::Id), self.i18n.t(I18nKey::ColumnId)),
+            (Some(SortColumn::Name), self.i18n.t(I18nKey::ColumnName)),
+            (Some(SortColumn::ModType), self.i18n.t(I18nKey::ColumnModType)),
+            (Some(SortColumn::Site), self.i18n.t(I18nKey::ColumnSite)),
+            (Some(SortColumn::Priority), self.i18n.t(I18nKey::ColumnPriority)),
         ];
 
-        enum_options(ui, &mut self.settings.ui.mod_list.filter_column, &items, Some([100.0, 30.0]));
+        let filter_column = &mut self.settings.ui.mod_list.filter_column;
+        let mut index = items.iter().position(|(column, _)| column == filter_column).unwrap_or(0);
+        if ComboBox::from_id_salt("filter_column")
+            .width(100.0)
+            .show_index(ui, &mut index, items.len(), |i| items[i].1)
+            .changed()
+        {
+            *filter_column = items[index].0;
+        }
     }
 
     /// Toggles or changes the active sort column.

@@ -1,14 +1,16 @@
 use d_merge_gui_shared::settings::ui::theme::{Rgba, Theme, ThemePreset};
 
+use crate::ui::shadcn::theme::ShadcnTheme;
+
 // NOTE: I made a few changes to the code for fine-tuning the theme because it was hard to read when viewed in the GUI.
-fn new_shadcn_dark() -> egui_shadcn::ShadcnTheme {
-    let mut theme = egui_shadcn::theme::shadcn_theme_dark::dark();
+fn new_shadcn_dark() -> ShadcnTheme {
+    let mut theme = ShadcnTheme::dark();
     theme.foreground = egui::Color32::from_rgb(200, 200, 200);
     theme
 }
 
-fn new_shadcn_light() -> egui_shadcn::ShadcnTheme {
-    let mut theme = egui_shadcn::theme::shadcn_theme_light::light();
+fn new_shadcn_light() -> ShadcnTheme {
+    let mut theme = ShadcnTheme::light();
     theme.muted = egui::Color32::from_rgb(190, 190, 190).gamma_multiply(0.8); // button hover
     theme
 }
@@ -44,7 +46,7 @@ pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<
     };
 
     ctx.set_style(egui::Style { visuals, ..Default::default() });
-    egui_shadcn::ShadcnThemeExt::set_shadcn_theme(ctx, shadcn_theme);
+    shadcn_theme.set(ctx);
 }
 
 /// Applies theme-dependent styling to a top/bottom panel.

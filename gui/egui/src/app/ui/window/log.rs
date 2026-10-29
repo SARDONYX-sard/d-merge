@@ -6,7 +6,7 @@ use d_merge_gui_shared::i18n::I18nKey;
 
 use crate::{
     app::{App, update_window_geometry},
-    ui::shadcn_compat::button,
+    ui::shadcn::Button,
 };
 
 impl App {
@@ -57,10 +57,10 @@ impl App {
                     update_window_geometry(ctx, log_viewer_id, &mut log_window_info.write());
 
                     ui.horizontal(|ui| {
-                        if ui.add(button(&clear_button_name)).clicked() {
+                        if ui.add(Button::new(&clear_button_name)).clicked() {
                             log_lines.write().clear();
                         }
-                        if ui.add(button("Copy")).clicked() {
+                        if ui.add(Button::new("Copy")).clicked() {
                             let text = log_lines
                                 .read()
                                 .iter()

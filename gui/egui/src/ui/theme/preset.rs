@@ -4,7 +4,7 @@ use d_merge_gui_shared::settings::ui::theme::{
     Rgba, ShadcnThemeConfig, StrokeConfig, VisualsConfig, WidgetVisualsConfig, WidgetsConfig,
 };
 
-use crate::theme::EguiColorExt;
+use crate::{theme::EguiColorExt, ui::shadcn::theme::ShadcnTheme};
 
 pub(super) fn to_egui_visuals(visual: &VisualsConfig) -> egui::Visuals {
     let mut v = if visual.dark_mode { egui::Visuals::dark() } else { egui::Visuals::light() };
@@ -54,7 +54,7 @@ pub(super) fn to_egui_visuals(visual: &VisualsConfig) -> egui::Visuals {
     v
 }
 
-pub(super) fn to_shadcn_theme(shadcn_theme: &ShadcnThemeConfig) -> egui_shadcn::ShadcnTheme {
+pub(super) fn to_shadcn_theme(shadcn_theme: &ShadcnThemeConfig) -> ShadcnTheme {
     let ShadcnThemeConfig {
         background,
         foreground,
@@ -78,7 +78,7 @@ pub(super) fn to_shadcn_theme(shadcn_theme: &ShadcnThemeConfig) -> egui_shadcn::
         radius,
     } = shadcn_theme;
 
-    egui_shadcn::ShadcnTheme {
+    ShadcnTheme {
         background: background.to_egui_color32(),
         foreground: foreground.to_egui_color32(),
         card: card.to_egui_color32(),
@@ -153,7 +153,7 @@ pub(super) fn from_egui_visuals(visuals: &egui::Visuals, disabled_alpha: f32) ->
     }
 }
 
-pub(super) fn from_shadcn_theme(theme: &egui_shadcn::ShadcnTheme) -> ShadcnThemeConfig {
+pub(super) fn from_shadcn_theme(theme: &ShadcnTheme) -> ShadcnThemeConfig {
     ShadcnThemeConfig {
         background: Rgba::from_egui_color32(theme.background),
         foreground: Rgba::from_egui_color32(theme.foreground),
