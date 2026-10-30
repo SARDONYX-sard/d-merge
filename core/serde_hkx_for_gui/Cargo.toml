@@ -1,7 +1,7 @@
 [package]
 name = "serde_hkx_for_gui"
 version = "0.1.0"
-description = "Common abstraction code layer for tauri & Electron desktop applications"
+description = "hkx conversion / annotation helpers used by the GUI"
 
 authors.workspace = true
 categories = ["development-tools"]

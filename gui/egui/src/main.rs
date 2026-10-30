@@ -51,7 +51,8 @@ fn main() -> Result<(), eframe::Error> {
         Box::new(|cc| {
             crate::fonts::setup_fonts(&cc.egui_ctx, &settings.ui.font);
             let theme_manager = crate::theme::setup_theme(&cc.egui_ctx, &settings);
-            Ok(Box::new(self::app::App::new(settings, theme_manager)))
+            let app = self::app::App::new(settings, theme_manager);
+            Ok(Box::new(self::app::router::Root::new(app)))
         }),
     )
 }

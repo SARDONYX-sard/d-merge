@@ -2,15 +2,6 @@
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
-  - package-ecosystem: 'npm'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-      day: 'monday'
-    open-pull-requests-limit: 1
-    commit-message:
-      prefix: 'build(deps(npm))'
-
   - package-ecosystem: 'cargo'
     directory: '/'
     schedule:

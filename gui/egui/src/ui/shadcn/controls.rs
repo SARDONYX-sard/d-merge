@@ -12,21 +12,31 @@ use super::theme::{ShadcnTheme, paint_focus_ring, with_alpha};
 pub(crate) struct Checkbox<'a> {
     checked: &'a mut bool,
     text: egui::WidgetText,
+    indeterminate: bool,
 }
 
 impl<'a> Checkbox<'a> {
     pub(crate) fn new(checked: &'a mut bool, text: impl Into<egui::WidgetText>) -> Self {
-        Self { checked, text: text.into() }
+        Self { checked, text: text.into(), indeterminate: false }
     }
 
     pub(crate) fn without_text(checked: &'a mut bool) -> Self {
         Self::new(checked, egui::WidgetText::default())
     }
+
+    /// Display a dash instead of a check mark, like [`egui::Checkbox::indeterminate`].
+    ///
+    /// Purely visual (e.g., a tree node whose children are only partly checked);
+    /// clicking still toggles `checked`.
+    pub(crate) const fn indeterminate(mut self, indeterminate: bool) -> Self {
+        self.indeterminate = indeterminate;
+        self
+    }
 }
 
 impl egui::Widget for Checkbox<'_> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let Self { checked, text } = self;
+        let Self { checked, text, indeterminate } = self;
         let theme = ShadcnTheme::get(ui.ctx());
 
         let box_size = 16.0;
@@ -55,7 +65,7 @@ impl egui::Widget for Checkbox<'_> {
         let anim_t = ui.ctx().animate_bool_responsive(response.id, *checked);
 
         if ui.is_rect_visible(rect) {
-            let (mut box_bg, mut box_border, check_color) = if *checked {
+            let (mut box_bg, mut box_border, check_color) = if *checked || indeterminate {
                 (theme.primary, theme.primary, theme.primary_foreground)
             } else if response.hovered() {
                 (egui::Color32::TRANSPARENT, theme.ring, egui::Color32::TRANSPARENT)
@@ -84,8 +94,16 @@ impl egui::Widget for Checkbox<'_> {
                 egui::epaint::StrokeKind::Inside,
             );
 
-            // Checkmark, scaled by anim_t
-            if anim_t >= 0.01 {
+            if indeterminate {
+                // e.g., a directory whose files are only partly checked.
+                let c = box_rect.center();
+                let half = box_rect.width() * 0.25;
+                painter.line_segment(
+                    [egui::pos2(c.x - half, c.y), egui::pos2(c.x + half, c.y)],
+                    egui::Stroke::new(2.0_f32, check_color),
+                );
+            } else if anim_t >= 0.01 {
+                // Checkmark, scaled by anim_t
                 let c = box_rect.center();
                 let s = box_rect.width() * 0.3 * anim_t;
                 let points = vec![

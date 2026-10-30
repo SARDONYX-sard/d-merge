@@ -19,7 +19,6 @@ members = [
   "gui/egui",
   "gui/shared",
   "gui/shared_derive",
-  "gui/tauri/backend",
 ]
 resolver = "3"
 default-members = ["gui/egui"]
@@ -67,6 +66,7 @@ quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 fast_hash = { path = "./core/fast_hash" }
 fnis_list = { path = "./core/fnis_list" }
 gh_issue_link = { path = "./core/gh_issue_link" }
+hkanno_lsp = { path = "./core/hkanno_lsp" }
 json_patch = { path = "./core/json_patch" }
 jwalk_glob = { path = "./core/jwalk_glob" }
 mod_info = { path = "./core/mod_info" }

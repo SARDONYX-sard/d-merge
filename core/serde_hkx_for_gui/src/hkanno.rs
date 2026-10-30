@@ -329,6 +329,77 @@ impl<'a> fmt::Display for Hkanno<'a> {
     }
 }
 
+/// Parses the annotation part of the hkanno text (the inverse of [`Hkanno`]'s `Display`).
+///
+/// Only `annotation_tracks` can be edited as text; `ptr`, `numOriginalFrames` and
+/// `duration` come from the original file, so the caller keeps them.
+///
+/// Strings are borrowed from `text`.
+///
+/// # Rules
+/// - blank lines and `#` lines are ignored
+/// - `trackName: <name>` (case-insensitive) starts a new track; `␀` means "no name"
+/// - `<time> <text>` adds an annotation to the current track
+///   (a dummy unnamed track is created when no `trackName:` came before)
+/// - an unparsable time becomes `NaN` (the editor's diagnostics report it before saving)
+///
+/// # Example
+/// ```
+/// use serde_hkx_for_gui::hkanno::annotation_tracks_from_text;
+///
+/// let tracks = annotation_tracks_from_text("trackName: Root\n0.100000 MCO_DodgeOpen");
+/// assert_eq!(tracks[0].track_name.as_deref(), Some("Root"));
+/// assert_eq!(tracks[0].annotations[0].text.as_deref(), Some("MCO_DodgeOpen"));
+/// ```
+pub fn annotation_tracks_from_text(text: &str) -> Vec<AnnotationTrack<'_>> {
+    /// `␀` is how `Display` writes a null string.
+    fn non_null(s: &str) -> Option<Cow<'_, str>> {
+        (s != havok_types::NULL_STR).then_some(Cow::Borrowed(s))
+    }
+
+    let mut tracks = Vec::new();
+    let mut current: Option<AnnotationTrack<'_>> = None;
+
+    for line in text.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        // e.g., `trackName: Root`
+        if let Some((head, name)) = line.split_once(':')
+            && head.trim_end().eq_ignore_ascii_case("trackName")
+        {
+            tracks.extend(current.take());
+            current = Some(AnnotationTrack {
+                track_name: non_null(name.trim()),
+                annotations: Vec::new(),
+            });
+            continue;
+        }
+
+        if line.starts_with('#') {
+            continue;
+        }
+
+        // e.g., `0.100000 MCO_DodgeOpen`
+        let (time, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
+        current
+            .get_or_insert_with(|| AnnotationTrack { track_name: None, annotations: Vec::new() })
+            .annotations
+            .push(Annotation { time: parse_float_prefix(time), text: non_null(rest.trim()) });
+    }
+
+    tracks.extend(current);
+    tracks
+}
+
+/// JS `parseFloat`: the longest leading number, or `NaN`.
+///
+/// e.g., `"0.5s"` -> `0.5`, `"abc"` -> `NaN`
+fn parse_float_prefix(s: &str) -> f32 {
+    let end = s
+        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '+' | '-' | '.' | 'e' | 'E')))
+        .unwrap_or(s.len());
+    // Shrink until it parses, e.g., `1e` -> `1`.
+    (1..=end).rev().find_map(|len| s[..len].parse::<f32>().ok()).unwrap_or(f32::NAN)
+}
+
 /// Parses a borrowed `Hkanno` structure from an already deserialized `ClassMap`.
 ///
 /// This function expects a `ClassMap` containing Havok animation data and extracts
@@ -337,17 +408,17 @@ impl<'a> fmt::Display for Hkanno<'a> {
 ///
 /// # Behavior
 ///
-/// - Searches for `hkaSplineCompressedAnimation` objects in the `ClassMap`.
-/// - If no spline is found, returns [`HkannoError::MissingSpline`].
-/// - If multiple splines are found, returns [`HkannoError::MultipleSplinesFound`] with the count.
+/// - Searches for the class derived from `hkaAnimation` (e.g., `hkaSplineCompressedAnimation`) in the `ClassMap`.
+/// - If none is found, returns [`HkannoError::MissingHkaAnimationClass`].
+/// - If multiple are found, returns [`HkannoError::MultipleHkaAnimationFound`] with the count.
 /// - Each annotation track and annotation is converted into [`AnnotationTrack`] and [`Annotation`] structures.
 ///
 /// # Errors
 ///
 /// Returns a [`HkannoError`] for any of the following cases:
 ///
-/// - [`HkannoError::MissingSpline`] – no spline found in the `ClassMap`.
-/// - [`HkannoError::MultipleSplinesFound`] – more than one spline found.
+/// - [`HkannoError::MissingHkaAnimationClass`] – no `hkaAnimation` found in the `ClassMap`.
+/// - [`HkannoError::MultipleHkaAnimationFound`] – more than one found.
 /// - [`HkannoError::UnsupportedI32Variant`] – the number-of-frames field is an unsupported variant (`EventId` or `VariableId`).
 pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, HkannoError> {
     use havok_types::I32;
@@ -453,24 +524,22 @@ const fn is_hka_animation_derived(class: &Classes<'_>) -> bool {
 ///
 /// # Arguments
 ///
-/// * `bytes` - Raw file contents as a byte vector (`Vec<u8>`).
-/// * `text` - Mutable `String` buffer used to avoid XML ownership or lifetime issues during deserialization.
-/// * `path` - File path, used for error reporting and extension checking.
+/// * `bytes` - Raw file contents.
+/// * `input` - File path, used for error reporting and extension checking.
 ///
 /// # Behavior
 ///
 /// - Automatically detects and parses `.hkx` or `.xml` files.
-/// - Populates the provided `text` buffer with intermediate string data if necessary.
-/// - Returns an [`Hkanno`] structure containing annotation tracks and entries as `Cow<'a, str>`
-///   references to the deserialized data.
+/// - Returns an [`Hkanno`] structure containing annotation tracks and entries as `Cow<'a, str>`.
 ///
 /// # Errors
 ///
 /// Returns a [`HkannoError`] if:
 ///
-/// - The input file extension is missing or not `.hkx` / `.xml` ([`HkannoError::MissingExtension`]).
-/// - The bytes cannot be parsed correctly ([`HkannoError::ParseError`]).
-/// - Any other internal deserialization or annotation extraction error occurs.
+/// - The bytes cannot be deserialized ([`HkannoError::SerdeHkxFeatureError`]),
+///   e.g., an unsupported extension or broken data.
+/// - No / multiple `hkaAnimation` classes exist
+///   ([`HkannoError::MissingHkaAnimationClass`], [`HkannoError::MultipleHkaAnimationFound`]).
 ///
 /// # Example
 ///
@@ -478,19 +547,18 @@ const fn is_hka_animation_derived(class: &Classes<'_>) -> bool {
 /// use std::path::Path;
 /// use std::error::Error;
 ///
-/// use serde_hkx_for_gui::hkanno::{parse_as_hkanno, HkannoError};
+/// use serde_hkx_for_gui::hkanno::parse_as_hkanno;
 ///
 /// fn example() -> Result<(), Box<dyn Error>> {
 ///     let path = Path::new("example.hkx"); // or xml(from hkx)
 ///     let bytes = std::fs::read(path)?;
-///     let mut buffer = String::new(); // To avoid ownership error xml receiver.
 ///
-///     // parse_as_hkanno returns Result<Hkanno, HkannoError>
-///     let hkanno = parse_as_hkanno(&bytes, &mut buffer, path)?;
+///     let hkanno = parse_as_hkanno(&bytes, path)?;
 ///
 ///     println!("Number of frames: {}", hkanno.num_original_frames);
 ///     Ok(())
 /// }
+/// ```
 #[inline]
 pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, HkannoError> {
     serde_hkx_features::convert::process_serde_with(

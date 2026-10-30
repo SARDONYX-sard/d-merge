@@ -2,6 +2,8 @@
 
 pub mod behavior;
 mod compat_old;
+pub mod convert;
+pub mod hkanno;
 pub mod log;
 pub mod mod_list;
 pub mod mod_list_ui;
@@ -48,6 +50,14 @@ pub struct Settings {
     #[serde(default)]
     pub pandora: PandoraSupportSettings,
 
+    /// Convert page state. (Added in v2.9; absent in older files -> default.)
+    #[serde(default)]
+    pub convert: convert::ConvertSettings,
+
+    /// hkanno editor state. (Added in v2.9; absent in older files -> default.)
+    #[serde(default)]
+    pub hkanno: hkanno::HkannoSettings,
+
     /// VFS-mode paths and mod list.
     #[serde(default)]
     pub vfs: ModListSettings,
@@ -67,6 +77,8 @@ impl Default for Settings {
             vfs: ModListSettings::default(),
             manual: ModListSettings::default(),
             pandora: PandoraSupportSettings::default(),
+            convert: convert::ConvertSettings::default(),
+            hkanno: hkanno::HkannoSettings::default(),
         }
     }
 }
@@ -223,5 +235,30 @@ impl Settings {
             skyrim_runtime,
             skyrim_version.as_deref(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A v2.8 `settings.json` (before the Convert/hkanno pages existed) must still load,
+    /// and the new sections must fall back to their defaults.
+    #[test]
+    fn loads_settings_without_new_sections() {
+        let json = r#"{ "app_version": "2.8.0", "behavior": {}, "ui": { "theme": "dark" } }"#;
+        let settings: Settings = sonic_rs::from_str(json).expect("v2.8 settings must parse");
+
+        assert_eq!(settings.ui.page, ui::Page::Patch);
+        assert!(settings.convert.selected_files.is_empty());
+        assert!(settings.hkanno.tabs.is_empty());
+        assert!(settings.hkanno.lsp.completion);
+    }
+
+    /// Unknown keys (e.g., written by a newer version) must not break loading either.
+    #[test]
+    fn ignores_unknown_sections() {
+        let json = r#"{ "app_version": "9.9.9", "behavior": {}, "future_section": { "x": 1 } }"#;
+        assert!(sonic_rs::from_str::<Settings>(json).is_ok());
     }
 }

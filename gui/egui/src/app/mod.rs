@@ -3,7 +3,9 @@
 mod background_image;
 mod fetch;
 mod log;
+mod pages;
 mod patch;
+pub(crate) mod router;
 mod ui;
 
 use std::sync::{Arc, atomic::AtomicBool};
@@ -18,7 +20,10 @@ use eframe::egui;
 use parking_lot::RwLock;
 
 use crate::{
-    app::log::LogQueueLock,
+    app::{
+        log::LogQueueLock,
+        pages::{convert::ConvertPage, hkanno::HkannoPage},
+    },
     ui::{notify::Notification, theme::ThemeManager},
 };
 
@@ -110,6 +115,13 @@ pub(crate) struct App {
 
     /// Latest status written by the `nemesis_merge` status-report callback.
     pub patch_status: Arc<PatchProgress>,
+
+    // ── Other pages ───────────────────────────────────────────────────────────
+    /// Convert page state that is not persisted (loaded tree, progress, ...).
+    pub convert: ConvertPage,
+
+    /// hkanno editor state (open files, editor buffers, preview, ...).
+    pub hkanno: HkannoPage,
 }
 
 impl App {
@@ -120,6 +132,8 @@ impl App {
     /// starts in its idle/empty variant.
     pub(crate) fn new(settings: Settings, theme_manager: ThemeManager) -> Self {
         let log_window_info = settings.log.window.clone();
+        let mut notify = Notification::default();
+        let hkanno = HkannoPage::restore(&settings.hkanno, &mut notify);
         let i18n =
             I18nMap::load_with_fallback(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
                 tracing::error!("Failed to load i18n map: {e}\nFallback to default");
@@ -145,7 +159,7 @@ impl App {
             bg_img_handle: None,
 
             mod_list_msg: Notification::default(),
-            notify: Notification::default(),
+            notify,
 
             current_log_dir: None,
             log_lines: LogQueueLock::default(),
@@ -159,6 +173,9 @@ impl App {
 
             patch_status: Arc::new(PatchProgress::default()),
             patch_start_time: None,
+
+            convert: ConvertPage::default(),
+            hkanno,
         }
     }
 
@@ -173,46 +190,41 @@ impl App {
     }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let ctx = &ui.ctx().clone();
-
+/// Per-frame hooks called by [`router::Root`] (which is the actual `eframe::App`).
+impl App {
+    /// Work done every frame **before** any page is drawn, regardless of the visible page.
+    pub(crate) fn frame_begin(&mut self, ctx: &egui::Context) {
         // ── Background task polling ───────────────────────────────────────────
         self.paint_background(ctx);
         self.poll_fetch_result(ctx);
         self.poll_patch_result();
+        self.poll_convert_result();
         self.update_window_info(ctx);
-        self.handle_shortcuts(ctx);
+
+        // Patch-page shortcuts (e.g., Ctrl+R = reload mod list) must not fire while typing elsewhere.
+        if self.settings.ui.page == d_merge_gui_shared::settings::ui::Page::Patch {
+            self.handle_shortcuts(ctx);
+        }
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
         self.start_log_watcher();
+    }
 
-        // ── Top panels (outermost -> innermost) ────────────────────────────────
-        self.ui_top_options(ui);
-        self.ui_paths(ui);
-
-        // ── Bottom panels (innermost -> outermost) ─────────────────────────────
-        // NOTE: egui stacks bottom panels in reverse registration order.
-        // `ui_notification` is registered first so it appears below `ui_bottom_panel`.
-        self.ui_notification(ui);
-        self.ui_bottom_panel(ui);
-
-        // ── Central panel (must be last among panels) ──────────────────────────
-        self.ui_mod_list(ui);
-
-        // ── Floating windows ───────────────────────────────────────────────────
+    /// Work done every frame **after** the page: floating windows on top of everything.
+    pub(crate) fn frame_end(&mut self, ctx: &egui::Context) {
         self.ui_log_window(ctx);
         self.ui_help_window(ctx);
 
         self.is_first_render = false;
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    /// Persists everything on shutdown.
+    pub(crate) fn on_exit(&mut self) {
         self.settings.log.window = self.log_window_info.read().clone();
+        self.settings.hkanno = self.hkanno.to_settings(&self.settings.hkanno);
         self.settings.save();
     }
 }
-
 pub(crate) fn update_window_geometry(
     ctx: &egui::Context,
     viewport_id: egui::ViewportId,

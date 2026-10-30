@@ -497,6 +497,180 @@ pub enum I18nKey {
     /// When booting using MO2's VFS, etc.
     VfsModeHover,
 
+    // ── Page navigation ─────────────────────────────────────────────────────
+    /// Patch
+    PagePatch,
+
+    /// Convert
+    PageConvert,
+
+    /// hkanno Editor
+    PageHkanno,
+
+    // ── Convert page ────────────────────────────────────────────────────────
+    /// All Clear
+    ConvertAllClearButton,
+
+    /// Selection type:
+    ConvertSelectionTypeLabel,
+
+    /// Directories
+    ConvertSelectionDirs,
+
+    /// Convert every file inside the selected directories.
+    ConvertSelectionDirsHover,
+
+    /// Tree
+    ConvertSelectionTree,
+
+    /// Select root directories, then check the files to convert.
+    ConvertSelectionTreeHover,
+
+    /// Files
+    ConvertSelectionFiles,
+
+    /// Select individual files.
+    ConvertSelectionFilesHover,
+
+    /// Output:
+    ConvertOutputLabel,
+
+    /// Output directory. If empty, each output is written next to its input.
+    ConvertOutputHover,
+
+    /// Output format:
+    ConvertOutputFormatLabel,
+
+    /// Convert
+    ConvertButton,
+
+    /// Converting...
+    ConvertingButton,
+
+    /// Conversion completed.
+    ConvertDone,
+
+    /// No input selected.
+    ConvertNoInput,
+
+    /// Select All
+    ConvertSelectAll,
+
+    /// Unselect All
+    ConvertUnselectAll,
+
+    /// Expand All
+    ConvertExpandAll,
+
+    /// Collapse All
+    ConvertCollapseAll,
+
+    // ── hkanno editor page ──────────────────────────────────────────────────
+    /// Open
+    HkannoOpenButton,
+
+    /// Open .hkx / .xml files. (Drag & drop also works.)
+    HkannoOpenHover,
+
+    /// Save
+    HkannoSaveButton,
+
+    /// Saved successfully.
+    HkannoSaved,
+
+    /// Save failed
+    HkannoSaveFailed,
+
+    /// Failed to load
+    HkannoLoadFailed,
+
+    /// Revert
+    HkannoRevertButton,
+
+    /// Discard the edits and restore the annotations of the original file?
+    HkannoRevertConfirm,
+
+    /// Apply
+    HkannoApplyButton,
+
+    /// Format
+    HkannoFormatButton,
+
+    /// Show Preview
+    HkannoShowPreview,
+
+    /// Hide Preview
+    HkannoHidePreview,
+
+    /// Annotation
+    HkannoAnnotationLabel,
+
+    /// Preview (XML)
+    HkannoPreviewTitle,
+
+    /// Preview error
+    HkannoPreviewError,
+
+    /// Problems
+    HkannoProblemsLabel,
+
+    /// Drop .hkx / .xml files here
+    HkannoDropHint,
+
+    /// Open or drop .hkx / .xml files to edit their annotations.
+    HkannoEmptyMessage,
+
+    /// Language features
+    HkannoLspOptionsTitle,
+
+    /// Completion
+    HkannoLspCompletion,
+
+    /// Suggestions while typing. Press Ctrl+Space to open them manually.
+    HkannoLspCompletionHover,
+
+    /// Code actions
+    HkannoLspCodeAction,
+
+    /// Quick fixes for some problems (e.g., IFrame key typos).
+    HkannoLspCodeActionHover,
+
+    /// Diagnostics
+    HkannoLspDiagnostics,
+
+    /// Underline errors and warnings.
+    HkannoLspDiagnosticsHover,
+
+    /// Formatter
+    HkannoLspFormatter,
+
+    /// Normalize spaces and number formats (Shift+Alt+F).
+    HkannoLspFormatterHover,
+
+    /// Semantic highlighting
+    HkannoLspSemanticTokens,
+
+    /// Parser-based coloring (e.g., PIE parameters).
+    HkannoLspSemanticTokensHover,
+
+    /// Hover
+    HkannoLspHover,
+
+    /// Show explanations when hovering a token.
+    HkannoLspHoverHover,
+
+    /// Inlay hints
+    HkannoLspInlayHints,
+
+    /// Show parameter names (time, x, y, ...) at the end of each line.
+    HkannoLspInlayHintsHover,
+
+    /// Signature help
+    HkannoLspSignatureHelp,
+
+    /// Show the signature of the event being typed.
+    HkannoLspSignatureHelpHover,
+
     // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
     /// Invalid key comes here when deserializing unknown strings.
     #[serde(other)]

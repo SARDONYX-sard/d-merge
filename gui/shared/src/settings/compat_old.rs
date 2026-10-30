@@ -129,6 +129,7 @@ impl From<OldSettings> for Settings {
                     width: old.window_width,
                     maximized: old.window_maximized,
                 },
+                page: super::ui::Page::default(),
             },
             log: LogSettings {
                 dir_path: format!("{}/.d_merge/logs", old.output_dir),
@@ -136,6 +137,8 @@ impl From<OldSettings> for Settings {
                 ..Default::default()
             },
             pandora: super::support_pandora::PandoraSupportSettings::default(),
+            convert: super::convert::ConvertSettings::default(),
+            hkanno: super::hkanno::HkannoSettings::default(),
             vfs: ModListSettings {
                 skyrim_data_dir: old.vfs_skyrim_data_dir,
                 mod_list: old.vfs_mod_list,

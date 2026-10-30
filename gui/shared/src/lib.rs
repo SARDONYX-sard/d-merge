@@ -14,7 +14,7 @@ pub mod settings;
 /// Not icon load
 #[inline]
 pub fn d_merge_icon() -> (Vec<u8>, [u32; 2]) {
-    ico_to_rgba(include_bytes!("../../tauri/backend/icons/icon.ico"))
+    ico_to_rgba(include_bytes!("../assets/icon.ico"))
 }
 
 #[expect(clippy::unwrap_used)]

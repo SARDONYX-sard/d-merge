@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://github.com/SARDONYX-sard/d-merge/releases">
-    <img src="./gui/tauri/backend/icons/icon.svg" alt="D Merge"/>
+    <img src="./gui/shared/assets/icon.svg" alt="D Merge"/>
   </a>
 
   <!-- Release Badges -->
@@ -52,10 +52,6 @@
 
 ## Release
 
-There have been reports that the Tauri-based GUI may not work in virtual environments such as MO2.
-
-In such cases, we recommend using the egui version build.
-
 - [Click assets](https://github.com/SARDONYX-sard/d-merge/releases)
 
 ## Intended Use of Automatic Settings File Loading
@@ -95,7 +91,7 @@ D:/MO2/mods/
 - [Mods Test status](./docs/test_status.md)
 
 - GUI
-  - [x] Basic frontend(Patch/Convert/Settings: Reports indicate that tauri ver. MO2 cannot be launched. Cause unknown.)
+  - [x] Basic frontend(Patch / Convert / hkanno editor)
   - [x] Support Virtual fs mode(Use `egui` ver.)
   - [x] Auto read settings file(Use `egui` ver.)
   - [ ] hkx json/patch editor
@@ -144,13 +140,7 @@ D:/MO2/mods/
 requirements: Rust1.91
 
 ```shell
-cargo build -p d_merge_egui --profile release-no-lto # Simple GUI by egui
-```
-
-requirements: Rust1.91, Node.js LTS
-
-```shell
-npm run build # Rich GUI by tauri
+cargo build -p d_merge_egui --profile release-no-lto
 ```
 
 ## Licenses

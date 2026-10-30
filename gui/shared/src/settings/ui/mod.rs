@@ -36,6 +36,37 @@ pub struct UiSettings {
 
     /// Last-known window geometry, updated every frame and restored on startup.
     pub window: WindowGeometry,
+
+    /// Page shown on startup (the last visited one). Added in v2.9.
+    pub page: Page,
+}
+
+/// Top-level pages of the GUI.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Page {
+    /// Mod list + patch execution (the original single page).
+    #[default]
+    Patch,
+    /// hkx <-> xml/json conversion.
+    Convert,
+    /// Animation annotation editor.
+    Hkanno,
+}
+
+impl Page {
+    /// All pages in navigation order.
+    pub const ALL: [Self; 3] = [Self::Patch, Self::Convert, Self::Hkanno];
+
+    /// Router path. e.g., `/convert`
+    pub const fn path(self) -> &'static str {
+        match self {
+            Self::Patch => "/patch",
+            Self::Convert => "/convert",
+            Self::Hkanno => "/hkanno",
+        }
+    }
 }
 
 impl Default for UiSettings {
@@ -48,6 +79,7 @@ impl Default for UiSettings {
             i18n_path: crate::i18n::I18nMap::FILE.into(),
             mod_list: ModListUiSettings::default(),
             window: WindowGeometry::default(),
+            page: Page::default(),
         }
     }
 }

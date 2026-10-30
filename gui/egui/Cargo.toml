@@ -32,6 +32,7 @@ eframe = { version = "0.37.0", default-features = false, features = [
 egui = { version = "0.37.0", features = ["monochrome_emoji_fonts"] }
 egui_dnd = "0.18.0"
 egui_extras = "0.37.0"
+egui_router = "0.10.0"
 image = { version = "0.25.10", features = ["jpeg", "png"] }
 # ---
 
@@ -46,8 +47,10 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 # workspace members
+hkanno_lsp = { workspace = true }
 mod_info = { workspace = true }
 nemesis_merge = { workspace = true, features = ["tracing"] }
+serde_hkx_for_gui = { workspace = true }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
 d_merge_gui_shared = { path = "../shared", features = ["tracing"] }
