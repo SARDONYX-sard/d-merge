@@ -1,8 +1,8 @@
 //! Bars and dialogs around the editor:
 //! - file bar: output path + output format of the active tab
-//! - toolbar: Save / Revert / Format / language feature options / preview toggle
+//! - toolbar: Save / Revert / Format / language feature options / Vim toggle / preview toggle
 //! - dialogs: revert confirmation, language feature options
-//! - shortcuts: `Ctrl+S` save, `Shift+Alt+F` format
+//! - shortcuts: `Ctrl+S` save (`Shift+Alt+F` format is handled by the editor itself)
 
 use d_merge_gui_shared::{i18n::I18nKey, settings::convert::OutFormat};
 
@@ -40,7 +40,7 @@ impl App {
         });
     }
 
-    /// `[Save] [Revert] [Format] [⚙] ........ [Hide Preview]`
+    /// `[Save] [Revert] [Format] [⚙] [Vim] ........ [Hide Preview]`
     pub(super) fn ui_hkanno_toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.add(Button::new(self.i18n.t(I18nKey::HkannoSaveButton)).primary()).clicked() {
@@ -64,6 +64,14 @@ impl App {
             {
                 self.hkanno.show_lsp_options ^= true;
             }
+            let vim = &mut self.settings.hkanno.vim_mode;
+            if ui
+                .add(Button::selectable(*vim, self.i18n.t(I18nKey::HkannoVimMode)))
+                .on_hover_text(self.i18n.t(I18nKey::HkannoVimModeHover))
+                .clicked()
+            {
+                *vim ^= true;
+            }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let show = &mut self.settings.hkanno.show_preview;
@@ -76,7 +84,7 @@ impl App {
         });
     }
 
-    /// `Ctrl+S` = save, `Shift+Alt+F` = format.
+    /// `Ctrl+S` = save.
     pub(super) fn handle_hkanno_shortcuts(&mut self, ctx: &egui::Context) {
         if self.hkanno.tabs.is_empty() {
             return;
@@ -84,15 +92,9 @@ impl App {
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
             self.save_active_hkanno();
         }
-        let format_keys = egui::Modifiers::SHIFT | egui::Modifiers::ALT;
-        if self.settings.hkanno.lsp.formatter
-            && ctx.input_mut(|i| i.consume_key(format_keys, egui::Key::F))
-        {
-            self.format_active_hkanno();
-        }
     }
 
-    fn save_active_hkanno(&mut self) {
+    pub(super) fn save_active_hkanno(&mut self) {
         let Some(tab) = self.hkanno.active_tab() else { return };
         match tab.save() {
             Ok(()) => self.notify.success(self.i18n.t(I18nKey::HkannoSaved)),

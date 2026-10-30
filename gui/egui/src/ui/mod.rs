@@ -1,3 +1,4 @@
+pub(crate) mod code_editor;
 pub(crate) mod dnd_table;
 pub(super) mod label_ext;
 pub(crate) mod markdown;

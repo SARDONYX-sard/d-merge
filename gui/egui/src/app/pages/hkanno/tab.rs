@@ -6,8 +6,11 @@ use d_merge_gui_shared::settings::{convert::OutFormat, hkanno::HkannoTabSettings
 use hkanno_lsp::features::diagnostics::{Diagnostic, diagnostics};
 use serde_hkx_for_gui::hkanno::{Hkanno, annotation_tracks_from_text, parse_as_hkanno};
 
-use super::{editor::EditorState, preview::Preview};
-use crate::app::pages::convert::to_format;
+use super::{language::to_editor_diagnostics, preview::Preview};
+use crate::{
+    app::pages::convert::to_format,
+    ui::code_editor::{self, CodeEditorState},
+};
 
 pub(crate) struct HkannoTab {
     /// Paths/format/cursor; this part is persisted in `settings.json`.
@@ -27,9 +30,16 @@ pub(crate) struct HkannoTab {
     pub(crate) dirty: bool,
 
     /// Diagnostics of `text`; refreshed by [`Self::text_changed`].
+    /// Kept in `hkanno_lsp` form for quick fixes (code actions).
     pub(crate) diagnostics: Vec<Diagnostic>,
 
-    pub(crate) editor: EditorState,
+    /// The same diagnostics converted for the editor's underlines.
+    pub(crate) editor_diagnostics: Vec<code_editor::Diagnostic>,
+
+    pub(crate) editor: CodeEditorState,
+
+    /// The saved cursor still has to be applied to the editor (once, on first show).
+    pub(crate) restore_cursor: bool,
     pub(crate) preview: Preview,
 }
 
@@ -57,7 +67,9 @@ impl HkannoTab {
             bytes: Arc::new(bytes),
             dirty: false,
             diagnostics: Vec::new(),
-            editor: EditorState::default(),
+            editor_diagnostics: Vec::new(),
+            editor: CodeEditorState::default(),
+            restore_cursor: true,
             preview: Preview::default(),
         };
         tab.text_changed();
@@ -85,6 +97,7 @@ impl HkannoTab {
     /// Must be called after every edit of `text`.
     pub(crate) fn text_changed(&mut self) {
         self.diagnostics = diagnostics(&self.text);
+        self.editor_diagnostics = to_editor_diagnostics(&self.diagnostics);
         self.preview.request();
     }
 

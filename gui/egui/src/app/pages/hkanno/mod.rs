@@ -1,6 +1,6 @@
 //! hkanno editor page: edit the annotations embedded in Havok animation files.
 //!
-//! ```text
+//! ``text
 //! ┌ [attack.hkx ✖] [idle.hkx ✖]                                     [Open] ┐  tabs
 //! ├ Output: [attack.modified.hkx                 ]  Format: [Amd64 ▼]       ┤  file bar
 //! ├ [Save] [Revert] [Format] [⚙]                              [Hide Preview] ┤  toolbar
@@ -10,30 +10,34 @@
 //! │ 0.100000 MCO_DodgeOpen                  │                                  │
 //! ├ Problems ─────────────────────────────────────────────────────────────────┤
 //! └ ✖ Ln 5, Col 1: Missing z value in animmotion.                  [Fix ...]  ┘
-//! ```
+//! ``
 //!
 //! # Modules
 //! - [`tab`]: one open file (load / save / revert / diagnostics)
-//! - [`editor`]: the text editor with language features
+//! - [`language`]: plugs `hkanno_lsp` into the generic [`CodeEditor`](crate::ui::code_editor::CodeEditor)
 //! - [`preview`]: XML preview + cursor sync
 //! - [`toolbar`]: file bar, toolbar, revert dialog, language feature options
 
-mod editor;
+mod language;
 mod preview;
 mod tab;
 mod toolbar;
 
 use d_merge_gui_shared::{i18n::I18nKey, settings::hkanno::HkannoSettings};
-use hkanno_lsp::features::{code_action::code_action, diagnostics::Severity};
+use hkanno_lsp::features::code_action::code_action;
 
-use self::{
-    editor::{EditorOutput, text_pos::LinePos},
-    tab::HkannoTab,
-};
+use self::{language::HkannoLanguage, tab::HkannoTab};
 use crate::{
     app::App,
     theme::{themed_central_panel, themed_top_bottom_panel},
-    ui::{notify::Notification, shadcn::Button},
+    ui::{
+        code_editor::{
+            self, CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures,
+            text_pos::{LinePos, char_to_byte},
+        },
+        notify::Notification,
+        shadcn::Button,
+    },
 };
 
 /// Open files and transient dialog state.
@@ -195,32 +199,50 @@ impl App {
         }
     }
 
-    /// The text editor of the active tab.
+    /// The text editor of the active tab (+ the Vim status line).
     fn ui_hkanno_editor(&mut self, ui: &mut egui::Ui) {
         ui.label(egui::RichText::new(self.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
 
-        let options = self.settings.hkanno.lsp.clone();
+        let lsp = &self.settings.hkanno.lsp;
+        let language = HkannoLanguage { semantic: lsp.semantic_tokens };
+        let features = EditorFeatures {
+            completion: lsp.completion,
+            hover: lsp.hover,
+            diagnostics: lsp.diagnostics,
+            format: lsp.formatter,
+            inlay_hints: lsp.inlay_hints,
+            signature_help: lsp.signature_help,
+        };
+        let vim = self.settings.hkanno.vim_mode;
         let show_preview = self.settings.hkanno.show_preview;
-        let Some(tab) = self.hkanno.active_tab() else { return };
-        let id = editor_id(&tab.settings.input_path);
+        let Some(tab) = self.hkanno.tabs.get_mut(self.hkanno.active) else { return };
 
         // Restore the saved cursor once, when the tab is first shown.
-        if let Some(index) = tab.editor.take_pending_cursor(tab.settings.cursor) {
-            editor::set_cursor(ui.ctx(), id, index);
+        if std::mem::take(&mut tab.restore_cursor) {
+            code_editor::set_cursor(
+                ui.ctx(),
+                editor_id(&tab.settings.input_path),
+                tab.settings.cursor,
+            );
         }
 
-        let EditorOutput { changed, cursor } = egui::ScrollArea::both()
+        // Status line first (bottom of the area), so it stays visible while the text scrolls.
+        if vim {
+            egui::Panel::bottom("hkanno_vim_status").show(ui, |ui| {
+                ui.label(egui::RichText::new(tab.editor.vim.status()).monospace());
+            });
+        }
+
+        let CodeEditorOutput { changed, cursor, command } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
             .auto_shrink(false)
             .show(ui, |ui| {
-                editor::editor_ui(
-                    ui,
-                    id,
-                    &mut tab.text,
-                    &tab.diagnostics,
-                    &options,
-                    &mut tab.editor,
-                )
+                CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
+                    .language(&language)
+                    .diagnostics(&tab.editor_diagnostics)
+                    .features(features)
+                    .vim(vim)
+                    .show(ui, &mut tab.editor)
             })
             .inner;
 
@@ -234,8 +256,10 @@ impl App {
                 tab.preview.jump_from_editor_line(cursor.line);
             }
         }
+        if command == Some(EditorCommand::Save) {
+            self.save_active_hkanno(); // Vim `:w`
+        }
     }
-
     /// Right pane: XML preview of the active tab.
     fn ui_hkanno_preview(&mut self, ui: &mut egui::Ui) {
         let title = self.i18n.t(I18nKey::HkannoPreviewTitle);
@@ -279,21 +303,15 @@ impl App {
         egui::Panel::bottom("hkanno_problems").resizable(true).default_size(120.0).show(ui, |ui| {
             ui.weak(format!("{title} ({})", tab.diagnostics.len()));
             egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-                for diagnostic in &tab.diagnostics {
+                // Both lists are built from the same source, in the same order.
+                for (lsp_diag, diagnostic) in tab.diagnostics.iter().zip(&tab.editor_diagnostics) {
                     ui.horizontal(|ui| {
-                        let icon = match diagnostic.severity {
-                            Severity::Error => "✖",
-                            Severity::Warning => "⚠",
-                        };
-                        ui.colored_label(
-                            editor::severity_color(ui.visuals(), diagnostic.severity),
-                            icon,
-                        );
+                        let severity = diagnostic.severity;
+                        ui.colored_label(severity.color(ui.visuals()), severity.icon());
 
-                        let pos = LinePos {
-                            line: diagnostic.range.line,
-                            column: diagnostic.range.span.start,
-                        };
+                        // e.g., `Ln 5, Col 1: Missing z value in animmotion.` -> click jumps there.
+                        let pos =
+                            LinePos { line: diagnostic.line, column: diagnostic.columns.start };
                         let location = format!(
                             "Ln {}, Col {}: {}",
                             pos.line + 1,
@@ -301,11 +319,11 @@ impl App {
                             diagnostic.message
                         );
                         if ui.link(location).clicked() {
-                            editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
+                            code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
                         }
 
                         if show_fixes
-                            && let Some(action) = code_action(&tab.text, diagnostic)
+                            && let Some(action) = code_action(&tab.text, lsp_diag)
                             && ui.add(Button::new(action.title).small()).clicked()
                         {
                             fix = Some(action.edit);
@@ -316,20 +334,14 @@ impl App {
         });
 
         if let Some(edit) = fix {
-            let range = edit.range;
-            let start =
-                LinePos { line: range.line, column: range.span.start }.to_char_index(&tab.text);
-            let end = LinePos { line: range.line, column: range.span.end }.to_char_index(&tab.text);
-            let (start, end) = (
-                editor::text_pos::char_to_byte(&tab.text, start),
-                editor::text_pos::char_to_byte(&tab.text, end),
-            );
+            let at = |column| LinePos { line: edit.range.line, column }.to_char_index(&tab.text);
+            let start = char_to_byte(&tab.text, at(edit.range.span.start));
+            let end = char_to_byte(&tab.text, at(edit.range.span.end));
             tab.text.replace_range(start..end, &edit.new_text);
             tab.dirty = true;
             tab.text_changed();
         }
     }
-
     /// Opens files dropped onto the window (only while this page is shown).
     fn handle_hkanno_drop(&mut self, ctx: &egui::Context) {
         let dropped: Vec<String> = ctx.input(|i| {
@@ -369,7 +381,8 @@ impl App {
     }
 }
 
-/// Stable id of a tab's editor, so cursor/undo state follows the file (not the tab position).
+/// Id of a tab's editor (same as `CodeEditor::new(input_path, ..)`), so cursor/undo state
+/// follows the file, not the tab position.
 fn editor_id(input_path: &str) -> egui::Id {
-    egui::Id::unique(("hkanno_editor", input_path))
+    code_editor::editor_id(input_path)
 }

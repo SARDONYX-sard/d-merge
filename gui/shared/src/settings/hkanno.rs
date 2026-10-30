@@ -28,6 +28,9 @@ pub struct HkannoSettings {
 
     /// Which language features are enabled.
     pub lsp: HkannoLspOptions,
+
+    /// Vim key bindings in the editor.
+    pub vim_mode: bool,
 }
 
 impl Default for HkannoSettings {
@@ -37,6 +40,7 @@ impl Default for HkannoSettings {
             active_tab: 0,
             show_preview: true,
             lsp: HkannoLspOptions::default(),
+            vim_mode: false,
         }
     }
 }

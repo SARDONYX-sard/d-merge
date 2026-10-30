@@ -623,6 +623,12 @@ pub enum I18nKey {
     /// Language features
     HkannoLspOptionsTitle,
 
+    /// Vim
+    HkannoVimMode,
+
+    /// Vim key bindings (Normal / Insert / Visual modes, `:w` saves).
+    HkannoVimModeHover,
+
     /// Completion
     HkannoLspCompletion,
 

@@ -2,30 +2,21 @@
 //!
 //! # Lifecycle
 //! ```text
-//! typing a trigger char (' ', '.', '@', '$', '!') or a word char, or Ctrl+Space
-//!     -> refresh(): ask hkanno_lsp for candidates at the cursor; open if any
+//! typing a trigger char (Language::completion_triggers) or a word char, or Ctrl+Space
+//!     -> refresh(): ask the language for candidates at the cursor; open if any
 //! while open:
 //!     ArrowUp/Down  -> move the selection
-//!     Enter / Tab   -> accept: replace the typed word with the snippet text
+//!     Enter / Tab   -> accept: replace the typed word with the candidate
 //!     Escape        -> close
 //!     cursor leaves the line / no candidates -> close
 //! ```
 //!
 //! Keys are consumed **before** the `TextEdit` runs, otherwise Enter would insert a newline.
 
-use hkanno_lsp::features::completion::{CompletionItem, CompletionKind, CompletionList, complete};
-
-use super::text_pos::{LinePos, char_to_byte};
-
-/// Characters that open the popup right after being typed.
-const TRIGGER_CHARS: [char; 5] = [' ', '.', '@', '$', '!'];
-
-/// What the user did with the keyboard while the popup was open (decided before the `TextEdit`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum PopupKey {
-    /// Insert the selected candidate.
-    Accept,
-}
+use super::{
+    language::{CompletionList, Language},
+    text_pos::{LinePos, char_to_byte},
+};
 
 #[derive(Default)]
 pub(super) struct CompletionPopup {
@@ -37,10 +28,10 @@ pub(super) struct CompletionPopup {
     selected: usize,
 }
 
-/// Result of accepting a candidate: the new text and the selection to put the cursor on.
+/// Result of accepting a candidate.
 pub(super) struct Accepted {
     pub(super) text: String,
-    /// Char range to select (the first snippet placeholder), or an empty range after the insertion.
+    /// Char range to select afterwards (a placeholder, or an empty range after the insertion).
     pub(super) select: std::ops::Range<usize>,
 }
 
@@ -53,14 +44,15 @@ impl CompletionPopup {
         self.list = None;
     }
 
-    /// Consumes the navigation keys while open. Call before showing the `TextEdit`.
-    pub(super) fn handle_keys(&mut self, ui: &egui::Ui) -> Option<PopupKey> {
-        let len = self.list.as_ref()?.items.len();
+    /// Consumes the navigation keys while open. Returns `true` when the user accepted.
+    /// Call before showing the `TextEdit`.
+    pub(super) fn handle_keys(&mut self, ui: &egui::Ui) -> bool {
+        let Some(len) = self.list.as_ref().map(|list| list.items.len()) else { return false };
         let consume = |key| ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key));
 
         if consume(egui::Key::Escape) {
             self.close();
-            return None;
+            return false;
         }
         if consume(egui::Key::ArrowDown) {
             self.selected = (self.selected + 1) % len;
@@ -68,13 +60,13 @@ impl CompletionPopup {
         if consume(egui::Key::ArrowUp) {
             self.selected = (self.selected + len - 1) % len;
         }
-        (consume(egui::Key::Enter) || consume(egui::Key::Tab)).then_some(PopupKey::Accept)
+        consume(egui::Key::Enter) || consume(egui::Key::Tab)
     }
 
     /// Recomputes candidates at `cursor`. Opens/closes the popup accordingly.
-    pub(super) fn refresh(&mut self, text: &str, cursor: LinePos) {
+    pub(super) fn refresh(&mut self, language: &dyn Language, text: &str, cursor: LinePos) {
         let line = text.split('\n').nth(cursor.line).unwrap_or_default();
-        let list = complete(line, cursor.column);
+        let list = language.complete(line, cursor.column);
 
         if list.items.is_empty() {
             self.close();
@@ -87,20 +79,27 @@ impl CompletionPopup {
 
     /// Decides whether the edit made this frame should (re)open the popup.
     ///
-    /// e.g., typing `.` after `PIE` opens it; typing in the middle of an open list refreshes it.
-    pub(super) fn on_text_changed(&mut self, ui: &egui::Ui, text: &str, cursor: LinePos) {
+    /// e.g., typing `.` after `PIE` opens it; typing while it is open refreshes (filters) it.
+    pub(super) fn on_text_changed(
+        &mut self,
+        ui: &egui::Ui,
+        language: &dyn Language,
+        text: &str,
+        cursor: LinePos,
+    ) {
+        let triggers = language.completion_triggers();
         let typed_trigger = ui.input(|i| {
             i.events.iter().any(|event| match event {
                 egui::Event::Text(s) => s
                     .chars()
                     .last()
-                    .is_some_and(|c| TRIGGER_CHARS.contains(&c) || c.is_alphanumeric() || c == '_'),
+                    .is_some_and(|c| triggers.contains(&c) || c.is_alphanumeric() || c == '_'),
                 _ => false,
             })
         });
 
         if typed_trigger || self.is_open() {
-            self.refresh(text, cursor);
+            self.refresh(language, text, cursor);
         }
     }
 
@@ -115,34 +114,30 @@ impl CompletionPopup {
     pub(super) fn accept(&mut self, text: &str) -> Option<Accepted> {
         let list = self.list.take()?;
         let item = list.items.get(self.selected)?;
-        let expanded = hkanno_lsp::snippet::expand(&item.insert);
 
         // Document char index of the replaced range.
         let line_start = LinePos { line: self.line, column: 0 }.to_char_index(text);
         let start = line_start + list.replace.start;
         let end = line_start + list.replace.end;
 
-        let mut new_text = String::with_capacity(text.len() + expanded.text.len());
+        let mut new_text = String::with_capacity(text.len() + item.insert.len());
         new_text.push_str(&text[..char_to_byte(text, start)]);
-        new_text.push_str(&expanded.text);
+        new_text.push_str(&item.insert);
         new_text.push_str(&text[char_to_byte(text, end)..]);
 
-        let inserted_len = expanded.text.chars().count();
-        let select = expanded
-            .first_placeholder
-            .map_or(start + inserted_len..start + inserted_len, |r| start + r.start..start + r.end);
-
+        let after = start + item.insert.chars().count();
+        let select = item.select.as_ref().map_or(after..after, |r| start + r.start..start + r.end);
         Some(Accepted { text: new_text, select })
     }
 
     /// Draws the list below `anchor` (the cursor rect in screen coordinates).
     ///
     /// Returns `true` when a candidate was clicked (the caller then calls [`Self::accept`]).
-    pub(super) fn ui(&mut self, ctx: &egui::Context, anchor: egui::Rect) -> bool {
+    pub(super) fn ui(&mut self, ctx: &egui::Context, id: egui::Id, anchor: egui::Rect) -> bool {
         let Some(list) = &self.list else { return false };
         let mut clicked = false;
 
-        egui::Area::new(egui::Id::unique("hkanno_completion_popup"))
+        egui::Area::new(id.with("completion"))
             .order(egui::Order::Foreground)
             .fixed_pos(anchor.left_bottom())
             .show(ctx, |ui| {
@@ -151,26 +146,24 @@ impl CompletionPopup {
                         // Candidates
                         ui.vertical(|ui| {
                             for (i, item) in list.items.iter().enumerate() {
-                                let label = format!("{} {}", kind_icon(item.kind), item.label);
-                                let response = ui.selectable_label(i == self.selected, label);
+                                let label = format!("{} {}", item.icon, item.label);
+                                let response =
+                                    ui.add(egui::Button::selectable(i == self.selected, label));
                                 if response.hovered() {
                                     self.selected = i;
                                 }
-                                if response.clicked() {
-                                    clicked = true;
-                                }
+                                clicked |= response.clicked();
                             }
                         });
 
                         // Documentation of the selected candidate
-                        if let Some(CompletionItem { documentation, .. }) =
-                            list.items.get(self.selected)
-                            && !documentation.is_empty()
+                        if let Some(item) = list.items.get(self.selected)
+                            && !item.documentation.is_empty()
                         {
                             ui.separator();
                             ui.vertical(|ui| {
                                 ui.set_max_width(360.0);
-                                crate::ui::markdown::markdown(ui, documentation);
+                                crate::ui::markdown::markdown(ui, &item.documentation);
                             });
                         }
                     });
@@ -178,16 +171,5 @@ impl CompletionPopup {
             });
 
         clicked
-    }
-}
-
-/// Small glyph shown before each candidate.
-const fn kind_icon(kind: CompletionKind) -> &'static str {
-    match kind {
-        CompletionKind::Keyword => "🔑",
-        CompletionKind::Value => "#",
-        CompletionKind::Function => "ƒ",
-        CompletionKind::Snippet => "✂",
-        CompletionKind::EnumMember => "◆",
     }
 }

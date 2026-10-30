@@ -1,7 +1,7 @@
 //! Conversions between the three ways the editor talks about a position:
 //!
 //! - **char index** into the whole text: what egui's `CCursor` uses
-//! - **line + column** (both 0-based, column in chars): what `hkanno_lsp` uses
+//! - **line + column** (both 0-based, column in chars): what [`super::Language`] methods use
 //! - **byte offset**: what `String` slicing needs
 //!
 //! e.g., in `"ab\n␀c"` the `c` is char index 4, `LinePos { line: 1, column: 1 }`, byte offset 6.
