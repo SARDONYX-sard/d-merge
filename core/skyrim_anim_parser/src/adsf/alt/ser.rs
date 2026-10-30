@@ -1,4 +1,4 @@
-use rapidhash::fast::RapidHashMap as HashMap;
+use fast_hash::HashMap;
 use rayon::prelude::*;
 
 use crate::{
@@ -44,7 +44,7 @@ pub fn serialize_alt_adsf(
 
     // NOTE: Since we reverted to the vanilla style name for serialization,
     // we must mode the key to reference alt_adsf. This is the procedure for that.
-    let mut counter = HashMap::default();
+    let mut counter = HashMap::<_, _>::default();
     for name in project_names {
         let name_str = name.as_ref();
         let base = name_str.strip_suffix(".txt").unwrap_or(name_str);

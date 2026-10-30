@@ -15,7 +15,7 @@ use egui::Label;
 use crate::{
     app::App,
     theme::{set_theme, themed_top_bottom_panel},
-    ui::shadcn_compat::{button, button_with_icon, checkbox, enum_select, radio_value},
+    ui::shadcn::{Button, Checkbox, ComboBox, Icon, RadioButton, TextEdit},
 };
 
 impl App {
@@ -23,14 +23,14 @@ impl App {
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
     /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
-    pub(crate) fn ui_top_options(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_top_options(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("ui_top_options"),
+            egui::Panel::top("ui_top_options"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_execution_mode(ui);
 
@@ -67,10 +67,12 @@ impl App {
             ];
 
             for (mode, label, hover) in items {
-                if radio_value(ui, &mut self.settings.behavior.mode, mode, label)
+                if ui
+                    .add(RadioButton::new(self.settings.behavior.mode == mode, label))
                     .on_hover_text(hover)
                     .clicked()
                 {
+                    self.settings.behavior.mode = mode;
                     self.update_mod_list();
                 }
             }
@@ -105,17 +107,19 @@ impl App {
                 make_runtimes()
             };
 
-            if enum_select(
-                ui,
-                &mut self.settings.behavior.target_runtime,
-                &RUNTIMES,
-                Some([100.0, 30.0]),
-            )
-            .changed()
-                && self.settings.behavior.mode == DataMode::Vfs
+            let runtime = &mut self.settings.behavior.target_runtime;
+            let mut index = RUNTIMES.iter().position(|(r, _)| r == runtime).unwrap_or(0);
+            if ComboBox::from_id_salt("target_runtime")
+                .width(100.0)
+                .show_index(ui, &mut index, RUNTIMES.len(), |i| RUNTIMES[i].1)
+                .changed()
             {
-                #[cfg(target_os = "windows")]
-                self.update_vfs_skyrim_data_dir_by_reg();
+                *runtime = RUNTIMES[index].0;
+
+                if self.settings.behavior.mode == DataMode::Vfs {
+                    #[cfg(target_os = "windows")]
+                    self.update_vfs_skyrim_data_dir_by_reg();
+                }
             }
         });
     }
@@ -125,15 +129,19 @@ impl App {
             ui.label(self.i18n.t(I18nKey::ParserModeLabel))
                 .on_hover_text(self.i18n.t(I18nKey::ParserModeHover));
 
-            enum_select(
-                ui,
-                &mut self.settings.behavior.parser_mode,
-                &[
-                    (ParserMode::Strict, self.i18n.t(I18nKey::ParserModeStrict)),
-                    (ParserMode::Lenient, self.i18n.t(I18nKey::ParserModeLenient)),
-                ],
-                Some([100.0, 30.0]),
-            );
+            let modes = [
+                (ParserMode::Strict, self.i18n.t(I18nKey::ParserModeStrict)),
+                (ParserMode::Lenient, self.i18n.t(I18nKey::ParserModeLenient)),
+            ];
+            let parser_mode = &mut self.settings.behavior.parser_mode;
+            let mut index = modes.iter().position(|(m, _)| m == parser_mode).unwrap_or(0);
+            if ComboBox::from_id_salt("parser_mode")
+                .width(100.0)
+                .show_index(ui, &mut index, modes.len(), |i| modes[i].1)
+                .changed()
+            {
+                *parser_mode = modes[index].0;
+            }
         });
     }
 
@@ -162,7 +170,7 @@ impl App {
             ),
             (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
         ] {
-            checkbox(ui, value, self.i18n.t(label)).on_hover_text(self.i18n.t(hover));
+            ui.add(Checkbox::new(value, self.i18n.t(label))).on_hover_text(self.i18n.t(hover));
         }
     }
 
@@ -179,8 +187,14 @@ impl App {
                 (Theme::Custom, self.i18n.t(I18nKey::ThemeSelectCustom)),
             ];
 
-            if enum_select(ui, &mut self.settings.ui.theme, &themes, Some([100.0, 30.0])).changed()
+            let theme = &mut self.settings.ui.theme;
+            let mut index = themes.iter().position(|(t, _)| t == theme).unwrap_or(0);
+            if ComboBox::from_id_salt("theme")
+                .width(100.0)
+                .show_index(ui, &mut index, themes.len(), |i| themes[i].1)
+                .changed()
             {
+                *theme = themes[index].0;
                 set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
         });
@@ -188,15 +202,12 @@ impl App {
 
     fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {
         if matches!(self.settings.ui.theme, Theme::Custom) {
-            fn toggle_value(
-                ui: &mut egui::Ui,
-                pressed: &mut bool,
-                text: impl Into<egui::WidgetText>,
-            ) -> egui::Response {
-                egui_shadcn::Toggle::new(pressed, text).show(ui)
+            let button =
+                Button::selectable(self.show_theme_editor, self.i18n.t(I18nKey::ThemeEditorButton));
+            if ui.add(button).on_hover_text(self.i18n.t(I18nKey::ThemeEditorButtonHover)).clicked()
+            {
+                self.show_theme_editor ^= true;
             }
-            toggle_value(ui, &mut self.show_theme_editor, self.i18n.t(I18nKey::ThemeEditorButton))
-                .on_hover_text(self.i18n.t(I18nKey::ThemeEditorButtonHover));
         }
 
         if matches!(self.settings.ui.theme, Theme::Custom)
@@ -223,14 +234,14 @@ impl App {
     /// | Skyrim      | path..................| Auto | ...  |
     /// | Output      | path..................|      | ...  |
     /// ```
-    pub(crate) fn ui_paths(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_paths(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::top("top_paths"),
+            egui::Panel::top("top_paths"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             self.ui_skyrim_dir_row(ui);
             ui.add_space(3.0);
             self.ui_output_dir_row(ui);
@@ -248,7 +259,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    button(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
+                    Button::new(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
                 )
                 .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
@@ -264,10 +275,9 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        button_with_icon(
-                            self.i18n.t(I18nKey::SelectButton),
-                            egui_shadcn::LucideIcon::FolderSearch,
-                        ),
+                        Button::new(self.i18n.t(I18nKey::SelectButton))
+                            .icon(Icon::FolderSearch)
+                            .full_width(),
                     )
                     .clicked()
                 {
@@ -290,10 +300,9 @@ impl App {
                         if ui
                             .add_sized(
                                 [BUTTON_WIDTH, BUTTON_HEIGHT],
-                                button_with_icon(
-                                    self.i18n.t(I18nKey::AutoDetectButton),
-                                    egui_shadcn::LucideIcon::ScanSearch,
-                                ),
+                                Button::new(self.i18n.t(I18nKey::AutoDetectButton))
+                                    .icon(Icon::ScanSearch)
+                                    .full_width(),
                             )
                             .on_hover_text(self.i18n.t(I18nKey::AutoDetectHover))
                             .clicked()
@@ -348,7 +357,7 @@ impl App {
             if ui
                 .add_sized(
                     [LABEL_WIDTH, BUTTON_HEIGHT],
-                    button(self.i18n.t(I18nKey::OutputDirLabel)),
+                    Button::new(self.i18n.t(I18nKey::OutputDirLabel)),
                 )
                 .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
@@ -365,10 +374,9 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        button_with_icon(
-                            self.i18n.t(I18nKey::SelectButton),
-                            egui_shadcn::LucideIcon::FolderSearch,
-                        ),
+                        Button::new(self.i18n.t(I18nKey::SelectButton))
+                            .icon(Icon::FolderSearch)
+                            .full_width(),
                     )
                     .clicked()
                 {
@@ -405,11 +413,9 @@ const BUTTON_HEIGHT: f32 = 32.0;
 const RIGHT_MARGIN: f32 = 8.0;
 
 fn path_text_edit(ui: &mut egui::Ui, value: &mut String, hint: Option<&str>) -> egui::Response {
-    let mut input = egui_shadcn::Input::new(value).desired_width(ui.available_width());
-
+    let mut text_edit = TextEdit::singleline(value).desired_width(ui.available_width());
     if let Some(hint) = hint {
-        input = input.placeholder(hint);
+        text_edit = text_edit.hint_text(hint);
     }
-
-    input.show(ui)
+    ui.add(text_edit)
 }

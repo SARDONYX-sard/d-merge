@@ -1,6 +1,7 @@
 //! # jwalk_glob
 //!
-//! A glob path expander backed by [`jwalk`] instead of the [`glob`] crate.
+//! A glob path expander backed by `std::fs::read_dir` + rayon instead of the [`glob`] crate.
+//! (It was backed by `jwalk` before, hence the name.)
 //!
 //! ## Why not the `glob` crate?
 //!
@@ -23,8 +24,8 @@
 //! and similar APIs return incorrect results or fail silently — roughly 50 % of
 //! the time depending on the directory tree depth.
 //!
-//! [`jwalk`] walks directories using a **rayon thread pool**, issuing one
-//! `read_dir` call per thread with no same-thread recursion:
+//! This crate reads each directory completely and closes its handle **before** descending into
+//! the children, and walks the children on a **rayon thread pool**:
 //!
 //! ```text
 //! thread A: read_dir(actors/character/animations)   (lock depth 1, released)
@@ -32,34 +33,40 @@
 //! thread C: read_dir(actors/dragon/animations)      (lock depth 1, released)
 //! ```
 //!
-//! Each thread acquires and releases the USVFS lock independently, so the
+//! Each `read_dir` acquires and releases the USVFS lock independently, so the
 //! benaphore never sees reentrance and the virtual filesystem stays intact.
+//!
+//! Only the directories matching each pattern component are read.
+//! (e.g. `mods/*/Data` reads `mods` only, not the whole tree under it.)
 //!
 //! ## Usage
 //!
 //! ```rust,no_run
-//! use jwalk_glob::glob;
+//! use jwalk_glob::glob_dirs;
 //!
 //! // Expand all mod data directories under a MO2 mods folder.
 //! // Each subdirectory of `mods/` that contains a `Data` folder is returned.
-//! let data_dirs = glob("C:/MO2/mods/*/Data");
+//! let data_dirs = glob_dirs("C:/MO2/mods/*/Data");
 //! for dir in &data_dirs {
 //!     println!("{}", dir.display());
 //! }
 //!
 //! // Recursive expansion — find every `Data` directory at any depth.
-//! let deep = glob("C:/MO2/mods/**/Data");
+//! let deep = glob_dirs("C:/MO2/mods/**/Data");
 //!
 //! // Literal path — returned as-is without touching the filesystem.
-//! let single = glob("C:/Skyrim Special Edition/Data");
+//! let single = glob_dirs("C:/Skyrim Special Edition/Data");
 //! assert_eq!(single, vec![std::path::PathBuf::from("C:/Skyrim Special Edition/Data")]);
 //! ```
 
 mod glob;
+mod walk;
 
 use std::path::PathBuf;
 
-/// Expands a glob pattern into concrete **directory** paths using [`jwalk`].
+pub use walk::walk_files;
+
+/// Expands a glob pattern into concrete **directory** paths. (Sorted)
 ///
 /// If `pattern` contains no glob meta characters (`*`, `?`, `[`), the path is
 /// returned as-is without any filesystem access.
@@ -75,7 +82,7 @@ pub fn glob_dirs(pattern: &str) -> Vec<PathBuf> {
     expand(pattern, true)
 }
 
-/// Expands a glob pattern into concrete **file** paths using [`jwalk`].
+/// Expands a glob pattern into concrete **file** paths. (Sorted)
 ///
 /// If `pattern` contains no glob meta characters (`*`, `?`, `[`), the path is
 /// returned as-is without any filesystem access.
@@ -112,34 +119,149 @@ fn expand(pattern: &str, is_dir: bool) -> Vec<PathBuf> {
     let pat_after_root = std::path::Path::new(pattern)
         .strip_prefix(&root)
         .unwrap_or_else(|_| std::path::Path::new(pattern));
-    let has_recursive = pat_after_root.components().any(|c| c.as_os_str() == "**");
-    let pat_depth = pat_after_root.components().count();
-    let max_depth = if has_recursive { usize::MAX } else { pat_depth };
 
-    jwalk::WalkDir::new(&root)
-        // NOTE: Important: By configuring the settings below to reserve just one core for the UI, we can prevent the UI from freezing.
-        .parallelism(jwalk::Parallelism::RayonNewPool(num_cpus::get() - 1))
-        .max_depth(max_depth)
-        .into_iter()
-        .filter_map(|r| {
-            r.map_err(|_e| {
-                #[cfg(feature = "tracing")]
-                tracing::warn!(error = %_e, "jwalk_glob: failed to read entry: {_e}");
-            })
-            .ok()
-        })
-        .filter(move |e| {
-            if e.depth == 0 {
-                return false;
+    // NOTE: Accept both `/` and `\` regardless of the platform.
+    let mut components: Vec<&str> = pat_after_root
+        .to_str()
+        .unwrap_or_default()
+        .split(['/', '\\'])
+        .filter(|s| !s.is_empty())
+        .collect();
+    // `**/**` is the same as `**`. (Also required by `expand_components`.)
+    components.dedup_by(|a, b| *a == "**" && *b == "**");
+
+    let mut paths = walk::expand_components(&root, &components, is_dir);
+    // The walk order depends on the thread scheduling, so fix it.
+    paths.sort_unstable();
+    paths
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::PathBuf};
+
+    use rayon::prelude::*;
+
+    use super::*;
+
+    /// Creates a dir tree under the temp dir and removes it on drop.
+    struct TempTree(PathBuf);
+
+    impl TempTree {
+        fn new(name: &str, dirs: &[&str], files: &[&str]) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("jwalk_glob_{name}_{}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            for dir in dirs {
+                fs::create_dir_all(root.join(dir)).unwrap();
             }
+            for file in files {
+                fs::write(root.join(file), "").unwrap();
+            }
+            Self(root)
+        }
 
-            let type_is_dir = e.file_type.is_dir();
-            let type_match = match is_dir {
-                true => type_is_dir,
-                false => !type_is_dir,
-            };
-            type_match && self::glob::match_glob_path(pattern, &e.path())
-        })
-        .map(|e| e.path())
-        .collect()
+        fn pattern(&self, pattern: &str) -> String {
+            format!("{}/{pattern}", self.0.display())
+        }
+
+        fn relative(&self, paths: Vec<PathBuf>) -> Vec<String> {
+            paths
+                .iter()
+                .map(|path| {
+                    path.strip_prefix(&self.0).unwrap().to_string_lossy().replace('\\', "/")
+                })
+                .collect()
+        }
+    }
+
+    impl Drop for TempTree {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn mods_tree(name: &str) -> TempTree {
+        TempTree::new(
+            name,
+            &[
+                "mods/Data",
+                "mods/FNISFlyer/Data/meshes",
+                "mods/FNISSFlyer",
+                "mods/TKDodge/Data",
+                "mods/a/b/Data",
+                "mods/a/b/Other",
+                "mods/a/b/c/Data",
+            ],
+            &["mods/FNISFlyer/Data/meshes/a.txt", "mods/a/b/c/b.txt", "mods/a/b/c/c.hkx"],
+        )
+    }
+
+    #[test]
+    fn glob_star() {
+        let tree = mods_tree("star");
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods/*/Data")));
+        assert_eq!(actual, ["mods/FNISFlyer/Data", "mods/TKDodge/Data"]);
+    }
+
+    #[test]
+    fn glob_partial_name_and_question_mark() {
+        let tree = mods_tree("partial");
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods/FNIS*/Data")));
+        assert_eq!(actual, ["mods/FNISFlyer/Data"]);
+
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods/FNI?Flyer")));
+        assert_eq!(actual, ["mods/FNISFlyer"]);
+    }
+
+    #[test]
+    fn glob_case_insensitive_and_backslash() {
+        let tree = mods_tree("case");
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods\\*\\data")));
+        assert_eq!(actual, ["mods/FNISFlyer/Data", "mods/TKDodge/Data"]);
+    }
+
+    #[test]
+    fn glob_double_star() {
+        let tree = mods_tree("double_star");
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods/**/Data")));
+        assert_eq!(
+            actual,
+            [
+                "mods/Data",
+                "mods/FNISFlyer/Data",
+                "mods/TKDodge/Data",
+                "mods/a/b/Data",
+                "mods/a/b/c/Data",
+            ]
+        );
+
+        // `**/**` is the same as `**`.
+        let actual = tree.relative(glob_dirs(&tree.pattern("mods/**/**/Data")));
+        assert_eq!(actual.len(), 5);
+    }
+
+    #[test]
+    fn glob_files_only() {
+        let tree = mods_tree("files");
+        let actual = tree.relative(glob_files(&tree.pattern("mods/**/*.txt")));
+        assert_eq!(actual, ["mods/FNISFlyer/Data/meshes/a.txt", "mods/a/b/c/b.txt"]);
+
+        // Dirs are not returned by `glob_files`.
+        assert!(glob_files(&tree.pattern("mods/*/Data")).is_empty());
+    }
+
+    #[test]
+    fn glob_literal_returns_as_is() {
+        assert_eq!(glob_dirs("C:/Skyrim/Data"), [PathBuf::from("C:/Skyrim/Data")]);
+    }
+
+    #[test]
+    fn walk_all_files() {
+        let tree = mods_tree("walk");
+        let is_txt = |path: &PathBuf| path.extension().is_some_and(|ext| ext == "txt");
+        let mut actual = tree.relative(walk_files(tree.0.join("mods")).filter(is_txt).collect());
+        actual.sort();
+        assert_eq!(actual, ["mods/FNISFlyer/Data/meshes/a.txt", "mods/a/b/c/b.txt"]);
+    }
 }

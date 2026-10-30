@@ -120,7 +120,7 @@ fn extract_nemesis_id_from_path(path: &Path) -> Option<&str> {
 /// # Errors
 /// If invalid glob pattern.
 fn get_all_fnis(skyrim_data_dir: &str) -> Result<Vec<ModInfo>, Error> {
-    use std::collections::HashSet;
+    use fast_hash::HashSet;
 
     fn collect_from_fnis_list(fnis_list_pattern: &str) -> Result<HashSet<ModInfo>, Error> {
         let mods = jwalk_glob::glob_files(fnis_list_pattern)

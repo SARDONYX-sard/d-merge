@@ -16,8 +16,7 @@ const NEW_LINE: &str = "\r\n";
 /// Resolves conflicts during key enumeration immediately before serialization.
 ///
 /// e.g., - key: `DefaultMaleData~DefaultMale`, - value: diff lines
-pub type SubHeaderDiffMap<'a> =
-    std::collections::HashMap<&'a str, DiffLines<'a>, rapidhash::fast::RandomState>;
+pub type SubHeaderDiffMap<'a> = fast_hash::HashMap<&'a str, DiffLines<'a>>;
 
 /// Converts an `AltAsdsf` struct back into the original `animationsetdatasinglefile.txt` text format with `\r\n` line endings.
 ///

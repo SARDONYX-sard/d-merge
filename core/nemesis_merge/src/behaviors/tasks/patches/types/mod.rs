@@ -10,6 +10,7 @@ use crate::behaviors::tasks::{
     adsf::types::OwnedAdsfPatchMap, asdsf::types::OwnedAsdsfPatchMap, templates::key::TemplateKey,
 };
 
+#[derive(Default)]
 pub(crate) struct OwnedPatches {
     /// Name of the template that needs to be read.
     ///
@@ -30,9 +31,20 @@ pub(crate) struct OwnedPatches {
     pub errors: Vec<crate::errors::Error>,
 }
 
+impl OwnedPatches {
+    /// Merges `other` into `self`. (For rayon `reduce`)
+    pub(crate) fn merge(mut self, other: Self) -> Self {
+        self.owned_patches.extend(other.owned_patches);
+        self.adsf_patches.0.extend(other.adsf_patches.0);
+        self.asdsf_patches.0.extend(other.asdsf_patches.0);
+        self.errors.extend(other.errors);
+        self
+    }
+}
+
 /// - key: full path
 /// - value: nemesis xml
-pub(crate) type OwnedPatchMap = IndexMap<PathBuf, (String, usize), rapidhash::fast::RandomState>;
+pub(crate) type OwnedPatchMap = IndexMap<PathBuf, (String, usize), fast_hash::RandomState>;
 
 /// Collection of patches with metadata
 pub(crate) struct PatchCollection<'a> {
@@ -40,9 +52,9 @@ pub(crate) struct PatchCollection<'a> {
     /// - key: template name (e.g., `"0_master"`, `"defaultmale"`)
     /// - value: `Map<jsonPath, { patch, priority }>`
     pub borrowed_patches: BehaviorPatchesMap<'a>,
-    /// Map showing which index of each template contains hkbBehaviorGraphData
+    /// Map showing which index of each template contains `hkbBehaviorGraphStringData` & `hkbBehaviorGraphData`.
     /// Used to replace Nemesis variables such as `$variableID[]$` or `$eventID[]$`.
-    pub behavior_graph_data_map: BehaviorGraphDataMap<'a>,
+    pub behavior_index_map: BehaviorIndexMap<'a>,
 }
 /// A patch containing references to parsed strings.
 ///
@@ -66,7 +78,7 @@ pub(crate) struct PatchCollection<'a> {
 /// ```
 #[derive(Debug, Default, Clone)]
 pub(crate) struct BehaviorPatchesMap<'a>(
-    pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, rapidhash::fast::RandomState>,
+    pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, fast_hash::RandomState>,
 );
 
 impl<'a> BehaviorPatchesMap<'a> {
@@ -95,22 +107,52 @@ impl<'a> BehaviorPatchesMap<'a> {
     }
 }
 
+/// Indexes(e.g. `#0000`) of the classes required to replace Nemesis variables.
+#[derive(Debug, Clone)]
+pub(crate) struct BehaviorIndexes {
+    /// Index of `hkbBehaviorGraphStringData`. Required to replace event/variable names.
+    pub string_data: Cow<'static, str>,
+    /// Index of `hkbBehaviorGraphData`. Used for the length check of events/variables.
+    ///
+    /// Known from the template table or FNIS, but not from the Nemesis patch xml.
+    pub behavior_graph: Option<Cow<'static, str>>,
+}
+
 /// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
-/// to the identifier string (e.g., `#0000`) of the contained `hkbBehaviorGraphData`.
+/// to the indexes of `hkbBehaviorGraphStringData` & `hkbBehaviorGraphData`.
 ///
 /// This mapping is necessary for replacing Nemesis variables such as `$variableID[]$`, `$eventID[]$`,
-/// where the variable needs to be resolved to the corresponding behavior string data name.
+/// where the variable needs to be resolved to the index of the event/variable names.
+///
+/// If a template is not in this map, the variables are not replaced.
 ///
 /// - key: template_name
-/// - value: index(e.g. `#0000`) of `hkbBehaviorGraphData`
+/// - value: [`BehaviorIndexes`]
 #[derive(Debug, Default, Clone)]
-pub(crate) struct BehaviorGraphDataMap<'a>(
-    pub DashMap<TemplateKey<'a>, Cow<'static, str>, rapidhash::fast::RandomState>,
+pub(crate) struct BehaviorIndexMap<'a>(
+    pub DashMap<TemplateKey<'a>, BehaviorIndexes, fast_hash::RandomState>,
 );
-impl BehaviorGraphDataMap<'_> {
+impl<'a> BehaviorIndexMap<'a> {
     /// Create `Self`
     #[inline]
     pub(crate) fn new() -> Self {
         Self(DashMap::default())
+    }
+
+    /// Inserts the indexes. Already inserted ones are kept, except that the one with
+    /// `behavior_graph` index(more information) is preferred.
+    ///
+    /// Therefore, the result does not depend on the insertion order.
+    pub(crate) fn insert(&self, key: TemplateKey<'a>, indexes: BehaviorIndexes) {
+        match self.0.entry(key) {
+            dashmap::Entry::Occupied(mut occ) => {
+                if occ.get().behavior_graph.is_none() && indexes.behavior_graph.is_some() {
+                    occ.insert(indexes);
+                }
+            }
+            dashmap::Entry::Vacant(vacant) => {
+                vacant.insert(indexes);
+            }
+        }
     }
 }

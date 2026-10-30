@@ -7,7 +7,7 @@ use d_merge_gui_shared::{
 use crate::{
     app::App,
     theme::themed_top_bottom_panel,
-    ui::shadcn_compat::{button_with_icon, enum_select, patch_button},
+    ui::shadcn::{Button, ComboBox, Icon},
 };
 
 impl App {
@@ -15,14 +15,15 @@ impl App {
     ///
     /// The patch button is disabled while a fetch is in progress to prevent
     /// launching a patch against a stale mod list.
-    pub(crate) fn ui_bottom_panel(&mut self, ctx: &egui::Context) {
+    pub(crate) fn ui_bottom_panel(&mut self, ui: &mut egui::Ui) {
+        let ctx = &ui.ctx().clone();
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("bottom_panel"),
+            egui::Panel::bottom("bottom_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.horizontal(|ui| {
                 self.ui_log_level_box(ui);
 
@@ -48,7 +49,13 @@ impl App {
                     } else {
                         self.i18n.t(I18nKey::PatchButton)
                     };
-                    if ui.add_sized([120.0, 40.0], patch_button(label)).clicked() {
+                    if ui
+                        .add_sized(
+                            [120.0, 40.0],
+                            Button::new(label).icon(Icon::Layers).full_width().primary(),
+                        )
+                        .clicked()
+                    {
                         self.patch(ui.ctx());
                     }
                 });
@@ -57,10 +64,9 @@ impl App {
                     if ui
                         .add_sized(
                             [100.0, 40.0],
-                            button_with_icon(
-                                self.i18n.t(I18nKey::HelpButton),
-                                egui_shadcn::LucideIcon::Toolbox,
-                            ),
+                            Button::new(self.i18n.t(I18nKey::HelpButton))
+                                .icon(Icon::Toolbox)
+                                .full_width(),
                         )
                         .clicked()
                     {
@@ -80,10 +86,7 @@ impl App {
         F: FnOnce(&mut Self, &egui::Context),
     {
         if ui
-            .add_sized(
-                [120.0, 40.0],
-                button_with_icon(self.i18n.t(key), egui_shadcn::LucideIcon::Logs),
-            )
+            .add_sized([120.0, 40.0], Button::new(self.i18n.t(key)).icon(Icon::Logs).full_width())
             .clicked()
         {
             f(self, ctx);
@@ -106,8 +109,14 @@ impl App {
                 (LogLevel::Trace, LogLevel::Trace.as_str()),
             ];
 
-            if enum_select(ui, &mut self.settings.log.level, &LEVELS, Some([120.0, 30.0])).changed()
+            let mut index =
+                LEVELS.iter().position(|(level, _)| *level == self.settings.log.level).unwrap_or(0);
+            if ComboBox::from_id_salt("log_level")
+                .width(120.0)
+                .show_index(ui, &mut index, LEVELS.len(), |i| LEVELS[i].1)
+                .changed()
             {
+                self.settings.log.level = LEVELS[index].0;
                 let _ = tracing_rotation::global::change_level(self.settings.log.level.as_str());
             }
         });
@@ -117,14 +126,14 @@ impl App {
     ///
     /// The message and color are set by [`App::set_colored_notify`] and
     /// cleared by [`App::clear_notification`].
-    pub(crate) fn ui_notification(&self, ctx: &egui::Context) {
+    pub(crate) fn ui_notification(&self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
-            egui::TopBottomPanel::bottom("notification_panel"),
+            egui::Panel::bottom("notification_panel"),
             self.settings.ui.theme,
             self.theme_manager.current_bg_color(),
         );
 
-        panel.show(ctx, |ui| {
+        panel.show(ui, |ui| {
             ui.colored_label(self.notify.color.resolve(ui.visuals()), &self.notify.message);
         });
     }

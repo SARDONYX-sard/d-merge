@@ -4,16 +4,9 @@ use indexmap::IndexMap;
 /// - key: full path(For adsf)
 /// - value: adsf patch
 #[derive(Debug, Default)]
-pub(crate) struct OwnedAdsfPatchMap(
-    pub IndexMap<PathBuf, (String, usize), rapidhash::fast::RandomState>,
-);
+pub(crate) struct OwnedAdsfPatchMap(pub IndexMap<PathBuf, (String, usize), fast_hash::RandomState>);
 
 impl OwnedAdsfPatchMap {
-    #[inline]
-    pub(crate) fn new() -> Self {
-        Self(IndexMap::default())
-    }
-
     #[inline]
     pub(crate) fn insert(
         &mut self,

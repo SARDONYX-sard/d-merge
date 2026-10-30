@@ -142,7 +142,8 @@ pub(super) fn write_file(output_path: &std::path::Path, bytes: &[u8]) -> Result<
 ///
 /// Returns `None` when `job.kind` is not `FnisAA { is_male_subdir: true, .. }`.
 fn mirror_male_to_female(job: &ConversionJob) -> Option<ConversionJob> {
-    let AnimKind::FnisAA { is_male_subdir: true, prefix, group_name, slot_count } = &job.kind
+    let AnimKind::FnisAA { is_male_subdir: true, prefix, group_name, slot_count, priority } =
+        &job.kind
     else {
         return None;
     };
@@ -175,6 +176,7 @@ fn mirror_male_to_female(job: &ConversionJob) -> Option<ConversionJob> {
             group_name: *group_name,
             slot_count: *slot_count,
             is_male_subdir: false, // prevent infinite mirroring
+            priority: *priority,
         },
     })
 }

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use d_merge_gui_shared::{fetch::FetchState, i18n::I18nKey, mod_item, settings::DataMode};
-use rayon::prelude::*;
 
 use crate::app::App;
 
@@ -65,7 +64,7 @@ impl App {
 
                 let mod_info = core::mem::take(&mut *self.fetched_mod_info.write());
                 let new_mods = mod_item::inherit_reorder_cast(self.settings.mod_list(), mod_info);
-                self.check_all = new_mods.par_iter().all(|m| m.enabled);
+                self.check_all = new_mods.iter().all(|m| m.enabled);
                 *self.settings.mod_list_mut() = new_mods;
 
                 // Reset to Idle so this branch is not re-entered next frame.
@@ -78,7 +77,7 @@ impl App {
                 ));
 
                 if self.settings.behavior.auto_run {
-                    self.settings.mod_list_mut().par_iter_mut().for_each(|m| m.enabled = true);
+                    self.settings.mod_list_mut().iter_mut().for_each(|m| m.enabled = true);
                     self.patch(ctx);
                 }
             }

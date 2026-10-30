@@ -13,6 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+fast_hash = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 serde_hkx = { workspace = true }

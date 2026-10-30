@@ -1,4 +1,4 @@
-use rapidhash::fast::RapidHashMap as HashMap;
+use fast_hash::HashMap;
 
 /// Path & Priority map
 ///

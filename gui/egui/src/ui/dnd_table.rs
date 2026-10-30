@@ -1,6 +1,5 @@
 use d_merge_gui_shared::mod_item::ModItem;
 use egui_extras::TableBody;
-use rayon::prelude::*;
 
 use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
 
@@ -22,8 +21,9 @@ pub(crate) fn dnd_table_body(
     let row_width = widths.iter().sum::<f32>() + 38.0;
     let mut selection_request: Option<(bool, String, bool)> = None;
 
-    let response =
-        egui_dnd::dnd(ui, "mod_list_dnd").show_vec(items, |ui, item, draggable_handle, state| {
+    let response = egui_dnd::dnd(ui, egui::Id::unique("mod_list_dnd")).show_vec(
+        items,
+        |ui, item, draggable_handle, state| {
             let row_rect = ui
                 .allocate_rect(
                     egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(row_width, ROW_HEIGHT)),
@@ -66,7 +66,8 @@ pub(crate) fn dnd_table_body(
                     });
                 });
             });
-        });
+        },
+    );
 
     if let Some((shift, clicked_id, enabled)) = selection_request {
         if shift {
@@ -82,7 +83,7 @@ pub(crate) fn dnd_table_body(
 
     // Reorder priority by index.
     if response.final_update().is_some() {
-        items.par_iter_mut().enumerate().for_each(|(idx, item)| {
+        items.iter_mut().enumerate().for_each(|(idx, item)| {
             item.priority = idx + 1;
         });
     }
@@ -108,8 +109,8 @@ pub(crate) fn check_only_table_body(
     let w_mod_type = widths[3];
     let w_site = widths[4];
 
-    let mut orig_map: rapidhash::fast::RapidHashMap<String, &mut ModItem> =
-        original_items.par_iter_mut().map(|o| (o.id.clone(), o)).collect();
+    let mut orig_map: fast_hash::HashMap<String, &mut ModItem> =
+        original_items.iter_mut().map(|o| (o.id.clone(), o)).collect();
 
     // is_shift, id, enabled
     let mut selection_request: Option<(bool, String, bool)> = None;

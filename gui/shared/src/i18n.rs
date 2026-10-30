@@ -431,6 +431,9 @@ pub enum I18nKey {
     /// Search
     SearchLabel,
 
+    /// hits
+    SearchHitsLabel,
+
     /// Select
     SelectButton,
 
@@ -501,7 +504,7 @@ pub enum I18nKey {
 }
 
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, rapidhash::fast::RandomState>);
+pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, fast_hash::RandomState>);
 
 impl I18nMap {
     pub fn new() -> Self {

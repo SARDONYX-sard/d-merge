@@ -1,5 +1,4 @@
-use std::collections::{HashMap, hash_map::Entry};
-
+use fast_hash::{HashMap, hash_map::Entry};
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
 
@@ -12,7 +11,7 @@ impl<'a> OnePatchMap<'a> {
     /// Constructs a new, empty [`OnePatchMap`].
     #[inline]
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self(HashMap::default())
     }
 
     /// Inserts a value for the given JSON path.
@@ -69,7 +68,7 @@ impl<'a> SeqPatchMap<'a> {
     #[inline]
     #[allow(unused)]
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self(HashMap::default())
     }
 
     /// Inserts a value for the given JSON path.
@@ -151,7 +150,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let mut map = HashMap::new();
+                let mut map = HashMap::default();
                 while let Some((key, value)) =
                     access.next_entry::<String, ValueWithPriority<'de>>()?
                 {
@@ -205,7 +204,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let mut map = HashMap::new();
+                let mut map = HashMap::default();
 
                 while let Some((key, value)) =
                     access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?

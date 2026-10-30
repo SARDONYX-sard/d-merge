@@ -18,7 +18,7 @@ ico = "0.5.0"
 indexmap = { workspace = true, features = ["serde"] }
 open = { version = "5.4.4" }
 parking_lot = { workspace = true }
-rapidhash = { workspace = true }
+fast_hash = { workspace = true }
 rayon = { workspace = true }
 semver = { version = "1.0.28", features = ["serde"] }
 serde = { workspace = true }

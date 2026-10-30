@@ -174,7 +174,9 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = &ui.ctx().clone();
+
         // ── Background task polling ───────────────────────────────────────────
         self.paint_background(ctx);
         self.poll_fetch_result(ctx);
@@ -186,17 +188,17 @@ impl eframe::App for App {
         self.start_log_watcher();
 
         // ── Top panels (outermost -> innermost) ────────────────────────────────
-        self.ui_top_options(ctx);
-        self.ui_paths(ctx);
+        self.ui_top_options(ui);
+        self.ui_paths(ui);
 
         // ── Bottom panels (innermost -> outermost) ─────────────────────────────
         // NOTE: egui stacks bottom panels in reverse registration order.
         // `ui_notification` is registered first so it appears below `ui_bottom_panel`.
-        self.ui_notification(ctx);
-        self.ui_bottom_panel(ctx);
+        self.ui_notification(ui);
+        self.ui_bottom_panel(ui);
 
         // ── Central panel (must be last among panels) ──────────────────────────
-        self.ui_mod_list(ctx);
+        self.ui_mod_list(ui);
 
         // ── Floating windows ───────────────────────────────────────────────────
         self.ui_log_window(ctx);

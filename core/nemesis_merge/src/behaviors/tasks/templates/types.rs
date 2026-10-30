@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use rapidhash::fast::RapidHashMap as HashMap;
+use fast_hash::HashMap;
 use simd_json::BorrowedValue;
 
 use crate::behaviors::tasks::templates::key::TemplateKey;
@@ -11,4 +11,4 @@ pub(crate) type OwnedTemplateMap = HashMap<TemplateKey<'static>, Vec<u8>>;
 /// - key: template file stem(e.g. `0_master`)
 /// - value: output_path(hkx file path), borrowed json (from template xml)
 pub(crate) type BorrowedTemplateMap<'a> =
-    DashMap<TemplateKey<'static>, BorrowedValue<'a>, rapidhash::fast::RandomState>;
+    DashMap<TemplateKey<'static>, BorrowedValue<'a>, fast_hash::RandomState>;

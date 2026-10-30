@@ -70,7 +70,7 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
         adsf_patches: owned_adsf_patches,
         asdsf_patches: owned_asdsf_patches,
         errors: owned_file_errors,
-    } = collect_owned_patches(nemesis_entries, &config).await;
+    } = collect_owned_patches(nemesis_entries, &config);
 
     let mut adsf_errors = vec![];
     let mut asdsf_errors = vec![];
@@ -153,10 +153,7 @@ fn apply_and_gen_patched_hkx<'a>(
     let mut all_errors = vec![];
 
     // 1/3: Parse nemesis patches
-    let (
-        PatchCollection { borrowed_patches, behavior_graph_data_map: variable_class_map },
-        patch_errors_len,
-    ) = {
+    let (PatchCollection { borrowed_patches, behavior_index_map }, patch_errors_len) = {
         let (borrowed_patches, errors) =
             collect_borrowed_patches(owned_patches, config, fnis_patches);
 
@@ -201,7 +198,7 @@ fn apply_and_gen_patched_hkx<'a>(
 
     // 3/3: Generate hkx files.
     let hkx_errors_len = {
-        if let Err(hkx_errors) = generate_hkx_files(config, templates, variable_class_map) {
+        if let Err(hkx_errors) = generate_hkx_files(config, templates, behavior_index_map) {
             let errors_len = hkx_errors.len();
             all_errors.par_extend(hkx_errors);
             errors_len

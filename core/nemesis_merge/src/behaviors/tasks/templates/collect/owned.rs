@@ -1,5 +1,6 @@
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 
+use fast_hash::HashSet;
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
 /// - `template_root`: meshes parent dir. e.g. `assets/templates`. This means search `asserts/templates/meshes/...`
 pub(crate) fn collect_templates(
     template_root: &Path,
-    template_names: HashSet<TemplateKey<'static>, rapidhash::fast::RandomState>,
+    template_names: HashSet<TemplateKey<'static>>,
 ) -> (OwnedTemplateMap, Vec<Error>) {
     template_names
         .into_par_iter()

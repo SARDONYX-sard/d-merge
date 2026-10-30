@@ -29,13 +29,14 @@ mod cache;
 mod preset;
 
 use d_merge_gui_shared::{fs::open_existing_dir_or_ancestor, settings::ui::theme::*};
-use egui_shadcn::ShadcnThemeExt;
 
 use crate::{
     theme::EguiColorExt as _,
     ui::{
         notify::Notification,
-        shadcn_compat::{button, checkbox, searchable_index_select, small_button, text},
+        shadcn::{
+            Button, Checkbox, ComboBox, Label, Slider, TextEdit, ToggleGroup, theme::ShadcnTheme,
+        },
         theme::cache::ThemeCache,
     },
 };
@@ -217,42 +218,42 @@ impl ThemeManager {
 
         egui::Grid::new("theme_manager_grid").num_columns(2).spacing([8.0, 8.0]).show(ui, |ui| {
             // ── Preset row ────────────────────────────────────────────────────────
-            if ui.add(button("Preset:")).on_hover_text("Open themes directory").clicked()
+            if ui.add(Button::new("Preset:")).on_hover_text("Open themes directory").clicked()
                 && let Err(err) = open_existing_dir_or_ancestor(&self.cache.dir)
             {
                 self.status.error(err);
             }
             ui.horizontal(|ui| {
-                if searchable_index_select(
-                    ui,
-                    "theme_preset_combo",
-                    &mut self.selected_index,
-                    &self.names,
-                    "Search...",
-                )
-                .changed()
+                let names = &self.names;
+                if ComboBox::from_id_salt("theme_preset_combo")
+                    .width(220.0)
+                    .search_hint("Search...")
+                    .show_index(ui, &mut self.selected_index, names.len(), |i| {
+                        names.get(i).map_or("", String::as_str)
+                    })
+                    .changed()
                 {
                     selection_changed = true;
                     self.load_selected();
                 }
 
-                if ui.add(button("Load")).clicked() {
+                if ui.add(Button::new("Load")).clicked() {
                     selection_changed = true;
                     self.load_selected();
                 }
 
-                if ui.add(button("⟳")).on_hover_text("Reload themes directory").clicked() {
+                if ui.add(Button::new("⟳")).on_hover_text("Reload themes directory").clicked() {
                     self.reload_dir();
                 }
             });
             ui.end_row();
 
             // ── Save-as row ───────────────────────────────────────────────────────
-            label("Save as:", ui);
+            ui.add(Label::new("Save as:"));
             ui.horizontal(|ui| {
-                text(ui, &mut self.save_name, None, 220.0);
+                ui.add(TextEdit::singleline(&mut self.save_name).desired_width(220.0));
 
-                if ui.add(button("Save")).clicked() {
+                if ui.add(Button::new("Save")).clicked() {
                     self.save_current();
                     selection_changed = true;
                 }
@@ -282,7 +283,14 @@ impl ThemeManager {
                 ui.add_space(4.0);
 
                 egui::CollapsingHeader::new("Widgets").default_open(false).show(ui, |ui| {
-                    toggle_group_widget_tab(ui, &mut self.widget_tab);
+                    let tabs = WidgetTab::ALL;
+                    let mut index = tabs.iter().position(|t| *t == self.widget_tab).unwrap_or(0);
+                    if ToggleGroup::new()
+                        .show_index(ui, &mut index, tabs.len(), |i| tabs[i].label())
+                        .changed()
+                    {
+                        self.widget_tab = tabs[index];
+                    }
 
                     ui.separator();
 
@@ -303,7 +311,7 @@ impl ThemeManager {
                 });
             });
         } else {
-            label("Select a preset and press Load.", ui);
+            ui.add(Label::new("Select a preset and press Load."));
         }
 
         // ── Derive update signal ──────────────────────────────────────────────
@@ -333,32 +341,32 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
     let mut changed = false;
 
     egui::Grid::new("visuals_grid").num_columns(2).spacing([12.0, 4.0]).show(ui, |ui| {
-        label("Dark mode", ui);
-        changed |= checkbox(ui, &mut v.dark_mode, "").changed();
+        ui.add(Label::new("Dark mode"));
+        changed |= ui.add(Checkbox::without_text(&mut v.dark_mode)).changed();
         ui.end_row();
 
-        label("Disabled alpha", ui);
-        changed |= slider_f32(ui, &mut v.disabled_alpha, 0.0..=1.0).changed();
+        ui.add(Label::new("Disabled alpha"));
+        changed |= ui.add(Slider::new(&mut v.disabled_alpha, 0.0..=1.0)).changed();
         ui.end_row();
 
-        label("Button frame", ui);
-        changed |= checkbox(ui, &mut v.button_frame, "").changed();
+        ui.add(Label::new("Button frame"));
+        changed |= ui.add(Checkbox::without_text(&mut v.button_frame)).changed();
         ui.end_row();
 
-        label("Striped", ui);
-        changed |= checkbox(ui, &mut v.striped, "").changed();
+        ui.add(Label::new("Striped"));
+        changed |= ui.add(Checkbox::without_text(&mut v.striped)).changed();
         ui.end_row();
 
-        label("Slider trailing fill", ui);
-        changed |= checkbox(ui, &mut v.slider_trailing_fill, "").changed();
+        ui.add(Label::new("Slider trailing fill"));
+        changed |= ui.add(Checkbox::without_text(&mut v.slider_trailing_fill)).changed();
         ui.end_row();
 
-        label("Window corner radius", ui);
-        changed |= slider_u8(ui, &mut v.window_corner_radius, 0..=24).changed();
+        ui.add(Label::new("Window corner radius"));
+        changed |= ui.add(Slider::new(&mut v.window_corner_radius, 0..=24)).changed();
         ui.end_row();
 
-        label("Menu corner radius", ui);
-        changed |= slider_u8(ui, &mut v.menu_corner_radius, 0..=24).changed();
+        ui.add(Label::new("Menu corner radius"));
+        changed |= ui.add(Slider::new(&mut v.menu_corner_radius, 0..=24)).changed();
         ui.end_row();
 
         for (label_, rgba) in [
@@ -371,19 +379,19 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
             ("Warn fg", &mut v.warn_fg_color),
             ("Error fg", &mut v.error_fg_color),
         ] {
-            label(label_, ui);
+            ui.add(Label::new(label_));
             changed |= rgba_edit(ui, rgba);
             ui.end_row();
         }
 
-        label("Override text", ui);
+        ui.add(Label::new("Override text"));
         if let Some(c) = v.override_text_color.as_mut() {
             let mut clear = false;
 
             ui.horizontal(|ui| {
                 changed |= rgba_edit(ui, c);
 
-                if ui.add(small_button("X")).clicked() {
+                if ui.add(Button::new("X").small()).clicked() {
                     clear = true;
                 }
             });
@@ -392,20 +400,20 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
                 v.override_text_color = None;
                 changed = true;
             }
-        } else if ui.add(small_button("+ Set")).clicked() {
+        } else if ui.add(Button::new("+ Set").small()).clicked() {
             v.override_text_color = Some(Rgba::new(255, 255, 255, 255));
             changed = true;
         }
         ui.end_row();
 
-        label("Text edit bg", ui);
+        ui.add(Label::new("Text edit bg"));
         if let Some(c) = v.text_edit_bg_color.as_mut() {
             let mut clear = false;
 
             ui.horizontal(|ui| {
                 changed |= rgba_edit(ui, c);
 
-                if ui.add(small_button("X")).clicked() {
+                if ui.add(Button::new("X").small()).clicked() {
                     clear = true;
                 }
             });
@@ -414,13 +422,13 @@ fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
                 v.text_edit_bg_color = None;
                 changed = true;
             }
-        } else if ui.add(small_button("+ Set")).clicked() {
+        } else if ui.add(Button::new("+ Set").small()).clicked() {
             v.text_edit_bg_color = Some(Rgba::new(255, 255, 255, 255));
             changed = true;
         }
         ui.end_row();
 
-        label("Window stroke", ui);
+        ui.add(Label::new("Window stroke"));
         changed |= stroke_edit(ui, &mut v.window_stroke);
         ui.end_row();
     });
@@ -432,24 +440,24 @@ fn widget_visuals_ui(ui: &mut egui::Ui, w: &mut WidgetVisualsConfig) -> bool {
     let mut changed = false;
 
     egui::Grid::new("widget_grid").num_columns(2).spacing([12.0, 4.0]).show(ui, |ui| {
-        label("bg fill", ui);
+        ui.add(Label::new("bg fill"));
         changed |= rgba_edit(ui, &mut w.bg_fill);
         ui.end_row();
 
-        label("weak bg fill", ui);
+        ui.add(Label::new("weak bg fill"));
         changed |= rgba_edit(ui, &mut w.weak_bg_fill);
         ui.end_row();
 
-        label("bg stroke", ui);
+        ui.add(Label::new("bg stroke"));
         changed |= stroke_edit(ui, &mut w.bg_stroke);
         ui.end_row();
 
-        label("fg stroke", ui);
+        ui.add(Label::new("fg stroke"));
         changed |= stroke_edit(ui, &mut w.fg_stroke);
         ui.end_row();
 
-        label("corner radius", ui);
-        changed |= slider_u8(ui, &mut w.corner_radius, 0..=24).changed();
+        ui.add(Label::new("corner radius"));
+        changed |= ui.add(Slider::new(&mut w.corner_radius, 0..=24)).changed();
         ui.end_row();
     });
 
@@ -481,13 +489,13 @@ fn shadcn_ui(ui: &mut egui::Ui, s: &mut ShadcnThemeConfig) -> bool {
             ("input", &mut s.input),
             ("ring", &mut s.ring),
         ] {
-            label(label_, ui);
+            ui.add(Label::new(label_));
             changed |= rgba_edit(ui, rgba);
             ui.end_row();
         }
 
-        label("radius", ui);
-        changed |= slider_f32(ui, &mut s.radius, 0.0..=32.0).changed();
+        ui.add(Label::new("radius"));
+        changed |= ui.add(Slider::new(&mut s.radius, 0.0..=32.0)).changed();
         ui.end_row();
     });
 
@@ -511,7 +519,7 @@ fn rgba_edit(ui: &mut egui::Ui, rgba: &mut Rgba) -> bool {
 fn stroke_edit(ui: &mut egui::Ui, stroke: &mut StrokeConfig) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
-        changed |= slider_f32(ui, &mut stroke.width, 0.0..=4.0).changed();
+        changed |= ui.add(Slider::new(&mut stroke.width, 0.0..=4.0)).changed();
         changed |= rgba_edit(ui, &mut stroke.color);
     });
     changed
@@ -522,88 +530,18 @@ fn stroke_edit(ui: &mut egui::Ui, stroke: &mut StrokeConfig) -> bool {
 /// Apply this preset to an egui `Context`.
 pub(crate) fn apply(preset: &ThemePreset, ctx: &egui::Context) {
     ctx.set_visuals(preset::to_egui_visuals(&preset.visuals));
-    ctx.set_style(egui::Style {
+    ctx.set_global_style(egui::Style {
         visuals: preset::to_egui_visuals(&preset.visuals),
         ..Default::default()
     });
 
-    ctx.set_shadcn_theme(preset::to_shadcn_theme(&preset.shadcn));
-}
-
-fn label(text: impl Into<String>, ui: &mut egui::Ui) -> egui::Response {
-    egui_shadcn::Label::new(text).show(ui)
-}
-
-fn slider_f32(
-    ui: &mut egui::Ui,
-    value: &mut f32,
-    range: std::ops::RangeInclusive<f32>,
-) -> egui::Response {
-    let before = *value;
-
-    let mut response = ui
-        .horizontal(|ui| {
-            let response = ui.add(egui_shadcn::Slider::f32(value, range));
-            ui.label(format!("{value:.2}"));
-
-            response
-        })
-        .inner;
-
-    // lint: Even if it can't be compared correctly, We'll just use it for the `changed` flag, so We'll ignore it.
-    #[allow(clippy::float_cmp)]
-    if *value != before {
-        response.mark_changed(); // egui_shadcn: To avoid no changed bug
-    }
-
-    response
-}
-
-fn slider_u8(
-    ui: &mut egui::Ui,
-    value: &mut u8,
-    range: std::ops::RangeInclusive<u8>,
-) -> egui::Response {
-    let before = *value;
-
-    let mut tmp = *value as f32;
-
-    let mut response = ui
-        .horizontal(|ui| {
-            let response = ui.add(
-                egui_shadcn::Slider::f32(&mut tmp, *range.start() as f32..=*range.end() as f32)
-                    .step(1.0),
-            );
-            ui.label(format!("{value}"));
-            *value = tmp.round() as u8;
-
-            response
-        })
-        .inner;
-
-    // egui_shadcn: To avoid no changed bug
-    if *value != before {
-        response.mark_changed();
-    }
-
-    response
-}
-
-fn toggle_group_widget_tab(ui: &mut egui::Ui, value: &mut WidgetTab) {
-    let Some(mut idx) = WidgetTab::ALL.iter().position(|tab| *tab == *value) else { return };
-
-    egui_shadcn::ToggleGroup::new(
-        WidgetTab::ALL.iter().map(|tab| tab.label().to_owned()).collect(),
-    )
-    .show(ui, &mut idx);
-
-    *value = WidgetTab::ALL[idx];
+    preset::to_shadcn_theme(&preset.shadcn).set(ctx);
 }
 
 fn dark_preset() -> ThemePreset {
     ThemePreset {
         visuals: preset::from_egui_visuals(&egui::Visuals::dark(), 1.0),
-        shadcn: preset::from_shadcn_theme(&egui_shadcn::theme::shadcn_theme_dark::dark()),
+        shadcn: preset::from_shadcn_theme(&ShadcnTheme::dark()),
     }
 }
 
@@ -611,6 +549,6 @@ fn dark_preset() -> ThemePreset {
 fn light_preset() -> ThemePreset {
     ThemePreset {
         visuals: preset::from_egui_visuals(&egui::Visuals::light(), 1.0),
-        shadcn: preset::from_shadcn_theme(&egui_shadcn::theme::shadcn_theme_light::light()),
+        shadcn: preset::from_shadcn_theme(&ShadcnTheme::light()),
     }
 }

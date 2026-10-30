@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// `(prefix, group_id)` → `base` lookup built from a finalized `AAConfig`.
-pub(crate) type BaseMap = rapidhash::fast::RapidHashMap<(Arc<str>, u64), u64>;
+pub(crate) type BaseMap = fast_hash::HashMap<(Arc<str>, u64), u64>;
 
 /// Builds the base lookup map from a finalized [`AAConfig`].
 ///
@@ -79,6 +79,10 @@ pub(crate) struct AAMod {
 
     /// Animation groups registered by this mod, sorted by `group_id`.
     pub groups: Vec<AAGroup>,
+
+    #[serde(skip)]
+    /// Priority of this mod. Used to sort mods into load order before assigning `mod_id`.
+    pub priority: usize,
 }
 
 /// Root configuration for the `fnis_aa` SKSE plugin.
@@ -156,7 +160,7 @@ impl AAConfig {
 /// Assigns `base` and `mod_id` for every group across all mods in load order.
 /// Slot 0 is always reserved for vanilla; custom slots start at 1.
 fn compute_bases(mods: &mut [AAMod]) {
-    let mut next_slot = rapidhash::fast::RapidHashMap::default();
+    let mut next_slot = fast_hash::HashMap::<_, _>::default();
 
     for (mod_id, aa_mod) in mods.iter_mut().enumerate() {
         aa_mod.mod_id = mod_id as u64;
@@ -218,11 +222,11 @@ pub(crate) fn build_aa_config_from_jobs(
     output_dir: &Path,
 ) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
-    let mut aa_mods = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
+    let mut aa_mods = IndexMap::<_, _, fast_hash::RandomState>::default();
 
     for job in jobs {
         let AnimIoJob::Hkx(ConversionJob {
-            kind: AnimKind::FnisAA { prefix, group_name, slot_count, .. },
+            kind: AnimKind::FnisAA { prefix, group_name, slot_count, priority, .. },
             ..
         }) = job
         else {
@@ -234,6 +238,7 @@ pub(crate) fn build_aa_config_from_jobs(
             name: Arc::clone(prefix),
             mod_id: 0, // assigned later by compute_bases()
             groups: vec![],
+            priority: *priority,
         });
 
         // Each group appears once per mod regardless of how many animation
@@ -246,6 +251,10 @@ pub(crate) fn build_aa_config_from_jobs(
             });
         }
     }
+
+    // NOTE: `jobs` come in the parallel completion order, which changes every run.
+    // Sort only the AA mods(not all jobs) into load order here, because `mod_id`/`base` and the CRC depend on it.
+    aa_mods.sort_unstable_by(|_, a, _, b| (a.priority, &a.prefix).cmp(&(b.priority, &b.prefix)));
 
     write_aa_config(aa_mods.into_values().collect(), output_dir)
 }
@@ -274,6 +283,7 @@ mod tests {
                 group_name,
                 slot_count,
                 is_male_subdir: false,
+                priority: 0,
             },
         })
     }
@@ -352,13 +362,12 @@ mod tests {
     }
 
     // Helper used by tests to inspect intermediate state without file I/O.
-    fn collect_aa_mods(
-        jobs: &[AnimIoJob],
-    ) -> IndexMap<Arc<str>, AAMod, rapidhash::fast::RandomState> {
-        let mut aa_mods = IndexMap::<_, _, rapidhash::fast::RandomState>::default();
+    fn collect_aa_mods(jobs: &[AnimIoJob]) -> IndexMap<Arc<str>, AAMod, fast_hash::RandomState> {
+        let mut aa_mods = IndexMap::<_, _, fast_hash::RandomState>::default();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
-                kind: AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false },
+                kind:
+                    AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false, priority },
                 ..
             }) = job
             else {
@@ -369,6 +378,7 @@ mod tests {
                 name: Arc::clone(prefix),
                 mod_id: 0,
                 groups: vec![],
+                priority: *priority,
             });
             if !aa_mod.groups.iter().any(|g| g.name == *group_name) {
                 aa_mod.groups.push(AAGroup { name: *group_name, base: 0, slot_count: *slot_count });

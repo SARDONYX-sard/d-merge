@@ -18,7 +18,7 @@ havok_classes = { workspace = true }
 indexmap = { workspace = true }
 jwalk = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
-rapidhash = { workspace = true }
+fast_hash = { workspace = true }
 rayon = { workspace = true }
 rmp-serde = { workspace = true }
 schemars = { version = "1.2.1", optional = true }
@@ -37,7 +37,7 @@ winnow_ext = { workspace = true }
 # workspace members
 auto_charset = { workspace = true }
 fnis_list = { workspace = true }
-json_patch = { workspace = true, features = ["rayon", "serde"] }
+json_patch = { workspace = true, features = ["serde"] }
 jwalk_glob = { workspace = true }
 nemesis_xml = { workspace = true }
 skyrim_anim_parser = { workspace = true, features = ["alt_map", "serde"] }

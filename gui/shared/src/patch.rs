@@ -15,16 +15,26 @@ use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
 use crate::i18n::I18nKey;
 
+/// Values of [`PatchProgress::phase`].
+///
+/// Progress phases are numbered in execution order, so they are also used as `[n/STEPS]`.
+pub mod phase {
+    pub const IDLE: u8 = 0;
+    pub const GENERATING_FNIS_PATCHES: u8 = 1;
+    pub const READING_PATCHES: u8 = 2;
+    pub const PARSING_PATCHES: u8 = 3;
+    pub const APPLYING_PATCHES: u8 = 4;
+    pub const GENERATING_HKX_FILES: u8 = 5;
+    pub const DONE: u8 = 6;
+    pub const ERROR: u8 = 7;
+
+    /// Number of steps shown as `[n/STEPS]`.
+    pub const STEPS: u8 = DONE;
+}
+
 #[derive(Debug, Default)]
 pub struct PatchProgress {
-    /// Current phase:
-    ///
-    /// 0 = idle
-    /// 1 = generating fnis patches
-    /// 2 = reading patches
-    /// 3 = parsing patches
-    /// 4 = applying patches
-    /// 5 = generating hkx files
+    /// Current phase. See [`phase`].
     pub phase: AtomicU8,
 
     /// Current item index within the phase.
@@ -54,7 +64,7 @@ impl PatchProgress {
     /// This operation is intentionally lock-free except for the rare
     /// `error` field.
     pub fn clear(&self) {
-        self.phase.store(0, Ordering::Relaxed);
+        self.phase.store(phase::IDLE, Ordering::Relaxed);
         self.index.store(0, Ordering::Relaxed);
         self.total.store(0, Ordering::Relaxed);
         *self.error.write() = None;
@@ -80,59 +90,33 @@ impl PatchProgress {
     /// stored outside the atomic hot path.
     pub fn text(&self, i18n: &crate::i18n::I18nMap, start_time: std::time::Instant) -> String {
         let snapshot = self.snapshot();
+        let steps = phase::STEPS;
+
+        let progress_key = match snapshot.phase {
+            phase::GENERATING_FNIS_PATCHES => Some(I18nKey::StatusGeneratingFnisPatches),
+            phase::READING_PATCHES => Some(I18nKey::StatusReadingPatches),
+            phase::PARSING_PATCHES => Some(I18nKey::StatusParsingPatches),
+            phase::APPLYING_PATCHES => Some(I18nKey::StatusApplyingPatches),
+            phase::GENERATING_HKX_FILES => Some(I18nKey::StatusGeneratingHkxFiles),
+            _ => None,
+        };
+        if let Some(key) = progress_key {
+            return format!(
+                "[{}/{steps}] {} ({}/{})",
+                snapshot.phase,
+                i18n.t(key),
+                snapshot.index,
+                snapshot.total,
+            );
+        }
 
         match snapshot.phase {
-            1 => {
-                format!(
-                    "[1/6] {} ({}/{})",
-                    i18n.t(I18nKey::StatusGeneratingFnisPatches),
-                    snapshot.index,
-                    snapshot.total,
-                )
-            }
-
-            2 => {
-                format!(
-                    "[2/6] {} ({}/{})",
-                    i18n.t(I18nKey::StatusReadingPatches),
-                    snapshot.index,
-                    snapshot.total,
-                )
-            }
-
-            3 => {
-                format!(
-                    "[3/6] {} ({}/{})",
-                    i18n.t(I18nKey::StatusParsingPatches),
-                    snapshot.index,
-                    snapshot.total,
-                )
-            }
-
-            4 => {
-                format!(
-                    "[4/6] {} ({}/{})",
-                    i18n.t(I18nKey::StatusApplyingPatches),
-                    snapshot.index,
-                    snapshot.total,
-                )
-            }
-
-            5 => {
-                format!(
-                    "[5/6] {} ({}/{})",
-                    i18n.t(I18nKey::StatusGeneratingHkxFiles),
-                    snapshot.index,
-                    snapshot.total,
-                )
-            }
-
-            6 => {
+            phase::DONE => {
                 let elapsed = start_time.elapsed().as_secs_f32();
-                format!("[6/6] {} ({elapsed:.2}s)", i18n.t(I18nKey::StatusDone),)
+                format!("[{steps}/{steps}] {} ({elapsed:.2}s)", i18n.t(I18nKey::StatusDone))
             }
 
-            7 => {
+            phase::ERROR => {
                 let elapsed = start_time.elapsed().as_secs_f32();
                 format!(
                     "[Error] {} ({elapsed:.2}s) {}",

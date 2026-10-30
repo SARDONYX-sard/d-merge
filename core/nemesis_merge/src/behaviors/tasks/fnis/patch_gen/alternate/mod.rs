@@ -172,6 +172,7 @@ pub(super) fn alt_anim_to_oar<'a>(
                             group_name: group_aa_name,
                             slot_count: registered_slots_count,
                             is_male_subdir,
+                            priority: owned_data.priority,
                         },
                     })
                 })

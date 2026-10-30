@@ -91,6 +91,7 @@
   "runtime_target_hover": "hkxの出力形式\n- SkyrimLE/Enderal: win32\n- SkyrimSE/SkyrimVR/EnderalSE: amd64\n\n注意\n- VFSモードかつWindows環境でこれを変更した場合、自動でレジストリを探索しSkyrim Dataディレクトリの更新も試みます",
   "runtime_target_label": "出力形式:",
   "search_label": "検索",
+  "search_hits_label": "件ヒット",
   "select_button": "選択",
   "selected_label": "選択中",
   "skyrim_data_dir_label": "Skyrim Dataディレクトリ:",

@@ -5,6 +5,7 @@ use std::sync::{Arc, atomic::Ordering};
 use d_merge_gui_shared::{
     i18n::I18nKey,
     mod_item::to_patches,
+    patch::phase,
     settings::{BehaviorSettings, DataMode},
 };
 use skyrim_data_dir::Runtime;
@@ -88,8 +89,8 @@ impl App {
             self.notify.set(text, self.patch_status.color());
         }
 
-        if matches!(self.patch_status.phase.load(Ordering::Relaxed), 6 | 7) {
-            self.patch_status.phase.store(0, Ordering::Relaxed);
+        if matches!(self.patch_status.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
+            self.patch_status.phase.store(phase::IDLE, Ordering::Relaxed);
             self.patch_start_time = None;
         }
     }
@@ -136,13 +137,13 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
         let old_phase = self.phase.load(Ordering::Relaxed);
 
         let new_phase = match &status {
-            nemesis_merge::Status::GeneratingFnisPatches { .. } => 1,
-            nemesis_merge::Status::ReadingPatches { .. } => 2,
-            nemesis_merge::Status::ParsingPatches { .. } => 3,
-            nemesis_merge::Status::ApplyingPatches { .. } => 4,
-            nemesis_merge::Status::GeneratingHkxFiles { .. } => 5,
-            nemesis_merge::Status::Done => 6,
-            nemesis_merge::Status::Error(_) => 7,
+            nemesis_merge::Status::GeneratingFnisPatches { .. } => phase::GENERATING_FNIS_PATCHES,
+            nemesis_merge::Status::ReadingPatches { .. } => phase::READING_PATCHES,
+            nemesis_merge::Status::ParsingPatches { .. } => phase::PARSING_PATCHES,
+            nemesis_merge::Status::ApplyingPatches { .. } => phase::APPLYING_PATCHES,
+            nemesis_merge::Status::GeneratingHkxFiles { .. } => phase::GENERATING_HKX_FILES,
+            nemesis_merge::Status::Done => phase::DONE,
+            nemesis_merge::Status::Error(_) => phase::ERROR,
         };
 
         self.phase.store(new_phase, Ordering::Relaxed);
@@ -164,7 +165,7 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
         // NOTE: Request a UI repaint when the phase changes or reaches a terminal state.
         // - If we do not do this, notifications that the patch has been applied may be significantly delayed.
         // - Comparing the status with the `old` phase is also important; without this, the UI will freeze.
-        if old_phase != new_phase || matches!(new_phase, 6 | 7) {
+        if old_phase != new_phase || matches!(new_phase, phase::DONE | phase::ERROR) {
             ctx.request_repaint();
         }
     }
@@ -174,13 +175,13 @@ impl EguiDisplay for Arc<d_merge_gui_shared::patch::PatchProgress> {
         let snapshot = self.snapshot();
 
         match snapshot.phase {
-            1 => egui::Color32::from_rgb(120, 170, 255),
-            2 => NotificationColor::RIGHT_BLUE,
-            3 => egui::Color32::from_rgb(140, 200, 255),
-            4 => egui::Color32::from_rgb(255, 170, 120),
-            5 => egui::Color32::from_rgb(200, 140, 255),
-            6 => egui::Color32::GREEN,
-            7 => egui::Color32::RED,
+            phase::GENERATING_FNIS_PATCHES => egui::Color32::from_rgb(120, 170, 255),
+            phase::READING_PATCHES => NotificationColor::RIGHT_BLUE,
+            phase::PARSING_PATCHES => egui::Color32::from_rgb(140, 200, 255),
+            phase::APPLYING_PATCHES => egui::Color32::from_rgb(255, 170, 120),
+            phase::GENERATING_HKX_FILES => egui::Color32::from_rgb(200, 140, 255),
+            phase::DONE => egui::Color32::GREEN,
+            phase::ERROR => egui::Color32::RED,
             _ => egui::Color32::WHITE,
         }
     }

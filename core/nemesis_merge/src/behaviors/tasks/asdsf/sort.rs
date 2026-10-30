@@ -1,8 +1,6 @@
-use std::{
-    borrow::Cow,
-    collections::{HashMap, hash_map::Entry},
-};
+use std::borrow::Cow;
 
+use fast_hash::{HashMap, hash_map::Entry};
 use rayon::prelude::*;
 
 use super::{AsdsfPatch, PatchKind};
@@ -24,7 +22,7 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
 ) -> Vec<AsdsfPatch<'a>> {
     patches
         .into_par_iter()
-        .fold(HashMap::new, |mut map: HashMap<PatchKey<'_>, AsdsfPatch<'a>>, patch| {
+        .fold(HashMap::default, |mut map: HashMap<PatchKey<'_>, AsdsfPatch<'a>>, patch| {
             let key = match &patch.patch {
                 PatchKind::EditAnimSet(edit) => {
                     PatchKey::EditAnim(patch.target, patch.id, edit.file_name)
@@ -54,7 +52,7 @@ pub(super) fn dedup_patches_by_priority_parallel<'a>(
 
             map
         })
-        .reduce(HashMap::new, |mut map1, map2| {
+        .reduce(HashMap::default, |mut map1, map2| {
             for (key, patch2) in map2 {
                 match map1.entry(key) {
                     std::collections::hash_map::Entry::Occupied(mut entry) => {

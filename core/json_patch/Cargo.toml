@@ -26,7 +26,7 @@ winnow = { workspace = true }
 workspace = true
 
 [features]
-default = ["rayon"] # for debug
+default = [] # for debug
 # default = ["tracing", "rayon"] # for debug
 tracing = ["dep:tracing"]
 serde = ["dep:serde"]

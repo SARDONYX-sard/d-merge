@@ -1,5 +1,6 @@
 use std::{borrow::Cow, path::PathBuf};
 
+use fast_hash::HashSet;
 use fnis_list::{
     FNISList, SyntaxPattern,
     combinator::{Trigger, fnis_animation::FNISAnimation},
@@ -9,7 +10,6 @@ use fnis_list::{
     },
 };
 use json_patch::{JsonPath, ValueWithPriority};
-use rapidhash::fast::RapidHashSet as HashSet;
 use rayon::prelude::*;
 use skyrim_anim_parser::adsf::normal::{ClipAnimDataBlock, ClipMotionBlock, Rotation};
 
@@ -27,7 +27,7 @@ use crate::behaviors::tasks::{
     },
 };
 
-type DashSet<K> = dashmap::DashSet<K, rapidhash::fast::RandomState>;
+type DashSet<K> = dashmap::DashSet<K, fast_hash::RandomState>;
 
 /// A patch with borrowed references to a single FNIS_*_List.txt file.
 #[derive(Debug)]

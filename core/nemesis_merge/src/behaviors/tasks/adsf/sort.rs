@@ -1,4 +1,4 @@
-use rapidhash::fast::RapidHashMap as HashMap;
+use fast_hash::HashMap;
 use rayon::prelude::*;
 
 use super::{AdsfPatch, PatchKind};

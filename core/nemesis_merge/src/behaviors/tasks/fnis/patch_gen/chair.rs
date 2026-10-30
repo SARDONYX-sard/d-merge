@@ -62,7 +62,7 @@ pub(super) fn new_chair_patches<'a>(
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
     let class_index_to_anim_object_map =
-        dashmap::DashMap::<_, _, rapidhash::fast::RandomState>::default();
+        dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
     one_patches.extend(start_animation.anim_objects.iter().enumerate().map(|(index, name)| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
         class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
@@ -631,7 +631,7 @@ pub(super) fn new_chair_patches<'a>(
 #[must_use]
 fn new_event_property_array_ri1<'a>(
     class_index: &str,
-    class_index_to_anim_object_map: &dashmap::DashMap<usize, String, rapidhash::fast::RandomState>,
+    class_index_to_anim_object_map: &dashmap::DashMap<usize, String, fast_hash::RandomState>,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let events: Vec<_> = class_index_to_anim_object_map

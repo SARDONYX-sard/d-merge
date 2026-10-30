@@ -1,8 +1,9 @@
 pub mod class_table;
 mod current_state;
 
-use std::{collections::HashMap, mem};
+use std::mem;
 
+use fast_hash::HashMap;
 use json_patch::{Action, JsonPatch, JsonPath, Op};
 use rayon::prelude::*;
 use serde_hkx::xml::de::parser::type_kind::{boolean, real, string};
@@ -88,7 +89,7 @@ impl<'de> PatchDeserializer<'de> {
         Self {
             input,
             original: input,
-            output_patches: HashMap::new(),
+            output_patches: HashMap::default(),
             hack_options,
             field_infos: Vec::new(),
             current: CurrentState::new(),
@@ -729,7 +730,7 @@ mod tests {
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         // if map.contain_keys() {}
 
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
         hash_map.insert(
             json_path!["#0010", "hkbProjectData", "stringData"],
             JsonPatch { action: Action::Pure { op: Op::Replace }, value: "$id".into() },
@@ -781,7 +782,7 @@ mod tests {
 "###;
 
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
 
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
@@ -831,7 +832,7 @@ mod tests {
 		</hkobject>
 "###;
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
 
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
@@ -886,7 +887,7 @@ mod tests {
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path!["#0009", "hkbProjectStringData", "characterFilenames"];
 
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
 
         hash_map.insert(
             json_path,
@@ -919,7 +920,7 @@ mod tests {
 "###;
         let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
         let json_path = json_path!["#0008", "hkRootLevelContainer", "namedVariants", "[0]", "name"];
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
 
         hash_map.insert(
             json_path.clone(),
@@ -963,7 +964,7 @@ mod tests {
         let json_path =
             json_path!["#2521", "BSRagdollContactListenerModifier", "contactEvent", "id"];
 
-        let mut hash_map = HashMap::new();
+        let mut hash_map = HashMap::default();
 
         hash_map.insert(
             json_path,
@@ -992,7 +993,7 @@ mod tests {
         )
         .unwrap_or_else(|e| panic!("{e}"));
 
-        let mut expected = HashMap::new();
+        let mut expected = HashMap::default();
         expected.insert(
             json_path!["#0119", "hkbBoneWeightArray", "boneWeights"],
             JsonPatch {

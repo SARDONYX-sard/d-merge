@@ -10,6 +10,7 @@
   ],
   "type": "module",
   "scripts": {
+    "build:egui": "cargo build -p d_merge_egui --profile release-no-lto",
     "build": "rimraf ./gui/tauri/frontend/out && tauri build --no-bundle -- --profile release-no-lto",
     "build:release": "rimraf ./gui/tauri/frontend/out && tauri build --no-bundle -- --profile release",
     "build:front": "npm --workspace gui/tauri/frontend run build:front",
@@ -29,7 +30,7 @@
     "@types/node": "26.6.4",
     "rimraf": "^6",
     "typescript": "^7.0.2",
-    "vite-plus": "1.3.0",
+    "vite-plus": "1.4.0",
     "why-is-node-running": "^3.2.2"
   },
   "overrides": {
@@ -37,7 +38,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
   },
   "packageManager": "npm@11.5.2"
 }
