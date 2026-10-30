@@ -33,10 +33,12 @@ runs:
         sudo apt-get install -y \
           build-essential \
           curl \
-          wget \
           file \
+          libssl-dev \
+          libwayland-dev \
           libxdo-dev \
-          libssl-dev
+          pkg-config \
+          wget
 
     - name: Rust setup
       uses: dtolnay/rust-toolchain@stable
