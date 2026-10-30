@@ -13,20 +13,15 @@ rust-version = "1.95"
 
 
 [workspace]
-members = [
-  "core/*",
-  #
-  "gui/egui",
-  "gui/shared",
-  "gui/shared_derive",
-]
+members = ["crates/core/*", "crates/gui/*", "xtask"]
 resolver = "3"
-default-members = ["gui/egui"]
+default-members = ["crates/gui/d_merge"]
 
 
 [workspace.dependencies]
 bitflags = "2.13.2"
 dashmap = { version = "6.2.1" }
+egui = { version = "0.37.0" } # GUI widgets (shared by the gui crates; eframe stays in the app crate)
 educe = { version = "0.8.1" }
 futures = { version = "0.3.34" }
 indexmap = { version = "2.14.2", features = ["rayon"] }
@@ -63,24 +58,30 @@ pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-fast_hash = { path = "./core/fast_hash" }
-fnis_list = { path = "./core/fnis_list" }
-gh_issue_link = { path = "./core/gh_issue_link" }
-hkanno_lsp = { path = "./core/hkanno_lsp" }
-json_patch = { path = "./core/json_patch" }
-jwalk_glob = { path = "./core/jwalk_glob" }
-mod_info = { path = "./core/mod_info" }
-nemesis_merge = { path = "./core/nemesis_merge" }
-nemesis_xml = { path = "./core/nemesis_xml" }
-node_expr = { path = "./core/node_expr" }
-serde_hkx_for_gui = { path = "./core/serde_hkx_for_gui" }
-skyrim_anim_parser = { path = "./core/skyrim_anim_parser" }
-skyrim_crc = { path = "./core/skyrim_crc" }
-skyrim_data_dir = { path = "./core/skyrim_data_dir" }
-skyrim_esp = { path = "./core/skyrim_esp" }
-tracing_rotation = { path = "./core/tracing_rotation" }
+fast_hash = { path = "./crates/core/fast_hash" }
+fnis_list = { path = "./crates/core/fnis_list" }
+fnis_patch_gen = { path = "./crates/core/fnis_patch_gen" }
+gh_issue_link = { path = "./crates/gui/gh_issue_link" }
+hkanno_lsp = { path = "./crates/gui/hkanno_lsp" }
+json_patch = { path = "./crates/core/json_patch" }
+jwalk_glob = { path = "./crates/core/jwalk_glob" }
+mod_info = { path = "./crates/gui/mod_info" }
+behavior_merge = { path = "./crates/core/behavior_merge" }
+behavior_merge_types = { path = "./crates/core/behavior_merge_types" }
+nemesis_xml = { path = "./crates/core/nemesis_xml" }
+node_expr = { path = "./crates/gui/node_expr" }
+serde_hkx_for_gui = { path = "./crates/gui/serde_hkx_for_gui" }
+skyrim_anim_data = { path = "./crates/core/skyrim_anim_data" }
+skyrim_crc = { path = "./crates/core/skyrim_crc" }
+skyrim_data_dir = { path = "./crates/gui/skyrim_data_dir" }
+skyrim_esp = { path = "./crates/core/skyrim_esp" }
+tracing_rotation = { path = "./crates/gui/tracing_rotation" }
 
-d_merge_gui_shared = { path = "./gui/shared" }
+gui_shared = { path = "./crates/gui/gui_shared" }
+egui_widgets = { path = "./crates/gui/egui_widgets" }
+egui_code_editor = { path = "./crates/gui/egui_code_editor" }
+page_convert = { path = "./crates/gui/page_convert" }
+page_hkanno = { path = "./crates/gui/page_hkanno" }
 
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.

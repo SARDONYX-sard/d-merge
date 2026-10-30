@@ -1,0 +1,334 @@
+//! # Patch Maps
+//!
+//! This module provides two map structures for managing JSON patches:
+//!
+//! - [`OnePatchMap`]: Maintains a mapping from JSON paths to a **single** value with a priority.
+//! - [`SeqPatchMap`]: Maintains a mapping from JSON paths to a **list** of values, supporting parallel insertion and extension.
+//!
+//! Both maps utilize `DashMap` for concurrent access and integrate with the `json_patch` crate.
+//!
+//! These are ideal for use-cases where patches must be merged, prioritized, or combined from multiple threads.
+
+use dashmap::DashMap;
+use json_patch::{JsonPath, ValueWithPriority};
+use rayon::prelude::*;
+
+/// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
+///
+/// This is useful when you want to manage both *single-value patches*
+/// and *multi-value patches* in the same context.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct HkxPatchMaps<'a> {
+    /// Stores one value per path (highest priority wins).
+    #[serde(bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))]
+    pub one: OnePatchMap<'a>,
+    /// Stores multiple values per path.
+    #[serde(bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))]
+    pub seq: SeqPatchMap<'a>,
+}
+
+impl<'a> HkxPatchMaps<'a> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.one.len() + self.seq.0.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn merge(&self, other: Self) {
+        self.one.merge(other.one);
+        self.seq.merge(other.seq);
+    }
+}
+
+/// Inserts a patch into the map.
+///
+/// Conflict resolution rules:
+///
+/// 1. If the exact JSON path already exists,
+///    the patch with the highest priority is retained.
+///
+/// 2. All other paths are inserted normally.
+///
+/// This method is thread-safe and may be called concurrently.
+#[derive(Debug, Clone, Default)]
+pub struct OnePatchMap<'a> {
+    /// Stores the final patch selected for each JSON path.
+    ///
+    /// If multiple patches target the same path, only the patch with the
+    /// highest priority is retained.
+    patches: DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState>,
+}
+
+impl<'a> OnePatchMap<'a> {
+    /// Inserts a patch into the map.
+    ///
+    /// If the path already exists, the patch with the highest priority is kept.
+    ///
+    /// Additionally, top-level class-add patches (`/#0000/ClassName`) are
+    /// treated as unique per object id. When multiple class-add patches target
+    /// the same object id, only the highest-priority patch is retained.
+    ///
+    /// This method is safe to call concurrently.
+    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+        // Same-path conflict.
+        if let Some(mut existing) = self.patches.get_mut(&key) {
+            if new_value.priority > existing.priority {
+                tracing::info!(
+                    "Conflict Path {key:?}: priority {} -> {} (overwritten)",
+                    new_value.priority,
+                    existing.priority,
+                );
+
+                *existing = new_value;
+            }
+
+            return;
+        }
+        self.patches.insert(key, new_value);
+    }
+
+    /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
+    pub fn merge(&self, other: Self) {
+        for (path, new_val) in other.patches {
+            match self.patches.entry(path) {
+                dashmap::Entry::Occupied(mut occ) => {
+                    let existing = occ.get_mut();
+                    if new_val.priority > existing.priority {
+                        *existing = new_val;
+                    }
+                }
+                dashmap::Entry::Vacant(v) => {
+                    v.insert(new_val);
+                }
+            }
+        }
+    }
+
+    /// Inserts patches in parallel without conflict resolution.
+    ///
+    /// This method bypasses `insert()` and directly inserts entries into the
+    /// underlying `DashMap`.
+    ///
+    /// # Requirements
+    ///
+    /// - No duplicate JSON paths may exist.
+    /// - No class conflicts may exist.
+    /// - Priority comparison is not performed.
+    ///
+    /// This method should only be used when all patches are known to be unique additions.
+    ///
+    /// For example, FNIS patches only performs additional operations, and this makes it very useful.
+    pub fn par_extend<I>(&mut self, patches: I)
+    where
+        I: IntoParallelIterator<Item = (JsonPath<'a>, ValueWithPriority<'a>)>,
+    {
+        self.patches.par_extend(patches);
+    }
+
+    /// Returns the number of patches stored in this map.
+    pub fn len(&self) -> usize {
+        self.patches.len()
+    }
+
+    /// Returns `true` if no patch is stored.
+    pub fn is_empty(&self) -> bool {
+        self.patches.is_empty()
+    }
+
+    /// Consumes this map and returns the underlying `DashMap` of patches.
+    pub fn into_inner(
+        self,
+    ) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
+        self.patches
+    }
+}
+
+/// A map that stores array field patches per JSON path,
+/// allowing parallel insertion and extension.
+#[derive(Debug, Clone, Default)]
+pub struct SeqPatchMap<'a>(
+    pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, fast_hash::RandomState>,
+);
+
+impl<'a> SeqPatchMap<'a> {
+    /// Inserts a value for the given JSON path.
+    ///
+    /// - If the path already has an entry, the new value is pushed to the list.
+    /// - Otherwise, a new list is created with the value.
+    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+        match self.0.entry(key) {
+            dashmap::Entry::Occupied(mut existing) => {
+                existing.get_mut().push(new_value);
+            }
+            dashmap::Entry::Vacant(v) => {
+                v.insert(vec![new_value]);
+            }
+        }
+    }
+
+    /// Extends the list of values for the given JSON path.
+    pub fn merge(&self, other: Self) {
+        for (path, other_vals) in other.0 {
+            match self.0.entry(path) {
+                dashmap::Entry::Occupied(mut occ) => {
+                    occ.get_mut().par_extend(other_vals);
+                }
+                dashmap::Entry::Vacant(v) => {
+                    v.insert(other_vals);
+                }
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// serde implementations
+//
+// Why:
+// We implement `Serialize` and `Deserialize` manually because the `JsonPath<'a>` key
+// is a `Vec<Cow<'a, str>>`. In JSON, map keys must be strings, so we encode
+// the path as a slash-separated `String` (e.g., `"#0001/hkbProjectData/[0:10]"`).
+// Without this manual implementation, `serde` would try to encode the key
+// as an array (`["#0001", "hkbProjectData", "[0:10]"]`), which is not
+// valid for JSON object keys.
+
+impl<'a> serde::Serialize for OnePatchMap<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(self.patches.len()))?;
+        for item in self.patches.iter() {
+            let joined = item.key().join("/"); // JsonPath -> "a/b/c"
+            map.serialize_entry(&joined, item.value())?;
+        }
+        map.end()
+    }
+}
+
+impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor<'a> {
+            marker: std::marker::PhantomData<&'a ()>,
+        }
+
+        impl<'de: 'a, 'a> serde::de::Visitor<'de> for Visitor<'a> {
+            type Value = OnePatchMap<'a>;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("a map with slash-separated json paths as keys")
+            }
+
+            fn visit_map<M>(self, mut access: M) -> Result<OnePatchMap<'a>, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                let patches = DashMap::<_, _, fast_hash::RandomState>::default();
+                while let Some((key, value)) =
+                    access.next_entry::<String, ValueWithPriority<'de>>()?
+                {
+                    let json_path =
+                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                    patches.insert(json_path, value);
+                }
+                Ok(OnePatchMap { patches })
+            }
+        }
+
+        deserializer.deserialize_map(Visitor { marker: std::marker::PhantomData })
+    }
+}
+
+impl<'a> serde::Serialize for SeqPatchMap<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
+        for item in self.0.iter() {
+            let joined = item.key().join("/"); // "a/b/c"
+            map.serialize_entry(&joined, item.value())?;
+        }
+        map.end()
+    }
+}
+
+impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor<'a> {
+            marker: std::marker::PhantomData<&'a ()>,
+        }
+
+        impl<'de: 'a, 'a> serde::de::Visitor<'de> for Visitor<'a> {
+            type Value = SeqPatchMap<'a>;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("a map with slash-separated JSON path keys and value arrays")
+            }
+
+            fn visit_map<M>(self, mut access: M) -> Result<SeqPatchMap<'a>, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                let map = DashMap::<_, _, fast_hash::RandomState>::default();
+
+                while let Some((key, value)) =
+                    access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?
+                {
+                    let json_path =
+                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                    map.insert(json_path, value);
+                }
+
+                Ok(SeqPatchMap(map))
+            }
+        }
+
+        deserializer.deserialize_map(Visitor { marker: std::marker::PhantomData })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn value(priority: usize) -> ValueWithPriority<'static> {
+        ValueWithPriority {
+            patch: json_patch::JsonPatch {
+                action: json_patch::Action::Pure { op: json_patch::Op::Add },
+                value: "test".into(),
+            },
+            priority,
+        }
+    }
+
+    #[test]
+    fn should_not_treat_nested_paths_as_class_adds() {
+        let map = OnePatchMap::default();
+
+        let path1 = json_patch::json_path!["#5176", "ClassA", "field1",];
+        let path2 = json_patch::json_path!["#5176", "ClassB", "field2",];
+
+        map.insert(path1.clone(), value(10));
+        map.insert(path2.clone(), value(20));
+
+        assert_eq!(map.len(), 2);
+        assert!(map.patches.contains_key(&path1));
+        assert!(map.patches.contains_key(&path2));
+    }
+}

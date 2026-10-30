@@ -1,0 +1,54 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+description = "Repository tasks: release, tags and code/asset generation (`cargo x help`)"
+publish = false
+
+authors.workspace = true
+edition.workspace = true
+license = "MIT OR Apache-2.0"
+repository.workspace = true
+rust-version.workspace = true
+
+# NOTE: `cargo x release` must stay fast, so the heavy crates are only built for `cargo x gen ..`
+#       (the `gen` feature; `cargo x gen` turns it on by itself).
+[dependencies]
+# gen
+havok_classes = { workspace = true, optional = true }
+rayon = { workspace = true, optional = true }
+rmp-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_hkx = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true, features = ["preserve_order"] }
+serde_hkx_features = { workspace = true, optional = true, features = ["extra_fmt", "serde_default"] }
+
+# workspace members (gen)
+behavior_merge = { workspace = true, optional = true }
+behavior_merge_types = { workspace = true, optional = true }
+skyrim_anim_data = { workspace = true, optional = true, features = ["alt_map", "serde"] }
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[[bin]]
+name = "xtask-gen"
+path = "src/generate/main.rs"
+required-features = ["gen"]
+
+[features]
+gen = [
+  "dep:havok_classes",
+  "dep:behavior_merge",
+  "dep:behavior_merge_types",
+  "dep:rayon",
+  "dep:rmp-serde",
+  "dep:serde",
+  "dep:serde_hkx",
+  "dep:serde_json",
+  "dep:serde_hkx_features",
+  "dep:skyrim_anim_data",
+]
+
+[lints]
+workspace = true

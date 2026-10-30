@@ -1,0 +1,239 @@
+//! Behavior-generation (patch) runner.
+
+use std::sync::{Arc, atomic::Ordering};
+
+use behavior_merge::PatchMaps;
+use gui_shared::{
+    i18n::I18nKey,
+    mod_item::ModItem,
+    patch::phase,
+    settings::{BehaviorSettings, DataMode, behavior::ParserMode},
+};
+use mod_info::ModType;
+use rayon::{iter::Either, prelude::*};
+use skyrim_data_dir::Runtime;
+
+use crate::{app::App, ui::notify::NotificationColor};
+
+impl App {
+    pub(crate) fn patch(&mut self, ctx: &egui::Context) {
+        self.patch_start_time = Some(std::time::Instant::now());
+        self.patch_status.clear();
+
+        if self.settings.behavior.auto_remove_meshes {
+            self.remove_meshes_dir_all();
+        }
+
+        let (skyrim_data_dir, is_vfs, mod_list) = match self.settings.behavior.mode {
+            DataMode::Vfs => {
+                (&self.settings.vfs.skyrim_data_dir, true, &self.settings.vfs.mod_list)
+            }
+            DataMode::Manual => {
+                (&self.settings.manual.skyrim_data_dir, false, &self.settings.manual.mod_list)
+            }
+        };
+        let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
+
+        let BehaviorSettings {
+            target_runtime,
+            enable_debug_output,
+            generate_fnis_esp,
+            skeleton_arm_fix,
+            template_dir,
+            ..
+        } = &self.settings.behavior;
+        let enable_debug_output = *enable_debug_output;
+        let output_target = match target_runtime {
+            Runtime::Le | Runtime::Enderal => behavior_merge::OutPutTarget::SkyrimLe,
+            Runtime::Se | Runtime::EnderalSe | Runtime::Vr => {
+                behavior_merge::OutPutTarget::SkyrimSe
+            }
+        };
+
+        let patch_status = Arc::clone(&self.patch_status);
+
+        let debug = behavior_merge::DebugOptions {
+            output_patch_json: enable_debug_output,
+            output_merged_json: enable_debug_output,
+            output_merged_xml: enable_debug_output,
+        };
+
+        let ctx = ctx.clone();
+        let config = behavior_merge::Config {
+            resource_dir: template_dir.to_string().into(),
+            output_dir: self.settings.current_output_dir().to_owned().into(),
+            output_target,
+            status_report: Some(Box::new(move |status| patch_status.apply(status, &ctx))),
+            parser_mode: to_nemesis_parser_mode(self.settings.behavior.parser_mode),
+            hack_options: Some(behavior_merge::HackOptions::enable_all()),
+            debug,
+            skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
+            generate_fnis_esp: *generate_fnis_esp,
+            skeleton_arm_fix: *skeleton_arm_fix,
+        };
+
+        self.async_rt.spawn(behavior_merge::behavior_gen(patches, config));
+    }
+
+    /// Polls the patch status written by the `status_report` callback and
+    /// forwards it to the notification bar.
+    ///
+    /// # Notes
+    /// Must be called once per frame from [`eframe::App::update`].
+    /// Short-circuits immediately when no patch is in progress
+    /// (`patch_start_time` is `None`), keeping the happy-path cost to a
+    /// single `Option` check.
+    pub(crate) fn poll_patch_result(&mut self) {
+        // Check start_time first to avoid an unnecessary RwLock read every frame.
+        let Some(start_time) = self.patch_start_time else {
+            return;
+        };
+
+        let text = self.patch_status.text(&self.i18n, start_time);
+        if !text.is_empty() {
+            self.notify.set(text, self.patch_status.color());
+        }
+
+        if matches!(self.patch_status.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
+            self.patch_status.phase.store(phase::IDLE, Ordering::Relaxed);
+            self.patch_start_time = None;
+        }
+    }
+
+    fn remove_meshes_dir_all(&mut self) {
+        let output_dir = self.settings.current_output_dir().to_owned();
+        let skyrim_data_dir = self.settings.current_skyrim_data_dir();
+
+        if behavior_merge::cache_remover::is_dangerous_remove(&output_dir, skyrim_data_dir) {
+            tracing::warn!(
+                "0/6: `auto remove meshes` is enabled but output dir equals the Skyrim data \
+                 directory — skipping to avoid destroying installed mods."
+            );
+            return;
+        }
+
+        self.notify.info(format!(
+            "0/6: {} `{output_dir}/meshes`",
+            self.i18n.t(I18nKey::RemovingMeshesMessage)
+        ));
+        behavior_merge::cache_remover::remove_meshes_dir_all(output_dir);
+    }
+}
+
+trait EguiDisplay {
+    fn apply(&self, status: behavior_merge::Status, ctx: &egui::Context);
+    fn color(&self) -> egui::Color32;
+}
+
+impl EguiDisplay for Arc<gui_shared::patch::PatchProgress> {
+    /// Applies a new patch-generation status emitted by
+    /// `behavior_merge::behavior_gen`.
+    ///
+    /// High-frequency progress updates are written into atomics so the egui
+    /// render loop can poll them without lock contention.
+    ///
+    /// Terminal states:
+    /// - `Done`
+    /// - `Error`
+    ///
+    /// are stored separately because they occur rarely compared to normal
+    /// progress updates.
+    fn apply(&self, status: behavior_merge::Status, ctx: &egui::Context) {
+        let old_phase = self.phase.load(Ordering::Relaxed);
+
+        let new_phase = match &status {
+            behavior_merge::Status::GeneratingFnisPatches { .. } => phase::GENERATING_FNIS_PATCHES,
+            behavior_merge::Status::ReadingPatches { .. } => phase::READING_PATCHES,
+            behavior_merge::Status::ParsingPatches { .. } => phase::PARSING_PATCHES,
+            behavior_merge::Status::ApplyingPatches { .. } => phase::APPLYING_PATCHES,
+            behavior_merge::Status::GeneratingHkxFiles { .. } => phase::GENERATING_HKX_FILES,
+            behavior_merge::Status::Done => phase::DONE,
+            behavior_merge::Status::Error(_) => phase::ERROR,
+        };
+
+        self.phase.store(new_phase, Ordering::Relaxed);
+
+        match status {
+            behavior_merge::Status::GeneratingFnisPatches { index, total }
+            | behavior_merge::Status::ReadingPatches { index, total }
+            | behavior_merge::Status::ParsingPatches { index, total }
+            | behavior_merge::Status::ApplyingPatches { index, total }
+            | behavior_merge::Status::GeneratingHkxFiles { index, total } => {
+                self.index.store(index, Ordering::Relaxed);
+                self.total.store(total, Ordering::Relaxed);
+            }
+
+            behavior_merge::Status::Done => {}
+            behavior_merge::Status::Error(err) => *self.error.write() = Some(err),
+        }
+
+        // NOTE: Request a UI repaint when the phase changes or reaches a terminal state.
+        // - If we do not do this, notifications that the patch has been applied may be significantly delayed.
+        // - Comparing the status with the `old` phase is also important; without this, the UI will freeze.
+        if old_phase != new_phase || matches!(new_phase, phase::DONE | phase::ERROR) {
+            ctx.request_repaint();
+        }
+    }
+
+    /// Returns the current UI color associated with the active patch phase.
+    fn color(&self) -> egui::Color32 {
+        let snapshot = self.snapshot();
+
+        match snapshot.phase {
+            phase::GENERATING_FNIS_PATCHES => egui::Color32::from_rgb(120, 170, 255),
+            phase::READING_PATCHES => NotificationColor::RIGHT_BLUE,
+            phase::PARSING_PATCHES => egui::Color32::from_rgb(140, 200, 255),
+            phase::APPLYING_PATCHES => egui::Color32::from_rgb(255, 170, 120),
+            phase::GENERATING_HKX_FILES => egui::Color32::from_rgb(200, 140, 255),
+            phase::DONE => egui::Color32::GREEN,
+            phase::ERROR => egui::Color32::RED,
+            _ => egui::Color32::WHITE,
+        }
+    }
+}
+
+/// Settings enum -> `behavior_merge` enum.
+///
+/// Lives here (not in `gui_shared`) so that the settings crate does not depend on
+/// the heavy `behavior_merge`.
+const fn to_nemesis_parser_mode(mode: ParserMode) -> behavior_merge::ParserMode {
+    match mode {
+        ParserMode::Strict => behavior_merge::ParserMode::Strict,
+        ParserMode::Lenient => behavior_merge::ParserMode::Lenient,
+    }
+}
+
+/// Converts the enabled mods into `behavior_merge`'s input.
+///
+/// IDs become what `behavior_merge` expects:
+/// - Nemesis/FNIS (manual): e.g. `aaaa`
+/// - Nemesis (vfs): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+/// - FNIS: always the bare id
+fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
+    let (nemesis_entries, fnis_entries) =
+        mod_infos.par_iter().filter(|item| item.enabled).partition_map(|mod_item| {
+            let ModItem { id, priority, mod_type, .. } = mod_item;
+            let priority = *priority;
+
+            match mod_type {
+                ModType::Nemesis => {
+                    let id = if is_vfs {
+                        format!("{skyrim_data_dir}/Nemesis_Engine/mod/{id}")
+                    } else {
+                        id.clone()
+                    };
+                    Either::Left((id, priority))
+                }
+                ModType::NemesisExt => {
+                    let id = if is_vfs {
+                        format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/{id}")
+                    } else {
+                        id.clone()
+                    };
+                    Either::Left((id, priority))
+                }
+                ModType::Fnis => Either::Right((id.clone(), priority)),
+            }
+        });
+    PatchMaps { nemesis_entries, fnis_entries }
+}

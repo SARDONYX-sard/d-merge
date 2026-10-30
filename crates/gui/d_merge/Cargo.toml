@@ -1,0 +1,82 @@
+[package]
+name = "d_merge"
+version.workspace = true
+description = "Diff & Merge hkx patcher"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license = "GPL-3.0-or-later"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+
+[build-dependencies]
+winres = "0.1.12"
+
+
+[dependencies]
+# Fixed version. To avoid scroll crash bug
+# NOTE: eframe 0.37 switched the default renderer to wgpu; keep glow as the default (wgpu is opt-in via `wgpu` feature).
+# OS-specific features are added in the `[target.'cfg(..)'.dependencies]` sections below.
+eframe = { version = "0.37.0", default-features = false, features = [
+  "accesskit",
+  "clipboard",
+  "default_fonts",
+  "glow",
+  "links",
+] }
+egui = { workspace = true, features = ["monochrome_emoji_fonts"] }
+egui_dnd = "0.18.0"
+egui_extras = "0.37.0"
+egui_router = "0.10.0"
+image = { version = "0.25.10", features = ["jpeg", "png"] }
+# ---
+
+dashmap = { workspace = true }
+dark-light = "3.0.0"
+font-kit = "0.14.3"
+mimalloc = { version = "0.1.52", optional = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+fast_hash = { workspace = true }
+snafu = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# workspace members
+egui_widgets = { workspace = true }
+page_convert = { workspace = true }
+page_hkanno = { workspace = true }
+mod_info = { workspace = true }
+behavior_merge = { workspace = true, features = ["tracing"] }
+skyrim_data_dir = { workspace = true, features = ["serde"] }
+tracing_rotation = { workspace = true }
+gui_shared = { path = "../gui_shared", features = ["tracing"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.17.2", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["wayland", "x11"] }
+rfd = { version = "0.15.4", features = ["xdg-portal"] }
+wgpu = { version = "30.0.1", default-features = true, features = [
+  "fragile-send-sync-non-atomic-wasm",
+], optional = true } # https://github.com/emilk/egui/issues/4885#issuecomment-2256316573
+
+
+[features]
+default = ["mimalloc"]
+
+# The patch time was reduced by 4secs.
+mimalloc = ["dep:mimalloc"]
+
+# Use WebGPU
+wgpu = ["eframe/wgpu", "dep:wgpu"]
+
+
+[lints]
+workspace = true

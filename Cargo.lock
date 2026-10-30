@@ -570,6 +570,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "behavior_merge"
+version = "0.1.0"
+dependencies = [
+ "behavior_merge_types",
+ "dashmap",
+ "fast_hash",
+ "fnis_patch_gen",
+ "indexmap 2.14.2",
+ "json_patch",
+ "jwalk 0.9.0",
+ "jwalk_glob",
+ "mod_info",
+ "nemesis_xml",
+ "rayon",
+ "rmp-serde",
+ "serde",
+ "serde_hkx",
+ "serde_hkx_features",
+ "serde_path_to_error",
+ "simd-json",
+ "skyrim_anim_data",
+ "snafu",
+ "sonic-rs",
+ "tokio",
+ "tracing",
+ "tracing_rotation",
+ "winnow",
+ "winnow_ext",
+]
+
+[[package]]
+name = "behavior_merge_types"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "fast_hash",
+ "json_patch",
+ "nemesis_xml",
+ "phf 0.14.0",
+ "rayon",
+ "serde",
+ "skyrim_anim_data",
+ "tracing",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1040,10 +1086,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
-name = "d_merge_egui"
+name = "d_merge"
 version = "2.8.0"
 dependencies = [
- "d_merge_gui_shared",
+ "behavior_merge",
  "dark-light",
  "dashmap",
  "eframe",
@@ -1051,17 +1097,19 @@ dependencies = [
  "egui_dnd",
  "egui_extras",
  "egui_router",
+ "egui_widgets",
  "fast_hash",
  "font-kit",
- "hkanno_lsp",
+ "gui_shared",
  "image",
  "mimalloc",
  "mod_info",
- "nemesis_merge",
+ "page_convert",
+ "page_hkanno",
  "parking_lot 0.13.0",
+ "rayon",
  "rfd 0.15.4",
  "rfd 0.17.2",
- "serde_hkx_for_gui",
  "skyrim_data_dir",
  "snafu",
  "tokio",
@@ -1069,36 +1117,6 @@ dependencies = [
  "tracing_rotation",
  "wgpu",
  "winres",
-]
-
-[[package]]
-name = "d_merge_gui_shared"
-version = "2.8.0"
-dependencies = [
- "d_merge_gui_shared_derive",
- "fast_hash",
- "gh_issue_link",
- "ico",
- "indexmap 2.14.2",
- "mod_info",
- "nemesis_merge",
- "open",
- "parking_lot 0.13.0",
- "rayon",
- "semver",
- "serde",
- "skyrim_data_dir",
- "snafu",
- "sonic-rs",
- "tracing",
-]
-
-[[package]]
-name = "d_merge_gui_shared_derive"
-version = "2.8.0"
-dependencies = [
- "quote",
- "syn 3.0.9",
 ]
 
 [[package]]
@@ -1456,6 +1474,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_code_editor"
+version = "2.8.0"
+dependencies = [
+ "egui",
+ "egui_widgets",
+]
+
+[[package]]
 name = "egui_dnd"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1520,6 +1546,13 @@ dependencies = [
  "thiserror 2.0.21",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "egui_widgets"
+version = "2.8.0"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -1829,8 +1862,38 @@ name = "fnis_list"
 version = "2.8.0"
 dependencies = [
  "bitflags 2.13.2",
- "skyrim_anim_parser",
+ "skyrim_anim_data",
  "winnow",
+]
+
+[[package]]
+name = "fnis_patch_gen"
+version = "0.1.0"
+dependencies = [
+ "auto_charset",
+ "behavior_merge_types",
+ "dashmap",
+ "fast_hash",
+ "fnis_list",
+ "havok_classes",
+ "indexmap 2.14.2",
+ "json_patch",
+ "jwalk_glob",
+ "phf 0.14.0",
+ "rayon",
+ "serde",
+ "serde_hkx",
+ "serde_hkx_features",
+ "simd-json",
+ "skyrim_anim_data",
+ "skyrim_crc",
+ "skyrim_esp",
+ "snafu",
+ "sonic-rs",
+ "tokio",
+ "tracing",
+ "winnow",
+ "winnow_ext",
 ]
 
 [[package]]
@@ -2202,6 +2265,35 @@ dependencies = [
  "presser",
  "thiserror 2.0.21",
  "windows",
+]
+
+[[package]]
+name = "gui_shared"
+version = "2.8.0"
+dependencies = [
+ "fast_hash",
+ "gh_issue_link",
+ "gui_shared_derive",
+ "ico",
+ "indexmap 2.14.2",
+ "mod_info",
+ "open",
+ "parking_lot 0.13.0",
+ "rayon",
+ "semver",
+ "serde",
+ "skyrim_data_dir",
+ "snafu",
+ "sonic-rs",
+ "tracing",
+]
+
+[[package]]
+name = "gui_shared_derive"
+version = "2.8.0"
+dependencies = [
+ "quote",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -3256,42 +3348,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nemesis_merge"
-version = "0.1.0"
-dependencies = [
- "auto_charset",
- "dashmap",
- "fast_hash",
- "fnis_list",
- "havok_classes",
- "indexmap 2.14.2",
- "json_patch",
- "jwalk 0.9.0",
- "jwalk_glob",
- "mod_info",
- "nemesis_xml",
- "phf 0.14.0",
- "rayon",
- "rmp-serde",
- "schemars 1.2.3",
- "serde",
- "serde_hkx",
- "serde_hkx_features",
- "serde_path_to_error",
- "simd-json",
- "skyrim_anim_parser",
- "skyrim_crc",
- "skyrim_esp",
- "snafu",
- "sonic-rs",
- "tokio",
- "tracing",
- "tracing_rotation",
- "winnow",
- "winnow_ext",
-]
-
-[[package]]
 name = "nemesis_xml"
 version = "0.1.0"
 dependencies = [
@@ -3861,6 +3917,39 @@ checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "page_convert"
+version = "2.8.0"
+dependencies = [
+ "egui",
+ "egui_widgets",
+ "fast_hash",
+ "gui_shared",
+ "parking_lot 0.13.0",
+ "rfd 0.15.4",
+ "rfd 0.17.2",
+ "serde_hkx_for_gui",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "page_hkanno"
+version = "2.8.0"
+dependencies = [
+ "egui",
+ "egui_code_editor",
+ "egui_widgets",
+ "fast_hash",
+ "gui_shared",
+ "hkanno_lsp",
+ "parking_lot 0.13.0",
+ "rfd 0.15.4",
+ "rfd 0.17.2",
+ "serde_hkx_for_gui",
+ "tracing",
 ]
 
 [[package]]
@@ -4810,21 +4899,8 @@ checksum = "ab508826f74a77ca9d5aba6ff19b522583ee3eaf28a19384ff3d0e5835fadf6e"
 dependencies = [
  "dyn-clone",
  "ref-cast",
- "schemars_derive",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c3a92094fa7d61aa124645844facb6b554dfc797136d0f5fd1f890e2bffc69"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn 3.0.9",
 ]
 
 [[package]]
@@ -4885,17 +4961,6 @@ name = "serde_derive"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.9",
-]
-
-[[package]]
-name = "serde_derive_internals"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f852137cce035d6a4df67ccce505ff6b3e9fd3a10e3e52b24dc71e650bb1a9bd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4973,6 +5038,8 @@ version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
+ "foldhash 0.2.0",
+ "indexmap 2.14.2",
  "itoa",
  "memchr",
  "serde",
@@ -5127,7 +5194,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "skyrim_anim_parser"
+name = "skyrim_anim_data"
 version = "0.1.0"
 dependencies = [
  "bitvec",
@@ -5139,7 +5206,6 @@ dependencies = [
  "rayon",
  "rmp-serde",
  "serde",
- "serde_json",
  "simd-json",
  "skyrim_crc",
  "snafu",
@@ -6705,6 +6771,22 @@ name = "xml-rs"
 version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "behavior_merge",
+ "behavior_merge_types",
+ "havok_classes",
+ "rayon",
+ "rmp-serde",
+ "serde",
+ "serde_hkx",
+ "serde_hkx_features",
+ "serde_json",
+ "skyrim_anim_data",
+]
 
 [[package]]
 name = "y4m"

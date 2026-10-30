@@ -1,0 +1,36 @@
+[package]
+name = "page_hkanno"
+version.workspace = true
+description = "D Merge GUI: hkanno (animation annotation) editor page"
+
+authors.workspace = true
+categories = ["gui"]
+edition.workspace = true
+keywords = ["skyrim", "egui", "hkanno"]
+license = "GPL-3.0-or-later"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+egui = { workspace = true }
+fast_hash = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+
+# workspace members
+egui_code_editor = { workspace = true }
+egui_widgets = { workspace = true }
+gui_shared = { workspace = true }
+hkanno_lsp = { workspace = true }
+serde_hkx_for_gui = { workspace = true }
+
+# NOTE: Same as the app crate: rfd differs per OS (Linux needs the xdg portal backend).
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.17.2", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd = { version = "0.15.4", features = ["xdg-portal"] }
+
+[lints]
+workspace = true

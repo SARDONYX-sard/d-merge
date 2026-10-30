@@ -1,0 +1,770 @@
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
+
+use indexmap::IndexMap;
+use rayon::prelude::*;
+use snafu::ResultExt as _;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
+#[serde(rename_all = "snake_case")]
+pub enum I18nKey {
+    /// Gets the bone count from each `skeleton.xml` distributed by mods such as
+    /// XPMSSE and extends the corresponding character hkx based on that information.
+    ///
+    /// This provides functionality equivalent to `Auto Skeleton Patch` and FNIS's `SKELETON arm fix`.
+    ///
+    /// # Recommended
+    /// The following mods are recommended to use with Arm Fix:
+    /// (Without this, arm animations such as blocking while moving may not work)
+    /// - XPMSSE (v5.06) and other bone-expanding mods
+    ///
+    /// # Notes
+    /// The following may result in incorrect patching:
+    /// - Manual mode + `Skyrim Data directory = MO2/mods/*`
+    ///   -> Multiple `skeleton.xml` files may be found.
+    ///   -> The first match is used.
+    ///   -> A warning is logged when multiple files are found.
+    ///
+    /// # Targets
+    /// - `<Skyrim Data directory>/meshes/actors/character/character assets/skeleton.xml`
+    ///   -> `defaultmale.hkx`
+    /// - `<Skyrim Data directory>/meshes/actors/character/character assets female/skeleton_female.xml`
+    ///   -> `defaultfemale.hkx`
+    ///
+    /// # Processing
+    /// - Missing bone indices -> extend `bonePairMap`.
+    /// - Missing bone weights -> append `0.0` / `1.0` to the corresponding weight arrays.
+    ArmFixHover,
+
+    /// Arm fix
+    ArmFixLabel,
+
+    /// Author:
+    AuthorLabel,
+
+    /// Auto Detect
+    AutoDetectButton,
+
+    /// Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once.
+    AutoDetectHover,
+
+    /// Auto remove `meshes`
+    AutoRemoveMeshes,
+
+    /// Deletes previous output before patch execution.
+    ///
+    /// # Targets
+    /// - `<output directory>/meshes`
+    /// - `<output directory>/.d_merge/.debug`
+    /// - `<output directory>/FNIS.esp`
+    /// - `<output directory>/SKSE/Plugins/fnis_aa/config.json`
+    ///
+    /// # Notes
+    /// To avoid accidental mod corruption caused by deleting `meshes`,
+    /// deletion is skipped when the output directory is the same as the Skyrim Data directory.
+    AutoRemoveMeshesHover,
+
+    /// Auto run
+    AutoRun,
+
+    /// Once the mod list has been updated, enable all mods and run the patch once.
+    ///
+    /// # Mod list update triggers
+    /// - Once at startup
+    /// - When the reload button is pressed
+    /// - When switching between vfs and manual environments
+    /// - When the Skyrim data directory is changed
+    ///
+    /// # Notes
+    /// You must close the window manually to prevent the auto-run option from becoming disabled.
+    AutoRunHover,
+
+    /// Background
+    BackgroundTitleLabel,
+
+    /// Background Image:
+    BackgroundImageLabel,
+
+    /// Reload background image.
+    ///
+    /// # Notes
+    /// When you click this button, the `Enabled` checkbox will also be checked.
+    BackgroundImageReloadHover,
+
+    /// Enabled
+    BackgroundImageEnabled,
+
+    /// Whether the background image is shown.
+    ///
+    /// This feature exists to allow you to toggle the setting on and off while keeping the background image path specified.
+    BackgroundImageEnabledHover,
+
+    /// Bug Report
+    BugReportTitleLabel,
+
+    /// See Issues
+    BugReportSeeIssues,
+
+    /// Cancel
+    CancelButton,
+
+    /// Change Log:
+    ChangeLogLabel,
+
+    /// Clear
+    ClearButton,
+
+    /// ID
+    ColumnId,
+
+    /// Mod Type
+    ColumnModType,
+
+    /// Name
+    ColumnName,
+
+    /// Priority
+    ColumnPriority,
+
+    /// Site
+    ColumnSite,
+
+    /// Debug output
+    DebugOutput,
+
+    /// Outputs debug JSON and XML files.
+    ///
+    /// # Examples
+    /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.xml`
+    /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.json`
+    /// - `<output directory>/.d_merge/.debug/patches/meshes/.../0_master.patch.json`
+    DebugOutputHover,
+
+    /// Execution mode:
+    ExecutionModeLabel,
+
+    /// All
+    FilterTextAll,
+
+    /// Generates a dummy FNIS.esp file.
+    ///
+    /// # Examples:
+    /// - XPMSE
+    /// - FNIS Sexy Move
+    /// - EatingSleepingDrinking
+    GenerateFnisEspHover,
+
+    /// Gen FNIS.esp
+    GenerateFnisEspLabel,
+
+    /// Font
+    FontTitleLabel,
+
+    /// Font family:
+    FontFamily,
+
+    /// Font Source:
+    FontModeLabel,
+
+    /// Font loading mode configuration.
+    ///
+    /// - Default:
+    ///   Uses the application's built-in font configuration.
+    /// - System:
+    ///   Loads a font from an installed system font family.
+    /// - File:
+    ///   Loads a font from the specified font file.
+    ///
+    /// # Notes
+    /// Different fonts may alter text width and spacing, which can affect
+    /// table layouts, column alignment, and overall UI appearance.
+    FontModeHover,
+
+    /// Default
+    FontModeDefault,
+
+    /// System
+    FontModeSystem,
+
+    /// File
+    FontModeFile,
+
+    /// Font Path:
+    FontFileLabel,
+
+    /// Reloads and applies the currently selected font path.
+    FontReloadHover,
+
+    /// Help
+    HelpButton,
+
+    /// Language & Translation
+    I18nTitleLabel,
+
+    /// I18n Path:
+    I18nPathLabel,
+
+    /// Reload the translation file. This is useful for previewing translations without restarting the application.
+    I18nReloadJsonHover,
+
+    /// New I18n
+    I18nWriteNewJsonButton,
+
+    /// Create a new translation JSON file for the current application version with English default values.
+    I18nWriteNewJsonHover,
+
+    /// Report Issue
+    IssueReportButton,
+
+    /// Report a bug on GitHub.
+    /// This will auto-fill version info and some hardware.
+    ///
+    /// # Notes
+    /// GitHub account required.
+    IssueReportHover,
+
+    /// License:
+    LicenseLabel,
+
+    /// Locked
+    LockButton,
+
+    /// Row reordering is locked unless sorting by Priority ascending.
+    /// Click to unlock.
+    LockButtonHover,
+
+    /// Logging
+    LoggingTitleLabel,
+
+    /// Log
+    LogButton,
+
+    /// Log Dir
+    LogDir,
+
+    /// Log Path:
+    LogDirPathLabel,
+
+    /// Change the log directory to the specified path.
+    ///
+    /// # Notes
+    /// Logs are rotated with a maximum of 5 files retained.
+    /// The log directory will not change until this button is clicked
+    /// (or the application is restarted).
+    LogReloadHover,
+
+    /// Log Level
+    LogLevelLabel,
+
+    /// Manual
+    ManualMode,
+
+    /// Mode for use without virtual mod managers such as MO2.
+    ///
+    /// # Notes
+    /// - Conflicts may occur if multiple versions of the same mod exist.
+    /// - In manual mode, absolute paths are used as identifiers to prevent duplication. This makes configuration sharing unsuitable.
+    ManualModeHover,
+
+    /// Mod Test Status:
+    ModTestStatusLabel,
+
+    /// Updated mod list
+    ModsListFetchStateDone,
+
+    /// No mods found
+    ModsListFetchStateEmpty,
+
+    /// Failed to update mod list
+    ModsListFetchStateError,
+
+    /// Fetching mod list...
+    ModsListFetchStateFetching,
+
+    /// Mods
+    ModsListTitle,
+
+    /// The list of mods is collected by scanning the following glob paths in the Skyrim Data directory.
+    ///
+    /// - Nemesis: Nemesis_Engine/mod/*/info.ini
+    /// - NemesisExt: Nemesis_EngineExt/mod/*/info.ini
+    /// - FNIS: meshes/**/animations/*/FNIS_*_List.txt
+    ModsListTitleHover,
+
+    /// Normalize
+    NormalizeButton,
+
+    /// Sort the mod list according to the following rules
+    ///
+    /// 1. Group mods by type in the following order:
+    ///    Nemesis -> NemesisExt -> FNIS
+    /// 2. Sort mods alphabetically within each type.
+    /// 3. Reassign priorities sequentially starting from `0`.
+    /// 4. In manual mode, disable the check for duplicate ID rows.
+    ///
+    /// # Notes
+    /// This sorting does not resolve conflicts between patches.
+    NormalizeHover,
+
+    /// Clear Notify
+    NotificationClearButton,
+
+    /// Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.
+    NotifyErrPlatformNotSupported,
+
+    /// Error: Could not find path in the Windows registry.
+    /// If you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually.
+    NotifyErrWindowsRegistryNotFound,
+
+    /// Updating Mod list…
+    NotifyInfoUpdatingModList,
+
+    /// Open selected path.
+    OpenSelectedPathHover,
+
+    /// Output dir:
+    OutputDirLabel,
+
+    /// Controls how parser input is validated and how invalid patch data is handled.
+    ///
+    /// - Strict:
+    ///   Rejects inconsistent or invalid input. This is the traditional behavior
+    ///   used before v2.6.0.
+    /// - Lenient:
+    ///   Behaves similarly to Nemesis by attempting to recover from known input
+    ///   mistakes when the intended value can be inferred from the input.
+    ///
+    /// # Notes
+    /// - A patch that requires Lenient mode contains invalid or potentially
+    ///   undefined input. Even if the parser can recover from it, the resulting
+    ///   behavior is not guaranteed to match the mod author's intent.
+    /// - Incorrect length values may cause unintended behavior. Lenient mode only
+    ///   allows the parser to continue based on the available input; it does not
+    ///   guarantee that the recovered data is correct.
+    /// - Lenient mode is not a convenience mode. It is a fallback for users who
+    ///   cannot reasonably fix the original patch themselves.
+    /// - Input that cannot be reasonably recovered, or whose intended value cannot
+    ///   be inferred, still fails in Lenient mode.
+    ///
+    /// Examples of mods with `trigger_names_len` errors that require Lenient mode:
+    /// - Unarmed Behaviors Expanded (v2.0.1)
+    /// - BFCO (v3.100.7)
+    ParserModeHover,
+
+    /// Parser:
+    ParserModeLabel,
+
+    /// Strict
+    ParserModeStrict,
+
+    /// Lenient
+    ParserModeLenient,
+
+    /// Patch
+    PatchButton,
+
+    /// Updating list...
+    PatchFetchingButton,
+
+    /// Target version:
+    PandoraTargetVersionLabel,
+
+    /// Select the Pandora version used for import or export.
+    ///
+    /// - `v4.4.0-beta`: Compatible with `v5.0.0`.
+    PandoraTargetVersionHover,
+
+    /// Imports Pandora settings into the d-merge VFS configuration.
+    ///
+    /// # Targets
+    /// - `Settings.json`
+    ///   - Skyrim SE data path
+    ///   - Output path
+    /// - `ActiveMods.json`
+    ///   - Nemesis mod enabled state
+    ///   - Nemesis mod priority
+    PandoraImportHover,
+
+    /// Import
+    PandoraImportLabel,
+
+    /// Import path:
+    PandoraImportPathLabel,
+
+    /// Exports d-merge VFS settings to Pandora.
+    ///
+    /// # Targets
+    /// - `Settings.json`
+    ///   - Skyrim SE data path
+    ///   - Output path
+    /// - `ActiveMods.json`
+    ///   - Nemesis mod enabled state
+    ///   - Nemesis mod priority
+    PandoraExportHover,
+
+    /// Export
+    PandoraExportLabel,
+
+    /// Export Path:
+    PandoraExportPathLabel,
+
+    /// Reload
+    ReloadButton,
+
+    /// Removing the `<output_dir>/meshes` directory...
+    RemovingMeshesMessage,
+
+    /// Output format for hkx.
+    /// - SkyrimLE/Enderal: win32
+    /// - SkyrimSE/SkyrimVR/EnderalSE: amd64
+    ///
+    /// # Notes
+    /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
+    RuntimeTargetHover,
+
+    /// Output format:
+    RuntimeTargetLabel,
+
+    /// Search
+    SearchLabel,
+
+    /// hits
+    SearchHitsLabel,
+
+    /// Select
+    SelectButton,
+
+    /// selected
+    SelectedLabel,
+
+    /// Skyrim Data dir:
+    SkyrimDataDirLabel,
+
+    /// Source Code:
+    SourceCodeLabel,
+
+    /// Applying patches...
+    StatusApplyingPatches,
+
+    /// Done.
+    StatusDone,
+
+    /// Recommend checking debug and log files.
+    StatusError,
+
+    /// Generating FNIS patches...
+    StatusGeneratingFnisPatches,
+
+    /// Generating .hkx files...
+    StatusGeneratingHkxFiles,
+
+    /// Parsing patches...
+    StatusParsingPatches,
+
+    /// Reading templates and patches...
+    StatusReadingPatches,
+
+    /// 🎨 Edit
+    ThemeEditorButton,
+
+    /// Open the theme editor to customize the app's appearance and color scheme
+    ThemeEditorButtonHover,
+
+    /// Change the application's overall appearance and color scheme
+    ThemeHover,
+
+    /// Theme:
+    ThemeLabel,
+
+    /// 💻 System
+    ThemeSelectSystem,
+
+    /// 🌙 Dark
+    ThemeSelectDark,
+
+    /// ☀ Light
+    ThemeSelectLight,
+
+    /// 🎨 Custom
+    ThemeSelectCustom,
+
+    /// VFS
+    VfsMode,
+
+    /// When booting using MO2's VFS, etc.
+    VfsModeHover,
+
+    // ── Page navigation ─────────────────────────────────────────────────────
+    /// Patch
+    PagePatch,
+
+    /// Convert
+    PageConvert,
+
+    /// hkanno Editor
+    PageHkanno,
+
+    // ── Convert page ────────────────────────────────────────────────────────
+    /// All Clear
+    ConvertAllClearButton,
+
+    /// Selection type:
+    ConvertSelectionTypeLabel,
+
+    /// Directories
+    ConvertSelectionDirs,
+
+    /// Convert every file inside the selected directories.
+    ConvertSelectionDirsHover,
+
+    /// Tree
+    ConvertSelectionTree,
+
+    /// Select root directories, then check the files to convert.
+    ConvertSelectionTreeHover,
+
+    /// Files
+    ConvertSelectionFiles,
+
+    /// Select individual files.
+    ConvertSelectionFilesHover,
+
+    /// Output:
+    ConvertOutputLabel,
+
+    /// Output directory. If empty, each output is written next to its input.
+    ConvertOutputHover,
+
+    /// Output format:
+    ConvertOutputFormatLabel,
+
+    /// Convert
+    ConvertButton,
+
+    /// Converting...
+    ConvertingButton,
+
+    /// Conversion completed.
+    ConvertDone,
+
+    /// No input selected.
+    ConvertNoInput,
+
+    /// Select All
+    ConvertSelectAll,
+
+    /// Unselect All
+    ConvertUnselectAll,
+
+    /// Expand All
+    ConvertExpandAll,
+
+    /// Collapse All
+    ConvertCollapseAll,
+
+    // ── hkanno editor page ──────────────────────────────────────────────────
+    /// Open
+    HkannoOpenButton,
+
+    /// Open .hkx / .xml files. (Drag & drop also works.)
+    HkannoOpenHover,
+
+    /// Save
+    HkannoSaveButton,
+
+    /// Saved successfully.
+    HkannoSaved,
+
+    /// Save failed
+    HkannoSaveFailed,
+
+    /// Failed to load
+    HkannoLoadFailed,
+
+    /// Revert
+    HkannoRevertButton,
+
+    /// Discard the edits and restore the annotations of the original file?
+    HkannoRevertConfirm,
+
+    /// Apply
+    HkannoApplyButton,
+
+    /// Format
+    HkannoFormatButton,
+
+    /// Show Preview
+    HkannoShowPreview,
+
+    /// Hide Preview
+    HkannoHidePreview,
+
+    /// Annotation
+    HkannoAnnotationLabel,
+
+    /// Preview (XML)
+    HkannoPreviewTitle,
+
+    /// Preview error
+    HkannoPreviewError,
+
+    /// Problems
+    HkannoProblemsLabel,
+
+    /// Drop .hkx / .xml files here
+    HkannoDropHint,
+
+    /// Open or drop .hkx / .xml files to edit their annotations.
+    HkannoEmptyMessage,
+
+    /// Language features
+    HkannoLspOptionsTitle,
+
+    /// Keymap:
+    HkannoEditorMode,
+
+    /// Key bindings of the editor. In Vim mode, `:w` saves.
+    HkannoEditorModeHover,
+
+    /// Completion
+    HkannoLspCompletion,
+
+    /// Suggestions while typing. Press Ctrl+Space to open them manually.
+    HkannoLspCompletionHover,
+
+    /// Code actions
+    HkannoLspCodeAction,
+
+    /// Quick fixes for some problems (e.g., IFrame key typos).
+    HkannoLspCodeActionHover,
+
+    /// Diagnostics
+    HkannoLspDiagnostics,
+
+    /// Underline errors and warnings.
+    HkannoLspDiagnosticsHover,
+
+    /// Formatter
+    HkannoLspFormatter,
+
+    /// Normalize spaces and number formats (Shift+Alt+F).
+    HkannoLspFormatterHover,
+
+    /// Semantic highlighting
+    HkannoLspSemanticTokens,
+
+    /// Parser-based coloring (e.g., PIE parameters).
+    HkannoLspSemanticTokensHover,
+
+    /// Hover
+    HkannoLspHover,
+
+    /// Show explanations when hovering a token.
+    HkannoLspHoverHover,
+
+    /// Inlay hints
+    HkannoLspInlayHints,
+
+    /// Show parameter names (time, x, y, ...) at the end of each line.
+    HkannoLspInlayHintsHover,
+
+    /// Signature help
+    HkannoLspSignatureHelp,
+
+    /// Show the signature of the event being typed.
+    HkannoLspSignatureHelpHover,
+
+    // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
+    /// Invalid key comes here when deserializing unknown strings.
+    #[serde(other)]
+    Invalid,
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, fast_hash::RandomState>);
+
+impl I18nMap {
+    pub fn new() -> Self {
+        Self(IndexMap::default())
+    }
+
+    /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
+    pub const FILE: &'static str = "./.d_merge/translation.json";
+
+    /// Translate given key or fallback to default English.
+    pub fn t(&self, key: I18nKey) -> &str {
+        self.0.get(&key).map_or_else(|| key.default_eng(), |s| s.as_ref())
+    }
+
+    /// Try to load path & parse i18n map.
+    ///
+    /// # Errors
+    /// failed to read json
+    #[inline]
+    pub fn load<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
+        let content = std::fs::read_to_string(path).with_context(|_| ReadFileSnafu { path })?;
+        let map: Self = sonic_rs::from_str(&content).with_context(|_| ParseJsonSnafu { path })?;
+        Ok(map)
+    }
+
+    /// Try to load `./.d_merge/translation.json`.
+    /// If not exists or failed to parse, fallback to `default_map()`.
+    ///
+    /// # Errors
+    /// failed to read json
+    pub fn load_with_fallback<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
+        if !path.exists() {
+            #[cfg(feature = "tracing")]
+            tracing::info!("{} does not exist.", path.display());
+            return Ok(Self::new());
+        }
+
+        Self::load(path)
+    }
+
+    /// Save translation.json
+    /// # Errors
+    /// failed to write json
+    pub fn save<P>(path: P) -> Result<(), Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
+        let map = Self(
+            I18nKey::ALL.par_iter().map(|key| (*key, Cow::Borrowed(key.default_eng()))).collect(),
+        );
+
+        let text = sonic_rs::to_string_pretty(&map).context(SerializeJsonSnafu { path })?;
+        std::fs::write(path, text).context(WriteFileSnafu { path })?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum Error {
+    #[snafu(display("Failed to read file: {}", path.display()))]
+    ReadFile { path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to write file: {}", path.display()))]
+    WriteFile { path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to parse json: {}", path.display()))]
+    ParseJson { path: PathBuf, source: sonic_rs::Error },
+
+    #[snafu(display("Failed to serialize json: {}", path.display()))]
+    SerializeJson { path: PathBuf, source: sonic_rs::Error },
+}

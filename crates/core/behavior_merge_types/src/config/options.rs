@@ -1,0 +1,230 @@
+use std::{fmt, path::PathBuf};
+
+use crate::config::{Status, StatusReporterFn};
+
+/// A configuration structure used to specify various directories and a status report callback.
+///
+/// The `Config` struct holds paths for input resources and output directories, along with optional
+/// settings for debugging and compatibility. It is used to control behavior during operations such as
+/// patching HKX templates, merging JSON data, and generating final outputs.
+#[derive(Default)]
+pub struct Config {
+    /// The directory containing the HKX templates you want to patch.
+    ///
+    /// Typically this is a directory like `assets/templates`. The actual patch target directory
+    /// should be a subdirectory such as `assets/templates/meshes`.
+    pub resource_dir: PathBuf,
+
+    /// The directory where the output files will be saved.
+    ///
+    /// This directory will also contain `.debug` subdirectory if debug output is enabled.
+    pub output_dir: PathBuf,
+
+    /// Generation target
+    pub output_target: OutPutTarget,
+
+    /// An optional callback function that reports the current status of the process.
+    ///
+    /// The callback is invoked with `Status` updates, allowing consumers to track
+    /// progress, errors, or other runtime events.
+    pub status_report: StatusReporterFn,
+
+    /// Controls how parser input is validated and whether recoverable
+    /// inconsistencies are automatically repaired.
+    pub parser_mode: ParserMode,
+
+    /// Enables lenient parsing for known issues in unofficial or modded patches.
+    ///
+    /// This setting allows the parser to work around common community patch errors
+    /// such as incorrect field names or missing values. Use with caution as it may
+    /// mask actual data issues.
+    pub hack_options: Option<HackOptions>,
+
+    /// Options controlling the output of debug artifacts.
+    pub debug: DebugOptions,
+
+    /// Skyrim data directories glob (required **only when using FNIS mods**).
+    ///
+    /// This must include all directories containing `animations/<namespace>`, otherwise FNIS
+    /// entries will not be detected and the process will fail.
+    ///
+    /// Skyrim data directories to be searched.
+    /// This must include all directories containing `animations/<namespace>` or FNIS will fail.
+    /// Examples:
+    /// - `"MO2/mods/*"`
+    /// - `"steamapps/Skyrim Special Edition/Data"`
+    ///
+    /// **Important:**
+    /// - If this glob does not cover the correct data directories, FNIS entries will not be
+    ///   detected and the process will error out.
+    /// - In manual mode (outside of VFS), if multiple versions of the same mod exist,
+    ///   they share the same namespace and may cause unintended conflicts such as
+    ///   duplicate animation registrations and bugs.
+    pub skyrim_data_dir_glob: Option<String>,
+
+    /// If true, generates a FNIS.esp(dummy ESP) file with the correct version and author information.
+    pub generate_fnis_esp: bool,
+
+    /// Read each `skeleton.xml` to determine the skeleton's bone count, then extend the corresponding character HKX with the missing bone data.
+    ///
+    /// ./meshes/actors/character/character assets/skeleton.xml
+    /// -> defaultfemale.hkx
+    ///
+    /// ./meshes/actors/character/character assets female/skeleton.xml
+    /// -> defaultmale.hkx
+    ///
+    /// - Append missing bone indices to `bonePairMap`.
+    /// - Append `0.0` / `1.0` weights for the extended bones.
+    ///
+    /// # Notes
+    /// - Equivalent to FNIS's `SKELETON arm fix` for XPMSSE (v5.06).
+    pub skeleton_arm_fix: bool,
+}
+
+impl Config {
+    /// Calls the status reporting closure with the provided status.
+    ///
+    /// This method allows us to easily invoke the status callback if it's provided.
+    #[inline]
+    pub fn on_report_status(&self, status: Status) {
+        if let Some(f) = &self.status_report {
+            f(status);
+        }
+    }
+}
+
+// Implements `Debug` for the `Config` struct, omitting the closure field as it cannot be debugged.
+//
+// This is useful for logging or debugging purposes, although the closure cannot be displayed.
+//
+// The `resource_dir` and `output_dir` fields are displayed, but the `status_report` closure
+// is omitted.
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Options")
+            .field("resource_dir", &self.resource_dir)
+            .field("output_dir", &self.output_dir)
+            // Skip closure
+            .finish()
+    }
+}
+
+/// A collection of hack options that enable non-standard parsing behavior.
+///
+/// These options exist to handle cases where game mods or other tools produce
+/// invalid or inconsistent data. Enabling these may allow parsing to succeed
+/// in otherwise broken scenarios, at the risk of hiding real errors.
+#[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+pub struct HackOptions {
+    /// Enables compatibility hacks for invalid fields in the `BSRagdollContactListenerModifier` class.
+    ///
+    /// This option activates targeted fixes for common field naming mistakes in patches:
+    /// - Substitutes `event` with `contactEvent`
+    /// - Substitutes `anotherBoneIndex` with `bones`
+    pub cast_ragdoll_event: bool,
+    /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
+    /// appears *outside* the closing `</hkparam>` tag instead of inside it.
+    ///
+    /// Such patches contain a raw space-separated float list between MOD_CODE and CLOSE
+    /// at the class field level, which is structurally invalid in normal Nemesis XML.
+    ///
+    /// For `Precision Creatures` patch.
+    pub bone_weight_outside_hkparam: bool,
+}
+
+impl HackOptions {
+    /// Enable all hack options.
+    #[inline]
+    pub const fn enable_all() -> Self {
+        Self { cast_ragdoll_event: true, bone_weight_outside_hkparam: true }
+    }
+}
+
+impl From<HackOptions> for nemesis_xml::hack::HackOptions {
+    #[inline]
+    fn from(value: HackOptions) -> Self {
+        Self {
+            cast_ragdoll_event: value.cast_ragdoll_event,
+            bone_weight_outside_hkparam: value.bone_weight_outside_hkparam,
+        }
+    }
+}
+
+/// A group of flags to enable debug output of intermediate files.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+pub struct DebugOptions {
+    /// If true, outputs the raw patch JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
+    ///
+    /// This includes:
+    /// - `patch.json`: The raw parsed patch data.
+    ///   - For `One` patches, it reflects the result of priority-based overwriting.
+    ///   - For `Seq` patches, all entries are preserved in a vector (`Vec`) for later conflict resolution.
+    pub output_patch_json: bool,
+
+    /// If true, outputs the merged JSON to the `.debug` subdirectory under `<output_dir>/.d_merge`.
+    ///
+    /// This represents the state of the data after all patches have been applied and
+    /// conflicts resolved, but before converting to `.hkx` format.
+    pub output_merged_json: bool,
+
+    /// If true, outputs the intermediate merged XML to the `.debug` subdirectory under `<output_dir>/.d_merge`.
+    ///
+    /// This is the final XML representation of the patched and merged data,
+    /// just before conversion to the binary `.hkx` format.
+    pub output_merged_xml: bool,
+}
+
+impl Default for DebugOptions {
+    #[inline]
+    fn default() -> Self {
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: false }
+    }
+}
+
+impl DebugOptions {
+    /// Enable all debug options.
+    #[inline]
+    pub const fn enable_all() -> Self {
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: true }
+    }
+}
+
+/// Output type
+///
+/// - feature = "ts_serde"
+///
+///  ```txt
+///  SkyrimSE | SkyrimLE
+///  ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum OutPutTarget {
+    /// Amd64
+    #[default]
+    #[serde(rename = "SkyrimSE")]
+    SkyrimSe,
+
+    /// Win32
+    #[serde(rename = "SkyrimLE")]
+    SkyrimLe,
+}
+
+/// Controls how input data is validated and handled when parsing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts_serde", serde(rename_all = "camelCase"))]
+pub enum ParserMode {
+    /// Requires input data to conform to the expected format.
+    ///
+    /// Invalid lengths, inconsistent values, and other malformed input are
+    /// rejected instead of being inferred or corrected.
+    #[default]
+    Strict,
+
+    /// Allows known recoverable inconsistencies to be automatically repaired.
+    ///
+    /// The parser may infer the intended value from the actual input when
+    /// the intended interpretation is unambiguous. Data that cannot be
+    /// safely repaired is still rejected.
+    Lenient,
+}

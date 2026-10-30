@@ -1,0 +1,23 @@
+[package]
+name = "egui_code_editor"
+version.workspace = true
+description = "Language-agnostic code editor widget for egui (highlighting, completion, hover, Vim keymap)"
+
+authors.workspace = true
+categories = ["gui", "text-editors"]
+edition.workspace = true
+keywords = ["egui", "editor"]
+license = "MIT"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+# NOTE: No language or app logic here; a language plugs in through the `Language` trait.
+[dependencies]
+egui = { workspace = true }
+
+# workspace members
+egui_widgets = { workspace = true } # Markdown for hover / completion docs
+
+[lints]
+workspace = true

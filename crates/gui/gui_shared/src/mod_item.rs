@@ -1,0 +1,224 @@
+use mod_info::{ModInfo, ModType};
+use rayon::{iter::Either, prelude::*};
+
+/// Represents a single mod entry.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)] // Need hash to dnd
+pub struct ModItem {
+    /// Whether the mod is enabled.
+    pub enabled: bool,
+    /// - Nemesis/FNIS(vfs): e.g. `aaaa`
+    /// - Nemesis(manual): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
+    /// - FNIS(manual): e.g. `<skyrim data dir>/meshes/actors/character/animations/aaaa`
+    pub id: String,
+    /// Display name of the mod.
+    pub name: String,
+    /// Mod source site.
+    pub site: String,
+    /// Load priority.
+    pub priority: usize,
+
+    /// Mod type. Nemesis, FNIS
+    #[serde(default)]
+    pub mod_type: ModType,
+}
+
+/// Inherit priority/enabled from old list.
+/// New items are appended in alphabetical order.
+/// Final priorities are always normalized.
+pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> {
+    let old_map: fast_hash::HashMap<&str, (bool, usize)> =
+        old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
+
+    let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =
+        new.into_par_iter().partition_map(|info| {
+            if let Some(&(enabled, priority)) = old_map.get(info.id.as_str()) {
+                Either::Left(ModItem {
+                    enabled,
+                    id: info.id,
+                    name: info.name,
+                    site: info.site,
+                    priority,
+                    mod_type: info.mod_type,
+                })
+            } else {
+                Either::Right(ModItem {
+                    enabled: false,
+                    id: info.id,
+                    name: info.name,
+                    site: info.site,
+                    priority: 0, // temporary
+                    mod_type: info.mod_type,
+                })
+            }
+        });
+
+    rayon::join(
+        // Existing mods: order by old priority
+        || with_old.par_sort_unstable_by(|a, b| a.priority.cmp(&b.priority)),
+        // New mods: alphabetical
+        || without_old.par_sort_unstable_by(|a, b| a.id.cmp(&b.id)),
+    );
+    with_old.par_extend(without_old);
+
+    // Final deterministic normalization
+    with_old.par_iter_mut().enumerate().for_each(|(index, item)| item.priority = index);
+
+    with_old
+}
+
+/// Reorder priorities:
+/// 1. Sort mods by type:
+///    Nemesis -> NemesisExt -> FNIS
+/// 2. Sort mods alphabetically within each type.
+/// 3. Reassign priorities sequentially starting from `0`.
+pub fn reorder_mods_priorities(mods: &mut [ModItem]) {
+    use mod_info::ModType;
+
+    const fn mod_type_rank(mod_type: &ModType) -> u8 {
+        match mod_type {
+            ModType::Nemesis => 0,
+            ModType::NemesisExt => 1,
+            ModType::Fnis => 2,
+        }
+    }
+
+    mods.par_sort_unstable_by(|a, b| {
+        mod_type_rank(&a.mod_type).cmp(&mod_type_rank(&b.mod_type)).then_with(|| a.id.cmp(&b.id))
+    });
+    mods.par_iter_mut().enumerate().for_each(|(priority, item)| {
+        item.priority = priority;
+    });
+}
+
+/// Disable duplicate mods and keep only the first occurrence enabled.
+///
+/// Duplicate detection uses:
+///
+/// 1. The full `id` for VFS mods.
+/// 2. The last path component of `id` for manual mode mods.
+///
+/// The first occurrence of a duplicate group remains unchanged.
+/// All subsequent duplicates are disabled.
+///
+/// This function does not modify mod ordering or priorities.
+///
+/// # Purpose of this function
+///
+/// In manual mode, applying patches with the same ID but different versions results in the simultaneous addition
+/// of different classes to the same pointer, causing a `tailing char 0` error. This function prevents that.
+pub fn dedup_mods_by_id(mods: &mut [ModItem]) {
+    use std::path::Path;
+
+    use fast_hash::HashSet;
+
+    let mut seen = HashSet::<_>::default();
+
+    for item in mods {
+        let key = Path::new(&item.id).file_name().and_then(|x| x.to_str()).unwrap_or(&item.id);
+
+        if !seen.insert(key) {
+            item.enabled = false;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_gaps_and_non_zero_start() {
+        let old = vec![
+            ModItem {
+                enabled: true,
+                id: "b".into(),
+                name: "B".into(),
+                site: "x".into(),
+                priority: 10,
+                mod_type: ModType::Nemesis,
+            },
+            ModItem {
+                enabled: true,
+                id: "a".into(),
+                name: "A".into(),
+                site: "x".into(),
+                priority: 3,
+                mod_type: ModType::Nemesis,
+            },
+        ];
+
+        let new = vec![
+            ModInfo {
+                id: "a".into(),
+                name: "A".into(),
+                site: "x".into(),
+                mod_type: ModType::Nemesis,
+                ..Default::default()
+            },
+            ModInfo {
+                id: "b".into(),
+                name: "B".into(),
+                site: "x".into(),
+                mod_type: ModType::Fnis,
+                ..Default::default()
+            },
+            ModInfo {
+                id: "c".into(),
+                name: "C".into(),
+                site: "x".into(),
+                mod_type: ModType::Fnis,
+                ..Default::default()
+            },
+        ];
+
+        let result = inherit_reorder_cast(&old, new);
+
+        let priorities: Vec<usize> = result.iter().map(|m| m.priority).collect();
+        assert_eq!(priorities, vec![0, 1, 2]);
+
+        let ids: Vec<&str> = result.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn preserves_relative_order_of_existing_mods() {
+        let old = vec![
+            ModItem {
+                enabled: true,
+                id: "low".into(),
+                name: "Low".into(),
+                site: "x".into(),
+                priority: 1,
+                ..Default::default()
+            },
+            ModItem {
+                enabled: true,
+                id: "high".into(),
+                name: "High".into(),
+                site: "x".into(),
+                priority: 100,
+                ..Default::default()
+            },
+        ];
+
+        let new = vec![
+            ModInfo {
+                id: "high".into(),
+                name: "High".into(),
+                site: "x".into(),
+                ..Default::default()
+            },
+            ModInfo {
+                id: "low".into(),
+                name: "Low".into(),
+                site: "x".into(),
+                ..Default::default()
+            },
+        ];
+
+        let result = inherit_reorder_cast(&old, new);
+
+        let ids: Vec<&str> = result.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, vec!["low", "high"]);
+    }
+}
