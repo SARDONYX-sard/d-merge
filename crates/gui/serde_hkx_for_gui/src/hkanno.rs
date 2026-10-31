@@ -233,7 +233,7 @@ impl<'a> Hkanno<'a> {
         let mut output = Vec::new();
         hkx_io::with_class_map(bytes, input, &mut |mut classes| {
             self.clone().into_static().write_to_classmap(&mut classes).map_err(|e| {
-                serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+                serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
             })?;
 
             output = match output_format {
@@ -246,7 +246,7 @@ impl<'a> Hkanno<'a> {
                     serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
                 }
             }
-            .with_context(|_| serde_hkx_features::error::SerSnafu { input: input.to_path_buf() })?;
+            .map_err(|err| err.with_path(input))?;
             Ok(())
         })
         .context(SerdeHkxFeatureSnafu)?;
@@ -548,7 +548,7 @@ pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, 
     let mut hkanno = None;
     hkx_io::with_class_map(bytes, input, &mut |classes| {
         let parsed = parse_hkanno_borrowed(classes).map_err(|e| {
-            serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+            serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
         })?;
         hkanno = Some(parsed.into_static());
         Ok(())

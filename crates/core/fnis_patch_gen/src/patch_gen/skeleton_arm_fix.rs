@@ -60,7 +60,7 @@ pub(crate) fn apply<'a>(
                 continue;
             }
 
-            return Err(serde_hkx_features::error::Error::IoError {
+            return Err(serde_hkx_features::error::Error::Io {
                 source: std::io::Error::new(
                     std::io::ErrorKind::NotFound,
                     format!("[Skeleton Arm Fix] No skeleton.xml matched: {skeleton_glob}"),
@@ -105,15 +105,13 @@ where
 {
     let path = path.as_ref();
 
-    let bytes = fs::read(path).map_err(|e| serde_hkx_features::error::Error::FailedReadFile {
-        path: path.to_path_buf(),
-        source: e,
-    })?;
+    let bytes = fs::read(path)
+        .map_err(|err| serde_hkx_features::error::Error::from(err).with_path(path))?;
 
     let mut bone_len = 0;
     hkx_io::with_class_map(&bytes, path, &mut |class_map| {
         bone_len = read_character_skeleton(&class_map).map_err(|e| {
-            serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+            serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
         })?;
         Ok(())
     })?;

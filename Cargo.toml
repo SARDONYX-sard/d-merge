@@ -43,15 +43,15 @@ tracing = { version = "0.1.44" } # logger
 tracing-subscriber = "0.3.23"
 winnow = { version = "1.0.4", features = ["simd"] }
 
-auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
-diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false, features = [
+auto_charset = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
+diff = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
+havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false, features = [
   "ignore_duplicates",
 ] }
-havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
-serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
-winnow_ext = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "63edc06", default-features = false }
+havok_types = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
+serde_hkx = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
+winnow_ext = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "1b2d1f6", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1" # Color diff assertion
@@ -234,8 +234,8 @@ useless_transmute = "deny"
 verbose_file_reads = "deny"
 wildcard_dependencies = "deny"
 
-# TODO: Remove after pushing d-merge-serde-hkx and bumping `rev` above
-#       (needs its `json` feature, split out of `extra_fmt`).
+# # TODO: Remove after pushing d-merge-serde-hkx and bumping `rev` above
+# #       (needs its `json` feature, split out of `extra_fmt`).
 # [patch."https://github.com/SARDONYX-forks/d-merge-serde-hkx"]
 # auto_charset = { path = "../d-merge-serde-hkx/crates/auto_charset" }
 # diff = { path = "../d-merge-serde-hkx/crates/diff" }

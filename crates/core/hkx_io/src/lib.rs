@@ -137,8 +137,5 @@ pub fn convert(
 /// # Errors
 /// The file cannot be read.
 pub fn read_file(path: &Path) -> serde_hkx_features::Result<Vec<u8>> {
-    std::fs::read(path).map_err(|source| serde_hkx_features::error::Error::FailedReadFile {
-        path: path.to_path_buf(),
-        source,
-    })
+    std::fs::read(path).map_err(|err| serde_hkx_features::error::Error::from(err).with_path(path))
 }
