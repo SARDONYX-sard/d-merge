@@ -7,7 +7,8 @@
 //!
 //! ```text
 //! "0.1 PIE.@SG"      context = "0.1 PIE.@"  -> native instructions, filtered by "SG"
-//! "0.1 "             context = "0.1 "       -> event names (animmotion, ...)
+//! "0.1 "             context = "0.1 "       -> event names (animmotion, SCAR_ActionData, ...)
+//! "0.1 SCAR_ActionData{\"Mi"                -> JSON keys (MinDistance, ...); after `:` values
 //! ""                 context = ""           -> <time>, trackName:, # numAnnotations:
 //! ```
 
@@ -17,7 +18,7 @@ use super::byte_offset;
 use crate::{
     Span,
     parser::{LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, parse_line},
-    pie,
+    pie, scar,
 };
 
 /// Icon/color category of a candidate.
@@ -145,7 +146,15 @@ fn text(node: &TextNode, cursor: usize) -> Vec<CompletionItem> {
         return Vec::new();
     }
 
-    vec![
+    // Inside `SCAR_ActionData{ ... }`: JSON keys / values.
+    if let Some(text) = node.text.as_ref().map(|t| t.value)
+        && let Some(json) = text.trim_start().strip_prefix(scar::ACTION_DATA)
+        && json.starts_with('{')
+    {
+        return scar_json(json);
+    }
+
+    let mut items = vec![
         item(
             "<eventName>",
             Snippet,
@@ -176,7 +185,78 @@ fn text(node: &TextNode, cursor: usize) -> Vec<CompletionItem> {
             "PIE.",
             "```hkanno\nPIE.@<instruction>|<param1>|...\n```\nPayload Interpreter instruction.",
         ),
+    ];
+    items.extend(scar_events());
+    items
+}
+
+/// SCAR event names (see [`scar`]).
+const fn scar_events() -> [CompletionItem; 4] {
+    use CompletionKind::Function;
+    [
+        item(scar::COMBO_START, Function, scar::COMBO_START, scar::COMBO_START_DOC),
+        item(
+            "SCAR_ComboStart.<chance>",
+            Function,
+            "SCAR_ComboStart.${1:60}",
+            scar::COMBO_START_DOC,
+        ),
+        item(scar::UPDATE_DUMMY, Function, scar::UPDATE_DUMMY, scar::UPDATE_DUMMY_DOC),
+        item(
+            scar::ACTION_DATA,
+            Function,
+            r#"SCAR_ActionData{"AttackData":"${1:attackStart}", "MinDistance":${2:0}, "MaxDistance":${3:139}, "StartAngle":${4:-60}, "EndAngle":${5:60}, "Chance":${6:100}, "Type":"${7:RA}"}"#,
+            scar::ACTION_DATA_DOC,
+        ),
     ]
+}
+
+/// `SCAR_ActionData{...}` body up to the cursor (`json` starts at `{`): keys or values.
+fn scar_json(json: &str) -> Vec<CompletionItem> {
+    match scar::json_position(json) {
+        scar::JsonPos::Key { quoted, used } => {
+            let has = |name: &str| used.iter().any(|u| u == name);
+            scar::ACTION_KEYS
+                .iter()
+                .filter(|key| !has(key.name))
+                // `IdleAnimation` and `AttackData` exclude each other.
+                .filter(|key| !(key.name == "IdleAnimation" && has("AttackData")))
+                .filter(|key| !(key.name == "AttackData" && has("IdleAnimation")))
+                .map(|key| {
+                    let open = if quoted { "" } else { "\"" };
+                    CompletionItem {
+                        label: key.name,
+                        kind: CompletionKind::Keyword,
+                        insert: Cow::Owned(format!("{open}{}\":{}", key.name, key.placeholder)),
+                        documentation: key.doc,
+                    }
+                })
+                .collect()
+        }
+        scar::JsonPos::Value { key, quoted } => {
+            let values: Vec<(&'static str, &'static str)> = match key.as_str() {
+                "Type" => scar::ACTION_TYPES.to_vec(),
+                "IdleAnimation" | "ConditionsAlias" => {
+                    scar::BUILTIN_IDLES.iter().map(|idle| (*idle, "Built-in SCAR idle")).collect()
+                }
+                _ => Vec::new(),
+            };
+            values
+                .into_iter()
+                .map(|(value, doc)| CompletionItem {
+                    label: value,
+                    kind: CompletionKind::EnumMember,
+                    insert: Cow::Owned(if quoted {
+                        value.to_string()
+                    } else {
+                        format!("\"{value}\"")
+                    }),
+                    documentation: doc,
+                })
+                .collect()
+        }
+        scar::JsonPos::Other => Vec::new(),
+    }
 }
 
 /// `animmotion x y z`: suggests the current value of the axis under the cursor.
@@ -271,6 +351,14 @@ mod tests {
     fn pie_flow() {
         assert_eq!(labels("0.1 PIE."), ["@", "$", "!"]);
         assert_eq!(labels("0.1 PIE.@SG"), ["SGVB", "SGVF", "SGVI"]);
+    }
+
+    #[test]
+    fn scar() {
+        assert!(labels("0.1 SCAR").contains(&"SCAR_ActionData"));
+        assert_eq!(labels(r#"0.1 SCAR_ActionData{"AttackData":"a", "Min"#), ["MinDistance"]);
+        assert!(!labels(r#"0.1 SCAR_ActionData{"AttackData":"a", ""#).contains(&"IdleAnimation"));
+        assert_eq!(labels(r#"0.1 SCAR_ActionData{"Type":"RP"#), ["RPA"]);
     }
 
     #[test]

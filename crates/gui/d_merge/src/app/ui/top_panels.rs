@@ -22,7 +22,7 @@ impl App {
     /// Renders the execution-mode radio buttons and global option checkboxes.
     ///
     /// Contains: VFS / Manual mode, target runtime combo, debug output,
-    /// auto-remove meshes, generate FNIS ESP, auto-run, transparent, theme.
+    /// auto-remove meshes, generate FNIS ESP, auto-run, transparent.
     pub(crate) fn ui_top_options(&mut self, ui: &mut egui::Ui) {
         let panel = themed_top_bottom_panel(
             egui::Panel::top("ui_top_options"),
@@ -39,13 +39,6 @@ impl App {
                 self.ui_target_runtime_box(ui);
                 self.ui_parser_mode(ui);
                 self.ui_behavior_options(ui);
-
-                ui.add_space(60.0);
-                ui.separator();
-
-                self.ui_theme_box(ui);
-
-                self.ui_bg_color_picker(ui);
             });
 
             ui.add_space(6.0);
@@ -174,8 +167,10 @@ impl App {
         }
     }
 
-    /// Renders the theme combo box (System / Dark / Light).
-    fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
+    /// Theme combo box (System / Dark / Light / Custom) + the custom theme editor button.
+    ///
+    /// Shown in the page bar (see `router`), so the theme can be changed on every page.
+    pub(crate) fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_top(|ui| {
             ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
@@ -198,6 +193,7 @@ impl App {
                 set_theme(ui.ctx(), self.settings.ui.theme, self.theme_manager.editing.as_ref());
             }
         });
+        self.ui_bg_color_picker(ui);
     }
 
     fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {

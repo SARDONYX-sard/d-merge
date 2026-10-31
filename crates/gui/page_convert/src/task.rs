@@ -62,10 +62,10 @@ impl ConvertTask {
 
         let statuses = Arc::clone(&self.statuses);
         let repaint_ctx = ctx.clone();
-        let on_status = move |payload: serde_hkx_for_gui::status::Payload| {
+        let on_status = Arc::new(move |payload: serde_hkx_for_gui::status::Payload| {
             statuses.lock().insert(payload.path_id, payload.status);
             repaint_ctx.request_repaint();
-        };
+        });
 
         let ctx = ctx.clone();
         rt.spawn(async move {

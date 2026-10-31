@@ -11,6 +11,7 @@ use crate::{
         IFrameNode, LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, TrackNameNode,
         parse_line,
     },
+    scar,
 };
 
 const UNKNOWN: &str = "<unknown>";
@@ -27,7 +28,7 @@ pub fn hover(line: &str, cursor: usize) -> Option<String> {
         LineNode::TrackName(node) => track_name(&node),
         LineNode::Motion(node) => motion(&node, cursor),
         LineNode::Rotation(node) => rotation(&node, cursor),
-        LineNode::Text(node) => text(&node),
+        LineNode::Text(node) => text(&node, cursor),
         LineNode::IFrame(node) => iframe(&node, cursor),
         LineNode::Pie(node) => pie(&node, cursor),
         LineNode::Comment(_) => return None,
@@ -78,12 +79,51 @@ fn rotation(node: &RotationNode, cursor: usize) -> String {
     )
 }
 
-fn text(node: &TextNode) -> String {
+fn text(node: &TextNode, cursor: usize) -> String {
+    if let Some(text) = &node.text
+        && let Some(markdown) = scar_hover(text.value, cursor.saturating_sub(text.span.start))
+    {
+        return markdown;
+    }
     format!(
         "# Text annotation\n- Time: {}s\n- Text: `{}`",
         num(node.time.as_ref().map(|f| f.value)),
         node.text.as_ref().map_or(UNKNOWN, |t| t.value)
     )
+}
+
+/// SCAR annotations: the docs of the JSON key under `column` (in `text`), else of the event.
+fn scar_hover(text: &str, column: usize) -> Option<String> {
+    let trimmed = text.trim_start();
+    if trimmed.starts_with(scar::ACTION_DATA) {
+        // e.g., hovering `"MaxDistance"` -> the docs of that key.
+        let chars: Vec<char> = text.chars().collect();
+        let key_at = scar::ACTION_KEYS.iter().find(|key| {
+            let quoted: Vec<char> = format!("\"{}\"", key.name).chars().collect();
+            (0..chars.len()).any(|at| {
+                chars[at..].starts_with(&quoted) && (at..at + quoted.len()).contains(&column)
+            })
+        });
+        return Some(match key_at {
+            Some(key) => format!(
+                "# SCAR_ActionData: `{}`\n{}\n\n- See: [SCAR manual]({})",
+                key.name,
+                key.doc,
+                scar::MANUAL_URL
+            ),
+            None => {
+                format!("{}\n- See: [SCAR manual]({})", scar::ACTION_DATA_DOC, scar::MANUAL_URL)
+            }
+        });
+    }
+    let doc = if trimmed.starts_with(scar::COMBO_START) {
+        scar::COMBO_START_DOC
+    } else if trimmed.starts_with(scar::UPDATE_DUMMY) {
+        scar::UPDATE_DUMMY_DOC
+    } else {
+        return None;
+    };
+    Some(format!("{doc}\n- See: [SCAR manual]({})", scar::MANUAL_URL))
 }
 
 fn iframe(node: &IFrameNode, cursor: usize) -> String {

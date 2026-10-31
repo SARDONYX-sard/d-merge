@@ -33,6 +33,8 @@ pub mod language;
 pub mod languages;
 mod layout;
 mod overlays;
+mod search;
+mod status;
 pub mod text_pos;
 
 use egui::text::{CCursor, CCursorRange};
@@ -40,12 +42,14 @@ use egui::text::{CCursor, CCursorRange};
 use self::{
     completion::CompletionPopup,
     hover::{HoverCtx, HoverPopup},
+    keymap::{KeymapOutput, Scroll, View},
     text_pos::LinePos,
 };
 pub use self::{
-    keymap::{Keymap, KeymapState, VimOptions},
+    keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{CompletionItem, CompletionList, Diagnostic, Language, Severity, SignatureHelp},
     layout::line_job,
+    status::status_line,
 };
 
 /// Which optional features are on. All default to `true` except inlay hints / signature help.
@@ -86,6 +90,10 @@ pub struct CodeEditorState {
     hover: HoverPopup,
     /// State of the key binding styles (e.g., Vim mode and registers).
     pub keymap: KeymapState,
+    /// Lines visible last frame (Vim `H`, `Ctrl+D`, ...).
+    view: View,
+    /// The editor had the keyboard focus last frame.
+    had_focus: bool,
 }
 
 /// What happened this frame.
@@ -113,6 +121,7 @@ pub struct CodeEditor<'a> {
     features: EditorFeatures,
     keymap: Keymap,
     desired_rows: usize,
+    line_numbers: bool,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -135,6 +144,7 @@ impl<'a> CodeEditor<'a> {
             features: EditorFeatures::default(),
             keymap: Keymap::Normal,
             desired_rows: 30,
+            line_numbers: true,
         }
     }
 
@@ -160,6 +170,12 @@ impl<'a> CodeEditor<'a> {
         self
     }
 
+    /// Show the line number gutter (default `true`).
+    pub const fn line_numbers(mut self, show: bool) -> Self {
+        self.line_numbers = show;
+        self
+    }
+
     /// Minimum height in text rows (default 30).
     pub const fn desired_rows(mut self, rows: usize) -> Self {
         self.desired_rows = rows;
@@ -167,18 +183,29 @@ impl<'a> CodeEditor<'a> {
     }
 
     pub fn show(self, ui: &mut egui::Ui, state: &mut CodeEditorState) -> CodeEditorOutput {
-        let Self { id, text, language, diagnostics, features, keymap, desired_rows } = self;
-        let has_focus = ui.memory(|m| m.has_focus(id));
+        let Self { id, text, language, diagnostics, features, keymap, desired_rows, line_numbers } =
+            self;
+        let mut has_focus = ui.memory(|m| m.has_focus(id));
+        // egui drops a widget's focus on `Esc` before we run, but Vim needs that key
+        // (e.g., to leave Visual mode): take the focus back.
+        if !has_focus
+            && state.had_focus
+            && keymap == Keymap::Vim
+            && ui.input(|i| i.key_pressed(egui::Key::Escape))
+        {
+            ui.memory_mut(|m| m.request_focus(id));
+            has_focus = true;
+        }
 
         // ── 1. Keys owned by the popups / keymap (must run before the TextEdit) ──
-        state.hover.close_on_input(ui); // before the keymap swallows the key events
+        state.hover.handle_input(ui, id); // before the keymap swallows the key events
         let accept_key = state.completion.handle_keys(ui);
-        let (mut changed, command, show_hover) = if has_focus {
-            let out = state.keymap.handle(keymap, ui, id, text);
-            (out.changed, out.command, out.show_hover)
+        let keys = if has_focus {
+            state.keymap.handle(keymap, ui, id, text, state.view)
         } else {
-            (false, None, false)
+            KeymapOutput::default()
         };
+        let mut changed = keys.changed;
         let inserting = state.keymap.is_inserting(keymap);
 
         let ctrl_space = features.completion
@@ -197,20 +224,52 @@ impl<'a> CodeEditor<'a> {
 
         // ── 2. The TextEdit ───────────────────────────────────────────────────
         let underlines = if features.diagnostics { diagnostics } else { &[] };
+        let search = state.keymap.search_highlight(keymap);
         let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
-            layout::layout(ui, buf.as_str(), language, underlines)
+            layout::layout(ui, buf.as_str(), language, underlines, search.as_ref())
         };
-        let output = egui::TextEdit::multiline(text)
-            .id(id)
-            .code_editor()
-            .desired_width(f32::INFINITY)
-            .desired_rows(desired_rows)
-            .layouter(&mut layouter)
-            .show(ui);
+        // e.g., Vim Normal mode draws a block cursor: no blinking I-beam then.
+        let hide_text_cursor = state.keymap.hides_text_cursor(keymap);
+        // Gutter for the line numbers on the left (drawn after the text is laid out, below).
+        let gutter = line_numbers.then(|| overlays::gutter_width(ui, text));
+        let (gutter_left, output) = ui
+            .horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                let gutter_left = ui.cursor().left();
+                if let Some(width) = gutter {
+                    ui.add_space(width);
+                }
+                let output = ui.scope(|ui| {
+                    if keymap == Keymap::Vim {
+                        // Vim selections often span many lines: a lighter color keeps the text readable.
+                        let selection = &mut ui.visuals_mut().selection.bg_fill;
+                        *selection = selection.gamma_multiply(0.55);
+                    }
+                    if hide_text_cursor {
+                        let cursor = &mut ui.visuals_mut().text_cursor;
+                        cursor.stroke = egui::Stroke::NONE;
+                        cursor.blink = false;
+                    }
+                    egui::TextEdit::multiline(text)
+                        .id(id)
+                        .code_editor()
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(desired_rows)
+                        .layouter(&mut layouter)
+                        .show(ui)
+                });
+                (gutter_left, output.inner)
+            })
+            .inner;
 
         let response = &output.response.response;
         changed |= response.changed();
-        let cursor_index = output.cursor_range.map(|range| range.primary.index.0);
+        // egui reports the cursor only while the editor has the focus; a jump from outside (e.g., a
+        // problems list, `set_cursor`) arrives one frame before the focus does, so read the state.
+        let cursor_range = output.cursor_range.or_else(|| {
+            egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range())
+        });
+        let cursor_index = cursor_range.map(|range| range.primary.index.0);
         let mut cursor = cursor_index.map(|i| LinePos::from_char_index(text, i));
 
         // ── 3. Completion ────────────────────────────────────────────────────────
@@ -246,12 +305,41 @@ impl<'a> CodeEditor<'a> {
         if let Some(cursor) = cursor {
             overlays::current_line(ui, galley, galley_pos, cursor.line);
         }
-        // Requested by `set_cursor` (e.g., a click in a problems list).
-        if ui.data_mut(|d| d.remove_temp::<bool>(scroll_request_id(id))).unwrap_or(false)
-            && let Some(cursor) = anchor
-        {
-            ui.scroll_to_rect(cursor, Some(egui::Align::Center));
+        if let Some(width) = gutter {
+            let current = cursor.map(|c| c.line);
+            overlays::line_numbers(
+                ui,
+                galley,
+                galley_pos,
+                gutter_left..gutter_left + width,
+                current,
+            );
         }
+        if let Some(ranges) = state.keymap.block_selection(keymap, text) {
+            overlays::block_selection(ui, galley, galley_pos, &ranges);
+        }
+        // Requested by `set_cursor` (e.g., a click in a problems list): center it.
+        // Moved by the keymap (e.g., Vim `G`, `n`): just bring it into view.
+        // (The `TextEdit` only scrolls for cursor moves it makes itself.)
+        if let Some(cursor) = anchor {
+            if ui.data_mut(|d| d.remove_temp::<bool>(scroll_request_id(id))).unwrap_or(false) {
+                ui.scroll_to_rect(cursor, Some(egui::Align::Center));
+            } else {
+                match keys.scroll {
+                    Some(Scroll::IntoView) => ui.scroll_to_rect(cursor, None),
+                    Some(Scroll::Align(align)) => ui.scroll_to_rect(cursor, Some(align)),
+                    Some(Scroll::Lines(lines)) => {
+                        let row_height =
+                            galley.rows.first().map_or(16.0, |row| row.rect().height());
+                        #[expect(clippy::cast_precision_loss, reason = "a few lines")]
+                        ui.scroll_with_delta(egui::vec2(0.0, -(lines as f32) * row_height));
+                    }
+                    None => {}
+                }
+            }
+        }
+        state.view = visible_lines(ui, galley, galley_pos);
+        state.had_focus = response.has_focus();
         if let Some(index) = state.keymap.block_cursor(keymap, cursor_index, text) {
             overlays::block_cursor(ui, galley, galley_pos, index);
         }
@@ -269,7 +357,9 @@ impl<'a> CodeEditor<'a> {
                 diagnostics: underlines,
                 with_docs: features.hover,
             };
-            if show_hover && let Some(index) = cursor_index {
+            if keys.show_hover
+                && let Some(index) = cursor_index
+            {
                 state.hover.open_at(index, &hover); // e.g., Vim `K`
             }
             state.hover.ui(ui, &hover);
@@ -283,8 +373,18 @@ impl<'a> CodeEditor<'a> {
             overlays::signature_box(ui.ctx(), id, anchor, language, text, cursor);
         }
 
-        CodeEditorOutput { changed, cursor, command }
+        CodeEditorOutput { changed, cursor, command: keys.command }
     }
+}
+
+/// The lines of `galley` inside the visible area (lines are never wrapped: row = line).
+fn visible_lines(ui: &egui::Ui, galley: &egui::Galley, galley_pos: egui::Pos2) -> View {
+    let clip = ui.clip_rect();
+    let rows = &galley.rows;
+    let first = rows.iter().position(|r| galley_pos.y + r.rect().max.y > clip.top()).unwrap_or(0);
+    let last =
+        rows.iter().rposition(|r| galley_pos.y + r.rect().min.y < clip.bottom()).unwrap_or(first);
+    View { first_line: first, lines: last.saturating_sub(first) + 1 }
 }
 
 /// The `TextEdit` id used by `CodeEditor::new(id_salt, ..)`.

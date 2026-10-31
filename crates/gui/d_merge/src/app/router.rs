@@ -6,7 +6,7 @@
 //!
 //! # Frame layout
 //! ```text
-//! ┌ page nav (Patch | Convert | hkanno Editor) ───────────────┐  <- Root
+//! ┌ page nav (Patch | Convert | hkanno Editor | Theme) ───────┐  <- Root
 //! │                                                           │
 //! │   current page (drawn by the router)                      │  <- App::ui_*_page
 //! │                                                           │
@@ -78,6 +78,8 @@ impl Root {
                         clicked = Some(page);
                     }
                 }
+                ui.separator();
+                self.app.ui_theme_box(ui);
             });
         });
 

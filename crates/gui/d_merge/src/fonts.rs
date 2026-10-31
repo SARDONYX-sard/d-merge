@@ -8,6 +8,12 @@
 //! - [`FontMode::System`] loads a system font family.
 //! - [`FontMode::File`] loads a font from a file path.
 //!
+//! # Symbol fallback
+//!
+//! Every font setup also appends a system symbol font as the last fallback, because neither the
+//! UI fonts nor egui's built-in ones have e.g. `␀` (U+2400, used by hkanno for empty text).
+//! See [`SYMBOL_FAMILIES`].
+//!
 //! # Caching
 //!
 //! Loaded font bytes are cached for the lifetime of the process to avoid
@@ -22,6 +28,13 @@ use dashmap::DashMap;
 use egui::{Context, FontData, FontDefinitions, FontFamily};
 use font_kit::source::SystemSource;
 use gui_shared::settings::ui::{FontMode, FontSettings};
+
+/// System fonts tried (in order) for symbols missing in the UI font, e.g. `␀` (U+2400).
+const SYMBOL_FAMILIES: [&str; 5] =
+    ["Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", "Noto Sans Symbols", "Symbola"];
+
+/// Cached symbol fallback font (`None`: none of [`SYMBOL_FAMILIES`] is installed).
+static SYMBOL_FONT: OnceLock<Option<Arc<Vec<u8>>>> = OnceLock::new();
 
 /// Cached list of available system font families.
 static FONT_FAMILIES: OnceLock<Vec<String>> = OnceLock::new();
@@ -125,7 +138,9 @@ fn apply_default_font(ctx: &Context) -> Result<(), FontError> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        ctx.set_fonts(FontDefinitions::default());
+        let mut defs = FontDefinitions::default();
+        add_symbol_fallback(&mut defs);
+        ctx.set_fonts(defs);
         Ok(())
     }
 }
@@ -221,6 +236,25 @@ fn build_font_definitions(font_data: Arc<Vec<u8>>) -> FontDefinitions {
     defs.font_data.insert("user_font".into(), FontData::from_owned(font_data.to_vec()).into());
     defs.families.entry(FontFamily::Proportional).or_default().insert(0, "user_font".into());
     defs.families.entry(FontFamily::Monospace).or_default().insert(0, "user_font".into());
+    add_symbol_fallback(&mut defs);
 
     defs
+}
+
+/// Appends the symbol font (see [`SYMBOL_FAMILIES`]) as the last fallback of both families.
+fn add_symbol_fallback(defs: &mut FontDefinitions) {
+    let Some(bytes) = SYMBOL_FONT.get_or_init(load_symbol_font) else { return };
+    defs.font_data.insert("symbol_fallback".into(), FontData::from_owned(bytes.to_vec()).into());
+    for family in [FontFamily::Proportional, FontFamily::Monospace] {
+        defs.families.entry(family).or_default().push("symbol_fallback".into());
+    }
+}
+
+fn load_symbol_font() -> Option<Arc<Vec<u8>>> {
+    let source = SystemSource::new();
+    SYMBOL_FAMILIES.iter().find_map(|name| {
+        let family = source.select_family_by_name(name).ok()?;
+        let font = family.fonts().first()?.load().ok()?;
+        font.copy_font_data()
+    })
 }

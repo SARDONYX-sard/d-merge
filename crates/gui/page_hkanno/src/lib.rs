@@ -238,9 +238,9 @@ impl HkannoPage {
         }
 
         // Status line first (bottom of the area), so it stays visible while the text scrolls.
-        if let Some(status) = tab.editor.keymap.status(keymap) {
+        if tab.editor.keymap.status(keymap).is_some() {
             egui::Panel::bottom("hkanno_keymap_status").show(ui, |ui| {
-                ui.label(egui::RichText::new(status).monospace());
+                egui_code_editor::status_line(ui, &tab.editor, keymap);
             });
         }
 

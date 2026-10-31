@@ -1,18 +1,17 @@
-//! Parses pending Normal/Visual-mode keys into a [`Command`].
+//! The commands of Normal / Visual mode (what [`super::parse`] turns keys into).
 //!
 //! # Grammar (the supported subset of Vim)
 //! ```text
-//! command  := [count] ( motion | operator [count] target | simple )
-//! target   := motion | operator (same char: `dd`, `yy`, `cc`) | ("i" | "a") "w"
-//! motion   := h j k l w b e 0 ^ $ G gg  (+ arrow keys)
-//! operator := d c y
-//! simple   := x X D C Y p P i a I A o O J ~ r<char> u <C-r> v V : K
+//! command  := ["<reg>] [count] ( motion | operator [count] target | simple )
+//! target   := motion | operator again (`dd`, `>>`, `gUU`) | ("i" | "a") object
+//! motion   := h j k l w W b B e E ge gE 0 ^ $ | + - _ <CR> gg G { } % f t F T ; , ' `
+//!             H M L n N <C-d> <C-u> <C-f> <C-b> (+ arrows, Home, End, PageUp/Down)
+//! operator := d c y > < gu gU g~
+//! object   := w W p " ' ` ( ) b [ ] { } B < >
+//! simple   := x X D C Y s S p P i a I A gi gI o O J gJ ~ r<c> u <C-r> . v V gv : / ? * # g* g#
+//!             K gx <C-a> <C-x> m<c> q<c> q @<c> @@ <C-o> <C-i> zz zt zb z. z<CR> z- <C-e> <C-y>
 //! ```
-//! e.g., `3j`, `dw`, `2dd`, `ciw`, `y$`, `r1`
-//!
-//! Keys accumulate until they form a complete command ([`Parse::Done`]) or cannot ([`Parse::Invalid`]).
-
-use super::keys::VimKey;
+//! e.g., `3j`, `dw`, `2dd`, `ci(`, `"ayy`, `>ip`, `gUiw`, `dt,`, `qa ... q`, `@a`
 
 /// Where a motion moves the cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,42 +20,147 @@ pub(super) enum Motion {
     Right,
     Down,
     Up,
-    /// `w`
-    WordForward,
-    /// `b`
-    WordBackward,
-    /// `e`
-    WordEnd,
+    /// `w` / `W` (`big`: words are separated by blanks only)
+    WordForward {
+        big: bool,
+    },
+    /// `b` / `B`
+    WordBackward {
+        big: bool,
+    },
+    /// `e` / `E`
+    WordEnd {
+        big: bool,
+    },
+    /// `ge` / `gE`
+    WordEndBackward {
+        big: bool,
+    },
     /// `0`
     LineStart,
     /// `^`
     FirstNonBlank,
     /// `$`
     LineEnd,
+    /// `|`: column `count`
+    Column,
+    /// `+`, `Enter`: first non-blank of the next line
+    NextLineStart,
+    /// `-`: first non-blank of the previous line
+    PrevLineStart,
+    /// `_`: first non-blank of the line `count - 1` below
+    CurrentLineStart,
     /// `gg` (with a count: that line)
     FileStart,
     /// `G` (with a count: that line)
     FileEnd,
+    /// `}`
+    ParagraphForward,
+    /// `{`
+    ParagraphBackward,
+    /// `%`: the matching bracket
+    MatchPair,
+    /// `f<c>` / `t<c>` (`forward`), `F<c>` / `T<c>`; `till` stops before the char
+    Find {
+        forward: bool,
+        till: bool,
+        ch: char,
+    },
+    /// `;` / `,` (`reverse`)
+    RepeatFind {
+        reverse: bool,
+    },
+    /// `'<c>` (`linewise`) / `` `<c> ``
+    Mark {
+        name: char,
+        linewise: bool,
+    },
+    /// `H`
+    ScreenTop,
+    /// `M`
+    ScreenMiddle,
+    /// `L`
+    ScreenBottom,
+    /// `Ctrl+D` / `Ctrl+U`
+    HalfPage {
+        down: bool,
+    },
+    /// `Ctrl+F` / `Ctrl+B`
+    Page {
+        down: bool,
+    },
+    /// `n` / `N` (`reverse`)
+    SearchNext {
+        reverse: bool,
+    },
 }
 
-/// `d`, `c`, `y`
+impl Motion {
+    /// Jumps are recorded in the jump list (`Ctrl+O` goes back), like Vim.
+    pub(super) const fn is_jump(self) -> bool {
+        matches!(
+            self,
+            Self::FileStart
+                | Self::FileEnd
+                | Self::ParagraphForward
+                | Self::ParagraphBackward
+                | Self::MatchPair
+                | Self::Mark { .. }
+                | Self::ScreenTop
+                | Self::ScreenMiddle
+                | Self::ScreenBottom
+                | Self::SearchNext { .. }
+        )
+    }
+}
+
+/// `d`, `c`, `y`, `>`, `<`, `gu`, `gU`, `g~`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Operator {
     Delete,
     Change,
     Yank,
+    Indent,
+    Outdent,
+    Lower,
+    Upper,
+    ToggleCase,
+}
+
+/// Text objects after `i` / `a`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ObjectKind {
+    /// `w`
+    Word,
+    /// `W`
+    BigWord,
+    /// `p`
+    Paragraph,
+    /// `"`, `'`, `` ` ``
+    Quote(char),
+    /// `(` `)` `b`, `[` `]`, `{` `}` `B`, `<` `>`: (open, close)
+    Pair(char, char),
 }
 
 /// What an operator acts on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Target {
     Motion(Motion),
-    /// `dd`, `cc`, `yy`
+    /// `dd`, `cc`, `yy`, `>>`, `gUU`, ...
     Line,
-    /// `iw` (`around: false`) / `aw` (`around: true`)
-    Word {
+    /// `iw`, `a(`, ... (`around`: the `a` form)
+    Object {
+        kind: ObjectKind,
         around: bool,
     },
+}
+
+/// Where `zz` / `zt` / `zb` put the cursor line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ScrollTo {
+    Center,
+    Top,
+    Bottom,
 }
 
 /// Commands that are not "operator + target".
@@ -84,12 +188,16 @@ pub(super) enum Simple {
     InsertLineStart,
     /// `A`
     AppendLineEnd,
+    /// `gi`: where Insert mode was left last time
+    InsertAtLastInsert,
+    /// `gI`: column 0
+    InsertAtColumnZero,
     /// `o`
     OpenBelow,
     /// `O`
     OpenAbove,
-    /// `J`
-    JoinLines,
+    /// `J` (`spaces`) / `gJ`
+    JoinLines { spaces: bool },
     /// `~`
     ToggleCase,
     /// `r<char>`
@@ -98,14 +206,44 @@ pub(super) enum Simple {
     Undo,
     /// `Ctrl+R`
     Redo,
+    /// `.`
+    Repeat,
     /// `v`
     Visual,
+    /// `Ctrl+V`
+    VisualBlock,
     /// `V`
     VisualLine,
+    /// `gv`
+    Reselect,
     /// `:`
     CommandLine,
+    /// `/`
+    SearchForward,
+    /// `?`
+    SearchBackward,
+    /// `*` / `#` (`whole`), `g*` / `g#`: search the word under the cursor
+    SearchWord { forward: bool, whole: bool },
     /// `K`: show hover docs at the cursor (like `vim.lsp.buf.hover`).
     Hover,
+    /// `gx`: open the URL under the cursor.
+    OpenUrl,
+    /// `Ctrl+A` (`up`) / `Ctrl+X`: add / subtract `count` to the number at or after the cursor
+    Increment { up: bool },
+    /// `m<c>`
+    SetMark(char),
+    /// `q<c>`: start recording a macro (`q` stops)
+    Record(char),
+    /// `@<c>` (`@@`: the last one)
+    Play(char),
+    /// `Ctrl+O` (`older`) / `Ctrl+I`, `Tab`
+    Jump { older: bool },
+    /// `zz`, `zt`, `zb` (+ `z.`, `z<CR>`, `z-`, which also go to the first non-blank)
+    ScrollCursor { to: ScrollTo, first_non_blank: bool },
+    /// `Ctrl+E` (`down`) / `Ctrl+Y`: scroll the view by `count` lines
+    ScrollLines { down: bool },
+    /// Keys that do nothing here (e.g., `Ctrl+W`, window commands).
+    Nop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,193 +251,4 @@ pub(super) enum Command {
     Move(Motion),
     Operate(Operator, Target),
     Simple(Simple),
-}
-
-/// Result of parsing the pending keys.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Parse {
-    /// A full command. `count` is at least 1; `explicit_count` tells whether one was typed
-    /// (`G` vs `5G`).
-    Done { command: Command, count: usize, explicit_count: bool },
-    /// Wait for more keys (e.g., after `d` or `g`).
-    Incomplete,
-    /// Not a command; drop the keys.
-    Invalid,
-}
-
-pub(super) fn parse(keys: &[VimKey]) -> Parse {
-    let (count1, after_count) = take_count(keys);
-
-    let Some((&first, rest)) = after_count.split_first() else { return Parse::Incomplete };
-    let done = |command, count2: Option<usize>| {
-        let explicit = count1.is_some() || count2.is_some();
-        let count = count1.unwrap_or(1) * count2.unwrap_or(1);
-        Parse::Done { command, count, explicit_count: explicit }
-    };
-
-    // ── operator + target ────────────────────────────────────────────────────
-    if let Some(op) = operator(first) {
-        let (count2, rest) = take_count(rest);
-        return match rest {
-            [] | [VimKey::Char('i' | 'a')] => Parse::Incomplete,
-            [key, ..] if operator(*key) == Some(op) => {
-                done(Command::Operate(op, Target::Line), count2)
-            }
-            [VimKey::Char(c @ ('i' | 'a')), VimKey::Char('w')] => {
-                done(Command::Operate(op, Target::Word { around: *c == 'a' }), count2)
-            }
-            _ => match motion(rest) {
-                MotionParse::Motion(m) => done(Command::Operate(op, Target::Motion(m)), count2),
-                MotionParse::NeedMore => Parse::Incomplete,
-                MotionParse::NotMotion => Parse::Invalid,
-            },
-        };
-    }
-
-    // ── motion ───────────────────────────────────────────────────────────────
-    match motion(after_count) {
-        MotionParse::Motion(m) => return done(Command::Move(m), None),
-        MotionParse::NeedMore => return Parse::Incomplete,
-        MotionParse::NotMotion => {}
-    }
-
-    // ── simple ───────────────────────────────────────────────────────────────
-    let simple = match first {
-        VimKey::Redo => Simple::Redo,
-        VimKey::Char('r') => match rest {
-            [] => return Parse::Incomplete,
-            [VimKey::Char(c), ..] => Simple::Replace(*c),
-            _ => return Parse::Invalid,
-        },
-        VimKey::Char(c) => match c {
-            'x' => Simple::DeleteChar,
-            'X' => Simple::DeleteCharBefore,
-            'D' => Simple::DeleteToEnd,
-            'C' => Simple::ChangeToEnd,
-            'Y' => Simple::YankLine,
-            'p' => Simple::PasteAfter,
-            'P' => Simple::PasteBefore,
-            'i' => Simple::Insert,
-            'a' => Simple::Append,
-            'I' => Simple::InsertLineStart,
-            'A' => Simple::AppendLineEnd,
-            'o' => Simple::OpenBelow,
-            'O' => Simple::OpenAbove,
-            'J' => Simple::JoinLines,
-            '~' => Simple::ToggleCase,
-            'u' => Simple::Undo,
-            'v' => Simple::Visual,
-            'V' => Simple::VisualLine,
-            ':' => Simple::CommandLine,
-            'K' => Simple::Hover,
-            _ => return Parse::Invalid,
-        },
-        _ => return Parse::Invalid,
-    };
-    done(Command::Simple(simple), None)
-}
-
-/// Leading digits (`0` alone is the `0` motion, not a count).
-fn take_count(keys: &[VimKey]) -> (Option<usize>, &[VimKey]) {
-    let digits = keys
-        .iter()
-        .enumerate()
-        .take_while(
-            |(i, k)| matches!(k, VimKey::Char(c) if c.is_ascii_digit() && !(*i == 0 && *c == '0')),
-        )
-        .count();
-    if digits == 0 {
-        return (None, keys);
-    }
-    let count = keys[..digits]
-        .iter()
-        .filter_map(|k| match k {
-            VimKey::Char(c) => c.to_digit(10),
-            _ => None,
-        })
-        .fold(0_usize, |acc, d| acc.saturating_mul(10).saturating_add(d as usize));
-    (Some(count.max(1)), &keys[digits..])
-}
-
-const fn operator(key: VimKey) -> Option<Operator> {
-    match key {
-        VimKey::Char('d') => Some(Operator::Delete),
-        VimKey::Char('c') => Some(Operator::Change),
-        VimKey::Char('y') => Some(Operator::Yank),
-        _ => None,
-    }
-}
-
-/// Result of trying to read a motion.
-enum MotionParse {
-    Motion(Motion),
-    /// A prefix such as `g` (of `gg`).
-    NeedMore,
-    NotMotion,
-}
-
-const fn motion(keys: &[VimKey]) -> MotionParse {
-    let motion = match keys {
-        [VimKey::Char('h') | VimKey::Left | VimKey::Backspace, ..] => Motion::Left,
-        [VimKey::Char('l') | VimKey::Right, ..] => Motion::Right,
-        [VimKey::Char('j') | VimKey::Down | VimKey::Enter, ..] => Motion::Down,
-        [VimKey::Char('k') | VimKey::Up, ..] => Motion::Up,
-        [VimKey::Char('w'), ..] => Motion::WordForward,
-        [VimKey::Char('b'), ..] => Motion::WordBackward,
-        [VimKey::Char('e'), ..] => Motion::WordEnd,
-        [VimKey::Char('0'), ..] => Motion::LineStart,
-        [VimKey::Char('^'), ..] => Motion::FirstNonBlank,
-        [VimKey::Char('$'), ..] => Motion::LineEnd,
-        [VimKey::Char('G'), ..] => Motion::FileEnd,
-        [VimKey::Char('g')] => return MotionParse::NeedMore,
-        [VimKey::Char('g'), VimKey::Char('g'), ..] => Motion::FileStart,
-        _ => return MotionParse::NotMotion,
-    };
-    MotionParse::Motion(motion)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn keys(s: &str) -> Vec<VimKey> {
-        s.chars().map(VimKey::Char).collect()
-    }
-
-    #[test]
-    fn counts_and_operators() {
-        assert_eq!(
-            parse(&keys("3j")),
-            Parse::Done { command: Command::Move(Motion::Down), count: 3, explicit_count: true }
-        );
-        assert_eq!(
-            parse(&keys("2dd")),
-            Parse::Done {
-                command: Command::Operate(Operator::Delete, Target::Line),
-                count: 2,
-                explicit_count: true
-            }
-        );
-        assert_eq!(
-            parse(&keys("ciw")),
-            Parse::Done {
-                command: Command::Operate(Operator::Change, Target::Word { around: false }),
-                count: 1,
-                explicit_count: false
-            }
-        );
-    }
-
-    #[test]
-    fn incomplete_and_invalid() {
-        assert_eq!(parse(&keys("d")), Parse::Incomplete);
-        assert_eq!(parse(&keys("g")), Parse::Incomplete);
-        assert_eq!(parse(&keys("r")), Parse::Incomplete);
-        assert_eq!(parse(&keys("Q")), Parse::Invalid);
-        assert_eq!(parse(&keys("0")), parse(&keys("0"))); // `0` is a motion, not a count
-        assert!(matches!(
-            parse(&keys("0")),
-            Parse::Done { command: Command::Move(Motion::LineStart), .. }
-        ));
-    }
 }

@@ -9,7 +9,11 @@
 //! Anything else is shown as plain text. A full CommonMark renderer would be overkill here.
 
 /// Renders `markdown` into `ui`.
-pub fn markdown(ui: &mut egui::Ui, markdown: &str) {
+///
+/// Returns the responses of the links, in order, e.g. to focus the first one for keyboard use
+/// (a focused link opens with `Enter`; `Tab` moves to the next one).
+pub fn markdown(ui: &mut egui::Ui, markdown: &str) -> Vec<egui::Response> {
+    let mut links = Vec::new();
     let mut in_code_block = false;
     let mut code = String::new();
 
@@ -36,12 +40,12 @@ pub fn markdown(ui: &mut egui::Ui, markdown: &str) {
         } else if let Some(item) = trimmed.strip_prefix("- ") {
             ui.horizontal_wrapped(|ui| {
                 ui.label("•");
-                inline(ui, item);
+                inline(ui, item, &mut links);
             });
         } else if trimmed.is_empty() {
             ui.add_space(4.0);
         } else {
-            ui.horizontal_wrapped(|ui| inline(ui, trimmed));
+            ui.horizontal_wrapped(|ui| inline(ui, trimmed, &mut links));
         }
     }
 
@@ -49,6 +53,7 @@ pub fn markdown(ui: &mut egui::Ui, markdown: &str) {
     if in_code_block && !code.is_empty() {
         code_block(ui, code.trim_end_matches('\n'));
     }
+    links
 }
 
 fn code_block(ui: &mut egui::Ui, code: &str) {
@@ -62,7 +67,7 @@ fn code_block(ui: &mut egui::Ui, code: &str) {
 }
 
 /// One line with `` `code` `` and `[text](url)` spans.
-fn inline(ui: &mut egui::Ui, text: &str) {
+fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
     ui.spacing_mut().item_spacing.x = 0.0;
 
     let mut rest = text;
@@ -90,7 +95,18 @@ fn inline(ui: &mut egui::Ui, text: &str) {
             ui.label(egui::RichText::new(&after[..end]).code());
             rest = &after[end + 1..];
         } else if let Some((label, url, after)) = parse_link(rest) {
-            ui.hyperlink_to(label, url);
+            let link = ui.hyperlink_to(label, url);
+            if link.has_focus() {
+                // Links have no focus look of their own; keyboard users need to see it.
+                let stroke = ui.visuals().selection.stroke;
+                ui.painter().rect_stroke(
+                    link.rect.expand(1.0),
+                    2.0,
+                    stroke,
+                    egui::StrokeKind::Outside,
+                );
+            }
+            links.push(link);
             rest = after;
         } else {
             // A lone `` ` `` or `[`: print it and move on.

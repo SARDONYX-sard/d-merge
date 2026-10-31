@@ -10,22 +10,22 @@ pub(super) struct Buffer {
 
 /// Word class: Vim treats `foo_1` and `.,|` as different words.
 #[derive(PartialEq, Eq, Clone, Copy)]
-enum Class {
+pub(super) enum Class {
     Space,
     Word,
     Punct,
 }
 
-fn class(c: char) -> Class {
+/// The class of `c`. `big`: a WORD (`W`, `B`, `E`, `iW`) is any run of non-blanks.
+pub(super) fn class(c: char, big: bool) -> Class {
     if c.is_whitespace() {
         Class::Space
-    } else if c.is_alphanumeric() || c == '_' {
+    } else if big || c.is_alphanumeric() || c == '_' {
         Class::Word
     } else {
         Class::Punct
     }
 }
-
 impl Buffer {
     pub(super) fn new(text: &str) -> Self {
         Self { chars: text.chars().collect() }
@@ -95,83 +95,84 @@ impl Buffer {
 
     // ── Words ────────────────────────────────────────────────────────────────
 
-    /// `w`: start of the next word.
-    pub(super) fn next_word_start(&self, i: usize) -> usize {
+    /// `w` / `W`: start of the next word.
+    pub(super) fn next_word_start(&self, i: usize, big: bool) -> usize {
         let len = self.len();
         if i >= len {
             return len;
         }
         let mut j = i;
-        let start_class = class(self.chars[j]);
+        let start_class = class(self.chars[j], big);
         // Skip the rest of the current word...
         if start_class != Class::Space {
-            while j < len && class(self.chars[j]) == start_class {
+            while j < len && class(self.chars[j], big) == start_class {
                 j += 1;
             }
         }
         // ...and the following spaces.
-        while j < len && class(self.chars[j]) == Class::Space {
+        while j < len && class(self.chars[j], big) == Class::Space {
             j += 1;
         }
         j
     }
 
-    /// `b`: start of the previous word.
-    pub(super) fn prev_word_start(&self, i: usize) -> usize {
+    /// `b` / `B`: start of the previous word.
+    pub(super) fn prev_word_start(&self, i: usize, big: bool) -> usize {
         let mut j = i;
-        while j > 0 && class(self.chars[j - 1]) == Class::Space {
+        while j > 0 && class(self.chars[j - 1], big) == Class::Space {
             j -= 1;
         }
         if j == 0 {
             return 0;
         }
-        let word_class = class(self.chars[j - 1]);
-        while j > 0 && class(self.chars[j - 1]) == word_class {
+        let word_class = class(self.chars[j - 1], big);
+        while j > 0 && class(self.chars[j - 1], big) == word_class {
             j -= 1;
         }
         j
     }
 
-    /// `e`: end (last char) of the current/next word.
-    pub(super) fn word_end(&self, i: usize) -> usize {
+    /// `e` / `E`: end (last char) of the current/next word.
+    pub(super) fn word_end(&self, i: usize, big: bool) -> usize {
         let len = self.len();
         let mut j = i + 1;
-        while j < len && class(self.chars[j]) == Class::Space {
+        while j < len && class(self.chars[j], big) == Class::Space {
             j += 1;
         }
         if j >= len {
             return len.saturating_sub(1);
         }
-        let word_class = class(self.chars[j]);
-        while j + 1 < len && class(self.chars[j + 1]) == word_class {
+        let word_class = class(self.chars[j], big);
+        while j + 1 < len && class(self.chars[j + 1], big) == word_class {
             j += 1;
         }
         j
     }
 
-    /// `iw` / `aw`: range of the word under `i` (`around` also takes the trailing spaces).
-    pub(super) fn word_object(&self, i: usize, around: bool) -> std::ops::Range<usize> {
-        let len = self.len();
-        if i >= len {
-            return len..len;
-        }
-        let word_class = class(self.chars[i]);
-        let (mut start, mut end) = (i, i + 1);
-        while start > 0
-            && class(self.chars[start - 1]) == word_class
-            && self.chars[start - 1] != '\n'
-        {
-            start -= 1;
-        }
-        while end < len && class(self.chars[end]) == word_class && self.chars[end] != '\n' {
-            end += 1;
-        }
-        if around {
-            while end < len && self.chars[end] == ' ' {
-                end += 1;
+    /// `ge` / `gE`: end (last char) of the previous word.
+    pub(super) fn prev_word_end(&self, i: usize, big: bool) -> usize {
+        let Some(&c) = self.chars.get(i) else { return i.saturating_sub(1) };
+        let mut j = i;
+        // Leave the current word...
+        let start_class = class(c, big);
+        if start_class != Class::Space {
+            while j > 0 && class(self.chars[j], big) == start_class {
+                j -= 1;
             }
         }
-        start..end
+        // ...and the spaces before it.
+        while j > 0 && class(self.chars[j], big) == Class::Space {
+            j -= 1;
+        }
+        j
+    }
+
+    /// The word under the cursor for `*` / `#` (or the next one on the line), e.g. `animmotion`.
+    pub(super) fn keyword_at(&self, i: usize) -> Option<String> {
+        let end_of_line = self.line_end(i);
+        let start = (i..end_of_line).find(|&j| class(self.chars[j], false) == Class::Word)?;
+        let range = self.word_object(start, false, false);
+        Some(self.slice(range))
     }
 
     // ── Editing ──────────────────────────────────────────────────────────────
@@ -193,10 +194,14 @@ mod tests {
     #[test]
     fn words() {
         let b = Buffer::new("0.5 animmotion x");
-        assert_eq!(b.next_word_start(4), 15);
-        assert_eq!(b.prev_word_start(15), 4);
-        assert_eq!(b.word_end(4), 13);
-        assert_eq!(b.word_object(6, false), 4..14);
+        assert_eq!(b.next_word_start(4, false), 15);
+        assert_eq!(b.prev_word_start(15, false), 4);
+        assert_eq!(b.word_end(4, false), 13);
+        assert_eq!(b.word_object(6, false, false), 4..14);
+        assert_eq!(b.prev_word_end(15, false), 13); // `ge`
+        assert_eq!(b.next_word_start(0, false), 1); // `0` then `.`
+        assert_eq!(b.next_word_start(0, true), 4); // WORD `0.5`
+        assert_eq!(b.keyword_at(0).as_deref(), Some("0"));
     }
 
     #[test]

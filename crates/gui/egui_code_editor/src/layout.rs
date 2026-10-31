@@ -1,8 +1,8 @@
 //! Text layout: syntax colors + diagnostic underlines.
 //!
 //! egui's `TextEdit` asks a *layouter* to turn the text into a [`egui::Galley`] every frame.
-//! We build a [`LayoutJob`] whose sections carry the colors from [`Language::highlight`]
-//! and an underline for every [`Diagnostic`].
+//! We build a [`LayoutJob`] whose sections carry the colors from [`Language::highlight`],
+//! an underline for every [`Diagnostic`] and a background for every search match.
 //!
 //! # Wrapping
 //! Lines are **never wrapped**, so galley row `n` is always document line `n`.
@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use egui::{Color32, Stroke, text::LayoutJob};
 
-use super::language::{Diagnostic, Language};
+use super::{
+    language::{Diagnostic, Language},
+    search::Matcher,
+};
 
 /// Builds the galley for `text`.
 pub(super) fn layout(
@@ -20,10 +23,12 @@ pub(super) fn layout(
     text: &str,
     language: &dyn Language,
     diagnostics: &[Diagnostic],
+    search: Option<&Matcher>,
 ) -> Arc<egui::Galley> {
     let font_id = egui::TextStyle::Monospace.resolve(ui.style());
     let visuals = ui.visuals();
     let default_color = visuals.text_color();
+    let match_bg = search_match_color(visuals);
 
     let mut job = LayoutJob::default();
     job.wrap.max_width = f32::INFINITY;
@@ -38,6 +43,7 @@ pub(super) fn layout(
         let len = line.chars().count();
         let mut colors = vec![default_color; len];
         let mut underlines: Vec<Option<Color32>> = vec![None; len];
+        let mut backgrounds = vec![Color32::TRANSPARENT; len];
 
         for (columns, color) in language.highlight(line, visuals) {
             fill(&mut colors, columns, color);
@@ -48,8 +54,17 @@ pub(super) fn layout(
             let end = diagnostic.columns.end.max(start + 1);
             fill(&mut underlines, start..end, Some(diagnostic.severity.color(visuals)));
         }
+        // e.g., Vim `/foo`: every `foo` gets a background.
+        for columns in search.map(|m| m.find_all(line)).unwrap_or_default() {
+            fill(&mut backgrounds, columns, match_bg);
+        }
 
-        append_runs(&mut job, line, &colors, &underlines, &font_id);
+        append_runs(
+            &mut job,
+            line,
+            Runs { colors: &colors, underlines: &underlines, backgrounds: &backgrounds },
+            &font_id,
+        );
     }
 
     ui.fonts_mut(|fonts| fonts.layout_job(job))
@@ -68,10 +83,16 @@ pub fn line_job(ui: &egui::Ui, line: &str, language: &dyn Language) -> LayoutJob
         fill(&mut colors, columns, color);
     }
     let underlines = vec![None; colors.len()];
+    let backgrounds = vec![Color32::TRANSPARENT; colors.len()];
 
     let mut job = LayoutJob::default();
     job.wrap.max_width = f32::INFINITY;
-    append_runs(&mut job, line, &colors, &underlines, &font_id);
+    append_runs(
+        &mut job,
+        line,
+        Runs { colors: &colors, underlines: &underlines, backgrounds: &backgrounds },
+        &font_id,
+    );
     job
 }
 
@@ -82,28 +103,45 @@ fn fill<T: Copy>(slots: &mut [T], range: std::ops::Range<usize>, value: T) {
     }
 }
 
-/// Emits one section per run of chars that share the same color and underline.
-fn append_runs(
-    job: &mut LayoutJob,
-    line: &str,
-    colors: &[Color32],
-    underlines: &[Option<Color32>],
-    font_id: &egui::FontId,
-) {
+/// Per-char styles of one line (all the same length: one entry per char).
+struct Runs<'a> {
+    colors: &'a [Color32],
+    underlines: &'a [Option<Color32>],
+    backgrounds: &'a [Color32],
+}
+
+impl Runs<'_> {
+    /// The style of char `i`.
+    const fn style(&self, i: usize) -> (Color32, Option<Color32>, Color32) {
+        (self.colors[i], self.underlines[i], self.backgrounds[i])
+    }
+}
+
+/// Emits one section per run of chars that share the same style.
+fn append_runs(job: &mut LayoutJob, line: &str, runs: Runs<'_>, font_id: &egui::FontId) {
     // Byte offset of every char, plus the end, so runs can be sliced from `line`.
     let mut bytes: Vec<usize> = line.char_indices().map(|(i, _)| i).collect();
     bytes.push(line.len());
 
+    let len = runs.colors.len();
     let mut run_start = 0;
-    for col in 1..=colors.len() {
-        let run_ends = col == colors.len()
-            || colors[col] != colors[run_start]
-            || underlines[col] != underlines[run_start];
-        if run_ends {
-            let text = &line[bytes[run_start]..bytes[col]];
-            job.append(text, 0.0, format(font_id, colors[run_start], underlines[run_start]));
+    for col in 1..=len {
+        if col == len || runs.style(col) != runs.style(run_start) {
+            let (color, underline, background) = runs.style(run_start);
+            let mut format = format(font_id, color, underline);
+            format.background = background;
+            job.append(&line[bytes[run_start]..bytes[col]], 0.0, format);
             run_start = col;
         }
+    }
+}
+
+/// Background of search matches (like Vim's `Search` highlight group).
+fn search_match_color(visuals: &egui::Visuals) -> Color32 {
+    if visuals.dark_mode {
+        Color32::from_rgba_unmultiplied(230, 180, 60, 90)
+    } else {
+        Color32::from_rgba_unmultiplied(255, 210, 60, 150)
     }
 }
 

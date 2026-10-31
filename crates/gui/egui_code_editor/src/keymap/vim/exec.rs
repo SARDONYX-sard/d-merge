@@ -1,41 +1,37 @@
-//! Executes parsed Vim commands on a [`Buffer`].
+//! Runs parsed commands: [`Exec`] (the text being edited) and the command dispatch.
 //!
-//! # Ranges
-//! Operators (`d`, `c`, `y`) act on a range computed from a motion. Like Vim, a motion is one of:
-//! - **exclusive**: the target char is not included (e.g., `dw` stops before the next word)
-//! - **inclusive**: the target char is included (e.g., `de`, `d$`)
-//! - **linewise**: whole lines (e.g., `dj`, `dd`, `dG`)
+//! The actual work lives in topic modules: motions in [`super::motion`], operators and other
+//! edits in [`super::edit`], search in [`super::prompt`], `.` / macros in [`super::repeat`].
 
 use std::ops::Range;
 
-use egui::text::{CCursor, CCursorRange};
-
 use super::{
-    super::KeymapOutput,
-    Mode, Register, VimState,
+    Mode, VimState,
     buffer::Buffer,
-    command::{Command, Motion, Operator, Simple, Target},
-    keys::VimKey,
+    command::{Command, Motion, ObjectKind, Operator, ScrollTo, Simple, Target},
+    history::{History, Snapshot},
+    motion::Kind,
+    prompt::{Prompt, PromptKind},
 };
-
-/// Same type as egui's (non-exported) `TextEditUndoer`: what `TextEditState::undoer()` returns.
-pub(super) type TextEditUndoer = egui::util::undoer::Undoer<(CCursorRange, String)>;
+use crate::keymap::{KeymapOutput, Scroll};
 
 /// Mutable context while running a batch of keys.
 pub(super) struct Exec {
     pub(super) buf: Buffer,
-    /// The `TextEdit`'s undo history; Vim edits are recorded into it.
-    pub(super) undoer: TextEditUndoer,
-    /// For copying yanks to the clipboard.
+    /// Vim's undo history (taken out of [`VimState`] while the keys run).
+    pub(super) history: History,
+    /// For the clipboard and opening URLs.
     pub(super) ctx: egui::Context,
     pub(super) output: KeymapOutput,
+    /// Number of edits so far (to tell whether a command changed the text, for `.`).
+    pub(super) edits: usize,
 }
 
 impl Exec {
     /// Records the state before an edit, so `u` can restore it.
-    fn snapshot(&mut self, cursor: usize) {
-        let state = (CCursorRange::one(CCursor::new(cursor)), self.buf.text());
-        self.undoer.add_undo(&state);
+    pub(super) fn snapshot(&mut self, cursor: usize) {
+        self.history.record(self.buf.text(), cursor);
+        self.edits += 1;
     }
 
     pub(super) fn edit(&mut self, cursor: usize, range: Range<usize>, with: &str) {
@@ -43,14 +39,6 @@ impl Exec {
         self.buf.replace(range, with);
         self.output.changed = true;
     }
-}
-
-/// How a motion's range is interpreted by operators.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Exclusive,
-    Inclusive,
-    Linewise,
 }
 
 impl VimState {
@@ -63,102 +51,36 @@ impl VimState {
     ) {
         match command {
             Command::Move(motion) => {
-                let (target, _) =
-                    self.motion_target(motion, count, explicit_count, &exec.buf, false);
+                let Some((target, _)) =
+                    self.motion_target(motion, count, explicit_count, &exec.buf, false)
+                else {
+                    return;
+                };
+                if motion.is_jump() {
+                    self.marks.push_jump(self.cursor);
+                }
                 if !matches!(motion, Motion::Up | Motion::Down) {
                     self.desired_col = None;
                 }
-                self.cursor =
-                    if self.mode == Mode::Normal { exec.buf.clamp_normal(target) } else { target };
+                self.cursor = if self.mode == Mode::Normal {
+                    exec.buf.clamp_normal(target)
+                } else {
+                    target.min(exec.buf.len())
+                };
             }
             Command::Operate(op, target) => {
-                let (range, linewise) =
-                    self.target_range(op, target, count, explicit_count, &exec.buf);
-                self.operate(op, range, linewise, exec);
+                if let Some((range, linewise)) =
+                    self.target_range(op, target, count, explicit_count, &exec.buf)
+                {
+                    self.operate(op, range, linewise, exec);
+                }
             }
             Command::Simple(simple) => self.simple(simple, count, exec),
         }
     }
 
-    // ── Motions ──────────────────────────────────────────────────────────────
-
-    /// Where `motion` (repeated `count` times) goes from the cursor.
-    ///
-    /// `for_operator`: `l` and `w` may then reach the line end (e.g., `dl` on the last char).
-    fn motion_target(
-        &mut self,
-        motion: Motion,
-        count: usize,
-        explicit_count: bool,
-        buf: &Buffer,
-        for_operator: bool,
-    ) -> (usize, Kind) {
-        let cur = self.cursor;
-        let line_end = buf.line_end(cur);
-
-        match motion {
-            Motion::Left => (cur.saturating_sub(count).max(buf.line_start(cur)), Kind::Exclusive),
-            Motion::Right => {
-                let limit = if for_operator { line_end } else { buf.line_last_char(cur) };
-                ((cur + count).min(limit), Kind::Exclusive)
-            }
-            Motion::Down | Motion::Up => {
-                let col = *self.desired_col.get_or_insert_with(|| cur - buf.line_start(cur));
-                let line = buf.line_of(cur);
-                let line = if motion == Motion::Down {
-                    (line + count).min(buf.line_count() - 1)
-                } else {
-                    line.saturating_sub(count)
-                };
-                let start = buf.nth_line_start(line);
-                ((start + col).min(buf.line_last_char(start)), Kind::Linewise)
-            }
-            Motion::WordForward => {
-                let mut i = cur;
-                for _ in 0..count {
-                    i = buf.next_word_start(i);
-                }
-                // `dw` on the last word of a line must not eat the newline.
-                if for_operator && i > line_end {
-                    i = line_end;
-                }
-                (i, Kind::Exclusive)
-            }
-            Motion::WordBackward => {
-                let mut i = cur;
-                for _ in 0..count {
-                    i = buf.prev_word_start(i);
-                }
-                (i, Kind::Exclusive)
-            }
-            Motion::WordEnd => {
-                let mut i = cur;
-                for _ in 0..count {
-                    i = buf.word_end(i);
-                }
-                (i, Kind::Inclusive)
-            }
-            Motion::LineStart => (buf.line_start(cur), Kind::Exclusive),
-            Motion::FirstNonBlank => (buf.first_non_blank(cur), Kind::Exclusive),
-            Motion::LineEnd => {
-                // `3$` = end of the line 2 below.
-                let line = (buf.line_of(cur) + count - 1).min(buf.line_count() - 1);
-                (buf.line_last_char(buf.nth_line_start(line)), Kind::Inclusive)
-            }
-            Motion::FileStart | Motion::FileEnd => {
-                let line = if explicit_count {
-                    count - 1
-                } else if motion == Motion::FileStart {
-                    0
-                } else {
-                    buf.line_count() - 1
-                };
-                (buf.first_non_blank(buf.nth_line_start(line)), Kind::Linewise)
-            }
-        }
-    }
-
-    /// Range an operator acts on, plus whether it is linewise.
+    /// Range an operator acts on, plus whether it is linewise. `None`: nothing to do
+    /// (e.g., `di(` outside parentheses).
     fn target_range(
         &mut self,
         op: Operator,
@@ -166,94 +88,50 @@ impl VimState {
         count: usize,
         explicit_count: bool,
         buf: &Buffer,
-    ) -> (Range<usize>, bool) {
+    ) -> Option<(Range<usize>, bool)> {
         let cur = self.cursor;
-        match target {
+        // `>`/`<` always work on whole lines, like Vim.
+        let force_lines = matches!(op, Operator::Indent | Operator::Outdent);
+        Some(match target {
             Target::Line => {
                 let last_line = (buf.line_of(cur) + count - 1).min(buf.line_count() - 1);
                 (cur..buf.nth_line_start(last_line), true)
             }
-            Target::Word { around } => (buf.word_object(cur, around), false),
-            Target::Motion(motion) => {
-                // Vim quirk: `cw` on a word behaves like `ce` (keeps the following space).
-                let on_word = buf.chars.get(cur).is_some_and(|c| !c.is_whitespace());
-                let motion = if op == Operator::Change && motion == Motion::WordForward && on_word {
-                    Motion::WordEnd
-                } else {
-                    motion
+            Target::Object { kind, around } => {
+                let range = match kind {
+                    ObjectKind::Word => buf.word_object(cur, around, false),
+                    ObjectKind::BigWord => buf.word_object(cur, around, true),
+                    ObjectKind::Paragraph => {
+                        return Some((buf.paragraph_object(cur, around), true));
+                    }
+                    ObjectKind::Quote(q) => buf.quote_object(cur, q, around)?,
+                    ObjectKind::Pair(open, close) => buf.pair_object(cur, open, close, around)?,
                 };
-
-                let (target, kind) = self.motion_target(motion, count, explicit_count, buf, true);
+                (range, force_lines)
+            }
+            Target::Motion(motion) => {
+                // Vim quirk: `cw` on a word changes only up to its end (keeps the following
+                // space), like `ce` but staying in the current word: `cw` on `a` in `a b` = `a`.
+                let on_word = buf.chars.get(cur).is_some_and(|c| !c.is_whitespace());
+                let (target, kind) = match motion {
+                    Motion::WordForward { big } if op == Operator::Change && on_word => {
+                        let mut end = buf.word_object(cur, false, big).end - 1;
+                        for _ in 1..count {
+                            end = buf.word_end(end, big);
+                        }
+                        (end, Kind::Inclusive)
+                    }
+                    _ => self.motion_target(motion, count, explicit_count, buf, true)?,
+                };
                 let (lo, hi) = (cur.min(target), cur.max(target));
                 match kind {
+                    _ if force_lines => (lo..hi, true),
                     Kind::Exclusive => (lo..hi, false),
                     Kind::Inclusive => (lo..(hi + 1).min(buf.len()), false),
                     Kind::Linewise => (lo..hi, true),
                 }
             }
-        }
-    }
-
-    // ── Operators ────────────────────────────────────────────────────────────
-
-    /// `range` for linewise operators only marks the first/last line; whole lines are used.
-    fn operate(&mut self, op: Operator, range: Range<usize>, linewise: bool, exec: &mut Exec) {
-        let buf = &exec.buf;
-        let (start, end) = if linewise {
-            (buf.line_start(range.start), buf.line_end(range.end))
-        } else {
-            (range.start, range.end)
-        };
-        if start > end || (start == end && !linewise) {
-            return;
-        }
-
-        self.yank(buf.slice(start..end), linewise, exec);
-        match op {
-            Operator::Yank => self.cursor = start,
-            Operator::Delete => {
-                let delete =
-                    if linewise { with_line_break(&exec.buf, start, end) } else { start..end };
-                exec.edit(self.cursor, delete.clone(), "");
-                let at = delete.start.min(exec.buf.len());
-                self.cursor =
-                    if linewise { exec.buf.first_non_blank(at) } else { exec.buf.clamp_normal(at) };
-            }
-            Operator::Change => {
-                // `cc` keeps the (now empty) line to type into.
-                exec.edit(self.cursor, start..end, "");
-                self.cursor = start;
-                self.mode = Mode::Insert;
-            }
-        }
-        if op != Operator::Change && matches!(self.mode, Mode::Visual | Mode::VisualLine) {
-            self.mode = Mode::Normal;
-        }
-    }
-
-    fn yank(&mut self, text: String, linewise: bool, exec: &Exec) {
-        exec.ctx.copy_text(text.clone());
-        self.register = Register { text, linewise };
-    }
-
-    /// In Visual mode, `d`/`x`, `y`, `c`/`s` act on the selection directly.
-    /// Returns `false` if `key` is not such an operator.
-    pub(super) fn visual_operator(&mut self, key: VimKey, exec: &mut Exec) -> bool {
-        let op = match key {
-            VimKey::Char('d' | 'x') => Operator::Delete,
-            VimKey::Char('y') => Operator::Yank,
-            VimKey::Char('c' | 's') => Operator::Change,
-            _ => return false,
-        };
-        let (lo, hi) = (self.anchor.min(self.cursor), self.anchor.max(self.cursor));
-        let linewise = self.mode == Mode::VisualLine;
-        let range = if linewise { lo..hi } else { lo..(hi + 1).min(exec.buf.len()) };
-        self.cursor = lo;
-        self.operate(op, range, linewise, exec);
-        if op == Operator::Yank {
-            self.mode = Mode::Normal;
-        }
-        true
+        })
     }
 
     // ── Simple commands ──────────────────────────────────────────────────────
@@ -267,26 +145,29 @@ impl VimState {
                 self.operate(Operator::Delete, cur..(cur + count).min(line_end), false, exec);
             }
             Simple::DeleteCharBefore => {
-                self.operate(
-                    Operator::Delete,
-                    cur.saturating_sub(count).max(line_start)..cur,
-                    false,
-                    exec,
-                );
+                let start = cur.saturating_sub(count).max(line_start);
+                self.operate(Operator::Delete, start..cur, false, exec);
             }
             Simple::DeleteToEnd => self.operate(Operator::Delete, cur..line_end, false, exec),
             Simple::ChangeToEnd => self.operate(Operator::Change, cur..line_end, false, exec),
             Simple::YankLine => {
-                let (range, _) =
-                    self.target_range(Operator::Yank, Target::Line, count, false, &exec.buf);
-                self.operate(Operator::Yank, range, true, exec);
+                if let Some((range, _)) =
+                    self.target_range(Operator::Yank, Target::Line, count, false, &exec.buf)
+                {
+                    self.operate(Operator::Yank, range, true, exec);
+                }
             }
             Simple::PasteAfter => self.paste(true, count, exec),
             Simple::PasteBefore => self.paste(false, count, exec),
-            Simple::Insert => self.mode = Mode::Insert,
+            Simple::Insert => self.insert_at(cur),
             Simple::Append => self.insert_at((cur + 1).min(line_end)),
             Simple::InsertLineStart => self.insert_at(exec.buf.first_non_blank(cur)),
             Simple::AppendLineEnd => self.insert_at(line_end),
+            Simple::InsertAtLastInsert => {
+                let at = self.last_insert.unwrap_or(cur).min(exec.buf.len());
+                self.insert_at(at);
+            }
+            Simple::InsertAtColumnZero => self.insert_at(line_start),
             Simple::OpenBelow => {
                 exec.edit(cur, line_end..line_end, "\n");
                 self.insert_at(line_end + 1);
@@ -295,20 +176,10 @@ impl VimState {
                 exec.edit(cur, line_start..line_start, "\n");
                 self.insert_at(line_start);
             }
-            Simple::JoinLines => self.join_lines(count, exec),
+            Simple::JoinLines { spaces } => self.join_lines(count, spaces, exec),
             Simple::ToggleCase => {
                 let end = (cur + count).min(line_end);
-                let toggled: String = exec.buf.chars[cur..end]
-                    .iter()
-                    .flat_map(|c| {
-                        if c.is_uppercase() {
-                            c.to_lowercase().collect::<Vec<_>>()
-                        } else {
-                            c.to_uppercase().collect()
-                        }
-                    })
-                    .collect();
-                exec.edit(cur, cur..end, &toggled);
+                self.operate(Operator::ToggleCase, cur..end, false, exec);
                 self.cursor = exec.buf.clamp_normal(end);
             }
             Simple::Replace(c) => {
@@ -319,14 +190,67 @@ impl VimState {
             }
             Simple::Undo => self.undo_redo(true, exec),
             Simple::Redo => self.undo_redo(false, exec),
-            Simple::Visual | Simple::VisualLine => {
-                let mode = if simple == Simple::Visual { Mode::Visual } else { Mode::VisualLine };
-                // Pressing `v` again in Visual mode leaves it.
+            Simple::Repeat => self.repeat_last_change(exec),
+            Simple::Visual | Simple::VisualLine | Simple::VisualBlock => {
+                let mode = match simple {
+                    Simple::Visual => Mode::Visual,
+                    Simple::VisualLine => Mode::VisualLine,
+                    _ => Mode::VisualBlock,
+                };
+                if !self.mode.is_visual() {
+                    self.anchor = cur;
+                }
+                // The same key again leaves Visual mode; the other one switches the kind.
                 self.mode = if self.mode == mode { Mode::Normal } else { mode };
-                self.anchor = cur;
             }
-            Simple::CommandLine => self.command_line = Some(String::new()),
+            Simple::Reselect => {
+                if let Some((mode, anchor, cursor)) = self.last_visual {
+                    let len = exec.buf.len();
+                    (self.mode, self.anchor, self.cursor) =
+                        (mode, anchor.min(len), cursor.min(len));
+                }
+            }
+            Simple::CommandLine => {
+                self.prompt = Some(if self.mode.is_visual() {
+                    self.mode = Mode::Normal;
+                    Prompt::with_text(PromptKind::Ex, "'<,'>")
+                } else {
+                    Prompt::new(PromptKind::Ex)
+                });
+            }
+            Simple::SearchForward => self.prompt = Some(Prompt::new(PromptKind::SearchForward)),
+            Simple::SearchBackward => self.prompt = Some(Prompt::new(PromptKind::SearchBackward)),
+            Simple::SearchWord { forward, whole } => self.search_word(forward, whole, &exec.buf),
             Simple::Hover => exec.output.show_hover = true,
+            Simple::OpenUrl => self.open_url(exec),
+            Simple::Increment { up } => self.increment(count, up, exec),
+            Simple::SetMark(name) => self.marks.set(name, cur),
+            Simple::Record(name) => {
+                if name.is_ascii_alphanumeric() {
+                    self.repeat.recording = Some((name.to_ascii_lowercase(), Vec::new()));
+                }
+            }
+            Simple::Play(name) => self.play_macro(name, count, exec),
+            Simple::Jump { older } => {
+                if let Some(at) = self.marks.walk(older, cur) {
+                    self.cursor = exec.buf.clamp_normal(at.min(exec.buf.len()));
+                }
+            }
+            Simple::ScrollCursor { to, first_non_blank } => {
+                if first_non_blank {
+                    self.cursor = exec.buf.first_non_blank(cur);
+                }
+                self.scroll = Some(Scroll::Align(match to {
+                    ScrollTo::Center => egui::Align::Center,
+                    ScrollTo::Top => egui::Align::Min,
+                    ScrollTo::Bottom => egui::Align::Max,
+                }));
+            }
+            Simple::ScrollLines { down } => {
+                let lines = i32::try_from(count).unwrap_or(i32::MAX);
+                self.scroll = Some(Scroll::Lines(if down { lines } else { -lines }));
+            }
+            Simple::Nop => {}
         }
     }
 
@@ -335,90 +259,47 @@ impl VimState {
         self.mode = Mode::Insert;
     }
 
-    /// `p` / `P`. Linewise text goes on its own line; charwise text after/before the cursor.
-    fn paste(&mut self, after: bool, count: usize, exec: &mut Exec) {
-        if self.register.text.is_empty() && !self.register.linewise {
-            return;
-        }
-        let cur = self.cursor;
-
-        if self.register.linewise {
-            let lines = vec![self.register.text.as_str(); count].join("\n");
-            if after {
-                let at = exec.buf.line_end(cur);
-                exec.edit(cur, at..at, &format!("\n{lines}"));
-                self.cursor = exec.buf.first_non_blank(at + 1);
-            } else {
-                let at = exec.buf.line_start(cur);
-                exec.edit(cur, at..at, &format!("{lines}\n"));
-                self.cursor = exec.buf.first_non_blank(at);
+    /// `u` / `Ctrl+R` (see [`History`]).
+    pub(super) fn undo_redo(&mut self, undo: bool, exec: &mut Exec) {
+        let current = Snapshot { text: exec.buf.text(), cursor: self.cursor };
+        let restored = if undo { exec.history.undo(current) } else { exec.history.redo(current) };
+        match restored {
+            Some(Snapshot { text, cursor }) => {
+                exec.buf = Buffer::new(&text);
+                self.cursor = exec.buf.clamp_normal(cursor);
+                exec.output.changed = true;
             }
-        } else {
-            let text = self.register.text.repeat(count);
-            let line_empty = exec.buf.line_start(cur) == exec.buf.line_end(cur);
-            let at = if after && !line_empty { cur + 1 } else { cur };
-            exec.edit(cur, at..at, &text);
-            self.cursor = at + text.chars().count().saturating_sub(1);
+            None => {
+                self.message = Some(
+                    if undo { "Already at oldest change" } else { "Already at newest change" }
+                        .to_string(),
+                );
+            }
         }
     }
-
-    /// `J`: joins the next line(s) with a single space.
-    fn join_lines(&mut self, count: usize, exec: &mut Exec) {
-        exec.snapshot(self.cursor);
-        for _ in 0..count.max(2) - 1 {
-            let newline = exec.buf.line_end(self.cursor);
-            if newline >= exec.buf.len() {
-                break;
-            }
-            // Remove `\n` + the next line's indentation, then put one space (unless a side is empty).
-            let mut end = newline + 1;
-            while exec.buf.chars.get(end).is_some_and(|c| *c == ' ' || *c == '\t') {
-                end += 1;
-            }
-            let left_empty = newline == exec.buf.line_start(newline);
-            let right_empty = exec.buf.chars.get(end).is_none_or(|c| *c == '\n');
-            let sep = if left_empty || right_empty { "" } else { " " };
-            exec.buf.replace(newline..end, sep);
-            self.cursor = newline;
-        }
-        exec.output.changed = true;
-    }
-
-    /// `u` / `Ctrl+R` through the `TextEdit`'s undo history.
-    fn undo_redo(&mut self, undo: bool, exec: &mut Exec) {
-        let current = (CCursorRange::one(CCursor::new(self.cursor)), exec.buf.text());
-        let restored = if undo { exec.undoer.undo(&current) } else { exec.undoer.redo(&current) };
-        if let Some((range, text)) = restored.cloned() {
-            exec.buf = Buffer::new(&text);
-            self.cursor = exec.buf.clamp_normal(range.primary.index.0);
-            exec.output.changed = true;
-        }
-    }
-}
-
-/// Lines `start..end` plus one line break, so deleting them removes the lines entirely.
-/// On the last line the break *before* it is taken instead.
-const fn with_line_break(buf: &Buffer, start: usize, end: usize) -> Range<usize> {
-    if end < buf.len() { start..end + 1 } else { start.saturating_sub(1)..end }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::keymap::vim::command::{Parse, parse};
+    use super::{
+        super::parse::{Parse, parse},
+        *,
+    };
+    use crate::keymap::vim::keys::VimKey;
 
     /// Runs `keys` (Normal mode) on `text` with the cursor at `cursor`.
     fn run(text: &str, cursor: usize, keys: &str) -> (String, usize, Mode) {
         let mut vim = VimState { cursor, ..VimState::default() };
         let mut exec = Exec {
             buf: Buffer::new(text),
-            undoer: TextEditUndoer::default(),
+            history: History::default(),
             ctx: egui::Context::default(),
             output: KeymapOutput::default(),
+            edits: 0,
         };
         for c in keys.chars() {
             vim.pending.push(VimKey::Char(c));
-            if let Parse::Done { command, count, explicit_count } = parse(&vim.pending) {
+            if let Parse::Done { command, count, explicit_count, .. } = parse(&vim.pending) {
                 vim.pending.clear();
                 vim.execute(command, count, explicit_count, &mut exec);
             } else if vim.mode != Mode::Normal {
@@ -444,13 +325,32 @@ mod tests {
     fn change_inner_word() {
         let (text, cursor, mode) = run("0.5 animmotion 1", 6, "ciw");
         assert_eq!(text, "0.5  1");
-        assert_eq!((cursor, mode), (4, Mode::Insert));
+        assert_eq!(cursor, 4);
+        assert_eq!(mode, Mode::Insert);
     }
 
     #[test]
-    fn counts_and_join() {
-        assert_eq!(run("a\nb\nc\nd", 0, "2dd").0, "c\nd");
-        assert_eq!(run("a\n  b", 0, "J").0, "a b");
-        assert_eq!(run("abc", 0, "2x").0, "c");
+    fn text_objects_and_finds() {
+        assert_eq!(run("f(a, b) x", 3, "di(").0, "f() x");
+        assert_eq!(run("say \"hi there\" ok", 0, "ci\"").0, "say \"\" ok");
+        assert_eq!(run("a, b, c", 0, "dt,").0, ", b, c");
+        assert_eq!(run("a, b, c", 0, "df,;").0, " b, c");
+        assert_eq!(run("a, b, c", 0, "2f,").1, 4);
+        assert_eq!(run("(a (b) c)", 0, "%").1, 8);
+    }
+
+    #[test]
+    fn case_indent_and_numbers() {
+        assert_eq!(run("hello world", 0, "gUiw").0, "HELLO world");
+        assert_eq!(run("Hello", 0, "g~~").0, "hELLO");
+        assert_eq!(run("a\nb", 0, ">j").0, "    a\n    b");
+        assert_eq!(run("    a", 0, "<<").0, "a");
+    }
+
+    #[test]
+    fn paragraphs_and_big_words() {
+        assert_eq!(run("a\nb\n\nc", 0, "}").1, 4);
+        assert_eq!(run("a.b c", 0, "W").1, 4);
+        assert_eq!(run("a\nb\n\nc", 0, "dap").0, "c");
     }
 }

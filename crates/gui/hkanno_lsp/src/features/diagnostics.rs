@@ -7,11 +7,13 @@
 //! - text annotation: something after the time
 //! - `SpecialFrames_Invincible`: time, event name, valid JSON, only the `Duration` key
 //! - `PIE.@<native>`: enough parameters
+//! - `SCAR_ActionData{...}`: valid JSON, known keys, value types / ranges, exclusive keys;
+//!   `SCAR_ComboStart.<chance>`: chance 0-100
 
 use crate::{
     LineSpan, Span,
     parser::{Field, IFrameNode, LineNode, PieNode, Syntax, parse_line},
-    pie,
+    pie, scar,
 };
 
 /// How bad a diagnostic is.
@@ -78,6 +80,9 @@ pub fn diagnostics(text: &str) -> Vec<Diagnostic> {
                         None,
                     );
                 }
+                if let Some(text) = &node.text {
+                    scar(&mut ctx, text);
+                }
             }
             LineNode::IFrame(node) => iframe(&mut ctx, &node),
             LineNode::Pie(node) => pie(&mut ctx, &node),
@@ -130,6 +135,31 @@ impl LineCtx<'_> {
         {
             self.push(field.span, Severity::Error, "Invalid number.", None);
         }
+    }
+}
+
+/// `SCAR_ActionData{...}` JSON and `SCAR_ComboStart.<chance>` (see [`crate::scar`]).
+fn scar(ctx: &mut LineCtx, text: &Field<&str>) {
+    let value = text.value.trim_end();
+    let leading = value.chars().take_while(|c| c.is_whitespace()).count();
+    let trimmed = value.trim_start();
+    let start = text.span.start + leading;
+    let end = start + trimmed.chars().count();
+
+    if let Some(json) = trimmed.strip_prefix(scar::ACTION_DATA) {
+        // Underline the JSON body (or the event name if it is missing).
+        let json_start = start + scar::ACTION_DATA.chars().count();
+        let span = if json.is_empty() { Span::new(start, end) } else { Span::new(json_start, end) };
+        if json.is_empty() {
+            ctx.push(span, Severity::Error, "SCAR_ActionData needs a JSON body `{...}`.", None);
+            return;
+        }
+        for (is_error, message) in scar::check_action_data(json) {
+            let severity = if is_error { Severity::Error } else { Severity::Warning };
+            ctx.push(span, severity, message, None);
+        }
+    } else if let Some(message) = scar::check_combo_start(trimmed) {
+        ctx.push(Span::new(start, end), Severity::Error, message, None);
     }
 }
 

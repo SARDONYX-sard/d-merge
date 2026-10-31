@@ -16,6 +16,7 @@
 //! # Layout
 //! - [`parser`]: one-line parser producing [`parser::LineNode`] (all language features start here)
 //! - [`features`]: diagnostics / completion / hover / signature help / semantic tokens / format / inlay hints / code actions
+//! - [`scar`]: SCAR 2.0+ annotations (`SCAR_ActionData{...}`, `SCAR_ComboStart`, ...) shared by several features
 //! - [`pie`]: Payload Interpreter (`PIE.@...`) instruction table shared by several features
 //! - [`snippet`]: `${1:placeholder}` snippet expansion used by completion items
 
@@ -25,6 +26,7 @@
 pub mod features;
 pub mod parser;
 pub mod pie;
+pub mod scar;
 pub mod snippet;
 mod span;
 

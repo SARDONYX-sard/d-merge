@@ -5,7 +5,9 @@
 //! - opens after the pointer rests on a char for [`HOVER_DELAY`]
 //! - stays open while the pointer is on the text or inside the popup (links are clickable)
 //! - closes when the pointer leaves both, on any key press, or on a click outside it
-//! - Vim `K` opens it at the text cursor (see [`HoverPopup::open_at`])
+//! - Vim `K` opens it at the text cursor (see [`HoverPopup::open_at`]); `K` again moves the
+//!   keyboard into it: `Tab` / `j` / `k` go through the links, `Enter` opens one,
+//!   `Esc` / `q` close it and return to the editor
 
 use egui::{Galley, Pos2, Rect, text::CCursor};
 
@@ -26,8 +28,10 @@ const POPUP_MARGIN: f32 = 8.0;
 pub(crate) struct HoverPopup {
     /// Char index the pointer rests on, and since when (seconds).
     resting: Option<(usize, f64)>,
-    /// Closed by a key press / click: do not reopen until the pointer moves to another char.
-    dismissed: Option<usize>,
+    /// Pointer position when a key was pressed (or the popup was clicked away): no hover popup
+    /// opens until the pointer moves from there, so it does not get in the way while typing or
+    /// moving with Vim keys (like VS Code).
+    suppressed_at: Option<Pos2>,
     open: Option<Open>,
 }
 
@@ -42,6 +46,10 @@ struct Open {
     rect: Option<Rect>,
     /// Opened by keyboard (Vim `K`): the pointer does not move or close it.
     pinned: bool,
+    /// The keyboard is in the popup (Vim `K` twice): keys go to its links, not to the editor.
+    focused: bool,
+    /// Focus the first link on the next draw.
+    focus_first_link: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -64,20 +72,45 @@ pub(crate) struct HoverCtx<'a> {
 }
 
 impl HoverPopup {
-    /// Closes the popup on a key press or a click outside it.
+    /// Handles the keys meant for the popup, and closes it on other keys or a click outside it.
     ///
     /// Call at the start of the frame, **before** the keymap swallows the key events.
-    pub(crate) fn close_on_input(&mut self, ui: &egui::Ui) {
-        let Some(open) = &self.open else { return };
-        let (key_pressed, click_pos) = ui.input(|i| {
+    /// `editor_id`: gets the keyboard focus back when a focused popup closes.
+    pub(crate) fn handle_input(&mut self, ui: &egui::Ui, editor_id: egui::Id) {
+        let (key_pressed, click_pos, pointer) = ui.input(|i| {
             let key = i.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. }));
             let click = i.pointer.any_pressed().then(|| i.pointer.interact_pos()).flatten();
-            (key, click)
+            (key, click, i.pointer.hover_pos())
         });
+        if key_pressed {
+            self.suppressed_at = Some(pointer.unwrap_or(Pos2::ZERO));
+            self.resting = None;
+        }
+
+        let Some(open) = &mut self.open else { return };
+
+        if open.focused {
+            focused_keys(ui, open, editor_id);
+            if !open.focused {
+                self.open = None;
+            }
+            return;
+        }
+
+        // Vim `K` on an open `K` popup: move the keyboard into it (like Neovim's hover window).
+        if open.pinned && take_shift_k(ui) {
+            open.focused = true;
+            open.focus_first_link = true;
+            return;
+        }
+
+        // Any other key (e.g., Vim `j`) or a click elsewhere closes it.
         let clicked_outside =
             click_pos.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
         if key_pressed || clicked_outside {
-            self.dismissed = Some(open.index);
+            if clicked_outside {
+                self.suppressed_at = click_pos;
+            }
             self.open = None;
             self.resting = None;
         }
@@ -92,8 +125,9 @@ impl HoverPopup {
             content,
             rect: None,
             pinned: true,
+            focused: false,
+            focus_first_link: false,
         });
-        self.dismissed = None;
     }
 
     /// Tracks the pointer and draws the popup.
@@ -111,11 +145,10 @@ impl HoverPopup {
 
         let pinned = self.open.as_ref().is_some_and(|o| o.pinned);
         match target {
-            Some(index) if !over_popup && !pinned => self.on_char(index, now, ui, ctx),
+            Some(index) if !over_popup && !pinned => self.on_char(index, pointer, now, ui, ctx),
             Some(_) => {}
             None => {
                 self.resting = None;
-                self.dismissed = None;
                 if !over_popup && !pinned && self.open.is_some() && pointer.is_some() {
                     self.open = None; // pointer left both the text and the popup
                 }
@@ -126,13 +159,24 @@ impl HoverPopup {
             // Re-anchor every frame so the popup follows its char when the text scrolls.
             open.anchor = char_rect(ctx.galley, ctx.galley_pos, open.index);
             open.rect = Some(show(ui.ctx(), ctx.id, open));
+            open.focus_first_link = false;
         }
     }
 
     /// The pointer is on the char at `index`: wait for the delay, then open / move the popup.
-    fn on_char(&mut self, index: usize, now: f64, ui: &egui::Ui, ctx: &HoverCtx<'_>) {
-        if self.dismissed.is_some_and(|i| i != index) {
-            self.dismissed = None;
+    fn on_char(
+        &mut self,
+        index: usize,
+        pointer: Option<Pos2>,
+        now: f64,
+        ui: &egui::Ui,
+        ctx: &HoverCtx<'_>,
+    ) {
+        if let Some(at) = self.suppressed_at {
+            if pointer.is_some_and(|p| p.distance(at) < 3.0) {
+                return;
+            }
+            self.suppressed_at = None;
         }
         let since = match self.resting {
             Some((i, since)) if i == index => since,
@@ -147,7 +191,7 @@ impl HoverPopup {
             ui.ctx().request_repaint_after_secs((HOVER_DELAY - waited) as f32);
             return;
         }
-        if self.dismissed.is_some() || self.open.as_ref().is_some_and(|o| o.index == index) {
+        if self.open.as_ref().is_some_and(|o| o.index == index) {
             return;
         }
 
@@ -156,7 +200,15 @@ impl HoverPopup {
             Some(new) if self.open.as_ref().is_some_and(|o| o.content == new) => {}
             Some(content) => {
                 let anchor = char_rect(ctx.galley, ctx.galley_pos, index);
-                self.open = Some(Open { index, anchor, content, rect: None, pinned: false });
+                self.open = Some(Open {
+                    index,
+                    anchor,
+                    content,
+                    rect: None,
+                    pinned: false,
+                    focused: false,
+                    focus_first_link: false,
+                });
             }
             None => self.open = None,
         }
@@ -181,6 +233,43 @@ fn content(index: usize, ctx: &HoverCtx<'_>) -> Option<Content> {
     (!problems.is_empty() || docs.is_some()).then_some(Content { problems, docs })
 }
 
+/// Keys while the keyboard is in the popup. Sets `open.focused = false` to close it.
+fn focused_keys(ui: &egui::Ui, open: &mut Open, editor_id: egui::Id) {
+    use egui::{Key, Modifiers};
+
+    let (close, next, prev, clicked_outside) = ui.input_mut(|i| {
+        let close =
+            i.consume_key(Modifiers::NONE, Key::Escape) || i.consume_key(Modifiers::NONE, Key::Q);
+        let next = i.consume_key(Modifiers::NONE, Key::J)
+            || i.consume_key(Modifiers::NONE, Key::ArrowDown);
+        let prev =
+            i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+        let click = i.pointer.any_pressed().then(|| i.pointer.interact_pos()).flatten();
+        let outside = click.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
+        (close, next, prev, outside)
+    });
+
+    if close || clicked_outside {
+        open.focused = false;
+        ui.memory_mut(|m| m.request_focus(editor_id));
+    } else if next {
+        ui.memory_mut(|m| m.move_focus(egui::FocusDirection::Next));
+    } else if prev {
+        ui.memory_mut(|m| m.move_focus(egui::FocusDirection::Previous));
+    }
+}
+
+/// Takes a `Shift+K` press (both its key and its text event) out of the input.
+fn take_shift_k(ui: &egui::Ui) -> bool {
+    ui.input_mut(|i| {
+        if !i.consume_key(egui::Modifiers::SHIFT, egui::Key::K) {
+            return false;
+        }
+        i.events.retain(|e| !matches!(e, egui::Event::Text(t) if t == "K"));
+        true
+    })
+}
+
 /// Draws the popup below its anchor and returns its rect.
 fn show(ctx: &egui::Context, id: egui::Id, open: &Open) -> Rect {
     egui::Area::new(id.with("hover_popup"))
@@ -198,7 +287,12 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &Open) -> Rect {
                     if !problems.is_empty() {
                         ui.separator();
                     }
-                    egui_widgets::markdown::markdown(ui, docs);
+                    let links = egui_widgets::markdown::markdown(ui, docs);
+                    if open.focus_first_link
+                        && let Some(first) = links.first()
+                    {
+                        first.request_focus();
+                    }
                 }
             });
         })

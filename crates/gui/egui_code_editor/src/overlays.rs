@@ -76,6 +76,43 @@ pub(super) fn inlay_hints(
     }
 }
 
+/// Width of the line number gutter for `text`: room for its largest number (at least 3 digits).
+pub(super) fn gutter_width(ui: &egui::Ui, text: &str) -> f32 {
+    let lines = text.split('\n').count();
+    let digits = lines.to_string().len().max(3);
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let digit_width = ui.fonts_mut(|f| f.glyph_width(&font, '0'));
+    #[expect(clippy::cast_precision_loss, reason = "a few digits")]
+    let width = digits as f32 * digit_width;
+    width + 16.0 // padding on both sides
+}
+
+/// Line numbers right-aligned in the gutter `x_range`; the cursor line is brighter.
+pub(super) fn line_numbers(
+    ui: &egui::Ui,
+    galley: &Galley,
+    galley_pos: Pos2,
+    x_range: std::ops::Range<f32>,
+    current_line: Option<usize>,
+) {
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let visuals = ui.visuals();
+    let (weak, strong) = (visuals.weak_text_color(), visuals.text_color());
+    let clip = ui.clip_rect();
+    let painter = ui.painter();
+
+    // Lines are never wrapped (see `layout`), so row `n` is line `n`.
+    for (line, row) in galley.rows.iter().enumerate() {
+        let rect = row.rect().translate(galley_pos.to_vec2());
+        if rect.bottom() < clip.top() || rect.top() > clip.bottom() {
+            continue; // only the visible ones
+        }
+        let color = if current_line == Some(line) { strong } else { weak };
+        let pos = egui::pos2(x_range.end - 8.0, rect.center().y);
+        painter.text(pos, egui::Align2::RIGHT_CENTER, (line + 1).to_string(), font.clone(), color);
+    }
+}
+
 /// Faint background behind the cursor line.
 pub(super) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, line: usize) {
     let Some(row) = galley.rows.get(line) else { return };
@@ -84,6 +121,24 @@ pub(super) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lin
     // A faint tint of the text color works for both dark and light themes.
     let tint: Color32 = ui.visuals().text_color().gamma_multiply(0.06);
     ui.painter().rect_filled(rect, 0.0, tint);
+}
+
+/// A rectangular selection (Vim `Ctrl+V`): one char range per line, drawn like a selection.
+pub(super) fn block_selection(
+    ui: &egui::Ui,
+    galley: &Galley,
+    galley_pos: Pos2,
+    ranges: &[std::ops::Range<usize>],
+) {
+    // Painted over the text (unlike egui's own selection), so it must stay see-through.
+    let fill = ui.visuals().selection.bg_fill.gamma_multiply(0.35);
+    for range in ranges.iter().filter(|r| !r.is_empty()) {
+        let start = galley.pos_from_cursor(egui::text::CCursor::new(range.start));
+        let end = galley.pos_from_cursor(egui::text::CCursor::new(range.end));
+        let rect =
+            egui::Rect::from_min_max(start.left_top(), egui::pos2(end.left(), start.bottom()));
+        ui.painter().rect_filled(rect.translate(galley_pos.to_vec2()), 0.0, fill);
+    }
 }
 
 /// Vim's block cursor (Normal / Visual mode) over the char at `index`.

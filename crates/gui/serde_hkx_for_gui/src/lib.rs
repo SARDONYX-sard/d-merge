@@ -4,7 +4,7 @@ mod par_walk_dir;
 pub mod path;
 pub mod status;
 
-use std::path::Path;
+use std::{future::Future, path::Path, pin::Pin, sync::Arc};
 
 use futures::{future::join_all, stream::FuturesUnordered};
 pub use par_walk_dir::{DirEntry, load_dir_node};
@@ -37,12 +37,27 @@ use crate::{hash::hash_djb2, path::infer::generate_output_path};
 /// Each `ConvertOneError` can be:
 /// - `FailedToConvert` - The underlying `serde_hkx_features` conversion failed.
 /// - `ThreadJoin` - A task panicked or failed to join in the async executor.
-pub async fn convert(
+///
+/// # Binary size
+/// The (de)serialization of every havok class is generic code; whatever instantiates it gets a
+/// copy (~15 MB in a non-LTO build). So this function is not generic (`status_sender` is a trait
+/// object) and returns a boxed future: a plain `async fn` body would be built in the caller crate.
+pub fn convert(
     inputs: Vec<String>,
     output: Option<String>,
     format: Format,
     roots: Option<Vec<String>>,
-    status_sender: impl Fn(Payload) + Clone + Send + 'static,
+    status_sender: Arc<dyn Fn(Payload) + Send + Sync>,
+) -> Pin<Box<dyn Future<Output = Result<(), ConvertError>> + Send>> {
+    Box::pin(convert_inner(inputs, output, format, roots, status_sender))
+}
+
+async fn convert_inner(
+    inputs: Vec<String>,
+    output: Option<String>,
+    format: Format,
+    roots: Option<Vec<String>>,
+    status_sender: Arc<dyn Fn(Payload) + Send + Sync>,
 ) -> Result<(), ConvertError> {
     let output = output.filter(|o| !o.is_empty());
     let strip_roots = roots.unwrap_or_default();
@@ -52,7 +67,7 @@ pub async fn convert(
         .map(|input| {
             let path_id = hash_djb2(&input);
             let input = Path::new(&input).to_path_buf();
-            let status_sender = status_sender.clone();
+            let status_sender = Arc::clone(&status_sender);
 
             let output = output.as_ref().map(|output| {
                 let mut output = generate_output_path(&input, output, &strip_roots);

@@ -1,32 +1,49 @@
 //! Takes keyboard input away from the `TextEdit` and turns it into [`VimKey`]s.
 //!
 //! In Normal/Visual mode **every** key event is removed from egui's input queue before the
-//! `TextEdit` runs, so typing `dd` never inserts text. Shortcuts with Ctrl/Cmd (e.g., `Ctrl+S`)
-//! are left alone for the app, except Vim's own `Ctrl+R` (redo).
+//! `TextEdit` runs, so typing `dd` never inserts text. `Ctrl` shortcuts that Vim does not use
+//! (e.g., `Ctrl+S`) are left alone for the app; see [`NORMAL_CTRL`] for the ones Vim takes.
 //!
-//! In Insert mode only `Esc` / `Ctrl+[` and the second char of an escape sequence
-//! (e.g., the `k` of `jk`, see [`InsertEscape`]) are taken; everything else is normal typing.
+//! In Insert mode only these are taken; everything else is normal typing:
+//! - `Esc`, `Ctrl+[`, `Ctrl+C` (arrives as `Event::Copy`) and the 2nd char of an escape sequence (e.g., `k` of `jk`)
+//! - `Ctrl+W` / `Ctrl+U` (delete word / line before the cursor), `Ctrl+T` / `Ctrl+D` (indent)
 
 use super::VimOptions;
 
 /// One key press as Vim sees it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum VimKey {
-    /// A printable char, already shifted (e.g., `$`, `G`).
+    /// A printable char, already shifted (e.g., `$`, `G`, ` `).
     Char(char),
+    /// `Ctrl` + a letter, lowercase. e.g., `Ctrl('d')` for `Ctrl+D`
+    Ctrl(char),
     Esc,
     /// The 2nd char of an Insert-mode escape sequence was typed (e.g., `k` of `jk`).
     /// The 1st char (here `j`) is already in the text and must be removed before leaving.
     SequenceEsc(char),
     Enter,
     Backspace,
+    Delete,
+    Tab,
     Left,
     Right,
     Up,
     Down,
-    /// `Ctrl+R` (redo).
-    Redo,
+    Home,
+    End,
+    PageUp,
+    PageDown,
 }
+
+/// `Ctrl` + letter combinations Vim uses in Normal/Visual mode. Others go to the app.
+///
+/// e.g., `d`/`u` half page, `f`/`b` page, `e`/`y` scroll a line, `a`/`x` increment,
+/// `o`/`i` jump list, `r` redo, `v` visual, `n`/`p` down/up, `w` (ignored, no windows)
+const NORMAL_CTRL: &[char] =
+    &['a', 'b', 'd', 'e', 'f', 'i', 'n', 'o', 'p', 'r', 'u', 'v', 'w', 'x', 'y'];
+
+/// `Ctrl` + letter combinations Vim uses in Insert mode.
+const INSERT_CTRL: &[char] = &['w', 'u', 't', 'd'];
 
 /// Remembers the last char typed in Insert mode, to detect sequences such as `jk`
 /// (Vim users map them with e.g. `inoremap jk <Esc>`).
@@ -66,24 +83,49 @@ pub(super) fn take(
         let mut keys = Vec::new();
         input.events.retain(|event| match event {
             egui::Event::Key { key, pressed, modifiers, .. } => {
-                let escape =
-                    *key == egui::Key::Escape || (modifiers.ctrl && *key == egui::Key::OpenBracket);
+                let ctrl_letter =
+                    (modifiers.ctrl && !modifiers.alt).then(|| letter(*key)).flatten();
+                let escape = *key == egui::Key::Escape
+                    || (modifiers.ctrl && *key == egui::Key::OpenBracket)
+                    || ctrl_letter == Some('c');
+
                 if insert_mode {
-                    if escape && *pressed {
-                        keys.push(VimKey::Esc);
+                    if escape {
+                        if *pressed {
+                            keys.push(VimKey::Esc);
+                        }
+                        return false;
+                    }
+                    if let Some(c) = ctrl_letter.filter(|c| INSERT_CTRL.contains(c)) {
+                        if *pressed {
+                            keys.push(VimKey::Ctrl(c));
+                        }
+                        return false;
                     }
                     // Moving/deleting between the two chars breaks a sequence: `j` <Left> `k`.
                     // (Letter keys also arrive as `Key` events, so only these reset it.)
                     if *pressed && breaks_sequence(*key) {
                         escape_seq.reset();
                     }
-                    return !escape; // keep everything else for the TextEdit
+                    return true; // keep everything else for the TextEdit
                 }
 
-                if modifiers.command && !(modifiers.ctrl && *key == egui::Key::R) && !escape {
-                    return true; // app shortcut such as Ctrl+S
+                if escape {
+                    if *pressed {
+                        keys.push(VimKey::Esc);
+                    }
+                    return false;
                 }
-                if *pressed && let Some(vim_key) = map_key(*key, *modifiers, escape) {
+                if modifiers.command {
+                    let Some(c) = ctrl_letter.filter(|c| NORMAL_CTRL.contains(c)) else {
+                        return true; // app shortcut such as Ctrl+S
+                    };
+                    if *pressed {
+                        keys.push(VimKey::Ctrl(c));
+                    }
+                    return false;
+                }
+                if *pressed && let Some(vim_key) = map_key(*key) {
                     keys.push(vim_key);
                 }
                 false // swallow: Normal mode must not edit text by itself
@@ -107,12 +149,35 @@ pub(super) fn take(
                     }
                 }
             }
-            // No pasting/cutting into Normal mode (Vim uses `p` / `d`).
-            egui::Event::Paste(_) | egui::Event::Cut if !insert_mode => false,
+            // egui sends `Ctrl+C` / `Ctrl+X` / `Ctrl+V` as clipboard events, not as keys.
+            // `Ctrl+C` leaves Insert/Visual mode like `Esc`.
+            egui::Event::Copy => {
+                keys.push(VimKey::Esc);
+                false
+            }
+            // Normal mode: `Ctrl+X` decrements, `Ctrl+V` starts a Visual block (Vim uses `p` / `d`
+            // for the clipboard). Insert mode keeps cutting / pasting.
+            egui::Event::Cut if !insert_mode => {
+                keys.push(VimKey::Ctrl('x'));
+                false
+            }
+            egui::Event::Paste(_) if !insert_mode => {
+                keys.push(VimKey::Ctrl('v'));
+                false
+            }
             _ => true,
         });
         keys
     })
+}
+
+/// `A`..`Z` -> `'a'`..`'z'`.
+fn letter(key: egui::Key) -> Option<char> {
+    let mut chars = key.name().chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_alphabetic() => Some(c.to_ascii_lowercase()),
+        _ => None,
+    }
 }
 
 /// Keys that move the cursor or delete text in Insert mode.
@@ -134,17 +199,21 @@ const fn breaks_sequence(key: egui::Key) -> bool {
 }
 
 /// Non-printable keys. Printable ones arrive as `Event::Text`.
-const fn map_key(key: egui::Key, modifiers: egui::Modifiers, escape: bool) -> Option<VimKey> {
+const fn map_key(key: egui::Key) -> Option<VimKey> {
     use egui::Key;
     Some(match key {
-        _ if escape => VimKey::Esc,
-        Key::R if modifiers.ctrl => VimKey::Redo,
         Key::Enter => VimKey::Enter,
         Key::Backspace => VimKey::Backspace,
+        Key::Delete => VimKey::Delete,
+        Key::Tab => VimKey::Tab,
         Key::ArrowLeft => VimKey::Left,
         Key::ArrowRight => VimKey::Right,
         Key::ArrowUp => VimKey::Up,
         Key::ArrowDown => VimKey::Down,
+        Key::Home => VimKey::Home,
+        Key::End => VimKey::End,
+        Key::PageUp => VimKey::PageUp,
+        Key::PageDown => VimKey::PageDown,
         _ => return None,
     })
 }

@@ -223,6 +223,7 @@ impl<'a> Hkanno<'a> {
     /// - Deserialization of the input bytes fails.
     /// - Annotation update fails.
     /// - Serialization of the updated data fails.
+    #[inline(never)] // keep the generic (de)serialization in this crate (see `parse_as_hkanno`)
     pub fn update_hkx_bytes(
         self,
         bytes: &[u8],
@@ -559,7 +560,11 @@ const fn is_hka_animation_derived(class: &Classes<'_>) -> bool {
 ///     Ok(())
 /// }
 /// ```
-#[inline]
+///
+/// # Binary size
+/// `#[inline(never)]`: the deserialization inside is huge generic code; inlined into a caller
+/// crate it would be copied there (~15 MB in a non-LTO build).
+#[inline(never)]
 pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, HkannoError> {
     serde_hkx_features::convert::process_serde_with(
         bytes,
