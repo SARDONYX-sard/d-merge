@@ -33,13 +33,12 @@ use crate::error::Error;
 ///
 /// # Examples
 /// ```no_run
-/// use mod_info::get_all_mods;
-///
 /// // VFS mode(real Skyrim Data dir)
-/// let mods_vfs = get_all_mods("C:/Games/Skyrim Special Edition/Data", true)?;
+/// let mods_vfs = mod_info::get_all("C:/Games/Skyrim Special Edition/Data", true)?;
 ///
 /// // Manual mode(MO2-managed mods dir)
-/// let mods_mo2 = get_all_mods("C:/Modding/MO2/mods/*", false)?;
+/// let mods_mo2 = mod_info::get_all("C:/Modding/MO2/mods/*", false)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let mut mods = Vec::new();
@@ -237,8 +236,8 @@ impl ModType {
     /// # Examples
     ///
     /// ```rust
-    /// assert_eq!(mod_info::ModType::Nemesis.as_str(), "nemesis");
-    /// assert_eq!(mod_info::ModType::Fnis.as_str(), "fnis");
+    /// assert_eq!(mod_info::ModType::Nemesis.as_lower_str(), "nemesis");
+    /// assert_eq!(mod_info::ModType::Fnis.as_lower_str(), "fnis");
     /// ```
     pub const fn as_lower_str(&self) -> &'static str {
         match self {

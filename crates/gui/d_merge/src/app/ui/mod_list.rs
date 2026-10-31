@@ -6,6 +6,7 @@ use gui_shared::{
     mod_item::{self, ModItem},
     settings::{DataMode, mod_list_ui::SortColumn},
 };
+use mod_info::ModType;
 
 use crate::{
     app::App,
@@ -266,17 +267,39 @@ impl App {
                 let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(MARGIN, 0.0));
                 let table_width = rect.width();
 
+                // Text-sized columns: `NemesisExt` just fits; the priority header (with the sort
+                // arrow) is not squashed.
+                let spacing = ui.spacing();
+                let padding = spacing.button_padding.x.mul_add(2.0, spacing.item_spacing.x);
+                let mod_type_width = text_width(ui, ModType::NemesisExt.as_str())
+                    .max(text_width(ui, self.i18n.t(I18nKey::ColumnModType)))
+                    + padding;
+                let priority_width =
+                    text_width(ui, &format!("{} ▲", self.i18n.t(I18nKey::ColumnPriority)))
+                        + padding;
+                const CHECKBOX_WIDTH: f32 = 24.0;
+                let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
+
+                // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
+                // remainder column's width in sync with the window only when it is the last one.
+                let gaps = spacing.item_spacing.x * 6.0;
+                let site_width = (table_width
+                    - (CHECKBOX_WIDTH + id_width + name_width + mod_type_width + priority_width)
+                    - gaps)
+                    .max(80.0);
+
                 // | checkbox | id | name | mod type | site (fills the rest) | priority |
+                // NOTE: The column border is the resize handle: keep every column resizable.
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     egui_extras::TableBuilder::new(ui)
                         .striped(true)
                         .auto_shrink([false, true])
-                        .column(egui_extras::Column::exact(24.0)) // checkbox
-                        .column(Self::resizable_column(table_width, 0.20, changed_width)) // id
-                        .column(Self::resizable_column(table_width, 0.28, changed_width)) // name
-                        .column(Self::resizable_column(table_width, 0.10, changed_width)) // mod type
-                        .column(egui_extras::Column::remainder().at_least(80.0).clip(true)) // site
-                        .column(egui_extras::Column::exact(80.0)) // priority
+                        .column(egui_extras::Column::exact(CHECKBOX_WIDTH)) // checkbox
+                        .column(Self::resizable_column(id_width, changed_width)) // id
+                        .column(Self::resizable_column(name_width, changed_width)) // name
+                        .column(Self::resizable_column(mod_type_width, changed_width)) // mod type
+                        .column(Self::resizable_column(site_width, changed_width).clip(true)) // site
+                        .column(Self::resizable_column(priority_width, changed_width)) // priority
                         .header(20.0, |mut header| self.render_table_header(&mut header))
                         .body(|mut body| {
                             let mut widths = [0.0_f32; 6];
@@ -305,15 +328,14 @@ impl App {
             });
     }
 
-    /// Creates a resizable column that also resets to its ratio-based width
+    /// Creates a resizable column that also resets to `width`
     /// whenever the table's total width changes.
     ///
     /// `egui_extras::Column` cannot simultaneously support `initial` (user
     /// resizable) and automatic width tracking.  This helper switches to
     /// `exact` for exactly one frame when `changed_width` is `true`, giving
     /// egui a concrete measurement to anchor the new layout.
-    fn resizable_column(total_width: f32, ratio: f32, changed_width: bool) -> egui_extras::Column {
-        let width = total_width * ratio;
+    fn resizable_column(width: f32, changed_width: bool) -> egui_extras::Column {
         if changed_width {
             egui_extras::Column::exact(width)
         } else {
@@ -396,4 +418,12 @@ impl App {
             );
         });
     }
+}
+
+/// Width of `text` drawn as a button label (no wrapping).
+fn text_width(ui: &egui::Ui, text: &str) -> f32 {
+    egui::WidgetText::from(text)
+        .into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Button)
+        .size()
+        .x
 }

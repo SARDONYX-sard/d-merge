@@ -16,8 +16,8 @@ use quote::quote;
 ///
 /// # Example
 ///
-/// ```rust
-/// # egui::derive::I18n
+/// ```ignore
+/// use gui_shared_derive::I18n;
 ///
 /// #[derive(I18n)]
 /// enum I18nKey {
@@ -34,7 +34,7 @@ use quote::quote;
 ///
 /// Expands roughly to:
 ///
-/// ```rust
+/// ```ignore
 /// impl I18nKey {
 ///     pub const ALL: &'static [Self] = &[
 ///         Self::ExecuteButton,

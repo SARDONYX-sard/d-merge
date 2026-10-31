@@ -9,7 +9,8 @@ use rayon::prelude::*;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
+/// // `pub(crate)`: not reachable from a doctest.
 /// let mut vec = Vec::new();
 /// vec.smart_extend(vec![1, 2, 3]);
 /// ```

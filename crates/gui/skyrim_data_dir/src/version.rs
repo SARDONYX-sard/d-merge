@@ -9,6 +9,8 @@ use std::path::Path;
 /// # Example
 ///
 /// ```
+/// use skyrim_data_dir::version::Version;
+///
 /// let v = Version { major: 10, minor: 0, patch: 19041, build: 1 };
 /// assert_eq!(v.to_string(), "10.0.19041.1");
 /// ```
@@ -40,6 +42,8 @@ impl core::fmt::Display for Version {
 /// # Example
 ///
 /// ```
+/// use skyrim_data_dir::version::get_file_version;
+///
 /// match get_file_version("nonexistent.exe") {
 ///     Ok(v) => println!("Version: {}", v),
 ///     Err(e) => println!("Error: {}", e),
@@ -69,14 +73,16 @@ impl core::error::Error for VersionError {}
 ///
 /// ## On Windows
 ///
-/// ```
+/// ```no_run
+/// # use skyrim_data_dir::version::get_file_version;
 /// let version = get_file_version("C:\\Windows\\System32\\notepad.exe").unwrap();
 /// println!("Version: {}", version); // e.g. "10.0.19041.1"
 /// ```
 ///
 /// ## On Linux or macOS
 ///
-/// ```
+/// ```no_run
+/// # use skyrim_data_dir::version::get_file_version;
 /// match get_file_version("/bin/ls") {
 ///     Ok(v) => println!("Version: {}", v),
 ///     Err(e) => println!("Error: {}", e), // always returns Err on Unix
@@ -176,7 +182,8 @@ where
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use skyrim_data_dir::version::get_file_version;
 /// match get_file_version("/bin/ls") {
 ///     Ok(v) => println!("Version: {}", v),
 ///     Err(e) => println!("Error: {}", e), // always returns Err on Unix
