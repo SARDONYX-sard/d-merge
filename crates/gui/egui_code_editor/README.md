@@ -21,13 +21,32 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 
 ## Editor keys (all keymaps)
 
-| Key                  | Action                     |
-| -------------------- | -------------------------- |
-| `Ctrl+Space`         | Open completion            |
-| `Tab` / `Enter`      | Accept completion          |
-| `Shift+Alt+F`        | Format document            |
+| Key                  | Action                                   |
+| -------------------- | ---------------------------------------- |
+| `Ctrl+Space`         | Open completion                          |
+| `Tab` / `Enter`      | Accept completion                        |
+| `Shift+Alt+F`        | Format document                          |
 | `Ctrl+.`             | Quick fix menu (`↑`/`↓`, `Enter`, `Esc`) |
-| Mouse rest on a word | Hover (diagnostics + docs) |
+| Mouse rest on a word | Hover (diagnostics + docs)               |
+
+## Normal keymap (VS Code keys)
+
+`Keymap::Normal` is plain egui editing plus the VS Code versions of the most used Vim features.
+Search is the same as Vim's `/` (plain text, smartcase).
+
+| Key                           | Action                                   | Vim     |
+| ----------------------------- | ---------------------------------------- | ------- |
+| `Ctrl+F`                      | Find bar (pre-filled with the selection) | `/`     |
+| `Enter` / `Shift+Enter`       | Next / previous match (in the find bar)  | `n` `N` |
+| `F3` / `Shift+F3`             | Next / previous match                    | `n` `N` |
+| `Ctrl+F3`                     | Find the word under the cursor           | `*`     |
+| `Ctrl+G`                      | Go to line                               | `:42`   |
+| `Esc`                         | Close the bar                            |         |
+| `Ctrl+Shift+K`                | Delete the line(s)                       | `dd`    |
+| `Alt+↑` / `Alt+↓`             | Move the line(s) up / down               | `ddkP`  |
+| `Shift+Alt+↑` / `Shift+Alt+↓` | Copy the line(s) up / down               | `yyP`   |
+| `Ctrl+Enter`                  | Insert a line below                      | `o`     |
+| `Ctrl+Shift+Enter`            | Insert a line above                      | `O`     |
 
 ## Vim
 

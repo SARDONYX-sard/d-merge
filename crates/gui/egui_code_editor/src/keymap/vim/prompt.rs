@@ -11,7 +11,7 @@
 //! Ex commands themselves are in [`super::ex`].
 
 use super::{VimState, buffer::Buffer, exec::Exec, keys::VimKey};
-use crate::search::Matcher;
+use crate::search::{Matcher, find_from};
 
 /// What the prompt line is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,17 +198,6 @@ impl VimState {
             None => self.message = Some("No URL under the cursor".to_string()),
         }
     }
-}
-/// The next match after (`forward`) or before `from`, wrapping around the text.
-fn find_from(matcher: &Matcher, chars: &[char], from: usize, forward: bool) -> Option<usize> {
-    let len = chars.len();
-    if len == 0 {
-        return None;
-    }
-    // Start next to the cursor so that `n` on a match moves to the next one.
-    (1..=len)
-        .map(|step| if forward { (from + step) % len } else { (from + len - step % len) % len })
-        .find(|&at| matcher.matches_at(chars, at))
 }
 
 /// The URL around `at`: the non-blank word, without surrounding brackets/quotes and trailing

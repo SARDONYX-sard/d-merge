@@ -27,6 +27,7 @@
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
 mod completion;
+mod find;
 mod hover;
 pub mod keymap;
 pub mod language;
@@ -42,6 +43,7 @@ use egui::text::{CCursor, CCursorRange};
 
 use self::{
     completion::CompletionPopup,
+    find::FindBar,
     hover::{HoverCtx, HoverPopup},
     keymap::{KeymapOutput, Scroll, View},
     quick_fix::QuickFixMenu,
@@ -93,12 +95,24 @@ pub struct CodeEditorState {
     completion: CompletionPopup,
     hover: HoverPopup,
     quick_fix: QuickFixMenu,
+    /// `Ctrl+F` / `Ctrl+G` bar (Normal keymap).
+    find: FindBar,
     /// State of the key binding styles (e.g., Vim mode and registers).
     pub keymap: KeymapState,
     /// Lines visible last frame (Vim `H`, `Ctrl+D`, ...).
     view: View,
     /// The editor had the keyboard focus last frame.
     had_focus: bool,
+}
+
+impl CodeEditorState {
+    /// Matches to highlight: the find bar (Normal) or the last `/` search (Vim).
+    fn search_highlight(&self, keymap: Keymap) -> Option<search::Matcher> {
+        match keymap {
+            Keymap::Normal => self.find.highlight(),
+            Keymap::Vim => self.keymap.search_highlight(keymap),
+        }
+    }
 }
 
 /// What happened this frame.
@@ -215,6 +229,7 @@ impl<'a> CodeEditor<'a> {
             let pos = LinePos::from_char_index(text, index);
             state.quick_fix.open(language.quick_fixes(text, pos.line, pos.column));
         }
+        state.find.handle_keys(keymap, ui, id, text, has_focus);
         let accept_key = state.completion.handle_keys(ui);
         let keys = if has_focus && !state.quick_fix.is_open() {
             state.keymap.handle(keymap, ui, id, text, state.view)
@@ -240,7 +255,7 @@ impl<'a> CodeEditor<'a> {
 
         // ── 2. The TextEdit ───────────────────────────────────────────────────
         let underlines = if features.diagnostics { diagnostics } else { &[] };
-        let search = state.keymap.search_highlight(keymap);
+        let search = state.search_highlight(keymap);
         let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
             layout::layout(ui, buf.as_str(), language, underlines, search.as_ref())
         };
@@ -367,6 +382,7 @@ impl<'a> CodeEditor<'a> {
                 }
             }
         }
+        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text);
         state.view = visible_lines(ui, galley, galley_pos);
         state.had_focus = response.has_focus();
         if let Some(index) = state.keymap.block_cursor(keymap, cursor_index, text) {
@@ -433,7 +449,7 @@ pub fn set_cursor(ctx: &egui::Context, id: egui::Id, index: usize) {
 }
 
 /// Temp-memory flag: "scroll the cursor into view on the next `show`".
-fn scroll_request_id(id: egui::Id) -> egui::Id {
+pub(crate) fn scroll_request_id(id: egui::Id) -> egui::Id {
     id.with("scroll_to_cursor")
 }
 

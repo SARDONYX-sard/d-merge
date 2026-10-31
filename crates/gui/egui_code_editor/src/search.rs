@@ -1,4 +1,5 @@
-//! Plain text search (no regex), shared by the Vim `/` search and the match highlighting.
+//! Plain text search (no regex), shared by the Vim `/` search, the `Ctrl+F` find bar and the
+//! match highlighting.
 //!
 //! Case: "smartcase" like Vim's `:set ignorecase smartcase`:
 //! a pattern without uppercase letters ignores case (`abc` finds `ABC`), otherwise it does not.
@@ -83,7 +84,23 @@ impl Matcher {
     }
 }
 
-fn is_word(c: char) -> bool {
+/// The next match after (`forward`) or before `from`, wrapping around the text.
+pub(crate) fn find_from(
+    matcher: &Matcher,
+    chars: &[char],
+    from: usize,
+    forward: bool,
+) -> Option<usize> {
+    let len = chars.len();
+    if len == 0 {
+        return None;
+    }
+    // Start next to the cursor so that `n` (or `F3`) on a match moves to the next one.
+    (1..=len)
+        .map(|step| if forward { (from + step) % len } else { (from + len - step % len) % len })
+        .find(|&at| matcher.matches_at(chars, at))
+}
+pub(crate) fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 

@@ -1,7 +1,8 @@
 //! Key binding styles ("keymaps").
 //!
 //! A keymap may take keyboard input **before** the `TextEdit` sees it (e.g., Vim's Normal mode)
-//! and edit the text itself. [`Keymap::Normal`] takes nothing: plain egui editing.
+//! and edit the text itself. [`Keymap::Normal`] is plain egui editing plus VS Code's line commands
+//! (see [`normal`]); its find bar lives in `crate::find`.
 //!
 //! # Adding a keymap (e.g., Emacs)
 //! 1. add a variant to [`Keymap`]
@@ -10,6 +11,7 @@
 //!
 //! Everything else in the editor only talks to [`KeymapState`], so no other file changes.
 
+pub(crate) mod normal;
 pub(crate) mod vim;
 
 pub use self::vim::VimOptions;
@@ -135,7 +137,7 @@ impl KeymapState {
         view: View,
     ) -> KeymapOutput {
         match keymap {
-            Keymap::Normal => KeymapOutput::default(),
+            Keymap::Normal => normal::handle(ui, id, text),
             Keymap::Vim => self.vim.handle(ui, id, text, view),
         }
     }
