@@ -16,7 +16,7 @@ pub struct TextEdit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeAction {
     /// Button/menu title.
-    pub title: &'static str,
+    pub title: String,
     /// What to change.
     pub edit: TextEdit,
 }
@@ -32,10 +32,15 @@ pub fn code_action(text: &str, diagnostic: &Diagnostic) -> Option<CodeAction> {
             let json: String = line.chars().skip(span.start).take(span.len()).collect();
 
             Some(CodeAction {
-                title: r#"Fix IFrame key → "Duration""#,
+                title: r#"Fix IFrame key → "Duration""#.to_string(),
                 edit: TextEdit { range: diagnostic.range, new_text: fix_iframe_key(&json)? },
             })
         }
+        // The range is the quoted key, e.g. `\"Chanse\"`.
+        DiagnosticCode::RenameScarKey(known) => Some(CodeAction {
+            title: format!("Rename key → \"{known}\""),
+            edit: TextEdit { range: diagnostic.range, new_text: format!("\"{known}\"") },
+        }),
     }
 }
 
@@ -64,5 +69,14 @@ mod tests {
         let diagnostic = &diagnostics(text)[0];
         let action = code_action(text, diagnostic).expect("quick fix");
         assert_eq!(action.edit.new_text, r#"{"Duration":0.5}"#);
+    }
+
+    #[test]
+    fn renames_scar_key() {
+        let text = r#"0.1 SCAR_ActionData{"chanse":50}"#;
+        let diagnostic = &diagnostics(text)[0];
+        let action = code_action(text, diagnostic).expect("quick fix");
+        assert_eq!(action.edit.new_text, r#""Chance""#);
+        assert_eq!(diagnostic.range.span.len(), r#""chanse""#.len());
     }
 }

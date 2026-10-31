@@ -508,29 +508,41 @@ pub enum I18nKey {
     PageHkanno,
 
     // ── Convert page ────────────────────────────────────────────────────────
-    /// All Clear
-    ConvertAllClearButton,
+    /// Inputs
+    ConvertInputsLabel,
 
-    /// Selection type:
-    ConvertSelectionTypeLabel,
+    /// Clear
+    ConvertClearButton,
 
-    /// Directories
-    ConvertSelectionDirs,
+    /// Add Files…
+    ConvertAddFiles,
 
-    /// Convert every file inside the selected directories.
-    ConvertSelectionDirsHover,
+    /// Add Directories…
+    ConvertAddDirs,
 
-    /// Tree
+    /// Add Root Directories…
+    ConvertAddRootDirs,
+
+    /// Drop .hkx / .xml / .json files or directories here
+    ConvertDropHint,
+
+    /// Directory Tree
     ConvertSelectionTree,
 
-    /// Select root directories, then check the files to convert.
+    /// Add root directories, then check the files to convert. The directory structure is kept in the output.
     ConvertSelectionTreeHover,
 
-    /// Files
+    /// Files & Directories
     ConvertSelectionFiles,
 
-    /// Select individual files.
+    /// Convert the listed files. A directory converts every file inside it.
     ConvertSelectionFilesHover,
+
+    /// Next to each input
+    ConvertOutputPlaceholder,
+
+    /// Open the output directory
+    ConvertOpenOutputHover,
 
     /// Output:
     ConvertOutputLabel,

@@ -1,7 +1,7 @@
 //! Bars above the editor and the page's dialogs.
 //!
 //! ```text
-//! Output: [attack.modified.hkx                      ]  Format: [Amd64 ▼]        <- file bar
+//! Output: [attack.modified.hkx                      ]  Format: [HKX SE (64-bit) ▼]        <- file bar
 //! [Save] [Revert] [Format] [⚙]  Keymap: [Vim ▼]                [Hide Preview]  <- toolbar
 //! ```
 
@@ -14,7 +14,7 @@ use gui_shared::{
 use crate::{HkannoPage, HkannoPageCtx};
 
 impl HkannoPage {
-    /// `Output: [path]  Format: [Amd64 ▼]`
+    /// `Output: [path]  Format: [HKX SE (64-bit) ▼]`
     pub(crate) fn file_bar(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
         ui.horizontal(|ui| {
@@ -25,7 +25,7 @@ impl HkannoPage {
                 let mut index =
                     OutFormat::ALL.iter().position(|f| *f == tab.settings.format).unwrap_or(0);
                 if ComboBox::from_id_salt("hkanno_out_format")
-                    .width(100.0)
+                    .width(150.0) // fits "HKX SE (64-bit)"
                     .show_index(ui, &mut index, OutFormat::ALL.len(), |i| OutFormat::ALL[i].label())
                     .changed()
                 {

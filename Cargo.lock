@@ -499,7 +499,7 @@ dependencies = [
 [[package]]
 name = "auto_charset"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "chardetng",
  "encoding_rs",
@@ -561,15 +561,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
-name = "basic-toml"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba62675e8242a4c4e806d12f11d136e626e6c8361d6b829310732241652a178a"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "behavior_merge"
 version = "0.1.0"
 dependencies = [
@@ -580,7 +571,7 @@ dependencies = [
  "hkx_io",
  "indexmap 2.14.2",
  "json_patch",
- "jwalk 0.9.0",
+ "jwalk",
  "jwalk_glob",
  "mod_info",
  "nemesis_xml",
@@ -1097,6 +1088,7 @@ dependencies = [
  "egui",
  "egui_dnd",
  "egui_extras",
+ "egui_flex",
  "egui_router",
  "egui_widgets",
  "fast_hash",
@@ -1236,7 +1228,7 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 [[package]]
 name = "diff"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "imara-diff",
 ]
@@ -1351,9 +1343,9 @@ dependencies = [
 
 [[package]]
 name = "educe"
-version = "0.7.6"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e451fac8dd8dece16234604bf1efce6e90fddd8ab6ad4d66eec0eca5160959dd"
+checksum = "1ebdb1f8f8d2815bbe7b369a7da10343c82026a4503b68bd1279ba557611e96d"
 dependencies = [
  "enum-ordinalize",
  "proc-macro2",
@@ -1507,6 +1499,15 @@ dependencies = [
  "log",
  "mime_guess2",
  "profiling",
+]
+
+[[package]]
+name = "egui_flex"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cba41d926d029588b0c6b1a7ce6e189ab39883a790fb7a6e45c88ccb4821e682"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -2385,7 +2386,7 @@ dependencies = [
 [[package]]
 name = "havok_classes"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "bitflags 2.13.2",
  "educe",
@@ -2401,7 +2402,7 @@ dependencies = [
 [[package]]
 name = "havok_serde"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "arrayvec",
  "havok_types",
@@ -2411,7 +2412,7 @@ dependencies = [
 [[package]]
 name = "havok_types"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "lexical",
  "serde",
@@ -2422,7 +2423,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "havok_types_derive_proc_macros",
 ]
@@ -2430,7 +2431,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2484,9 +2485,9 @@ dependencies = [
 
 [[package]]
 name = "html-escape"
-version = "0.2.15"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
+checksum = "491194d601b4fa9fac3c9571e014070a0ad1bc3392d1bc10419695196a8b3cc3"
 
 [[package]]
 name = "iana-time-zone"
@@ -2668,11 +2669,12 @@ dependencies = [
 
 [[package]]
 name = "imara-diff"
-version = "0.1.8"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17d34b7d42178945f775e84bc4c36dde7c1c6cdfea656d3354d009056f2bb3d2"
+checksum = "2f01d462f766df78ab820dd06f5eb700233c51f0f4c2e846520eaf4ba6aa5c5c"
 dependencies = [
  "hashbrown 0.15.5",
+ "memchr",
 ]
 
 [[package]]
@@ -2902,16 +2904,6 @@ dependencies = [
  "snafu",
  "tracing",
  "winnow",
-]
-
-[[package]]
-name = "jwalk"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2735847566356cd2179a2a38264839308f7079fa96e6bd5a42d740460e003c56"
-dependencies = [
- "crossbeam",
- "rayon",
 ]
 
 [[package]]
@@ -4982,7 +4974,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "byteorder",
  "educe",
@@ -4998,16 +4990,15 @@ dependencies = [
 [[package]]
 name = "serde_hkx_features"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "auto_charset",
- "basic-toml",
  "diff 1.0.1",
  "havok_classes",
  "havok_serde",
  "havok_types",
  "indexmap 2.14.2",
- "jwalk 0.8.1",
+ "jwalk",
  "rayon",
  "serde",
  "serde_hkx",
@@ -6657,7 +6648,7 @@ dependencies = [
 [[package]]
 name = "winnow_ext"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=315b101#315b1017aa602f42ead9fb512249647fd14c82ec"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=63edc06#63edc063cd09dfd81d548a7576893dc91bdb8836"
 dependencies = [
  "annotate-snippets",
  "winnow",

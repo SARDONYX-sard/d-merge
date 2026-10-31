@@ -246,7 +246,8 @@ impl App {
     /// Renders the scroll area and [`egui_extras::TableBuilder`].
     fn render_table(&mut self, ui: &mut egui::Ui, filtered_mods: &[ModItem], editable: bool) {
         let table_max_height = ui.available_height() * 0.97;
-        let total_width = self.settings.ui.window.width;
+        // The real space of this panel (the window size setting is not the panel width).
+        let total_width = ui.available_width();
 
         let changed_width = (self.prev_table_available_width - total_width).abs() > 0.5;
         if changed_width {
@@ -255,24 +256,27 @@ impl App {
 
         egui::ScrollArea::vertical()
             .max_height(table_max_height)
-            .max_width(total_width)
+            // Fill the width instead of shrinking to the table.
+            .auto_shrink([false, true])
             .scroll_bar_rect(egui::Rect::everything_above(20.0))
             .show(ui, |ui| {
                 const MARGIN: f32 = 8.0;
 
                 ui.add_space(MARGIN * 2.0);
-                let table_width = ui.available_width() - MARGIN;
                 let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(MARGIN, 0.0));
+                let table_width = rect.width();
 
+                // | checkbox | id | name | mod type | site (fills the rest) | priority |
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     egui_extras::TableBuilder::new(ui)
                         .striped(true)
-                        .column(egui_extras::Column::initial(table_width * 0.01)) // checkbox
+                        .auto_shrink([false, true])
+                        .column(egui_extras::Column::exact(24.0)) // checkbox
                         .column(Self::resizable_column(table_width, 0.20, changed_width)) // id
-                        .column(Self::resizable_column(table_width, 0.30, changed_width)) // name
-                        .column(Self::resizable_column(table_width, 0.07, changed_width)) // mod type
-                        .column(Self::resizable_column(table_width, 0.33, changed_width)) // site
-                        .column(Self::resizable_column(table_width, 0.03, changed_width)) // priority
+                        .column(Self::resizable_column(table_width, 0.28, changed_width)) // name
+                        .column(Self::resizable_column(table_width, 0.10, changed_width)) // mod type
+                        .column(egui_extras::Column::remainder().at_least(80.0).clip(true)) // site
+                        .column(egui_extras::Column::exact(80.0)) // priority
                         .header(20.0, |mut header| self.render_table_header(&mut header))
                         .body(|mut body| {
                             let mut widths = [0.0_f32; 6];

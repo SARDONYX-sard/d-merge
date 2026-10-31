@@ -65,8 +65,11 @@ impl Root {
         );
 
         let mut clicked = None;
+        // `[Patch] [Convert] [hkanno]  <- grow ->  Theme: [Dark ▼]`
         panel.show(ui, |ui| {
-            ui.horizontal(|ui| {
+            let flex =
+                egui_flex::Flex::horizontal().w_full().align_items(egui_flex::FlexAlign::Center);
+            flex.show(ui, |flex| {
                 for page in Page::ALL {
                     let label = self.app.i18n.t(match page {
                         Page::Patch => I18nKey::PagePatch,
@@ -74,12 +77,15 @@ impl Root {
                         Page::Hkanno => I18nKey::PageHkanno,
                     });
                     let selected = self.app.settings.ui.page == page;
-                    if ui.add(Button::selectable(selected, label)).clicked() {
+                    let button = Button::selectable(selected, label);
+                    if flex.add_widget(egui_flex::item(), button).inner.clicked() {
                         clicked = Some(page);
                     }
                 }
-                ui.separator();
-                self.app.ui_theme_box(ui);
+                flex.grow();
+                flex.add_ui(egui_flex::item(), |ui| {
+                    ui.horizontal(|ui| self.app.ui_theme_box(ui));
+                });
             });
         });
 

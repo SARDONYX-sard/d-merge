@@ -13,6 +13,9 @@ use egui::{Pos2, pos2};
 pub enum Icon {
     Check,
     ChevronDown,
+    FilePlus,
+    FolderOpen,
+    FolderPlus,
     FolderSearch,
     Layers,
     Lock,
@@ -23,6 +26,7 @@ pub enum Icon {
     Search,
     TextAlignJustify,
     Toolbox,
+    Trash,
 }
 
 impl Icon {
@@ -31,6 +35,15 @@ impl Icon {
         match self {
             Self::Check => r#"<path d="M20 6 9 17l-5-5" />"#,
             Self::ChevronDown => r#"<path d="m6 9 6 6 6-6" />"#,
+            Self::FilePlus => {
+                r#"<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /> <path d="M14 2v4a2 2 0 0 0 2 2h4" /> <path d="M9 15h6" /> <path d="M12 18v-6" />"#
+            }
+            Self::FolderOpen => {
+                r#"<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />"#
+            }
+            Self::FolderPlus => {
+                r#"<path d="M12 10v6" /> <path d="M9 13h6" /> <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />"#
+            }
             Self::FolderSearch => {
                 r#"<path d="M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1" /> <path d="m21 21-1.9-1.9" /> <circle cx="17" cy="17" r="3" />"#
             }
@@ -55,6 +68,9 @@ impl Icon {
             Self::Search => r#"<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />"#,
             Self::TextAlignJustify => {
                 r#"<path d="M3 5h18" /> <path d="M3 12h18" /> <path d="M3 19h18" />"#
+            }
+            Self::Trash => {
+                r#"<path d="M3 6h18" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />"#
             }
             Self::Toolbox => {
                 r#"<path d="M16 12v4" /> <path d="M16 6a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 22 12v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 .586-1.414l4-4A2 2 0 0 1 8 6z" /> <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /> <path d="M2 14h20" /> <path d="M8 12v4" />"#

@@ -219,7 +219,8 @@ impl HkannoPage {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
 
         let lsp = &ctx.settings.lsp;
-        let language = HkannoLanguage { semantic: lsp.semantic_tokens };
+        let language =
+            HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
         let features = EditorFeatures {
             completion: lsp.completion,
             hover: lsp.hover,
@@ -340,7 +341,7 @@ impl HkannoPage {
 
                         if show_fixes
                             && let Some(action) = code_action(&tab.text, lsp_diag)
-                            && ui.add(Button::new(action.title).small()).clicked()
+                            && ui.add(Button::new(&action.title).small()).clicked()
                         {
                             fix = Some(action.edit);
                         }

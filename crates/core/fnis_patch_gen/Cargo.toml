@@ -21,7 +21,7 @@ phf = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_hkx = { workspace = true }
-serde_hkx_features = { workspace = true, features = ["extra_fmt", "serde_default"] }
+serde_hkx_features = { workspace = true, features = ["json", "serde_default"] }
 simd-json = { workspace = true }
 snafu = { workspace = true }
 sonic-rs = { workspace = true }

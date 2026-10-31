@@ -17,6 +17,7 @@ impl TemplateKey<'static> {
     ///
     /// # Note
     /// If the search fails using get(`O(1)`), it falls back to an ASCII Ignore(`O(n)`) search.
+    #[inline]
     pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<Self> {
         let map = if is_1st_person { &NEMESIS_1ST_PERSON_MAP } else { &NEMESIS_3RD_PERSON_MAP };
 
@@ -41,6 +42,7 @@ impl<'a> TemplateKey<'a> {
     /// - extension: `bin` or `xml`
     ///
     /// Otherwise [`Option::None`]
+    #[inline]
     pub fn new(template_name: Cow<'a, str>) -> Option<Self> {
         Self::is_valid(template_name.as_ref()).then_some(Self { template_name })
     }
@@ -109,12 +111,14 @@ impl<'a> TemplateKey<'a> {
     }
 
     /// As utf-8
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.template_name.as_ref()
     }
 
     /// Get inner `meshes` path.
     /// - e.g. `meshes/actors/character/_1stperson/behaviors/0_master.bin`
+    #[inline]
     pub fn as_meshes_inner_path(&self) -> &Path {
         Path::new(self.template_name.as_ref())
     }
@@ -128,6 +132,7 @@ impl<'a> TemplateKey<'a> {
     /// # Note
     /// Vanilla Skyrim is configured this way. Removing duplicates causes NPCs to become immobile when casting spells.
     #[allow(unused)]
+    #[inline]
     pub fn has_duplicate_event_names(&self) -> bool {
         matches!(
             self.as_str(),
@@ -330,6 +335,7 @@ pub struct MasterIndex {
 
 impl MasterIndex {
     /// From nemesis file stem. e.g. `0_master` -> MasterIndex
+    #[inline]
     pub fn from_nemesis_file(
         template_file_stem: &str,
         is_1st_person: bool,

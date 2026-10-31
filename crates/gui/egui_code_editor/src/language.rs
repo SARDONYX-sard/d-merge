@@ -59,6 +59,25 @@ pub trait Language {
         let _ = text;
         None
     }
+
+    /// Quick fixes for the problems at `line` / `column` of the **whole document** `text`
+    /// (`Ctrl+.`, like VS Code).
+    fn quick_fixes(&self, text: &str, line: usize, column: usize) -> Vec<QuickFix> {
+        let _ = (text, line, column);
+        Vec::new()
+    }
+}
+
+/// One quick fix: replace `columns` of `line` with `new_text`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickFix {
+    /// Menu title, e.g. `Fix IFrame key -> \"Duration\"`.
+    pub title: String,
+    /// 0-based line.
+    pub line: usize,
+    /// Char columns to replace.
+    pub columns: Range<usize>,
+    pub new_text: String,
 }
 
 /// How serious a [`Diagnostic`] is.

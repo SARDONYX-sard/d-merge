@@ -22,7 +22,7 @@ tokio = { workspace = true }
 
 havok_classes = { workspace = true }
 havok_types = { workspace = true }
-serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
+serde_hkx_features = { workspace = true, features = ["json"] }
 
 # workspace members
 hkx_io = { workspace = true }

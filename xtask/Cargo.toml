@@ -20,7 +20,7 @@ rmp-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_hkx = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true, features = ["preserve_order"] }
-serde_hkx_features = { workspace = true, optional = true, features = ["extra_fmt", "serde_default"] }
+serde_hkx_features = { workspace = true, optional = true, features = ["json", "serde_default"] }
 
 # workspace members (gen)
 behavior_merge = { workspace = true, optional = true }

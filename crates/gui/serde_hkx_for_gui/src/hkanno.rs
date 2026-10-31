@@ -240,7 +240,7 @@ impl<'a> Hkanno<'a> {
                 Format::Amd64 | Format::Win32 | Format::Xml => {
                     serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
                 }
-                Format::Json | Format::Toml => {
+                Format::Json => {
                     let mut classes =
                         serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
                     serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)

@@ -9,9 +9,10 @@
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SelectionType {
-    /// Pick individual files.
+    /// A list of files and directories (a directory converts everything inside).
     Files,
-    /// Pick directories; everything inside is converted.
+    /// v2.9 `Directories` mode. Kept so old settings load; the page moves `selected_dirs` into
+    /// `selected_files` and switches to [`Self::Files`].
     Dir,
     /// Pick a root directory, then check files in a tree view.
     #[default]
@@ -40,13 +41,13 @@ impl OutFormat {
     /// All variants in UI order.
     pub const ALL: [Self; 4] = [Self::Amd64, Self::Win32, Self::Xml, Self::Json];
 
-    /// Label shown in the UI. e.g., `Amd64`
+    /// Label shown in the UI. e.g., `HKX SE (64-bit)`
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Amd64 => "Amd64",
-            Self::Win32 => "Win32",
+            Self::Amd64 => "HKX SE (64-bit)",
+            Self::Win32 => "HKX LE (32-bit)",
             Self::Xml => "XML",
-            Self::Json => "Json",
+            Self::Json => "JSON",
         }
     }
 
@@ -70,10 +71,10 @@ pub struct ConvertSettings {
     /// Current selection mode.
     pub selection_type: SelectionType,
 
-    /// Inputs for [`SelectionType::Files`].
+    /// Inputs (files and directories) for [`SelectionType::Files`].
     pub selected_files: Vec<String>,
 
-    /// Inputs for [`SelectionType::Dir`].
+    /// v2.9 inputs of [`SelectionType::Dir`]; moved into `selected_files` on load.
     pub selected_dirs: Vec<String>,
 
     /// Root directories shown by [`SelectionType::Tree`].

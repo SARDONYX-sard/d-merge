@@ -5,6 +5,8 @@
 //!    Always on, so even unparseable lines get some color.
 //! 2. **semantic** (optional): parser-based tokens drawn **over** the basic layer.
 //!    e.g., the parameters of `PIE.@SGVB|IsAttacking|1` become string / number.
+//! 3. **JSON** (always): the `{...}` body of `SpecialFrames_Invincible{...}` /
+//!    `SCAR_ActionData{...}`: keys, strings, numbers, literals and punctuation.
 
 use crate::{
     Span,
@@ -62,6 +64,9 @@ pub fn highlight_line(line: &str, semantic: bool) -> Vec<(Span, TokenKind)> {
             paint(span, kind);
         }
     }
+    for (span, kind) in json_tokens(line) {
+        paint(span, kind);
+    }
 
     // Compress runs of the same kind back into spans.
     let mut out: Vec<(Span, TokenKind)> = Vec::new();
@@ -118,7 +123,11 @@ pub fn semantic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
         LineNode::IFrame(node) => push(node.event, Identifier),
         LineNode::Text(node) => {
             push(node.time.map(|f| f.span), Number);
-            push(node.text.map(|f| f.span), String);
+            // SCAR events are names (+ JSON, see `json_tokens`), not free text.
+            let is_scar = node.text.is_some_and(|t| t.value.trim_start().starts_with("SCAR_"));
+            if !is_scar {
+                push(node.text.map(|f| f.span), String);
+            }
         }
         LineNode::Comment(_) => {}
     }
@@ -127,8 +136,15 @@ pub fn semantic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
 
 /// Word scanner (layer 1). Mirrors the old Monarch tokenizer.
 pub fn basic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
-    const IDENTIFIERS: [&str; 4] =
-        ["animmotion", "animrotation", "SoundPlay", "SpecialFrames_Invincible"];
+    const IDENTIFIERS: [&str; 7] = [
+        "animmotion",
+        "animrotation",
+        "SoundPlay",
+        "SpecialFrames_Invincible",
+        "SCAR_ActionData",
+        "SCAR_ComboStart",
+        "SCAR_UpdateDummy",
+    ];
 
     let chars: Vec<char> = line.chars().collect();
     let mut tokens = Vec::new();
@@ -175,6 +191,64 @@ pub fn basic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
     tokens
 }
 
+/// JSON body tokens (layer 3): from the first `{` of an event line to the end.
+///
+/// e.g., `0.1 SCAR_ActionData{"Type":"RA", "Chance":30}` ->
+/// `{` `"Type"`(key) `:` `"RA"`(string) `,` `"Chance"`(key) `:` `30`(number) `}`
+pub fn json_tokens(line: &str) -> Vec<(Span, TokenKind)> {
+    let chars: Vec<char> = line.chars().collect();
+    // Only event payloads, not `#` comments or annotation text with a stray brace.
+    let Some(open) = chars.iter().position(|&c| c == '{') else { return Vec::new() };
+    if chars[..open].contains(&'#') {
+        return Vec::new();
+    }
+
+    let mut tokens = Vec::new();
+    let mut i = open;
+    while i < chars.len() {
+        let start = i;
+        let c = chars[i];
+        match c {
+            '{' | '}' | '[' | ']' | ':' | ',' => {
+                tokens.push((Span::new(i, i + 1), TokenKind::Operator));
+                i += 1;
+            }
+            '"' => {
+                i += 1;
+                while i < chars.len() && chars[i] != '"' {
+                    i += usize::from(chars[i] == '\\') + 1; // skip escaped chars, e.g. `\"`
+                }
+                i = (i + 1).min(chars.len());
+                // A string followed by `:` is a key.
+                let next = chars[i..].iter().find(|c| !c.is_whitespace());
+                let kind = if next == Some(&':') { TokenKind::Variable } else { TokenKind::String };
+                tokens.push((Span::new(start, i), kind));
+            }
+            c if c == '-' || c.is_ascii_digit() => {
+                i += 1;
+                while chars
+                    .get(i)
+                    .is_some_and(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-'))
+                {
+                    i += 1;
+                }
+                tokens.push((Span::new(start, i), TokenKind::Number));
+            }
+            c if c.is_ascii_alphabetic() => {
+                while chars.get(i).is_some_and(char::is_ascii_alphabetic) {
+                    i += 1;
+                }
+                let word: std::string::String = chars[start..i].iter().collect();
+                if matches!(word.as_str(), "true" | "false" | "null") {
+                    tokens.push((Span::new(start, i), TokenKind::Keyword));
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    tokens
+}
+
 /// JS `!isNaN(parseFloat(s))`: does `s` begin with a number?
 ///
 /// e.g., `"1"`, `"0.5x"`, `"-.5"` -> `true`; `"IsAttacking"` -> `false`.
@@ -188,6 +262,22 @@ fn starts_like_float(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_body() {
+        let line = r#"0.1 SCAR_ActionData{"Type":"RA", "Chance":30, "X":true}"#;
+        let kinds: Vec<_> = json_tokens(line).into_iter().map(|(_, k)| k).collect();
+        use TokenKind::*;
+        assert_eq!(
+            kinds,
+            [
+                Operator, Variable, Operator, String, Operator, Variable, Operator, Number,
+                Operator, Variable, Operator, Keyword, Operator
+            ]
+        );
+        // The event name is an identifier, not annotation text.
+        assert!(highlight_line(line, true).contains(&(Span::new(4, 19), Identifier)));
+    }
 
     #[test]
     fn semantic_overrides_basic() {

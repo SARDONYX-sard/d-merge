@@ -74,6 +74,7 @@ impl<'a> OnePatchMap<'a> {
     /// the same object id, only the highest-priority patch is retained.
     ///
     /// This method is safe to call concurrently.
+    #[inline]
     pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         // Same-path conflict.
         if let Some(mut existing) = self.patches.get_mut(&key) {
@@ -93,6 +94,7 @@ impl<'a> OnePatchMap<'a> {
     }
 
     /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
+    #[inline]
     pub fn merge(&self, other: Self) {
         for (path, new_val) in other.patches {
             match self.patches.entry(path) {
@@ -131,11 +133,13 @@ impl<'a> OnePatchMap<'a> {
     }
 
     /// Returns the number of patches stored in this map.
+    #[inline]
     pub fn len(&self) -> usize {
         self.patches.len()
     }
 
     /// Returns `true` if no patch is stored.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.patches.is_empty()
     }
@@ -160,6 +164,7 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
+    #[inline]
     pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut existing) => {
@@ -172,6 +177,7 @@ impl<'a> SeqPatchMap<'a> {
     }
 
     /// Extends the list of values for the given JSON path.
+    #[inline]
     pub fn merge(&self, other: Self) {
         for (path, other_vals) in other.0 {
             match self.0.entry(path) {

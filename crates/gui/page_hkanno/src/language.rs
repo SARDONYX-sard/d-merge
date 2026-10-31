@@ -7,7 +7,7 @@ use std::ops::Range;
 
 use egui::Color32;
 use egui_code_editor::{
-    CompletionItem, CompletionList, Diagnostic, Language, Severity, SignatureHelp,
+    CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp,
 };
 use hkanno_lsp::features::{self, completion::CompletionKind, highlight::TokenKind};
 
@@ -15,6 +15,8 @@ use hkanno_lsp::features::{self, completion::CompletionKind, highlight::TokenKin
 pub(super) struct HkannoLanguage {
     /// LSP option "semantic tokens": parser-based coloring on top of the basic one.
     pub(super) semantic: bool,
+    /// LSP option "code action": quick fixes (`Ctrl+.`).
+    pub(super) code_action: bool,
 }
 
 impl Language for HkannoLanguage {
@@ -69,6 +71,28 @@ impl Language for HkannoLanguage {
 
     fn format(&self, text: &str) -> Option<String> {
         Some(features::format::format_document(text))
+    }
+
+    fn quick_fixes(&self, text: &str, line: usize, column: usize) -> Vec<QuickFix> {
+        if !self.code_action {
+            return Vec::new();
+        }
+        let mut on_line: Vec<_> = features::diagnostics::diagnostics(text)
+            .into_iter()
+            .filter(|d| d.range.line == line)
+            .collect();
+        // The problem under the cursor first.
+        on_line.sort_by_key(|d| !(d.range.span.start..=d.range.span.end).contains(&column));
+        on_line
+            .iter()
+            .filter_map(|d| features::code_action::code_action(text, d))
+            .map(|action| QuickFix {
+                title: action.title,
+                line: action.edit.range.line,
+                columns: action.edit.range.span.start..action.edit.range.span.end,
+                new_text: action.edit.new_text,
+            })
+            .collect()
     }
 }
 

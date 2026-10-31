@@ -26,6 +26,7 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 | `Ctrl+Space`         | Open completion            |
 | `Tab` / `Enter`      | Accept completion          |
 | `Shift+Alt+F`        | Format document            |
+| `Ctrl+.`             | Quick fix menu (`↑`/`↓`, `Enter`, `Esc`) |
 | Mouse rest on a word | Hover (diagnostics + docs) |
 
 ## Vim

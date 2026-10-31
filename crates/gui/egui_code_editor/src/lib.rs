@@ -33,6 +33,7 @@ pub mod language;
 pub mod languages;
 mod layout;
 mod overlays;
+mod quick_fix;
 mod search;
 mod status;
 pub mod text_pos;
@@ -43,11 +44,14 @@ use self::{
     completion::CompletionPopup,
     hover::{HoverCtx, HoverPopup},
     keymap::{KeymapOutput, Scroll, View},
+    quick_fix::QuickFixMenu,
     text_pos::LinePos,
 };
 pub use self::{
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
-    language::{CompletionItem, CompletionList, Diagnostic, Language, Severity, SignatureHelp},
+    language::{
+        CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp,
+    },
     layout::line_job,
     status::status_line,
 };
@@ -88,6 +92,7 @@ pub enum EditorCommand {
 pub struct CodeEditorState {
     completion: CompletionPopup,
     hover: HoverPopup,
+    quick_fix: QuickFixMenu,
     /// State of the key binding styles (e.g., Vim mode and registers).
     pub keymap: KeymapState,
     /// Lines visible last frame (Vim `H`, `Ctrl+D`, ...).
@@ -199,8 +204,19 @@ impl<'a> CodeEditor<'a> {
 
         // ── 1. Keys owned by the popups / keymap (must run before the TextEdit) ──
         state.hover.handle_input(ui, id); // before the keymap swallows the key events
+        // `Ctrl+.`: quick fixes at the cursor; while the menu is open it owns the arrow keys.
+        let mut fix = state.quick_fix.handle_keys(ui);
+        if has_focus
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Period))
+            && let Some(index) = egui::TextEdit::load_state(ui.ctx(), id)
+                .and_then(|s| s.cursor.char_range())
+                .map(|r| r.primary.index.0)
+        {
+            let pos = LinePos::from_char_index(text, index);
+            state.quick_fix.open(language.quick_fixes(text, pos.line, pos.column));
+        }
         let accept_key = state.completion.handle_keys(ui);
-        let keys = if has_focus {
+        let keys = if has_focus && !state.quick_fix.is_open() {
             state.keymap.handle(keymap, ui, id, text, state.view)
         } else {
             KeymapOutput::default()
@@ -304,6 +320,19 @@ impl<'a> CodeEditor<'a> {
         let (galley, galley_pos) = (&output.galley, output.galley_pos);
         if let Some(cursor) = cursor {
             overlays::current_line(ui, galley, galley_pos, cursor.line);
+        }
+        if let Some(anchor) = anchor
+            && let Some(clicked) = state.quick_fix.ui(ui.ctx(), id, anchor)
+        {
+            fix = Some(clicked);
+        }
+        if let Some(QuickFix { line, columns, new_text, .. }) = fix.take() {
+            let line_start = LinePos { line, column: 0 }.to_char_index(text);
+            let start = text_pos::char_to_byte(text, line_start + columns.start);
+            let end = text_pos::char_to_byte(text, line_start + columns.end);
+            text.replace_range(start..end, &new_text);
+            set_cursor(ui.ctx(), id, line_start + columns.start);
+            changed = true;
         }
         if let Some(width) = gutter {
             let current = cursor.map(|c| c.line);

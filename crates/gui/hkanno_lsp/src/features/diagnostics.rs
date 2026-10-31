@@ -30,6 +30,8 @@ pub enum Severity {
 pub enum DiagnosticCode {
     /// `SpecialFrames_Invincible{"Duratoin": 0.5}` -> rename the key to `Duration`.
     FixIFrameKey,
+    /// `SCAR_ActionData{"Chanse": 50}` -> rename the key (the quoted key is the range).
+    RenameScarKey(&'static str),
 }
 
 /// One problem found in the document.
@@ -115,6 +117,11 @@ impl LineCtx<'_> {
         });
     }
 
+    /// The last char of the line (e.g., where a missing value would follow).
+    const fn line_end(&self) -> Span {
+        Span::new(self.line_len.saturating_sub(1), self.line_len)
+    }
+
     /// The whole line; used when the missing piece has no position of its own.
     const fn whole_line(&self) -> Span {
         Span::new(0, self.line_len)
@@ -124,7 +131,8 @@ impl LineCtx<'_> {
     fn required(&mut self, field: Option<&Field<f64>>, missing_message: &str) {
         match field {
             Some(_) => self.number(field),
-            None => self.push(self.whole_line(), Severity::Error, missing_message, None),
+            // Point at the end of the line, where the missing value goes.
+            None => self.push(self.line_end(), Severity::Error, missing_message, None),
         }
     }
 
@@ -154,9 +162,17 @@ fn scar(ctx: &mut LineCtx, text: &Field<&str>) {
             ctx.push(span, Severity::Error, "SCAR_ActionData needs a JSON body `{...}`.", None);
             return;
         }
-        for (is_error, message) in scar::check_action_data(json) {
-            let severity = if is_error { Severity::Error } else { Severity::Warning };
-            ctx.push(span, severity, message, None);
+        for problem in scar::check_action_data(json) {
+            let severity = if problem.is_error { Severity::Error } else { Severity::Warning };
+            // Point at the key (e.g., `\"Chance\"`) when the problem is about one.
+            let key_span = problem.key.as_deref().and_then(|key| {
+                let quoted = format!("\"{key}\"");
+                let at = json.find(&quoted)?;
+                let start = json_start + json[..at].chars().count();
+                Some(Span::new(start, start + quoted.chars().count()))
+            });
+            let code = problem.rename.map(DiagnosticCode::RenameScarKey);
+            ctx.push(key_span.unwrap_or(span), severity, problem.message, code);
         }
     } else if let Some(message) = scar::check_combo_start(trimmed) {
         ctx.push(Span::new(start, end), Severity::Error, message, None);

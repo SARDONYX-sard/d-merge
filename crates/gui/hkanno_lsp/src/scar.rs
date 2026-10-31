@@ -168,6 +168,34 @@ pub(crate) fn action_key(name: &str) -> Option<&'static ActionKey> {
     ACTION_KEYS.iter().find(|key| key.name == name)
 }
 
+/// The known key `name` is a typo of: same ignoring case, or at most 2 edits away
+/// (e.g., `chance` / `Chanse` -> `Chance`).
+pub(crate) fn closest_key(name: &str) -> Option<&'static str> {
+    let lower = name.to_ascii_lowercase();
+    ACTION_KEYS
+        .iter()
+        .map(|key| (edit_distance(&lower, &key.name.to_ascii_lowercase()), key.name))
+        .filter(|&(distance, _)| distance <= 2)
+        .min_by_key(|&(distance, _)| distance)
+        .map(|(_, name)| name)
+}
+
+/// Levenshtein distance (chars).
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1).min(row[j] + 1).min(diagonal + usize::from(ca != cb));
+            diagonal = above;
+        }
+    }
+    row[b.len()]
+}
+
 /// Markdown for `SCAR_ComboStart`.
 pub(crate) const COMBO_START_DOC: &str = "# SCAR_ComboStart\nAnnotated at the local time when the next attack transition may begin.\nFor ADXP/AMCO, place it between `MCO_WinOpen` and `MCO_WinClose` (or `MCO_PowerWinOpen` and `MCO_PowerWinClose`).\n\n# Format\n```hkanno\nSCAR_ComboStart\nSCAR_ComboStart.<chance: 0-100>\n```\nThe optional `.<chance>` suffix is the percentage chance that the next attack starts (default: 100).\n- required: SCAR (Skyrim Combat AI Revamp)";
 
@@ -240,47 +268,89 @@ pub(crate) fn json_position(before_cursor: &str) -> JsonPos {
     }
 }
 
-/// Problems of a `SCAR_ActionData` JSON object: `(is_error, message)`.
-pub(crate) fn check_action_data(json: &str) -> Vec<(bool, String)> {
+/// A problem of a `SCAR_ActionData` JSON object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Problem {
+    pub(crate) is_error: bool,
+    pub(crate) message: String,
+    /// The key it is about (to point at it), e.g. `Chance`.
+    pub(crate) key: Option<String>,
+    /// The known key `key` was probably meant to be (quick fix).
+    pub(crate) rename: Option<&'static str>,
+}
+
+const fn problem(is_error: bool, message: String, key: Option<String>) -> Problem {
+    Problem { is_error, message, key, rename: None }
+}
+
+/// Problems of a `SCAR_ActionData` JSON object.
+pub(crate) fn check_action_data(json: &str) -> Vec<Problem> {
     let value: serde_json::Value = match serde_json::from_str(json) {
         Ok(value) => value,
-        Err(err) => return vec![(true, format!("SCAR_ActionData JSON parse error: {err}"))],
+        Err(err) => {
+            return vec![problem(true, format!("SCAR_ActionData JSON parse error: {err}"), None)];
+        }
     };
     let Some(object) = value.as_object() else {
-        return vec![(true, "SCAR_ActionData must be a JSON object `{...}`.".to_string())];
+        return vec![problem(
+            true,
+            "SCAR_ActionData must be a JSON object `{...}`.".to_string(),
+            None,
+        )];
     };
 
     let mut problems = Vec::new();
     for (name, value) in object {
         let Some(key) = action_key(name) else {
-            problems.push((false, format!("Unknown SCAR_ActionData key `{name}`.")));
+            let rename = closest_key(name);
+            let message = match rename {
+                Some(known) => {
+                    format!("Unknown SCAR_ActionData key `{name}`. Did you mean `{known}`?")
+                }
+                None => format!("Unknown SCAR_ActionData key `{name}`."),
+            };
+            problems.push(Problem { rename, ..problem(false, message, Some(name.clone())) });
             continue;
         };
         if let Some(message) = check_value(key, value) {
-            problems.push((true, message));
+            problems.push(problem(true, message, Some(name.clone())));
         }
     }
 
     let has = |name: &str| object.contains_key(name);
     match (has("IdleAnimation"), has("AttackData")) {
-        (true, true) => problems
-            .push((true, "`IdleAnimation` and `AttackData` cannot be combined.".to_string())),
-        (false, false) => problems.push((
+        (true, true) => problems.push(problem(
+            true,
+            "`IdleAnimation` and `AttackData` cannot be combined.".to_string(),
+            Some("AttackData".to_string()),
+        )),
+        (false, false) => problems.push(problem(
             false,
             "Neither `IdleAnimation` nor `AttackData` is set: nothing is performed.".to_string(),
+            None,
         )),
         _ => {}
     }
     if has("StartAngle") != has("EndAngle") {
-        problems.push((false, "`StartAngle` and `EndAngle` are used together.".to_string()));
+        problems.push(problem(
+            false,
+            "`StartAngle` and `EndAngle` are used together.".to_string(),
+            None,
+        ));
     }
     if has("CoolDownAlias") && !has("IdleAnimation") {
-        problems
-            .push((false, "`CoolDownAlias` is meant to be used with `IdleAnimation`.".to_string()));
+        problems.push(problem(
+            false,
+            "`CoolDownAlias` is meant to be used with `IdleAnimation`.".to_string(),
+            None,
+        ));
     }
     if has("ConditionsAlias") && !has("AttackData") {
-        problems
-            .push((false, "`ConditionsAlias` is meant to be used with `AttackData`.".to_string()));
+        problems.push(problem(
+            false,
+            "`ConditionsAlias` is meant to be used with `AttackData`.".to_string(),
+            None,
+        ));
     }
     problems
 }
@@ -352,7 +422,7 @@ mod tests {
         assert!(check_action_data(ok).is_empty());
 
         let bad = r#"{"IdleAnimation":"a", "AttackData":"b", "Type":"XX", "Chance":200, "Foo":1}"#;
-        let messages: Vec<_> = check_action_data(bad).into_iter().map(|(_, m)| m).collect();
+        let messages: Vec<_> = check_action_data(bad).into_iter().map(|p| p.message).collect();
         assert!(messages.iter().any(|m| m.contains("cannot be combined")));
         assert!(messages.iter().any(|m| m.contains("`Type` must be one of")));
         assert!(messages.iter().any(|m| m.contains("`Chance` must be between")));
@@ -360,6 +430,8 @@ mod tests {
 
         assert_eq!(check_combo_start("SCAR_ComboStart.60"), None);
         assert!(check_combo_start("SCAR_ComboStart.x").is_some());
+        assert_eq!(closest_key("chanse"), Some("Chance"));
+        assert_eq!(closest_key("Foo"), None);
         assert_eq!(check_combo_start("SCAR_ComboStart"), None);
     }
 }

@@ -71,6 +71,10 @@ impl TreeView {
         out
     }
 
+    pub(crate) fn checked_count(&self) -> usize {
+        self.checked.len()
+    }
+
     pub(crate) fn has_checked(&self) -> bool {
         !self.checked.is_empty()
     }

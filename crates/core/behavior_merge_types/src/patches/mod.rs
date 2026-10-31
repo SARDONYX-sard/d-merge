@@ -47,6 +47,7 @@ pub struct BehaviorPatchesMap<'a>(
 );
 
 impl<'a> BehaviorPatchesMap<'a> {
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -112,6 +113,7 @@ impl<'a> BehaviorIndexMap<'a> {
     /// `behavior_graph` index(more information) is preferred.
     ///
     /// Therefore, the result does not depend on the insertion order.
+    #[inline]
     pub fn insert(&self, key: TemplateKey<'a>, indexes: BehaviorIndexes) {
         match self.0.entry(key) {
             dashmap::Entry::Occupied(mut occ) => {
