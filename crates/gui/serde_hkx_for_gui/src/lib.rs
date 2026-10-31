@@ -80,7 +80,7 @@ async fn convert_inner(
             tokio::spawn(async move {
                 status_sender(Payload { path_id, status: Status::Processing });
 
-                serde_hkx_features::convert(&input, output, format)
+                hkx_io::convert(input.clone(), output, format)
                     .await
                     .map(|_| {
                         status_sender(Payload { path_id, status: Status::Done });

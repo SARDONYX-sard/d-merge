@@ -71,8 +71,8 @@ D:/MO2/mods/
 
 - GUI
   - [x] Basic frontend(Patch / Convert / hkanno editor)
-  - [x] Support Virtual fs mode(Use `egui` ver.)
-  - [x] Auto read settings file(Use `egui` ver.)
+  - [x] Support Virtual fs mode
+  - [x] Auto read settings file
   - [ ] hkx json/patch editor
 
 - AnimData(`animationdatasinglefile.txt`)
@@ -136,6 +136,7 @@ Workspace crates only (`crates/core/*`, `crates/gui/*`). `fast_hash` (MIT OR Apa
 
 ```txt
 d_merge (GPL-3.0-or-later)                          <- crates/gui/d_merge: the app
+│
 ├── behavior_merge (GPL-3.0-or-later)               <- crates/core: patch merge engine
 │   ├── behavior_merge_types (GPL-3.0-or-later)
 │   ├── fnis_patch_gen (GPL-3.0-or-later)
@@ -148,15 +149,16 @@ d_merge (GPL-3.0-or-later)                          <- crates/gui/d_merge: the a
 │   ├── nemesis_xml (MIT OR Apache-2.0)
 │   └── skyrim_anim_data (GPL-3.0-or-later)
 │       └── skyrim_crc (MIT OR Apache-2.0)
-├── gui_shared (GPL-3.0-or-later)                   <- crates/gui: GUI parts
+│
+├── gui_shared (MIT OR Apache-2.0)                   <- crates/gui: GUI parts
 │   ├── gh_issue_link (MIT OR Apache-2.0)
-│   ├── gui_shared_derive (GPL-3.0-or-later)
+│   ├── gui_shared_derive (MIT OR Apache-2.0)
 │   ├── mod_info (MIT OR Apache-2.0)
 │   └── skyrim_data_dir (MIT OR Apache-2.0)
 ├── page_convert (GPL-3.0-or-later)
 │   └── serde_hkx_for_gui (MIT OR Apache-2.0)
 │       └── node_expr (MIT OR Apache-2.0)
-├── page_hkanno (GPL-3.0-or-later)
+├── page_hkanno (MIT OR Apache-2.0)
 │   ├── egui_code_editor (MIT)
 │   │   └── egui_widgets (MIT)
 │   ├── hkanno_lsp (MIT OR Apache-2.0)

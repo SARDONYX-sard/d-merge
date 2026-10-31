@@ -2,7 +2,7 @@ use std::{borrow::Cow, fs, path::Path};
 
 use havok_classes::Classes;
 use json_patch::{Action, JsonPatch, ValueWithPriority, json_path};
-use serde_hkx_features::{ClassMap, convert::process_serde_with};
+use serde_hkx_features::ClassMap;
 use simd_json::json_typed;
 
 use crate::{
@@ -110,13 +110,14 @@ where
         source: e,
     })?;
 
-    fn f(class_map: ClassMap<'_>) -> Result<usize, serde_hkx_features::error::Error> {
-        read_character_skeleton(&class_map).map_err(|e| serde_hkx_features::error::Error::IoError {
-            source: std::io::Error::other(e),
-        })
-    }
-
-    process_serde_with(&bytes, path, f, f)
+    let mut bone_len = 0;
+    hkx_io::with_class_map(&bytes, path, &mut |class_map| {
+        bone_len = read_character_skeleton(&class_map).map_err(|e| {
+            serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+        })?;
+        Ok(())
+    })?;
+    Ok(bone_len)
 }
 
 /// Resolve the character skeleton through the HKX object graph.

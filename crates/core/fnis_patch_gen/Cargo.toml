@@ -31,6 +31,7 @@ winnow = { workspace = true }
 winnow_ext = { workspace = true }
 
 # workspace members
+hkx_io = { workspace = true }
 auto_charset = { workspace = true }
 fnis_list = { workspace = true }
 json_patch = { workspace = true, features = ["serde"] }

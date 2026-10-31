@@ -4,8 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use hkx_io::{EventIdMap, HkxHeader, VariableIdMap};
 use rayon::prelude::*;
-use serde_hkx::{EventIdMap, HavokSort as _, VariableIdMap, bytes::serde::hkx_header::HkxHeader};
+use serde_hkx::HavokSort as _;
 use serde_hkx_features::{ClassMap, id_maker::create_maps};
 use snafu::ResultExt;
 
@@ -61,7 +62,7 @@ pub(crate) fn generate_hkx_files(
                     })
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
                 #[cfg(not(feature = "json_error_path"))]
-                let mut class_map: ClassMap = simd_json::serde::from_borrowed_value(template_json)
+                let mut class_map: ClassMap = hkx_io::from_json_value(template_json)
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
 
                 // NOTE: If the indexes are unknown, Nemesis variables are not replaced.
@@ -104,7 +105,7 @@ pub(crate) fn generate_hkx_files(
 
                 // Output error info
                 // serialize target class, field ptr number.
-                serde_hkx::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
+                hkx_io::to_bytes_with_maps(&class_map, &header, event_id_map, variable_id_map)
                     .with_context(|_| HkxSerSnafu { path: output_path.clone() })?
             };
 
@@ -153,8 +154,8 @@ fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()>
 
     let mut class_map = class_map.clone();
     let ptr = class_map.sort_for_xml().with_context(|_| HkxSerSnafu { path: output_path })?;
-    let xml = serde_hkx::to_string(&class_map, &ptr)
-        .with_context(|_| HkxSerSnafu { path: output_path })?;
+    let xml =
+        hkx_io::to_xml(&class_map, &ptr).with_context(|_| HkxSerSnafu { path: output_path })?;
 
     let mut xml_path = output_path.to_path_buf();
     xml_path.set_extension("xml");

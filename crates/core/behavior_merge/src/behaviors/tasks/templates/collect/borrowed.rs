@@ -49,7 +49,7 @@ pub(crate) fn template_xml_to_value(bytes: &[u8], path: &Path) -> Result<Borrowe
     let template_xml =
         core::str::from_utf8(bytes).map_err(|_| Error::NonUtf8Path { path: path.to_path_buf() })?;
     let ast: serde_hkx_features::ClassMap =
-        serde_hkx::from_str(template_xml).with_context(|_| HkxDeSnafu { path })?;
+        hkx_io::from_xml(template_xml).with_context(|_| HkxDeSnafu { path })?;
     let value = to_borrowed_value(ast).with_context(|_| TemplateXmlSnafu { path })?;
     Ok(value)
 }

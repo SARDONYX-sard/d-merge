@@ -230,49 +230,27 @@ impl<'a> Hkanno<'a> {
         output_format: Format,
         input: &Path,
     ) -> Result<Vec<u8>, HkannoError> {
-        serde_hkx_features::convert::process_serde_with(
-            bytes,
-            input,
-            |mut classes| {
-                self.clone().into_static().write_to_classmap(&mut classes).map_err(|e| {
-                    serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
-                })?;
+        let mut output = Vec::new();
+        hkx_io::with_class_map(bytes, input, &mut |mut classes| {
+            self.clone().into_static().write_to_classmap(&mut classes).map_err(|e| {
+                serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+            })?;
 
-                match output_format {
-                    Format::Amd64 | Format::Win32 | Format::Xml => {
-                        serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
-                    }
-                    Format::Json | Format::Toml => {
-                        let mut classes =
-                            serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
-                        serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
-                    }
+            output = match output_format {
+                Format::Amd64 | Format::Win32 | Format::Xml => {
+                    serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
                 }
-                .with_context(|_| serde_hkx_features::error::SerSnafu {
-                    input: input.to_path_buf(),
-                })
-            },
-            |mut classes| {
-                self.clone().write_to_classmap(&mut classes).map_err(|e| {
-                    serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
-                })?;
-
-                match output_format {
-                    Format::Amd64 | Format::Win32 | Format::Xml => {
-                        serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
-                    }
-                    Format::Json | Format::Toml => {
-                        let mut classes =
-                            serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
-                        serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
-                    }
+                Format::Json | Format::Toml => {
+                    let mut classes =
+                        serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
+                    serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
                 }
-                .with_context(|_| serde_hkx_features::error::SerSnafu {
-                    input: input.to_path_buf(),
-                })
-            },
-        )
-        .context(SerdeHkxFeatureSnafu)
+            }
+            .with_context(|_| serde_hkx_features::error::SerSnafu { input: input.to_path_buf() })?;
+            Ok(())
+        })
+        .context(SerdeHkxFeatureSnafu)?;
+        Ok(output)
     }
 }
 
@@ -566,23 +544,17 @@ const fn is_hka_animation_derived(class: &Classes<'_>) -> bool {
 /// crate it would be copied there (~15 MB in a non-LTO build).
 #[inline(never)]
 pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, HkannoError> {
-    serde_hkx_features::convert::process_serde_with(
-        bytes,
-        input,
-        |classes| {
-            parse_hkanno_borrowed(classes)
-                .map_err(|e| serde_hkx_features::error::Error::IoError {
-                    source: std::io::Error::other(e),
-                })
-                .map(|ano| ano.into_static())
-        },
-        |classes| {
-            parse_hkanno_borrowed(classes).map_err(|e| serde_hkx_features::error::Error::IoError {
-                source: std::io::Error::other(e),
-            })
-        },
-    )
-    .context(SerdeHkxFeatureSnafu)
+    // Owned (`into_static`): XML is decoded into a temporary string the classes borrow from.
+    let mut hkanno = None;
+    hkx_io::with_class_map(bytes, input, &mut |classes| {
+        let parsed = parse_hkanno_borrowed(classes).map_err(|e| {
+            serde_hkx_features::error::Error::IoError { source: std::io::Error::other(e) }
+        })?;
+        hkanno = Some(parsed.into_static());
+        Ok(())
+    })
+    .context(SerdeHkxFeatureSnafu)?;
+    hkanno.ok_or(HkannoError::MissingHkaAnimationClass)
 }
 
 /// Custom error type for hkanno parsing operations.

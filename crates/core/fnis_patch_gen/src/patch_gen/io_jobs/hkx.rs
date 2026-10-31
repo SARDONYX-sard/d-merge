@@ -157,14 +157,13 @@ fn convert(
     bytes: &mut Vec<u8>,
     output_target: OutPutTarget,
 ) -> Result<(), Error> {
-    use serde_hkx::bytes::serde::hkx_header::HkxHeader;
-    use serde_hkx_features::ClassMap;
+    use hkx_io::HkxHeader;
 
     if bytes.is_empty() {
         return Ok(());
     }
 
-    let class_map: ClassMap = serde_hkx::from_bytes(bytes)
+    let class_map = hkx_io::from_bytes(bytes)
         .map_err(|e| Error::HkxDeError { path: input_path.to_path_buf(), source: e })?;
 
     let header = match output_target {
@@ -172,7 +171,7 @@ fn convert(
         OutPutTarget::SkyrimSe => HkxHeader::new_skyrim_se(),
     };
 
-    *bytes = serde_hkx::to_bytes(&class_map, &header)
+    *bytes = hkx_io::to_bytes(&class_map, &header)
         .map_err(|e| Error::HkxSerError { path: input_path.to_path_buf(), source: e })?;
 
     Ok(())

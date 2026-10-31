@@ -63,6 +63,7 @@ fnis_list = { path = "./crates/core/fnis_list" }
 fnis_patch_gen = { path = "./crates/core/fnis_patch_gen" }
 gh_issue_link = { path = "./crates/gui/gh_issue_link" }
 hkanno_lsp = { path = "./crates/gui/hkanno_lsp" }
+hkx_io = { path = "./crates/core/hkx_io" }
 json_patch = { path = "./crates/core/json_patch" }
 jwalk_glob = { path = "./crates/core/jwalk_glob" }
 mod_info = { path = "./crates/gui/mod_info" }

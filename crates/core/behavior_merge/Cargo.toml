@@ -32,6 +32,7 @@ winnow = { workspace = true }
 winnow_ext = { workspace = true }
 
 # workspace members
+hkx_io = { workspace = true }
 fnis_patch_gen = { workspace = true }
 behavior_merge_types = { workspace = true }
 json_patch = { workspace = true, features = ["serde"] }
@@ -44,6 +45,7 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 # quick_tracing = { version = "*" }
 
 # workspace members
+hkx_io = { workspace = true }
 jwalk_glob = { workspace = true }
 mod_info = { workspace = true }
 tracing_rotation = { workspace = true }

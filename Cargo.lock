@@ -577,6 +577,7 @@ dependencies = [
  "dashmap",
  "fast_hash",
  "fnis_patch_gen",
+ "hkx_io",
  "indexmap 2.14.2",
  "json_patch",
  "jwalk 0.9.0",
@@ -1876,6 +1877,7 @@ dependencies = [
  "fast_hash",
  "fnis_list",
  "havok_classes",
+ "hkx_io",
  "indexmap 2.14.2",
  "json_patch",
  "jwalk_glob",
@@ -2468,6 +2470,16 @@ name = "hkanno_lsp"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "hkx_io"
+version = "0.1.0"
+dependencies = [
+ "havok_types",
+ "serde_hkx",
+ "serde_hkx_features",
+ "simd-json",
 ]
 
 [[package]]
@@ -5012,6 +5024,7 @@ dependencies = [
  "futures",
  "havok_classes",
  "havok_types",
+ "hkx_io",
  "node_expr",
  "rayon",
  "serde",

@@ -25,6 +25,7 @@ havok_types = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["extra_fmt"] }
 
 # workspace members
+hkx_io = { workspace = true }
 node_expr = { workspace = true }
 
 [dev-dependencies]
