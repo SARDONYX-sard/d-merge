@@ -20,8 +20,6 @@ mod tree;
 mod vars_panel;
 mod workspace;
 
-use self::language::NemesisXml;
-
 use std::{path::Path, time::Instant};
 
 use egui_code_editor::{
@@ -41,7 +39,10 @@ use gui_shared::{
 };
 use nemesis_diff::is_valid_mod_code;
 
-use self::workspace::{Behavior, Target, TemplateEntry, Workspace};
+use self::{
+    language::NemesisXml,
+    workspace::{Behavior, Target, TemplateEntry, Workspace},
+};
 
 /// How long after an edit the workspace is written to its cache.
 const SAVE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
@@ -657,8 +658,10 @@ impl PatchTool {
         let behavior = &self.workspace.behaviors[self.active];
         let filter = self.class_filter.to_lowercase();
         let used = |class: &str| behavior.object_of_class(class).is_some();
-        let mut classes: Vec<&str> =
-            nemesis_diff::class_names().filter(|c| c.to_lowercase().contains(&filter)).collect();
+        let mut classes: Vec<&str> = nemesis_diff::schema::class_names()
+            .into_iter()
+            .filter(|c| c.to_lowercase().contains(&filter))
+            .collect();
         classes.sort_by_key(|class| !used(class)); // stable: alphabetical within each group
 
         let mut picked = None;
@@ -717,7 +720,8 @@ impl PatchTool {
             let behavior = &self.workspace.behaviors[self.active];
             let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(patch));
             self.preview = Some((patch, check));
-            self.field_problems = field_diagnostics(&self.editor_text);
+            self.field_problems =
+                field_diagnostics(&self.editor_text, &self.workspace.behaviors[self.active]);
             self.hunk_labels = self.workspace.behaviors[self.active]
                 .template_object(&id)
                 .map(|template| hunk_labels(&template.text, &self.editor_text))
@@ -796,7 +800,7 @@ impl PatchTool {
             .unwrap_or_default();
         let values = values.as_ref();
         // The class (and fields) around the cursor line of last frame: field names / hover.
-        let context = nemesis_diff::field_context(&self.editor_text, self.cursor_line);
+        let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
         let fields = context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice()));
         let language = NemesisXml {
             events: &events,
@@ -901,24 +905,26 @@ fn hunk_labels(template: &str, edited: &str) -> Vec<String> {
         .collect()
 }
 
-/// [`nemesis_diff::check_fields`] as editor underlines (the trimmed line, as a warning).
-fn field_diagnostics(text: &str) -> Vec<Diagnostic> {
+/// [`nemesis_diff::check_fields`] (names) and [`nemesis_diff::schema::check_pointers`] (pointer
+/// targets: they exist and have the right class) as editor underlines (the trimmed line).
+fn field_diagnostics(text: &str, behavior: &workspace::Behavior) -> Vec<Diagnostic> {
     let lines: Vec<&str> = text.lines().collect();
-    nemesis_diff::check_fields(text)
+    let class_of = |id: &str| behavior.class_of(id);
+    let names = nemesis_diff::check_fields(text)
         .into_iter()
-        .map(|problem| {
-            let line = lines.get(problem.line).copied().unwrap_or_default();
+        .map(|p| (p.line, p.message, Severity::Warning));
+    let pointers = nemesis_diff::schema::check_pointers(text, &class_of)
+        .into_iter()
+        .map(|p| (p.line, p.message, Severity::Error));
+    names
+        .chain(pointers)
+        .map(|(line_no, message, severity)| {
+            let line = lines.get(line_no).copied().unwrap_or_default();
             let start = line.chars().take_while(|c| c.is_whitespace()).count();
-            Diagnostic {
-                line: problem.line,
-                columns: start..line.chars().count(),
-                severity: Severity::Warning,
-                message: problem.message,
-            }
+            Diagnostic { line: line_no, columns: start..line.chars().count(), severity, message }
         })
         .collect()
 }
-
 /// Char index of the previous / next `<!-- MOD_CODE` line from the cursor of editor `id`, wrapping.
 fn next_block(ctx: &egui::Context, id: egui::Id, patch: &str, forward: bool) -> Option<usize> {
     let cursor = egui::TextEdit::load_state(ctx, id)

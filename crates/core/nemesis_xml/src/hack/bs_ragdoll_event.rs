@@ -4,7 +4,10 @@ use winnow::{
     combinator::{alt, delimited},
 };
 
-use crate::helpers::tag::{field_start_close_tag, field_start_open_tag};
+use crate::{
+    helpers::tag::{field_start_close_tag, field_start_open_tag},
+    patch::FieldType,
+};
 
 /// Parser hack for misnamed or invalid fields in the `BSRagdollContactListenerModifier` class.
 ///
@@ -28,13 +31,13 @@ use crate::helpers::tag::{field_start_close_tag, field_start_open_tag};
 /// Returns an error if the expected malformed field tag is not present at the current input.
 pub fn do_hack_cast_ragdoll_event<'a>(
     input: &mut &'a str,
-) -> ModalResult<(&'a str, &'static str, Option<u64>)> {
+) -> ModalResult<(&'a str, FieldType, Option<u64>)> {
     field_start_open_tag.parse_next(input)?; // <hkparam name=
     let (field_name, field_type) = delimited(
         "\"",
         alt((
-            Caseless("event").map(|_| ("contactEvent", "Object|hkbEventProperty")),
-            Caseless("anotherBoneIndex").map(|_| ("bones", "Pointer")),
+            Caseless("event").map(|_| ("contactEvent", FieldType::object("hkbEventProperty"))),
+            Caseless("anotherBoneIndex").map(|_| ("bones", FieldType::POINTER)),
         )),
         "\"",
     )

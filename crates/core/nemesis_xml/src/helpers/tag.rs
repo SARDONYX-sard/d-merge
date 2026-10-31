@@ -15,7 +15,7 @@ use winnow::{
 use super::delimited_multispace0;
 use crate::{
     error::Error,
-    patch::class_table::{FieldInfo, find_json_parser_by},
+    patch::{FieldType, class_schema::ClassSchema},
 };
 
 /// Parses the start tag `<tag>`
@@ -111,9 +111,10 @@ pub fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
     .parse_next(input)
 }
 
-fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, Error> {
-    find_json_parser_by(field_name, field_info).ok_or_else(|| {
-        let acceptable_fields: Vec<&'static str> = field_info.keys().copied().collect();
+fn find_type(field_name: &str, field_info: &ClassSchema) -> Result<FieldType, Error> {
+    field_info.field(field_name).map(FieldType::from).ok_or_else(|| {
+        let acceptable_fields: Vec<&'static str> =
+            field_info.fields.iter().map(|f| f.name).collect();
 
         Error::UnknownField { field_name: field_name.to_string(), acceptable_fields }
     })
@@ -122,7 +123,7 @@ fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, E
 /// Parses the start tag of a field element (`<hkparam name="..." numelements="...">`).
 ///
 /// This parser extracts the field name, type kind, and an optional array length (if specified
-/// via `numelements="..."`). It performs type lookup using the provided [`FieldInfo`] and may fail
+/// via `numelements="..."`). It performs type lookup using the provided [`ClassSchema`] and may fail
 /// if the type is unknown.
 ///
 /// # Returns
@@ -134,8 +135,8 @@ fn find_type(field_name: &str, field_info: &FieldInfo) -> Result<&'static str, E
 /// # Errors
 /// Returns a [`ContextError`] if the input does not match the expected structure or if the type cannot be resolved.
 pub fn field_start_tag<'a>(
-    field_info: &'a FieldInfo,
-) -> impl Parser<&'a str, (&'a str, &'static str, Option<u64>), ErrMode<ContextError>> {
+    field_info: &'static ClassSchema,
+) -> impl Parser<&'a str, (&'a str, FieldType, Option<u64>), ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         any_field_start_tag
             .try_map(|(field_name, array_len)| {

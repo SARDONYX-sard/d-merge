@@ -170,3 +170,28 @@ fn real_add_event_and_variable() {
         assert_eq!(patch.matches("<!-- CLOSE -->").count(), blocks, "{patch}");
     }
 }
+
+/// The template's own pointers all point to objects of the right class (no false positives).
+#[test]
+#[ignore = "needs local mod files"]
+fn template_pointers_are_valid() {
+    let template =
+        std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
+    let all = objects(&template);
+    let classes: fast_hash::HashMap<&str, &str> = all.iter().map(|o| (o.id, o.class)).collect();
+    let class_of = |id: &str| classes.get(id).map(|c| (*c).to_string());
+    let problems: Vec<_> = all
+        .iter()
+        .flat_map(|o| {
+            nemesis_diff::schema::check_pointers(o.text, &class_of)
+                .into_iter()
+                .map(|p| format!("{}: {}", o.id, p.message))
+        })
+        .collect();
+    assert!(
+        problems.is_empty(),
+        "{} problems, e.g. {:?}",
+        problems.len(),
+        &problems[..problems.len().min(5)]
+    );
+}

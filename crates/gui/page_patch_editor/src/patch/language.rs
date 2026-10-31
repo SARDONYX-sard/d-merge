@@ -14,6 +14,7 @@ use std::ops::Range;
 use egui::Color32;
 use egui_code_editor::{CompletionItem, CompletionList, Language, languages::Xml};
 use fast_hash::HashMap;
+use nemesis_diff::schema::{self, FieldSchema};
 
 use super::workspace::Behavior;
 
@@ -37,8 +38,8 @@ pub(crate) struct NemesisXml<'a> {
     pub(crate) values: &'a FieldValues,
     /// `(id, "class name")`
     pub(crate) pointers: &'a [(String, String)],
-    /// The class around the cursor and its `(field, type)`s (class table).
-    pub(crate) fields: Option<(&'a str, &'a [(&'static str, &'static str)])>,
+    /// The class around the cursor and its XML fields (class schema).
+    pub(crate) fields: Option<(&'a str, &'a [&'static FieldSchema])>,
 }
 
 impl Language for NemesisXml<'_> {
@@ -60,8 +61,8 @@ impl Language for NemesisXml<'_> {
                 return Some(format!("**{id}**: {doc}"));
             }
         }
-        let (class, field, kind) = self.field_of_line(line)?;
-        Some(format!("**{class}.{field}**: `{kind}`"))
+        let (class, field) = self.field_of_line(line)?;
+        Some(field_doc(class, field))
     }
 
     /// `hkbClipGenerator.mode: String` for the field of the cursor line.
@@ -70,11 +71,12 @@ impl Language for NemesisXml<'_> {
         line: &str,
         _column: usize,
     ) -> Option<egui_code_editor::SignatureHelp> {
-        let (class, field, kind) = self.field_of_line(line)?;
+        let (class, field) = self.field_of_line(line)?;
         Some(egui_code_editor::SignatureHelp {
-            label: format!("{class}.{field}: {kind}"),
-            params: Vec::new(),
-            active: 0,
+            label: format!("{class}.{}: {}", field.name, type_label(field)),
+            // Enum / flags values, the current one emphasized.
+            params: field.values.iter().map(|v| (*v).to_string()).collect(),
+            active: field.values.iter().position(|v| line.contains(v)).unwrap_or(usize::MAX),
             documentation: None,
         })
     }
@@ -87,6 +89,7 @@ impl Language for NemesisXml<'_> {
         let before: String = line.chars().take(column).collect();
         self.nemesis_variable(line, &before, column)
             .or_else(|| self.field_name(line, &before, column))
+            .or_else(|| self.pointer_value(&before, column))
             .or_else(|| self.pointer(&before, column))
             .or_else(|| self.field_value(&before, column))
             .unwrap_or_default()
@@ -107,11 +110,11 @@ impl NemesisXml<'_> {
             let typed = before[at + OPEN.len()..].to_lowercase();
             let items = fields
                 .iter()
-                .filter(|(name, _)| name.to_lowercase().contains(&typed))
-                .map(|(name, kind)| {
-                    let snippet = nemesis_diff::field_snippet(name, kind, depth);
+                .filter(|field| field.name.to_lowercase().contains(&typed))
+                .map(|field| {
+                    let snippet = schema::field_snippet(field, depth);
                     let insert = snippet[OPEN.len()..].to_string();
-                    let mut item = item(name, "▪", insert, format!("`{class}.{name}`: `{kind}`"));
+                    let mut item = item(field.name, "▪", insert, field_doc(class, field));
                     item.select = value_range(&item.insert);
                     item
                 })
@@ -120,13 +123,14 @@ impl NemesisXml<'_> {
             return Some(CompletionList { replace: start..column, items });
         }
 
+        // An empty line (`Ctrl+Space`) or `<`, `<hk`, ...: whole field snippets.
         let trimmed = before.trim_start();
-        if trimmed.starts_with('<') && "<hkparam".starts_with(trimmed) {
+        if trimmed.is_empty() || (trimmed.starts_with('<') && "<hkparam".starts_with(trimmed)) {
             let items = fields
                 .iter()
-                .map(|(name, kind)| {
-                    let insert = nemesis_diff::field_snippet(name, kind, depth);
-                    let mut item = item(name, "▪", insert, format!("`{class}.{name}`: `{kind}`"));
+                .map(|field| {
+                    let insert = schema::field_snippet(field, depth);
+                    let mut item = item(field.name, "▪", insert, field_doc(class, field));
                     item.select = value_range(&item.insert);
                     item
                 })
@@ -137,11 +141,11 @@ impl NemesisXml<'_> {
         None
     }
 
-    /// The `(field, type)` of the `<hkparam name="..">` on `line`.
-    fn field_of_line(&self, line: &str) -> Option<(&str, &'static str, &'static str)> {
+    /// The field of the `<hkparam name="..">` on `line`.
+    fn field_of_line(&self, line: &str) -> Option<(&str, &'static FieldSchema)> {
         let (class, fields) = self.fields?;
         let name = line.split_once("<hkparam name=\"")?.1.split('"').next()?;
-        fields.iter().find(|(field, _)| *field == name).map(|(field, kind)| (class, *field, *kind))
+        fields.iter().find(|field| field.name == name).map(|field| (class, *field))
     }
 
     /// After an unclosed `$eventID[` / `$variableID[`.
@@ -171,6 +175,40 @@ impl NemesisXml<'_> {
             .map(|(index, name)| item(name, icon, format!("{name}]$"), format!("{doc} #{index}")))
             .collect();
         Some(CompletionList { replace: start..end, items })
+    }
+
+    /// In the value of a pointer field: `null` and the objects of the field's class (or a subclass).
+    fn pointer_value(&self, before: &str, column: usize) -> Option<CompletionList> {
+        use nemesis_diff::schema::{TypeKind, is_subclass};
+        let open = before.rfind("<hkparam name=\"")?;
+        let rest = &before[open + "<hkparam name=\"".len()..];
+        let (name, value) = rest.split_once('"')?;
+        let value = value.split_once('>')?.1;
+        let field = self.fields?.1.iter().find(|f| f.name == name)?;
+        if value.contains('<')
+            || (field.kind != TypeKind::Pointer && field.sub_kind != TypeKind::Pointer)
+        {
+            return None;
+        }
+        let typed = value.rsplit(char::is_whitespace).next().unwrap_or_default();
+        let typed_lower = typed.to_lowercase();
+        let fits = |doc: &str| {
+            let class = doc.split_whitespace().next().unwrap_or_default();
+            field.class.is_none_or(|expected| is_subclass(class, expected))
+        };
+        let null = (field.kind == TypeKind::Pointer && "null".starts_with(&typed_lower))
+            .then(|| item("null", "∅", "null".to_string(), "No object".to_string()));
+        let items = null
+            .into_iter()
+            .chain(
+                self.pointers
+                    .iter()
+                    .filter(|(id, doc)| fits(doc) && id.to_lowercase().starts_with(&typed_lower))
+                    .take(200)
+                    .map(|(id, doc)| item(id, "→", id.clone(), doc.clone())),
+            )
+            .collect();
+        Some(CompletionList { replace: column - typed.chars().count()..column, items })
     }
 
     /// A `#...` token being typed.
@@ -203,16 +241,53 @@ impl NemesisXml<'_> {
         if value.contains('<') {
             return None;
         }
-        let values = self.values.get(field)?;
+        // The schema's enum / flags values; else what the template uses for this field name.
+        let schema_values = self
+            .fields
+            .and_then(|(_, fields)| fields.iter().find(|f| f.name == field))
+            .map(|f| f.values)
+            .filter(|values| !values.is_empty());
+        let (values, doc): (Vec<&str>, &str) = match schema_values {
+            Some(values) => (values.to_vec(), "class schema"),
+            None => (
+                self.values.get(field)?.iter().map(String::as_str).collect(),
+                "used in the template",
+            ),
+        };
         // The token after the last `|` (flags) or the start of the value.
         let typed = value.rsplit('|').next().unwrap_or_default().trim_start();
         let typed_lower = typed.to_lowercase();
         let items = values
             .iter()
             .filter(|v| v.to_lowercase().contains(&typed_lower))
-            .map(|v| item(v, "◆", v.clone(), format!("`{field}` value in the template")))
+            .map(|v| item(v, "◆", (*v).to_string(), format!("`{field}` value ({doc})")))
             .collect();
         Some(CompletionList { replace: column - typed.chars().count()..column, items })
+    }
+}
+
+/// `**hkbClipGenerator.mode**: Enum(Int8)` + its values.
+fn field_doc(class: &str, field: &FieldSchema) -> String {
+    let mut doc = format!("**{class}.{}**: `{}`", field.name, type_label(field));
+    if let Some(target) = field.class {
+        doc.push_str(&format!(" → `{target}`"));
+    }
+    if !field.values.is_empty() {
+        let sep = if field.kind == nemesis_diff::schema::TypeKind::Flags { " | " } else { ", " };
+        doc.push_str(&format!("\n\n{}", field.values.join(sep)));
+    }
+    doc
+}
+
+/// `Real`, `Array<Pointer>`, `Enum(Int8)`.
+fn type_label(field: &FieldSchema) -> String {
+    use nemesis_diff::schema::TypeKind;
+    match field.kind {
+        TypeKind::Array | TypeKind::SimpleArray => {
+            format!("{:?}<{:?}>", field.kind, field.sub_kind)
+        }
+        TypeKind::Enum | TypeKind::Flags => format!("{:?}({:?})", field.kind, field.sub_kind),
+        kind => format!("{kind:?}"),
     }
 }
 

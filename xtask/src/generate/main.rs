@@ -10,6 +10,7 @@ mod alt_groups;
 mod anim_data;
 mod behavior_table;
 mod behaviors;
+mod class_schema;
 mod nemesis_indexes;
 mod templates;
 
@@ -46,6 +47,7 @@ fn run(args: &[String]) -> Result {
             behaviors::run(&input, &output)
         }
         "nemesis-indexes" => nemesis_indexes::run(&ws),
+        "class-schema" => class_schema::run(&ws),
         other => Err(format!("unknown `gen {other}` (see `cargo x help gen`)").into()),
     }
 }

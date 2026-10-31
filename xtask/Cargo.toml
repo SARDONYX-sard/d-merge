@@ -14,6 +14,7 @@ rust-version.workspace = true
 #       (the `gen` feature; `cargo x gen` turns it on by itself).
 [dependencies]
 # gen
+class_generator = { workspace = true, optional = true }
 havok_classes = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
 rmp-serde = { workspace = true, optional = true }
@@ -38,6 +39,7 @@ required-features = ["gen"]
 
 [features]
 gen = [
+  "dep:class_generator",
   "dep:havok_classes",
   "dep:behavior_merge",
   "dep:behavior_merge_types",

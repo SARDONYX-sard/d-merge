@@ -188,6 +188,15 @@ impl Behavior {
         self.objects.iter().find(|o| o.class == class).map(|o| o.id.as_str())
     }
 
+    /// The class of object `id` (a template object or a new one).
+    pub(crate) fn class_of(&self, id: &str) -> Option<String> {
+        if let Some(text) = self.added.get(id) {
+            let class = text.split_once("class=\"")?.1.split('"').next()?;
+            return Some(class.to_string());
+        }
+        self.template_object(id).map(|o| o.class.clone())
+    }
+
     pub(crate) fn template_object(&self, id: &str) -> Option<&TemplateObject> {
         self.objects.iter().find(|o| o.id == id)
     }
@@ -232,11 +241,10 @@ impl Behavior {
         format!("{prefix}{next}")
     }
 
-    /// Adds a new object of `class` with every field at its default (see [`nemesis_diff::skeleton`]).
+    /// Adds a new object of `class` with every field at its default (see [`nemesis_diff::schema::skeleton`]).
     pub(crate) fn add_class(&mut self, code: &str, class: &str) -> Option<String> {
         let id = self.next_id(code);
-        let like = self.objects.iter().find(|o| o.class == class).map(|o| o.text.as_str());
-        let text = nemesis_diff::skeleton(class, &id, like)?;
+        let text = nemesis_diff::schema::skeleton(class, &id)?;
         self.added.insert(id.clone(), text);
         Some(id)
     }

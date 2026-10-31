@@ -21,6 +21,7 @@
 //! diffing, so that each pointer is its own patch line (as Nemesis expects).
 
 pub mod asdsf;
+pub mod schema;
 pub mod vars;
 
 use std::{fmt::Write as _, ops::Range};
@@ -78,7 +79,7 @@ pub fn objects(xml: &str) -> Vec<XmlObject<'_>> {
 }
 
 /// `name="#0106"` -> `#0106`
-fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+pub(crate) fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
     let key = format!("{name}=\"");
     let start = tag.find(&key)? + key.len();
     let len = tag[start..].find('"')?;
@@ -426,13 +427,13 @@ pub struct FieldProblem {
 }
 
 /// Checks the class and field names of an object (and of its nested classless `<hkobject>`s)
-/// against d-merge's class table, e.g. a typo like `<hkparam name="modifers">`.
+/// against d-merge's class schema, e.g. a typo like `<hkparam name="modifers">`.
 pub fn check_fields(object: &str) -> Vec<FieldProblem> {
-    use nemesis_xml::patch::class_table::{FieldInfo, find_class_info};
+    use nemesis_xml::patch::class_schema::{ClassSchema, TypeKind, find_class_schema};
 
     let mut problems = Vec::new();
-    // Open objects: (class name, its fields if known).
-    let mut objects: Vec<(&str, Option<&'static FieldInfo>)> = Vec::new();
+    // Open objects: (class name, its schema if known).
+    let mut objects: Vec<(&str, Option<&'static ClassSchema>)> = Vec::new();
     // Open fields: the class of their nested `<hkobject>`, if they hold objects.
     let mut fields: Vec<Option<&'static str>> = Vec::new();
 
@@ -440,7 +441,7 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
         let trimmed = line.trim();
         if let Some(rest) = trimmed.strip_prefix("<hkobject") {
             let class = attribute(rest, "class").or_else(|| fields.last().copied().flatten());
-            let info = class.and_then(find_class_info);
+            let info = class.and_then(find_class_schema);
             if let Some(class) = class.filter(|_| info.is_none()) {
                 problems.push(FieldProblem {
                     line: line_no,
@@ -455,21 +456,23 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
             objects.pop();
         } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
             let name = attribute(rest, "name").unwrap_or_default();
-            let kind = match objects.last() {
+            let field = match objects.last() {
                 Some((class, Some(info))) => {
-                    let kind = info.get(name).copied();
-                    if kind.is_none() {
+                    let field = info.field(name);
+                    if field.is_none() {
                         problems.push(FieldProblem {
                             line: line_no,
                             message: format!("`{class}` has no field `{name}`."),
                         });
                     }
-                    kind
+                    field
                 }
                 _ => None,
             };
-            // `Object|hkbEventProperty`, `Array|Object|hkbStateMachineTransitionInfo`
-            let nested = kind.and_then(|k| k.trim_start_matches("Array|").strip_prefix("Object|"));
+            // A struct, or an array of structs: their `<hkobject>`s are of `field.class`.
+            let nested = field
+                .filter(|f| f.kind == TypeKind::Struct || f.sub_kind == TypeKind::Struct)
+                .and_then(|f| f.class);
             if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
                 fields.push(nested);
             }
@@ -478,130 +481,6 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
         }
     }
     problems
-}
-
-/// The class (and its class table fields) of the innermost `<hkobject>` open at `line`.
-///
-/// `line` is 0-based in an object text. A classless nested `<hkobject>` gets the class from
-/// its field's type (`Object|hkbEventProperty`).
-pub fn field_context(
-    object: &str,
-    line: usize,
-) -> Option<(String, Vec<(&'static str, &'static str)>)> {
-    use nemesis_xml::patch::class_table::find_class_info;
-    let mut objects: Vec<Option<&str>> = Vec::new();
-    let mut fields: Vec<Option<&str>> = Vec::new();
-    let current_fields =
-        |class: Option<&str>| -> Option<&'static nemesis_xml::patch::class_table::FieldInfo> {
-            class.and_then(find_class_info)
-        };
-    for text in object.lines().take(line) {
-        let trimmed = text.trim();
-        if let Some(rest) = trimmed.strip_prefix("<hkobject") {
-            let class = attribute(rest, "class").or_else(|| fields.last().copied().flatten());
-            objects.push(class);
-            if trimmed.ends_with("/>") {
-                objects.pop();
-            }
-        } else if trimmed.starts_with("</hkobject>") {
-            objects.pop();
-        } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
-            if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
-                let name = attribute(rest, "name").unwrap_or_default();
-                let kind = current_fields(objects.last().copied().flatten())
-                    .and_then(|info| info.get(name).copied());
-                fields.push(
-                    kind.and_then(|k| k.trim_start_matches("Array|").strip_prefix("Object|")),
-                );
-            }
-        } else if trimmed.starts_with("</hkparam>") {
-            fields.pop();
-        }
-    }
-    let class = objects.last().copied().flatten()?;
-    let info = find_class_info(class)?;
-    Some((class.to_string(), info.entries().map(|(name, kind)| (*name, *kind)).collect()))
-}
-
-/// `<hkparam name="name">default</hkparam>` for a field of type `kind` (see [`skeleton`]);
-/// nested lines are indented for a field at `depth` tabs. No trailing newline.
-pub fn field_snippet(name: &str, kind: &str, depth: usize) -> String {
-    let mut out = String::new();
-    field_skeleton(&mut out, depth, name, kind, 0);
-    out.trim_start_matches('\t').trim_end().to_string()
-}
-
-/// Every class name of d-merge's class table (alphabetical).
-pub fn class_names() -> impl Iterator<Item = &'static str> {
-    nemesis_xml::patch::class_table::class_names()
-}
-
-/// A new object `id` of `class` with every field of the class table at a default value
-/// (`null`, `0`, `false`, empty array, nested objects filled the same way).
-///
-/// `like`: a template object of the same class, if any. Its `signature` and its set of fields
-/// are used (Havok XML leaves out the serialize-ignored ones such as `referenceCount`).
-pub fn skeleton(class: &str, id: &str, like: Option<&str>) -> Option<String> {
-    use nemesis_xml::patch::class_table::find_class_info;
-    let fields = find_class_info(class)?;
-    let signature = like.and_then(|text| attribute(text, "signature")).unwrap_or("");
-    // Fields `like` has at its top level (3 tabs), or all but the usual ignored ones.
-    let keep = |name: &str| match like {
-        Some(text) => text.contains(&format!("\n\t\t\t<hkparam name=\"{name}\"")),
-        None => !IGNORED_FIELDS.contains(&name),
-    };
-
-    let mut out =
-        format!("\t\t<hkobject name=\"{id}\" class=\"{class}\" signature=\"{signature}\">\n");
-    for (name, kind) in fields.entries().filter(|(name, _)| keep(name)) {
-        field_skeleton(&mut out, 3, name, kind, 0);
-    }
-    out.push_str("\t\t</hkobject>\n");
-    Some(out)
-}
-
-/// Fields Havok XML does not write (`SERIALIZE_IGNORED`), used when there is no template object.
-const IGNORED_FIELDS: [&str; 9] = [
-    "memSizeAndFlags",
-    "referenceCount",
-    "cachedBindables",
-    "areBindablesCached",
-    "id",
-    "cloneState",
-    "padNode",
-    "padModifier",
-    "padStateInfo",
-];
-
-fn field_skeleton(out: &mut String, depth: usize, name: &str, kind: &str, nesting: usize) {
-    use nemesis_xml::patch::class_table::find_class_info;
-    let indent = "\t".repeat(depth);
-    let value = match kind {
-        "Pointer" => "null",
-        "Bool" => "false",
-        "F64" => "0.000000",
-        "Object|Vector4" | "Object|Quaternion" => "(0.000000 0.000000 0.000000 0.000000)",
-        kind if kind.starts_with('I') || kind.starts_with('U') => "0",
-        kind if kind.starts_with("Array|") => {
-            let _ = writeln!(out, "{indent}<hkparam name=\"{name}\" numelements=\"0\"></hkparam>");
-            return;
-        }
-        kind => match kind.strip_prefix("Object|").and_then(find_class_info) {
-            // A nested struct (e.g. `hkbEventProperty`): its fields, a few levels deep at most.
-            Some(fields) if nesting < 4 => {
-                let _ = writeln!(out, "{indent}<hkparam name=\"{name}\">");
-                let _ = writeln!(out, "{indent}\t<hkobject>");
-                for (field, kind) in fields.entries() {
-                    field_skeleton(out, depth + 2, field, kind, nesting + 1);
-                }
-                let _ = writeln!(out, "{indent}\t</hkobject>");
-                let _ = writeln!(out, "{indent}</hkparam>");
-                return;
-            }
-            _ => "",
-        },
-    };
-    let _ = writeln!(out, "{indent}<hkparam name=\"{name}\">{value}</hkparam>");
 }
 
 /// `info.ini` of a Nemesis mod.
@@ -715,30 +594,6 @@ mod tests {
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].line, 5);
         assert!(problems[0].message.contains("modifers"));
-    }
-
-    #[test]
-    fn class_skeleton() {
-        let template = objects(TEMPLATE)[0].text;
-        let new = skeleton("hkbModifierList", "#mymod$0", Some(template)).unwrap();
-        assert!(new.starts_with(
-            "\t\t<hkobject name=\"#mymod$0\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n"
-        ));
-        assert!(new.contains("\t\t\t<hkparam name=\"modifiers\" numelements=\"0\"></hkparam>\n"));
-        assert!(!new.contains("referenceCount"));
-        assert!(check_fields(&new).is_empty(), "{new}");
-        validate(&new).unwrap();
-    }
-
-    #[test]
-    fn context_of_a_line() {
-        let template = objects(TEMPLATE)[0].text;
-        let (class, fields) = field_context(template, 2).unwrap();
-        assert_eq!(class, "hkbModifierList");
-        assert!(
-            fields.iter().any(|(name, kind)| *name == "modifiers" && kind.starts_with("Array"))
-        );
-        assert_eq!(field_snippet("enable", "Bool", 3), "<hkparam name=\"enable\">false</hkparam>");
     }
 
     #[test]

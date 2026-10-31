@@ -3,14 +3,14 @@ use std::{borrow::Cow, mem, ops::Range};
 use json_patch::Op;
 use simd_json::BorrowedValue;
 
-use super::class_table::FieldInfo;
+use super::class_schema::ClassSchema;
 
 type Patches<'xml> = Vec<CurrentJsonPatch<'xml>>;
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct CurrentState<'xml> {
     /// current parsing filed type info.
-    pub field_info: Option<&'static FieldInfo>,
+    pub field_info: Option<&'static ClassSchema>,
     /// When present, this signals the start of a differential change
     pub mode_code: Option<&'xml str>,
 

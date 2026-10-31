@@ -26,6 +26,8 @@ pub(super) struct CompletionPopup {
     line: usize,
     /// Highlighted candidate.
     selected: usize,
+    /// The candidate the list was last scrolled to (scroll again when `selected` moves).
+    scrolled_to: Option<usize>,
 }
 
 /// Result of accepting a candidate.
@@ -137,18 +139,35 @@ impl CompletionPopup {
         let Some(list) = &self.list else { return false };
         let mut clicked = false;
 
+        // Below the cursor, or above it when there is more room there; never taller than the room
+        // (a long list scrolls instead of running off the window).
+        let screen = ctx.content_rect();
+        let (below, above) = (screen.bottom() - anchor.bottom(), anchor.top() - screen.top());
+        let (pos, pivot, room) = if below >= 200.0 || below >= above {
+            (anchor.left_bottom(), egui::Align2::LEFT_TOP, below)
+        } else {
+            (anchor.left_top(), egui::Align2::LEFT_BOTTOM, above)
+        };
+        let max_height = (room - 24.0).clamp(80.0, 400.0);
+        let follow = self.scrolled_to != Some(self.selected);
+
         egui::Area::new(id.with("completion"))
             .order(egui::Order::Foreground)
-            .fixed_pos(anchor.left_bottom())
+            .fixed_pos(pos)
+            .pivot(pivot)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     ui.horizontal_top(|ui| {
                         // Candidates
-                        ui.vertical(|ui| {
+                        egui::ScrollArea::vertical().max_height(max_height).show(ui, |ui| {
                             for (i, item) in list.items.iter().enumerate() {
                                 let label = format!("{} {}", item.icon, item.label);
                                 let response =
                                     ui.add(egui::Button::selectable(i == self.selected, label));
+                                // Keep the keyboard-selected one in view.
+                                if i == self.selected && follow {
+                                    response.scroll_to_me(None);
+                                }
                                 if response.hovered() {
                                     self.selected = i;
                                 }
@@ -169,6 +188,7 @@ impl CompletionPopup {
                     });
                 });
             });
+        self.scrolled_to = Some(self.selected);
 
         clicked
     }

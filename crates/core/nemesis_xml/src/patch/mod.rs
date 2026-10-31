@@ -1,4 +1,7 @@
-pub mod class_table;
+pub mod class_schema;
+mod field_type;
+
+pub use field_type::FieldType;
 mod current_state;
 
 use std::mem;
@@ -17,7 +20,7 @@ use winnow::{
 use winnow_ext::ReadableError;
 
 use self::{
-    class_table::{FieldInfo, find_class_info},
+    class_schema::{ClassSchema, TypeKind, find_class_schema},
     current_state::{CurrentJsonPatch, CurrentState},
 };
 use crate::{
@@ -71,7 +74,7 @@ struct PatchDeserializer<'a> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // current state
     /// N time nested classes fields.
-    field_infos: Vec<&'static FieldInfo>,
+    field_infos: Vec<&'static ClassSchema>,
 
     /// - `<! -- CLOSE --! >`(XML) where it is temporarily stored because the operation type is unknown until a comment is found.
     /// - `<! -- CLOSE --! >` is found, have it added to `output_patches`.
@@ -143,7 +146,7 @@ impl<'de> PatchDeserializer<'de> {
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fn push_current_field_table(&mut self, info: &'static FieldInfo) {
+    fn push_current_field_table(&mut self, info: &'static ClassSchema) {
         self.field_infos.push(info);
         self.current.field_info = Some(info);
     }
@@ -169,7 +172,7 @@ impl<'de> PatchDeserializer<'de> {
         self.current.path.push(class_name.into());
 
         {
-            let field_info = find_class_info(class_name)
+            let field_info = find_class_schema(class_name)
                 .ok_or_else(|| Error::UnknownClass { class_name: class_name.to_string() })?;
             self.push_current_field_table(field_info);
         }
@@ -211,7 +214,7 @@ impl<'de> PatchDeserializer<'de> {
         self.parse_next(start_tag("hkobject"))?;
 
         {
-            let field_info = find_class_info(class_name)
+            let field_info = find_class_schema(class_name)
                 .ok_or_else(|| Error::UnknownClass { class_name: class_name.to_string() })?;
             self.push_current_field_table(field_info);
         }
@@ -279,17 +282,18 @@ impl<'de> PatchDeserializer<'de> {
     /// - Null
     /// - Pointer
     /// - String
-    fn parse_plane_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
-        let value = match field_type {
-            "Null" => BorrowedValue::Static(StaticNode::Null),
-            "I64" => self.parse_i64()?,
-            "U64" => self.parse_u64()?,
-            "F64" => self.parse_next(real.map(|real| real.into()))?,
-            "String" => self.parse_string_ptr()?, // StringPtr | CString
-            "Pointer" => self.parse_next(pointer)?,
-            "Bool" => self.parse_next(boolean.map(|boolean| boolean.into()))?,
+    fn parse_plane_value(&mut self, field_type: FieldType) -> Result<BorrowedValue<'de>> {
+        use TypeKind as K;
+        let value = match field_type.kind {
+            K::Void => BorrowedValue::Static(StaticNode::Null),
+            K::Int8 | K::Int16 | K::Int32 | K::Int64 => self.parse_i64()?,
+            K::Uint8 | K::Uint16 | K::Uint32 | K::Uint64 | K::Ulong => self.parse_u64()?,
+            K::Real | K::Half => self.parse_next(real.map(|real| real.into()))?,
+            _ if field_type.is_string() => self.parse_string_ptr()?, // StringPtr | CString | enum
+            K::Pointer => self.parse_next(pointer)?,
+            K::Bool => self.parse_next(boolean.map(|boolean| boolean.into()))?,
             unknown => {
-                return Err(Error::UnknownFieldType { field_type: unknown.to_string() });
+                return Err(Error::UnknownFieldType { field_type: format!("{unknown:?}") });
             }
         };
         Ok(value)
@@ -471,7 +475,7 @@ impl<'de> PatchDeserializer<'de> {
     /// - Object|<ClassName>
     /// - Array|<TypeName>
     /// - Array|Object|<ClassName>
-    fn parse_value(&mut self, field_type: &'static str) -> Result<BorrowedValue<'de>> {
+    fn parse_value(&mut self, field_type: FieldType) -> Result<BorrowedValue<'de>> {
         self.parse_next(multispace0)?;
         // NOTE: Is there any possibility of a comment indicating field change intent coming here?
         // If there is a comment directly below `<hkparam>` indicating a differential change, it is a change in value alone,
@@ -479,32 +483,29 @@ impl<'de> PatchDeserializer<'de> {
         // If we want to change the field data itself, we should indicate the `<hkparam>` situation with a
         // comment showing the difference.
 
-        let value = match field_type {
-            obj if obj.starts_with("Object|") => {
-                let class_name = &obj[7..]; // Remove "object|"
-                match class_name {
-                    "Matrix3" | "Rotation" => self.parse_matrix3()?,
-                    "Matrix4" => self.parse_matrix4()?,
-                    "QsTransform" => self.parse_qs_transform()?,
-                    "Quaternion" => self.parse_quaternion()?,
-                    "Transform" => self.parse_transform()?,
-                    "Vector4" => self.parse_vector4()?,
-                    _ => self.class_in_field(class_name)?, // Start with `<hkobject>`
-                }
-            }
-            arr if arr.starts_with("Array|") => self.parse_array(arr)?,
-            other => self.parse_plane_value(other)?,
+        use TypeKind as K;
+        let value = match field_type.kind {
+            K::Matrix3 | K::Rotation => self.parse_matrix3()?,
+            K::Matrix4 => self.parse_matrix4()?,
+            K::QsTransform => self.parse_qs_transform()?,
+            K::Quaternion => self.parse_quaternion()?,
+            K::Transform => self.parse_transform()?,
+            K::Vector4 => self.parse_vector4()?,
+            // Start with `<hkobject>`
+            K::Struct => self.class_in_field(field_type.class.ok_or(Error::MissingFieldInfo)?)?,
+            K::Variant => self.class_in_field("Variant")?,
+            K::Array | K::SimpleArray => self.parse_array(field_type.element())?,
+            _ => self.parse_plane_value(field_type)?,
         };
 
         Ok(value)
     }
 
-    fn parse_array(&mut self, arr: &'static str) -> Result<BorrowedValue<'de>> {
-        // Array|Null
-        let name = &arr[6..]; // Remove "array|"
+    /// `element`: the type of one element.
+    fn parse_array(&mut self, element: FieldType) -> Result<BorrowedValue<'de>> {
         let mut vec = vec![];
 
-        if name.starts_with("Null") {
+        if element.kind == TypeKind::Void {
             return Ok(BorrowedValue::Array(Box::new(vec))); // `Null`(void)
         };
 
@@ -519,7 +520,7 @@ impl<'de> PatchDeserializer<'de> {
             }
 
             // seq inner
-            let value = if name.starts_with("String") {
+            let value = if element.is_string() {
                 // <hkcstring>String</hkcstring>
                 self.parse_next(start_tag("hkcstring"))?;
                 let value = self.parse_string_ptr()?;
@@ -532,7 +533,7 @@ impl<'de> PatchDeserializer<'de> {
                 if self.current.seq_range.is_none() {
                     self.current.path.push(format!("[{index}]").into()); // only for class
                 }
-                let value = self.parse_value(name)?;
+                let value = self.parse_value(element)?;
                 // If not a class, remove `[index]` because of non-nesting.
                 //  Array|Object|<ClassName> ...Array|<TypeName> -> pop
                 if self.current.seq_range.is_none() {
