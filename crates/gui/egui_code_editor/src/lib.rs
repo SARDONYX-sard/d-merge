@@ -141,6 +141,7 @@ pub struct CodeEditor<'a> {
     keymap: Keymap,
     desired_rows: usize,
     line_numbers: bool,
+    whitespace: bool,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -164,6 +165,7 @@ impl<'a> CodeEditor<'a> {
             keymap: Keymap::Normal,
             desired_rows: 30,
             line_numbers: true,
+            whitespace: true,
         }
     }
 
@@ -190,6 +192,12 @@ impl<'a> CodeEditor<'a> {
     }
 
     /// Show the line number gutter (default `true`).
+    /// Show `·` / `→` for spaces / tabs and tint the indent levels (default `true`).
+    pub const fn whitespace(mut self, show: bool) -> Self {
+        self.whitespace = show;
+        self
+    }
+
     pub const fn line_numbers(mut self, show: bool) -> Self {
         self.line_numbers = show;
         self
@@ -202,8 +210,17 @@ impl<'a> CodeEditor<'a> {
     }
 
     pub fn show(self, ui: &mut egui::Ui, state: &mut CodeEditorState) -> CodeEditorOutput {
-        let Self { id, text, language, diagnostics, features, keymap, desired_rows, line_numbers } =
-            self;
+        let Self {
+            id,
+            text,
+            language,
+            diagnostics,
+            features,
+            keymap,
+            desired_rows,
+            line_numbers,
+            whitespace,
+        } = self;
         let mut has_focus = ui.memory(|m| m.has_focus(id));
         // egui drops a widget's focus on `Esc` before we run, but Vim needs that key
         // (e.g., to leave Visual mode): take the focus back.
@@ -336,6 +353,9 @@ impl<'a> CodeEditor<'a> {
         if let Some(cursor) = cursor {
             overlays::current_line(ui, galley, galley_pos, cursor.line);
         }
+        if whitespace {
+            overlays::whitespace(ui, galley, galley_pos);
+        }
         if let Some(anchor) = anchor
             && let Some(clicked) = state.quick_fix.ui(ui.ctx(), id, anchor)
         {
@@ -382,7 +402,7 @@ impl<'a> CodeEditor<'a> {
                 }
             }
         }
-        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text);
+        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text, (galley, galley_pos));
         state.view = visible_lines(ui, galley, galley_pos);
         state.had_focus = response.has_focus();
         if let Some(index) = state.keymap.block_cursor(keymap, cursor_index, text) {
@@ -422,14 +442,22 @@ impl<'a> CodeEditor<'a> {
     }
 }
 
-/// The lines of `galley` inside the visible area (lines are never wrapped: row = line).
+/// The lines of `galley` **fully** inside the visible area (lines are never wrapped: row = line).
+///
+/// Half-visible rows do not count: Vim `L` on one would scroll the view to show it, so `H` / `L`
+/// pressed in turn would creep down a line each time.
 fn visible_lines(ui: &egui::Ui, galley: &egui::Galley, galley_pos: egui::Pos2) -> View {
+    const EPS: f32 = 0.5; // rounding of the scroll offset
     let clip = ui.clip_rect();
     let rows = &galley.rows;
-    let first = rows.iter().position(|r| galley_pos.y + r.rect().max.y > clip.top()).unwrap_or(0);
-    let last =
-        rows.iter().rposition(|r| galley_pos.y + r.rect().min.y < clip.bottom()).unwrap_or(first);
-    View { first_line: first, lines: last.saturating_sub(first) + 1 }
+    let first =
+        rows.iter().position(|r| galley_pos.y + r.rect().min.y >= clip.top() - EPS).unwrap_or(0);
+    let last = rows
+        .iter()
+        .rposition(|r| galley_pos.y + r.rect().max.y <= clip.bottom() + EPS)
+        .unwrap_or(first)
+        .max(first);
+    View { first_line: first, lines: last - first + 1 }
 }
 
 /// The `TextEdit` id used by `CodeEditor::new(id_salt, ..)`.

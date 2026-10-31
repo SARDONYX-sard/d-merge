@@ -14,6 +14,7 @@ rust-version.workspace = true
 
 [dependencies]
 havok_types = { workspace = true }
+rmp-serde = { workspace = true }
 serde_hkx = { workspace = true }
 serde_hkx_features = { workspace = true, features = ["json", "serde_default"] }
 simd-json = { workspace = true }

@@ -178,13 +178,17 @@ impl HkannoPage {
                         } else {
                             tab.title().to_string()
                         };
-                        if ui
+                        let response = ui
                             .add(Button::selectable(i == self.active, title))
-                            .on_hover_text(&tab.settings.input_path)
-                            .clicked()
-                        {
+                            .on_hover_text(&tab.settings.input_path);
+                        if response.clicked() {
                             self.active = i;
                         }
+                        response.context_menu(|ui| {
+                            if tab_menu(ui, tab, ctx.i18n) {
+                                close = Some(i);
+                            }
+                        });
                         if ui.small_button("✖").clicked() {
                             close = Some(i);
                         }
@@ -361,14 +365,58 @@ impl HkannoPage {
     }
 
     /// Opens files dropped onto the window (only while this page is shown).
+    /// A `.txt` is imported into the active tab instead (see `import_txt`).
     fn handle_drop(&mut self, egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>) {
-        let dropped: Vec<String> = egui_ctx.input(|i| {
-            i.raw.dropped_files.iter().map(|f| f.path().display().to_string()).collect()
-        });
-        if !dropped.is_empty() {
-            self.open(dropped, ctx);
+        let dropped: Vec<std::path::PathBuf> = egui_ctx
+            .input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect());
+        let (txt, files): (Vec<_>, Vec<_>) = dropped
+            .into_iter()
+            .partition(|p| p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt")));
+        if !files.is_empty() {
+            self.open(files.iter().map(|p| p.display().to_string()), ctx);
+        }
+        if let Some(path) = txt.last() {
+            self.import_txt(path, ctx);
         }
     }
+}
+
+/// Right-click menu of a tab. Returns `true` for "Close".
+///
+/// ```text
+/// Open Input Directory
+/// Open Output Directory
+/// Copy Input Path
+/// Copy Output Path
+/// ───────────
+/// Close
+/// ```
+fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
+    // The parent: an existing file itself would be opened with its default app.
+    let open_dir = |path: &str| {
+        let path = std::path::Path::new(path);
+        let dir = path.parent().unwrap_or(path);
+        if let Err(err) = gui_shared::fs::open_existing_dir_or_ancestor(dir) {
+            tracing::error!("{err}");
+        }
+    };
+    let input = tab.settings.input_path.as_str();
+    let output = tab.settings.output_path.as_str();
+
+    if ui.button(i18n.t(I18nKey::HkannoTabOpenInputDir)).clicked() {
+        open_dir(input);
+    }
+    if ui.button(i18n.t(I18nKey::HkannoTabOpenOutputDir)).clicked() {
+        open_dir(output);
+    }
+    if ui.button(i18n.t(I18nKey::HkannoTabCopyInputPath)).clicked() {
+        ui.ctx().copy_text(input.to_string());
+    }
+    if ui.button(i18n.t(I18nKey::HkannoTabCopyOutputPath)).clicked() {
+        ui.ctx().copy_text(output.to_string());
+    }
+    ui.separator();
+    ui.button(i18n.t(I18nKey::HkannoTabClose)).clicked()
 }
 
 /// Settings enum -> editor enum.

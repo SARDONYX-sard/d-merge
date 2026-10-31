@@ -123,6 +123,66 @@ pub(super) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lin
     ui.painter().rect_filled(rect, 0.0, tint);
 }
 
+/// Indent rainbow + whitespace marks, on the visible rows only.
+///
+/// ```text
+/// →   →   <hkparam ...>      tabs: `→`, spaces: `·`
+/// ████████                   leading indent: one tint per level (a tab, or 4 spaces)
+/// ```
+pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
+    // Yellow, green, purple, blue: the indent-rainbow palette, very faint.
+    const RAINBOW: [Color32; 4] = [
+        Color32::from_rgb(255, 255, 64),
+        Color32::from_rgb(127, 255, 127),
+        Color32::from_rgb(255, 127, 255),
+        Color32::from_rgb(79, 236, 236),
+    ];
+    let clip = ui.clip_rect();
+    let painter = ui.painter();
+    let mark_color = ui.visuals().weak_text_color().gamma_multiply(0.6);
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+
+    for placed in &galley.rows {
+        let row_rect = placed.rect().translate(galley_pos.to_vec2());
+        if row_rect.bottom() < clip.top() || row_rect.top() > clip.bottom() {
+            continue;
+        }
+        let (mut leading, mut spaces) = (true, 0_usize);
+        let mut level = 0_usize;
+        for glyph in &placed.row.glyphs {
+            let (is_tab, is_space) = (glyph.chr == '\t', glyph.chr == ' ');
+            if !is_tab && !is_space {
+                leading = false;
+                continue;
+            }
+            let left = row_rect.left() + glyph.pos.x;
+            let rect =
+                egui::Rect::from_x_y_ranges(left..=left + glyph.advance_width, row_rect.y_range());
+            if leading {
+                painter.rect_filled(rect, 0.0, RAINBOW[level % RAINBOW.len()].gamma_multiply(0.07));
+                if is_tab {
+                    level += 1;
+                    spaces = 0;
+                } else {
+                    spaces += 1;
+                    if spaces == 4 {
+                        level += 1;
+                        spaces = 0;
+                    }
+                }
+            }
+            let mark = if is_tab { "→" } else { "·" };
+            painter.text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                mark,
+                font.clone(),
+                mark_color,
+            );
+        }
+    }
+}
+
 /// A rectangular selection (Vim `Ctrl+V`): one char range per line, drawn like a selection.
 pub(super) fn block_selection(
     ui: &egui::Ui,

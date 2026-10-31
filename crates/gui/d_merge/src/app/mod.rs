@@ -19,6 +19,7 @@ use gui_shared::{
 };
 use page_convert::ConvertPage;
 use page_hkanno::HkannoPage;
+use page_patch_editor::PatchEditorPage;
 use parking_lot::RwLock;
 
 use crate::{
@@ -121,6 +122,9 @@ pub(crate) struct App {
 
     /// hkanno editor state (open files, editor buffers, preview, ...).
     pub hkanno: HkannoPage,
+
+    /// CRC32 page state (inputs, loaded mod tree).
+    pub patch_editor: PatchEditorPage,
 }
 
 impl App {
@@ -175,6 +179,7 @@ impl App {
 
             convert: ConvertPage::default(),
             hkanno,
+            patch_editor: PatchEditorPage::default(),
         }
     }
 

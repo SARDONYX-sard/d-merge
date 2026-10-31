@@ -53,11 +53,14 @@ pub enum Page {
     Convert,
     /// Animation annotation editor.
     Hkanno,
+    /// Behavior patch mod tools: Nemesis patch generation, CRC32 (Pandora planned).
+    #[serde(rename = "patch_editor")]
+    PatchEditor,
 }
 
 impl Page {
     /// All pages in navigation order.
-    pub const ALL: [Self; 3] = [Self::Patch, Self::Convert, Self::Hkanno];
+    pub const ALL: [Self; 4] = [Self::Patch, Self::Convert, Self::Hkanno, Self::PatchEditor];
 
     /// Router path. e.g., `/convert`
     pub const fn path(self) -> &'static str {
@@ -65,6 +68,7 @@ impl Page {
             Self::Patch => "/patch",
             Self::Convert => "/convert",
             Self::Hkanno => "/hkanno",
+            Self::PatchEditor => "/patch_editor",
         }
     }
 }

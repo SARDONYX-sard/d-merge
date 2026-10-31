@@ -1099,6 +1099,7 @@ dependencies = [
  "mod_info",
  "page_convert",
  "page_hkanno",
+ "page_patch_editor",
  "parking_lot 0.13.0",
  "rayon",
  "rfd 0.15.4",
@@ -2478,6 +2479,7 @@ name = "hkx_io"
 version = "0.1.0"
 dependencies = [
  "havok_types",
+ "rmp-serde",
  "serde_hkx",
  "serde_hkx_features",
  "simd-json",
@@ -3352,6 +3354,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nemesis_diff"
+version = "0.1.0"
+dependencies = [
+ "fast_hash",
+ "imara-diff",
+ "nemesis_xml",
+]
+
+[[package]]
 name = "nemesis_xml"
 version = "0.1.0"
 dependencies = [
@@ -3954,6 +3965,26 @@ dependencies = [
  "rfd 0.17.2",
  "serde_hkx_for_gui",
  "tracing",
+]
+
+[[package]]
+name = "page_patch_editor"
+version = "2.8.0"
+dependencies = [
+ "behavior_merge_types",
+ "egui",
+ "egui_code_editor",
+ "egui_widgets",
+ "fast_hash",
+ "gui_shared",
+ "hkx_io",
+ "nemesis_diff",
+ "phf 0.14.0",
+ "rfd 0.15.4",
+ "rfd 0.17.2",
+ "rmp-serde",
+ "skyrim_anim_data",
+ "skyrim_crc",
 ]
 
 [[package]]

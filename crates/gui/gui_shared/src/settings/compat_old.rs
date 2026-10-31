@@ -139,6 +139,7 @@ impl From<OldSettings> for Settings {
             pandora: super::support_pandora::PandoraSupportSettings::default(),
             convert: super::convert::ConvertSettings::default(),
             hkanno: super::hkanno::HkannoSettings::default(),
+            patch_editor: super::patch_editor::PatchEditorSettings::default(),
             vfs: ModListSettings {
                 skyrim_data_dir: old.vfs_skyrim_data_dir,
                 mod_list: old.vfs_mod_list,

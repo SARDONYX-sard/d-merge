@@ -167,7 +167,20 @@ fn directory_row(ui: &mut egui::Ui, entry: &DirEntry, state: &mut NodeState) {
             }
         });
     }
-    ui.label(&entry.name);
+    // Right click: open / close this directory and everything below it.
+    ui.label(&entry.name).context_menu(|ui| {
+        for (open, label) in [(true, "⊞ Expand all below"), (false, "⊟ Collapse all below")] {
+            if ui.button(label).clicked() {
+                for_each_dir(entry, &mut |dir| {
+                    if open {
+                        state.expanded.insert(dir.path.clone());
+                    } else {
+                        state.expanded.remove(&dir.path);
+                    }
+                });
+            }
+        }
+    });
 }
 
 /// `[✔] (status) name`

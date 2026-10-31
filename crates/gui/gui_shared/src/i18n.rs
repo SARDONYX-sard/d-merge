@@ -507,6 +507,203 @@ pub enum I18nKey {
     /// hkanno Editor
     PageHkanno,
 
+    /// Patch Editor
+    PagePatchEditor,
+
+    // ── Patch Editor page ─────────────────────────────────────────────────
+    /// Patch
+    NemesisPatchTab,
+
+    /// CRC32
+    NemesisCrcTab,
+
+    /// Output:
+    NemesisOutputLabel,
+
+    /// The mod's directory. Export writes Nemesis_Engine/mod/<code> here, and the work in progress is kept in .d_merge/caches/patch_editor/nemesis.
+    NemesisOutputHover,
+
+    /// Mod code:
+    NemesisModCodeLabel,
+
+    /// e.g. mymod
+    NemesisModCodeHint,
+
+    /// A mod code is 4-6 ASCII letters/digits and not "vanilla".
+    NemesisModCodeInvalid,
+
+    /// Name:
+    NemesisNameLabel,
+
+    /// Author:
+    NemesisAuthorLabel,
+
+    /// Site:
+    NemesisSiteLabel,
+
+    /// Templates (Settings > template_dir):
+    NemesisTemplatesLabel,
+
+    /// Custom Template…
+    NemesisCustomXml,
+
+    /// Use your own template file (.xml, or a d-merge .bin). Its object ids must match the game's template.
+    NemesisCustomXmlHover,
+
+    /// No templates (.bin / .xml under meshes/) in the template directory. Check template_dir in the settings.
+    NemesisNoTemplates,
+
+    /// Add Behavior…
+    NemesisAddBehavior,
+
+    /// Import Mod…
+    NemesisImportMod,
+
+    /// Load a Nemesis mod (…/Nemesis_Engine/mod/<code>) to keep working on it.
+    NemesisImportModHover,
+
+    /// Export
+    NemesisExport,
+
+    /// Set the output directory and a valid mod code first.
+    NemesisExportDisabledHover,
+
+    /// Exported
+    NemesisExported,
+
+    /// Export failed
+    NemesisExportFailed,
+
+    /// Some patches are rejected by d-merge's Nemesis parser
+    NemesisRejected,
+
+    /// Failed to load
+    NemesisLoadFailed,
+
+    /// Failed to save the work in progress
+    NemesisSaveFailed,
+
+    /// No template found for
+    NemesisNoTemplateFor,
+
+    /// Filter (id, class, name)
+    NemesisFilterHint,
+
+    /// Changed only
+    NemesisChangedOnly,
+
+    /// New
+    NemesisNewObject,
+
+    /// Duplicate
+    NemesisDuplicate,
+
+    /// Revert
+    NemesisRevert,
+
+    /// Discard the changes of this object (a new object is removed).
+    NemesisRevertHover,
+
+    /// Patch preview
+    NemesisPatchPreview,
+
+    /// No change
+    NemesisNoChange,
+
+    /// d-merge's Nemesis parser accepts this patch.
+    NemesisParserOk,
+
+    /// Add a behavior (a template xml) or import a mod to start.
+    NemesisNoBehavior,
+
+    /// Select an object on the left.
+    NemesisSelectObject,
+
+    /// Put this changed block back to the template's lines.
+    NemesisRevertHunkHover,
+
+    /// Previous / next change
+    NemesisJumpDiffHover,
+
+    /// Class of the new object (filter)
+    NemesisClassFilterHint,
+
+    /// Delete
+    NemesisDeleteObject,
+
+    /// Delete this new object.
+    NemesisDeleteObjectHover,
+
+    /// Copy id
+    NemesisCopyId,
+
+    /// Tree
+    NemesisTreeView,
+
+    /// Show the objects as a tree from hkRootLevelContainer, following their #pointers. (A filter shows the flat list.)
+    NemesisTreeViewHover,
+
+    /// Objects
+    NemesisObjectsTab,
+
+    /// Events / Variables
+    NemesisVarsTab,
+
+    /// Events
+    NemesisEvents,
+
+    /// Variables
+    NemesisVariables,
+
+    /// Add
+    NemesisAdd,
+
+    /// This template has no event / variable data (hkbBehaviorGraphStringData).
+    NemesisNoVars,
+
+    /// Remove from the work
+    NemesisRemoveBehavior,
+
+    /// Removes this behavior and discards all its edits and new objects.
+    NemesisRemoveBehaviorHover,
+
+    /// NemesisExt
+    NemesisForceExt,
+
+    /// Write to Nemesis_EngineExt/mod/<code>/meshes/... even though Nemesis supports this template.
+    NemesisForceExtHover,
+
+    /// Nemesis does not support this template: it can only be written as NemesisExt.
+    NemesisUnsupportedTemplate,
+
+    /// ⚠ NemesisExt is read by d-merge only (not by Nemesis or Pandora).
+    NemesisExtOnlyWarning,
+
+    // ── CRC32 page ──────────────────────────────────────────────────────────
+    /// Text / path:
+    CrcTextLabel,
+
+    /// e.g. meshes\actors\character\animations\mymod  or  ground_bite
+    CrcTextHint,
+
+    /// Skyrim's CRC32 of the lowercase text, with `/` as `\`. A file name is hashed without `.hkx`.
+    CrcTextHover,
+
+    /// Nemesis mod:
+    CrcModDirLabel,
+
+    /// Directory of a Nemesis patch mod (or drop it here)
+    CrcModDirHint,
+
+    /// No .hkx files found.
+    CrcNoHkx,
+
+    /// Copy
+    CrcCopy,
+
+    /// Filter
+    CrcFilterHint,
+
     // ── Convert page ────────────────────────────────────────────────────────
     /// Inputs
     ConvertInputsLabel,
@@ -584,6 +781,21 @@ pub enum I18nKey {
     /// Open .hkx / .xml files. (Drag & drop also works.)
     HkannoOpenHover,
 
+    /// Open Input Directory
+    HkannoTabOpenInputDir,
+
+    /// Open Output Directory
+    HkannoTabOpenOutputDir,
+
+    /// Copy Input Path
+    HkannoTabCopyInputPath,
+
+    /// Copy Output Path
+    HkannoTabCopyOutputPath,
+
+    /// Close
+    HkannoTabClose,
+
     /// Save
     HkannoSaveButton,
 
@@ -595,6 +807,24 @@ pub enum I18nKey {
 
     /// Failed to load
     HkannoLoadFailed,
+
+    /// Import .txt…
+    HkannoImportTxt,
+
+    /// Replace the annotations of this tab with a .txt file (hkanno text). A .txt dropped on the page does the same.
+    HkannoImportTxtHover,
+
+    /// Export .txt…
+    HkannoExportTxt,
+
+    /// Save the annotation text as a .txt file.
+    HkannoExportTxtHover,
+
+    /// Imported
+    HkannoImported,
+
+    /// Exported
+    HkannoExported,
 
     /// Revert
     HkannoRevertButton,

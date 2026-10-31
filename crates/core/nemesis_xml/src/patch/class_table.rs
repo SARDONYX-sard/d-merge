@@ -2469,6 +2469,11 @@ const CLASS_TABLE: ClassTable = phf_ordered_map! {
     "hkxVertexVectorDataChannel" => phf_ordered_map! { "memSizeAndFlags" => "U64",
     "referenceCount" => "I64", "perVertexVectors" => "Array|Object|Vector4", },
 };
+/// Every class name of the table (alphabetical: the table is sorted).
+pub fn class_names() -> impl Iterator<Item = &'static str> {
+    CLASS_TABLE.keys().copied()
+}
+
 /// Find class information by class name.
 pub fn find_class_info(class_name: &str) -> Option<&'static FieldInfo> {
     CLASS_TABLE.get(class_name)

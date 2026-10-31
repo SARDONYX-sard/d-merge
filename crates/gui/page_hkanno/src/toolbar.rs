@@ -64,6 +64,25 @@ impl HkannoPage {
                 }
             }
 
+            let has_tab = !self.tabs.is_empty();
+            let import = Button::new(i18n.t(I18nKey::HkannoImportTxt));
+            if ui
+                .add_enabled(has_tab, import)
+                .on_hover_text(i18n.t(I18nKey::HkannoImportTxtHover))
+                .clicked()
+                && let Some(path) = rfd::FileDialog::new().add_filter("Text", &["txt"]).pick_file()
+            {
+                self.import_txt(&path, ctx);
+            }
+            let export = Button::new(i18n.t(I18nKey::HkannoExportTxt));
+            if ui
+                .add_enabled(has_tab, export)
+                .on_hover_text(i18n.t(I18nKey::HkannoExportTxtHover))
+                .clicked()
+            {
+                self.export_txt(ctx);
+            }
+
             if ui
                 .add(Button::selectable(self.show_lsp_options, "⚙"))
                 .on_hover_text(i18n.t(I18nKey::HkannoLspOptionsTitle))
@@ -94,6 +113,49 @@ impl HkannoPage {
                 "{}: {}",
                 ctx.i18n.t(I18nKey::HkannoSaved),
                 tab.settings.output_path
+            )),
+            Err(err) => {
+                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoSaveFailed));
+                tracing::error!("{msg}");
+                ctx.notify.error(msg);
+            }
+        }
+    }
+
+    /// Replaces the active tab's annotations with the `.txt` at `path`, and reports the result.
+    pub(crate) fn import_txt(&mut self, path: &std::path::Path, ctx: &mut HkannoPageCtx<'_>) {
+        let Some(tab) = self.active_tab() else { return };
+        match tab.import_txt(path) {
+            Ok(()) => ctx.notify.success(format!(
+                "{}: {}",
+                ctx.i18n.t(I18nKey::HkannoImported),
+                path.display()
+            )),
+            Err(err) => {
+                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoLoadFailed));
+                tracing::error!("{msg}");
+                ctx.notify.error(msg);
+            }
+        }
+    }
+
+    /// Asks where to save, then writes the active tab's annotation text as `.txt`.
+    fn export_txt(&mut self, ctx: &mut HkannoPageCtx<'_>) {
+        let Some(tab) = self.active_tab() else { return };
+        let default = tab.default_txt_path();
+        let mut dialog = rfd::FileDialog::new().add_filter("Text", &["txt"]);
+        if let Some(dir) = default.parent() {
+            dialog = dialog.set_directory(dir);
+        }
+        if let Some(name) = default.file_name() {
+            dialog = dialog.set_file_name(name.to_string_lossy());
+        }
+        let Some(path) = dialog.save_file() else { return };
+        match tab.export_txt(&path) {
+            Ok(()) => ctx.notify.success(format!(
+                "{}: {}",
+                ctx.i18n.t(I18nKey::HkannoExported),
+                path.display()
             )),
             Err(err) => {
                 let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoSaveFailed));

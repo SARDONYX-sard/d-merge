@@ -1,7 +1,7 @@
 //! Top-level pages, shown one at a time by the router (see [`super::router`]).
 //!
 //! - Patch: in this crate ([`patch`]), it needs most of [`App`].
-//! - Convert / hkanno: separate crates (`page_convert`, `page_hkanno`) that only
+//! - Convert / hkanno / Patch Editor: separate crates (`page_convert`, `page_hkanno`, `page_patch_editor`) that only
 //!   see what they are given in a `*PageCtx`. Their state lives in [`App`], because the router
 //!   recreates the route object on every navigation.
 
@@ -9,6 +9,7 @@ mod patch;
 
 use page_convert::ConvertPageCtx;
 use page_hkanno::HkannoPageCtx;
+use page_patch_editor::PatchEditorPageCtx;
 
 use crate::{app::App, theme::frame_from_theme};
 
@@ -37,5 +38,17 @@ impl App {
             notify: &mut self.notify,
         };
         self.hkanno.ui(ui, ctx);
+    }
+
+    pub(crate) fn ui_patch_editor_page(&mut self, ui: &mut egui::Ui) {
+        let ctx = PatchEditorPageCtx {
+            panel_frame: self.panel_frame(),
+            i18n: &self.i18n,
+            notify: &mut self.notify,
+            template_dir: &self.settings.behavior.template_dir,
+            settings: &mut self.settings.patch_editor,
+            editor: &mut self.settings.hkanno,
+        };
+        self.patch_editor.ui(ui, ctx);
     }
 }

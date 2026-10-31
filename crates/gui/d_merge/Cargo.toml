@@ -51,6 +51,7 @@ tracing = { workspace = true }
 # workspace members
 egui_widgets = { workspace = true }
 page_convert = { workspace = true }
+page_patch_editor = { workspace = true }
 page_hkanno = { workspace = true }
 mod_info = { workspace = true }
 behavior_merge = { workspace = true, features = ["tracing"] }

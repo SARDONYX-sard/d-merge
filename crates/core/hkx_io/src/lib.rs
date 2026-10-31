@@ -18,6 +18,7 @@
 //! | [`with_class_map`]   | any format, by file extension (`.hkx`, `.xml`, `.json`, ...) |
 //! | [`to_bytes`] / [`to_bytes_with_maps`] | [`ClassMap`] -> `.hkx` bytes               |
 //! | [`to_xml`]           | [`ClassMap`] -> XML                                         |
+//! | [`template_bin_to_xml`] | d-merge template `.bin` -> XML (ids kept)                 |
 //! | [`convert`]          | a file or directory -> another format (the Convert page)   |
 
 use std::{
@@ -119,6 +120,32 @@ pub fn to_bytes_with_maps(
 #[inline(never)]
 pub fn to_xml(classes: &ClassMap<'_>, top_ptr: &Pointer<'_>) -> Result<String, SerError> {
     serde_hkx::to_string(classes, top_ptr)
+}
+
+/// d-merge's template `.bin` (MessagePack of the classes, `assets/templates/meshes/**`) -> Havok
+/// XML. Object ids (`#0106`) are kept as they were in the template.
+///
+/// # Errors
+/// Not a template bin, or the classes cannot be written as XML.
+#[inline(never)]
+pub fn template_bin_to_xml(bytes: &[u8]) -> Result<String, String> {
+    use serde_hkx::HavokSort as _;
+    let value: simd_json::BorrowedValue<'_> =
+        rmp_serde::from_slice(bytes).map_err(|e| e.to_string())?;
+    let mut classes = from_json_value(value).map_err(|e| e.to_string())?;
+    let top = classes.sort_for_xml().map_err(|e| e.to_string())?;
+    let xml = to_xml(&classes, &top).map_err(|e| e.to_string())?;
+
+    // `<!-- referenceCount SERIALIZE_IGNORED -->` lines: the template xml (and Nemesis' own
+    // templates) do not have them, and Nemesis patch parsers reject comments in objects.
+    let mut out = String::with_capacity(xml.len());
+    for line in xml.split_inclusive('\n') {
+        let trimmed = line.trim();
+        if !(trimmed.starts_with("<!--") && trimmed.ends_with("SERIALIZE_IGNORED -->")) {
+            out.push_str(line);
+        }
+    }
+    Ok(out)
 }
 
 /// Converts the file or directory `input` into `format`, written to `output` (or next to the

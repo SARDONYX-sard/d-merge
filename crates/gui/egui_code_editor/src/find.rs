@@ -44,6 +44,9 @@ pub(crate) struct FindBar {
     focus_field: bool,
     /// Char index the incremental search starts from (the cursor when the bar opened).
     origin: usize,
+    /// The match selected last. Remembered here because egui collapses the selection of an
+    /// unfocused `TextEdit` to its end, so the editor's selection cannot tell where it starts.
+    current: Option<Range<usize>>,
 }
 
 impl FindBar {
@@ -115,10 +118,23 @@ impl FindBar {
         }
     }
 
-    /// Draws the bar at the top right of `editor_rect` (the visible part of the editor).
-    pub(crate) fn ui(&mut self, ui: &egui::Ui, id: egui::Id, editor_rect: egui::Rect, text: &str) {
+    /// Draws the bar at the top right of `editor_rect` (the visible part of the editor), and
+    /// marks the current match (the editor shows no selection while the bar has the focus).
+    pub(crate) fn ui(
+        &mut self,
+        ui: &egui::Ui,
+        id: egui::Id,
+        editor_rect: egui::Rect,
+        text: &str,
+        (galley, galley_pos): (&egui::Galley, egui::Pos2),
+    ) {
         let Some(kind) = self.open else { return };
         let ctx = ui.ctx();
+        if kind == Kind::Find
+            && let Some(current) = self.current_match(ctx, id, text)
+        {
+            crate::overlays::block_selection(ui, galley, galley_pos, &[current]);
+        }
 
         egui::Area::new(id.with("find_bar"))
             .order(egui::Order::Foreground)
@@ -150,7 +166,8 @@ impl FindBar {
         let chars: Vec<char> = text.chars().collect();
         let matcher = Matcher::new(&self.query);
         let total = matcher.as_ref().map_or(0, |m| m.count(&chars));
-        let current = selection(ui.ctx(), id)
+        let current = self
+            .current_match(ui.ctx(), id, text)
             .and_then(|range| matcher.as_ref()?.index_of(&chars, range.start));
         let counter = match (total, current) {
             (0, _) if self.query.is_empty() => String::new(),
@@ -227,7 +244,7 @@ impl FindBar {
     }
 
     /// While typing: select the first match at or after where the search started.
-    fn select_from_origin(&self, ctx: &egui::Context, id: egui::Id, text: &str) {
+    fn select_from_origin(&mut self, ctx: &egui::Context, id: egui::Id, text: &str) {
         let Some(matcher) = Matcher::new(&self.query) else { return };
         let chars: Vec<char> = text.chars().collect();
         let at = if matcher.matches_at(&chars, self.origin) {
@@ -236,18 +253,35 @@ impl FindBar {
             find_from(&matcher, &chars, self.origin, true)
         };
         if let Some(at) = at {
-            select(ctx, id, at..at + self.query.chars().count());
+            self.select(ctx, id, at..at + self.query.chars().count());
         }
     }
 
-    /// Selects the next (`forward`) or previous match from the cursor, wrapping around.
-    fn jump(&self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
+    /// Selects the next (`forward`) or previous match, wrapping around. It starts from the
+    /// current match, or from the cursor once the user moved it.
+    fn jump(&mut self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
         let Some(matcher) = Matcher::new(&self.query) else { return };
         let chars: Vec<char> = text.chars().collect();
-        let from = selection(ctx, id).map_or(0, |r| r.start);
+        let from =
+            self.current_match(ctx, id, text).or_else(|| selection(ctx, id)).map_or(0, |r| r.start);
         if let Some(at) = find_from(&matcher, &chars, from, forward) {
-            select(ctx, id, at..at + self.query.chars().count());
+            self.select(ctx, id, at..at + self.query.chars().count());
         }
+    }
+
+    fn select(&mut self, ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
+        select(ctx, id, range.clone());
+        self.current = Some(range);
+    }
+
+    /// [`Self::current`] while it is still valid: the cursor is at its end (not moved by the
+    /// user) and the text there still matches.
+    fn current_match(&self, ctx: &egui::Context, id: egui::Id, text: &str) -> Option<Range<usize>> {
+        let current = self.current.clone()?;
+        let matcher = Matcher::new(&self.query)?;
+        let cursor = selection(ctx, id)?;
+        let chars: Vec<char> = text.chars().collect();
+        (cursor.end == current.end && matcher.matches_at(&chars, current.start)).then_some(current)
     }
 }
 
@@ -285,6 +319,30 @@ fn word_at(chars: &[char], at: usize) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jump_both_ways() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::unique("editor");
+        let text = "ab x ab x ab";
+        let mut bar = FindBar { query: "ab".to_string(), ..Default::default() };
+        // What an unfocused egui `TextEdit` does every frame: the selection shrinks to its end.
+        let collapse = || {
+            let end = selection(&ctx, id).unwrap().end;
+            select(&ctx, id, end..end);
+        };
+
+        bar.select(&ctx, id, 5..7); // 2nd match
+        collapse();
+        bar.jump(&ctx, id, text, true);
+        assert_eq!(bar.current, Some(10..12));
+        collapse();
+        bar.jump(&ctx, id, text, false);
+        assert_eq!(bar.current, Some(5..7));
+        collapse();
+        bar.jump(&ctx, id, text, false);
+        assert_eq!(bar.current, Some(0..2));
+    }
 
     #[test]
     fn word_under_cursor() {

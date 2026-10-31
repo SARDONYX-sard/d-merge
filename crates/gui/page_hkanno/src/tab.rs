@@ -126,6 +126,32 @@ impl HkannoTab {
         Ok(())
     }
 
+    /// Replaces the annotation text with the contents of a `.txt` file (hkanno text format).
+    /// The header values still come from the opened file (see [`document`]).
+    ///
+    /// # Errors
+    /// The file cannot be read.
+    pub(crate) fn import_txt(&mut self, path: &Path) -> Result<(), String> {
+        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        self.text = txt_to_text(&bytes);
+        self.dirty = true;
+        self.text_changed();
+        Ok(())
+    }
+
+    /// Writes the annotation text to a `.txt` file as is.
+    ///
+    /// # Errors
+    /// The file cannot be written.
+    pub(crate) fn export_txt(&self, path: &Path) -> Result<(), String> {
+        std::fs::write(path, &self.text).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Where "Export .txt" starts: next to the input. e.g., `C:/a/attack.hkx` -> `C:/a/attack.txt`
+    pub(crate) fn default_txt_path(&self) -> std::path::PathBuf {
+        Path::new(&self.settings.input_path).with_extension("txt")
+    }
+
     /// Discards the edits.
     pub(crate) fn revert(&mut self) {
         self.text = self.original.to_string();
@@ -178,6 +204,12 @@ fn infer_output_path(input_path: &str) -> String {
     path.with_file_name(name).display().to_string()
 }
 
+/// `.txt` bytes -> editor text: UTF-8 (lossy) without a BOM, `\r\n` -> `\n` (the editor's line end).
+fn txt_to_text(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    text.strip_prefix('\u{feff}').unwrap_or(&text).replace("\r\n", "\n")
+}
+
 /// Builds the annotation data for `text`: tracks from the text, header values
 /// (`ptr`, `numOriginalFrames`, `duration`) from the `original` file (they are not editable).
 ///
@@ -200,5 +232,10 @@ mod tests {
         // Compare as paths: the separator differs per OS (`a\attack...` on Windows).
         let output = infer_output_path("a/attack.hkx");
         assert_eq!(Path::new(&output), Path::new("a/attack.modified.hkx"));
+    }
+
+    #[test]
+    fn txt_is_normalized() {
+        assert_eq!(txt_to_text(b"\xEF\xBB\xBF0.1 a\r\n0.2 b"), "0.1 a\n0.2 b");
     }
 }

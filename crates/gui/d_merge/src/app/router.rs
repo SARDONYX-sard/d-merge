@@ -37,6 +37,7 @@ impl Root {
             .route(Page::Patch.path(), patch_route)
             .route(Page::Convert.path(), convert_route)
             .route(Page::Hkanno.path(), hkanno_route)
+            .route(Page::PatchEditor.path(), patch_editor_route)
             .default_path(start_page.path())
             .build(&mut app);
 
@@ -75,6 +76,7 @@ impl Root {
                         Page::Patch => I18nKey::PagePatch,
                         Page::Convert => I18nKey::PageConvert,
                         Page::Hkanno => I18nKey::PageHkanno,
+                        Page::PatchEditor => I18nKey::PagePatchEditor,
                     });
                     let selected = self.app.settings.ui.page == page;
                     let button = Button::selectable(selected, label);
@@ -130,4 +132,8 @@ fn convert_route() -> impl Route<App> {
 
 fn hkanno_route() -> impl Route<App> {
     |ui: &mut egui::Ui, app: &mut App| app.ui_hkanno_page(ui)
+}
+
+fn patch_editor_route() -> impl Route<App> {
+    |ui: &mut egui::Ui, app: &mut App| app.ui_patch_editor_page(ui)
 }

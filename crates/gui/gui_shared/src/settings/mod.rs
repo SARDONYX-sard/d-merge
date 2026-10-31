@@ -7,6 +7,7 @@ pub mod hkanno;
 pub mod log;
 pub mod mod_list;
 pub mod mod_list_ui;
+pub mod patch_editor;
 pub mod support_pandora;
 pub mod ui;
 
@@ -58,6 +59,10 @@ pub struct Settings {
     #[serde(default)]
     pub hkanno: hkanno::HkannoSettings,
 
+    /// Patch Editor page: where the work in progress is. (Added in v2.9; absent -> default.)
+    #[serde(default)]
+    pub patch_editor: patch_editor::PatchEditorSettings,
+
     /// VFS-mode paths and mod list.
     #[serde(default)]
     pub vfs: ModListSettings,
@@ -79,6 +84,7 @@ impl Default for Settings {
             pandora: PandoraSupportSettings::default(),
             convert: convert::ConvertSettings::default(),
             hkanno: hkanno::HkannoSettings::default(),
+            patch_editor: patch_editor::PatchEditorSettings::default(),
         }
     }
 }

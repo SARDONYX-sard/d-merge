@@ -69,6 +69,7 @@ jwalk_glob = { path = "./crates/core/jwalk_glob" }
 mod_info = { path = "./crates/gui/mod_info" }
 behavior_merge = { path = "./crates/core/behavior_merge" }
 behavior_merge_types = { path = "./crates/core/behavior_merge_types" }
+nemesis_diff = { path = "./crates/core/nemesis_diff" }
 nemesis_xml = { path = "./crates/core/nemesis_xml" }
 node_expr = { path = "./crates/gui/node_expr" }
 serde_hkx_for_gui = { path = "./crates/gui/serde_hkx_for_gui" }
@@ -82,6 +83,7 @@ gui_shared = { path = "./crates/gui/gui_shared" }
 egui_widgets = { path = "./crates/gui/egui_widgets" }
 egui_code_editor = { path = "./crates/gui/egui_code_editor" }
 page_convert = { path = "./crates/gui/page_convert" }
+page_patch_editor = { path = "./crates/gui/page_patch_editor" }
 page_hkanno = { path = "./crates/gui/page_hkanno" }
 
 
