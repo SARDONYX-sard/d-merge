@@ -249,7 +249,7 @@ impl HkannoPage {
             });
         }
 
-        let CodeEditorOutput { changed, cursor, command } = egui::ScrollArea::both()
+        let CodeEditorOutput { changed, cursor, command, .. } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
             .auto_shrink(false)
             .show(ui, |ui| {

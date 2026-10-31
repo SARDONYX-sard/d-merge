@@ -135,7 +135,7 @@ const CLOSE: &str = "<!-- CLOSE -->";
 /// Both sides are [`normalize`]d first.
 pub fn object_patch(mod_code: &str, template: &str, edited: &str) -> Option<String> {
     let before = normalize(template);
-    let after = normalize(edited);
+    let after = align_numelements(&before, &normalize(edited));
     if before == after {
         return None;
     }
@@ -184,12 +184,14 @@ fn line_hunks(before: &str, after: &str) -> Vec<Hunk> {
 
 /// The changed blocks of an edited object (the `OPEN` blocks of its patch, in order).
 pub fn hunks(template: &str, edited: &str) -> Vec<Hunk> {
-    line_hunks(&normalize(template), &normalize(edited))
+    let before = normalize(template);
+    line_hunks(&before, &align_numelements(&before, &normalize(edited)))
 }
 
 /// `edited` ([`normalize`]d) with hunk `index` put back to the template's lines.
 pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
-    let (before, after) = (normalize(template), normalize(edited));
+    let before = normalize(template);
+    let after = align_numelements(&before, &normalize(edited));
     let Some(Hunk { old, new }) = line_hunks(&before, &after).into_iter().nth(index) else {
         return after;
     };
@@ -199,6 +201,46 @@ pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
     after_lines[..new.start].iter().for_each(|line| out.push_str(line));
     before_lines[old].iter().for_each(|line| out.push_str(line));
     after_lines[new.end..].iter().for_each(|line| out.push_str(line));
+    out
+}
+
+/// `edited` with each `numelements="N"` set back to the template's value for the same field (the
+/// k-th `<hkparam name="x" numelements=` of a name matches the template's k-th).
+///
+/// Nemesis / d-merge count the elements themselves, and a changed `<hkparam ...>` line would
+/// become a patch block where the parsers do not accept one.
+pub fn align_numelements(template: &str, edited: &str) -> String {
+    const KEY: &str = " numelements=\"";
+    let field = |line: &str| -> Option<String> {
+        let rest = line.trim_start().strip_prefix("<hkparam name=\"")?;
+        line.contains(KEY).then(|| rest.split('"').next().unwrap_or_default().to_string())
+    };
+    let count = |line: &str| -> Option<String> {
+        let at = line.find(KEY)? + KEY.len();
+        Some(line[at..].split('"').next()?.to_string())
+    };
+    // field name -> its `numelements` values in template order
+    let mut template_counts: HashMap<String, Vec<String>> = HashMap::default();
+    for line in template.lines() {
+        if let (Some(name), Some(n)) = (field(line), count(line)) {
+            template_counts.entry(name).or_default().push(n);
+        }
+    }
+
+    let mut seen: HashMap<String, usize> = HashMap::default();
+    let mut out = String::with_capacity(edited.len());
+    for line in edited.split_inclusive('\n') {
+        let aligned = field(line).and_then(|name| {
+            let k = seen.entry(name.clone()).or_default();
+            let original = template_counts.get(&name)?.get(*k)?;
+            *k += 1;
+            let current = count(line)?;
+            (current != *original).then(|| {
+                line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1)
+            })
+        });
+        out.push_str(aligned.as_deref().unwrap_or(line));
+    }
     out
 }
 
@@ -594,6 +636,19 @@ mod tests {
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].line, 5);
         assert!(problems[0].message.contains("modifers"));
+    }
+
+    #[test]
+    fn numelements_is_not_a_change() {
+        let template = objects(TEMPLATE)[0].text;
+        // The modder bumped the count while adding a pointer.
+        let edited = template
+            .replace("numelements=\"3\"", "numelements=\"4\"")
+            .replace("#0105 #0107 #0104", "#0105 #0107 #0104 #0200");
+        let patch = object_patch("mymod", template, &edited).unwrap();
+        assert!(patch.contains("<hkparam name=\"modifiers\" numelements=\"3\">"), "{patch}");
+        assert_eq!(patch.matches("<!-- CLOSE -->").count(), 1, "{patch}");
+        validate(&patch).unwrap();
     }
 
     #[test]

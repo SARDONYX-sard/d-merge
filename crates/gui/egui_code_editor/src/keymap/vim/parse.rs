@@ -267,6 +267,8 @@ const fn simple(keys: &[VimKey]) -> Step<Command> {
         [Char('g'), Char('J'), ..] => Simple::JoinLines { spaces: false },
         [Char('g'), Char('v'), ..] => Simple::Reselect,
         [Char('g'), Char('x'), ..] => Simple::OpenUrl,
+        [Char('g'), Char('d'), ..] => Simple::GoTo { references: false },
+        [Char('g'), Char('D'), ..] => Simple::GoTo { references: true },
         [Char('g'), Char('*'), ..] => Simple::SearchWord { forward: true, whole: false },
         [Char('g'), Char('#'), ..] => Simple::SearchWord { forward: false, whole: false },
         [Char('z'), key, ..] => {

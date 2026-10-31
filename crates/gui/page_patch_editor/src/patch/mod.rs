@@ -16,6 +16,8 @@
 //! Work is cached under the output dir and saved a moment after each edit (see [`workspace`]).
 
 mod language;
+mod navigate;
+mod preview;
 mod tree;
 mod vars_panel;
 mod workspace;
@@ -24,7 +26,6 @@ use std::{path::Path, time::Instant};
 
 use egui_code_editor::{
     CodeEditor, CodeEditorState, Diagnostic, EditorCommand, EditorFeatures, Keymap, Severity,
-    languages::Xml,
 };
 use egui_widgets::{
     notify::Notification,
@@ -77,11 +78,15 @@ pub(crate) struct PatchTool {
     editor: CodeEditorState,
     /// Preview of `editor_for`: (patch, parser result). Recomputed when the text changes.
     preview: Option<(Option<String>, Result<(), String>)>,
-    preview_state: CodeEditorState,
     /// Unknown class / field names in the editor text (underlined).
     field_problems: Vec<Diagnostic>,
     /// One label per changed block of the selected object (its `↶` revert buttons).
-    hunk_labels: Vec<String>,
+    preview_view: Option<preview::Preview>,
+    /// `Shift+F12`: who points to an object.
+    references: navigate::References,
+    history: navigate::History,
+    /// The `#id` the editor's right-click menu was opened on.
+    menu_target: Option<String>,
 
     /// Normal / Vim keys of the object editor.
     editor_mode: EditorMode,
@@ -205,6 +210,18 @@ impl PatchTool {
         }
         if let Err(err) = self.workspace.save(Path::new(output), code) {
             notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
+        }
+    }
+
+    /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object (skips deleted ones).
+    fn walk_history(&mut self, older: bool, current: &str) {
+        let mut current = current.to_string();
+        while let Some(target) = self.history.walk(older, &current) {
+            if self.workspace.behaviors[self.active].text(&target).is_some() {
+                self.selected = Some(target);
+                return;
+            }
+            current = target;
         }
     }
 
@@ -567,14 +584,16 @@ impl PatchTool {
         ui.separator();
 
         // Tree (from the root container) unless filtering: a filter wants the flat list.
-        if self.tree_view && self.filter.is_empty() && !self.changed_only {
+        if self.tree_view && self.filter.is_empty() {
             let behavior = &self.workspace.behaviors[self.active];
-            egui::ScrollArea::both()
-                .auto_shrink(false)
-                .show(ui, |ui| tree::tree_ui(ui, behavior, &mut self.selected, &mut self.tree));
+            let changed_only = self.changed_only;
+            egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
+                tree::tree_ui(ui, behavior, &mut self.selected, &mut self.tree, changed_only);
+            });
             return;
         }
 
+        let _ = self.names(); // where new objects are linked (cached)
         let rows = self.rows();
         let mut menu_action = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
@@ -620,10 +639,16 @@ impl PatchTool {
                 || name.to_lowercase().contains(&filter)
         };
 
+        // A new object shows where it is linked: `← #0106` (or a warning).
+        let parents = self.names.as_ref().map(|(_, names)| &names.parents);
         let added = behavior.added.iter().map(|(id, text)| {
             let class =
                 text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map(|(c, _)| c);
-            ('+', id.clone(), class.unwrap_or_default().to_string(), String::new())
+            let linked = match parents.and_then(|p| p.get(id)) {
+                Some(from) => format!("← {}", from.join(", ")),
+                None => "⚠ not linked".to_string(),
+            };
+            ('+', id.clone(), class.unwrap_or_default().to_string(), linked)
         });
         let template = behavior
             .objects
@@ -722,68 +747,50 @@ impl PatchTool {
             self.preview = Some((patch, check));
             self.field_problems =
                 field_diagnostics(&self.editor_text, &self.workspace.behaviors[self.active]);
-            self.hunk_labels = self.workspace.behaviors[self.active]
-                .template_object(&id)
-                .map(|template| hunk_labels(&template.text, &self.editor_text))
-                .unwrap_or_default();
+            let current = self.preview_view.as_ref().map_or(0, |v| v.current);
+            self.preview_view = self
+                .preview
+                .as_ref()
+                .and_then(|(patch, _)| patch.as_deref())
+                .map(preview::Preview::new);
+            // Keep the ▲ / ▼ position across edits.
+            if let Some(view) = &mut self.preview_view {
+                view.keep_current(current);
+            }
         }
 
+        // The patch preview (not for a new object: it is written as is).
         let mut revert = None;
-        egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(ui, |ui| {
-            let Some((patch, check)) = &self.preview else { return };
-            // `↶ 1: <hkparam name="userData">2</hkparam>` per changed block.
-            ui.horizontal_wrapped(|ui| {
-                for (i, label) in self.hunk_labels.iter().enumerate() {
-                    if ui
-                        .small_button(format!("↶ {}: {label}", i + 1))
-                        .on_hover_text(i18n.t(I18nKey::NemesisRevertHunkHover))
-                        .clicked()
-                    {
-                        revert = Some(i);
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
-                if let Some(patch) = patch {
-                    // ▲ / ▼: the previous / next `MOD_CODE` block of the preview.
-                    let preview_id = egui_code_editor::editor_id(("nemesis_preview", &id));
-                    for (forward, glyph) in [(false, "▲"), (true, "▼")] {
-                        if ui
-                            .small_button(glyph)
-                            .on_hover_text(i18n.t(I18nKey::NemesisJumpDiffHover))
-                            .clicked()
-                            && let Some(at) = next_block(ui.ctx(), preview_id, patch, forward)
-                        {
-                            egui_code_editor::set_cursor(ui.ctx(), preview_id, at);
+        let is_new = self.workspace.behaviors[self.active].added.contains_key(&id);
+        if !is_new {
+            egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(
+                ui,
+                |ui| {
+                    let Some((patch, check)) = &self.preview else { return };
+                    ui.horizontal(|ui| {
+                        ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
+                        if let Some(view) = &mut self.preview_view {
+                            view.nav_ui(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                         }
+                        match check {
+                            _ if patch.is_none() => {
+                                ui.weak(i18n.t(I18nKey::NemesisNoChange));
+                            }
+                            Ok(()) => {
+                                ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔")
+                                    .on_hover_text(i18n.t(I18nKey::NemesisParserOk));
+                            }
+                            Err(err) => {
+                                ui.colored_label(ui.visuals().error_fg_color, format!("✖ {err}"));
+                            }
+                        }
+                    });
+                    if let Some(view) = &mut self.preview_view {
+                        revert = view.ui(ui, i18n.t(I18nKey::NemesisRevertHunkHover));
                     }
-                }
-                match check {
-                    _ if patch.is_none() => {
-                        ui.weak(i18n.t(I18nKey::NemesisNoChange));
-                    }
-                    Ok(()) => {
-                        ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔")
-                            .on_hover_text(i18n.t(I18nKey::NemesisParserOk));
-                    }
-                    Err(err) => {
-                        ui.colored_label(ui.visuals().error_fg_color, format!("✖ {err}"));
-                    }
-                }
-            });
-            if let Some(patch) = patch {
-                let mut shown = patch.clone(); // read only: edits are dropped
-                egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-                    let _ = CodeEditor::new(("nemesis_preview", &id), &mut shown)
-                        .language(&Xml)
-                        .features(EditorFeatures { completion: false, ..Default::default() })
-                        .desired_rows(8)
-                        .show(ui, &mut self.preview_state);
-                });
-            }
-        });
-
+                },
+            );
+        }
         // `$eventID[` / `$variableID[` complete with the behavior's names.
         let names = self.names();
         let (events, variables, pointers) =
@@ -821,6 +828,9 @@ impl PatchTool {
             EditorMode::Normal => Keymap::Normal,
             EditorMode::Vim => Keymap::Vim,
         };
+        // `F12` / `Shift+F12` before the editor (its keymap would take them).
+        let editor_id = egui_code_editor::editor_id(("nemesis_object", &id));
+        let mut nav = navigate::key_request(ui, editor_id, &self.editor_text);
         egui::CentralPanel::default().show(ui, |ui| {
             // `Keys: [Vim ▼]`, and the Vim status line under the editor.
             ui.horizontal(|ui| {
@@ -862,6 +872,22 @@ impl PatchTool {
                 if let Some(cursor) = output.cursor {
                     self.cursor_line = cursor.line;
                 }
+                // `Ctrl+click` / right-click menu on a `#id`.
+                let labels = (
+                    i18n.t(I18nKey::NemesisGoToDefinition),
+                    i18n.t(I18nKey::NemesisFindReferences),
+                );
+                if let Some(request) = navigate::pointer_request(
+                    &output,
+                    &self.editor_text,
+                    &mut self.menu_target,
+                    labels,
+                ) {
+                    nav = Some(request);
+                }
+                if let Some(request) = navigate::command_request(&output, &self.editor_text) {
+                    nav = Some(request);
+                }
                 // Vim `:w`: save the work now.
                 if output.command == Some(EditorCommand::Save) {
                     self.dirty_since = Instant::now().checked_sub(SAVE_DELAY);
@@ -874,6 +900,26 @@ impl PatchTool {
             });
         });
 
+        match nav {
+            Some(navigate::Request::GoTo(target))
+                if self.workspace.behaviors[self.active].text(&target).is_some() =>
+            {
+                self.history.visit(&id);
+                self.selected = Some(target);
+            }
+            Some(navigate::Request::Back) => self.walk_history(true, &id),
+            Some(navigate::Request::Forward) => self.walk_history(false, &id),
+            Some(navigate::Request::References(target)) => {
+                let list = navigate::references(&self.workspace.behaviors[self.active], &target);
+                self.references = Some((target, list));
+            }
+            _ => {}
+        }
+        if let Some(target) = navigate::references_window(ui.ctx(), &mut self.references) {
+            self.history.visit(&id);
+            self.selected = Some(target);
+        }
+
         let behavior = &mut self.workspace.behaviors[self.active];
         if let Some(index) = revert
             && let Some(template) = behavior.template_object(&id)
@@ -884,25 +930,6 @@ impl PatchTool {
             self.mark_dirty();
         }
     }
-}
-
-/// One short label per changed block: its first new (else removed) line, trimmed.
-fn hunk_labels(template: &str, edited: &str) -> Vec<String> {
-    let (before, after) = (nemesis_diff::normalize(template), nemesis_diff::normalize(edited));
-    let (before, after): (Vec<&str>, Vec<&str>) =
-        (before.lines().collect(), after.lines().collect());
-    nemesis_diff::hunks(template, edited)
-        .into_iter()
-        .map(|hunk| {
-            let line = after
-                .get(hunk.new.start)
-                .filter(|_| !hunk.new.is_empty())
-                .map(|line| format!("+ {}", line.trim()))
-                .or_else(|| before.get(hunk.old.start).map(|line| format!("- {}", line.trim())))
-                .unwrap_or_default();
-            line.chars().take(48).collect()
-        })
-        .collect()
 }
 
 /// [`nemesis_diff::check_fields`] (names) and [`nemesis_diff::schema::check_pointers`] (pointer
@@ -924,25 +951,6 @@ fn field_diagnostics(text: &str, behavior: &workspace::Behavior) -> Vec<Diagnost
             Diagnostic { line: line_no, columns: start..line.chars().count(), severity, message }
         })
         .collect()
-}
-/// Char index of the previous / next `<!-- MOD_CODE` line from the cursor of editor `id`, wrapping.
-fn next_block(ctx: &egui::Context, id: egui::Id, patch: &str, forward: bool) -> Option<usize> {
-    let cursor = egui::TextEdit::load_state(ctx, id)
-        .and_then(|state| state.cursor.char_range())
-        .map_or(0, |range| range.primary.index.0);
-    let mut starts = Vec::new();
-    let mut at = 0;
-    for line in patch.split_inclusive('\n') {
-        if line.trim_start().starts_with("<!-- MOD_CODE") {
-            starts.push(at);
-        }
-        at += line.chars().count();
-    }
-    if forward {
-        starts.iter().copied().find(|&s| s > cursor).or_else(|| starts.first().copied())
-    } else {
-        starts.iter().rev().copied().find(|&s| s < cursor).or_else(|| starts.last().copied())
-    }
 }
 
 /// What a row's right-click menu asked for.

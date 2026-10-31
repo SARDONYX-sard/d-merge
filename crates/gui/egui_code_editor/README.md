@@ -216,6 +216,10 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | ---- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `K`  | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
 | `gx` | Open the URL under the cursor                                                                                                    |
+| `gd` | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
+| `gD` | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
+
+`Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 
 ### Ex commands
 

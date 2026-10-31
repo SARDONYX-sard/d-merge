@@ -33,18 +33,51 @@ pub(super) struct TreeState {
 }
 
 /// Draws the tree; a click selects an object (`selected`).
+///
+/// `changed_only`: only the branches leading to edited / new objects (opened), then the new
+/// objects nothing in the tree points to ("not linked").
 pub(super) fn tree_ui(
     ui: &mut egui::Ui,
     behavior: &Behavior,
     selected: &mut Option<String>,
     state: &mut TreeState,
+    changed_only: bool,
 ) {
     let root = behavior
         .object_of_class("hkRootLevelContainer")
         .or_else(|| behavior.objects.first().map(|o| o.id.as_str()));
     let Some(root) = root else { return };
-    let mut walk = Walk { behavior, selected, state, path: Vec::new(), shown: HashSet::default() };
+    let relevant = changed_only.then(|| leads_to_change(behavior, root));
+    let mut walk = Walk {
+        behavior,
+        selected,
+        state,
+        path: Vec::new(),
+        shown: HashSet::default(),
+        relevant: relevant.as_ref(),
+    };
     walk.node(ui, root);
+
+    // New objects the tree does not reach: link them from somewhere to make them count.
+    let mut unlinked: Vec<&String> =
+        behavior.added.keys().filter(|id| !walk.shown.contains(id.as_str())).collect();
+    if !unlinked.is_empty() {
+        unlinked.sort();
+        ui.separator();
+        ui.colored_label(ui.visuals().warn_fg_color, format!("⚠ Not linked ({})", unlinked.len()))
+            .on_hover_text("New objects no object in the tree points to (Nemesis ignores them).");
+        for id in unlinked {
+            let text =
+                egui::RichText::new(label(behavior, id, behavior.text(id).unwrap_or_default()))
+                    .monospace();
+            if ui
+                .add(egui::Button::selectable(walk.selected.as_deref() == Some(id), text))
+                .clicked()
+            {
+                *walk.selected = Some(id.clone());
+            }
+        }
+    }
 
     if let Some(request) = &mut walk.state.expand_all {
         request.frames_left = request.frames_left.saturating_sub(1);
@@ -56,6 +89,43 @@ pub(super) fn tree_ui(
     }
 }
 
+/// Objects that are edited / new or (transitively) point to one, from `root`.
+fn leads_to_change(behavior: &Behavior, root: &str) -> HashSet<String> {
+    fn visit(behavior: &Behavior, id: &str, memo: &mut fast_hash::HashMap<String, bool>) -> bool {
+        if let Some(&known) = memo.get(id) {
+            return known;
+        }
+        memo.insert(id.to_string(), false); // a cycle back here adds nothing
+        let text = behavior.text(id).unwrap_or_default();
+        let changed = behavior.edits.contains_key(id) || behavior.added.contains_key(id);
+        let mut relevant = changed;
+        for child in pointers(text, id) {
+            if behavior.text(&child).is_some() {
+                relevant |= visit(behavior, &child, memo);
+            }
+        }
+        memo.insert(id.to_string(), relevant);
+        relevant
+    }
+    let mut memo = fast_hash::HashMap::default();
+    visit(behavior, root, &mut memo);
+    memo.into_iter().filter(|(_, relevant)| *relevant).map(|(id, _)| id).collect()
+}
+
+/// `id` -> the objects pointing to it, for every new object (to show where it is linked).
+pub(super) fn new_object_parents(behavior: &Behavior) -> fast_hash::HashMap<String, Vec<String>> {
+    let mut parents: fast_hash::HashMap<String, Vec<String>> = fast_hash::HashMap::default();
+    let ids = behavior.added.keys().chain(behavior.objects.iter().map(|o| &o.id));
+    for id in ids {
+        let Some(text) = behavior.text(id) else { continue };
+        for target in pointers(text, id) {
+            if behavior.added.contains_key(&target) {
+                parents.entry(target).or_default().push(id.clone());
+            }
+        }
+    }
+    parents
+}
 struct Walk<'a> {
     behavior: &'a Behavior,
     selected: &'a mut Option<String>,
@@ -64,6 +134,8 @@ struct Walk<'a> {
     path: Vec<String>,
     /// Nodes already drawn this frame.
     shown: HashSet<String>,
+    /// `changed_only`: the nodes to show.
+    relevant: Option<&'a HashSet<String>>,
 }
 
 impl Walk<'_> {
@@ -73,8 +145,11 @@ impl Walk<'_> {
         let label = egui::RichText::new(label(behavior, id, text)).monospace();
         let is_selected = self.selected.as_deref() == Some(id);
 
-        let children: Vec<String> =
-            pointers(text, id).into_iter().filter(|child| behavior.text(child).is_some()).collect();
+        let children: Vec<String> = pointers(text, id)
+            .into_iter()
+            .filter(|child| behavior.text(child).is_some())
+            .filter(|child| self.relevant.is_none_or(|r| r.contains(child)))
+            .collect();
         let seen = !self.shown.insert(id.to_string());
         if children.is_empty() || seen {
             let label = if seen { label.weak() } else { label };
@@ -92,7 +167,8 @@ impl Walk<'_> {
         let mut collapsing = egui::collapsing_header::CollapsingState::load_with_default_open(
             ui.ctx(),
             state_id,
-            self.path.is_empty(),
+            // The changed branches start open.
+            self.path.is_empty() || self.relevant.is_some(),
         );
         if let Some(request) = &self.state.expand_all
             && self.path.len() >= request.path.len().saturating_sub(1)

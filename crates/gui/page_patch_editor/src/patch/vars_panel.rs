@@ -31,6 +31,8 @@ pub(super) struct Names {
     template_variables: usize,
     /// `(id, "class name")` for the `#` completion (new objects change it too).
     pub(super) pointers: Vec<(String, String)>,
+    /// New object -> the objects pointing to it (where it is linked).
+    pub(super) parents: fast_hash::HashMap<String, Vec<String>>,
 }
 
 /// Inputs of the "add" rows.
@@ -228,8 +230,9 @@ impl PatchTool {
 
 fn names_of(behavior: &super::Behavior) -> Names {
     let pointers = super::language::pointer_items(behavior);
+    let parents = super::tree::new_object_parents(behavior);
     let Some(id) = behavior.object_of_class(STRING_DATA) else {
-        return Names { pointers, ..Names::default() };
+        return Names { pointers, parents, ..Names::default() };
     };
     let current = behavior.text(id).unwrap_or_default();
     let template = behavior.template_object(id).map(|o| o.text.as_str()).unwrap_or_default();
@@ -239,6 +242,7 @@ fn names_of(behavior: &super::Behavior) -> Names {
         template_events: vars::names(template, "eventNames").len(),
         template_variables: vars::names(template, "variableNames").len(),
         pointers,
+        parents,
     }
 }
 

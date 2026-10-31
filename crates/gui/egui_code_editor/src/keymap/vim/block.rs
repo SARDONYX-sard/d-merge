@@ -7,8 +7,9 @@
 //! r<c> replace every char      ~ u U  change case     > <  shift the lines
 //! o    other corner            O  other side on the same line
 //! ```
-//! Columns are char columns. egui has a single text selection, so the editor draws the block
-//! itself from [`VimState::block_ranges`].
+//! Columns are display columns (a tab reaches the next multiple of [`TAB_WIDTH`]), like Vim's
+//! `virtcol`: lines with tabs and lines with spaces line up. egui has a single text selection, so
+//! the editor draws the block itself from [`VimState::block_ranges`].
 
 use std::ops::Range;
 
@@ -17,20 +18,47 @@ use super::{
     registers::Register,
 };
 
+/// Width of a tab in display columns (egui's monospace tab).
+pub(crate) const TAB_WIDTH: usize = 4;
+
+/// Display column of char `col` of `line` (a tab advances to the next multiple of [`TAB_WIDTH`]).
+fn vcol(line: &[char], col: usize) -> usize {
+    line.iter()
+        .take(col)
+        .fold(0, |v, &c| if c == '\t' { (v / TAB_WIDTH + 1) * TAB_WIDTH } else { v + 1 })
+}
+
+/// The char of `line` covering display column `target` (`line.len()` past the end).
+fn col_at(line: &[char], target: usize) -> usize {
+    let mut v = 0;
+    for (i, &c) in line.iter().enumerate() {
+        let next = if c == '\t' { (v / TAB_WIDTH + 1) * TAB_WIDTH } else { v + 1 };
+        if target < next {
+            return i;
+        }
+        v = next;
+    }
+    line.len()
+}
+
 /// Text typed in Insert mode after `I` / `A` / `c` on a block, to be copied to the other lines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct BlockInsert {
     /// The other lines (the first one gets the typed text directly).
     lines: (usize, usize),
+    /// Display column.
     column: usize,
     /// `A`: short lines are padded with spaces up to `column` (`I` skips them).
     append: bool,
 }
 
 impl VimState {
-    /// The block: (first line, last line, first column, last column), all inclusive.
+    /// The block: (first line, last line, first display column, last display column), inclusive.
     fn block(&self, buf: &Buffer) -> (usize, usize, usize, usize) {
-        let pos = |i: usize| (buf.line_of(i), i - buf.line_start(i));
+        let pos = |i: usize| {
+            let start = buf.line_start(i);
+            (buf.line_of(i), vcol(&buf.chars[start..i], i - start))
+        };
         let ((l1, c1), (l2, c2)) = (pos(self.anchor), pos(self.cursor));
         (l1.min(l2), l1.max(l2), c1.min(c2), c1.max(c2))
     }
@@ -41,8 +69,8 @@ impl VimState {
         (first..=last)
             .map(|line| {
                 let start = buf.nth_line_start(line);
-                let len = buf.line_end(start) - start;
-                (start + left.min(len))..(start + (right + 1).min(len))
+                let chars = &buf.chars[start..buf.line_end(start)];
+                (start + col_at(chars, left))..(start + (col_at(chars, right) + 1).min(chars.len()))
             })
             .collect()
     }
@@ -106,7 +134,8 @@ impl VimState {
     fn leave_block(&mut self, column: usize, line: usize, exec: &Exec) {
         self.mode = Mode::Normal;
         let start = exec.buf.nth_line_start(line);
-        self.cursor = exec.buf.clamp_normal(start + column.min(exec.buf.line_end(start) - start));
+        let chars = &exec.buf.chars[start..exec.buf.line_end(start)];
+        self.cursor = exec.buf.clamp_normal(start + col_at(chars, column));
     }
 
     /// The block as text: its lines joined by `\n`.
@@ -184,11 +213,13 @@ impl VimState {
         exec: &mut Exec,
     ) {
         let start = exec.buf.nth_line_start(first);
-        let len = exec.buf.line_end(start) - start;
-        if append && len < column {
-            exec.edit(self.cursor, start + len..start + len, &" ".repeat(column - len));
+        let end = exec.buf.line_end(start);
+        let width = vcol(&exec.buf.chars[start..end], end - start);
+        if append && width < column {
+            exec.edit(self.cursor, end..end, &" ".repeat(column - width));
         }
-        self.cursor = start + column.min(exec.buf.line_end(start) - start);
+        let chars = &exec.buf.chars[start..exec.buf.line_end(start)];
+        self.cursor = start + col_at(chars, column);
         self.mode = Mode::Insert;
         self.block_insert =
             (last > first).then_some(BlockInsert { lines: (first + 1, last), column, append });
@@ -206,14 +237,16 @@ impl VimState {
         exec.snapshot(self.cursor);
         for line in (first..=last).rev() {
             let start = exec.buf.nth_line_start(line);
-            let len = exec.buf.line_end(start) - start;
-            if len < column {
+            let end = exec.buf.line_end(start);
+            let width = vcol(&exec.buf.chars[start..end], end - start);
+            if width < column {
                 if !append {
                     continue; // `I` skips lines that end before the block
                 }
-                exec.buf.replace(start + len..start + len, &" ".repeat(column - len));
+                exec.buf.replace(end..end, &" ".repeat(column - width));
             }
-            exec.buf.replace(start + column..start + column, text);
+            let at = start + col_at(&exec.buf.chars[start..exec.buf.line_end(start)], column);
+            exec.buf.replace(at..at, text);
         }
         exec.output.changed = true;
     }
@@ -263,6 +296,14 @@ mod tests {
 
     fn block(anchor: usize, cursor: usize) -> VimState {
         VimState { mode: Mode::VisualBlock, anchor, cursor, ..VimState::default() }
+    }
+
+    #[test]
+    fn tabs_line_up_with_spaces() {
+        // `\tab` and `    cd`: column 4 is `a` on the first line and `c` on the second.
+        let e = exec("\tab\n    cd");
+        let vim = block(1, 8); // `a` (char 1) .. `c` (char 8: line 2 starts at 4, then 4 spaces)
+        assert_eq!(vim.block_ranges_in(&e.buf), vec![1..2, 8..9]);
     }
 
     #[test]

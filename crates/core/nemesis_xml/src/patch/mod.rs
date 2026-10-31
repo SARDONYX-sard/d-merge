@@ -274,31 +274,6 @@ impl<'de> PatchDeserializer<'de> {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// non Array or Struct(Object)
-    /// - Bool
-    /// - I64
-    /// - U64
-    /// - F64
-    /// - Null
-    /// - Pointer
-    /// - String
-    fn parse_plane_value(&mut self, field_type: FieldType) -> Result<BorrowedValue<'de>> {
-        use TypeKind as K;
-        let value = match field_type.kind {
-            K::Void => BorrowedValue::Static(StaticNode::Null),
-            K::Int8 | K::Int16 | K::Int32 | K::Int64 => self.parse_i64()?,
-            K::Uint8 | K::Uint16 | K::Uint32 | K::Uint64 | K::Ulong => self.parse_u64()?,
-            K::Real | K::Half => self.parse_next(real.map(|real| real.into()))?,
-            _ if field_type.is_string() => self.parse_string_ptr()?, // StringPtr | CString | enum
-            K::Pointer => self.parse_next(pointer)?,
-            K::Bool => self.parse_next(boolean.map(|boolean| boolean.into()))?,
-            unknown => {
-                return Err(Error::UnknownFieldType { field_type: format!("{unknown:?}") });
-            }
-        };
-        Ok(value)
-    }
-
     /// Parse [`i64`]
     fn parse_i64(&mut self) -> Result<BorrowedValue<'de>> {
         let event_parser = event_id.map(|s| s.into());
@@ -495,7 +470,16 @@ impl<'de> PatchDeserializer<'de> {
             K::Struct => self.class_in_field(field_type.class.ok_or(Error::MissingFieldInfo)?)?,
             K::Variant => self.class_in_field("Variant")?,
             K::Array | K::SimpleArray => self.parse_array(field_type.element())?,
-            _ => self.parse_plane_value(field_type)?,
+
+            // plain value
+            K::Void => BorrowedValue::Static(StaticNode::Null),
+            K::Int8 | K::Int16 | K::Int32 | K::Int64 => self.parse_i64()?,
+            K::Uint8 | K::Uint16 | K::Uint32 | K::Uint64 | K::Ulong => self.parse_u64()?,
+            K::Real | K::Half => self.parse_next(real.map(|real| real.into()))?,
+            _ if field_type.is_string() => self.parse_string_ptr()?, // StringPtr | CString | enum
+            K::Pointer => self.parse_next(pointer)?,
+            K::Bool => self.parse_next(boolean.map(|boolean| boolean.into()))?,
+            unknown => return Err(Error::UnknownFieldType { field_type: format!("{unknown:?}") }),
         };
 
         Ok(value)

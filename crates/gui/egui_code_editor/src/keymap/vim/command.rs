@@ -228,6 +228,8 @@ pub(super) enum Simple {
     Hover,
     /// `gx`: open the URL under the cursor.
     OpenUrl,
+    /// `gd` / `gD`: ask the host to go to the definition / list the references.
+    GoTo { references: bool },
     /// `Ctrl+A` (`up`) / `Ctrl+X`: add / subtract `count` to the number at or after the cursor
     Increment { up: bool },
     /// `m<c>`

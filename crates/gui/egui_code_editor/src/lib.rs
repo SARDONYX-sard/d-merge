@@ -87,6 +87,14 @@ impl Default for EditorFeatures {
 pub enum EditorCommand {
     /// e.g., Vim `:w`.
     Save,
+    /// Vim `gd`: go to the definition of the symbol under the cursor.
+    GoToDefinition,
+    /// Vim `gD`: find the references of the symbol under the cursor.
+    FindReferences,
+    /// Vim `Ctrl+O` past the oldest jump of this text: back to the previous document / object.
+    JumpBack,
+    /// Vim `Ctrl+I` past the newest jump: forward again.
+    JumpForward,
 }
 
 /// Per-document state that is not part of the text. Keep one per open document.
@@ -124,6 +132,10 @@ pub struct CodeEditorOutput {
     pub cursor: Option<LinePos>,
     /// Request for the host, e.g., Vim `:w`.
     pub command: Option<EditorCommand>,
+    /// The text area's response (e.g., to add a right-click menu).
+    pub response: egui::Response,
+    /// The char under the mouse pointer (a right click does not move the cursor there).
+    pub pointer: Option<LinePos>,
 }
 
 /// Language used when none is given: no colors, no completion, ...
@@ -390,8 +402,12 @@ impl<'a> CodeEditor<'a> {
                 ui.scroll_to_rect(cursor, Some(egui::Align::Center));
             } else {
                 match keys.scroll {
-                    Some(Scroll::IntoView) => ui.scroll_to_rect(cursor, None),
-                    Some(Scroll::Align(align)) => ui.scroll_to_rect(cursor, Some(align)),
+                    // Keymap moves (Vim `gg`, `G`, `zz`, ...) jump at once: an animation is slow
+                    // over a long distance.
+                    Some(Scroll::IntoView) => ui.scroll_to_rect_animation(cursor, None, instant()),
+                    Some(Scroll::Align(align)) => {
+                        ui.scroll_to_rect_animation(cursor, Some(align), instant());
+                    }
                     Some(Scroll::Lines(lines)) => {
                         let row_height =
                             galley.rows.first().map_or(16.0, |row| row.rect().height());
@@ -438,7 +454,17 @@ impl<'a> CodeEditor<'a> {
             overlays::signature_box(ui.ctx(), id, anchor, language, text, cursor);
         }
 
-        CodeEditorOutput { changed, cursor, command: keys.command }
+        let pointer = response.hover_pos().map(|pos| {
+            let index = galley.cursor_from_pos(pos - galley_pos).index.0;
+            LinePos::from_char_index(text, index)
+        });
+        CodeEditorOutput {
+            changed,
+            cursor,
+            command: keys.command,
+            response: response.clone(),
+            pointer,
+        }
     }
 }
 
@@ -490,4 +516,9 @@ fn set_selection(ctx: &egui::Context, id: egui::Id, range: std::ops::Range<usize
     )));
     state.store(ctx, id);
     ctx.memory_mut(|mem| mem.request_focus(id));
+}
+
+/// No scroll animation.
+fn instant() -> egui::style::ScrollAnimation {
+    egui::style::ScrollAnimation::none()
 }

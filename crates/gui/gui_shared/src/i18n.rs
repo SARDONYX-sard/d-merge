@@ -637,6 +637,12 @@ pub enum I18nKey {
     /// Copy id
     NemesisCopyId,
 
+    /// Go to Definition
+    NemesisGoToDefinition,
+
+    /// Find References
+    NemesisFindReferences,
+
     /// Tree
     NemesisTreeView,
 

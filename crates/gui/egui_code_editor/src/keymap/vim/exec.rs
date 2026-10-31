@@ -13,7 +13,10 @@ use super::{
     motion::Kind,
     prompt::{Prompt, PromptKind},
 };
-use crate::keymap::{KeymapOutput, Scroll};
+use crate::{
+    EditorCommand,
+    keymap::{KeymapOutput, Scroll},
+};
 
 /// Mutable context while running a batch of keys.
 pub(super) struct Exec {
@@ -223,6 +226,13 @@ impl VimState {
             Simple::SearchWord { forward, whole } => self.search_word(forward, whole, &exec.buf),
             Simple::Hover => exec.output.show_hover = true,
             Simple::OpenUrl => self.open_url(exec),
+            Simple::GoTo { references } => {
+                exec.output.command = Some(if references {
+                    EditorCommand::FindReferences
+                } else {
+                    EditorCommand::GoToDefinition
+                });
+            }
             Simple::Increment { up } => self.increment(count, up, exec),
             Simple::SetMark(name) => self.marks.set(name, cur),
             Simple::Record(name) => {
@@ -234,6 +244,11 @@ impl VimState {
             Simple::Jump { older } => {
                 if let Some(at) = self.marks.walk(older, cur) {
                     self.cursor = exec.buf.clamp_normal(at.min(exec.buf.len()));
+                } else {
+                    // No more jumps in this text: the host may go back to another one.
+                    let command =
+                        if older { EditorCommand::JumpBack } else { EditorCommand::JumpForward };
+                    exec.output.command = Some(command);
                 }
             }
             Simple::ScrollCursor { to, first_non_blank } => {
