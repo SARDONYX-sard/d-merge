@@ -1,0 +1,23 @@
+[package]
+name = "hkx_io"
+version = "0.1.0"
+description = "D merge core: the single place that (de)serializes havok classes (keeps the binary small)"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim", "havok"]
+license = "MIT OR Apache-2.0"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+havok_types = { workspace = true }
+rmp-serde = { workspace = true }
+serde_hkx = { workspace = true }
+serde_hkx_features = { workspace = true, features = ["json", "serde_default"] }
+simd-json = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,34 @@
+[package]
+name = "serde_hkx_for_gui"
+version = "0.1.0"
+description = "hkx conversion / annotation helpers used by the GUI"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["tracing"]
+license = "MIT OR Apache-2.0"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+futures = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_repr = { workspace = true }
+snafu = { workspace = true }
+tokio = { workspace = true }
+
+havok_classes = { workspace = true }
+havok_types = { workspace = true }
+serde_hkx_features = { workspace = true, features = ["json"] }
+
+# workspace members
+hkx_io = { workspace = true }
+node_expr = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

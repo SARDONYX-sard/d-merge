@@ -1,0 +1,226 @@
+use fast_hash::HashMap;
+use rayon::prelude::*;
+
+use crate::{
+    adsf::{
+        alt::{AltAdsf, AltAnimData, to_adsf_key},
+        clip_id_manager::ClipIdManager,
+        normal::{
+            AnimDataHeader,
+            ser::{serialize_clip_anim_block, serialize_clip_motion_block},
+        },
+    },
+    diff_line::DiffLines,
+};
+
+/// Serializes to `animationdatasinglefile.txt` string.
+///
+/// # Errors
+/// Returns an error if serialization fails.
+pub fn serialize_alt_adsf(
+    alt_adsf: AltAdsf,
+    project_names_patches: Option<DiffLines>,
+) -> Result<String, SerializeError> {
+    let mut output = String::new();
+
+    let mut project_names: Vec<_> =
+        alt_adsf.0.par_iter().map(|(k, _)| to_adsf_key(k.clone())).collect();
+
+    if let Some(patches) = project_names_patches {
+        patches.into_apply(&mut project_names)?;
+    }
+
+    // Serialize project names
+    output.push_str(&format!("{}\r\n", project_names.len()));
+    for name in &project_names {
+        output.push_str(name.as_ref());
+        output.push_str("\r\n");
+    }
+
+    // Serialize in the order of project_names.
+    // NOTE: Any additions to the project headers will be reflected.
+    let mut clip_id_manager = crate::adsf::clip_id_manager::ClipIdManager::new_vanilla();
+    let mut clip_id_map = HashMap::default(); // TODO: clip id unique check - It did not crash even if the number of `anim_data` and `motion_data` did not match.
+
+    // NOTE: Since we reverted to the vanilla style name for serialization,
+    // we must mode the key to reference alt_adsf. This is the procedure for that.
+    let mut counter = HashMap::<_, _>::default();
+    for name in project_names {
+        let name_str = name.as_ref();
+        let base = name_str.strip_suffix(".txt").unwrap_or(name_str);
+        let count = counter.entry(base.to_string()).or_insert(1);
+        let name = if *count == 1 { format!("{base}~1") } else { format!("{base}~{count}") };
+
+        let anim_data = alt_adsf
+            .0
+            .get(name.as_str())
+            .ok_or_else(|| SerializeError::MissingAnimData { name })?;
+
+        output.push_str(&serialize_anim_data(anim_data, &mut clip_id_manager, &mut clip_id_map)?);
+    }
+
+    Ok(output)
+}
+
+/// Serializes animation data into a string.
+///
+/// # Errors
+/// Returns an error if serialization fails.
+fn serialize_anim_data<'a>(
+    anim_data: &'a AltAnimData<'a>,
+    clip_id_manager: &mut ClipIdManager,
+    clip_id_map: &mut HashMap<&'a str, usize>,
+) -> Result<String, SerializeError> {
+    let mut output = String::new();
+
+    let base_len = anim_data.clip_anim_blocks.len();
+    let add_clip_len = anim_data.add_clip_anim_blocks.len();
+    // NOTE: Due to the addition of patches, motion may sometimes be present.
+    // Therefore, ignore the header's `has_motion_data` field and determine based on the actual presence of data
+    let has_motion_data = !(base_len == 0 && add_clip_len == 0);
+
+    // Serialize header
+    output.push_str(&serialize_anim_header(
+        &anim_data.header,
+        has_motion_data,
+        anim_data.to_line_range(),
+    ));
+
+    for block in &anim_data.add_clip_anim_blocks {
+        let new_id = clip_id_manager.next_id();
+        if let Some(new_id) = new_id {
+            clip_id_map.insert(&block.clip_id, new_id);
+        } else {
+            return Err(SerializeError::ClipIdLimitReached { base_len, needed: add_clip_len });
+        }
+        output.push_str(&serialize_clip_anim_block(block, new_id.map(|id| id.to_string().into())));
+    }
+
+    for (_, block) in &anim_data.clip_anim_blocks {
+        output.push_str(&serialize_clip_anim_block(block, None));
+    }
+
+    let clip_motion_blocks_line_len = anim_data.clip_motion_blocks_line_len();
+    if clip_motion_blocks_line_len > 0 {
+        output.push_str(&format!("{clip_motion_blocks_line_len}\r\n"));
+    };
+    if has_motion_data {
+        for block in &anim_data.add_clip_motion_blocks {
+            if let Some(&new_id) = clip_id_map.get(block.clip_id.as_ref()) {
+                output
+                    .push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
+            } else {
+                let new_id = clip_id_manager.next_id();
+                output.push_str(&serialize_clip_motion_block(
+                    block,
+                    new_id.map(|id| id.to_string().into()),
+                ));
+            }
+        }
+
+        for (_, block) in &anim_data.clip_motion_blocks {
+            output.push_str(&serialize_clip_motion_block(block, None));
+        }
+    }
+
+    Ok(output)
+}
+
+fn serialize_anim_header(
+    header: &AnimDataHeader,
+    has_motion_data: bool,
+    line_range: usize,
+) -> String {
+    let mut output = String::new();
+
+    output.push_str(&line_range.to_string());
+    output.push_str("\r\n");
+    output.push_str(&header.lead_int);
+    output.push_str("\r\n");
+    output.push_str(&header.project_assets.len().to_string());
+    output.push_str("\r\n");
+
+    for asset in &header.project_assets {
+        output.push_str(asset.as_ref());
+        output.push_str("\r\n");
+    }
+    output.push(if has_motion_data { '1' } else { '0' });
+    output.push_str("\r\n");
+
+    output
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum SerializeError {
+    #[snafu(display(
+        "Clip ID allocation failed: base({base_len})) {needed} IDs needed but maximum i16 value is 32767. \
+         Consider reducing the number of clips or splitting animations.",
+    ))]
+    ClipIdLimitReached { base_len: usize, needed: usize },
+
+    #[snafu(transparent)]
+    DiffLine { source: crate::diff_line::error::Error },
+
+    /// Missing project name: `{name}`
+    MissingAnimData { name: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
+        if input.contains("\r\n") {
+            input.into()
+        } else {
+            input.replace("\r", "").replace("\n", "\r\n").into()
+        }
+    }
+
+    #[test]
+    fn test_serialize_alt_adsf() {
+        let alt_adsf_bytes = include_bytes!(
+            "../../../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
+        );
+        let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
+        let actual = serialize_alt_adsf(alt_adsf, None).unwrap();
+
+        let expected = normalize_to_crlf(include_str!(
+            "../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
+        ));
+        let res = dbg!(actual == expected);
+        if !res {
+            let diff = ::diff::diff(&actual, &expected);
+            std::fs::write("../../../dummy/debug/animationdatasinglefile.diff", diff).unwrap();
+            panic!("actual != expected");
+        }
+        assert!(res);
+    }
+
+    #[test]
+    fn alt_adsf_keeps_max_clip_id() {
+        use crate::adsf::alt::AltAdsf;
+
+        let input = include_str!(
+            "../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
+        );
+        let adsf = crate::adsf::normal::de::parse_adsf(input).unwrap_or_else(|err| {
+            panic!("Failed to parse adsf:\n{err}");
+        });
+        let alt_adsf: AltAdsf = adsf.into();
+
+        fn max_clip_id(adsf: &AltAdsf) -> Option<u64> {
+            adsf.0
+                .par_values()
+                .filter_map(|anim_data| {
+                    anim_data
+                        .clip_anim_blocks
+                        .par_values()
+                        .filter_map(|block| block.clip_id.parse::<u64>().ok())
+                        .max()
+                })
+                .max()
+        }
+        assert_eq!(max_clip_id(&alt_adsf).unwrap(), 1655);
+    }
+}

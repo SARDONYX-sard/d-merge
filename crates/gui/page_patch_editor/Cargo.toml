@@ -1,0 +1,39 @@
+[package]
+name = "page_patch_editor"
+version.workspace = true
+description = "D Merge GUI: Patch Editor page (Skyrim CRC32 of texts and Nemesis mod animation paths, ...)"
+
+authors.workspace = true
+categories = ["gui"]
+edition.workspace = true
+keywords = ["skyrim", "egui"]
+license = "GPL-3.0-or-later"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+egui = { workspace = true }
+phf = { workspace = true }
+rmp-serde = { workspace = true }
+
+# workspace members
+fast_hash = { workspace = true }
+behavior_merge_types = { workspace = true }
+egui_code_editor = { workspace = true }
+egui_widgets = { workspace = true }
+gui_shared = { workspace = true }
+hkx_io = { workspace = true }
+nemesis_diff = { workspace = true }
+skyrim_anim_data = { workspace = true }
+skyrim_crc = { workspace = true }
+
+# NOTE: Same as the app crate: rfd differs per OS (Linux needs the xdg portal backend).
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.17.2", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd = { version = "0.15.4", features = ["xdg-portal"] }
+
+[lints]
+workspace = true

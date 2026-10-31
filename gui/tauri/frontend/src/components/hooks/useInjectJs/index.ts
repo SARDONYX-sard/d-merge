@@ -1,1 +1,0 @@
-export { useInjectJs } from './useInjectJs';

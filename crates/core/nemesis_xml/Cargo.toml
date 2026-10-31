@@ -1,0 +1,38 @@
+[package]
+name = "nemesis_xml"
+version = "0.1.0"
+description = "D merge core"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim"]
+license = "MIT OR Apache-2.0"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fast_hash = { workspace = true }
+phf = { workspace = true, features = ["macros"] }
+rayon = { workspace = true }
+serde_hkx = { workspace = true }
+simd-json = { workspace = true }
+snafu = { workspace = true }
+tracing = { workspace = true, optional = true }
+winnow = { workspace = true }
+winnow_ext = { workspace = true }
+
+# workspace members
+json_patch = { workspace = true }
+
+[dev-dependencies]
+# quick_tracing = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+# default = ["tracing"] # for debug
+
+tracing = ["dep:tracing"]

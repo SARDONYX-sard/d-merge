@@ -1,0 +1,23 @@
+[package]
+name = "nemesis_diff"
+version = "0.1.0"
+description = "D merge core: Nemesis behavior patch (`#XXXX.txt`) generation from a template xml and an edited copy"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim", "nemesis"]
+license = "MIT OR Apache-2.0"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+imara-diff = "0.2.0"
+
+# workspace members
+fast_hash = { workspace = true }
+nemesis_xml = { workspace = true }
+
+[lints]
+workspace = true

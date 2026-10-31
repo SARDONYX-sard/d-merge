@@ -18,24 +18,6 @@ jobs:
       matrix:
         include:
           # --------------------
-          # Tauri
-          # --------------------
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            kind: tauri
-            art_name: d_merge-tauri-aarch64-apple-darwin
-
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            kind: tauri
-            art_name: d_merge-tauri-x86_64-pc-windows-msvc
-
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            kind: tauri
-            art_name: d_merge-tauri-x86_64-unknown-linux-gnu
-
-          # --------------------
           # egui
           # --------------------
           - target: aarch64-apple-darwin
@@ -65,18 +47,12 @@ jobs:
         with:
           platform: ${{ matrix.os }}
           build_profile: ${{ env.BUILD_PROFILE }}
-          install_front_deps: ${{ matrix.kind == 'tauri' && 'true' || 'false' }}
 
       # ----------------------------
       # build switch
       # ----------------------------
-      - name: Build GUI (tauri)
-        if: matrix.kind == 'tauri'
-        run: npm run build:${{ env.BUILD_PROFILE }}
-
       - name: Build GUI (egui)
-        if: matrix.kind == 'egui'
-        run: cargo build -p d_merge_egui --profile ${{ env.BUILD_PROFILE }}
+        run: cargo build -p d_merge --profile ${{ env.BUILD_PROFILE }}
 
       # ----------------------------
       # move output (existing logic)
@@ -84,7 +60,7 @@ jobs:
       - name: Move exe -> ./build
         uses: ./.github/actions/setup-release
         with:
-          app_name: ${{ matrix.kind == 'tauri' && 'd_merge' || 'd_merge_egui' }}
+          app_name: d_merge
           build_profile: ${{ env.BUILD_PROFILE }}
 
       - name: Upload artifact

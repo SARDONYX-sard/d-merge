@@ -1,0 +1,52 @@
+[package]
+name = "fnis_patch_gen"
+version = "0.1.0"
+description = "D merge core: generates behavior patches from FNIS mods (FNIS_*_List.txt)"
+
+authors.workspace = true
+categories = ["development-tools"]
+edition.workspace = true
+keywords = ["skyrim", "fnis"]
+license = "GPL-3.0-or-later"
+readme = "../../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+dashmap = { workspace = true, features = ["rayon", "serde"] }
+fast_hash = { workspace = true }
+havok_classes = { workspace = true }
+indexmap = { workspace = true }
+phf = { workspace = true, features = ["macros"] }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_hkx = { workspace = true }
+serde_hkx_features = { workspace = true, features = ["json", "serde_default"] }
+simd-json = { workspace = true }
+snafu = { workspace = true }
+sonic-rs = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true, optional = true }
+winnow = { workspace = true }
+winnow_ext = { workspace = true }
+
+# workspace members
+hkx_io = { workspace = true }
+auto_charset = { workspace = true }
+fnis_list = { workspace = true }
+json_patch = { workspace = true, features = ["serde"] }
+jwalk_glob = { workspace = true }
+behavior_merge_types = { workspace = true }
+skyrim_anim_data = { workspace = true, features = ["alt_map", "serde"] }
+skyrim_crc = { workspace = true }
+skyrim_esp = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true
+
+[features]
+default = ["tracing"]
+tracing = ["dep:tracing", "behavior_merge_types/tracing"]
