@@ -58,7 +58,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         (FNIS_AA_GLOBAL_AUTO_GEN_2528, 543, None), // AnimObjectUnequip
         (FNIS_AA_GLOBAL_AUTO_GEN_2530, 1061, Some(FNIS_AA_STRING_PAYLOAD_2531)), // StartAnimatedCamera
         (FNIS_AA_GLOBAL_AUTO_GEN_2532, 1062, None), // EndAnimatedCamera
-        (FNIS_AA_GLOBAL_AUTO_GEN_2533, 915, None),  // PairedKillTarget
+        (FNIS_AA_GLOBAL_AUTO_GEN_2533, 915, None), // PairedKillTarget
     ];
 
     let mut patches: JsonPatchPairs<'a> = SINGLE_EVENTS

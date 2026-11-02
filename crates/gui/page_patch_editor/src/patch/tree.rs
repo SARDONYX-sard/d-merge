@@ -43,37 +43,24 @@ pub(super) fn tree_ui(
     state: &mut TreeState,
     changed_only: bool,
 ) {
-    let root = behavior
-        .object_of_class("hkRootLevelContainer")
-        .or_else(|| behavior.objects.first().map(|o| o.id.as_str()));
+    let root =
+        behavior.object_of_class("hkRootLevelContainer").or_else(|| behavior.objects.first().map(|o| o.id.as_str()));
     let Some(root) = root else { return };
     let relevant = changed_only.then(|| leads_to_change(behavior, root));
-    let mut walk = Walk {
-        behavior,
-        selected,
-        state,
-        path: Vec::new(),
-        shown: HashSet::default(),
-        relevant: relevant.as_ref(),
-    };
+    let mut walk =
+        Walk { behavior, selected, state, path: Vec::new(), shown: HashSet::default(), relevant: relevant.as_ref() };
     walk.node(ui, root);
 
     // New objects the tree does not reach: link them from somewhere to make them count.
-    let mut unlinked: Vec<&String> =
-        behavior.added.keys().filter(|id| !walk.shown.contains(id.as_str())).collect();
+    let mut unlinked: Vec<&String> = behavior.added.keys().filter(|id| !walk.shown.contains(id.as_str())).collect();
     if !unlinked.is_empty() {
         unlinked.sort();
         ui.separator();
         ui.colored_label(ui.visuals().warn_fg_color, format!("⚠ Not linked ({})", unlinked.len()))
             .on_hover_text("New objects no object in the tree points to (Nemesis ignores them).");
         for id in unlinked {
-            let text =
-                egui::RichText::new(label(behavior, id, behavior.text(id).unwrap_or_default()))
-                    .monospace();
-            if ui
-                .add(egui::Button::selectable(walk.selected.as_deref() == Some(id), text))
-                .clicked()
-            {
+            let text = egui::RichText::new(label(behavior, id, behavior.text(id).unwrap_or_default())).monospace();
+            if ui.add(egui::Button::selectable(walk.selected.as_deref() == Some(id), text)).clicked() {
                 *walk.selected = Some(id.clone());
             }
         }
@@ -258,8 +245,7 @@ mod tests {
 
     #[test]
     fn finds_pointers() {
-        let text =
-            "<hkobject name=\"#0106\" class=\"x\">\n#0105 #0109\n#mymod$0 #0105\n</hkobject>\n";
+        let text = "<hkobject name=\"#0106\" class=\"x\">\n#0105 #0109\n#mymod$0 #0105\n</hkobject>\n";
         assert_eq!(pointers(text, "#0106"), ["#0105", "#0109", "#mymod$0"]);
     }
 }

@@ -71,30 +71,33 @@ pub(crate) fn parse_anim_var_line<'a>(input: &mut &'a str) -> ModalResult<AnimVa
 /// Parse the value portion: `[ BOOL | INT32 | REAL ] <value>`
 fn parse_value<'a>(input: &mut &'a str) -> ModalResult<Value> {
     alt((
-        move |input: &mut &'a str|{
-            let (v,) = seq!{
+        move |input: &mut &'a str| {
+            let (v,) = seq! {
                 _: Caseless("BOOL"),
                 _: space1,
                 alt(("0".value(false), "1".value(true))).map(Value::Bool).context(StrContext::Label("value: 0 | 1"))
-            }.parse_next(input)?;
+            }
+            .parse_next(input)?;
             Ok(v)
         },
-        move |input: &mut &'a str|{
-            let (v,) = seq!{
+        move |input: &mut &'a str| {
+            let (v,) = seq! {
                 _: Caseless("INT32"),
                 _: space1,
                 dec_int.map(Value::Int32).context(StrContext::Label("value: i32")),
-            }.parse_next(input)?;
+            }
+            .parse_next(input)?;
             Ok(v)
         },
-        move |input: &mut &'a str|{
-            let (v,) = seq!{
+        move |input: &mut &'a str| {
+            let (v,) = seq! {
                 _: Caseless("REAL"),
                 _: space1,
                 float.map(Value::Real).context(StrContext::Label("value: f32")),
-            }.parse_next(input)?;
+            }
+            .parse_next(input)?;
             Ok(v)
-        }
+        },
     ))
     .context(StrContext::Label("value"))
     .context(StrContext::Expected(StrContextValue::StringLiteral("BOOL")))

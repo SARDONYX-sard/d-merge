@@ -25,7 +25,7 @@ pub enum SelectionType {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum OutFormat {
+pub enum OutputFormat {
     /// 64-bit hkx (Skyrim SE/AE).
     #[default]
     Amd64,
@@ -37,7 +37,7 @@ pub enum OutFormat {
     Json,
 }
 
-impl OutFormat {
+impl OutputFormat {
     /// All variants in UI order.
     pub const ALL: [Self; 4] = [Self::Amd64, Self::Win32, Self::Xml, Self::Json];
 
@@ -86,5 +86,5 @@ pub struct ConvertSettings {
     pub output: String,
 
     /// Output format.
-    pub format: OutFormat,
+    pub format: OutputFormat,
 }

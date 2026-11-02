@@ -69,10 +69,7 @@ impl ThemeCache {
         {
             let names = self.names.read();
             if !names.iter().any(|n| n == name) {
-                return Err(Error::Io {
-                    path: name.into(),
-                    source: std::io::Error::new(ErrorKind::NotFound, ""),
-                });
+                return Err(Error::Io { path: name.into(), source: std::io::Error::new(ErrorKind::NotFound, "") });
             }
         }
 
@@ -159,11 +156,7 @@ fn scan_names(dir: &Path) -> Vec<String> {
         .flatten()
         .filter_map(|e| {
             let path = e.path();
-            if path.extension()?.to_str()? == "json" {
-                Some(path.file_stem()?.to_str()?.to_owned())
-            } else {
-                None
-            }
+            if path.extension()?.to_str()? == "json" { Some(path.file_stem()?.to_str()?.to_owned()) } else { None }
         })
         .collect();
 

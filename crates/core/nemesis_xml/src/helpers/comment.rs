@@ -52,9 +52,7 @@ pub(crate) fn close_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<
     let kind_parser = {
         let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
 
-        let ignore_parser = delimited_multispace0(
-            (take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take(),
-        );
+        let ignore_parser = delimited_multispace0((take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take());
 
         alt((
             original_parser.value(CommentKind::Original),
@@ -78,11 +76,8 @@ pub(crate) fn close_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 pub(crate) fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // NOTE: The comment `<! -- UNKNOWN BITS -->` in hkFlags,
     //       so the only way is to match the comment exactly.
-    terminated(
-        winnow_ext::take_until_ext(0.., Caseless("<!-- CLOSE -->")),
-        Caseless("<!-- CLOSE -->"),
-    )
-    .parse_next(input)
+    terminated(winnow_ext::take_until_ext(0.., Caseless("<!-- CLOSE -->")), Caseless("<!-- CLOSE -->"))
+        .parse_next(input)
 }
 
 #[cfg(test)]
@@ -91,10 +86,7 @@ mod tests {
 
     #[test]
     fn test_comment_kind() {
-        assert_eq!(
-            comment_kind.parse("<!-- MOD_CODE ~hi!~ OPEN -->"),
-            Ok(CommentKind::ModCode("hi!"))
-        );
+        assert_eq!(comment_kind.parse("<!-- MOD_CODE ~hi!~ OPEN -->"), Ok(CommentKind::ModCode("hi!")));
 
         assert_eq!(close_comment.parse("<!-- ORIGINAL -->"), Ok(CommentKind::Original));
 

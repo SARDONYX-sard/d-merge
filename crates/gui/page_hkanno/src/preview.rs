@@ -168,9 +168,5 @@ fn build_jump_map(editor_text: &str, xml_lines: &[String]) -> HashMap<usize, usi
         }
     }
 
-    editor_tracks
-        .into_iter()
-        .zip(xml_tracks)
-        .chain(editor_times.into_iter().zip(xml_times))
-        .collect()
+    editor_tracks.into_iter().zip(xml_tracks).chain(editor_times.into_iter().zip(xml_times)).collect()
 }

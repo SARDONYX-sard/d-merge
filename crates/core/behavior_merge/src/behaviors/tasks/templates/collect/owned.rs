@@ -24,16 +24,14 @@ pub(crate) fn collect_templates(
             let template_path = template_root.join(template_key.as_meshes_inner_path());
 
             if !template_path.exists() || !template_path.is_file() {
-                return Either::Right(Error::NotFoundTemplate {
-                    template_name: template_path.display().to_string(),
-                });
+                return Either::Right(Error::NotFoundTemplate { template_name: template_path.display().to_string() });
             }
 
             match std::fs::read(&template_path) {
                 Ok(bytes) => Either::Left((template_key, bytes)),
-                Err(_err) => Either::Right(Error::NotFoundTemplate {
-                    template_name: template_path.display().to_string(),
-                }),
+                Err(_err) => {
+                    Either::Right(Error::NotFoundTemplate { template_name: template_path.display().to_string() })
+                }
             }
         })
         .partition_map(|either| either)

@@ -14,8 +14,7 @@ pub fn load_dir_node(dirs: Vec<String>) -> Result<Vec<DirEntry>, Vec<Error>> {
 
     // Collect error messages and join them
     if !errors.is_empty() {
-        let error_messages: Vec<node_expr::error::Error> =
-            errors.into_par_iter().map(Result::unwrap_err).collect();
+        let error_messages: Vec<node_expr::error::Error> = errors.into_par_iter().map(Result::unwrap_err).collect();
         return Err(error_messages);
     }
 

@@ -17,9 +17,7 @@ mod patch_gen;
 
 // The shared modules are imported at the root, so paths read the same as in `behavior_merge`.
 // e.g., `crate::config::Config`, `crate::patches::BehaviorPatchesMap`
-use behavior_merge_types::{
-    Config, OutPutTarget, ParserMode, PriorityMap, adsf, asdsf, config, patches, template_key,
-};
+use behavior_merge_types::{Config, OutPutTarget, ParserMode, PriorityMap, adsf, asdsf, config, patches, template_key};
 
 pub use self::{
     errors::Error,

@@ -141,12 +141,7 @@ impl AAConfig {
     /// embedded in the output JSON as `$schema`.
     pub(crate) fn new(fnis_version: impl Into<Cow<'static, str>>, mods: Vec<AAMod>) -> Self {
         let fnis_version = fnis_version.into();
-        Self {
-            crc: compute_crc(&mods),
-            fnis_version: fnis_version.clone(),
-            fnis_creature_version: fnis_version,
-            mods,
-        }
+        Self { crc: compute_crc(&mods), fnis_version: fnis_version.clone(), fnis_creature_version: fnis_version, mods }
     }
 }
 
@@ -192,11 +187,9 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error
     let config = AAConfig::new("V07.06.00.0", mods);
 
     let path = output_dir.join("SKSE/Plugins/fnis_aa/config.json");
-    let json = sonic_rs::to_string_pretty(&config)
-        .map_err(|e| Error::JsonError { path: path.clone(), source: e })?;
+    let json = sonic_rs::to_string_pretty(&config).map_err(|e| Error::JsonError { path: path.clone(), source: e })?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| Error::FailedIo { path: parent.to_path_buf(), source: e })?;
+        std::fs::create_dir_all(parent).map_err(|e| Error::FailedIo { path: parent.to_path_buf(), source: e })?;
     }
     std::fs::write(&path, &json).map_err(|e| Error::FailedIo { path: path.clone(), source: e })?;
 
@@ -214,10 +207,7 @@ fn write_aa_config(mods: Vec<AAMod>, output_dir: &Path) -> Result<BaseMap, Error
 ///
 /// # Output path
 /// `SKSE/Plugins/fnis_aa/config.json`
-pub(crate) fn build_aa_config_from_jobs(
-    jobs: &[AnimIoJob],
-    output_dir: &Path,
-) -> Result<BaseMap, Error> {
+pub(crate) fn build_aa_config_from_jobs(jobs: &[AnimIoJob], output_dir: &Path) -> Result<BaseMap, Error> {
     // IndexMap preserves insertion order = mod load order, giving a stable CRC.
     let mut aa_mods = IndexMap::<_, _, fast_hash::RandomState>::default();
 
@@ -266,12 +256,7 @@ mod tests {
 
     use super::*;
 
-    fn make_fnis_job(
-        prefix: &str,
-        group_name: AAGroupName,
-        slot_index: u64,
-        slot_count: u64,
-    ) -> AnimIoJob {
+    fn make_fnis_job(prefix: &str, group_name: AAGroupName, slot_index: u64, slot_count: u64) -> AnimIoJob {
         AnimIoJob::Hkx(ConversionJob {
             input_path: PathBuf::from(format!("{prefix}{slot_index}_1hm_equip.hkx")),
             output_path: PathBuf::from("out/1hm_equip.hkx"),
@@ -303,10 +288,8 @@ mod tests {
     #[test]
     fn deduplicates_groups_within_mod() {
         // Same group, two animation files → one group entry.
-        let jobs = vec![
-            make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5),
-            make_fnis_job("xpe", AAGroupName::OneHmEqp, 1, 5),
-        ];
+        let jobs =
+            vec![make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5), make_fnis_job("xpe", AAGroupName::OneHmEqp, 1, 5)];
         let config = collect_aa_mods(&jobs);
         assert_eq!(config["xpe"].groups.len(), 1);
     }
@@ -323,10 +306,8 @@ mod tests {
     fn base_accumulates_across_mods() {
         // XPMSE: _1hmeqp slot_count=5  → base=1, occupies slots 1-5
         // TestMod: _1hmeqp slot_count=3 → base=6
-        let jobs = vec![
-            make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5),
-            make_fnis_job("tst", AAGroupName::OneHmEqp, 0, 3),
-        ];
+        let jobs =
+            vec![make_fnis_job("xpe", AAGroupName::OneHmEqp, 0, 5), make_fnis_job("tst", AAGroupName::OneHmEqp, 0, 3)];
         let mut mods: Vec<AAMod> = collect_aa_mods(&jobs).into_values().collect();
         compute_bases(&mut mods);
         assert_eq!(mods[0].groups[0].base, 1);
@@ -363,8 +344,7 @@ mod tests {
         let mut aa_mods = IndexMap::<_, _, fast_hash::RandomState>::default();
         for job in jobs {
             let AnimIoJob::Hkx(ConversionJob {
-                kind:
-                    AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false, priority },
+                kind: AnimKind::FnisAA { prefix, group_name, slot_count, is_male_subdir: false, priority },
                 ..
             }) = job
             else {

@@ -27,14 +27,8 @@ mod tests {
 
     #[test]
     fn test_pointer() {
-        assert_eq!(
-            pointer.parse_next(&mut "#0000 #0000"),
-            Ok(BorrowedValue::String("#0000".into()))
-        );
+        assert_eq!(pointer.parse_next(&mut "#0000 #0000"), Ok(BorrowedValue::String("#0000".into())));
 
-        assert_eq!(
-            pointer.parse_next(&mut "$turn$12\r\n</hkparam>"),
-            Ok(BorrowedValue::String("$turn$12".into()))
-        );
+        assert_eq!(pointer.parse_next(&mut "$turn$12\r\n</hkparam>"), Ok(BorrowedValue::String("$turn$12".into())));
     }
 }

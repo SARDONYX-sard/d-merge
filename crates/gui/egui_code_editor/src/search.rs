@@ -85,12 +85,7 @@ impl Matcher {
 }
 
 /// The next match after (`forward`) or before `from`, wrapping around the text.
-pub(crate) fn find_from(
-    matcher: &Matcher,
-    chars: &[char],
-    from: usize,
-    forward: bool,
-) -> Option<usize> {
+pub(crate) fn find_from(matcher: &Matcher, chars: &[char], from: usize, forward: bool) -> Option<usize> {
     let len = chars.len();
     if len == 0 {
         return None;

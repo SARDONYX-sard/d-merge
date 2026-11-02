@@ -62,8 +62,7 @@ pub(crate) struct ParsedAsdsfPatchPath<'a> {
 /// # Returns
 /// Returns a [`ParsedAdsfPatchPath`] with extracted metadata or a [`ParseError`] if the format is invalid.
 pub(crate) fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPath<'a>, ParseError> {
-    let components: Vec<&'a str> =
-        path.components().filter_map(|c| c.as_os_str().to_str()).collect();
+    let components: Vec<&'a str> = path.components().filter_map(|c| c.as_os_str().to_str()).collect();
 
     let anim_data_index = components
         .iter()
@@ -74,17 +73,12 @@ pub(crate) fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPat
         return Err(ParseError::TooShortPathFormat { path: path.to_path_buf() });
     }
 
-    let path_str =
-        path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
+    let path_str = path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
     let id = get_nemesis_id(path_str)?;
 
     // e.g. `DefaultMaleData~DefaultMale`
     let target_component = components[anim_data_index + 1];
-    let target = if target_component.eq_ignore_ascii_case("$header$") {
-        "$header$"
-    } else {
-        target_component
-    };
+    let target = if target_component.eq_ignore_ascii_case("$header$") { "$header$" } else { target_component };
 
     let file_name = path
         .file_name()
@@ -92,11 +86,7 @@ pub(crate) fn parse_asdsf_path<'a>(path: &'a Path) -> Result<ParsedAsdsfPatchPat
         .ok_or_else(|| ParseError::TooShortPathFormat { path: path.to_path_buf() })?;
 
     let parser_type = if file_name.eq_ignore_ascii_case("$header$.txt") {
-        if target.eq_ignore_ascii_case("$header$") {
-            ParserType::TxtProjectHeader
-        } else {
-            ParserType::SubTxtHeader
-        }
+        if target.eq_ignore_ascii_case("$header$") { ParserType::TxtProjectHeader } else { ParserType::SubTxtHeader }
     } else if let Some((_, file_name)) = file_name.split_once('$') {
         if file_name.is_empty() {
             return Err(ParseError::InvalidAddAnimSetFileName { path: path.to_path_buf() });
@@ -155,9 +145,7 @@ mod tests {
 
     #[test]
     fn test_txt_project_header_add() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationsetdatasinglefile/$header$/$header$.txt",
-        );
+        let parsed = parse("/some/mods/Nemesis_Engine/mod/slide/animationsetdatasinglefile/$header$/$header$.txt");
         assert_eq!(
             parsed,
             ParsedAsdsfPatchPath {

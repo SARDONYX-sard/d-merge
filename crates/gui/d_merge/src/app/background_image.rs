@@ -18,8 +18,7 @@ impl super::App {
 
         let size = [image.width() as usize, image.height() as usize];
         let color_image = ColorImage::from_rgba_unmultiplied(size, image.as_raw());
-        self.bg_img_handle =
-            Some(ctx.load_texture("background", color_image, TextureOptions::LINEAR));
+        self.bg_img_handle = Some(ctx.load_texture("background", color_image, TextureOptions::LINEAR));
     }
 
     pub(crate) fn paint_background(&mut self, ctx: &egui::Context) {

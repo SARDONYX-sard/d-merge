@@ -117,10 +117,7 @@ impl<'a> Hkanno<'a> {
                     annotations: track
                         .annotations
                         .into_par_iter()
-                        .map(|ann| Annotation {
-                            time: ann.time,
-                            text: ann.text.map(|t| Cow::Owned(t.into_owned())),
-                        })
+                        .map(|ann| Annotation { time: ann.time, text: ann.text.map(|t| Cow::Owned(t.into_owned())) })
                         .collect(),
                 })
                 .collect(),
@@ -148,34 +145,22 @@ impl<'a> Hkanno<'a> {
         };
 
         let (num_original_frames, duration, annotation_tracks) = match animation_class {
-            Classes::hkaAnimation(class) => {
-                (&mut I32::Number(0), &mut class.m_duration, &mut class.m_annotationTracks)
+            Classes::hkaAnimation(class) => (&mut I32::Number(0), &mut class.m_duration, &mut class.m_annotationTracks),
+            Classes::hkaDeltaCompressedAnimation(class) => {
+                (&mut I32::Number(0), &mut class.parent.m_duration, &mut class.parent.m_annotationTracks)
             }
-            Classes::hkaDeltaCompressedAnimation(class) => (
-                &mut I32::Number(0),
-                &mut class.parent.m_duration,
-                &mut class.parent.m_annotationTracks,
-            ),
-            Classes::hkaInterleavedUncompressedAnimation(class) => (
-                &mut I32::Number(0),
-                &mut class.parent.m_duration,
-                &mut class.parent.m_annotationTracks,
-            ),
-            Classes::hkaQuantizedAnimation(class) => (
-                &mut I32::Number(0),
-                &mut class.parent.m_duration,
-                &mut class.parent.m_annotationTracks,
-            ),
-            Classes::hkaSplineCompressedAnimation(class) => (
-                &mut class.m_numFrames,
-                &mut class.parent.m_duration,
-                &mut class.parent.m_annotationTracks,
-            ),
-            Classes::hkaWaveletCompressedAnimation(class) => (
-                &mut I32::Number(0),
-                &mut class.parent.m_duration,
-                &mut class.parent.m_annotationTracks,
-            ),
+            Classes::hkaInterleavedUncompressedAnimation(class) => {
+                (&mut I32::Number(0), &mut class.parent.m_duration, &mut class.parent.m_annotationTracks)
+            }
+            Classes::hkaQuantizedAnimation(class) => {
+                (&mut I32::Number(0), &mut class.parent.m_duration, &mut class.parent.m_annotationTracks)
+            }
+            Classes::hkaSplineCompressedAnimation(class) => {
+                (&mut class.m_numFrames, &mut class.parent.m_duration, &mut class.parent.m_annotationTracks)
+            }
+            Classes::hkaWaveletCompressedAnimation(class) => {
+                (&mut I32::Number(0), &mut class.parent.m_duration, &mut class.parent.m_annotationTracks)
+            }
             _ => return Err(HkannoError::MissingHkaAnimationClass),
         };
 
@@ -224,25 +209,20 @@ impl<'a> Hkanno<'a> {
     /// - Annotation update fails.
     /// - Serialization of the updated data fails.
     #[inline(never)] // keep the generic (de)serialization in this crate (see `parse_as_hkanno`)
-    pub fn update_hkx_bytes(
-        self,
-        bytes: &[u8],
-        output_format: Format,
-        input: &Path,
-    ) -> Result<Vec<u8>, HkannoError> {
+    pub fn update_hkx_bytes(self, bytes: &[u8], output_format: Format, input: &Path) -> Result<Vec<u8>, HkannoError> {
         let mut output = Vec::new();
         hkx_io::with_class_map(bytes, input, &mut |mut classes| {
-            self.clone().into_static().write_to_classmap(&mut classes).map_err(|e| {
-                serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
-            })?;
+            self.clone()
+                .into_static()
+                .write_to_classmap(&mut classes)
+                .map_err(|e| serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) })?;
 
             output = match output_format {
                 Format::Amd64 | Format::Win32 | Format::Xml => {
                     serde_hkx_features::serde::ser::to_bytes(&mut classes, output_format)
                 }
                 Format::Json => {
-                    let mut classes =
-                        serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
+                    let mut classes = serde_hkx_features::types_wrapper::ClassPtrMap::from_class_map(classes);
                     serde_hkx_features::serde_extra::ser::to_bytes(&mut classes, output_format)
                 }
             }
@@ -288,11 +268,7 @@ impl<'a> fmt::Display for Hkanno<'a> {
 
         // Each track block
         for track in &self.annotation_tracks {
-            writeln!(
-                f,
-                "trackName: {}",
-                track.track_name.as_deref().unwrap_or(havok_types::NULL_STR)
-            )?;
+            writeln!(f, "trackName: {}", track.track_name.as_deref().unwrap_or(havok_types::NULL_STR))?;
             writeln!(f, "# numAnnotations: {}", track.annotations.len())?;
 
             for ann in &track.annotations {
@@ -345,10 +321,7 @@ pub fn annotation_tracks_from_text(text: &str) -> Vec<AnnotationTrack<'_>> {
             && head.trim_end().eq_ignore_ascii_case("trackName")
         {
             tracks.extend(current.take());
-            current = Some(AnnotationTrack {
-                track_name: non_null(name.trim()),
-                annotations: Vec::new(),
-            });
+            current = Some(AnnotationTrack { track_name: non_null(name.trim()), annotations: Vec::new() });
             continue;
         }
 
@@ -372,9 +345,7 @@ pub fn annotation_tracks_from_text(text: &str) -> Vec<AnnotationTrack<'_>> {
 ///
 /// e.g., `"0.5s"` -> `0.5`, `"abc"` -> `NaN`
 fn parse_float_prefix(s: &str) -> f32 {
-    let end = s
-        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '+' | '-' | '.' | 'e' | 'E')))
-        .unwrap_or(s.len());
+    let end = s.find(|c: char| !(c.is_ascii_digit() || matches!(c, '+' | '-' | '.' | 'e' | 'E'))).unwrap_or(s.len());
     // Shrink until it parses, e.g., `1e` -> `1`.
     (1..=end).rev().find_map(|len| s[..len].parse::<f32>().ok()).unwrap_or(f32::NAN)
 }
@@ -405,42 +376,30 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
     // Find the one `hkaAnimation`
     let (ptr, animation_class) = {
         // Find C++ classes that inherit from `hkaAnimation` C++
-        let mut animation_classes: Vec<_> = class_map
-            .into_par_iter()
-            .filter(|(_, class)| is_hka_animation_derived(class))
-            .collect();
+        let mut animation_classes: Vec<_> =
+            class_map.into_par_iter().filter(|(_, class)| is_hka_animation_derived(class)).collect();
 
         match animation_classes.len() {
             0 => return MissingHkaAnimationClassSnafu.fail(),
             1 => animation_classes.swap_remove(0),
             _ => {
-                return Err(HkannoError::MultipleHkaAnimationFound {
-                    count: animation_classes.len(),
-                });
+                return Err(HkannoError::MultipleHkaAnimationFound { count: animation_classes.len() });
             }
         }
     };
 
     const FPS: f32 = 30.0;
     let (num_original_frames, duration, annotation_tracks): (f32, _, _) = match animation_class {
-        Classes::hkaAnimation(class) => {
-            (class.m_duration * FPS, class.m_duration, class.m_annotationTracks)
+        Classes::hkaAnimation(class) => (class.m_duration * FPS, class.m_duration, class.m_annotationTracks),
+        Classes::hkaDeltaCompressedAnimation(class) => {
+            (class.parent.m_duration * FPS, class.parent.m_duration, class.parent.m_annotationTracks)
         }
-        Classes::hkaDeltaCompressedAnimation(class) => (
-            class.parent.m_duration * FPS,
-            class.parent.m_duration,
-            class.parent.m_annotationTracks,
-        ),
-        Classes::hkaInterleavedUncompressedAnimation(class) => (
-            class.parent.m_duration * FPS,
-            class.parent.m_duration,
-            class.parent.m_annotationTracks,
-        ),
-        Classes::hkaQuantizedAnimation(class) => (
-            class.parent.m_duration * FPS,
-            class.parent.m_duration,
-            class.parent.m_annotationTracks,
-        ),
+        Classes::hkaInterleavedUncompressedAnimation(class) => {
+            (class.parent.m_duration * FPS, class.parent.m_duration, class.parent.m_annotationTracks)
+        }
+        Classes::hkaQuantizedAnimation(class) => {
+            (class.parent.m_duration * FPS, class.parent.m_duration, class.parent.m_annotationTracks)
+        }
         Classes::hkaSplineCompressedAnimation(class) => (
             match &class.m_numFrames {
                 I32::Number(n) => *n as f32,
@@ -454,11 +413,9 @@ pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, 
             class.parent.m_duration,
             class.parent.m_annotationTracks,
         ),
-        Classes::hkaWaveletCompressedAnimation(class) => (
-            class.parent.m_duration * FPS,
-            class.parent.m_duration,
-            class.parent.m_annotationTracks,
-        ),
+        Classes::hkaWaveletCompressedAnimation(class) => {
+            (class.parent.m_duration * FPS, class.parent.m_duration, class.parent.m_annotationTracks)
+        }
         _ => return Err(HkannoError::MissingHkaAnimationClass),
     };
 
@@ -547,9 +504,8 @@ pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, 
     // Owned (`into_static`): XML is decoded into a temporary string the classes borrow from.
     let mut hkanno = None;
     hkx_io::with_class_map(bytes, input, &mut |classes| {
-        let parsed = parse_hkanno_borrowed(classes).map_err(|e| {
-            serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
-        })?;
+        let parsed = parse_hkanno_borrowed(classes)
+            .map_err(|e| serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) })?;
         hkanno = Some(parsed.into_static());
         Ok(())
     })
@@ -641,8 +597,7 @@ mod tests {
         let path = "../../../dummy/convert/input/MCO_Dodge-B-1.xml";
         let bytes = std::fs::read(path).expect("Failed to read test HKX file");
 
-        let hkanno =
-            parse_as_hkanno(&bytes, Path::new(path)).expect("Failed to parse HKX file as Hkanno");
+        let hkanno = parse_as_hkanno(&bytes, Path::new(path)).expect("Failed to parse HKX file as Hkanno");
 
         dbg!(&hkanno);
 

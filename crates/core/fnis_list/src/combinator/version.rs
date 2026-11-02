@@ -31,9 +31,7 @@ pub(crate) fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
         }
     }
     .context(StrContext::Label("Minimum Version Requirement for FNIS"))
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Format: Version V<n>.<m> (e.g. Version V7.3)",
-    )))
+    .context(StrContext::Expected(StrContextValue::Description("Format: Version V<n>.<m> (e.g. Version V7.3)")))
     .parse_next(input)
 }
 

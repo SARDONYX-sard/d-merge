@@ -44,8 +44,7 @@ pub(crate) static ALT_GROUPS: phf::Map<&'static str, AltGroup> = phf::phf_map! {
     }
     code.push_str("};\n");
 
-    let output =
-        ws.join("crates/core/fnis_patch_gen/src/patch_gen/alternate/generated_group_table.rs");
+    let output = ws.join("crates/core/fnis_patch_gen/src/patch_gen/alternate/generated_group_table.rs");
     std::fs::write(&output, code)?;
     println!("generated: {}", output.display());
     Ok(())

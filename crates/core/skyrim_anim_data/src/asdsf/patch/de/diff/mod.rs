@@ -31,10 +31,7 @@ pub struct DiffPatchAnimSetData<'a> {
     )]
     pub(crate) conditions_patches: NonNestedArrayDiff<'a>,
 
-    #[cfg_attr(
-        feature = "serde",
-        serde(borrow, bound(deserialize = "AttacksDiff<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(borrow, bound(deserialize = "AttacksDiff<'a>: serde::Deserialize<'de>")))]
     pub(crate) attacks_patches: AttacksDiff<'a>,
 
     #[cfg_attr(
@@ -105,10 +102,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             if !self.conditions_patches.seq.is_empty() {
                 let patches = core::mem::take(&mut self.conditions_patches.seq);
                 let template_array = template_value.try_as_array_mut().map_err(|_| {
-                    JsonPatchError::unsupported_range_kind_from(
-                        &json_patch::json_path!["conditions"],
-                        &patches,
-                    )
+                    JsonPatchError::unsupported_range_kind_from(&json_patch::json_path!["conditions"], &patches)
                 })?;
                 apply_seq_array_directly(template_array, patches)?;
             }
@@ -127,17 +121,12 @@ impl<'a> DiffPatchAnimSetData<'a> {
             }
             for (path, patches) in seq_patch_map.0 {
                 if path.is_empty() {
-                    let template_array = template_value.try_as_array_mut().map_err(|_| {
-                        JsonPatchError::unsupported_range_kind_from(&path, &patches)
-                    })?;
+                    let template_array = template_value
+                        .try_as_array_mut()
+                        .map_err(|_| JsonPatchError::unsupported_range_kind_from(&path, &patches))?;
                     json_patch::apply_seq_array_directly(template_array, patches)?;
                 } else {
-                    json_patch::apply_seq_by_priority(
-                        "attacks",
-                        &mut template_value,
-                        path,
-                        patches,
-                    )?;
+                    json_patch::apply_seq_by_priority("attacks", &mut template_value, path, patches)?;
                 }
             }
 
@@ -156,10 +145,7 @@ impl<'a> DiffPatchAnimSetData<'a> {
             if !self.anim_infos_patches.seq.is_empty() {
                 let patches = core::mem::take(&mut self.anim_infos_patches.seq);
                 let template_array = template_value.try_as_array_mut().map_err(|_| {
-                    JsonPatchError::unsupported_range_kind_from(
-                        &json_patch::json_path!["anim_infos"],
-                        &patches,
-                    )
+                    JsonPatchError::unsupported_range_kind_from(&json_patch::json_path!["anim_infos"], &patches)
                 })?;
                 apply_seq_array_directly(template_array, patches)?;
             }

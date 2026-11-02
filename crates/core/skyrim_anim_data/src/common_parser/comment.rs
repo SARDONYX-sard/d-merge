@@ -43,13 +43,10 @@ pub(crate) fn take_till_original<'a>(input: &mut &'a str) -> ModalResult<&'a str
     let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
 
     terminated(
-        take_until_ext(0.., delimited("<!--", original_parser.value(CommentKind::Original), "-->"))
-            .take(),
+        take_until_ext(0.., delimited("<!--", original_parser.value(CommentKind::Original), "-->")).take(),
         (Caseless("<!-- ORIGINAL -->"), multispace0),
     )
-    .context(StrContext::Expected(StrContextValue::Description(
-        "Comment(e.g. `<!-- ORIGINAL -->`)",
-    )))
+    .context(StrContext::Expected(StrContextValue::Description("Comment(e.g. `<!-- ORIGINAL -->`)")))
     .parse_next(input)
 }
 
@@ -60,9 +57,7 @@ pub(crate) fn original_or_close_comment<'a>(input: &mut &'a str) -> ModalResult<
     let kind_parser = {
         let original_parser = delimited_multispace0(Caseless("ORIGINAL"));
 
-        let ignore_parser = delimited_multispace0(
-            (take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take(),
-        );
+        let ignore_parser = delimited_multispace0((take_until(0.., "SERIALIZE_IGNORED"), "SERIALIZE_IGNORED").take());
 
         alt((
             original_parser.value(CommentKind::Original),
@@ -125,10 +120,7 @@ mod tests {
 
     #[test]
     fn test_comment_kind() {
-        assert_eq!(
-            open_comment.parse("<!-- MOD_CODE ~hi!~ OPEN -->"),
-            Ok(CommentKind::ModCode("hi!"))
-        );
+        assert_eq!(open_comment.parse("<!-- MOD_CODE ~hi!~ OPEN -->"), Ok(CommentKind::ModCode("hi!")));
 
         assert_eq!(original_or_close_comment.parse("<!-- ORIGINAL -->"), Ok(CommentKind::Original));
 

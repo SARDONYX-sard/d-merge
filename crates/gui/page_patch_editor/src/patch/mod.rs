@@ -24,9 +24,7 @@ mod workspace;
 
 use std::{path::Path, time::Instant};
 
-use egui_code_editor::{
-    CodeEditor, CodeEditorState, Diagnostic, EditorCommand, EditorFeatures, Keymap, Severity,
-};
+use egui_code_editor::{CodeEditor, CodeEditorState, Diagnostic, EditorCommand, EditorFeatures, Keymap, Severity};
 use egui_widgets::{
     notify::Notification,
     shadcn::{Button, Checkbox, TextEdit},
@@ -34,8 +32,8 @@ use egui_widgets::{
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::{
-        hkanno::{EditorMode, HkannoLspOptions, HkannoSettings},
-        patch_editor::PatchEditorSettings,
+        pages::patch_editor::PatchEditorSettings,
+        ui::editor::{EditorMode, LspOptions},
     },
 };
 use nemesis_diff::is_valid_mod_code;
@@ -91,7 +89,7 @@ pub(crate) struct PatchTool {
     /// Normal / Vim keys of the object editor.
     editor_mode: EditorMode,
     /// Language features (shared with hkanno's options), and their window is open.
-    lsp: HkannoLspOptions,
+    lsp: LspOptions,
     show_lsp_options: bool,
     /// The editor's cursor line last frame (for the class around it).
     cursor_line: usize,
@@ -124,10 +122,10 @@ impl PatchTool {
         notify: &mut Notification,
         template_dir: &str,
         settings: &mut PatchEditorSettings,
-        editor: &mut HkannoSettings,
+        editor: &mut LspOptions,
     ) {
         self.editor_mode = editor.editor_mode;
-        self.lsp.clone_from(&editor.lsp);
+        self.lsp.clone_from(editor);
         if self.template_dir != template_dir {
             template_dir.clone_into(&mut self.template_dir);
         }
@@ -142,8 +140,8 @@ impl PatchTool {
 
         // Changed by the editor's keymap box / options window.
         editor.editor_mode = self.editor_mode;
-        if editor.lsp != self.lsp {
-            editor.lsp.clone_from(&self.lsp);
+        if *editor != self.lsp {
+            editor.clone_from(&self.lsp);
         }
         if settings.output != self.output || settings.mod_code != self.mod_code {
             settings.output.clone_from(&self.output);
@@ -234,8 +232,7 @@ impl PatchTool {
 
     fn settings_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         ui.horizontal(|ui| {
-            ui.label(i18n.t(I18nKey::NemesisOutputLabel))
-                .on_hover_text(i18n.t(I18nKey::NemesisOutputHover));
+            ui.label(i18n.t(I18nKey::NemesisOutputLabel)).on_hover_text(i18n.t(I18nKey::NemesisOutputHover));
             ui.add(TextEdit::singleline(&mut self.output).desired_width(260.0));
             if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
                 && let Some(dir) = rfd::FileDialog::new().set_directory(&self.output).pick_folder()
@@ -274,11 +271,7 @@ impl PatchTool {
             let label = format!("{} ▼", i18n.t(I18nKey::NemesisAddBehavior));
             if ui
                 .add(Button::selectable(self.picker_open, label))
-                .on_hover_text(format!(
-                    "{} {}",
-                    i18n.t(I18nKey::NemesisTemplatesLabel),
-                    self.template_dir
-                ))
+                .on_hover_text(format!("{} {}", i18n.t(I18nKey::NemesisTemplatesLabel), self.template_dir))
                 .clicked()
             {
                 self.picker_open = !self.picker_open;
@@ -337,8 +330,7 @@ impl PatchTool {
                 return;
             }
             let filter = self.picker_filter.to_lowercase();
-            let shown: Vec<&TemplateEntry> =
-                self.catalog.iter().filter(|e| e.meshes_path.contains(&filter)).collect();
+            let shown: Vec<&TemplateEntry> = self.catalog.iter().filter(|e| e.meshes_path.contains(&filter)).collect();
             let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
             egui::ScrollArea::vertical().max_height(220.0).auto_shrink([false, true]).show_rows(
                 ui,
@@ -371,9 +363,7 @@ impl PatchTool {
     fn add_behavior(&mut self, path: &Path, notify: &mut Notification, i18n: &I18nMap) {
         match Behavior::open(path) {
             Ok(behavior) => {
-                if let Some(at) =
-                    self.workspace.behaviors.iter().position(|b| b.name == behavior.name)
-                {
+                if let Some(at) = self.workspace.behaviors.iter().position(|b| b.name == behavior.name) {
                     self.active = at; // already there
                     return;
                 }
@@ -392,19 +382,14 @@ impl PatchTool {
                 self.workspace = workspace;
                 self.mod_code = code;
                 // Write it to `(output, code)` instead of loading what may be there.
-                self.loaded_for = (!self.output.trim().is_empty()
-                    && is_valid_mod_code(&self.mod_code))
-                .then(|| (self.output.trim().to_string(), self.mod_code.clone()));
+                self.loaded_for = (!self.output.trim().is_empty() && is_valid_mod_code(&self.mod_code))
+                    .then(|| (self.output.trim().to_string(), self.mod_code.clone()));
                 self.mark_dirty();
                 self.active = 0;
                 self.selected = None;
                 self.editor_for = None;
                 if !skipped.is_empty() {
-                    notify.warn(format!(
-                        "{}: {}",
-                        i18n.t(I18nKey::NemesisNoTemplateFor),
-                        skipped.join(", ")
-                    ));
+                    notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
                 }
             }
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed))),
@@ -437,11 +422,7 @@ impl PatchTool {
         ui.horizontal_wrapped(|ui| {
             for (i, behavior) in self.workspace.behaviors.iter().enumerate() {
                 let count = behavior.edits.len() + behavior.added.len();
-                let label = if count > 0 {
-                    format!("{} ({count})", behavior.name)
-                } else {
-                    behavior.name.clone()
-                };
+                let label = if count > 0 { format!("{} ({count})", behavior.name) } else { behavior.name.clone() };
                 let response = ui
                     .add(Button::selectable(i == self.active, label))
                     .on_hover_text(behavior.template_path.display().to_string());
@@ -450,11 +431,7 @@ impl PatchTool {
                 }
                 response.context_menu(|ui| {
                     let button = Button::new(i18n.t(I18nKey::NemesisRemoveBehavior)).destructive();
-                    if ui
-                        .add(button)
-                        .on_hover_text(i18n.t(I18nKey::NemesisRemoveBehaviorHover))
-                        .clicked()
-                    {
+                    if ui.add(button).on_hover_text(i18n.t(I18nKey::NemesisRemoveBehaviorHover)).clicked() {
                         remove = Some(i);
                     }
                 });
@@ -471,8 +448,7 @@ impl PatchTool {
 
     /// `→ Nemesis_Engine/mod/mymod/0_master   ☐ NemesisExt` (+ a warning for NemesisExt)
     fn target_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let code =
-            if is_valid_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
+        let code = if is_valid_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
         let behavior = &mut self.workspace.behaviors[self.active];
         let mut changed = false;
         ui.horizontal(|ui| {
@@ -482,11 +458,7 @@ impl PatchTool {
             }
             let supported = behavior.nemesis.is_some();
             let mut ext = behavior.force_ext || !supported;
-            let hover = if supported {
-                I18nKey::NemesisForceExtHover
-            } else {
-                I18nKey::NemesisUnsupportedTemplate
-            };
+            let hover = if supported { I18nKey::NemesisForceExtHover } else { I18nKey::NemesisUnsupportedTemplate };
             if ui
                 .add_enabled(supported, Checkbox::new(&mut ext, i18n.t(I18nKey::NemesisForceExt)))
                 .on_hover_text(i18n.t(hover))
@@ -497,10 +469,7 @@ impl PatchTool {
                 changed = true;
             }
             if behavior.target() == Target::Ext {
-                ui.colored_label(
-                    ui.visuals().warn_fg_color,
-                    i18n.t(I18nKey::NemesisExtOnlyWarning),
-                );
+                ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisExtOnlyWarning));
             }
         });
         if changed {
@@ -513,9 +482,7 @@ impl PatchTool {
     fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         if !self.workspace.behaviors[self.active].asdsf {
             ui.horizontal(|ui| {
-                for (vars, label) in
-                    [(false, I18nKey::NemesisObjectsTab), (true, I18nKey::NemesisVarsTab)]
-                {
+                for (vars, label) in [(false, I18nKey::NemesisObjectsTab), (true, I18nKey::NemesisVarsTab)] {
                     if ui.add(Button::selectable(self.show_vars == vars, i18n.t(label))).clicked() {
                         self.show_vars = vars;
                     }
@@ -541,8 +508,7 @@ impl PatchTool {
 
         ui.horizontal(|ui| {
             // Anim sets can only be edited, not added.
-            let code_ok = is_valid_mod_code(self.mod_code.trim())
-                && !self.workspace.behaviors[self.active].asdsf;
+            let code_ok = is_valid_mod_code(self.mod_code.trim()) && !self.workspace.behaviors[self.active].asdsf;
             if ui
                 .add_enabled(code_ok, Button::new(i18n.t(I18nKey::NemesisNewObject)).small())
                 .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
@@ -552,18 +518,14 @@ impl PatchTool {
             }
             let selected = self.selected.clone();
             if ui
-                .add_enabled(
-                    code_ok && selected.is_some(),
-                    Button::new(i18n.t(I18nKey::NemesisDuplicate)).small(),
-                )
+                .add_enabled(code_ok && selected.is_some(), Button::new(i18n.t(I18nKey::NemesisDuplicate)).small())
                 .clicked()
             {
                 self.new_object(selected.as_deref());
             }
             // A new object is deleted, a template object goes back to the template.
-            let is_new = selected
-                .as_ref()
-                .is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(id));
+            let is_new =
+                selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(id));
             let (label, hover) = if is_new {
                 (I18nKey::NemesisDeleteObject, I18nKey::NemesisDeleteObjectHover)
             } else {
@@ -597,28 +559,22 @@ impl PatchTool {
         let rows = self.rows();
         let mut menu_action = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
-        egui::ScrollArea::vertical().auto_shrink(false).show_rows(
-            ui,
-            row_height,
-            rows.len(),
-            |ui, range| {
-                for (marker, id, class, name) in &rows[range] {
-                    let text =
-                        egui::RichText::new(format!("{marker} {id}  {class}  {name}")).monospace();
-                    let selected = self.selected.as_deref() == Some(id.as_str());
-                    let response = ui.add(egui::Button::selectable(selected, text));
-                    if response.clicked() {
-                        self.selected = Some(id.clone());
-                    }
-                    let changed = *marker != ' ';
-                    response.context_menu(|ui| {
-                        if let Some(action) = row_menu(ui, i18n, *marker == '+', changed) {
-                            menu_action = Some((id.clone(), action));
-                        }
-                    });
+        egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
+            for (marker, id, class, name) in &rows[range] {
+                let text = egui::RichText::new(format!("{marker} {id}  {class}  {name}")).monospace();
+                let selected = self.selected.as_deref() == Some(id.as_str());
+                let response = ui.add(egui::Button::selectable(selected, text));
+                if response.clicked() {
+                    self.selected = Some(id.clone());
                 }
-            },
-        );
+                let changed = *marker != ' ';
+                response.context_menu(|ui| {
+                    if let Some(action) = row_menu(ui, i18n, *marker == '+', changed) {
+                        menu_action = Some((id.clone(), action));
+                    }
+                });
+            }
+        });
         if let Some((id, action)) = menu_action {
             match action {
                 RowAction::Duplicate => self.new_object(Some(&id)),
@@ -642,19 +598,15 @@ impl PatchTool {
         // A new object shows where it is linked: `← #0106` (or a warning).
         let parents = self.names.as_ref().map(|(_, names)| &names.parents);
         let added = behavior.added.iter().map(|(id, text)| {
-            let class =
-                text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map(|(c, _)| c);
+            let class = text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map(|(c, _)| c);
             let linked = match parents.and_then(|p| p.get(id)) {
                 Some(from) => format!("← {}", from.join(", ")),
                 None => "⚠ not linked".to_string(),
             };
             ('+', id.clone(), class.unwrap_or_default().to_string(), linked)
         });
-        let template = behavior
-            .objects
-            .iter()
-            .filter(|o| !self.changed_only || behavior.edits.contains_key(&o.id))
-            .map(|o| {
+        let template =
+            behavior.objects.iter().filter(|o| !self.changed_only || behavior.edits.contains_key(&o.id)).map(|o| {
                 let marker = if behavior.edits.contains_key(&o.id) { '●' } else { ' ' };
                 (marker, o.id.clone(), o.class.clone(), o.name.clone())
             });
@@ -683,10 +635,8 @@ impl PatchTool {
         let behavior = &self.workspace.behaviors[self.active];
         let filter = self.class_filter.to_lowercase();
         let used = |class: &str| behavior.object_of_class(class).is_some();
-        let mut classes: Vec<&str> = nemesis_diff::schema::class_names()
-            .into_iter()
-            .filter(|c| c.to_lowercase().contains(&filter))
-            .collect();
+        let mut classes: Vec<&str> =
+            nemesis_diff::schema::class_names().into_iter().filter(|c| c.to_lowercase().contains(&filter)).collect();
         classes.sort_by_key(|class| !used(class)); // stable: alphabetical within each group
 
         let mut picked = None;
@@ -726,8 +676,7 @@ impl PatchTool {
 
     fn object_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let Some(id) = self.selected.clone() else {
-            egui::CentralPanel::default()
-                .show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisSelectObject)));
+            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisSelectObject)));
             return;
         };
         let key = (self.active, id.clone());
@@ -745,14 +694,10 @@ impl PatchTool {
             let behavior = &self.workspace.behaviors[self.active];
             let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(patch));
             self.preview = Some((patch, check));
-            self.field_problems =
-                field_diagnostics(&self.editor_text, &self.workspace.behaviors[self.active]);
+            self.field_problems = field_diagnostics(&self.editor_text, &self.workspace.behaviors[self.active]);
             let current = self.preview_view.as_ref().map_or(0, |v| v.current);
-            self.preview_view = self
-                .preview
-                .as_ref()
-                .and_then(|(patch, _)| patch.as_deref())
-                .map(preview::Preview::new);
+            self.preview_view =
+                self.preview.as_ref().and_then(|(patch, _)| patch.as_deref()).map(preview::Preview::new);
             // Keep the ▲ / ▼ position across edits.
             if let Some(view) = &mut self.preview_view {
                 view.keep_current(current);
@@ -763,59 +708,45 @@ impl PatchTool {
         let mut revert = None;
         let is_new = self.workspace.behaviors[self.active].added.contains_key(&id);
         if !is_new {
-            egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(
-                ui,
-                |ui| {
-                    let Some((patch, check)) = &self.preview else { return };
-                    ui.horizontal(|ui| {
-                        ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
-                        if let Some(view) = &mut self.preview_view {
-                            view.nav_ui(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
-                        }
-                        match check {
-                            _ if patch.is_none() => {
-                                ui.weak(i18n.t(I18nKey::NemesisNoChange));
-                            }
-                            Ok(()) => {
-                                ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔")
-                                    .on_hover_text(i18n.t(I18nKey::NemesisParserOk));
-                            }
-                            Err(err) => {
-                                ui.colored_label(ui.visuals().error_fg_color, format!("✖ {err}"));
-                            }
-                        }
-                    });
+            egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(ui, |ui| {
+                let Some((patch, check)) = &self.preview else { return };
+                ui.horizontal(|ui| {
+                    ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
                     if let Some(view) = &mut self.preview_view {
-                        revert = view.ui(ui, i18n.t(I18nKey::NemesisRevertHunkHover));
+                        view.nav_ui(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                     }
-                },
-            );
+                    match check {
+                        _ if patch.is_none() => {
+                            ui.weak(i18n.t(I18nKey::NemesisNoChange));
+                        }
+                        Ok(()) => {
+                            ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔")
+                                .on_hover_text(i18n.t(I18nKey::NemesisParserOk));
+                        }
+                        Err(err) => {
+                            ui.colored_label(ui.visuals().error_fg_color, format!("✖ {err}"));
+                        }
+                    }
+                });
+                if let Some(view) = &mut self.preview_view {
+                    revert = view.ui(ui, i18n.t(I18nKey::NemesisRevertHunkHover));
+                }
+            });
         }
         // `$eventID[` / `$variableID[` complete with the behavior's names.
         let names = self.names();
-        let (events, variables, pointers) =
-            (names.events.clone(), names.variables.clone(), names.pointers.clone());
+        let (events, variables, pointers) = (names.events.clone(), names.variables.clone(), names.pointers.clone());
         // Enum / flag values only depend on the template: computed once per behavior.
         if self.field_values.as_ref().is_none_or(|(active, _)| *active != self.active) {
             let values = language::field_values(&self.workspace.behaviors[self.active]);
             self.field_values = Some((self.active, std::rc::Rc::new(values)));
         }
-        let values = self
-            .field_values
-            .as_ref()
-            .map(|(_, values)| std::rc::Rc::clone(values))
-            .unwrap_or_default();
+        let values = self.field_values.as_ref().map(|(_, values)| std::rc::Rc::clone(values)).unwrap_or_default();
         let values = values.as_ref();
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
         let fields = context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice()));
-        let language = NemesisXml {
-            events: &events,
-            variables: &variables,
-            values,
-            pointers: &pointers,
-            fields,
-        };
+        let language = NemesisXml { events: &events, variables: &variables, values, pointers: &pointers, fields };
         let features = EditorFeatures {
             completion: self.lsp.completion,
             hover: self.lsp.hover,
@@ -834,14 +765,11 @@ impl PatchTool {
         egui::CentralPanel::default().show(ui, |ui| {
             // `Keys: [Vim ▼]`, and the Vim status line under the editor.
             ui.horizontal(|ui| {
-                ui.label(i18n.t(I18nKey::HkannoEditorMode));
-                let mut index =
-                    EditorMode::ALL.iter().position(|m| *m == self.editor_mode).unwrap_or(0);
+                ui.label(i18n.t(I18nKey::LspEditorMode));
+                let mut index = EditorMode::ALL.iter().position(|m| *m == self.editor_mode).unwrap_or(0);
                 if egui::ComboBox::from_id_salt("nemesis_editor_mode")
                     .width(80.0)
-                    .show_index(ui, &mut index, EditorMode::ALL.len(), |i| {
-                        EditorMode::ALL[i].label()
-                    })
+                    .show_index(ui, &mut index, EditorMode::ALL.len(), |i| EditorMode::ALL[i].label())
                     .changed()
                 {
                     self.editor_mode = EditorMode::ALL[index];
@@ -873,16 +801,10 @@ impl PatchTool {
                     self.cursor_line = cursor.line;
                 }
                 // `Ctrl+click` / right-click menu on a `#id`.
-                let labels = (
-                    i18n.t(I18nKey::NemesisGoToDefinition),
-                    i18n.t(I18nKey::NemesisFindReferences),
-                );
-                if let Some(request) = navigate::pointer_request(
-                    &output,
-                    &self.editor_text,
-                    &mut self.menu_target,
-                    labels,
-                ) {
+                let labels = (i18n.t(I18nKey::NemesisGoToDefinition), i18n.t(I18nKey::NemesisFindReferences));
+                if let Some(request) =
+                    navigate::pointer_request(&output, &self.editor_text, &mut self.menu_target, labels)
+                {
                     nav = Some(request);
                 }
                 if let Some(request) = navigate::command_request(&output, &self.editor_text) {
@@ -901,9 +823,7 @@ impl PatchTool {
         });
 
         match nav {
-            Some(navigate::Request::GoTo(target))
-                if self.workspace.behaviors[self.active].text(&target).is_some() =>
-            {
+            Some(navigate::Request::GoTo(target)) if self.workspace.behaviors[self.active].text(&target).is_some() => {
                 self.history.visit(&id);
                 self.selected = Some(target);
             }
@@ -937,12 +857,9 @@ impl PatchTool {
 fn field_diagnostics(text: &str, behavior: &workspace::Behavior) -> Vec<Diagnostic> {
     let lines: Vec<&str> = text.lines().collect();
     let class_of = |id: &str| behavior.class_of(id);
-    let names = nemesis_diff::check_fields(text)
-        .into_iter()
-        .map(|p| (p.line, p.message, Severity::Warning));
-    let pointers = nemesis_diff::schema::check_pointers(text, &class_of)
-        .into_iter()
-        .map(|p| (p.line, p.message, Severity::Error));
+    let names = nemesis_diff::check_fields(text).into_iter().map(|p| (p.line, p.message, Severity::Warning));
+    let pointers =
+        nemesis_diff::schema::check_pointers(text, &class_of).into_iter().map(|p| (p.line, p.message, Severity::Error));
     names
         .chain(pointers)
         .map(|(line_no, message, severity)| {
@@ -970,47 +887,25 @@ fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> O
         let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::NemesisRevert };
         ui.add(Button::new(i18n.t(label)).destructive()).clicked()
     };
-    [
-        (duplicate, RowAction::Duplicate),
-        (copy, RowAction::CopyId),
-        (revert, RowAction::RevertOrDelete),
-    ]
-    .into_iter()
-    .find_map(|(clicked, action)| clicked.then_some(action))
+    [(duplicate, RowAction::Duplicate), (copy, RowAction::CopyId), (revert, RowAction::RevertOrDelete)]
+        .into_iter()
+        .find_map(|(clicked, action)| clicked.then_some(action))
 }
 
 /// The language features that apply to the object editor (the hkanno options window's subset).
-fn lsp_options_window(
-    ctx: &egui::Context,
-    i18n: &I18nMap,
-    lsp: &mut HkannoLspOptions,
-    open: &mut bool,
-) {
-    egui::Window::new(i18n.t(I18nKey::HkannoLspOptionsTitle))
-        .open(open)
-        .resizable(false)
-        .collapsible(false)
-        .show(ctx, |ui| {
+fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions, open: &mut bool) {
+    egui::Window::new(i18n.t(I18nKey::HkannoLspOptionsTitle)).open(open).resizable(false).collapsible(false).show(
+        ctx,
+        |ui| {
             let options = [
-                (
-                    &mut lsp.completion,
-                    I18nKey::HkannoLspCompletion,
-                    I18nKey::HkannoLspCompletionHover,
-                ),
-                (
-                    &mut lsp.diagnostics,
-                    I18nKey::HkannoLspDiagnostics,
-                    I18nKey::HkannoLspDiagnosticsHover,
-                ),
-                (&mut lsp.hover, I18nKey::HkannoLspHover, I18nKey::HkannoLspHoverHover),
-                (
-                    &mut lsp.signature_help,
-                    I18nKey::HkannoLspSignatureHelp,
-                    I18nKey::HkannoLspSignatureHelpHover,
-                ),
+                (&mut lsp.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
+                (&mut lsp.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
+                (&mut lsp.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
+                (&mut lsp.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
             ];
             for (value, label, hover) in options {
                 ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
             }
-        });
+        },
+    );
 }

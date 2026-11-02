@@ -116,11 +116,7 @@ mod tests {
     use crate::asdsf::normal::de::parse_asdsf;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
-        if input.contains("\r\n") {
-            input.into()
-        } else {
-            input.replace("\r", "").replace("\n", "\r\n").into()
-        }
+        if input.contains("\r\n") { input.into() } else { input.replace("\r", "").replace("\n", "\r\n").into() }
     }
 
     #[test]

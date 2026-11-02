@@ -19,9 +19,7 @@ pub struct SequencedAnimation<'a> {
 }
 
 pub(crate) fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<SequencedAnimation<'a>> {
-    use crate::combinator::anim_types::FNISAnimType::{
-        Sequenced, SequencedContinued, SequencedOptimized,
-    };
+    use crate::combinator::anim_types::FNISAnimType::{Sequenced, SequencedContinued, SequencedOptimized};
 
     let seq_start_anim = parse_fnis_animation
         .verify(|anim| matches!(anim.anim_type, Sequenced | SequencedOptimized))
@@ -33,10 +31,7 @@ pub(crate) fn parse_seq_animation<'a>(input: &mut &'a str) -> ModalResult<Sequen
     // NOTE: To avoid intermediate allocations of `Vec` caused by using `repeat`, manually perform the loop.
     loop {
         skip_ws_and_comments0.parse_next(input)?;
-        match parse_fnis_animation
-            .verify(|anim| matches!(anim.anim_type, SequencedContinued))
-            .parse_next(input)
-        {
+        match parse_fnis_animation.verify(|anim| matches!(anim.anim_type, SequencedContinued)).parse_next(input) {
             Ok(anim) => animations.push(anim),
             Err(winnow::error::ErrMode::Backtrack(_)) => break, // End if no further action.
             Err(e) => return Err(e),
@@ -137,8 +132,7 @@ mod tests {
         use crate::combinator::version::parse_version_line;
 
         let list = std::fs::read_to_string("../../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer/FNIS_FNISFLyer_List.txt").unwrap();
-        let ret =
-            must_parse((parse_version_line, parse_seq_animation, parse_fnis_animation), &list);
+        let ret = must_parse((parse_version_line, parse_seq_animation, parse_fnis_animation), &list);
         std::fs::write("./debug.log", format!("{ret:#?}")).unwrap();
     }
 }

@@ -65,10 +65,7 @@ pub(super) fn new_mt_global_patch<'a>(
     seq_patches.push((
         json_path!["#5195", "hkbStateMachine", "states"],
         ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: simd_json::json_typed!(borrowed, [FNIS_FU_MT_5200]),
-            },
+            patch: JsonPatch { action: Action::SeqPush, value: simd_json::json_typed!(borrowed, [FNIS_FU_MT_5200]) },
             priority,
         },
     ));

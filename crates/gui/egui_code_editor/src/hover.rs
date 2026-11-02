@@ -105,8 +105,7 @@ impl HoverPopup {
         }
 
         // Any other key (e.g., Vim `j`) or a click elsewhere closes it.
-        let clicked_outside =
-            click_pos.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
+        let clicked_outside = click_pos.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
         if key_pressed || clicked_outside {
             if clicked_outside {
                 self.suppressed_at = click_pos;
@@ -164,14 +163,7 @@ impl HoverPopup {
     }
 
     /// The pointer is on the char at `index`: wait for the delay, then open / move the popup.
-    fn on_char(
-        &mut self,
-        index: usize,
-        pointer: Option<Pos2>,
-        now: f64,
-        ui: &egui::Ui,
-        ctx: &HoverCtx<'_>,
-    ) {
+    fn on_char(&mut self, index: usize, pointer: Option<Pos2>, now: f64, ui: &egui::Ui, ctx: &HoverCtx<'_>) {
         if let Some(at) = self.suppressed_at {
             if pointer.is_some_and(|p| p.distance(at) < 3.0) {
                 return;
@@ -223,9 +215,7 @@ fn content(index: usize, ctx: &HoverCtx<'_>) -> Option<Content> {
     let problems: Vec<(Severity, String)> = ctx
         .diagnostics
         .iter()
-        .filter(|d| {
-            d.line == pos.line && d.columns.start <= pos.column && pos.column <= d.columns.end
-        })
+        .filter(|d| d.line == pos.line && d.columns.start <= pos.column && pos.column <= d.columns.end)
         .map(|d| (d.severity, d.message.clone()))
         .collect();
     let docs = if ctx.with_docs { ctx.language.hover(line, pos.column) } else { None };
@@ -238,12 +228,9 @@ fn focused_keys(ui: &egui::Ui, open: &mut Open, editor_id: egui::Id) {
     use egui::{Key, Modifiers};
 
     let (close, next, prev, clicked_outside) = ui.input_mut(|i| {
-        let close =
-            i.consume_key(Modifiers::NONE, Key::Escape) || i.consume_key(Modifiers::NONE, Key::Q);
-        let next = i.consume_key(Modifiers::NONE, Key::J)
-            || i.consume_key(Modifiers::NONE, Key::ArrowDown);
-        let prev =
-            i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+        let close = i.consume_key(Modifiers::NONE, Key::Escape) || i.consume_key(Modifiers::NONE, Key::Q);
+        let next = i.consume_key(Modifiers::NONE, Key::J) || i.consume_key(Modifiers::NONE, Key::ArrowDown);
+        let prev = i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
         let click = i.pointer.any_pressed().then(|| i.pointer.interact_pos()).flatten();
         let outside = click.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
         (close, next, prev, outside)
@@ -304,8 +291,8 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &Open) -> Rect {
 fn char_at(galley: &Galley, galley_pos: Pos2, pointer: Pos2) -> Option<usize> {
     let cursor = galley.cursor_from_pos(pointer - galley_pos);
     let glyph = galley.pos_from_cursor(cursor).translate(galley_pos.to_vec2());
-    let near_glyph = (pointer.x - glyph.left()).abs() <= 40.0
-        && glyph.expand2(egui::vec2(0.0, 2.0)).y_range().contains(pointer.y);
+    let near_glyph =
+        (pointer.x - glyph.left()).abs() <= 40.0 && glyph.expand2(egui::vec2(0.0, 2.0)).y_range().contains(pointer.y);
     near_glyph.then_some(cursor.index.0)
 }
 

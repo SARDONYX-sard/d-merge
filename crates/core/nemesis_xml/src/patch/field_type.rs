@@ -19,8 +19,7 @@ impl FieldType {
     }
 
     /// A single pointer.
-    pub const POINTER: Self =
-        Self { kind: TypeKind::Pointer, sub_kind: TypeKind::Void, class: None };
+    pub const POINTER: Self = Self { kind: TypeKind::Pointer, sub_kind: TypeKind::Void, class: None };
 
     /// The type of one element of this array.
     pub const fn element(self) -> Self {
@@ -29,14 +28,7 @@ impl FieldType {
 
     /// Read as a string (`<hkcstring>` in arrays): text, enums and flags.
     pub const fn is_string(self) -> bool {
-        matches!(
-            self.kind,
-            TypeKind::Char
-                | TypeKind::CString
-                | TypeKind::StringPtr
-                | TypeKind::Enum
-                | TypeKind::Flags
-        )
+        matches!(self.kind, TypeKind::Char | TypeKind::CString | TypeKind::StringPtr | TypeKind::Enum | TypeKind::Flags)
     }
 }
 

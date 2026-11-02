@@ -115,9 +115,7 @@ pub(crate) fn new_fnis_aa_slot_config_json(
         Ok(json) => json,
         Err(e) => {
             #[cfg(feature = "tracing")]
-            tracing::error!(
-                "Failed to serialize animation config JSON for group '{group_name}' slot {slot}: {e}"
-            );
+            tracing::error!("Failed to serialize animation config JSON for group '{group_name}' slot {slot}: {e}");
             String::new()
         }
     }

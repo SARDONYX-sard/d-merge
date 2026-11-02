@@ -29,28 +29,27 @@ pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> 
     let old_map: fast_hash::HashMap<&str, (bool, usize)> =
         old.par_iter().map(|m| (m.id.as_str(), (m.enabled, m.priority))).collect();
 
-    let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) =
-        new.into_par_iter().partition_map(|info| {
-            if let Some(&(enabled, priority)) = old_map.get(info.id.as_str()) {
-                Either::Left(ModItem {
-                    enabled,
-                    id: info.id,
-                    name: info.name,
-                    site: info.site,
-                    priority,
-                    mod_type: info.mod_type,
-                })
-            } else {
-                Either::Right(ModItem {
-                    enabled: false,
-                    id: info.id,
-                    name: info.name,
-                    site: info.site,
-                    priority: 0, // temporary
-                    mod_type: info.mod_type,
-                })
-            }
-        });
+    let (mut with_old, mut without_old): (Vec<ModItem>, Vec<ModItem>) = new.into_par_iter().partition_map(|info| {
+        if let Some(&(enabled, priority)) = old_map.get(info.id.as_str()) {
+            Either::Left(ModItem {
+                enabled,
+                id: info.id,
+                name: info.name,
+                site: info.site,
+                priority,
+                mod_type: info.mod_type,
+            })
+        } else {
+            Either::Right(ModItem {
+                enabled: false,
+                id: info.id,
+                name: info.name,
+                site: info.site,
+                priority: 0, // temporary
+                mod_type: info.mod_type,
+            })
+        }
+    });
 
     rayon::join(
         // Existing mods: order by old priority
@@ -202,18 +201,8 @@ mod tests {
         ];
 
         let new = vec![
-            ModInfo {
-                id: "high".into(),
-                name: "High".into(),
-                site: "x".into(),
-                ..Default::default()
-            },
-            ModInfo {
-                id: "low".into(),
-                name: "Low".into(),
-                site: "x".into(),
-                ..Default::default()
-            },
+            ModInfo { id: "high".into(), name: "High".into(), site: "x".into(), ..Default::default() },
+            ModInfo { id: "low".into(), name: "Low".into(), site: "x".into(), ..Default::default() },
         ];
 
         let result = inherit_reorder_cast(&old, new);

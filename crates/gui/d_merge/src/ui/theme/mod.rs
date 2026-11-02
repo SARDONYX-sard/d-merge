@@ -34,9 +34,7 @@ use crate::{
     theme::EguiColorExt as _,
     ui::{
         notify::Notification,
-        shadcn::{
-            Button, Checkbox, ComboBox, Label, Slider, TextEdit, ToggleGroup, theme::ShadcnTheme,
-        },
+        shadcn::{Button, Checkbox, ComboBox, Label, Slider, TextEdit, ToggleGroup, theme::ShadcnTheme},
         theme::cache::ThemeCache,
     },
 };
@@ -53,8 +51,7 @@ enum WidgetTab {
 }
 
 impl WidgetTab {
-    const ALL: &'static [Self] =
-        &[Self::Noninteractive, Self::Inactive, Self::Hovered, Self::Active, Self::Open];
+    const ALL: &'static [Self] = &[Self::Noninteractive, Self::Inactive, Self::Hovered, Self::Active, Self::Open];
 
     const fn label(self) -> &'static str {
         match self {
@@ -165,8 +162,7 @@ impl ThemeManager {
             Ok(_) => {
                 // Refresh the local name snapshot in case a new entry was added.
                 self.names = self.cache.names();
-                self.selected_index =
-                    self.names.iter().position(|n| n == &self.save_name).unwrap_or(0);
+                self.selected_index = self.names.iter().position(|n| n == &self.save_name).unwrap_or(0);
                 self.status.success(format!("Saved \"{}\".", self.save_name));
             }
             Err(e) => {
@@ -182,10 +178,8 @@ impl ThemeManager {
         self.names = self.cache.names();
 
         // re select
-        self.selected_index = selected_name
-            .as_deref()
-            .and_then(|name| self.names.iter().position(|n| n == name))
-            .unwrap_or(0);
+        self.selected_index =
+            selected_name.as_deref().and_then(|name| self.names.iter().position(|n| n == name)).unwrap_or(0);
 
         self.status.success("Directory reloaded.");
     }
@@ -200,14 +194,12 @@ impl ThemeManager {
     pub(crate) fn show(&mut self, ctx: &egui::Context, open: &mut bool) -> Option<SettingsUpdate> {
         let mut update: Option<SettingsUpdate> = None;
 
-        egui::Window::new("Theme Editor")
-            .open(open)
-            .default_width(380.0)
-            .min_width(300.0)
-            .resizable(true)
-            .show(ctx, |ui| {
+        egui::Window::new("Theme Editor").open(open).default_width(380.0).min_width(300.0).resizable(true).show(
+            ctx,
+            |ui| {
                 update = self.ui_contents(ui);
-            });
+            },
+        );
 
         update
     }
@@ -228,9 +220,7 @@ impl ThemeManager {
                 if ComboBox::from_id_salt("theme_preset_combo")
                     .width(220.0)
                     .search_hint("Search...")
-                    .show_index(ui, &mut self.selected_index, names.len(), |i| {
-                        names.get(i).map_or("", String::as_str)
-                    })
+                    .show_index(ui, &mut self.selected_index, names.len(), |i| names.get(i).map_or("", String::as_str))
                     .changed()
                 {
                     selection_changed = true;
@@ -285,10 +275,7 @@ impl ThemeManager {
                 egui::CollapsingHeader::new("Widgets").default_open(false).show(ui, |ui| {
                     let tabs = WidgetTab::ALL;
                     let mut index = tabs.iter().position(|t| *t == self.widget_tab).unwrap_or(0);
-                    if ToggleGroup::new()
-                        .show_index(ui, &mut index, tabs.len(), |i| tabs[i].label())
-                        .changed()
-                    {
+                    if ToggleGroup::new().show_index(ui, &mut index, tabs.len(), |i| tabs[i].label()).changed() {
                         self.widget_tab = tabs[index];
                     }
 
@@ -530,10 +517,7 @@ fn stroke_edit(ui: &mut egui::Ui, stroke: &mut StrokeConfig) -> bool {
 /// Apply this preset to an egui `Context`.
 pub(crate) fn apply(preset: &ThemePreset, ctx: &egui::Context) {
     ctx.set_visuals(preset::to_egui_visuals(&preset.visuals));
-    ctx.set_global_style(egui::Style {
-        visuals: preset::to_egui_visuals(&preset.visuals),
-        ..Default::default()
-    });
+    ctx.set_global_style(egui::Style { visuals: preset::to_egui_visuals(&preset.visuals), ..Default::default() });
 
     preset::to_shadcn_theme(&preset.shadcn).set(ctx);
 }

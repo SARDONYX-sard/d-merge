@@ -226,10 +226,7 @@ pub fn json_tokens(line: &str) -> Vec<(Span, TokenKind)> {
             }
             c if c == '-' || c.is_ascii_digit() => {
                 i += 1;
-                while chars
-                    .get(i)
-                    .is_some_and(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-'))
-                {
+                while chars.get(i).is_some_and(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-')) {
                     i += 1;
                 }
                 tokens.push((Span::new(start, i), TokenKind::Number));
@@ -271,8 +268,8 @@ mod tests {
         assert_eq!(
             kinds,
             [
-                Operator, Variable, Operator, String, Operator, Variable, Operator, Number,
-                Operator, Variable, Operator, Keyword, Operator
+                Operator, Variable, Operator, String, Operator, Variable, Operator, Number, Operator, Variable,
+                Operator, Keyword, Operator
             ]
         );
         // The event name is an identifier, not annotation text.

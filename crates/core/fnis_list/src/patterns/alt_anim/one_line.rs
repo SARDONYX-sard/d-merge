@@ -8,9 +8,7 @@ use winnow::{
     token::take_till,
 };
 
-use crate::combinator::{
-    Trigger, comment::skip_ws_and_comments0, take_till_fnis_ignores, take_till_space,
-};
+use crate::combinator::{Trigger, comment::skip_ws_and_comments0, take_till_fnis_ignores, take_till_space};
 
 /// AlterativeAnimation set
 ///
@@ -134,10 +132,7 @@ mod tests {
             res,
             AnimTrigger {
                 anim_name: "_run",
-                triggers: vec![
-                    Trigger { event: "start", time: 0.0 },
-                    Trigger { event: "end", time: 1.5 },
-                ],
+                triggers: vec![Trigger { event: "start", time: 0.0 }, Trigger { event: "end", time: 1.5 },],
             }
         );
 
@@ -146,10 +141,7 @@ mod tests {
             res2,
             AnimTrigger {
                 anim_name: "_walk",
-                triggers: vec![
-                    Trigger { event: "trigger1", time: 0.2 },
-                    Trigger { event: "trigger2", time: 3.5 },
-                ],
+                triggers: vec![Trigger { event: "trigger1", time: 0.2 }, Trigger { event: "trigger2", time: 3.5 },],
             }
         );
 

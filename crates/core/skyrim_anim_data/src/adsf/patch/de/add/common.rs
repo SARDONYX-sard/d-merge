@@ -136,17 +136,11 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     pub(super) fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::ContextError { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::ContextError { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::ReadableError { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::ReadableError { source: readable }
@@ -161,17 +155,11 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     pub(super) fn finish_error(&self, err: Error) -> ReadableError {
         match err {
-            Error::ContextError { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::ContextError { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::ReadableError { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         }
     }
 

@@ -43,8 +43,7 @@ impl<'a> TryFrom<Asdsf<'a>> for AltAsdsf<'a> {
         let mut txt_projects = IndexMap::<_, _, fast_hash::RandomState>::default();
         for (key, anim_set_list) in asdsf.txt_projects.0 {
             let mut buf = String::new();
-            to_alt_txt_project_name(key.as_ref(), &mut buf)
-                .ok_or_else(|| format!("Invalid path: {key}"))?;
+            to_alt_txt_project_name(key.as_ref(), &mut buf).ok_or_else(|| format!("Invalid path: {key}"))?;
             let alt_key = Str::from(buf);
             txt_projects.insert(alt_key, anim_set_list);
         }
@@ -59,8 +58,7 @@ impl<'a> TryFrom<AltAsdsf<'a>> for Asdsf<'a> {
         let mut txt_projects = IndexMap::<_, _, fast_hash::RandomState>::default();
         for (key, anim_set_list) in alt_asdsf.txt_projects.0 {
             let mut buf = String::new();
-            to_normal_txt_project_name(key.as_ref(), &mut buf)
-                .ok_or_else(|| format!("Invalid path: {key}"))?;
+            to_normal_txt_project_name(key.as_ref(), &mut buf).ok_or_else(|| format!("Invalid path: {key}"))?;
             let normal_key = Str::from(buf);
             txt_projects.insert(normal_key, anim_set_list);
         }

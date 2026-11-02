@@ -18,10 +18,8 @@ pub(super) fn to_egui_visuals(visual: &VisualsConfig) -> egui::Visuals {
     v.error_fg_color = visual.error_fg_color.to_egui_color32();
     v.window_fill = visual.window_fill.to_egui_color32();
     v.panel_fill = visual.panel_fill.to_egui_color32();
-    v.window_stroke = egui::Stroke {
-        width: visual.window_stroke.width,
-        color: visual.window_stroke.color.to_egui_color32(),
-    };
+    v.window_stroke =
+        egui::Stroke { width: visual.window_stroke.width, color: visual.window_stroke.color.to_egui_color32() };
     v.window_corner_radius = visual.window_corner_radius.into();
     v.menu_corner_radius = visual.menu_corner_radius.into();
     v.button_frame = visual.button_frame;
@@ -33,14 +31,8 @@ pub(super) fn to_egui_visuals(visual: &VisualsConfig) -> egui::Visuals {
     let map_wvc = |wvc: &WidgetVisualsConfig| egui::style::WidgetVisuals {
         bg_fill: wvc.bg_fill.to_egui_color32(),
         weak_bg_fill: wvc.weak_bg_fill.to_egui_color32(),
-        bg_stroke: egui::Stroke {
-            width: wvc.bg_stroke.width,
-            color: wvc.bg_stroke.color.to_egui_color32(),
-        },
-        fg_stroke: egui::Stroke {
-            width: wvc.fg_stroke.width,
-            color: wvc.fg_stroke.color.to_egui_color32(),
-        },
+        bg_stroke: egui::Stroke { width: wvc.bg_stroke.width, color: wvc.bg_stroke.color.to_egui_color32() },
+        fg_stroke: egui::Stroke { width: wvc.fg_stroke.width, color: wvc.fg_stroke.color.to_egui_color32() },
         corner_radius: wvc.corner_radius.into(),
         expansion: 0.0,
     };
@@ -106,14 +98,8 @@ pub(super) fn from_egui_visuals(visuals: &egui::Visuals, disabled_alpha: f32) ->
     let map_wvc = |wvc: &egui::style::WidgetVisuals| WidgetVisualsConfig {
         bg_fill: Rgba::from_egui_color32(wvc.bg_fill),
         weak_bg_fill: Rgba::from_egui_color32(wvc.weak_bg_fill),
-        bg_stroke: StrokeConfig {
-            width: wvc.bg_stroke.width,
-            color: Rgba::from_egui_color32(wvc.bg_stroke.color),
-        },
-        fg_stroke: StrokeConfig {
-            width: wvc.fg_stroke.width,
-            color: Rgba::from_egui_color32(wvc.fg_stroke.color),
-        },
+        bg_stroke: StrokeConfig { width: wvc.bg_stroke.width, color: Rgba::from_egui_color32(wvc.bg_stroke.color) },
+        fg_stroke: StrokeConfig { width: wvc.fg_stroke.width, color: Rgba::from_egui_color32(wvc.fg_stroke.color) },
         corner_radius: wvc.corner_radius.sw,
     };
 

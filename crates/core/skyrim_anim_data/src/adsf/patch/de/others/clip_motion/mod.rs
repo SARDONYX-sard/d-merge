@@ -72,10 +72,7 @@ impl<'a> ClipMotionDiffPatch<'a> {
             if !self.translations_patches.seq.is_empty() {
                 let patches = core::mem::take(&mut self.translations_patches.seq);
                 let template_array = template.try_as_array_mut().map_err(|_| {
-                    JsonPatchError::unsupported_range_kind_from(
-                        &json_patch::json_path!["translations"],
-                        &patches,
-                    )
+                    JsonPatchError::unsupported_range_kind_from(&json_patch::json_path!["translations"], &patches)
                 })?;
                 apply_seq_array_directly(template_array, patches)?;
             }
@@ -94,10 +91,7 @@ impl<'a> ClipMotionDiffPatch<'a> {
             if !self.rotations_patches.seq.is_empty() {
                 let patches = core::mem::take(&mut self.rotations_patches.seq);
                 let template_array = template.try_as_array_mut().map_err(|_| {
-                    JsonPatchError::unsupported_range_kind_from(
-                        &json_patch::json_path!["rotations"],
-                        &patches,
-                    )
+                    JsonPatchError::unsupported_range_kind_from(&json_patch::json_path!["rotations"], &patches)
                 })?;
                 apply_seq_array_directly(template_array, patches)?;
             }

@@ -45,11 +45,7 @@ impl Range {
             }
             Self::FromTo(range) => {
                 if range.start >= range.end || range.start >= array_len || range.end > array_len {
-                    return Err(RangeError::FromToOutOfBounds {
-                        start: range.start,
-                        end: range.end,
-                        len: array_len,
-                    });
+                    return Err(RangeError::FromToOutOfBounds { start: range.start, end: range.end, len: array_len });
                 }
             }
             Self::To(range_to) => {
@@ -59,10 +55,7 @@ impl Range {
             }
             Self::From(range_from) => {
                 if range_from.start >= array_len {
-                    return Err(RangeError::StartOutOfBounds {
-                        start: range_from.start,
-                        len: array_len,
-                    });
+                    return Err(RangeError::StartOutOfBounds { start: range_from.start, len: array_len });
                 }
             }
             Self::Full => {} // The full range is always valid

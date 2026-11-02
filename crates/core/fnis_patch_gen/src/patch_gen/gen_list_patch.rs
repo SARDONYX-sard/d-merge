@@ -20,8 +20,8 @@ use crate::{
     errors::FnisPatchGenerationError,
     patch_gen::{
         anim_var::new_push_anim_vars_patch, chair::new_chair_patches,
-        furniture::one_group::new_furniture_one_group_patches, io_jobs::AnimIoJob,
-        kill_move::new_kill_patches, offset_arm::new_offset_arm_patches, pair::new_pair_patches,
+        furniture::one_group::new_furniture_one_group_patches, io_jobs::AnimIoJob, kill_move::new_kill_patches,
+        offset_arm::new_offset_arm_patches, pair::new_pair_patches,
     },
 };
 
@@ -99,12 +99,9 @@ pub(super) fn generate_patch<'a>(
                 seq_master_patches.par_extend(new_push_anim_vars_patch(&[anim_var], owned_data));
             }
             SyntaxPattern::AltAnim(alt_animation) => {
-                let (jobs, errs) =
-                    super::alternate::alt_anim_to_oar(owned_data, alt_animation, config);
+                let (jobs, errs) = super::alternate::alt_anim_to_oar(owned_data, alt_animation, config);
                 if !errs.is_empty() {
-                    return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR {
-                        errors: errs,
-                    });
+                    return Err(FnisPatchGenerationError::FailedToConvertAltAnimToOAR { errors: errs });
                 }
                 conversion_jobs.par_extend(jobs);
             }
@@ -116,8 +113,7 @@ pub(super) fn generate_patch<'a>(
                     });
                 }
 
-                let FNISPairedAndKillAnimation { kind, flag_set, anim_file, anim_event, .. } =
-                    &paired_and_kill_anim;
+                let FNISPairedAndKillAnimation { kind, flag_set, anim_file, anim_event, .. } = &paired_and_kill_anim;
 
                 if flag_set.flags.should_check_anim_file() {
                     all_anim_files.insert(*anim_file);
@@ -149,33 +145,23 @@ pub(super) fn generate_patch<'a>(
             }
             SyntaxPattern::Furniture(furniture_animation) => {
                 if !owned_data.behavior_entry.is_3rd_person_character() {
-                    return Err(
-                        FnisPatchGenerationError::UnsupportedFurnitureAnimationToCreature {
-                            path: owned_data.to_list_path(),
-                        },
-                    );
+                    return Err(FnisPatchGenerationError::UnsupportedFurnitureAnimationToCreature {
+                        path: owned_data.to_list_path(),
+                    });
                 }
 
-                all_anim_files.extend(furniture_animation.animations.iter().filter_map(
-                    |fnis_anim| {
-                        fnis_anim
-                            .flag_set
-                            .flags
-                            .should_check_anim_file()
-                            .then_some(fnis_anim.anim_file)
-                    },
-                ));
+                all_anim_files.extend(furniture_animation.animations.iter().filter_map(|fnis_anim| {
+                    fnis_anim.flag_set.flags.should_check_anim_file().then_some(fnis_anim.anim_file)
+                }));
 
                 // NOTE: Based on the temporal_log, it appears Furniture does not need to register its animation with behaviors like `defaultmale.xml`.
-                let (one, seq, group_root_index) =
-                    new_furniture_one_group_patches(&furniture_animation, owned_data);
+                let (one, seq, group_root_index) = new_furniture_one_group_patches(&furniture_animation, owned_data);
                 one_mt_behavior_patches.par_extend(one);
                 seq_mt_behavior_patches.par_extend(seq);
                 furniture_group_root_indexes.push(group_root_index);
             }
             SyntaxPattern::Sequenced(sequenced_animation) => {
-                let (anim_files, events, adsf_patches) =
-                    collect_seq_patch(owned_data, sequenced_animation);
+                let (anim_files, events, adsf_patches) = collect_seq_patch(owned_data, sequenced_animation);
 
                 all_anim_files.extend(anim_files);
                 all_events.extend(events);
@@ -183,11 +169,9 @@ pub(super) fn generate_patch<'a>(
             }
             SyntaxPattern::OffsetArm(fnis_animation) => {
                 if !owned_data.behavior_entry.is_3rd_person_character() {
-                    return Err(
-                        FnisPatchGenerationError::UnsupportedOffsetArmAnimationToCreature {
-                            path: owned_data.to_list_path(),
-                        },
-                    );
+                    return Err(FnisPatchGenerationError::UnsupportedOffsetArmAnimationToCreature {
+                        path: owned_data.to_list_path(),
+                    });
                 }
 
                 let FNISAnimation { flag_set, anim_file, .. } = &fnis_animation;
@@ -266,17 +250,10 @@ fn collect_seq_patch<'a>(
 ///   generation time (confirmed from FNIS-generated behavior output)
 ///   Whether this applies to other mods is not yet verified.
 fn anim_event_hack<'a>(namespace: &str, anim_event: &'a str) -> Cow<'a, str> {
-    if namespace == "FNISFlyer" {
-        Cow::Owned(format!("{namespace}_{anim_event}"))
-    } else {
-        Cow::Borrowed(anim_event)
-    }
+    if namespace == "FNISFlyer" { Cow::Owned(format!("{namespace}_{anim_event}")) } else { Cow::Borrowed(anim_event) }
 }
 
-fn new_adsf_patch<'a>(
-    owned_data: &'a OwnedFnisInjection,
-    fnis_animation: FNISAnimation<'a>,
-) -> Vec<AdsfPatch<'a>> {
+fn new_adsf_patch<'a>(owned_data: &'a OwnedFnisInjection, fnis_animation: FNISAnimation<'a>) -> Vec<AdsfPatch<'a>> {
     use crate::adsf::PatchKind;
 
     let FNISAnimation { flag_set, anim_event, motions, rotations, .. } = fnis_animation;
@@ -309,8 +286,7 @@ fn new_adsf_patch<'a>(
     });
 
     let motion_block = {
-        let rotations: Vec<Rotation<'a>> =
-            rotations.into_par_iter().map(|rotation| rotation.into_rotation()).collect();
+        let rotations: Vec<Rotation<'a>> = rotations.into_par_iter().map(|rotation| rotation.into_rotation()).collect();
 
         let duration = match (motions.last(), rotations.last()) {
             (None, None) => Cow::Borrowed("0.000000"), // NOTE: Unreachable. The empty check has already been done above.
@@ -374,21 +350,21 @@ fn new_asdsf_patch<'a>(
     let namespace = &owned_data.namespace;
 
     // NOTE: need lowercase
-    let lower_anim_file = PathBuf::from(
-        format!("meshes\\actors\\character\\animations\\{namespace}\\{anim_file}").to_lowercase(),
-    );
+    let lower_anim_file =
+        PathBuf::from(format!("meshes\\actors\\character\\animations\\{namespace}\\{anim_file}").to_lowercase());
 
     // Intended:
     // `meshes\actors\character\animations\foo\bar.hkx`
     // -> `meshes\actors\character\animations\foo`
-    let parent = lower_anim_file.parent().and_then(|dir| dir.to_str()).ok_or_else(|| {
-        FnisPatchGenerationError::MissingAnimationParent { path: lower_anim_file.clone() }
-    })?;
+    let parent = lower_anim_file
+        .parent()
+        .and_then(|dir| dir.to_str())
+        .ok_or_else(|| FnisPatchGenerationError::MissingAnimationParent { path: lower_anim_file.clone() })?;
 
-    let file_stem =
-        lower_anim_file.file_stem().and_then(|path| path.to_str()).ok_or_else(|| {
-            FnisPatchGenerationError::MissingAnimationFileStem { path: lower_anim_file.clone() }
-        })?;
+    let file_stem = lower_anim_file
+        .file_stem()
+        .and_then(|path| path.to_str())
+        .ok_or_else(|| FnisPatchGenerationError::MissingAnimationFileStem { path: lower_anim_file.clone() })?;
 
     let anim_info = skyrim_anim_data::asdsf::normal::AnimInfo {
         hashed_path: skyrim_crc::calc_crc32(parent).to_string().into(),
@@ -433,16 +409,8 @@ fn new_asdsf_patch<'a>(
     let player_patch = make_patch(anim_event, true);
 
     Ok(vec![
-        AsdsfPatch {
-            target: "DefaultFemaleData~DefaultFemale",
-            id: namespace,
-            patch: npc_patch.clone(),
-        },
-        AsdsfPatch {
-            target: "DefaultFemaleData~DefaultFemale",
-            id: namespace,
-            patch: player_patch.clone(),
-        },
+        AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: namespace, patch: npc_patch.clone() },
+        AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: namespace, patch: player_patch.clone() },
         AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: namespace, patch: npc_patch },
         AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: namespace, patch: player_patch },
     ])

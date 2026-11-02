@@ -64,12 +64,7 @@ pub fn objects(xml: &str) -> Vec<XmlObject<'_>> {
             }
             Some((begin, open_indent, id, class)) => {
                 if indent == open_indent && trimmed.trim_end() == "</hkobject>" {
-                    found.push(XmlObject {
-                        id,
-                        class,
-                        text: &xml[begin..offset],
-                        range: begin..offset,
-                    });
+                    found.push(XmlObject { id, class, text: &xml[begin..offset], range: begin..offset });
                     open = None;
                 }
             }
@@ -100,8 +95,7 @@ pub fn normalize(text: &str) -> String {
         }
         let indent = &content[..content.len() - trimmed.len()];
         let mut tokens = trimmed.split_whitespace().peekable();
-        let only_pointers =
-            tokens.peek().is_some() && trimmed.split_whitespace().all(|t| t.starts_with('#'));
+        let only_pointers = tokens.peek().is_some() && trimmed.split_whitespace().all(|t| t.starts_with('#'));
 
         if only_pointers && trimmed.split_whitespace().nth(1).is_some() {
             for token in tokens {
@@ -235,9 +229,8 @@ pub fn align_numelements(template: &str, edited: &str) -> String {
             let original = template_counts.get(&name)?.get(*k)?;
             *k += 1;
             let current = count(line)?;
-            (current != *original).then(|| {
-                line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1)
-            })
+            (current != *original)
+                .then(|| line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1))
         });
         out.push_str(aligned.as_deref().unwrap_or(line));
     }
@@ -333,8 +326,7 @@ impl BehaviorDiff {
 /// Objects the template does not have get Nemesis ids (`#mymod$0`, `#mymod$1`, ...), and every
 /// reference to them is renamed too. Ids already in that form are kept.
 pub fn diff_behavior(mod_code: &str, template: &str, edited: &str) -> BehaviorDiff {
-    let template_objects: HashMap<&str, XmlObject<'_>> =
-        objects(template).into_iter().map(|o| (o.id, o)).collect();
+    let template_objects: HashMap<&str, XmlObject<'_>> = objects(template).into_iter().map(|o| (o.id, o)).collect();
     let edited_objects = objects(edited);
 
     let renames = new_ids(mod_code, &template_objects, &edited_objects);
@@ -366,11 +358,7 @@ pub fn diff_behavior(mod_code: &str, template: &str, edited: &str) -> BehaviorDi
             });
         }
     }
-    diff.removed = objects(template)
-        .iter()
-        .filter(|o| !seen.contains(o.id))
-        .map(|o| o.id.to_string())
-        .collect();
+    diff.removed = objects(template).iter().filter(|o| !seen.contains(o.id)).map(|o| o.id.to_string()).collect();
     diff
 }
 
@@ -381,11 +369,8 @@ fn new_ids(
     edited: &[XmlObject<'_>],
 ) -> HashMap<String, String> {
     let prefix = format!("#{mod_code}$");
-    let first = edited
-        .iter()
-        .filter_map(|o| o.id.strip_prefix(&prefix)?.parse::<usize>().ok())
-        .max()
-        .map_or(0, |n| n + 1);
+    let first =
+        edited.iter().filter_map(|o| o.id.strip_prefix(&prefix)?.parse::<usize>().ok()).max().map_or(0, |n| n + 1);
     edited
         .iter()
         .filter(|o| !template.contains_key(o.id) && !o.id.starts_with(&prefix))
@@ -401,8 +386,7 @@ fn rename_pointers(text: &str, renames: &HashMap<String, String>) -> String {
     let mut rest = text;
     while let Some(at) = rest.find('#') {
         out.push_str(&rest[..at]);
-        let token_len =
-            rest[at + 1..].find(|c: char| !is_id_char(c)).unwrap_or(rest.len() - at - 1);
+        let token_len = rest[at + 1..].find(|c: char| !is_id_char(c)).unwrap_or(rest.len() - at - 1);
         let token = &rest[at..at + 1 + token_len];
         out.push_str(renames.get(token).map_or(token, String::as_str));
         rest = &rest[at + 1 + token_len..];
@@ -415,10 +399,7 @@ fn rename_pointers(text: &str, renames: &HashMap<String, String>) -> String {
 ///
 /// `patches`: `(file stem, contents)`, e.g. `("#0106", "..")`, `("#mymod$0", "..")`.
 /// Changed objects are replaced by their [`View::Mod`]; new objects are appended to the section.
-pub fn apply_patches<'a>(
-    template: &str,
-    patches: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> String {
+pub fn apply_patches<'a>(template: &str, patches: impl IntoIterator<Item = (&'a str, &'a str)>) -> String {
     let objects = objects(template);
     let mut replaced: HashMap<&str, String> = HashMap::default();
     let mut appended = String::new();
@@ -442,10 +423,8 @@ pub fn apply_patches<'a>(
     }
     let rest = &template[at..];
     // New objects go on the line before `</hksection>` (or at the end without one).
-    let insert_at = rest
-        .rfind("</hksection>")
-        .and_then(|end| rest[..end].rfind('\n').map(|nl| nl + 1))
-        .unwrap_or(rest.len());
+    let insert_at =
+        rest.rfind("</hksection>").and_then(|end| rest[..end].rfind('\n').map(|nl| nl + 1)).unwrap_or(rest.len());
     out.push_str(&rest[..insert_at]);
     out.push_str(&appended);
     out.push_str(&rest[insert_at..]);
@@ -485,10 +464,7 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
             let class = attribute(rest, "class").or_else(|| fields.last().copied().flatten());
             let info = class.and_then(find_class_schema);
             if let Some(class) = class.filter(|_| info.is_none()) {
-                problems.push(FieldProblem {
-                    line: line_no,
-                    message: format!("Unknown class `{class}`."),
-                });
+                problems.push(FieldProblem { line: line_no, message: format!("Unknown class `{class}`.") });
             }
             objects.push((class.unwrap_or("?"), info));
             if trimmed.ends_with("/>") {
@@ -502,19 +478,16 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
                 Some((class, Some(info))) => {
                     let field = info.field(name);
                     if field.is_none() {
-                        problems.push(FieldProblem {
-                            line: line_no,
-                            message: format!("`{class}` has no field `{name}`."),
-                        });
+                        problems
+                            .push(FieldProblem { line: line_no, message: format!("`{class}` has no field `{name}`.") });
                     }
                     field
                 }
                 _ => None,
             };
             // A struct, or an array of structs: their `<hkobject>`s are of `field.class`.
-            let nested = field
-                .filter(|f| f.kind == TypeKind::Struct || f.sub_kind == TypeKind::Struct)
-                .and_then(|f| f.class);
+            let nested =
+                field.filter(|f| f.kind == TypeKind::Struct || f.sub_kind == TypeKind::Struct).and_then(|f| f.class);
             if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
                 fields.push(nested);
             }
@@ -598,10 +571,8 @@ mod tests {
 
     #[test]
     fn apply_then_diff_round_trips() {
-        let edited = TEMPLATE.replace(
-            "<hkparam name=\"userData\">1</hkparam>",
-            "<hkparam name=\"userData\">2</hkparam>",
-        );
+        let edited =
+            TEMPLATE.replace("<hkparam name=\"userData\">1</hkparam>", "<hkparam name=\"userData\">2</hkparam>");
         let diff = diff_behavior("mymod", TEMPLATE, &edited);
         let patch = &diff.changed[0].patch;
 
@@ -613,14 +584,8 @@ mod tests {
     fn revert_one_hunk() {
         let template = objects(TEMPLATE)[0].text;
         let edited = template
-            .replace(
-                "<hkparam name=\"userData\">1</hkparam>",
-                "<hkparam name=\"userData\">2</hkparam>",
-            )
-            .replace(
-                "<hkparam name=\"enable\">true</hkparam>",
-                "<hkparam name=\"enable\">false</hkparam>",
-            );
+            .replace("<hkparam name=\"userData\">1</hkparam>", "<hkparam name=\"userData\">2</hkparam>")
+            .replace("<hkparam name=\"enable\">true</hkparam>", "<hkparam name=\"enable\">false</hkparam>");
         assert_eq!(hunks(template, &edited).len(), 2);
 
         let reverted = revert_hunk(template, &edited, 0);

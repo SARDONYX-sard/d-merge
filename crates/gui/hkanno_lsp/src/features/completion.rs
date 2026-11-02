@@ -82,10 +82,8 @@ pub fn complete(line: &str, cursor: usize) -> CompletionList {
     };
 
     let typed = typed.to_lowercase();
-    let items = items
-        .into_iter()
-        .filter(|item| typed.is_empty() || item.label.to_lowercase().contains(&typed))
-        .collect();
+    let items =
+        items.into_iter().filter(|item| typed.is_empty() || item.label.to_lowercase().contains(&typed)).collect();
 
     CompletionList { replace: Span::new(word_start, cursor), items }
 }
@@ -120,12 +118,7 @@ fn text(node: &TextNode, cursor: usize) -> Vec<CompletionItem> {
     // Empty line: start of an annotation or a header.
     if node.time.is_none() {
         return vec![
-            item(
-                "<time>",
-                Value,
-                "0.0",
-                "```hkanno\n<time: f32>\n```\nThe timestamp at which this annotation occurs.",
-            ),
+            item("<time>", Value, "0.0", "```hkanno\n<time: f32>\n```\nThe timestamp at which this annotation occurs."),
             item(
                 "# numAnnotations:",
                 Keyword,
@@ -195,12 +188,7 @@ const fn scar_events() -> [CompletionItem; 4] {
     use CompletionKind::Function;
     [
         item(scar::COMBO_START, Function, scar::COMBO_START, scar::COMBO_START_DOC),
-        item(
-            "SCAR_ComboStart.<chance>",
-            Function,
-            "SCAR_ComboStart.${1:60}",
-            scar::COMBO_START_DOC,
-        ),
+        item("SCAR_ComboStart.<chance>", Function, "SCAR_ComboStart.${1:60}", scar::COMBO_START_DOC),
         item(scar::UPDATE_DUMMY, Function, scar::UPDATE_DUMMY, scar::UPDATE_DUMMY_DOC),
         item(
             scar::ACTION_DATA,
@@ -246,11 +234,7 @@ fn scar_json(json: &str) -> Vec<CompletionItem> {
                 .map(|(value, doc)| CompletionItem {
                     label: value,
                     kind: CompletionKind::EnumMember,
-                    insert: Cow::Owned(if quoted {
-                        value.to_string()
-                    } else {
-                        format!("\"{value}\"")
-                    }),
+                    insert: Cow::Owned(if quoted { value.to_string() } else { format!("\"{value}\"") }),
                     documentation: doc,
                 })
                 .collect()
@@ -265,9 +249,7 @@ fn motion(node: &MotionNode, cursor: usize) -> Vec<CompletionItem> {
 
     let end_of = |span: Option<Span>| span.map_or(0, |s| s.end);
     let start_of = |span: Option<Span>| span.map_or(usize::MAX, |s| s.start);
-    let value = |field: Option<&crate::parser::Field<f64>>| {
-        Cow::Owned(field.map_or(0.0, |f| f.value).to_string())
-    };
+    let value = |field: Option<&crate::parser::Field<f64>>| Cow::Owned(field.map_or(0.0, |f| f.value).to_string());
 
     let (label, insert, documentation) =
         if cursor >= end_of(node.space_after_event) && cursor < start_of(node.space_after_x) {

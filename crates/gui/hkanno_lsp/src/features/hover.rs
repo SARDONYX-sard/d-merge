@@ -7,10 +7,7 @@ use std::fmt::Write as _;
 
 use crate::{
     Span,
-    parser::{
-        IFrameNode, LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, TrackNameNode,
-        parse_line,
-    },
+    parser::{IFrameNode, LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, TrackNameNode, parse_line},
     scar,
 };
 
@@ -100,17 +97,12 @@ fn scar_hover(text: &str, column: usize) -> Option<String> {
         let chars: Vec<char> = text.chars().collect();
         let key_at = scar::ACTION_KEYS.iter().find(|key| {
             let quoted: Vec<char> = format!("\"{}\"", key.name).chars().collect();
-            (0..chars.len()).any(|at| {
-                chars[at..].starts_with(&quoted) && (at..at + quoted.len()).contains(&column)
-            })
+            (0..chars.len()).any(|at| chars[at..].starts_with(&quoted) && (at..at + quoted.len()).contains(&column))
         });
         return Some(match key_at {
-            Some(key) => format!(
-                "# SCAR_ActionData: `{}`\n{}\n\n- See: [SCAR manual]({})",
-                key.name,
-                key.doc,
-                scar::MANUAL_URL
-            ),
+            Some(key) => {
+                format!("# SCAR_ActionData: `{}`\n{}\n\n- See: [SCAR manual]({})", key.name, key.doc, scar::MANUAL_URL)
+            }
             None => {
                 format!("{}\n- See: [SCAR manual]({})", scar::ACTION_DATA_DOC, scar::MANUAL_URL)
             }
@@ -171,9 +163,7 @@ fn pie(node: &PieNode, cursor: usize) -> String {
     let name = ins.and_then(|ins| ins.name.as_ref()).map_or(UNKNOWN, |n| n.value);
     let params: Vec<&str> = ins
         .and_then(|ins| ins.parameters.as_ref())
-        .map(|params| {
-            params.items.iter().map(|p| p.value.as_ref().map_or(UNKNOWN, |v| v.value)).collect()
-        })
+        .map(|params| params.items.iter().map(|p| p.value.as_ref().map_or(UNKNOWN, |v| v.value)).collect())
         .unwrap_or_default();
 
     let mut md = format!("# PIE Instruction\n- Kind: `{kind}`\n- Name: `{name}`\n");

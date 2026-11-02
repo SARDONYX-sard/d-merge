@@ -90,13 +90,9 @@ pub fn remove(object: &str, param: &str, index: usize) -> Option<String> {
 
 /// `(string data, graph data)` with event `name` appended.
 pub fn add_event(string_data: &str, graph_data: &str, name: &str) -> Option<(String, String)> {
-    let string_data =
-        push(string_data, "eventNames", &[&format!("<hkcstring>{name}</hkcstring>")])?;
-    let graph_data = push(
-        graph_data,
-        "eventInfos",
-        &["<hkobject>", "\t<hkparam name=\"flags\">0</hkparam>", "</hkobject>"],
-    )?;
+    let string_data = push(string_data, "eventNames", &[&format!("<hkcstring>{name}</hkcstring>")])?;
+    let graph_data =
+        push(graph_data, "eventInfos", &["<hkobject>", "\t<hkparam name=\"flags\">0</hkparam>", "</hkobject>"])?;
     Some((string_data, graph_data))
 }
 
@@ -109,8 +105,7 @@ pub fn add_variable(
     kind: VariableType,
     value: i64,
 ) -> Option<(String, String, String)> {
-    let string_data =
-        push(string_data, "variableNames", &[&format!("<hkcstring>{name}</hkcstring>")])?;
+    let string_data = push(string_data, "variableNames", &[&format!("<hkcstring>{name}</hkcstring>")])?;
     let type_line = format!("\t<hkparam name=\"type\">{}</hkparam>", kind.havok_name());
     let graph_data = push(
         graph_data,
@@ -128,8 +123,7 @@ pub fn add_variable(
         ],
     )?;
     let value_line = format!("\t<hkparam name=\"value\">{value}</hkparam>");
-    let value_set =
-        push(value_set, "wordVariableValues", &["<hkobject>", &value_line, "</hkobject>"])?;
+    let value_set = push(value_set, "wordVariableValues", &["<hkobject>", &value_line, "</hkobject>"])?;
     Some((string_data, graph_data, value_set))
 }
 
@@ -165,9 +159,7 @@ impl Array {
         let close = lines[at + 1..]
             .iter()
             .position(|line| {
-                line.trim() == "</hkparam>"
-                    && line.starts_with(&indent)
-                    && line[indent.len()..].starts_with('<')
+                line.trim() == "</hkparam>" && line.starts_with(&indent) && line[indent.len()..].starts_with('<')
             })
             .map(|i| at + 1 + i)?;
         let mut elements = Vec::new();
@@ -175,8 +167,7 @@ impl Array {
         while i < close {
             let line = lines[i];
             if line.trim() == "<hkobject>" {
-                let element_indent: String =
-                    line.chars().take_while(|c| c.is_whitespace()).collect();
+                let element_indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
                 let end = (i + 1..close)
                     .find(|&j| {
                         lines[j].trim() == "</hkobject>"
@@ -209,7 +200,8 @@ impl Array {
 mod tests {
     use super::*;
 
-    const STRING_DATA: &str = "\t\t<hkobject name=\"#0092\" class=\"hkbBehaviorGraphStringData\" signature=\"0xc713064e\">
+    const STRING_DATA: &str =
+        "\t\t<hkobject name=\"#0092\" class=\"hkbBehaviorGraphStringData\" signature=\"0xc713064e\">
 \t\t\t<hkparam name=\"eventNames\" numelements=\"2\">
 \t\t\t\t<hkcstring>moveStart</hkcstring>
 \t\t\t\t<hkcstring>moveStop</hkcstring>
@@ -217,8 +209,7 @@ mod tests {
 \t\t\t<hkparam name=\"variableNames\" numelements=\"0\"></hkparam>
 \t\t</hkobject>
 ";
-    const GRAPH_DATA: &str =
-        "\t\t<hkobject name=\"#0094\" class=\"hkbBehaviorGraphData\" signature=\"0x95aca5d\">
+    const GRAPH_DATA: &str = "\t\t<hkobject name=\"#0094\" class=\"hkbBehaviorGraphData\" signature=\"0x95aca5d\">
 \t\t\t<hkparam name=\"eventInfos\" numelements=\"1\">
 \t\t\t\t<hkobject>
 \t\t\t\t\t<hkparam name=\"flags\">0</hkparam>
@@ -227,8 +218,7 @@ mod tests {
 \t\t\t<hkparam name=\"variableInfos\" numelements=\"0\"></hkparam>
 \t\t</hkobject>
 ";
-    const VALUE_SET: &str =
-        "\t\t<hkobject name=\"#0093\" class=\"hkbVariableValueSet\" signature=\"0x27812d8d\">
+    const VALUE_SET: &str = "\t\t<hkobject name=\"#0093\" class=\"hkbVariableValueSet\" signature=\"0x27812d8d\">
 \t\t\t<hkparam name=\"wordVariableValues\" numelements=\"0\"></hkparam>
 \t\t</hkobject>
 ";
@@ -241,18 +231,15 @@ mod tests {
         assert_eq!(names(&string_data, "eventNames"), ["moveStart", "moveStop", "MyEvent"]);
         assert_eq!(Array::find(&graph_data, "eventInfos").unwrap().elements.len(), 2);
 
-        let (string_data, graph_data, value_set) = add_variable(
-            &string_data,
-            &graph_data,
-            VALUE_SET,
-            "myVar",
-            VariableType::Real,
-            1_045_220_557,
-        )
-        .unwrap();
+        let (string_data, graph_data, value_set) =
+            add_variable(&string_data, &graph_data, VALUE_SET, "myVar", VariableType::Real, 1_045_220_557).unwrap();
         assert_eq!(names(&string_data, "variableNames"), ["myVar"]);
         assert!(graph_data.contains("VARIABLE_TYPE_REAL"));
-        assert!(value_set.contains("\t\t\t\t\t<hkparam name=\"value\">1045220557</hkparam>\n\t\t\t\t</hkobject>\n\t\t\t</hkparam>"));
+        assert!(
+            value_set.contains(
+                "\t\t\t\t\t<hkparam name=\"value\">1045220557</hkparam>\n\t\t\t\t</hkobject>\n\t\t\t</hkparam>"
+            )
+        );
 
         let removed = remove(&string_data, "eventNames", 2).unwrap();
         assert_eq!(names(&removed, "eventNames"), ["moveStart", "moveStop"]);

@@ -3,7 +3,7 @@
 use std::{path::Path, sync::Arc};
 
 use egui_code_editor::CodeEditorState;
-use gui_shared::settings::{convert::OutFormat, hkanno::HkannoTabSettings};
+use gui_shared::settings::pages::{convert::OutputFormat, hkanno::HkannoTabSettings};
 use hkanno_lsp::features::diagnostics::{Diagnostic, diagnostics};
 use serde_hkx_for_gui::hkanno::{Format, Hkanno, annotation_tracks_from_text, parse_as_hkanno};
 
@@ -47,9 +47,8 @@ impl HkannoTab {
     /// Unreadable file, or no/multiple `hkaAnimation` in it.
     pub(crate) fn open(input_path: &str) -> Result<Self, String> {
         let bytes = std::fs::read(input_path).map_err(|e| format!("{input_path}: {e}"))?;
-        let original = parse_as_hkanno(&bytes, Path::new(input_path))
-            .map_err(|e| format!("{input_path}: {e}"))?
-            .into_static();
+        let original =
+            parse_as_hkanno(&bytes, Path::new(input_path)).map_err(|e| format!("{input_path}: {e}"))?.into_static();
 
         let format = infer_format(input_path);
         let mut tab = Self {
@@ -162,7 +161,7 @@ impl HkannoTab {
     /// Changes the output format and the output extension with it.
     ///
     /// e.g., `a.modified.hkx` + `Xml` -> `a.modified.xml`
-    pub(crate) fn set_format(&mut self, format: OutFormat) {
+    pub(crate) fn set_format(&mut self, format: OutputFormat) {
         self.settings.format = format;
         let path = Path::new(&self.settings.output_path).with_extension(format.extension());
         self.settings.output_path = path.display().to_string();
@@ -175,20 +174,19 @@ impl HkannoTab {
 }
 
 /// Settings enum -> serializer enum.
-const fn to_format(format: OutFormat) -> Format {
+const fn to_format(format: OutputFormat) -> Format {
     match format {
-        OutFormat::Amd64 => Format::Amd64,
-        OutFormat::Win32 => Format::Win32,
-        OutFormat::Xml => Format::Xml,
-        OutFormat::Json => Format::Json,
+        OutputFormat::Amd64 => Format::Amd64,
+        OutputFormat::Win32 => Format::Win32,
+        OutputFormat::Xml => Format::Xml,
+        OutputFormat::Json => Format::Json,
     }
 }
 
 /// `.hkx` -> `Amd64`, anything else -> `Xml`.
-fn infer_format(input_path: &str) -> OutFormat {
-    let is_hkx =
-        Path::new(input_path).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("hkx"));
-    if is_hkx { OutFormat::Amd64 } else { OutFormat::Xml }
+fn infer_format(input_path: &str) -> OutputFormat {
+    let is_hkx = Path::new(input_path).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("hkx"));
+    if is_hkx { OutputFormat::Amd64 } else { OutputFormat::Xml }
 }
 
 /// Never overwrite the input by default.

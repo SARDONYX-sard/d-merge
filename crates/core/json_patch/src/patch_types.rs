@@ -12,10 +12,7 @@ pub(crate) use crate::operation::Op;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ValueWithPriority<'a> {
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "JsonPatch<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(bound(deserialize = "JsonPatch<'a>: serde::Deserialize<'de>")))]
     pub patch: JsonPatch<'a>,
     /// The priority of the patch. Higher values have higher precedence.
     pub priority: usize,
@@ -88,10 +85,7 @@ pub struct JsonPatch<'a> {
     pub action: Action,
 
     /// The value involved in the patch (e.g., value to add or replace).
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(bound(deserialize = "BorrowedValue<'a>: serde::Deserialize<'de>")))]
     pub value: BorrowedValue<'a>,
 }
 

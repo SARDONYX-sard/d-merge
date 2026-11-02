@@ -59,11 +59,8 @@ impl VimState {
             Motion::Down | Motion::Up => {
                 let col = *self.desired_col.get_or_insert_with(|| cur - buf.line_start(cur));
                 let line = buf.line_of(cur);
-                let line = if motion == Motion::Down {
-                    (line + count).min(last_line)
-                } else {
-                    line.saturating_sub(count)
-                };
+                let line =
+                    if motion == Motion::Down { (line + count).min(last_line) } else { line.saturating_sub(count) };
                 let start = buf.nth_line_start(line);
                 ((start + col).min(buf.line_last_char(start)), Kind::Linewise)
             }
@@ -75,13 +72,9 @@ impl VimState {
                 }
                 (i, Kind::Exclusive)
             }
-            Motion::WordBackward { big } => {
-                (repeat(cur, &|i| buf.prev_word_start(i, big)), Kind::Exclusive)
-            }
+            Motion::WordBackward { big } => (repeat(cur, &|i| buf.prev_word_start(i, big)), Kind::Exclusive),
             Motion::WordEnd { big } => (repeat(cur, &|i| buf.word_end(i, big)), Kind::Inclusive),
-            Motion::WordEndBackward { big } => {
-                (repeat(cur, &|i| buf.prev_word_end(i, big)), Kind::Inclusive)
-            }
+            Motion::WordEndBackward { big } => (repeat(cur, &|i| buf.prev_word_end(i, big)), Kind::Inclusive),
             Motion::LineStart => (buf.line_start(cur), Kind::Exclusive),
             Motion::FirstNonBlank => (buf.first_non_blank(cur), Kind::Exclusive),
             Motion::LineEnd => {
@@ -93,16 +86,11 @@ impl VimState {
                 let start = buf.line_start(cur);
                 ((start + count - 1).min(buf.line_last_char(start)), Kind::Exclusive)
             }
-            Motion::NextLineStart => {
-                (line_first_non_blank((buf.line_of(cur) + count).min(last_line)), Kind::Linewise)
+            Motion::NextLineStart => (line_first_non_blank((buf.line_of(cur) + count).min(last_line)), Kind::Linewise),
+            Motion::PrevLineStart => (line_first_non_blank(buf.line_of(cur).saturating_sub(count)), Kind::Linewise),
+            Motion::CurrentLineStart => {
+                (line_first_non_blank((buf.line_of(cur) + count - 1).min(last_line)), Kind::Linewise)
             }
-            Motion::PrevLineStart => {
-                (line_first_non_blank(buf.line_of(cur).saturating_sub(count)), Kind::Linewise)
-            }
-            Motion::CurrentLineStart => (
-                line_first_non_blank((buf.line_of(cur) + count - 1).min(last_line)),
-                Kind::Linewise,
-            ),
             Motion::FileStart | Motion::FileEnd => {
                 let line = if explicit_count {
                     count - 1
@@ -113,12 +101,8 @@ impl VimState {
                 };
                 (line_first_non_blank(line.min(last_line)), Kind::Linewise)
             }
-            Motion::ParagraphForward => {
-                (repeat(cur, &|i| paragraph_boundary(buf, i, true)), Kind::Exclusive)
-            }
-            Motion::ParagraphBackward => {
-                (repeat(cur, &|i| paragraph_boundary(buf, i, false)), Kind::Exclusive)
-            }
+            Motion::ParagraphForward => (repeat(cur, &|i| paragraph_boundary(buf, i, true)), Kind::Exclusive),
+            Motion::ParagraphBackward => (repeat(cur, &|i| paragraph_boundary(buf, i, false)), Kind::Exclusive),
             Motion::MatchPair => (match_pair(buf, cur)?, Kind::Inclusive),
             Motion::Find { forward, till, ch } => {
                 self.last_find = Some(Find { forward, till, ch });
@@ -155,16 +139,13 @@ impl VimState {
                     count * (lines - 2).max(1)
                 };
                 let line = buf.line_of(cur);
-                let line =
-                    if down { (line + step).min(last_line) } else { line.saturating_sub(step) };
+                let line = if down { (line + step).min(last_line) } else { line.saturating_sub(step) };
                 // The view scrolls with the cursor, like Vim.
                 let step_i32 = i32::try_from(step).unwrap_or(i32::MAX);
                 self.scroll = Some(Scroll::Lines(if down { step_i32 } else { -step_i32 }));
                 (line_first_non_blank(line), Kind::Linewise)
             }
-            Motion::SearchNext { reverse } => {
-                (self.search_target(!reverse, count, buf)?, Kind::Exclusive)
-            }
+            Motion::SearchNext { reverse } => (self.search_target(!reverse, count, buf)?, Kind::Exclusive),
         })
     }
 }
@@ -212,13 +193,7 @@ fn match_pair(buf: &Buffer, i: usize) -> Option<usize> {
 
 /// `f`/`t`/`F`/`T` on the current line. `repeating` (`;`, `,`): `t` does not get stuck right
 /// before the char it already stopped at.
-fn find_char(
-    buf: &Buffer,
-    cur: usize,
-    find: Find,
-    count: usize,
-    repeating: bool,
-) -> Option<(usize, Kind)> {
+fn find_char(buf: &Buffer, cur: usize, find: Find, count: usize, repeating: bool) -> Option<(usize, Kind)> {
     let (start, end) = (buf.line_start(cur), buf.line_end(cur));
     let Find { forward, till, ch } = find;
     let mut at = cur;

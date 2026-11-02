@@ -56,9 +56,7 @@ pub fn serialize_alt_asdsf(
     for vanilla_name in txt_projects {
         let mut name = String::new();
         if super::alt_key::to_alt_txt_project_name(vanilla_name.as_ref(), &mut name).is_none() {
-            return Err(SerializeError::InvalidVanillaTxtProjectPath {
-                name: vanilla_name.to_string(),
-            });
+            return Err(SerializeError::InvalidVanillaTxtProjectPath { name: vanilla_name.to_string() });
         };
         let anim_set_list = if let Some(list) = alt_asdsf.txt_projects.0.get(name.as_str()) {
             list
@@ -75,8 +73,7 @@ pub fn serialize_alt_asdsf(
         };
 
         // sub header seq patch
-        let mut sub_txt_headers: Vec<_> =
-            anim_set_list.0.par_iter().map(|(k, _)| k.clone()).collect();
+        let mut sub_txt_headers: Vec<_> = anim_set_list.0.par_iter().map(|(k, _)| k.clone()).collect();
         if let Some(sub_header_diff) = sub_txt_header_patch_map.remove(name.as_str()) {
             sub_header_diff.into_apply(&mut sub_txt_headers)?;
         }
@@ -84,10 +81,7 @@ pub fn serialize_alt_asdsf(
 
         for sub_txt_header in sub_txt_headers {
             let Some(anim_set) = anim_set_list.0.get(sub_txt_header.as_ref()) else {
-                return Err(SerializeError::MissingSubTxtHeader {
-                    name,
-                    sub_txt_name: sub_txt_header.to_string(),
-                });
+                return Err(SerializeError::MissingSubTxtHeader { name, sub_txt_name: sub_txt_header.to_string() });
             };
             write_anim_set(&mut out, anim_set);
         }
@@ -153,11 +147,7 @@ mod tests {
     use crate::asdsf::normal::de::parse_asdsf;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
-        if input.contains("\r\n") {
-            input.into()
-        } else {
-            input.replace("\r", "").replace("\n", "\r\n").into()
-        }
+        if input.contains("\r\n") { input.into() } else { input.replace("\r", "").replace("\n", "\r\n").into() }
     }
 
     #[cfg(feature = "alt_map")]
@@ -170,9 +160,7 @@ mod tests {
         let alt_asdsf = asdsf.try_into().unwrap_or_else(|e| panic!("{e}"));
 
         // std::fs::write("../../../dummy/debug/adsf_debug.txt", format!("{:#?}", adsf)).unwrap();
-        let actual =
-            serialize_alt_asdsf(alt_asdsf, DiffLines::DEFAULT, SubHeaderDiffMap::default())
-                .unwrap();
+        let actual = serialize_alt_asdsf(alt_asdsf, DiffLines::DEFAULT, SubHeaderDiffMap::default()).unwrap();
 
         // std::fs::create_dir_all("../../../dummy").unwrap();
         // std::fs::write("../../../dummy/adsf.txt", &actual).unwrap();
@@ -189,9 +177,7 @@ mod tests {
     #[cfg(feature = "alt_map")]
     #[test]
     fn converts_to_alt_asdsf() {
-        let input = include_str!(
-            "../../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
-        );
+        let input = include_str!("../../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt");
         let asdsf = crate::asdsf::normal::de::parse_asdsf(input).unwrap_or_else(|err| {
             panic!("Failed to parse asdsf:\n{err}");
         });

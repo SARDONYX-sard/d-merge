@@ -99,10 +99,8 @@ impl Preview {
         let current = self.current;
         scroll.show_rows(ui, row_height, self.lines.len(), |ui, range| {
             for (kind, text) in &self.lines[range] {
-                let (rect, _) = ui.allocate_exact_size(
-                    egui::vec2(ui.available_width().max(600.0), row_height),
-                    egui::Sense::hover(),
-                );
+                let (rect, _) = ui
+                    .allocate_exact_size(egui::vec2(ui.available_width().max(600.0), row_height), egui::Sense::hover());
                 let fill = match kind {
                     Kind::New => Some(green),
                     Kind::Old => Some(red),
@@ -115,10 +113,7 @@ impl Preview {
                 // `↶` at the start of each block, like git's conflict buttons.
                 let gutter = egui::Rect::from_min_size(rect.min, egui::vec2(20.0, row_height));
                 if let Kind::Open(i) = kind
-                    && ui
-                        .put(gutter, egui::Button::new("↶").small())
-                        .on_hover_text(revert_hover)
-                        .clicked()
+                    && ui.put(gutter, egui::Button::new("↶").small()).on_hover_text(revert_hover).clicked()
                 {
                     revert = Some(*i);
                 }
@@ -150,15 +145,7 @@ mod tests {
         let kinds: Vec<_> = preview.lines.iter().map(|(k, _)| *k).collect();
         assert_eq!(
             kinds,
-            [
-                Kind::Common,
-                Kind::Open(0),
-                Kind::New,
-                Kind::Marker,
-                Kind::Old,
-                Kind::Marker,
-                Kind::Common
-            ]
+            [Kind::Common, Kind::Open(0), Kind::New, Kind::Marker, Kind::Old, Kind::Marker, Kind::Common]
         );
         assert_eq!(preview.blocks, 1);
     }

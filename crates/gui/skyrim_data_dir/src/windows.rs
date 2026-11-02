@@ -90,39 +90,23 @@ fn get_skyrim_dir(runtime: Runtime) -> Result<PathBuf, io::Error> {
     ];
 
     let (root_key, sub_key, value_name, flags) = match runtime {
-        Runtime::Le => (
-            HKEY_LOCAL_MACHINE,
-            SKYRIM_LE_REG_KEY,
-            INSTALLED_PATH_VALUE,
-            RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY,
-        ),
-        Runtime::Se => (
-            HKEY_LOCAL_MACHINE,
-            SKYRIM_SE_REG_KEY,
-            INSTALLED_PATH_VALUE,
-            RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY,
-        ),
-        Runtime::Vr => (
-            HKEY_LOCAL_MACHINE,
-            SKYRIM_VR_REG_KEY,
-            INSTALLED_PATH_VALUE,
-            RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY,
-        ),
-        Runtime::Enderal => (HKEY_CURRENT_USER, ENDERAL_REG_KEY, INSTALL_PATH_VALUE, RRF_RT_REG_SZ),
-        Runtime::EnderalSe => {
-            (HKEY_CURRENT_USER, ENDERAL_SE_REG_KEY, INSTALL_PATH_VALUE, RRF_RT_REG_SZ)
+        Runtime::Le => {
+            (HKEY_LOCAL_MACHINE, SKYRIM_LE_REG_KEY, INSTALLED_PATH_VALUE, RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY)
         }
+        Runtime::Se => {
+            (HKEY_LOCAL_MACHINE, SKYRIM_SE_REG_KEY, INSTALLED_PATH_VALUE, RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY)
+        }
+        Runtime::Vr => {
+            (HKEY_LOCAL_MACHINE, SKYRIM_VR_REG_KEY, INSTALLED_PATH_VALUE, RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY)
+        }
+        Runtime::Enderal => (HKEY_CURRENT_USER, ENDERAL_REG_KEY, INSTALL_PATH_VALUE, RRF_RT_REG_SZ),
+        Runtime::EnderalSe => (HKEY_CURRENT_USER, ENDERAL_SE_REG_KEY, INSTALL_PATH_VALUE, RRF_RT_REG_SZ),
     };
 
     get_registry_path(root_key, sub_key, value_name, flags)
 }
 
-fn get_registry_path(
-    root_key: usize,
-    sub_key: &[u16],
-    value_name: &[u16],
-    flags: u32,
-) -> Result<PathBuf, io::Error> {
+fn get_registry_path(root_key: usize, sub_key: &[u16], value_name: &[u16], flags: u32) -> Result<PathBuf, io::Error> {
     use bindings::*;
 
     const MAX_PATH: usize = 4096;
@@ -183,8 +167,7 @@ mod tests {
     #[ignore = "Local only"]
     #[test]
     fn test_get_game_dirs() {
-        for runtime in [Runtime::Le, Runtime::Se, Runtime::Vr, Runtime::Enderal, Runtime::EnderalSe]
-        {
+        for runtime in [Runtime::Le, Runtime::Se, Runtime::Vr, Runtime::Enderal, Runtime::EnderalSe] {
             let result = get_skyrim_data_dir(runtime);
             let _ = dbg!(runtime, result);
         }

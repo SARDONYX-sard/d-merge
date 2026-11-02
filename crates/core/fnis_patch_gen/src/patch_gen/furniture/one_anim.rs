@@ -101,8 +101,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map =
-        dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
+    let class_index_to_anim_object_map = dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
     one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
         class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
@@ -196,27 +195,13 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     one_patches.push({
         // #$:AnimObj+&ao$
         let anim_obj_class_index = class_index_to_anim_object_map.get(&0).map(|v| v.clone());
-        new_event_property_array_ri1(
-            flags,
-            anim_obj_class_index.as_deref(),
-            &class_indexes[1],
-            priority,
-        )
+        new_event_property_array_ri1(flags, anim_obj_class_index.as_deref(), &class_indexes[1], priority)
     });
-    one_patches.push(new_event_property_array_ri2(
-        flags,
-        has_any_anim_obj,
-        current_phase,
-        &class_indexes[2],
-        priority,
-    ));
+    one_patches.push(new_event_property_array_ri2(flags, has_any_anim_obj, current_phase, &class_indexes[2], priority));
 
     // #$RI+3$ hkbStateMachineTransitionInfoArray
     one_patches.push((
-        vec![
-            Cow::Owned(class_indexes[3].clone()),
-            Cow::Borrowed("hkbStateMachineTransitionInfoArray"),
-        ],
+        vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbStateMachineTransitionInfoArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -278,9 +263,8 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
         // #RI+5
         one_patches.push({
-            let inverse_flags: [bool; 5] = core::array::from_fn(|i| {
-                animation.flag_set.anim_vars.get(i).is_some_and(|v| v.inverse)
-            });
+            let inverse_flags: [bool; 5] =
+                core::array::from_fn(|i| animation.flag_set.anim_vars.get(i).is_some_and(|v| v.inverse));
 
             (
                 vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("BSIsActiveModifier")],
@@ -356,9 +340,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         // Therefore, it seems necessary to make them unique per file.
         let name = match current_phase {
             FurniturePhase::Start => Cow::Borrowed("IdleBlessingKneelEnter"),
-            FurniturePhase::Middle(_) | FurniturePhase::End(_) => {
-                format!("FNISCG_{class_index_0_id}").into()
-            }
+            FurniturePhase::Middle(_) | FurniturePhase::End(_) => format!("FNISCG_{class_index_0_id}").into(),
         };
 
         // NOTE: `T` is probably has_triggers
@@ -373,11 +355,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         };
 
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
-        let mode = if flags.contains(FNISAnimFlags::Acyclic) {
-            "MODE_SINGLE_PLAY"
-        } else {
-            "MODE_LOOPING"
-        };
+        let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
         (
             vec![Cow::Owned(class_indexes[7].clone()), Cow::Borrowed("hkbClipGenerator")],
@@ -407,13 +385,8 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         )
     });
     one_patches.push({
-        let triggers = new_values_from_triggers(
-            flags,
-            &animation.flag_set.triggers,
-            event_name,
-            next_event_name,
-            current_phase,
-        );
+        let triggers =
+            new_values_from_triggers(flags, &animation.flag_set.triggers, event_name, next_event_name, current_phase);
 
         (
             vec![Cow::Owned(class_indexes[8].clone()), Cow::Borrowed("hkbClipTriggerArray")],
@@ -468,10 +441,7 @@ fn new_event_property_array_ri1<'a>(
     }
 
     (
-        vec![
-            Cow::Owned(class_index.to_string()),
-            Cow::Borrowed("hkbStateMachineEventPropertyArray"),
-        ],
+        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -528,10 +498,7 @@ fn new_event_property_array_ri2<'a>(
     }
 
     (
-        vec![
-            Cow::Owned(class_index.to_string()),
-            Cow::Borrowed("hkbStateMachineEventPropertyArray"),
-        ],
+        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -640,10 +607,7 @@ pub(crate) fn new_push_values_seq_patch<'a>(
         (
             json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
             ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: values.iter().map(|value| value.name).collect(),
-                },
+                patch: JsonPatch { action: Action::SeqPush, value: values.iter().map(|value| value.name).collect() },
                 priority,
             },
         ),

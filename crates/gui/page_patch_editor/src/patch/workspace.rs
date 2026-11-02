@@ -80,8 +80,7 @@ impl Behavior {
     /// Reads and indexes the template (behavior xml, or the anim set data txt).
     /// A `.bin` (d-merge's shipped template) is converted to text first; ids are the template's.
     pub(crate) fn open(template_path: &Path) -> Result<Self, String> {
-        let bytes = std::fs::read(template_path)
-            .map_err(|e| format!("{}: {e}", template_path.display()))?;
+        let bytes = std::fs::read(template_path).map_err(|e| format!("{}: {e}", template_path.display()))?;
         let is_bin = template_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("bin"));
         let asdsf = template_path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(ASDSF));
         let error = |e: String| format!("{}: {e}", template_path.display());
@@ -94,12 +93,7 @@ impl Behavior {
             let objects = nemesis_diff::asdsf::anim_sets(&text.replace("\r\n", "\n"))
                 .map_err(error)?
                 .into_iter()
-                .map(|set| TemplateObject {
-                    id: set.id(),
-                    class: set.project,
-                    name: set.file,
-                    text: set.text,
-                })
+                .map(|set| TemplateObject { id: set.id(), class: set.project, name: set.file, text: set.text })
                 .collect();
             return Ok(Self {
                 name: ASDSF.to_string(),
@@ -120,10 +114,7 @@ impl Behavior {
         };
         let meshes_path = meshes_path(template_path);
         let nemesis = nemesis_folder(&meshes_path);
-        let stem = template_path
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
+        let stem = template_path.file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
         let name = match &nemesis {
             Some((_, true)) => format!("_1stperson/{stem}"),
             _ => stem,
@@ -173,9 +164,7 @@ impl Behavior {
                 let dir = Path::new("Nemesis_Engine").join("mod").join(code);
                 if first_person { dir.join("_1stperson").join(name) } else { dir.join(name) }
             }
-            Target::Ext => {
-                Path::new("Nemesis_EngineExt").join("mod").join(code).join(&self.meshes_path)
-            }
+            Target::Ext => Path::new("Nemesis_EngineExt").join("mod").join(code).join(&self.meshes_path),
         }
     }
 
@@ -253,9 +242,7 @@ impl Behavior {
     pub(crate) fn add_object(&mut self, code: &str, from: Option<&str>) -> String {
         let id = self.next_id(code);
         let text = match from.and_then(|from| Some((from, self.text(from)?))) {
-            Some((from, text)) => {
-                text.replacen(&format!("name=\"{from}\""), &format!("name=\"{id}\""), 1)
-            }
+            Some((from, text)) => text.replacen(&format!("name=\"{from}\""), &format!("name=\"{id}\""), 1),
             None => {
                 format!("\t\t<hkobject name=\"{id}\" class=\"\" signature=\"\">\n\t\t</hkobject>\n")
             }
@@ -287,12 +274,7 @@ fn index(object: XmlObject<'_>) -> TemplateObject {
         .and_then(|(_, rest)| rest.split_once("</hkparam>"))
         .map(|(name, _)| name.to_string())
         .unwrap_or_default();
-    TemplateObject {
-        id: object.id.to_string(),
-        class: object.class.to_string(),
-        name,
-        text: object.text.to_string(),
-    }
+    TemplateObject { id: object.id.to_string(), class: object.class.to_string(), name, text: object.text.to_string() }
 }
 
 /// The whole patch being made.
@@ -315,9 +297,7 @@ impl Workspace {
         if !dir.is_dir() {
             return Ok(workspace);
         }
-        workspace.info = std::fs::read_to_string(dir.join("info.ini"))
-            .map(|s| parse_info(&s))
-            .unwrap_or_default();
+        workspace.info = std::fs::read_to_string(dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default();
 
         for entry in read_dir(&dir)?.filter(|p| p.is_dir()) {
             let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
@@ -348,10 +328,7 @@ impl Workspace {
         write(&dir.join("info.ini"), &info_ini(&self.info))?;
         for behavior in &self.behaviors {
             let behavior_dir = dir.join(behavior.cache_name());
-            write(
-                &behavior_dir.join("template.path"),
-                &behavior.template_path.display().to_string(),
-            )?;
+            write(&behavior_dir.join("template.path"), &behavior.template_path.display().to_string())?;
             if behavior.force_ext {
                 write(&behavior_dir.join("force_ext"), "")?;
             }
@@ -369,16 +346,10 @@ impl Workspace {
     /// - `meshes/.../<x>.bin/` (NemesisExt): by that path (`.bin` -> `.xml`)
     ///
     /// Returns `(workspace, code, folders without a template)`.
-    pub(crate) fn import(
-        mod_dir: &Path,
-        template_root: &Path,
-    ) -> Result<(Self, String, Vec<String>), String> {
-        let code =
-            mod_dir.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    pub(crate) fn import(mod_dir: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
+        let code = mod_dir.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let mut workspace = Self {
-            info: std::fs::read_to_string(mod_dir.join("info.ini"))
-                .map(|s| parse_info(&s))
-                .unwrap_or_default(),
+            info: std::fs::read_to_string(mod_dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default(),
             behaviors: Vec::new(),
         };
         let mut skipped = Vec::new();
@@ -399,8 +370,7 @@ impl Workspace {
                 continue;
             };
             let mut behavior = Behavior::open(&template)?;
-            behavior.force_ext =
-                relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
+            behavior.force_ext = relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 let id = file_stem(&file);
                 let text = resolve(&read_text(&file)?, View::Mod);
@@ -430,8 +400,7 @@ impl Workspace {
         for root in roots.iter().filter(|r| r.is_dir()) {
             std::fs::remove_dir_all(root).map_err(|e| format!("{}: {e}", root.display()))?;
         }
-        let mut info =
-            nemesis_diff::info_ini(&self.info.name, &self.info.author, &self.info.site, false);
+        let mut info = nemesis_diff::info_ini(&self.info.name, &self.info.author, &self.info.site, false);
         info.truncate(info.trim_end().len());
 
         let (mut written, mut invalid) = (0, Vec::new());
@@ -455,11 +424,7 @@ impl Workspace {
 
 /// `<mod>/animationsetdatasinglefile/<project>/<set>.txt` -> an anim set "behavior" (or `None`).
 /// Sets the template does not have are added to `skipped`.
-fn import_asdsf(
-    mod_dir: &Path,
-    template_root: &Path,
-    skipped: &mut Vec<String>,
-) -> Result<Option<Behavior>, String> {
+fn import_asdsf(mod_dir: &Path, template_root: &Path, skipped: &mut Vec<String>) -> Result<Option<Behavior>, String> {
     let dir = mod_dir.join(ASDSF);
     if !dir.is_dir() {
         return Ok(None);
@@ -474,18 +439,12 @@ fn import_asdsf(
     };
     let mut behavior = Behavior::open(&template)?;
     for project in read_dir(&dir)?.filter(|p| p.is_dir()) {
-        let project_name =
-            project.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let project_name = project.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         for file in read_dir(&project)?.filter(|p| p.is_file()) {
-            let file_name =
-                file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            let file_name = file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             let wanted = format!("{project_name}/{file_name}");
             // Folder / file names are case-insensitive.
-            let Some(id) = behavior
-                .objects
-                .iter()
-                .find(|o| o.id.eq_ignore_ascii_case(&wanted))
-                .map(|o| o.id.clone())
+            let Some(id) = behavior.objects.iter().find(|o| o.id.eq_ignore_ascii_case(&wanted)).map(|o| o.id.clone())
             else {
                 skipped.push(format!("{ASDSF}/{wanted}"));
                 continue;
@@ -521,8 +480,8 @@ pub(crate) fn catalog(template_dir: &Path) -> Vec<TemplateEntry> {
                 continue;
             }
             let ext = path.extension().map(|e| e.to_string_lossy().to_ascii_lowercase());
-            let is_asdsf_txt = ext.as_deref() == Some("txt")
-                && path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(ASDSF));
+            let is_asdsf_txt =
+                ext.as_deref() == Some("txt") && path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(ASDSF));
             if !matches!(ext.as_deref(), Some("bin" | "xml")) && !is_asdsf_txt {
                 continue;
             }
@@ -541,10 +500,8 @@ pub(crate) fn catalog(template_dir: &Path) -> Vec<TemplateEntry> {
 }
 
 fn meshes_path(template: &Path) -> String {
-    let parts: Vec<String> =
-        template.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
-    let from =
-        parts.iter().rposition(|p| p == "meshes").unwrap_or_else(|| parts.len().saturating_sub(1));
+    let parts: Vec<String> = template.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+    let from = parts.iter().rposition(|p| p == "meshes").unwrap_or_else(|| parts.len().saturating_sub(1));
     let joined = parts[from..].join("/");
     Path::new(&joined).with_extension("bin").to_string_lossy().replace('\\', "/")
 }
@@ -553,9 +510,7 @@ fn meshes_path(template: &Path) -> String {
 fn nemesis_folder(meshes_path: &str) -> Option<(String, bool)> {
     use behavior_merge_types::template_key::{NEMESIS_1ST_PERSON_MAP, NEMESIS_3RD_PERSON_MAP};
     let find = |map: &phf::Map<&'static str, &'static str>| {
-        map.entries()
-            .find(|(_, path)| path.eq_ignore_ascii_case(meshes_path))
-            .map(|(name, _)| (*name).to_string())
+        map.entries().find(|(_, path)| path.eq_ignore_ascii_case(meshes_path)).map(|(name, _)| (*name).to_string())
     };
     find(&NEMESIS_3RD_PERSON_MAP)
         .map(|name| (name, false))
@@ -650,18 +605,10 @@ mod tests {
     #[ignore = "needs the template files of the repository"]
     fn asdsf_bin_matches_txt() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource");
-        let bin =
-            Behavior::open(&root.join("assets/templates/meshes/animationsetdatasinglefile.bin"))
-                .unwrap();
-        let txt = Behavior::open(&root.join("xml/templates/meshes/animationsetdatasinglefile.txt"))
-            .unwrap();
+        let bin = Behavior::open(&root.join("assets/templates/meshes/animationsetdatasinglefile.bin")).unwrap();
+        let txt = Behavior::open(&root.join("xml/templates/meshes/animationsetdatasinglefile.txt")).unwrap();
         assert_eq!(bin.objects.len(), txt.objects.len());
-        let differ = bin
-            .objects
-            .iter()
-            .zip(&txt.objects)
-            .filter(|(a, b)| a.id != b.id || a.text != b.text)
-            .count();
+        let differ = bin.objects.iter().zip(&txt.objects).filter(|(a, b)| a.id != b.id || a.text != b.text).count();
         assert_eq!(differ, 0);
     }
 

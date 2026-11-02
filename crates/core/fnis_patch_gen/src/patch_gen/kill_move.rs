@@ -14,9 +14,8 @@ use crate::{
     patch_gen::{
         JsonPatchPairs,
         global::_0_master::{
-            FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527,
-            FNIS_AA_GLOBAL_AUTO_GEN_2528, FNIS_AA_GLOBAL_AUTO_GEN_2529,
-            FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
+            FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
+            FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
             FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
         },
         new_push_events_seq_patch,
@@ -29,8 +28,7 @@ pub(super) fn new_kill_patches<'a>(
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
     // new C++ Havok class XML name attributes
-    let class_indexes: [String; 26] =
-        core::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [String; 26] = core::array::from_fn(|_| owned_data.next_class_name_attribute());
 
     let player_event = paired_and_kill_animation.anim_event;
     let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
@@ -40,8 +38,7 @@ pub(super) fn new_kill_patches<'a>(
     let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
     let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
 
-    let anim_file =
-        format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
+    let anim_file = format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
     let duration = paired_and_kill_animation.flag_set.duration;
@@ -85,10 +82,7 @@ pub(super) fn new_kill_patches<'a>(
                 let new_anim_object_index = owned_data.next_class_name_attribute();
 
                 acc.2.push((
-                    vec![
-                        Cow::Owned(new_anim_object_index.clone()),
-                        Cow::Borrowed("hkbStringEventPayload"),
-                    ],
+                    vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
                     ValueWithPriority {
                         patch: JsonPatch {
                             action: Action::Pure { op: Op::Add },
@@ -341,8 +335,7 @@ pub(super) fn new_kill_patches<'a>(
     // $RI+11
     one_patches.push({
         // "id": 615, // NPCKillMoveStart
-        let mut triggers =
-            new_values_from_triggers(615, &paired_and_kill_animation.flag_set.triggers);
+        let mut triggers = new_values_from_triggers(615, &paired_and_kill_animation.flag_set.triggers);
 
         //  156: NPCPairedStop
         //  616: NPCKillMoveEnd
@@ -647,8 +640,7 @@ pub(super) fn new_kill_patches<'a>(
     // $RI+25
     one_patches.push({
         // Syntaxes starting with `T2`, such as `T2_KillActor/5.867`, are processed here.
-        let mut triggers =
-            new_values_from_triggers(614, &paired_and_kill_animation.flag_set.triggers2);
+        let mut triggers = new_values_from_triggers(614, &paired_and_kill_animation.flag_set.triggers2);
 
         // NOTE: The insertion of the following triggers is not documented even in 0_master.TEMPLATE.txt.
         //       This was discovered by reading the differences from `temporary_logs/0_master.xml`.
@@ -709,14 +701,12 @@ pub(super) fn make_player_root_state_info_patch<'a>(
     // `AnimatedCameraSet`/`AnimatedCameraReset` flag enables these events.
 
     // -ac1|#2530|null
-    let enter_notify_events =
-        match flags.intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraSet) {
-            true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
-            false => "#0000",
-        };
+    let enter_notify_events = match flags.intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraSet) {
+        true => FNIS_AA_GLOBAL_AUTO_GEN_2530,
+        false => "#0000",
+    };
     // -ac0|#2532|null
-    let exit_notify_events = match flags
-        .intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraReset)
+    let exit_notify_events = match flags.intersects(FNISAnimFlags::AnimatedCamera | FNISAnimFlags::AnimatedCameraReset)
     {
         true => FNIS_AA_GLOBAL_AUTO_GEN_2532,
         false => "#0000",
@@ -770,16 +760,15 @@ pub(super) fn make_event_state_info_patch<'a>(
         FNIS_AA_GLOBAL_AUTO_GEN_2526
     };
     // $-h,o|#2528|h|null|o|#2529|#2527$
-    let exit_notify_events =
-        if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
-            FNIS_AA_GLOBAL_AUTO_GEN_2528
-        } else if flags.contains(FNISAnimFlags::HeadTracking) {
-            "#0000"
-        } else if flags.contains(FNISAnimFlags::AnimObjects) {
-            FNIS_AA_GLOBAL_AUTO_GEN_2529
-        } else {
-            FNIS_AA_GLOBAL_AUTO_GEN_2527
-        };
+    let exit_notify_events = if flags.contains(FNISAnimFlags::HeadTracking | FNISAnimFlags::AnimObjects) {
+        FNIS_AA_GLOBAL_AUTO_GEN_2528
+    } else if flags.contains(FNISAnimFlags::HeadTracking) {
+        "#0000"
+    } else if flags.contains(FNISAnimFlags::AnimObjects) {
+        FNIS_AA_GLOBAL_AUTO_GEN_2529
+    } else {
+        FNIS_AA_GLOBAL_AUTO_GEN_2527
+    };
 
     (
         vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineStateInfo")],
@@ -945,10 +934,7 @@ pub(super) fn new_event_property_array<'a>(
     }
 
     (
-        vec![
-            Cow::Owned(class_index.to_string()),
-            Cow::Borrowed("hkbStateMachineEventPropertyArray"),
-        ],
+        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
@@ -963,10 +949,7 @@ pub(super) fn new_event_property_array<'a>(
 }
 
 #[must_use]
-fn new_values_from_triggers<'a>(
-    event_id: u64,
-    triggers: &[Trigger<'a>],
-) -> Vec<simd_json::borrowed::Value<'a>> {
+fn new_values_from_triggers<'a>(event_id: u64, triggers: &[Trigger<'a>]) -> Vec<simd_json::borrowed::Value<'a>> {
     let mut values: Vec<simd_json::borrowed::Value> = vec![];
     values.push(json_typed!(borrowed, {
         "localTime": 0.0,

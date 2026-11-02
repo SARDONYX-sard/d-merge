@@ -87,12 +87,7 @@ pub fn line_job(ui: &egui::Ui, line: &str, language: &dyn Language) -> LayoutJob
 
     let mut job = LayoutJob::default();
     job.wrap.max_width = f32::INFINITY;
-    append_runs(
-        &mut job,
-        line,
-        Runs { colors: &colors, underlines: &underlines, backgrounds: &backgrounds },
-        &font_id,
-    );
+    append_runs(&mut job, line, Runs { colors: &colors, underlines: &underlines, backgrounds: &backgrounds }, &font_id);
     job
 }
 

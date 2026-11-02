@@ -114,12 +114,7 @@ pub const fn popup_shadow() -> egui::Shadow {
 pub fn interpolate_color(a: Color32, b: Color32, t: f32) -> Color32 {
     let t = t.clamp(0.0, 1.0);
     let lerp = |x: u8, y: u8| (f32::from(x) * (1.0 - t) + f32::from(y) * t).round() as u8;
-    Color32::from_rgba_unmultiplied(
-        lerp(a.r(), b.r()),
-        lerp(a.g(), b.g()),
-        lerp(a.b(), b.b()),
-        lerp(a.a(), b.a()),
-    )
+    Color32::from_rgba_unmultiplied(lerp(a.r(), b.r()), lerp(a.g(), b.g()), lerp(a.b(), b.b()), lerp(a.a(), b.a()))
 }
 
 /// Returns `c` with its alpha replaced by `a`.
@@ -128,12 +123,7 @@ pub fn with_alpha(c: Color32, a: u8) -> Color32 {
 }
 
 /// Paints a 3px focus ring around `rect`.
-pub fn paint_focus_ring(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    corner_radius: f32,
-    ring_color: Color32,
-) {
+pub fn paint_focus_ring(painter: &egui::Painter, rect: egui::Rect, corner_radius: f32, ring_color: Color32) {
     painter.rect_stroke(
         rect.expand(2.0),
         egui::CornerRadius::same((corner_radius + 2.0).round() as u8),

@@ -21,9 +21,7 @@ use crate::adsf::normal::ClipAnimDataBlock;
 /// In lenient mode, the declared length is ignored and all consecutive
 /// non-empty trigger-name lines are read until an empty line or end of input.
 #[inline]
-pub fn parse_clip_anim_block_patch<const STRICT: bool>(
-    input: &str,
-) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
+pub fn parse_clip_anim_block_patch<const STRICT: bool>(input: &str) -> Result<ClipAnimDataBlock<'_>, ReadableError> {
     let mut de = PatchDeserializer::from_str(input);
     let result = clip_anim_block_patch::<STRICT>(&mut de);
     result.map_err(|err| de.finish_error(err))
@@ -44,28 +42,22 @@ fn clip_anim_block_patch<'a, const STRICT: bool>(
 
     let clip_id = de.parse_next(one_line.context(Expected(Description("clip_id: str"))))?;
 
-    let play_back_speed = de.parse_next(
-        verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))),
-    )?;
+    let play_back_speed =
+        de.parse_next(verify_line_parses_to::<f32>.context(Expected(Description("play_back_speed: f32"))))?;
 
-    let crop_start_local_time = de.parse_next(
-        verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))),
-    )?;
+    let crop_start_local_time =
+        de.parse_next(verify_line_parses_to::<f32>.context(Expected(Description("crop_start_local_time: f32"))))?;
 
-    let crop_end_local_time = de.parse_next(
-        verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))),
-    )?;
+    let crop_end_local_time =
+        de.parse_next(verify_line_parses_to::<f32>.context(Expected(Description("crop_end_local_time: f32"))))?;
 
-    let trigger_names_len =
-        de.parse_next(parse_one_line.context(Expected(Description("trigger_names_len: usize"))))?;
+    let trigger_names_len = de.parse_next(parse_one_line.context(Expected(Description("trigger_names_len: usize"))))?;
 
     let trigger_names = if STRICT {
         let trigger_names = de.read_non_empty_lines("trigger_names", trigger_names_len)?;
         de.parse_next(multispace0)?;
-        de.parse_next(eof).map_err(|_| Error::TooManyEntries {
-            field: "trigger_names",
-            expected: trigger_names_len,
-        })?;
+        de.parse_next(eof)
+            .map_err(|_| Error::TooManyEntries { field: "trigger_names", expected: trigger_names_len })?;
         trigger_names
     } else {
         de.read_non_empty_lines_until_end()?
@@ -101,8 +93,7 @@ event_a
 event_b
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.name, "name");
         assert_eq!(block.clip_id, "amco$0");
@@ -130,8 +121,7 @@ event_a
 event_b
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);
@@ -149,8 +139,7 @@ amco$0
 event_a
 ";
 
-        let err = parse_clip_anim_block_patch::<true>(input)
-            .expect_err("strict mode must reject fewer trigger names");
+        let err = parse_clip_anim_block_patch::<true>(input).expect_err("strict mode must reject fewer trigger names");
 
         let message = err.to_string();
 
@@ -171,15 +160,11 @@ event_b
 event_c
 ";
 
-        let err = parse_clip_anim_block_patch::<true>(input)
-            .expect_err("strict mode must reject more trigger names");
+        let err = parse_clip_anim_block_patch::<true>(input).expect_err("strict mode must reject more trigger names");
 
         let message = err.to_string();
 
-        assert!(
-            message.contains(" too many trigger_names: expected 2"),
-            "unexpected error: {message}"
-        );
+        assert!(message.contains(" too many trigger_names: expected 2"), "unexpected error: {message}");
     }
 
     #[test]
@@ -195,8 +180,8 @@ event_a
 
 ";
 
-        let err = parse_clip_anim_block_patch::<true>(input)
-            .expect_err("strict mode must reject an empty trigger name line");
+        let err =
+            parse_clip_anim_block_patch::<true>(input).expect_err("strict mode must reject an empty trigger name line");
 
         let message = err.to_string();
 
@@ -215,8 +200,7 @@ amco$0
 0
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 0);
         assert!(block.trigger_names.is_empty());
@@ -239,8 +223,7 @@ event_a
 event_b
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);
@@ -259,8 +242,7 @@ event_a
 event_b
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);
@@ -280,8 +262,7 @@ event_b
 event_c
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 3);
         assert_eq!(block.trigger_names, ["event_a", "event_b", "event_c",]);
@@ -301,8 +282,7 @@ event_b
 
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);
@@ -320,8 +300,7 @@ amco$0
 event_a
 event_b";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);
@@ -340,8 +319,7 @@ event_a
 event_b
 ";
 
-        let block =
-            parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let block = parse_clip_anim_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(block.trigger_names_len, 2);
         assert_eq!(block.trigger_names, ["event_a", "event_b"]);

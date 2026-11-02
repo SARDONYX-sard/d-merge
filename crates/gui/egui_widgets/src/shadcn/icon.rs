@@ -66,9 +66,7 @@ impl Icon {
                 r#"<path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="3" /> <path d="m16 16-1.9-1.9" />"#
             }
             Self::Search => r#"<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />"#,
-            Self::TextAlignJustify => {
-                r#"<path d="M3 5h18" /> <path d="M3 12h18" /> <path d="M3 19h18" />"#
-            }
+            Self::TextAlignJustify => r#"<path d="M3 5h18" /> <path d="M3 12h18" /> <path d="M3 19h18" />"#,
             Self::Trash => {
                 r#"<path d="M3 6h18" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />"#
             }
@@ -82,8 +80,7 @@ impl Icon {
 /// Shows the icon as an 18px image in the foreground color: `ui.add(Icon::Search)`.
 impl egui::Widget for Icon {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let (rect, response) =
-            ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::hover());
+        let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::hover());
         let color = super::theme::ShadcnTheme::get(ui.ctx()).foreground;
         paint_icon(ui.painter(), rect, self, color);
         response
@@ -121,8 +118,7 @@ pub fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: 
             }
             Some("rect") => {
                 let min = pen.map(pos2(num("x"), num("y")));
-                let r =
-                    egui::Rect::from_min_size(min, egui::vec2(num("width"), num("height")) * scale);
+                let r = egui::Rect::from_min_size(min, egui::vec2(num("width"), num("height")) * scale);
                 let cr = egui::CornerRadius::same((num("rx") * scale) as u8);
                 painter.rect_stroke(r, cr, pen.stroke, egui::epaint::StrokeKind::Outside);
             }
@@ -177,11 +173,8 @@ impl Pen<'_> {
     fn flush(&mut self, closed: bool) {
         if self.points.len() >= 2 {
             let pts = std::mem::take(&mut self.points);
-            let shape = if closed {
-                egui::Shape::closed_line(pts, self.stroke)
-            } else {
-                egui::Shape::line(pts, self.stroke)
-            };
+            let shape =
+                if closed { egui::Shape::closed_line(pts, self.stroke) } else { egui::Shape::line(pts, self.stroke) };
             self.painter.add(shape);
         } else {
             self.points.clear();
@@ -275,15 +268,7 @@ impl Pen<'_> {
     }
 
     /// Convert an SVG arc to cubic Bézier segments (SVG spec endpoint-to-center parameterisation).
-    fn arc(
-        &mut self,
-        rx: f32,
-        ry: f32,
-        x_rotation_deg: f32,
-        large_arc: bool,
-        sweep: bool,
-        end: Pos2,
-    ) {
+    fn arc(&mut self, rx: f32, ry: f32, x_rotation_deg: f32, large_arc: bool, sweep: bool, end: Pos2) {
         let start = self.cur;
 
         // Degenerate: zero radius → line
@@ -320,13 +305,11 @@ impl Pen<'_> {
 
         // Step 4: compute center in original coordinates
         let mid = (start.to_vec2() + end.to_vec2()) / 2.0;
-        let center =
-            pos2(cos_phi * cxp - sin_phi * cyp + mid.x, sin_phi * cxp + cos_phi * cyp + mid.y);
+        let center = pos2(cos_phi * cxp - sin_phi * cyp + mid.x, sin_phi * cxp + cos_phi * cyp + mid.y);
 
         // Step 5: compute start angle and sweep angle
         let theta1 = angle_between(1.0, 0.0, (x1p - cxp) / rx, (y1p - cyp) / ry);
-        let mut dtheta =
-            angle_between((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+        let mut dtheta = angle_between((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
         if !sweep && dtheta > 0.0 {
             dtheta -= std::f32::consts::TAU;
         } else if sweep && dtheta < 0.0 {

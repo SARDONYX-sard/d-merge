@@ -58,12 +58,7 @@ pub fn signature_help(line: &str, cursor: usize) -> Option<SignatureHelp> {
     }
 }
 
-fn signature(
-    label: &str,
-    documentation: &'static str,
-    params: &[&str],
-    active: usize,
-) -> SignatureHelp {
+fn signature(label: &str, documentation: &'static str, params: &[&str], active: usize) -> SignatureHelp {
     SignatureHelp {
         label: label.to_string(),
         documentation: Some(documentation),
@@ -107,11 +102,7 @@ fn pie_signature(node: &PieNode) -> Option<SignatureHelp> {
 
     // Each `|` starts the next parameter.
     let separators = ins.parameters.as_ref().map_or(0, |p| p.items.len());
-    let label = format!(
-        "{}|{}",
-        def.name,
-        params.iter().map(|p| format!("<{p}>")).collect::<Vec<_>>().join("|")
-    );
+    let label = format!("{}|{}", def.name, params.iter().map(|p| format!("<{p}>")).collect::<Vec<_>>().join("|"));
 
     Some(SignatureHelp {
         label,

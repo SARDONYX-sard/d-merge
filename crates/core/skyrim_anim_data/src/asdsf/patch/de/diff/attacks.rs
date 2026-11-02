@@ -10,10 +10,7 @@ pub struct AttacksDiff<'a> {
     ///   - ["[0]", "attack_trigger"]
     ///   - ["[1]", "is_contextual"]
     ///   - ["[2]", "clip_names", "[0]"]
-    #[cfg_attr(
-        feature = "serde",
-        serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>")))]
     pub one: OnePatchMap<'a>,
 
     /// add/replace/remove entire attacks in the range.
@@ -21,10 +18,7 @@ pub struct AttacksDiff<'a> {
     /// - key(json path): e.g.,
     ///   - []: attacks array itself
     ///   - ["[1]", "clip_names"]
-    #[cfg_attr(
-        feature = "serde",
-        serde(borrow, bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(borrow, bound(deserialize = "SeqPatchMap<'a>: serde::Deserialize<'de>")))]
     pub seq: SeqPatchMap<'a>,
 }
 

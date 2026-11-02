@@ -68,8 +68,7 @@ impl Root {
         let mut clicked = None;
         // `[Patch] [Convert] [hkanno]  <- grow ->  Theme: [Dark ▼]`
         panel.show(ui, |ui| {
-            let flex =
-                egui_flex::Flex::horizontal().w_full().align_items(egui_flex::FlexAlign::Center);
+            let flex = egui_flex::Flex::horizontal().w_full().align_items(egui_flex::FlexAlign::Center);
             flex.show(ui, |flex| {
                 for page in Page::ALL {
                     let label = self.app.i18n.t(match page {

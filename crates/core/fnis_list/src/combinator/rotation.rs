@@ -127,10 +127,7 @@ mod tests {
     #[test]
     fn parse_format1_rotation() {
         let input = "RD 1.5 0.0 0.0 0.0 1.0\n";
-        let expected = RotationData {
-            time: "1.5",
-            format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" },
-        };
+        let expected = RotationData { time: "1.5", format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" } };
         let parsed = must_parse(parse_rd_data, input);
         assert_eq!(parsed, expected);
     }
@@ -138,10 +135,7 @@ mod tests {
     #[test]
     fn parse_format2_rotation() {
         let input = "RD 2.0 90\n";
-        let expected = RotationData {
-            time: "2.0",
-            format: RotationFormat::DeltaZAngle { delta_z_angle: 90.0 },
-        };
+        let expected = RotationData { time: "2.0", format: RotationFormat::DeltaZAngle { delta_z_angle: 90.0 } };
         let parsed = must_parse(parse_rd_data, input);
         assert_eq!(parsed, expected);
     }
@@ -155,18 +149,12 @@ mod tests {
     #[test]
     fn parse_multiple_rotations() {
         let input1 = "RD 1.5 0.0 0.0 0.0 1.0\n";
-        let expected1 = RotationData {
-            time: "1.5",
-            format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" },
-        };
+        let expected1 = RotationData { time: "1.5", format: RotationFormat::Quaternion { text: "0.0 0.0 0.0 1.0" } };
         let parsed1 = must_parse(parse_rd_data, input1);
         assert_eq!(parsed1, expected1);
 
         let input2 = "RD 2.0 45\n";
-        let expected2 = RotationData {
-            time: "2.0",
-            format: RotationFormat::DeltaZAngle { delta_z_angle: 45.0 },
-        };
+        let expected2 = RotationData { time: "2.0", format: RotationFormat::DeltaZAngle { delta_z_angle: 45.0 } };
         let parsed2 = must_parse(parse_rd_data, input2);
         assert_eq!(parsed2, expected2);
     }

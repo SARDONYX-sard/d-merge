@@ -227,11 +227,7 @@ fn resolve_animation_path(
             true,
         )
     } else if parent.as_os_str().is_empty() {
-        (
-            owned_data.animations_mod_dir.join(format!("{prefix}{slot}_{file_name}")),
-            PathBuf::from(file_name),
-            false,
-        )
+        (owned_data.animations_mod_dir.join(format!("{prefix}{slot}_{file_name}")), PathBuf::from(file_name), false)
     } else {
         (
             owned_data.animations_mod_dir.join(parent).join(format!("{prefix}{slot}_{file_name}")),

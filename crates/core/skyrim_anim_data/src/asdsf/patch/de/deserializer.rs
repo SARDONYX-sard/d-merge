@@ -28,10 +28,7 @@ pub type PatchesMap<'a> = fast_hash::HashMap<JsonPath<'a>, ValueWithPriority<'a>
 ///
 /// # Errors
 /// Parse failed.
-pub fn parse_anim_set_diff_patch(
-    asdsf_patch: &str,
-    priority: usize,
-) -> Result<DiffPatchAnimSetData<'_>> {
+pub fn parse_anim_set_diff_patch(asdsf_patch: &str, priority: usize) -> Result<DiffPatchAnimSetData<'_>> {
     let mut patcher_de = PatchDeserializer::new(asdsf_patch);
     patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
 
@@ -108,10 +105,7 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(
-        &mut self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
     }
 
@@ -122,17 +116,11 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::ContextError { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::ContextError { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::ReadableError { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::ReadableError { source: readable }
@@ -160,13 +148,7 @@ impl<'de> PatchDeserializer<'de> {
                 self.ignore_close = true;
             }
 
-            self.raw_diffs.push(RawDiff {
-                path,
-                text: raw,
-                op,
-                seq_index: self.seq_index,
-                category: self.category,
-            });
+            self.raw_diffs.push(RawDiff { path, text: raw, op, seq_index: self.seq_index, category: self.category });
         }
         Ok(())
     }
@@ -210,9 +192,7 @@ impl<'de> PatchDeserializer<'de> {
         use winnow::error::{StrContext::Expected, StrContextValue::Description};
 
         self.maybe_capture_diff()?;
-        let len = self.parse_next(
-            parse_one_line::<usize>.context(Expected(Description("length_line: usize"))),
-        )?;
+        let len = self.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
         #[cfg(feature = "tracing")]
         tracing::trace!("{:?}, line Length = {len}", self.path);
         Ok(len)
@@ -317,9 +297,7 @@ mod tests {
     use json_patch::{Action, JsonPatch, Op, ValueWithPriority};
 
     use super::*;
-    use crate::asdsf::patch::de::{
-        AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff, patch_map::SeqPatchMap,
-    };
+    use crate::asdsf::patch::de::{AttacksDiff, DiffPatchAnimSetData, NonNestedArrayDiff, patch_map::SeqPatchMap};
 
     // V3                             <- version
     // 0                              <- triggers_len
@@ -426,10 +404,7 @@ $crc32[ground_bite]$
                         ValueWithPriority {
                             patch: JsonPatch {
                                 action: Action::Seq { op: Op::Replace, range: 0..1 },
-                                value: simd_json::json_typed!(
-                                    borrowed,
-                                    ["AttackTestReplacedClipName"]
-                                ),
+                                value: simd_json::json_typed!(borrowed, ["AttackTestReplacedClipName"]),
                             },
                             priority: 0,
                         },

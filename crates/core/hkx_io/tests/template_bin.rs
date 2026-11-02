@@ -37,8 +37,7 @@ fn bin_keeps_xml_ids() {
         let mut current: Option<(String, String)> = None;
         for line in xml.lines() {
             if let Some(rest) = line.strip_prefix("\t\t<hkobject name=\"") {
-                current =
-                    Some((rest.split('"').next().unwrap_or_default().to_string(), String::new()));
+                current = Some((rest.split('"').next().unwrap_or_default().to_string(), String::new()));
             }
             if let Some((_, text)) = &mut current {
                 text.push_str(line.trim_end());
@@ -53,8 +52,7 @@ fn bin_keeps_xml_ids() {
         map
     };
     let (bin_objects, xml_objects) = (objects(&from_bin), objects(&xml));
-    let differ: Vec<_> =
-        xml_objects.iter().filter(|(id, text)| bin_objects.get(*id) != Some(text)).collect();
+    let differ: Vec<_> = xml_objects.iter().filter(|(id, text)| bin_objects.get(*id) != Some(text)).collect();
     if let Some((id, text)) = differ.first() {
         let bin = &bin_objects[*id];
         let at = text.lines().zip(bin.lines()).position(|(a, b)| a != b).unwrap_or(0);

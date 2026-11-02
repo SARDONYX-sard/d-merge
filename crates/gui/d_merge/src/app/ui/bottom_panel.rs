@@ -1,8 +1,6 @@
 //! Bottom-panel UI: notification bar, action buttons, log-level selector.
 
-use gui_shared::{
-    fetch::FetchState, fs::open_existing_dir_or_ancestor, i18n::I18nKey, log::LogLevel,
-};
+use gui_shared::{fetch::FetchState, fs::open_existing_dir_or_ancestor, i18n::I18nKey, log::LogLevel};
 
 use crate::{
     app::App,
@@ -28,9 +26,7 @@ impl App {
                 self.ui_log_level_box(ui);
 
                 self.add_button(ui, ctx, I18nKey::LogDir, |app, _| {
-                    if let Err(err) =
-                        open_existing_dir_or_ancestor(app.settings.log.dir_path.as_str())
-                    {
+                    if let Err(err) = open_existing_dir_or_ancestor(app.settings.log.dir_path.as_str()) {
                         app.notify.error(err);
                     }
                 });
@@ -50,10 +46,7 @@ impl App {
                         self.i18n.t(I18nKey::PatchButton)
                     };
                     if ui
-                        .add_sized(
-                            [120.0, 40.0],
-                            Button::new(label).icon(Icon::Layers).full_width().primary(),
-                        )
+                        .add_sized([120.0, 40.0], Button::new(label).icon(Icon::Layers).full_width().primary())
                         .clicked()
                     {
                         self.patch(ui.ctx());
@@ -64,9 +57,7 @@ impl App {
                     if ui
                         .add_sized(
                             [100.0, 40.0],
-                            Button::new(self.i18n.t(I18nKey::HelpButton))
-                                .icon(Icon::Toolbox)
-                                .full_width(),
+                            Button::new(self.i18n.t(I18nKey::HelpButton)).icon(Icon::Toolbox).full_width(),
                         )
                         .clicked()
                     {
@@ -85,10 +76,7 @@ impl App {
     where
         F: FnOnce(&mut Self, &egui::Context),
     {
-        if ui
-            .add_sized([120.0, 40.0], Button::new(self.i18n.t(key)).icon(Icon::Logs).full_width())
-            .clicked()
-        {
+        if ui.add_sized([120.0, 40.0], Button::new(self.i18n.t(key)).icon(Icon::Logs).full_width()).clicked() {
             f(self, ctx);
         }
     }
@@ -109,8 +97,7 @@ impl App {
                 (LogLevel::Trace, LogLevel::Trace.as_str()),
             ];
 
-            let mut index =
-                LEVELS.iter().position(|(level, _)| *level == self.settings.log.level).unwrap_or(0);
+            let mut index = LEVELS.iter().position(|(level, _)| *level == self.settings.log.level).unwrap_or(0);
             if ComboBox::from_id_salt("log_level")
                 .width(120.0)
                 .show_index(ui, &mut index, LEVELS.len(), |i| LEVELS[i].1)

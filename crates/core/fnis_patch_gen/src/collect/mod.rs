@@ -6,9 +6,7 @@ use crate::{
     PriorityMap,
     collect::owned::{OwnedFnisInjection, collect_fnis_injection},
     errors::Error,
-    patch_gen::generated_behaviors::{
-        AUXBONES, BehaviorEntry, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS,
-    },
+    patch_gen::generated_behaviors::{AUXBONES, BehaviorEntry, CREATURES, HUMANOID, PLANTS_ACTIVATORS, SKELETONS},
 };
 
 static ALL_ENTRIES: LazyLock<Vec<&'static BehaviorEntry>> = LazyLock::new(|| {
@@ -26,11 +24,7 @@ pub async fn collect_all_fnis_injections(
     fnis_entries: &PriorityMap,
 ) -> (Vec<OwnedFnisInjection>, Vec<Error>) {
     #[cfg(feature = "tracing")]
-    tracing::debug!(
-        skyrim_data_dir,
-        entry_count = ALL_ENTRIES.len(),
-        "Starting FNIS injection collection"
-    );
+    tracing::debug!(skyrim_data_dir, entry_count = ALL_ENTRIES.len(), "Starting FNIS injection collection");
 
     // In manual mode, you need to search everything in the `MO2/mods/*` directory as if it were the meshes directory.
     // That is why `data_dirs` is defined as a Vec.
@@ -82,19 +76,12 @@ pub async fn collect_all_fnis_injections(
                 };
 
                 #[cfg(feature = "tracing")]
-                tracing::debug!(
-                    namespace,
-                    priority,
-                    base_dir = entry.base_dir,
-                    "Spawning FNIS injection task"
-                );
+                tracing::debug!(namespace, priority, base_dir = entry.base_dir, "Spawning FNIS injection task");
 
                 let namespace = namespace.to_string();
                 let entry: &'static BehaviorEntry = entry;
 
-                handles.spawn(async move {
-                    collect_fnis_injection(&ns_path, entry, &namespace, priority).await
-                });
+                handles.spawn(async move { collect_fnis_injection(&ns_path, entry, &namespace, priority).await });
             }
         }
     }
@@ -122,11 +109,7 @@ pub async fn collect_all_fnis_injections(
     }
 
     #[cfg(feature = "tracing")]
-    tracing::debug!(
-        succeeded = oks.len(),
-        failed = errs.len(),
-        "FNIS injection collection complete"
-    );
+    tracing::debug!(succeeded = oks.len(), failed = errs.len(), "FNIS injection collection complete");
 
     (oks, errs)
 }
@@ -147,8 +130,7 @@ mod tests {
             .enumerate()
             .map(|(idx, namespace)| (namespace.to_string(), idx))
             .collect();
-        let res =
-            collect_all_fnis_injections("../../../dummy/fnis_test_mods/*", &fnis_entries).await;
+        let res = collect_all_fnis_injections("../../../dummy/fnis_test_mods/*", &fnis_entries).await;
 
         std::fs::write(output_path, format!("{res:#?}")).unwrap();
     }

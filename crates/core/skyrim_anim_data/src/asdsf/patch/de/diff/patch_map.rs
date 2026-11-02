@@ -30,9 +30,7 @@ impl<'a> OnePatchMap<'a> {
 
             if new_priority > existing_priority {
                 #[cfg(feature = "tracing")]
-                tracing::info!(
-                    "Conflict Path {key:?}: priority {new_priority} ➔ {existing_priority} (overwritten)",
-                );
+                tracing::info!("Conflict Path {key:?}: priority {new_priority} ➔ {existing_priority} (overwritten)",);
                 *existing = new_value;
             }
         } else {
@@ -151,11 +149,8 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
                 M: serde::de::MapAccess<'de>,
             {
                 let mut map = HashMap::default();
-                while let Some((key, value)) =
-                    access.next_entry::<String, ValueWithPriority<'de>>()?
-                {
-                    let json_path =
-                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                while let Some((key, value)) = access.next_entry::<String, ValueWithPriority<'de>>()? {
+                    let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     map.insert(json_path, value);
                 }
                 Ok(OnePatchMap(map))
@@ -206,11 +201,8 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             {
                 let mut map = HashMap::default();
 
-                while let Some((key, value)) =
-                    access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?
-                {
-                    let json_path =
-                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                while let Some((key, value)) = access.next_entry::<String, Vec<ValueWithPriority<'de>>>()? {
+                    let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     map.insert(json_path, value);
                 }
 

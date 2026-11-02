@@ -49,10 +49,8 @@ pub(crate) fn apply_asdsf_patches(
     fnis_asdsf_patches: Vec<AsdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse adsf patch
-    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
-        .0
-        .par_iter()
-        .partition_map(|path| match parse_anim_data_patch(path) {
+    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) =
+        owned_anim_data_patches.0.par_iter().partition_map(|path| match parse_anim_data_patch(path) {
             Ok(v) => Either::Left(v),
             Err(e) => Either::Right(e),
         });
@@ -80,10 +78,10 @@ pub(crate) fn apply_asdsf_patches(
 
     // 3/5 read template asdsf.
     let alt_asdsf_bytes = bail!(read_asdsf_file(config));
-    let mut alt_adsf: AltAsdsf =
-        bail!(rmp_serde::from_slice(&alt_asdsf_bytes).with_context(|_| {
-            FailedParseAdsfTemplateSnafu { path: config.resource_dir.join(ASDSF_INNER_PATH) }
-        }));
+    let mut alt_adsf: AltAsdsf = bail!(
+        rmp_serde::from_slice(&alt_asdsf_bytes)
+            .with_context(|_| { FailedParseAdsfTemplateSnafu { path: config.resource_dir.join(ASDSF_INNER_PATH) } })
+    );
 
     let mut txt_project_header_patches = DiffLines::DEFAULT;
 
@@ -121,9 +119,12 @@ pub(crate) fn apply_asdsf_patches(
                 PatchKind::EditAnimSet(edit_anim) => {
                     let file_name = edit_anim.file_name;
                     if let Some(anim) = anim_data.0.get_mut(file_name) {
-                        bail!(edit_anim.patch.into_apply(anim).with_context(|_| {
-                            FailedParseEditAsdsfPatchSnafu { path: edit_anim.file_name }
-                        }));
+                        bail!(
+                            edit_anim
+                                .patch
+                                .into_apply(anim)
+                                .with_context(|_| { FailedParseEditAsdsfPatchSnafu { path: edit_anim.file_name } })
+                        );
                     }
                 }
                 PatchKind::TxtProjectHeader(_) | PatchKind::SubTxtHeader(_) => {}
@@ -140,12 +141,7 @@ pub(crate) fn apply_asdsf_patches(
     // 5/5 Write adsf.
     let mut output_path = config.output_dir.join(ASDSF_INNER_PATH);
     output_path.set_extension("txt");
-    bail!(write_alt_asdsf_file(
-        output_path,
-        alt_adsf,
-        txt_project_header_patches,
-        sub_txt_header_patch_map,
-    ));
+    bail!(write_alt_asdsf_file(output_path, alt_adsf, txt_project_header_patches, sub_txt_header_patch_map,));
 
     errors
 }
@@ -162,23 +158,23 @@ fn parse_anim_data_patch<'a>(
     } = parse_asdsf_path(path)?;
 
     let patch = match parser_type {
-        ParserType::TxtProjectHeader => PatchKind::TxtProjectHeader(
-            parse_lines_diff_patch(asdsf_patch, priority).with_context(|_| {
+        ParserType::TxtProjectHeader => {
+            PatchKind::TxtProjectHeader(parse_lines_diff_patch(asdsf_patch, priority).with_context(|_| {
                 FailedDiffLinesPatchSnafu {
                     kind: AnimPatchErrKind::Asdsf,
                     sub_kind: AnimPatchErrSubKind::TxtProjectHeader,
                     path,
                 }
-            })?,
-        ),
+            })?)
+        }
         ParserType::SubTxtHeader => {
-            PatchKind::SubTxtHeader(parse_lines_diff_patch(asdsf_patch, priority).with_context(
-                |_| FailedDiffLinesPatchSnafu {
+            PatchKind::SubTxtHeader(parse_lines_diff_patch(asdsf_patch, priority).with_context(|_| {
+                FailedDiffLinesPatchSnafu {
                     kind: AnimPatchErrKind::Asdsf,
                     sub_kind: AnimPatchErrSubKind::SubTxtHeader,
                     path,
-                },
-            )?)
+                }
+            })?)
         }
         ParserType::AddAnimSet(file_name) => {
             let patch = skyrim_anim_data::asdsf::normal::de::anim_set_data
@@ -213,8 +209,7 @@ fn sort_patches_by_priority(patches: &mut [AsdsfPatch], id_orders: &PatchMaps) {
 /// Read `animationsetdatasinglefile.txt` from the resource directory
 fn read_asdsf_file(config: &Config) -> Result<Vec<u8>, Error> {
     let adsf_read_path = config.resource_dir.join(ASDSF_INNER_PATH);
-    let adsf_string =
-        std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu { path: adsf_read_path })?;
+    let adsf_string = std::fs::read(&adsf_read_path).with_context(|_| FailedIoSnafu { path: adsf_read_path })?;
     Ok(adsf_string)
 }
 
@@ -227,18 +222,18 @@ fn write_alt_asdsf_file(
 ) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let serialized = serialize_alt_asdsf(alt_asdsf, patches, sub_txt_header_patch_map)
-        .with_context(|_| FailedSerializeAsdsfSnafu {
+    let serialized = serialize_alt_asdsf(alt_asdsf, patches, sub_txt_header_patch_map).with_context(|_| {
+        FailedSerializeAsdsfSnafu {
             kind: AnimPatchErrKind::Asdsf,
             sub_kind: AnimPatchErrSubKind::TxtProjectHeader,
             path,
-        })?;
+        }
+    })?;
 
     if let Some(parent_dir) = path.parent() {
         let _ = std::fs::create_dir_all(parent_dir);
     }
-    std::fs::write(path, serialized)
-        .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
+    std::fs::write(path, serialized).with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
 
     #[cfg(feature = "tracing")]
     tracing::info!("Generated: {}", path.display());
@@ -247,8 +242,7 @@ fn write_alt_asdsf_file(
 
 /// Outputs debug JSON files for each patch in the provided slice.
 fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
-    let mut dest_path =
-        config.output_dir.join(".d_merge").join(".debug").join("patches").join(ASDSF_INNER_PATH);
+    let mut dest_path = config.output_dir.join(".d_merge").join(".debug").join("patches").join(ASDSF_INNER_PATH);
     dest_path.set_extension("patch.json");
     if let Err(_err) = write_patched_json(&dest_path, patches) {
         #[cfg(feature = "tracing")]

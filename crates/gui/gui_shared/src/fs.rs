@@ -29,17 +29,12 @@ where
 
     loop {
         if current.exists() {
-            return current
-                .canonicalize()
-                .map_err(|e| format!("Failed to canonicalize path({}): {e}", dir.display()));
+            return current.canonicalize().map_err(|e| format!("Failed to canonicalize path({}): {e}", dir.display()));
         }
         match current.parent() {
             Some(parent) => current = parent,
             None => {
-                return Err(format!(
-                    "No existing directory found in path hierarchy ({})",
-                    dir.display()
-                ));
+                return Err(format!("No existing directory found in path hierarchy ({})", dir.display()));
             }
         }
     }
@@ -61,6 +56,5 @@ where
 {
     let dir = dir.as_ref();
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
-    open::that_detached(abs_dir)
-        .map_err(|e| format!("Failed to open directory ({}): {e}", dir.display()))
+    open::that_detached(abs_dir).map_err(|e| format!("Failed to open directory ({}): {e}", dir.display()))
 }

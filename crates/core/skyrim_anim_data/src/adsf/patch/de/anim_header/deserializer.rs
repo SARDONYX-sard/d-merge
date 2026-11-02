@@ -10,9 +10,7 @@ use winnow_ext::ReadableError;
 use super::current_state::CurrentState;
 use crate::{
     adsf::patch::de::{
-        anim_header::{
-            AnimHeaderDiffPatch, DiffProjectAssets, LineKind, current_state::PartialProjectAssets,
-        },
+        anim_header::{AnimHeaderDiffPatch, DiffProjectAssets, LineKind, current_state::PartialProjectAssets},
         error::{Error, Result},
     },
     common_parser::{
@@ -50,28 +48,17 @@ struct Deserializer<'a> {
 
 impl<'de> Deserializer<'de> {
     fn new(input: &'de str) -> Self {
-        Self {
-            input,
-            original: input,
-            output_patches: AnimHeaderDiffPatch::DEFAULT,
-            current: CurrentState::new(),
-        }
+        Self { input, original: input, output_patches: AnimHeaderDiffPatch::DEFAULT, current: CurrentState::new() }
     }
 
-    fn parse_next<O>(
-        &mut self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
     ///
     /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
@@ -83,17 +70,11 @@ impl<'de> Deserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::Context { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::Context { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::Readable { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::Readable { source: readable }
@@ -111,10 +92,8 @@ impl<'de> Deserializer<'de> {
                     let should_take = self.parse_opt_start_comment()?;
                     self.parse_next(multispace0)?;
 
-                    let lead_int = self.parse_next(
-                        verify_line_parses_to::<i32>
-                            .context(Expected(Description("lead_int: i32"))),
-                    )?;
+                    let lead_int =
+                        self.parse_next(verify_line_parses_to::<i32>.context(Expected(Description("lead_int: i32"))))?;
                     #[cfg(feature = "tracing")]
                     tracing::trace!("lead_int = {lead_int:#?}");
 
@@ -129,10 +108,8 @@ impl<'de> Deserializer<'de> {
                     if diff_start {
                         self.current.set_range_start(0)?;
                     }
-                    let _len = self.parse_next(
-                        verify_line_parses_to::<usize>
-                            .context(Expected(Description("length: usize"))),
-                    )?;
+                    let _len = self
+                        .parse_next(verify_line_parses_to::<usize>.context(Expected(Description("length: usize"))))?;
                     #[cfg(feature = "tracing")]
                     tracing::trace!("{line_kind:#?} = {_len:#?}");
                 }
@@ -164,9 +141,8 @@ impl<'de> Deserializer<'de> {
                     let should_take = self.parse_opt_start_comment()?;
                     self.parse_next(multispace0)?;
 
-                    let _has_motion_data = self.parse_next(
-                        num_bool_line.context(Expected(Description("has_motion_data: '0' | '1'"))),
-                    )?;
+                    let _has_motion_data =
+                        self.parse_next(num_bool_line.context(Expected(Description("has_motion_data: '0' | '1'"))))?;
                     #[cfg(feature = "tracing")]
                     tracing::trace!("has_motion_data = {_has_motion_data}");
 
@@ -251,8 +227,7 @@ impl<'de> Deserializer<'de> {
                     if let Some(project_assets) = partial_patch.project_assets.take() {
                         let PartialProjectAssets { range, values } = project_assets;
                         let values = if op == Op::Remove { vec![] } else { values };
-                        self.output_patches.project_assets =
-                            Some(DiffProjectAssets { op, range, values });
+                        self.output_patches.project_assets = Some(DiffProjectAssets { op, range, values });
                     }
                 }
             }
@@ -305,10 +280,7 @@ Character Assets\skeleton.HKX
                 project_assets: Some(DiffProjectAssets {
                     op: Op::Replace,
                     range: 1..3,
-                    values: vec![
-                        "Characters\\ChickenTest0.hkx".into(),
-                        "Characters\\ChickenTest1.hkx".into(),
-                    ],
+                    values: vec!["Characters\\ChickenTest0.hkx".into(), "Characters\\ChickenTest1.hkx".into(),],
                 })
             }
         );

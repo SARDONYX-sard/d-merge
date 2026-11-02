@@ -32,10 +32,7 @@ pub(crate) fn apply<'a>(
 
     for (template_key, skeleton_suffix) in [
         (THREAD_PERSON_DEFAULTMALE_KEY, "meshes/actors/character/character assets/skeleton.xml"),
-        (
-            THREAD_PERSON_DEFAULTFEMALE_KEY,
-            "meshes/actors/character/character assets female/skeleton_female.xml",
-        ),
+        (THREAD_PERSON_DEFAULTFEMALE_KEY, "meshes/actors/character/character assets female/skeleton_female.xml"),
     ] {
         let skeleton_glob = format!("{skyrim_data_dir_glob}/{skeleton_suffix}");
         let skeleton_paths = jwalk_glob::glob_files(&skeleton_glob);
@@ -105,14 +102,12 @@ where
 {
     let path = path.as_ref();
 
-    let bytes = fs::read(path)
-        .map_err(|err| serde_hkx_features::error::Error::from(err).with_path(path))?;
+    let bytes = fs::read(path).map_err(|err| serde_hkx_features::error::Error::from(err).with_path(path))?;
 
     let mut bone_len = 0;
     hkx_io::with_class_map(&bytes, path, &mut |class_map| {
-        bone_len = read_character_skeleton(&class_map).map_err(|e| {
-            serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) }
-        })?;
+        bone_len = read_character_skeleton(&class_map)
+            .map_err(|e| serde_hkx_features::error::Error::Io { source: std::io::Error::other(e) })?;
         Ok(())
     })?;
     Ok(bone_len)
@@ -137,9 +132,7 @@ where
 ///
 /// Returns [`SkeletonArmFixPatchGenerationError`] if any required object or
 /// reference is missing or malformed.
-fn read_character_skeleton(
-    class_map: &ClassMap<'_>,
-) -> Result<usize, SkeletonArmFixPatchGenerationError> {
+fn read_character_skeleton(class_map: &ClassMap<'_>) -> Result<usize, SkeletonArmFixPatchGenerationError> {
     const ANIMATION_CONTAINER_NAME: &str = "Merged Animation Container";
     const NPC_ROOT_BONE: &str = "NPC Root [Root]";
 
@@ -163,8 +156,7 @@ fn read_character_skeleton(
         .iter()
         .find(|variant| *variant.m_name.get_ref() == Some(Cow::Borrowed(ANIMATION_CONTAINER_NAME)))
     else {
-        return MissingAnimationContainerVariantSnafu { variant_name: ANIMATION_CONTAINER_NAME }
-            .fail();
+        return MissingAnimationContainerVariantSnafu { variant_name: ANIMATION_CONTAINER_NAME }.fail();
     };
 
     if *named_variant.m_className.get_ref() != Some(Cow::Borrowed("hkaAnimationContainer")) {
@@ -211,9 +203,7 @@ fn read_character_skeleton(
     for skeleton_reference in &animation_container.m_skeletons {
         let skeleton_index = skeleton_reference.get();
 
-        let Some(class) =
-            class_map.iter().find_map(|(index, class)| (index == skeleton_index).then_some(class))
-        else {
+        let Some(class) = class_map.iter().find_map(|(index, class)| (index == skeleton_index).then_some(class)) else {
             return MissingSkeletonSnafu { index: skeleton_index.to_string() }.fail();
         };
 
@@ -227,8 +217,7 @@ fn read_character_skeleton(
         }
     }
 
-    let skeleton = character_skeleton
-        .ok_or_else(|| MissingCharacterSkeletonSnafu { name: NPC_ROOT_BONE }.build())?;
+    let skeleton = character_skeleton.ok_or_else(|| MissingCharacterSkeletonSnafu { name: NPC_ROOT_BONE }.build())?;
 
     let bone_count = skeleton.m_bones.len();
     if bone_count == 0 {
@@ -261,8 +250,8 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
     /// - Same Index defaultmale/defaultfemale
     /// - These additional class specifications can be obtained from the FNIS templates.
     const ZERO_WEIGHT_ARRAYS: &[&str] = &[
-        "#0031", "#0032", "#0035", "#0037", "#0038", "#0040", "#0044", "#0045", "#0046", "#0047",
-        "#0048", "#0049", "#0050", "#0054", "#0055", "#0056", "#0057",
+        "#0031", "#0032", "#0035", "#0037", "#0038", "#0040", "#0044", "#0045", "#0046", "#0047", "#0048", "#0049",
+        "#0050", "#0054", "#0055", "#0056", "#0057",
     ];
 
     /// Bone-weight arrays that receive `1.0` for every newly appended bone.
@@ -270,26 +259,21 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
     /// # Notes
     /// - Same Index defaultmale/defaultfemale
     /// - These additional class specifications can be obtained from the FNIS templates.
-    const ONE_WEIGHT_ARRAYS: &[&str] =
-        &["#0033", "#0034", "#0036", "#0039", "#0041", "#0051", "#0052", "#0053"];
+    const ONE_WEIGHT_ARRAYS: &[&str] = &["#0033", "#0034", "#0036", "#0039", "#0041", "#0051", "#0052", "#0053"];
 
     let missing_bone_len = bone_len.saturating_sub(VANILLA_BONE_LEN);
     if missing_bone_len == 0 || bone_len <= VANILLA_BONE_LEN {
         return Vec::new();
     }
 
-    let mut seq_patches =
-        Vec::with_capacity(1 + ZERO_WEIGHT_ARRAYS.len() + ONE_WEIGHT_ARRAYS.len());
+    let mut seq_patches = Vec::with_capacity(1 + ZERO_WEIGHT_ARRAYS.len() + ONE_WEIGHT_ARRAYS.len());
 
     // Append all missing bone-pair indices in one SeqPush.
     let missing_bone_indices: Vec<_> = (VANILLA_BONE_LEN..bone_len).collect();
     seq_patches.push((
         json_path!["#0028", "hkbMirroredSkeletonInfo", "bonePairMap"],
         ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, missing_bone_indices),
-            },
+            patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, missing_bone_indices) },
             priority: 0,
         },
     ));
@@ -300,10 +284,7 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
         seq_patches.push((
             json_path![class_index, "hkbBoneWeightArray", "boneWeights"],
             ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: json_typed!(borrowed, zero_weights),
-                },
+                patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, zero_weights) },
                 priority: 0,
             },
         ));
@@ -314,10 +295,7 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
         seq_patches.push((
             json_path![class_index, "hkbBoneWeightArray", "boneWeights"],
             ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: json_typed!(borrowed, one_weights),
-                },
+                patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, one_weights) },
                 priority: 0,
             },
         ));
@@ -334,16 +312,12 @@ pub(crate) enum SkeletonArmFixPatchGenerationError {
 
     /// The root-level container does not contain the expected animation
     /// container named variant.
-    #[snafu(display(
-        "The hkRootLevelContainer does not contain the `{variant_name}` named variant"
-    ))]
+    #[snafu(display("The hkRootLevelContainer does not contain the `{variant_name}` named variant"))]
     MissingAnimationContainerVariant { variant_name: &'static str },
 
     /// The expected animation container named variant references an
     /// unexpected Havok class.
-    #[snafu(display(
-        "The `{variant_name}` named variant has an unexpected class name `{class_name}`"
-    ))]
+    #[snafu(display("The `{variant_name}` named variant has an unexpected class name `{class_name}`"))]
     UnexpectedAnimationContainerClass { variant_name: &'static str, class_name: String },
 
     /// The animation container named variant references an object that does
@@ -376,8 +350,6 @@ pub(crate) enum SkeletonArmFixPatchGenerationError {
 
     /// The source skeleton contains more bones than can be represented by
     /// the `i16` indices used by `hkbMirroredSkeletonInfo.bonePairMap`.
-    #[snafu(display(
-        "The skeleton contains {bone_count} bones, but the bone index cannot be represented by i16"
-    ))]
+    #[snafu(display("The skeleton contains {bone_count} bones, but the bone index cannot be represented by i16"))]
     BoneIndexOverflow { bone_count: usize },
 }

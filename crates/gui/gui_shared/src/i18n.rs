@@ -1,11 +1,10 @@
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, path::Path};
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use snafu::ResultExt as _;
+
+use crate::error::{Error, *};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
@@ -377,6 +376,9 @@ pub enum I18nKey {
     /// - `v4.4.0-beta`: Compatible with `v5.0.0`.
     PandoraTargetVersionHover,
 
+    /// output dir:
+    PandoraOutputDirLabel,
+
     /// Imports Pandora settings into the d-merge VFS configuration.
     ///
     /// # Targets
@@ -391,9 +393,6 @@ pub enum I18nKey {
     /// Import
     PandoraImportLabel,
 
-    /// Import path:
-    PandoraImportPathLabel,
-
     /// Exports d-merge VFS settings to Pandora.
     ///
     /// # Targets
@@ -407,9 +406,6 @@ pub enum I18nKey {
 
     /// Export
     PandoraExportLabel,
-
-    /// Export Path:
-    PandoraExportPathLabel,
 
     /// Reload
     ReloadButton,
@@ -872,58 +868,58 @@ pub enum I18nKey {
     HkannoLspOptionsTitle,
 
     /// Keymap:
-    HkannoEditorMode,
+    LspEditorMode,
 
     /// Key bindings of the editor. In Vim mode, `:w` saves.
-    HkannoEditorModeHover,
+    LspEditorModeHover,
 
     /// Completion
-    HkannoLspCompletion,
+    LspCompletion,
 
     /// Suggestions while typing. Press Ctrl+Space to open them manually.
-    HkannoLspCompletionHover,
+    LspCompletionHover,
 
     /// Code actions
-    HkannoLspCodeAction,
+    LspCodeAction,
 
     /// Quick fixes for some problems (e.g., IFrame key typos).
-    HkannoLspCodeActionHover,
+    LspCodeActionHover,
 
     /// Diagnostics
-    HkannoLspDiagnostics,
+    LspDiagnostics,
 
     /// Underline errors and warnings.
-    HkannoLspDiagnosticsHover,
+    LspDiagnosticsHover,
 
     /// Formatter
-    HkannoLspFormatter,
+    LspFormatter,
 
     /// Normalize spaces and number formats (Shift+Alt+F).
-    HkannoLspFormatterHover,
+    LspFormatterHover,
 
     /// Semantic highlighting
-    HkannoLspSemanticTokens,
+    LspSemanticTokens,
 
     /// Parser-based coloring (e.g., PIE parameters).
-    HkannoLspSemanticTokensHover,
+    LspSemanticTokensHover,
 
     /// Hover
-    HkannoLspHover,
+    LspHover,
 
     /// Show explanations when hovering a token.
-    HkannoLspHoverHover,
+    LspHoverHover,
 
     /// Inlay hints
-    HkannoLspInlayHints,
+    LspInlayHints,
 
     /// Show parameter names (time, x, y, ...) at the end of each line.
-    HkannoLspInlayHintsHover,
+    LspInlayHintsHover,
 
     /// Signature help
-    HkannoLspSignatureHelp,
+    LspSignatureHelp,
 
     /// Show the signature of the event being typed.
-    HkannoLspSignatureHelpHover,
+    LspSignatureHelpHover,
 
     // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
     /// Invalid key comes here when deserializing unknown strings.
@@ -940,7 +936,7 @@ impl I18nMap {
     }
 
     /// By placing settings in a fixed location within the Skyrim Data directory, you can handle switching between profiles in MO2.
-    pub const FILE: &'static str = "./.d_merge/translation.json";
+    pub const PATH: &'static str = "./.d_merge/translation.json";
 
     /// Translate given key or fallback to default English.
     pub fn t(&self, key: I18nKey) -> &str {
@@ -992,27 +988,10 @@ impl I18nMap {
     {
         let path = path.as_ref();
 
-        let map = Self(
-            I18nKey::ALL.par_iter().map(|key| (*key, Cow::Borrowed(key.default_eng()))).collect(),
-        );
+        let map = Self(I18nKey::ALL.par_iter().map(|key| (*key, Cow::Borrowed(key.default_eng()))).collect());
 
         let text = sonic_rs::to_string_pretty(&map).context(SerializeJsonSnafu { path })?;
         std::fs::write(path, text).context(WriteFileSnafu { path })?;
         Ok(())
     }
-}
-
-#[derive(Debug, snafu::Snafu)]
-pub enum Error {
-    #[snafu(display("Failed to read file: {}", path.display()))]
-    ReadFile { path: PathBuf, source: std::io::Error },
-
-    #[snafu(display("Failed to write file: {}", path.display()))]
-    WriteFile { path: PathBuf, source: std::io::Error },
-
-    #[snafu(display("Failed to parse json: {}", path.display()))]
-    ParseJson { path: PathBuf, source: sonic_rs::Error },
-
-    #[snafu(display("Failed to serialize json: {}", path.display()))]
-    SerializeJson { path: PathBuf, source: sonic_rs::Error },
 }

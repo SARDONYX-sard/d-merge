@@ -113,8 +113,7 @@ pub fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
 
 fn find_type(field_name: &str, field_info: &ClassSchema) -> Result<FieldType, Error> {
     field_info.field(field_name).map(FieldType::from).ok_or_else(|| {
-        let acceptable_fields: Vec<&'static str> =
-            field_info.fields.iter().map(|f| f.name).collect();
+        let acceptable_fields: Vec<&'static str> = field_info.fields.iter().map(|f| f.name).collect();
 
         Error::UnknownField { field_name: field_name.to_string(), acceptable_fields }
     })
@@ -140,8 +139,7 @@ pub fn field_start_tag<'a>(
     move |input: &mut &'a str| {
         any_field_start_tag
             .try_map(|(field_name, array_len)| {
-                find_type(field_name, field_info)
-                    .map(|field_type| (field_name, field_type, array_len))
+                find_type(field_name, field_info).map(|field_type| (field_name, field_type, array_len))
             })
             .parse_next(input)
     }
@@ -206,8 +204,7 @@ fn index_name_attr<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
 /// # Errors
 /// If parsing failed.
 pub fn index_name<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
-    alt((("#", digit1).take().map(PointerType::Index), take_until(0.., '\"').map(PointerType::Var)))
-        .parse_next(input)
+    alt((("#", digit1).take().map(PointerType::Index), take_until(0.., '\"').map(PointerType::Var))).parse_next(input)
 }
 
 #[cfg(test)]

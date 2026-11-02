@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::mod_item::ModItem;
+use super::mod_item::ModItem;
 
 /// Paths and mod list for one execution mode (VFS or Manual).
 ///
@@ -51,10 +51,55 @@ pub struct ModListSettings {
 
 impl Default for ModListSettings {
     fn default() -> Self {
-        Self {
-            skyrim_data_dir: String::new(),
-            output_dir: "./d_merge_output".into(),
-            mod_list: Vec::new(),
-        }
+        Self { skyrim_data_dir: String::new(), output_dir: "./d_merge_output".into(), mod_list: Vec::new() }
     }
+}
+
+/// Filter and sort state for the mod-list table.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ViewState {
+    /// Current text in the mod-list search box.
+    ///
+    /// Matched case-insensitively against the column selected by
+    /// [`filter_column`].  An empty string disables filtering and enables
+    /// drag-and-drop reordering.
+    ///
+    /// [`filter_column`]: ModListUiSettings::filter_column
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub filter_text: String,
+
+    /// Which column the filter text is matched against.
+    ///
+    /// `None` matches all text-bearing columns (id, name, site).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter_column: Option<SortColumn>,
+
+    /// Primary sort key for the mod-list table.
+    ///
+    /// Drag-and-drop reordering is only active when this is
+    /// [`SortColumn::Priority`] and [`sort_asc`] is `true`.
+    ///
+    /// [`sort_asc`]: ModListUiSettings::sort_asc
+    pub sort_column: SortColumn,
+
+    /// Sort direction: `true` = ascending, `false` = descending.
+    pub sort_asc: bool,
+}
+
+impl Default for ViewState {
+    fn default() -> Self {
+        Self { filter_text: String::new(), filter_column: None, sort_column: SortColumn::Priority, sort_asc: true }
+    }
+}
+
+/// Columns that can be used for sorting mods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SortColumn {
+    Id,
+    Name,
+    ModType,
+    Site,
+    Priority,
 }

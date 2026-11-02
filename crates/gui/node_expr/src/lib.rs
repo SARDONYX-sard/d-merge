@@ -26,22 +26,15 @@ pub struct DirEntry {
 ///
 /// # Errors
 /// Returns an error if there is an issue reading the directory or its contents.
-pub fn build_dir_tree<const N: usize>(
-    path: impl AsRef<Path>,
-    allowed_extensions: [&str; N],
-) -> Result<DirEntry> {
+pub fn build_dir_tree<const N: usize>(path: impl AsRef<Path>, allowed_extensions: [&str; N]) -> Result<DirEntry> {
     let path = path.as_ref();
 
-    let name = path
-        .file_name()
-        .map_or_else(|| path.to_string_lossy(), |os_str| os_str.to_string_lossy())
-        .to_string();
+    let name = path.file_name().map_or_else(|| path.to_string_lossy(), |os_str| os_str.to_string_lossy()).to_string();
 
     let children = if path.is_dir() {
         // Collect entries in a vector for parallel processing
-        let entries: Vec<_> = fs::read_dir(path)
-            .map_err(|e| Error::IoError { source: e, path: path.to_path_buf() })?
-            .collect();
+        let entries: Vec<_> =
+            fs::read_dir(path).map_err(|e| Error::IoError { source: e, path: path.to_path_buf() })?.collect();
 
         // Use parallel processing to handle entries
         let child_nodes: Vec<DirEntry> = entries

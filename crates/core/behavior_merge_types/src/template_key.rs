@@ -27,9 +27,8 @@ impl TemplateKey<'static> {
         }
 
         // Fallback search by ASCII ignore(For Nemesis_Engine\mod\pscd\MagicBehavior)
-        let template_name = map
-            .into_iter()
-            .find_map(|(k, v)| k.eq_ignore_ascii_case(template_file_stem).then_some(*v))?;
+        let template_name =
+            map.into_iter().find_map(|(k, v)| k.eq_ignore_ascii_case(template_file_stem).then_some(*v))?;
 
         Some(Self { template_name: Cow::Borrowed(template_name) })
     }
@@ -106,8 +105,7 @@ impl<'a> TemplateKey<'a> {
         }
 
         starts_with_ignore_ascii(template_name, "meshes")
-            && (ends_with_ignore_ascii(template_name, "bin")
-                || ends_with_ignore_ascii(template_name, "xml"))
+            && (ends_with_ignore_ascii(template_name, "bin") || ends_with_ignore_ascii(template_name, "xml"))
     }
 
     /// As utf-8
@@ -336,10 +334,7 @@ pub struct MasterIndex {
 impl MasterIndex {
     /// From nemesis file stem. e.g. `0_master` -> MasterIndex
     #[inline]
-    pub fn from_nemesis_file(
-        template_file_stem: &str,
-        is_1st_person: bool,
-    ) -> Option<&'static Self> {
+    pub fn from_nemesis_file(template_file_stem: &str, is_1st_person: bool) -> Option<&'static Self> {
         let map = if is_1st_person { &FIRST_PERSON_INDEX_MAP } else { &MASTER_INDEX_MAP };
 
         if let Some(index) = map.get(template_file_stem) {

@@ -135,8 +135,7 @@ const VARIANT: &str = r#"    "Variant" => ClassSchema { name: "Variant", signatu
 "#;
 
 fn class_entry(out: &mut String, class: &Class<'_>, classes: &ClassMap<'_>) {
-    let parent =
-        class.parent.as_deref().map_or_else(|| "None".to_string(), |p| format!("Some({p:?})"));
+    let parent = class.parent.as_deref().map_or_else(|| "None".to_string(), |p| format!("Some({p:?})"));
     let _ = writeln!(
         out,
         "    {name:?} => ClassSchema {{ name: {name:?}, signature: \"{signature}\", parent: {parent}, fields: &[",
@@ -155,18 +154,11 @@ fn class_entry(out: &mut String, class: &Class<'_>, classes: &ClassMap<'_>) {
     out.push_str(" } },\n");
 }
 
-fn field_entry(
-    out: &mut String,
-    member: &Member<'_>,
-    inherited: &[&Class<'_>],
-    classes: &ClassMap<'_>,
-) {
+fn field_entry(out: &mut String, member: &Member<'_>, inherited: &[&Class<'_>], classes: &ClassMap<'_>) {
     let enum_def = member.enum_ref.as_deref().and_then(|name| find_enum(name, inherited, classes));
-    let values: Vec<String> = enum_def
-        .map(|e| e.enum_item.iter().map(|item| format!("{:?}", item.name)).collect())
-        .unwrap_or_default();
-    let class =
-        member.class_ref.as_deref().map_or_else(|| "None".to_string(), |c| format!("Some({c:?})"));
+    let values: Vec<String> =
+        enum_def.map(|e| e.enum_item.iter().map(|item| format!("{:?}", item.name)).collect()).unwrap_or_default();
+    let class = member.class_ref.as_deref().map_or_else(|| "None".to_string(), |c| format!("Some({c:?})"));
     let _ = writeln!(
         out,
         "        FieldSchema {{ name: {name:?}, kind: TypeKind::{kind}, sub_kind: TypeKind::{sub}, class: {class}, values: &[{values}], serialize_ignored: {ignored} }},",
@@ -221,11 +213,7 @@ fn variant(kind: &TypeKind) -> &'static str {
 }
 
 /// An enum by name: in the class or its parents, else `Class::Enum` / any class (shared enums).
-fn find_enum<'a>(
-    name: &str,
-    inherited: &[&'a Class<'a>],
-    classes: &'a ClassMap<'a>,
-) -> Option<&'a Enum<'a>> {
+fn find_enum<'a>(name: &str, inherited: &[&'a Class<'a>], classes: &'a ClassMap<'a>) -> Option<&'a Enum<'a>> {
     let (owner, enum_name) = name.rsplit_once("::").map_or((None, name), |(o, e)| (Some(o), e));
     if let Some(owner) = owner.and_then(|o| classes.get(o)) {
         return owner.enums.iter().find(|e| e.name == enum_name);
@@ -234,7 +222,5 @@ fn find_enum<'a>(
         .iter()
         .rev()
         .find_map(|class| class.enums.iter().find(|e| e.name == enum_name))
-        .or_else(|| {
-            classes.values().find_map(|class| class.enums.iter().find(|e| e.name == enum_name))
-        })
+        .or_else(|| classes.values().find_map(|class| class.enums.iter().find(|e| e.name == enum_name)))
 }

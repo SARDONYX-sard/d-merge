@@ -26,8 +26,6 @@ pub mod priority;
 pub mod template_key;
 
 pub use crate::{
-    config::{
-        Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, Status, StatusReporterFn,
-    },
+    config::{Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, Status, StatusReporterFn},
     priority::{PatchMaps, PriorityMap},
 };

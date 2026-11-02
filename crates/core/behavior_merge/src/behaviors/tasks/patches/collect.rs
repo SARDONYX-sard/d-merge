@@ -14,8 +14,7 @@ use crate::{
     Config, PriorityMap,
     behaviors::tasks::{
         patches::types::{
-            BehaviorIndexes, BehaviorPatchesMap, HkxPatchMaps, OwnedPatchMap, OwnedPatches,
-            PatchCollection,
+            BehaviorIndexes, BehaviorPatchesMap, HkxPatchMaps, OwnedPatchMap, OwnedPatches, PatchCollection,
         },
         templates::key::TemplateKey,
     },
@@ -30,16 +29,9 @@ use crate::{
 ///
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
-pub(crate) fn collect_owned_patches(
-    nemesis_entries: &PriorityMap,
-    config: &Config,
-) -> OwnedPatches {
+pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Config) -> OwnedPatches {
     // NOTE: Walking and reading take seconds when the OS file cache is cold, so report the progress per mod dir.
-    let reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::ReadingPatches,
-        nemesis_entries.len(),
-    );
+    let reporter = StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, nemesis_entries.len());
 
     // Walk, read and sort into each category at once per mod dir. (No intermediate `Vec` of paths)
     // - No need to sort. Conflicts are resolved by priority, not by this order.
@@ -98,14 +90,9 @@ pub(crate) fn collect_borrowed_patches<'a>(
     config: &Config,
     fnis_patches: PatchCollection<'a>,
 ) -> (PatchCollection<'a>, Vec<Error>) {
-    let PatchCollection { borrowed_patches: raw_borrowed_patches, behavior_index_map } =
-        fnis_patches;
+    let PatchCollection { borrowed_patches: raw_borrowed_patches, behavior_index_map } = fnis_patches;
 
-    let reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::ParsingPatches,
-        owned_patches.len(),
-    );
+    let reporter = StatusReportCounter::new(&config.status_report, ReportType::ParsingPatches, owned_patches.len());
 
     // 1/3: Parse each file in parallel into thread-local data (no shared map, no lock).
     //
@@ -141,10 +128,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         .map(|(key, TemplatePatches { base, files })| {
             for (patches, priority) in files {
                 for (json_path, value) in patches {
-                    let is_seq = matches!(
-                        value.action,
-                        json_patch::Action::Seq { .. } | json_patch::Action::SeqPush
-                    );
+                    let is_seq = matches!(value.action, json_patch::Action::Seq { .. } | json_patch::Action::SeqPush);
                     let value = ValueWithPriority::new(value, priority);
                     if is_seq {
                         base.seq.insert(json_path, value);
@@ -157,13 +141,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
         })
         .collect();
 
-    (
-        PatchCollection {
-            borrowed_patches: BehaviorPatchesMap(borrowed_patches),
-            behavior_index_map,
-        },
-        errors,
-    )
+    (PatchCollection { borrowed_patches: BehaviorPatchesMap(borrowed_patches), behavior_index_map }, errors)
 }
 
 /// One parsed Nemesis patch file.
@@ -184,21 +162,13 @@ struct TemplatePatches<'a> {
     files: Vec<(PatchesMap<'a>, usize)>,
 }
 
-fn parse_one_patch<'a>(
-    path: &Path,
-    xml: &'a str,
-    priority: usize,
-    config: &Config,
-) -> Result<ParsedPatch<'a>> {
+fn parse_one_patch<'a>(path: &Path, xml: &'a str, priority: usize, config: &Config) -> Result<ParsedPatch<'a>> {
     // NOTE: The root class index is returned only if it is `hkbBehaviorGraphStringData`.
     let (patches, parsed_string_data_index) =
-        parse_nemesis_patch(xml, config.hack_options.map(Into::into))
-            .with_context(|_| NemesisXmlErrSnafu { path })?;
+        parse_nemesis_patch(xml, config.hack_options.map(Into::into)).with_context(|_| NemesisXmlErrSnafu { path })?;
 
     let nemesis_path = parse_nemesis_path(path)?;
-    let key = nemesis_path
-        .to_template_key()
-        .with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
+    let key = nemesis_path.to_template_key().with_context(|| FailedToCastNemesisPathToTemplateKeySnafu { path })?;
 
     let indexes = match nemesis_path.get_master_index() {
         Some(index) => Some(BehaviorIndexes {
@@ -206,10 +176,8 @@ fn parse_one_patch<'a>(
             behavior_graph: Some(Cow::Borrowed(index.master_behavior_graph_index)),
         }),
         // `hkbBehaviorGraphData` is unknown from the patch xml.
-        None => parsed_string_data_index.map(|index| BehaviorIndexes {
-            string_data: Cow::Owned(index.to_string()),
-            behavior_graph: None,
-        }),
+        None => parsed_string_data_index
+            .map(|index| BehaviorIndexes { string_data: Cow::Owned(index.to_string()), behavior_graph: None }),
     };
 
     Ok(ParsedPatch { key, indexes, patches, priority })

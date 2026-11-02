@@ -10,9 +10,7 @@ use winnow_ext::ReadableError;
 use super::{AnimInfo, AnimSetData, Asdsf, Attack, Condition};
 use crate::{
     asdsf::normal::{AnimSetList, TxtProjects},
-    common_parser::lines::{
-        Str, lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to,
-    },
+    common_parser::lines::{Str, lines, num_bool_line, one_line, parse_one_line, verify_line_parses_to},
 };
 
 /// Parses the animation data structure from the input.
@@ -46,9 +44,7 @@ fn asdsf<'a>(input: &mut &'a str) -> ModalResult<Asdsf<'a>> {
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn txt_projects<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
-    let line_len = parse_one_line
-        .context(Expected(Description("project_names_len: usize")))
-        .parse_next(input)?;
+    let line_len = parse_one_line.context(Expected(Description("project_names_len: usize"))).parse_next(input)?;
 
     let mut txt_projects = vec![];
     for _ in 0..line_len {
@@ -70,11 +66,7 @@ fn file_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
     .parse_next(input)?;
 
     let file_names = if let Some(file_names_len) = file_names_len {
-        Some(
-            lines(file_names_len)
-                .context(Expected(Description("file_names: Vec<Str>")))
-                .parse_next(input)?,
-        )
+        Some(lines(file_names_len).context(Expected(Description("file_names: Vec<Str>"))).parse_next(input)?)
     } else {
         None
     };
@@ -87,34 +79,22 @@ fn file_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
 /// # Errors
 /// If got unexpected str.
 pub fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
-    let version = one_line
-        .verify(|line: &str| line == "V3")
-        .context(Expected(Description("version == V3")))
-        .parse_next(input)?;
+    let version =
+        one_line.verify(|line: &str| line == "V3").context(Expected(Description("version == V3"))).parse_next(input)?;
 
-    let triggers_len =
-        parse_one_line.context(Expected(Description("triggers_len: usize"))).parse_next(input)?;
-    let triggers = lines(triggers_len)
-        .context(Expected(Description("triggers: Vec<Str>")))
-        .parse_next(input)?;
+    let triggers_len = parse_one_line.context(Expected(Description("triggers_len: usize"))).parse_next(input)?;
+    let triggers = lines(triggers_len).context(Expected(Description("triggers: Vec<Str>"))).parse_next(input)?;
 
-    let conditions_len =
-        parse_one_line.context(Expected(Description("conditions_len: usize"))).parse_next(input)?;
-    let conditions = conditions(conditions_len)
-        .context(Expected(Description("conditions: Vec<Str>")))
-        .parse_next(input)?;
+    let conditions_len = parse_one_line.context(Expected(Description("conditions_len: usize"))).parse_next(input)?;
+    let conditions =
+        conditions(conditions_len).context(Expected(Description("conditions: Vec<Str>"))).parse_next(input)?;
 
-    let attacks_len =
-        parse_one_line.context(Expected(Description("attacks_len: usize"))).parse_next(input)?;
-    let attacks = attacks(attacks_len)
-        .context(Expected(Description("attacks: Vec<Str>")))
-        .parse_next(input)?;
+    let attacks_len = parse_one_line.context(Expected(Description("attacks_len: usize"))).parse_next(input)?;
+    let attacks = attacks(attacks_len).context(Expected(Description("attacks: Vec<Str>"))).parse_next(input)?;
 
-    let anim_infos_len =
-        parse_one_line.context(Expected(Description("anim_infos_len: usize"))).parse_next(input)?;
-    let anim_infos = anim_infos(anim_infos_len)
-        .context(Expected(Description("anim_infos: Vec<Str>")))
-        .parse_next(input)?;
+    let anim_infos_len = parse_one_line.context(Expected(Description("anim_infos_len: usize"))).parse_next(input)?;
+    let anim_infos =
+        anim_infos(anim_infos_len).context(Expected(Description("anim_infos: Vec<Str>"))).parse_next(input)?;
 
     Ok(AnimSetData {
         version,
@@ -129,9 +109,7 @@ pub fn anim_set_data<'a>(input: &mut &'a str) -> ModalResult<AnimSetData<'a>> {
     })
 }
 
-fn conditions<'a>(
-    line_len: usize,
-) -> impl Parser<&'a str, Vec<Condition<'a>>, ErrMode<ContextError>> {
+fn conditions<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Condition<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut conditions = vec![];
         for _ in 0..line_len {
@@ -157,15 +135,15 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode
         let mut attacks = vec![];
         for _ in 0..line_len {
             let attack = seq! {
-                    Attack {
-                        attack_trigger: one_line.context(Expected(Description("attack_trigger: str"))),
-                        is_contextual: num_bool_line.context(Expected(Description("unknown: 0 | 1"))),
-                        clip_names_len: parse_one_line.context(Expected(Description("clip_names_len: usize"))),
-                        clip_names: lines(clip_names_len).context(Expected(Description("clip_names: Vec<str>"))),
-                    }
+                Attack {
+                    attack_trigger: one_line.context(Expected(Description("attack_trigger: str"))),
+                    is_contextual: num_bool_line.context(Expected(Description("unknown: 0 | 1"))),
+                    clip_names_len: parse_one_line.context(Expected(Description("clip_names_len: usize"))),
+                    clip_names: lines(clip_names_len).context(Expected(Description("clip_names: Vec<str>"))),
                 }
-                .context(Label("Attack"))
-                .parse_next(input)?;
+            }
+            .context(Label("Attack"))
+            .parse_next(input)?;
             attacks.push(attack);
         }
 
@@ -173,9 +151,7 @@ fn attacks<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Attack<'a>>, ErrMode
     }
 }
 
-fn anim_infos<'a>(
-    line_len: usize,
-) -> impl Parser<&'a str, Vec<AnimInfo<'a>>, ErrMode<ContextError>> {
+fn anim_infos<'a>(line_len: usize) -> impl Parser<&'a str, Vec<AnimInfo<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut anim_infos = vec![];
         for _ in 0..line_len {
@@ -214,8 +190,7 @@ mod tests {
                 //     .zip(asdsf.anim_set_list)
                 //     .collect();
 
-                std::fs::write("../../../dummy/debug/asdsf_debug.log", format!("{asdsf:#?}"))
-                    .unwrap();
+                std::fs::write("../../../dummy/debug/asdsf_debug.log", format!("{asdsf:#?}")).unwrap();
             }
             Err(err) => panic!("{err}"),
         }
@@ -223,9 +198,7 @@ mod tests {
 
     #[test]
     fn should_parse() {
-        let s = include_str!(
-            "../../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt"
-        );
+        let s = include_str!("../../../../../../resource/xml/templates/meshes/animationsetdatasinglefile.txt");
         test_parse(s);
     }
 }

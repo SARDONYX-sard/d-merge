@@ -88,11 +88,8 @@ pub(crate) fn expand_components(dir: &Path, pattern: &[&str], is_dir: bool) -> V
         .flat_map_iter(|entry| match pattern {
             ["**", rest @ ..] => {
                 // `**` consumes this entry (and maybe more components).
-                let mut found = if rest.is_empty() && entry.is_dir == is_dir {
-                    vec![entry.path.clone()]
-                } else {
-                    vec![]
-                };
+                let mut found =
+                    if rest.is_empty() && entry.is_dir == is_dir { vec![entry.path.clone()] } else { vec![] };
                 if entry.is_dir {
                     found.extend(expand_components(&entry.path, pattern, is_dir));
                 }
@@ -112,11 +109,7 @@ fn match_entry(entry: Entry, pattern: &[&str], is_dir: bool) -> Vec<PathBuf> {
         return vec![];
     };
 
-    let is_match = entry
-        .path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| match_segment(first, name));
+    let is_match = entry.path.file_name().and_then(|name| name.to_str()).is_some_and(|name| match_segment(first, name));
     if !is_match {
         return vec![];
     }

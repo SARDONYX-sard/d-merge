@@ -27,10 +27,7 @@ pub(super) enum ItemStyle {
 impl ItemStyle {
     /// The style of the nearest enclosing [`ComboBox`] popup, if any.
     pub(super) fn find(ui: &egui::Ui) -> Option<Self> {
-        ui.stack()
-            .iter()
-            .find_map(|frame| frame.tags().get_downcast::<Self>(ITEM_STYLE_TAG))
-            .copied()
+        ui.stack().iter().find_map(|frame| frame.tags().get_downcast::<Self>(ITEM_STYLE_TAG)).copied()
     }
 
     /// Runs `add_contents` in a child ui whose [`Button::selectable`]s render in this style.
@@ -177,9 +174,7 @@ impl ComboBox {
         let mut response = self
             .show_ui(ui, |ui| {
                 for i in 0..len {
-                    if ui.add(Button::selectable(i == *selected, get(i))).clicked()
-                        && *selected != i
-                    {
+                    if ui.add(Button::selectable(i == *selected, get(i))).clicked() && *selected != i {
                         *selected = i;
                         changed = true;
                     }
@@ -219,20 +214,13 @@ impl ComboBox {
             } else {
                 theme.background
             };
-            let trigger_border =
-                if response.hovered() || pressed { theme.ring } else { theme.border };
+            let trigger_border = if response.hovered() || pressed { theme.ring } else { theme.border };
 
             painter.rect_filled(rect, cr, trigger_bg);
-            painter.rect_stroke(
-                rect,
-                cr,
-                egui::Stroke::new(1.0_f32, trigger_border),
-                egui::epaint::StrokeKind::Inside,
-            );
+            painter.rect_stroke(rect, cr, egui::Stroke::new(1.0_f32, trigger_border), egui::epaint::StrokeKind::Inside);
 
             let galley = selected_galley(ui, &theme, &self.selected_text, &self.placeholder);
-            let text_pos =
-                egui::pos2(rect.min.x + h_padding, rect.center().y - galley.size().y / 2.0);
+            let text_pos = egui::pos2(rect.min.x + h_padding, rect.center().y - galley.size().y / 2.0);
             painter.galley(text_pos, galley, theme.foreground);
 
             let icon_size: f32 = 14.0;
@@ -252,33 +240,27 @@ impl ComboBox {
         }
 
         let toggle_cmd = response.clicked().then_some(egui::SetOpenCommand::Toggle);
-        let inner =
-            egui::Popup::new(response.id.with("popup"), ui.ctx().clone(), &response, ui.layer_id())
-                .open_memory(toggle_cmd)
-                .close_behavior(self.close_behavior.unwrap_or_default())
-                .frame(
-                    egui::Frame::NONE
-                        .fill(theme.popover)
-                        .inner_margin(egui::Margin::same(4))
-                        .corner_radius(theme.corner_radius())
-                        .stroke(egui::Stroke::new(1.0_f32, with_alpha(theme.foreground, 26)))
-                        .shadow(popup_shadow()),
-                )
-                .show(|ui: &mut egui::Ui| {
-                    let popup_width = width.max(144.0);
-                    ui.set_min_width(popup_width);
-                    ui.set_max_width(popup_width);
-                    ItemStyle::Select.scope(ui, |ui| match self.height {
-                        Some(height) => {
-                            egui::ScrollArea::vertical()
-                                .max_height(height)
-                                .show(ui, menu_contents)
-                                .inner
-                        }
-                        None => menu_contents(ui),
-                    })
+        let inner = egui::Popup::new(response.id.with("popup"), ui.ctx().clone(), &response, ui.layer_id())
+            .open_memory(toggle_cmd)
+            .close_behavior(self.close_behavior.unwrap_or_default())
+            .frame(
+                egui::Frame::NONE
+                    .fill(theme.popover)
+                    .inner_margin(egui::Margin::same(4))
+                    .corner_radius(theme.corner_radius())
+                    .stroke(egui::Stroke::new(1.0_f32, with_alpha(theme.foreground, 26)))
+                    .shadow(popup_shadow()),
+            )
+            .show(|ui: &mut egui::Ui| {
+                let popup_width = width.max(144.0);
+                ui.set_min_width(popup_width);
+                ui.set_max_width(popup_width);
+                ItemStyle::Select.scope(ui, |ui| match self.height {
+                    Some(height) => egui::ScrollArea::vertical().max_height(height).show(ui, menu_contents).inner,
+                    None => menu_contents(ui),
                 })
-                .map(|inner| inner.inner);
+            })
+            .map(|inner| inner.inner);
 
         egui::InnerResponse::new(inner, response)
     }
@@ -299,8 +281,7 @@ impl ComboBox {
         let menu_height = self.height.unwrap_or(250.0);
 
         let id = ui.make_persistent_id(self.id_salt);
-        let (trigger_rect, _) =
-            ui.allocate_exact_size(egui::vec2(width, trigger_height), egui::Sense::hover());
+        let (trigger_rect, _) = ui.allocate_exact_size(egui::vec2(width, trigger_height), egui::Sense::hover());
         let mut trigger = ui.interact(trigger_rect, id, egui::Sense::click());
 
         if ui.is_rect_visible(trigger_rect) {
@@ -322,17 +303,11 @@ impl ComboBox {
             );
 
             let galley = selected_galley(ui, &theme, &self.selected_text, &self.placeholder);
-            let text_pos = egui::pos2(
-                trigger_rect.min.x + h_padding,
-                trigger_rect.center().y - galley.size().y / 2.0,
-            );
+            let text_pos = egui::pos2(trigger_rect.min.x + h_padding, trigger_rect.center().y - galley.size().y / 2.0);
             ui.painter().galley(text_pos, galley, theme.foreground);
 
             let icon_rect = egui::Rect::from_min_size(
-                egui::pos2(
-                    trigger_rect.max.x - h_padding - icon_size,
-                    trigger_rect.center().y - icon_size / 2.0,
-                ),
+                egui::pos2(trigger_rect.max.x - h_padding - icon_size, trigger_rect.center().y - icon_size / 2.0),
                 egui::vec2(icon_size, icon_size),
             );
             paint_icon(ui.painter(), icon_rect, Icon::ChevronDown, theme.muted_foreground);
@@ -362,8 +337,7 @@ impl ComboBox {
         let mut close = false;
         let mut changed = false;
 
-        let mut search_text =
-            ui.memory_mut(|mem| mem.data.get_temp::<String>(search_id).unwrap_or_default());
+        let mut search_text = ui.memory_mut(|mem| mem.data.get_temp::<String>(search_id).unwrap_or_default());
 
         popup.show(|ui| {
             let popup_width = trigger_rect.width().max(200.0);
@@ -390,9 +364,7 @@ impl ComboBox {
                 .collect();
 
             if filtered.is_empty() {
-                let text = egui::RichText::new(self.no_results_text.text())
-                    .color(theme.muted_foreground)
-                    .size(13.0);
+                let text = egui::RichText::new(self.no_results_text.text()).color(theme.muted_foreground).size(13.0);
                 ui.label(text);
                 return;
             }
@@ -474,11 +446,8 @@ pub(super) fn paint_item(
     let theme = ShadcnTheme::get(ui.ctx());
     let check_icon_size: f32 = 12.0;
 
-    let galley = ui.painter().layout_no_wrap(
-        text.text().to_owned(),
-        egui::FontId::proportional(14.0),
-        theme.popover_foreground,
-    );
+    let galley =
+        ui.painter().layout_no_wrap(text.text().to_owned(), egui::FontId::proportional(14.0), theme.popover_foreground);
 
     let desired = egui::vec2(ui.available_width(), galley.size().y + 8.0);
     let (rect, response) = ui.allocate_exact_size(desired, egui::Sense::click());
@@ -490,12 +459,7 @@ pub(super) fn paint_item(
             rect.max.x - check_icon_size - 8.0,
             rect.min.x + 6.0,
         ),
-        ItemStyle::Search => (
-            response.hovered() || selected,
-            4,
-            rect.min.x + 4.0,
-            rect.min.x + check_icon_size + 6.0,
-        ),
+        ItemStyle::Search => (response.hovered() || selected, 4, rect.min.x + 4.0, rect.min.x + check_icon_size + 6.0),
     };
 
     if highlight {

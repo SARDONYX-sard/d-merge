@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 
-use super::{
-    Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
-};
+use super::{Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
 
 /// Serializes the animation data structure into a string.
 ///
@@ -65,14 +63,10 @@ fn serialize_anim_data(anim_data: &AnimData) -> String {
     if anim_data.header.has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
             if let Some(&new_id) = clip_id_map.get(&block.clip_id) {
-                output
-                    .push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
+                output.push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
             } else {
                 let new_id = clip_id_manager.next_id();
-                output.push_str(&serialize_clip_motion_block(
-                    block,
-                    new_id.map(|id| id.to_string().into()),
-                ));
+                output.push_str(&serialize_clip_motion_block(block, new_id.map(|id| id.to_string().into())));
             }
         }
 
@@ -109,10 +103,7 @@ fn serialize_anim_header(header: &AnimDataHeader, line_range: usize) -> String {
 }
 
 /// Serializes a clip animation data block into a string.
-pub(crate) fn serialize_clip_anim_block(
-    block: &ClipAnimDataBlock,
-    replace_clip_id: Option<Cow<'_, str>>,
-) -> String {
+pub(crate) fn serialize_clip_anim_block(block: &ClipAnimDataBlock, replace_clip_id: Option<Cow<'_, str>>) -> String {
     let mut output = String::new();
 
     let ClipAnimDataBlock {
@@ -154,10 +145,7 @@ pub(crate) fn serialize_clip_anim_block(
 }
 
 /// Serializes a clip motion block into a string.
-pub(crate) fn serialize_clip_motion_block(
-    block: &ClipMotionBlock,
-    replace_clip_id: Option<Cow<'_, str>>,
-) -> String {
+pub(crate) fn serialize_clip_motion_block(block: &ClipMotionBlock, replace_clip_id: Option<Cow<'_, str>>) -> String {
     let mut output = String::new();
 
     let ClipMotionBlock { clip_id, duration, translations, rotations, .. } = block;
@@ -212,11 +200,7 @@ mod tests {
     use crate::adsf::normal::de::parse_adsf;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
-        if input.contains("\r\n") {
-            input.into()
-        } else {
-            input.replace("\r", "").replace("\n", "\r\n").into()
-        }
+        if input.contains("\r\n") { input.into() } else { input.replace("\r", "").replace("\n", "\r\n").into() }
     }
 
     #[test]

@@ -13,9 +13,9 @@ use crate::{
     patch_gen::{
         JsonPatchPairs,
         kill_move::{
-            calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch,
-            new_event_property_array, new_npc_synchronized_clip_generator,
-            new_player_synchronized_clip_generator, new_push_transitions_seq_patch,
+            calculate_hash, make_event_state_info_patch, make_player_root_state_info_patch, new_event_property_array,
+            new_npc_synchronized_clip_generator, new_player_synchronized_clip_generator,
+            new_push_transitions_seq_patch,
         },
         new_push_events_seq_patch,
     },
@@ -26,8 +26,7 @@ pub(super) fn new_pair_patches<'a>(
     paired_and_kill_animation: FNISPairedAndKillAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 22] =
-        std::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [String; 22] = std::array::from_fn(|_| owned_data.next_class_name_attribute());
 
     let player_event = paired_and_kill_animation.anim_event;
     let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
@@ -36,8 +35,7 @@ pub(super) fn new_pair_patches<'a>(
     let npc_event = format!("pa_{player_event}");
     let npc_root_state_name = format!("NPC_FNISpa{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
 
-    let anim_file =
-        format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fpa$
+    let anim_file = format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fpa$
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
     let duration = paired_and_kill_animation.flag_set.duration;
@@ -86,10 +84,7 @@ pub(super) fn new_pair_patches<'a>(
                 let new_anim_object_index = owned_data.next_class_name_attribute();
 
                 acc.2.push((
-                    vec![
-                        Cow::Owned(new_anim_object_index.clone()),
-                        Cow::Borrowed("hkbStringEventPayload"),
-                    ],
+                    vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
                     ValueWithPriority {
                         patch: JsonPatch {
                             action: Action::Pure { op: Op::Add },
@@ -494,12 +489,7 @@ pub(super) fn new_pair_patches<'a>(
     // $RI+18
     //
     // "payload": "#$:AnimObj+&ao2$"
-    one_patches.push(new_event_property_array(
-        flags,
-        &passive_indexes,
-        &class_indexes[18],
-        priority,
-    ));
+    one_patches.push(new_event_property_array(flags, &passive_indexes, &class_indexes[18], priority));
 
     // $RI+19
     one_patches.push(new_player_synchronized_clip_generator(

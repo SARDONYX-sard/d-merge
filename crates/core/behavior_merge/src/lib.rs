@@ -11,8 +11,7 @@ mod results;
 // Imported at the root so paths read `crate::config::..`, as before the crate split.
 use behavior_merge_types::config;
 pub use behavior_merge_types::{
-    Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, PatchMaps, PriorityMap, Status,
-    StatusReporterFn,
+    Config, DebugOptions, HackOptions, OutPutTarget, ParserMode, PatchMaps, PriorityMap, Status, StatusReporterFn,
 };
 
 pub use crate::behaviors::{behavior_gen, create_bin_templates};

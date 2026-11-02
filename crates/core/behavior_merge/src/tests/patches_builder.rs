@@ -30,18 +30,13 @@ pub(crate) fn build_patch_maps(config: PatchMapsConfig<'_>) -> PatchMaps {
         .par_iter()
         .enumerate()
         .filter_map(|(idx, info)| {
-            let mod_id = std::path::Path::new(&info.id)
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or(&info.id);
+            let mod_id = std::path::Path::new(&info.id).file_name().and_then(|s| s.to_str()).unwrap_or(&info.id);
 
             match info.mod_type {
                 ModType::Nemesis | ModType::NemesisExt if !nemesis_excludes.contains(mod_id) => {
                     Some(Either::Left((info.id.clone(), idx)))
                 }
-                ModType::Fnis if !fnis_excludes.contains(mod_id) => {
-                    Some(Either::Right((info.id.clone(), idx)))
-                }
+                ModType::Fnis if !fnis_excludes.contains(mod_id) => Some(Either::Right((info.id.clone(), idx))),
                 _ => None,
             }
         })

@@ -17,8 +17,7 @@ use crate::settings::Settings;
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct PandoraSupportSettings {
-    pub import_path: String,
-    pub export_path: String,
+    pub output_dir: String,
     pub version: PandoraVersion,
 }
 
@@ -98,11 +97,7 @@ impl Pandora {
     /// Returns an error if Pandora files cannot be read or parsed, if the
     /// selected Pandora version is unsupported, or if duplicate Pandora mod
     /// codes are found.
-    pub fn import_to<P>(
-        root: P,
-        settings: &mut Settings,
-        version: PandoraVersion,
-    ) -> Result<(), String>
+    pub fn import_to<P>(root: P, settings: &mut Settings, version: PandoraVersion) -> Result<(), String>
     where
         P: AsRef<Path>,
     {
@@ -116,11 +111,7 @@ impl Pandora {
     ///
     /// Returns an error if the Pandora configuration cannot be generated or
     /// written, or if the selected Pandora version is unsupported.
-    pub fn export_from<P>(
-        root: P,
-        settings: &Settings,
-        version: PandoraVersion,
-    ) -> Result<(), String>
+    pub fn export_from<P>(root: P, settings: &Settings, version: PandoraVersion) -> Result<(), String>
     where
         P: AsRef<Path>,
     {
@@ -165,8 +156,7 @@ impl Pandora {
         let root = root.as_ref();
         let engine_dir = root.join(PANDORA_ENGINE_DIR_NAME);
 
-        std::fs::create_dir_all(&engine_dir)
-            .map_err(|e| format!("Failed to create {}: {e}", engine_dir.display()))?;
+        std::fs::create_dir_all(&engine_dir).map_err(|e| format!("Failed to create {}: {e}", engine_dir.display()))?;
 
         let settings_path = root.join(SETTINGS_FILE_NAME);
         let active_mods_path = engine_dir.join(ACTIVE_MODS_FILE_NAME);
@@ -193,7 +183,7 @@ impl Pandora {
     }
 
     fn from_settings_v4_4_0_beta(settings: &Settings) -> Result<Self, String> {
-        let vfs = &settings.vfs;
+        let vfs = &settings.pages.patch.vfs;
 
         let pandora_settings = PandoraSettings {
             app: PandoraAppSettings { theme: 0 }, // System: 0
@@ -222,11 +212,10 @@ impl Pandora {
     }
 
     fn apply_to(&self, settings: &mut Settings) -> Result<(), String> {
-        settings.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
-        settings.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
+        settings.pages.patch.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
+        settings.pages.patch.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
 
-        let mut seen =
-            HashSet::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
+        let mut seen = HashSet::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
 
         for active_mod in &self.active_mods {
             if !seen.insert(active_mod.code.as_str()) {
@@ -234,8 +223,7 @@ impl Pandora {
             }
         }
 
-        let mut pandora_order =
-            HashMap::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
+        let mut pandora_order = HashMap::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
 
         for (index, active_mod) in self.active_mods.iter().enumerate() {
             pandora_order.insert(active_mod.code.as_str(), (index, active_mod.active));
@@ -244,7 +232,7 @@ impl Pandora {
         let mut nemesis = Vec::new();
         let mut other = Vec::new();
 
-        for mut item in settings.vfs.mod_list.drain(..) {
+        for mut item in settings.pages.patch.vfs.mod_list.drain(..) {
             if item.mod_type == ModType::Nemesis {
                 if let Some(&(order, active)) = pandora_order.get(item.id.as_str()) {
                     item.enabled = active;
@@ -267,10 +255,10 @@ impl Pandora {
             a_order.cmp(&b_order).then_with(|| a.id.cmp(&b.id))
         });
 
-        settings.vfs.mod_list = nemesis;
-        settings.vfs.mod_list.extend(other);
+        settings.pages.patch.vfs.mod_list = nemesis;
+        settings.pages.patch.vfs.mod_list.extend(other);
 
-        settings.vfs.mod_list.iter_mut().enumerate().for_each(|(priority, item)| {
+        settings.pages.patch.vfs.mod_list.iter_mut().enumerate().for_each(|(priority, item)| {
             item.priority = priority;
         });
 

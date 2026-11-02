@@ -52,11 +52,7 @@ pub(crate) fn set_theme(ctx: &egui::Context, theme: Theme, theme_preset: Option<
 /// Applies theme-dependent styling to a top/bottom panel.
 ///
 /// The panel background is determined by `bg_color`.
-pub(crate) fn themed_top_bottom_panel(
-    panel: egui::Panel,
-    theme: Theme,
-    bg_color: Option<&Rgba>,
-) -> egui::Panel {
+pub(crate) fn themed_top_bottom_panel(panel: egui::Panel, theme: Theme, bg_color: Option<&Rgba>) -> egui::Panel {
     panel.frame(frame_from_theme(theme, bg_color))
 }
 

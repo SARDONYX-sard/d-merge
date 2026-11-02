@@ -135,9 +135,7 @@ mod tests {
         );
         assert_eq!(
             p,
-            NemesisPath::EngineExt {
-                meshes_path: "meshes/actors/character/behaviors/character assets/skeleton.bin"
-            }
+            NemesisPath::EngineExt { meshes_path: "meshes/actors/character/behaviors/character assets/skeleton.bin" }
         );
     }
 

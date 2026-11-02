@@ -150,8 +150,7 @@ pub(super) fn inserted_text(before: &str, after: &str) -> Option<String> {
     }
     let prefix = b.iter().zip(&a).take_while(|(x, y)| x == y).count();
     let max_suffix = b.len() - prefix;
-    let suffix =
-        b.iter().rev().zip(a.iter().rev()).take(max_suffix).take_while(|(x, y)| x == y).count();
+    let suffix = b.iter().rev().zip(a.iter().rev()).take(max_suffix).take_while(|(x, y)| x == y).count();
     // Everything of `before` must be kept around the insertion.
     (prefix + suffix == b.len()).then(|| a[prefix..a.len() - suffix].iter().collect())
 }

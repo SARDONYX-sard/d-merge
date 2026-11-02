@@ -94,10 +94,7 @@ fn tag(chars: &[char], start: usize, p: &Palette, out: &mut Vec<(Range<usize>, C
                 i += 1;
             }
             quote @ ('"' | '\'') => {
-                let end = chars[i + 1..]
-                    .iter()
-                    .position(|&c| c == quote)
-                    .map_or(chars.len(), |n| i + n + 2);
+                let end = chars[i + 1..].iter().position(|&c| c == quote).map_or(chars.len(), |n| i + n + 2);
                 out.push((i..end, p.string));
                 i = end;
             }
@@ -113,12 +110,7 @@ fn tag(chars: &[char], start: usize, p: &Palette, out: &mut Vec<(Range<usize>, C
 }
 
 /// One word of text between tags. e.g., `0.100000`, `#0042`, `(1.0`
-fn text_token(
-    chars: &[char],
-    start: usize,
-    p: &Palette,
-    out: &mut Vec<(Range<usize>, Color32)>,
-) -> usize {
+fn text_token(chars: &[char], start: usize, p: &Palette, out: &mut Vec<(Range<usize>, Color32)>) -> usize {
     let is_sep = |c: char| c.is_whitespace() || matches!(c, '<' | '(' | ')' | ',');
     if is_sep(chars[start]) {
         return start + 1;
@@ -152,10 +144,7 @@ mod tests {
 
     fn kinds(line: &str) -> Vec<(String, Color32)> {
         let chars: Vec<char> = line.chars().collect();
-        Xml.highlight(line, &egui::Visuals::dark())
-            .into_iter()
-            .map(|(r, c)| (chars[r].iter().collect(), c))
-            .collect()
+        Xml.highlight(line, &egui::Visuals::dark()).into_iter().map(|(r, c)| (chars[r].iter().collect(), c)).collect()
     }
 
     #[test]

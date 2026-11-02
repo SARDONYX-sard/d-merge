@@ -50,10 +50,7 @@ pub(super) enum Op {
     SeqPush,
 }
 
-pub(crate) fn into_patch_map(
-    raw_diffs: Vec<RawDiff<'_>>,
-    priority: usize,
-) -> Result<ClipAnimDiffPatch<'_>> {
+pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Result<ClipAnimDiffPatch<'_>> {
     let mut patches = ClipAnimDiffPatch::default();
 
     for raw in raw_diffs {
@@ -141,9 +138,7 @@ pub(crate) fn into_patch_map(
                     verify_line_parses_to::<usize>
                         .context(Expected(Description("trigger_names_len: usize")))
                         .parse_next(&mut input)
-                        .map_err(|err| {
-                            ReadableError::from_display(err, raw.text, raw.text.len() - input.len())
-                        })?;
+                        .map_err(|err| ReadableError::from_display(err, raw.text, raw.text.len() - input.len()))?;
 
                     // If `len` is the only parameter, the patch consists only of the
                     // difference in `len`. Since `len` can be derived from `Vec::len`,
@@ -157,15 +152,13 @@ pub(crate) fn into_patch_map(
                     raw.text
                 };
 
-                let (v, delete_len) =
-                    trigger_names.parse(input).map_err(|e| ReadableError::from_parse(e))?;
-                let action =
-                    make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
+                let (v, delete_len) = trigger_names.parse(input).map_err(|e| ReadableError::from_parse(e))?;
+                let action = make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
 
-                patches.trigger_names_patches.seq.push(ValueWithPriority {
-                    patch: json_patch::JsonPatch { action, value: v.into() },
-                    priority,
-                });
+                patches
+                    .trigger_names_patches
+                    .seq
+                    .push(ValueWithPriority { patch: json_patch::JsonPatch { action, value: v.into() }, priority });
             }
         }
     }
@@ -180,15 +173,13 @@ const fn make_seq_action(
     new_len: usize,
 ) -> json_patch::Action {
     match (seq_index, original_len) {
-        (Some(start), _) => json_patch::Action::Seq {
-            op: to_json_patch_op(op),
-            range: Range { start, end: start + new_len },
-        },
+        (Some(start), _) => {
+            json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start, end: start + new_len } }
+        }
         // Diff starts from `trigger_names_len`, meaning the whole array is replaced.
-        (None, Some(_)) => json_patch::Action::Seq {
-            op: to_json_patch_op(op),
-            range: Range { start: 0, end: new_len },
-        },
+        (None, Some(_)) => {
+            json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start: 0, end: new_len } }
+        }
         (None, None) => json_patch::Action::SeqPush,
     }
 }

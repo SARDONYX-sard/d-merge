@@ -39,15 +39,12 @@ use winnow_ext::ReadableError;
 /// `D:\\...\\Nemesis_EngineExt\\mod\\abc\\meshes\\somefile.txt` -> `D:\\...\\Nemesis_EngineExt\\mod\\abc`
 /// ```
 pub(super) fn get_nemesis_id(input: &str) -> Result<&str, ReadableError> {
-    alt((_get_nemesis_id, _get_nemesis_ext_id))
-        .parse(input)
-        .map_err(|e| ReadableError::from_parse(e))
+    alt((_get_nemesis_id, _get_nemesis_ext_id)).parse(input).map_err(|e| ReadableError::from_parse(e))
 }
 
 fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // Match either '/' or '\\' as path separator
-    let mut sep =
-        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
+    let mut sep = alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
 
     // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {
@@ -67,8 +64,7 @@ fn _get_nemesis_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 fn _get_nemesis_ext_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // Match either '/' or '\\' as path separator
-    let mut sep =
-        alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
+    let mut sep = alt(('/', '\\')).context(Expected(CharLiteral('/'))).context(Expected(CharLiteral('\\')));
 
     // Build parser for: <any>* Nemesis_Engine/mod/<mod_code>
     let mut parser = seq! {

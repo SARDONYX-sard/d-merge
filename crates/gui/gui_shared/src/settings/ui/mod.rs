@@ -3,9 +3,10 @@
 //! Split into two structs so that transient geometry (`window`) can be
 //! updated every frame without touching the appearance fields, and vice
 //! versa.
+pub mod editor;
 pub mod theme;
 
-use crate::settings::{ModListUiSettings, ui::theme::CustomTheme};
+use crate::settings::ui::theme::CustomTheme;
 
 /// Appearance and window settings persisted across sessions.
 ///
@@ -31,14 +32,14 @@ pub struct UiSettings {
     /// Path to the i18n JSON file used for UI translation.
     pub i18n_path: String,
 
-    /// Mod-list filter and sort state.
-    pub mod_list: ModListUiSettings,
+    /// Page shown on startup (the last visited one). Added in v3.0.0
+    pub page: Page,
+
+    /// Which language features are enabled. Added in v3.0.0
+    pub lsp: editor::LspOptions,
 
     /// Last-known window geometry, updated every frame and restored on startup.
     pub window: WindowGeometry,
-
-    /// Page shown on startup (the last visited one). Added in v2.9.
-    pub page: Page,
 }
 
 /// Top-level pages of the GUI.
@@ -76,14 +77,14 @@ impl Page {
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
-            theme: theme::Theme::System,
-            custom_theme: CustomTheme::default(),
             background_image: BackgroundImageSettings::default(),
+            custom_theme: CustomTheme::default(),
             font: FontSettings::default(),
-            i18n_path: crate::i18n::I18nMap::FILE.into(),
-            mod_list: ModListUiSettings::default(),
-            window: WindowGeometry::default(),
+            i18n_path: crate::i18n::I18nMap::PATH.into(),
+            lsp: editor::LspOptions::default(),
             page: Page::default(),
+            theme: theme::Theme::System,
+            window: WindowGeometry::default(),
         }
     }
 }

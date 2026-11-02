@@ -10,10 +10,7 @@ pub(crate) struct NonNestedArrayDiff<'a> {
     /// - key(replace target index): e.g.,
     ///   - ["[0]", "value_a"]
     ///   - ["[0]", "hashed_path"]
-    #[cfg_attr(
-        feature = "serde",
-        serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(borrow, bound(deserialize = "OnePatchMap<'a>: serde::Deserialize<'de>")))]
     pub one: OnePatchMap<'a>,
 
     /// A request to change all elements of an array.

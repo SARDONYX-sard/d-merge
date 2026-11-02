@@ -12,8 +12,8 @@ use crate::{
         JsonPatchPairs,
         furniture::one_anim::{FurniturePhase, new_furniture_one_anim_patches},
         global::mt_behavior::{
-            FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_AA_MT_AUTO_GEN_5232,
-            FNIS_AA_MT_AUTO_GEN_5235, FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
+            FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221, FNIS_AA_MT_AUTO_GEN_5232, FNIS_AA_MT_AUTO_GEN_5235,
+            FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID,
         },
         kill_move::calculate_hash,
     },
@@ -50,9 +50,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
 
     let has_any_anim_obj = furniture.animations.iter().any(|anim| !anim.anim_objects.is_empty());
 
-    for (i, (animation, class_indexes)) in
-        furniture.animations.iter().zip(&all_class_indexes).enumerate()
-    {
+    for (i, (animation, class_indexes)) in furniture.animations.iter().zip(&all_class_indexes).enumerate() {
         let phase = match i {
             0 => FurniturePhase::Start,
             n if n == total - 1 => FurniturePhase::End(total - 1),
@@ -78,8 +76,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // One Furniture seq root
 
-    let class_indexes: [String; 6] =
-        std::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [String; 6] = std::array::from_fn(|_| owned_data.next_class_name_attribute());
     // NOTE: Assign a unique ID for each furniture sequence. Must be 1 file unique.
     let class_index_0_id = calculate_hash(&class_indexes[0]);
     let furniture_one_seq_state_name = format!("FNIS_Furniture{class_index_0_id}_State"); // FNIS_Furniture$1/1$_State
@@ -90,8 +87,7 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
     let first_animation_flags = first_animation.flag_set.flags;
     let first_animation_vars = first_animation.flag_set.anim_vars.as_slice();
     // furniture seq hkbStateMachineStateInfo indexes
-    let all_state_infos_indexes: Vec<&str> =
-        all_class_indexes.iter().map(|indexes| indexes[0].as_str()).collect();
+    let all_state_infos_indexes: Vec<&str> = all_class_indexes.iter().map(|indexes| indexes[0].as_str()).collect();
 
     // Push the first animation for furniture seq
     seq_patches.push({
@@ -130,50 +126,42 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    one_patches.par_extend(first_animation.anim_objects.par_iter().enumerate().map(
-        |(_index, name)| {
-            let new_anim_object_index = owned_data.next_class_name_attribute();
+    one_patches.par_extend(first_animation.anim_objects.par_iter().enumerate().map(|(_index, name)| {
+        let new_anim_object_index = owned_data.next_class_name_attribute();
 
-            // One anim object
-            (
-                vec![
-                    Cow::Owned(new_anim_object_index.clone()),
-                    Cow::Borrowed("hkbStringEventPayload"),
-                ],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
-                            "__ptr": new_anim_object_index,
-                            "data": name, // StringPtr
-                        }),
-                    },
-                    priority,
+        // One anim object
+        (
+            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
+            ValueWithPriority {
+                patch: JsonPatch {
+                    action: Action::Pure { op: Op::Add },
+                    value: simd_json::json_typed!(borrowed, {
+                        "__ptr": new_anim_object_index,
+                        "data": name, // StringPtr
+                    }),
                 },
-            )
-        },
-    ));
+                priority,
+            },
+        )
+    }));
 
     // $RI
     one_patches.push({
         // $-ac1|#5220|null$
-        let enter_notify_events =
-            if first_animation_flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-                FNIS_AA_MT_AUTO_GEN_5220
-            } else {
-                "#0000"
-            };
+        let enter_notify_events = if first_animation_flags.contains(FNISAnimFlags::AnimatedCameraSet) {
+            FNIS_AA_MT_AUTO_GEN_5220
+        } else {
+            "#0000"
+        };
         // $-ac0|#5221|null$
-        let exit_notify_events =
-            if first_animation_flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-                FNIS_AA_MT_AUTO_GEN_5221
-            } else {
-                "#0000"
-            };
+        let exit_notify_events = if first_animation_flags.contains(FNISAnimFlags::AnimatedCameraReset) {
+            FNIS_AA_MT_AUTO_GEN_5221
+        } else {
+            "#0000"
+        };
 
         // #$-AV|%RI+1%|%RI+4%$
-        let generator =
-            if first_animation_vars.is_empty() { &class_indexes[4] } else { &class_indexes[1] };
+        let generator = if first_animation_vars.is_empty() { &class_indexes[4] } else { &class_indexes[1] };
 
         (
             vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
@@ -329,42 +317,40 @@ pub(crate) fn new_furniture_one_group_patches<'a>(
             .map(|anim| format!("$eventID[{}]$", anim.anim_event)) // use Nemesis variable
             .collect();
 
-        let transitions: Vec<_> = all_state_infos_indexes.iter().zip(&all_event_ids).enumerate().map(|(index, (_, event_id))| {
-            let blend_class_index = if index == 0 {
-                FNIS_AA_MT_AUTO_GEN_5235
-            } else {
-                FNIS_AA_MT_AUTO_GEN_5232
-            };
+        let transitions: Vec<_> = all_state_infos_indexes
+            .iter()
+            .zip(&all_event_ids)
+            .enumerate()
+            .map(|(index, (_, event_id))| {
+                let blend_class_index = if index == 0 { FNIS_AA_MT_AUTO_GEN_5235 } else { FNIS_AA_MT_AUTO_GEN_5232 };
 
-            json_typed!(borrowed, {
-                "triggerInterval": {
-                    "enterEventId": -1,
-                    "exitEventId": -1,
-                    "enterTime": 0.0,
-                    "exitTime": 0.0,
-                },
-                "initiateInterval": {
-                    "enterEventId": -1,
-                    "exitEventId": -1,
-                    "enterTime": 0.0,
-                    "exitTime": 0.0,
-                },
-                "transition": blend_class_index, // #$:BlendTransition+&bl$
-                "condition": "#0000",
-                "eventId": event_id, // $AE1fu+%fu$
-                "toStateId": index + 1, // $1/1$
-                "fromNestedStateId": 0,
-                "toNestedStateId": 0,
-                "priority": 0,
-                "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION",
+                json_typed!(borrowed, {
+                    "triggerInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0,
+                    },
+                    "initiateInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0,
+                    },
+                    "transition": blend_class_index, // #$:BlendTransition+&bl$
+                    "condition": "#0000",
+                    "eventId": event_id, // $AE1fu+%fu$
+                    "toStateId": index + 1, // $1/1$
+                    "fromNestedStateId": 0,
+                    "toNestedStateId": 0,
+                    "priority": 0,
+                    "flags": "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION",
+                })
             })
-        }).collect();
+            .collect();
 
         (
-            vec![
-                Cow::Owned(class_indexes[5].clone()),
-                Cow::Borrowed("hkbStateMachineTransitionInfoArray"),
-            ],
+            vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("hkbStateMachineTransitionInfoArray")],
             ValueWithPriority {
                 patch: JsonPatch {
                     action: Action::Pure { op: Op::Add },

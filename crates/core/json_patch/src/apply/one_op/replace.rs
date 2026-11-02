@@ -11,11 +11,7 @@ use crate::{
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
-pub(crate) fn apply_replace<'a>(
-    json: &mut Value<'a>,
-    path: JsonPath<'a>,
-    value: Value<'a>,
-) -> Result<()> {
+pub(crate) fn apply_replace<'a>(json: &mut Value<'a>, path: JsonPath<'a>, value: Value<'a>) -> Result<()> {
     let Some(target) = json.ptr_mut(&path) else {
         return Err(JsonPatchError::not_found_target_from(&path, &value));
     };

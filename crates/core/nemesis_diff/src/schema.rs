@@ -18,10 +18,7 @@ pub fn class_names() -> Vec<&'static str> {
 
 /// The fields written in XML (not `SERIALIZE_IGNORED`), in order.
 pub fn xml_fields(class: &str) -> impl Iterator<Item = &'static FieldSchema> {
-    find_class_schema(class)
-        .into_iter()
-        .flat_map(|c| c.fields.iter())
-        .filter(|f| !f.serialize_ignored)
+    find_class_schema(class).into_iter().flat_map(|c| c.fields.iter()).filter(|f| !f.serialize_ignored)
 }
 
 /// Is `class` `base` or one of its subclasses?
@@ -50,11 +47,7 @@ pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static 
 }
 
 /// Tracks the open objects (their classes) and fields (the class their nested objects have).
-fn walk_line<'a>(
-    text: &'a str,
-    objects: &mut Vec<Option<&'a str>>,
-    fields: &mut Vec<Option<&'static str>>,
-) {
+fn walk_line<'a>(text: &'a str, objects: &mut Vec<Option<&'a str>>, fields: &mut Vec<Option<&'static str>>) {
     let trimmed = text.trim();
     if let Some(rest) = trimmed.strip_prefix("<hkobject") {
         let class = attribute(rest, "class").or_else(|| fields.last().copied().flatten());
@@ -66,15 +59,10 @@ fn walk_line<'a>(
         objects.pop();
     } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
         if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
-            let field = field_of(
-                objects.last().copied().flatten(),
-                attribute(rest, "name").unwrap_or_default(),
-            );
+            let field = field_of(objects.last().copied().flatten(), attribute(rest, "name").unwrap_or_default());
             // Only structs (inline objects) give their class to a nested `<hkobject>`.
             fields.push(
-                field
-                    .filter(|f| f.kind == TypeKind::Struct || f.sub_kind == TypeKind::Struct)
-                    .and_then(|f| f.class),
+                field.filter(|f| f.kind == TypeKind::Struct || f.sub_kind == TypeKind::Struct).and_then(|f| f.class),
             );
         }
     } else if trimmed.starts_with("</hkparam>") {
@@ -98,10 +86,7 @@ pub fn field_snippet(field: &FieldSchema, depth: usize) -> String {
 /// enum value, empty arrays, nested structs filled the same way), with the class signature.
 pub fn skeleton(class: &str, id: &str) -> Option<String> {
     let schema = find_class_schema(class)?;
-    let mut out = format!(
-        "\t\t<hkobject name=\"{id}\" class=\"{class}\" signature=\"{}\">\n",
-        schema.signature
-    );
+    let mut out = format!("\t\t<hkobject name=\"{id}\" class=\"{class}\" signature=\"{}\">\n", schema.signature);
     for field in xml_fields(class) {
         field_skeleton(&mut out, 3, field, 0);
     }
@@ -165,10 +150,7 @@ pub struct PointerProblem {
 ///
 /// `class_of` returns a target's class; it must be the field's pointer class or a subclass, e.g.
 /// `variableBindingSet` -> `hkbVariableBindingSet`. Nemesis variables (`$...$`) are not checked.
-pub fn check_pointers(
-    object: &str,
-    class_of: &dyn Fn(&str) -> Option<String>,
-) -> Vec<PointerProblem> {
+pub fn check_pointers(object: &str, class_of: &dyn Fn(&str) -> Option<String>) -> Vec<PointerProblem> {
     let mut problems = Vec::new();
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
@@ -183,26 +165,20 @@ pub fn check_pointers(
             }
             let Some(expected) = field.class else { return };
             match class_of(pointer) {
-                None => problems.push(PointerProblem {
-                    line: line_no,
-                    message: format!("`{pointer}` does not exist."),
-                }),
+                None => {
+                    problems.push(PointerProblem { line: line_no, message: format!("`{pointer}` does not exist.") });
+                }
                 Some(actual) if !is_subclass(&actual, expected) => problems.push(PointerProblem {
                     line: line_no,
-                    message: format!(
-                        "`{}` expects `{expected}`, but `{pointer}` is `{actual}`.",
-                        field.name
-                    ),
+                    message: format!("`{}` expects `{expected}`, but `{pointer}` is `{actual}`.", field.name),
                 }),
                 Some(_) => {}
             }
         };
 
         if let Some(rest) = trimmed.strip_prefix("<hkparam")
-            && let Some(field) = field_of(
-                objects.last().copied().flatten(),
-                attribute(rest, "name").unwrap_or_default(),
-            )
+            && let Some(field) =
+                field_of(objects.last().copied().flatten(), attribute(rest, "name").unwrap_or_default())
         {
             let is_pointer = field.kind == TypeKind::Pointer || field.sub_kind == TypeKind::Pointer;
             // `<hkparam name="x">#0001</hkparam>` or `<hkparam name="xs" ...>#0001 #0002</hkparam>`
@@ -229,8 +205,7 @@ pub fn check_pointers(
 mod tests {
     use super::*;
 
-    const OBJECT: &str =
-        "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">
+    const OBJECT: &str = "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">
 \t\t\t<hkparam name=\"variableBindingSet\">#0001</hkparam>
 \t\t\t<hkparam name=\"modifiers\" numelements=\"2\">
 \t\t\t\t#0105 #0002

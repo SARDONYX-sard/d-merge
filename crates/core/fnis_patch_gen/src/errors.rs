@@ -78,9 +78,7 @@ pub enum Error {
 #[snafu(visibility(pub))]
 pub enum FnisError {
     /// One or more HKX files were expected below the given directory, but none were found.
-    #[snafu(display(
-        "One or more hkx files were expected below(`{animations_mod_dir:?}`), but none were found."
-    ))]
+    #[snafu(display("One or more hkx files were expected below(`{animations_mod_dir:?}`), but none were found."))]
     EmptyAnimPaths { animations_mod_dir: PathBuf },
 
     /// Expected list file at `{expected}`, but couldn't read this path.

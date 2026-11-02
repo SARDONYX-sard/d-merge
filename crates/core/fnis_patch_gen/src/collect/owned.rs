@@ -139,7 +139,8 @@ impl OwnedFnisInjection {
         } else {
             let behavior_object = self.behavior_entry.behavior_object;
             format!("meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt")
-        }.into()
+        }
+        .into()
     }
 
     /// Return information for conversion
@@ -155,10 +156,10 @@ impl OwnedFnisInjection {
         let namespace = &self.namespace;
 
         // e.g. `behaviors wolf/`
-        let master_behavior_dir =
-            master_path.parent().and_then(|p| p.file_name()).ok_or_else(|| {
-                FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() }
-            })?;
+        let master_behavior_dir = master_path
+            .parent()
+            .and_then(|p| p.file_name())
+            .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() })?;
 
         let file_name = if behavior_entry.is_humanoid() {
             format!("FNIS_{namespace}_Behavior.hkx")
@@ -169,9 +170,10 @@ impl OwnedFnisInjection {
         };
 
         // e.g. ../meshes/actors/canine
-        let parent_dir = animations_mod_dir.parent().and_then(|p| p.parent()).ok_or_else(|| {
-            FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.clone() }
-        })?;
+        let parent_dir = animations_mod_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .ok_or_else(|| FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.clone() })?;
 
         // e.g., `behavior/FNIS_{namespace}_Behavior.hkx`
         let behavior_path = Path::new(master_behavior_dir).join(&file_name);
@@ -290,10 +292,10 @@ async fn load_fnis_list_file(
     };
 
     // NOTE: Since there are mod files that are not UTF-8, we need to support them.
-    let content =
-        fs::read(&list_path_string).await.and_then(auto_charset::decode_to_utf8).map_err(|e| {
-            FnisError::FailedReadingListFile { expected: list_path_string.clone(), source: e }
-        })?;
+    let content = fs::read(&list_path_string)
+        .await
+        .and_then(auto_charset::decode_to_utf8)
+        .map_err(|e| FnisError::FailedReadingListFile { expected: list_path_string.clone(), source: e })?;
 
     Ok(content)
 }
@@ -314,17 +316,18 @@ fn find_behavior_file(
     namespace: &str,
 ) -> Result<String, FnisError> {
     // e.g. ../meshes/actors/canine
-    let parent_dir = animations_mod_dir.parent().and_then(|p| p.parent()).ok_or_else(|| {
-        FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.to_path_buf() }
-    })?;
+    let parent_dir = animations_mod_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| FnisError::BehaviorParentMissing { animations_mod_dir: animations_mod_dir.to_path_buf() })?;
 
     let master_path = Path::new(behavior_entry.master_behavior);
 
     // e.g. `behaviors wolf`
-    let master_behavior_dir =
-        master_path.parent().and_then(|p| p.file_name()).ok_or_else(|| {
-            FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() }
-        })?;
+    let master_behavior_dir = master_path
+        .parent()
+        .and_then(|p| p.file_name())
+        .ok_or_else(|| FnisError::BehaviorNotFoundSubDirParent { sub_dir: master_path.to_path_buf() })?;
 
     let file_name = if behavior_entry.is_humanoid() {
         format!("FNIS_{namespace}_Behavior.hkx")
@@ -365,9 +368,7 @@ mod tests {
 
         let input = "../../../dummy/fnis_test_mods/FNIS Flyer SE 7.0/Data/Meshes/actors/character/animations/FNISFlyer";
         let behavior_entry = HUMANOID.get("character").unwrap();
-        let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0)
-            .await
-            .unwrap_or_else(|e| panic!("{e}"));
+        let res = collect_fnis_injection(input, behavior_entry, "FNISFlyer", 0).await.unwrap_or_else(|e| panic!("{e}"));
         dbg!(res);
     }
 }

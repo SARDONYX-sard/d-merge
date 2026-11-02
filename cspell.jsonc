@@ -49,6 +49,7 @@
     "hkxcmd",
     "indexmap",
     "Jwalk",
+    "Keymap",
     "Lucide",
     "maturin",
     "mimalloc",

@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use fast_hash::HashMap;
-use gui_shared::settings::convert::OutFormat;
+use gui_shared::settings::pages::convert::OutputFormat;
 use parking_lot::Mutex;
 use serde_hkx_for_gui::{hash::hash_djb2, hkanno::Format, status::Status};
 
@@ -52,7 +52,7 @@ impl ConvertTask {
         ctx: &egui::Context,
         inputs: Vec<String>,
         output: String,
-        format: OutFormat,
+        format: OutputFormat,
         roots: Option<Vec<String>>,
     ) {
         self.clear_statuses();
@@ -69,15 +69,9 @@ impl ConvertTask {
 
         let ctx = ctx.clone();
         rt.spawn(async move {
-            let result = serde_hkx_for_gui::convert(
-                inputs,
-                Some(output),
-                to_format(format),
-                roots,
-                on_status,
-            )
-            .await
-            .map_err(|err| err.to_string());
+            let result = serde_hkx_for_gui::convert(inputs, Some(output), to_format(format), roots, on_status)
+                .await
+                .map_err(|err| err.to_string());
             *slot.lock() = Some(result);
             ctx.request_repaint();
         });
@@ -92,12 +86,12 @@ impl ConvertTask {
 }
 
 /// Settings enum -> converter enum.
-pub(crate) const fn to_format(format: OutFormat) -> Format {
+pub(crate) const fn to_format(format: OutputFormat) -> Format {
     match format {
-        OutFormat::Amd64 => Format::Amd64,
-        OutFormat::Win32 => Format::Win32,
-        OutFormat::Xml => Format::Xml,
-        OutFormat::Json => Format::Json,
+        OutputFormat::Amd64 => Format::Amd64,
+        OutputFormat::Win32 => Format::Win32,
+        OutputFormat::Xml => Format::Xml,
+        OutputFormat::Json => Format::Json,
     }
 }
 

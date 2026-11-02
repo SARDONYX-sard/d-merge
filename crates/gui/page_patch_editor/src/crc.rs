@@ -94,8 +94,7 @@ impl CrcTool {
                         .desired_width(160.0),
                 );
                 if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
-                    && let Some(dir) =
-                        rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()
+                    && let Some(dir) = rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()
                 {
                     self.mod_dir = dir.display().to_string();
                 }
@@ -113,11 +112,8 @@ impl CrcTool {
         let filter = self.filter.to_lowercase();
         for dir in &self.dirs {
             let dir_matches = dir.path.to_lowercase().contains(&filter);
-            let files: Vec<_> = dir
-                .files
-                .iter()
-                .filter(|(name, _)| dir_matches || name.to_lowercase().contains(&filter))
-                .collect();
+            let files: Vec<_> =
+                dir.files.iter().filter(|(name, _)| dir_matches || name.to_lowercase().contains(&filter)).collect();
             if files.is_empty() {
                 continue;
             }
@@ -135,14 +131,12 @@ impl CrcTool {
 
     /// A dropped directory becomes the mod directory; anything else goes into the text box.
     fn handle_drop(&mut self, ctx: &egui::Context) {
-        let dropped: Option<PathBuf> =
-            ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()));
+        let dropped: Option<PathBuf> = ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()));
         let Some(path) = dropped else { return };
         if path.is_dir() {
             self.mod_dir = path.display().to_string();
         } else {
-            self.text =
-                path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            self.text = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         }
     }
 }
@@ -214,8 +208,7 @@ fn load_hkx_dirs(root: &Path) -> Vec<HkxDir> {
 /// e.g. `D:/mods/mymod/meshes/actors/character/animations/mymod`
 /// -> `meshes\actors\character\animations\mymod`
 fn game_path(root: &Path, dir: &Path) -> String {
-    let parts: Vec<String> =
-        dir.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+    let parts: Vec<String> = dir.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
     let from_meshes = parts.iter().rposition(|part| part == "meshes").map(|at| &parts[at..]);
     match from_meshes {
         Some(parts) => parts.join("\\"),

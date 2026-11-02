@@ -240,10 +240,7 @@ mod tests {
             flags: FNISAnimFlags::Acyclic | FNISAnimFlags::AnimatedCameraReset,
             blend_time: Some(1.5),
             triggers: vec![Trigger { event: "Jump", time: 2.0 }],
-            anim_vars: vec![
-                AnimVar { name: "foo", inverse: false },
-                AnimVar { name: "bar", inverse: true },
-            ],
+            anim_vars: vec![AnimVar { name: "foo", inverse: false }, AnimVar { name: "bar", inverse: true }],
         };
 
         assert_eq!(actual, expected);
@@ -257,10 +254,7 @@ mod tests {
             flags: FNISAnimFlags::TransitionNext | FNISAnimFlags::MotionDriven,
             blend_time: Some(1.0),
             triggers: vec![Trigger { event: "Run", time: 3.0 }],
-            anim_vars: vec![
-                AnimVar { name: "x", inverse: false },
-                AnimVar { name: "y", inverse: true },
-            ],
+            anim_vars: vec![AnimVar { name: "x", inverse: false }, AnimVar { name: "y", inverse: true }],
         };
 
         assert_eq!(actual, expected);

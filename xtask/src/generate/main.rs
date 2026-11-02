@@ -32,17 +32,14 @@ fn main() -> ExitCode {
 
 fn run(args: &[String]) -> Result {
     let ws = workspace_root();
-    let (what, rest) =
-        args.split_first().ok_or("usage: cargo x gen <what> (see `cargo x help gen`)")?;
+    let (what, rest) = args.split_first().ok_or("usage: cargo x gen <what> (see `cargo x help gen`)")?;
     match what.as_str() {
         "templates" => templates::run(&ws, rest),
         "anim-data" => anim_data::run(&ws),
         "alt-groups" => alt_groups::run(&ws),
         "behavior-table" => behavior_table::run(&ws),
         "behaviors" => {
-            let input = rest
-                .first()
-                .map_or_else(|| ws.join("dummy/debug/behaviors_table.json"), |path| ws.join(path));
+            let input = rest.first().map_or_else(|| ws.join("dummy/debug/behaviors_table.json"), |path| ws.join(path));
             let output = ws.join("crates/core/fnis_patch_gen/src/patch_gen/generated_behaviors.rs");
             behaviors::run(&input, &output)
         }

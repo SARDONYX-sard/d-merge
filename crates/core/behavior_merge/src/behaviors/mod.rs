@@ -5,8 +5,7 @@ pub(crate) mod tasks;
 use rayon::prelude::*;
 pub use tasks::templates::gen_bin::create_bin_templates;
 pub(crate) use tasks::{
-    adsf::path_parser::ParseError as AsdfPathParseError,
-    asdsf::path_parser::ParseError as AsdsfPathParseError,
+    adsf::path_parser::ParseError as AsdfPathParseError, asdsf::path_parser::ParseError as AsdsfPathParseError,
 };
 
 use crate::{
@@ -50,10 +49,8 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let (owned_fnis_patches, mut fnis_errors) = if fnis_entries.is_empty() {
         (vec![], vec![])
     } else {
-        let skyrim_data_dir_glob =
-            config.skyrim_data_dir_glob.as_ref().ok_or(Error::MissingSkyrimDataDirGlob)?;
-        fnis_patch_gen::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries)
-            .await
+        let skyrim_data_dir_glob = config.skyrim_data_dir_glob.as_ref().ok_or(Error::MissingSkyrimDataDirGlob)?;
+        fnis_patch_gen::collect::collect_all_fnis_injections(skyrim_data_dir_glob, fnis_entries).await
     };
 
     let (fnis_hkx_patches, fnis_adsf_patches, fnis_asdsf_patches, io_job_runner) = {
@@ -80,16 +77,13 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     rayon::scope(|s| {
         s.spawn(|_| fnis_convert_errors = io_job_runner.convert());
         s.spawn(|_| {
-            adsf_errors =
-                apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
+            adsf_errors = apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
         });
         s.spawn(|_| {
-            asdsf_errors =
-                apply_asdsf_patches(owned_asdsf_patches, &patches, &config, fnis_asdsf_patches);
+            asdsf_errors = apply_asdsf_patches(owned_asdsf_patches, &patches, &config, fnis_asdsf_patches);
         });
         s.spawn(|_| {
-            patched_hkx_errors =
-                Some(apply_and_gen_patched_hkx(&owned_patches, &config, fnis_hkx_patches));
+            patched_hkx_errors = Some(apply_and_gen_patched_hkx(&owned_patches, &config, fnis_hkx_patches));
         });
     });
 
@@ -154,8 +148,7 @@ fn apply_and_gen_patched_hkx<'a>(
 
     // 1/3: Parse nemesis patches
     let (PatchCollection { borrowed_patches, behavior_index_map }, patch_errors_len) = {
-        let (borrowed_patches, errors) =
-            collect_borrowed_patches(owned_patches, config, fnis_patches);
+        let (borrowed_patches, errors) = collect_borrowed_patches(owned_patches, config, fnis_patches);
 
         let patch_errors_len = errors.len();
         all_errors.par_extend(errors);
@@ -166,11 +159,9 @@ fn apply_and_gen_patched_hkx<'a>(
     let mut template_error_len;
     let owned_templates = {
         // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        let needed_template_names =
-            borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
+        let needed_template_names = borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
 
-        let (owned_templates, errors) =
-            owned::collect_templates(&config.resource_dir, needed_template_names);
+        let (owned_templates, errors) = owned::collect_templates(&config.resource_dir, needed_template_names);
         template_error_len = errors.len();
         all_errors.par_extend(errors);
         owned_templates
@@ -184,10 +175,7 @@ fn apply_and_gen_patched_hkx<'a>(
     };
 
     #[cfg(feature = "tracing")]
-    tracing::debug!(
-        "owned_templates_keys(Things that actually exist) = {:#?}",
-        owned_templates.keys()
-    );
+    tracing::debug!("owned_templates_keys(Things that actually exist) = {:#?}", owned_templates.keys());
 
     // 2/3: Apply patches & Replace variables to indexes
     let mut apply_errors_len = template_error_len;

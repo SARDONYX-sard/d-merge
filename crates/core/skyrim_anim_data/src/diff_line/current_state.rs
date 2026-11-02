@@ -36,13 +36,7 @@ impl<'de> Default for CurrentState<'de> {
 impl<'de> CurrentState<'de> {
     #[inline]
     pub(super) const fn new() -> Self {
-        Self {
-            mode_code: None,
-            is_passed_original: false,
-            patch: None,
-            force_removed: false,
-            range: None,
-        }
+        Self { mode_code: None, is_passed_original: false, patch: None, force_removed: false, range: None }
     }
 
     /// The following is an additional element, so push.
@@ -101,11 +95,7 @@ impl<'de> CurrentState<'de> {
                 return Op::Remove;
             }
 
-            if self.is_passed_original {
-                if self.patch.is_some() { Op::Replace } else { Op::Remove }
-            } else {
-                Op::Add
-            }
+            if self.is_passed_original { if self.patch.is_some() { Op::Replace } else { Op::Remove } } else { Op::Add }
         })
     }
 

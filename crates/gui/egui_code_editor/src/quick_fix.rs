@@ -55,12 +55,7 @@ impl QuickFixMenu {
     }
 
     /// Draws the menu below `anchor` (the cursor rect). Returns the fix clicked.
-    pub(crate) fn ui(
-        &mut self,
-        ctx: &egui::Context,
-        id: egui::Id,
-        anchor: egui::Rect,
-    ) -> Option<QuickFix> {
+    pub(crate) fn ui(&mut self, ctx: &egui::Context, id: egui::Id, anchor: egui::Rect) -> Option<QuickFix> {
         let (fixes, selected) = self.open.as_ref()?;
         let mut clicked = None;
         egui::Area::new(id.with("quick_fix"))

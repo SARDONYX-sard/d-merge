@@ -47,9 +47,7 @@ pub enum ActorRole {
     Passive,
 }
 
-pub(crate) fn parse_paired_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<FNISPairedAndKillAnimation<'a>> {
+pub(crate) fn parse_paired_animation<'a>(input: &mut &'a str) -> ModalResult<FNISPairedAndKillAnimation<'a>> {
     seq!(FNISPairedAndKillAnimation {
         _: space0,
         kind: alt((Caseless("pa").value(FNISPairedType::Paired), Caseless("km").value(FNISPairedType::KilMove))),
@@ -66,7 +64,7 @@ pub(crate) fn parse_paired_animation<'a>(
     })
     .context(StrContext::Label("FNIS Paired/KillMove Animation"))
     .context(StrContext::Expected(StrContextValue::Description(
-        "Format: pa|km [-<option,option ...>] <AnimEvent> <AnimFile> [<AnimObject>/<number> ...]"
+        "Format: pa|km [-<option,option ...>] <AnimEvent> <AnimFile> [<AnimObject>/<number> ...]",
     )))
     .parse_next(input)
 }

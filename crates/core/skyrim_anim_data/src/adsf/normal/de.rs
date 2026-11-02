@@ -15,9 +15,7 @@ use winnow::{
 };
 use winnow_ext::ReadableError;
 
-use super::{
-    Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation,
-};
+use super::{Adsf, AnimData, AnimDataHeader, ClipAnimDataBlock, ClipMotionBlock, Rotation, Translation};
 use crate::common_parser::lines::{
     Str, lines, num_bool_line, one_line, parse_one_line, txt_one_line, verify_line_parses_to,
 };
@@ -35,8 +33,7 @@ pub fn parse_adsf(input: &str) -> Result<Adsf<'_>, ReadableError> {
 fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
     // DefaultMale
     // DefaultMale.txt
-    let project_names =
-        project_names.context(Expected(Description("project_names: *.txt"))).parse_next(input)?;
+    let project_names = project_names.context(Expected(Description("project_names: *.txt"))).parse_next(input)?;
 
     let mut anim_list = vec![];
     for _ in 0..project_names.len() {
@@ -53,9 +50,7 @@ fn adsf<'a>(input: &mut &'a str) -> ModalResult<Adsf<'a>> {
 /// # Errors
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn project_names<'a>(input: &mut &'a str) -> ModalResult<Vec<Str<'a>>> {
-    let line_len = parse_one_line
-        .context(Expected(Description("project_names_len: usize")))
-        .parse_next(input)?;
+    let line_len = parse_one_line.context(Expected(Description("project_names_len: usize"))).parse_next(input)?;
 
     (move |input: &mut &'a str| {
         let mut lines = vec![];
@@ -83,8 +78,7 @@ fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
         clip_anim_blocks.push(clip_anim_block);
     }
 
-    let clip_motion_blocks =
-        if header.has_motion_data { clip_motion_blocks.parse_next(input)? } else { vec![] };
+    let clip_motion_blocks = if header.has_motion_data { clip_motion_blocks.parse_next(input)? } else { vec![] };
 
     Ok(AnimData { header, clip_anim_blocks, clip_motion_blocks, ..Default::default() })
 }
@@ -95,21 +89,15 @@ fn anim_data<'a>(input: &mut &'a str) -> ModalResult<AnimData<'a>> {
 /// If parsing fails, returns an error with information (context) of where the error occurred pushed to Vec
 fn anim_header<'a>(input: &mut &'a str) -> ModalResult<(usize, AnimDataHeader<'a>)> {
     // Number of lines when `AnimDataHeader` & `clip_anim_blocks: Vec<ClipAnimDataBlock>`(+ add) are serialized.
-    let line_range =
-        parse_one_line.context(Expected(Description("anim_line_len: usize"))).parse_next(input)?;
+    let line_range = parse_one_line.context(Expected(Description("anim_line_len: usize"))).parse_next(input)?;
 
-    let lead_int = verify_line_parses_to::<i32>
-        .context(Expected(Description("lead_int: i32")))
-        .parse_next(input)?;
-    let project_assets_len = parse_one_line
-        .context(Expected(Description("project_assets_len: usize")))
-        .parse_next(input)?;
-    let project_assets = lines(project_assets_len)
-        .context(Expected(Description("project_assets: Vec<str>")))
-        .parse_next(input)?;
+    let lead_int = verify_line_parses_to::<i32>.context(Expected(Description("lead_int: i32"))).parse_next(input)?;
+    let project_assets_len =
+        parse_one_line.context(Expected(Description("project_assets_len: usize"))).parse_next(input)?;
+    let project_assets =
+        lines(project_assets_len).context(Expected(Description("project_assets: Vec<str>"))).parse_next(input)?;
 
-    let has_motion_data =
-        num_bool_line.context(Expected(Description("has_motion_data: 1 | 0"))).parse_next(input)?;
+    let has_motion_data = num_bool_line.context(Expected(Description("has_motion_data: 1 | 0"))).parse_next(input)?;
 
     Ok((line_range, AnimDataHeader { lead_int, project_assets, has_motion_data }))
 }
@@ -171,9 +159,7 @@ fn clip_motion_block<'a>(input: &mut &'a str) -> ModalResult<ClipMotionBlock<'a>
     Ok(block)
 }
 
-fn translations<'a>(
-    line_len: usize,
-) -> impl Parser<&'a str, Vec<Translation<'a>>, ErrMode<ContextError>> {
+fn translations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Translation<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut translations = vec![];
         for _ in 0..line_len {
@@ -198,9 +184,7 @@ fn translations<'a>(
     }
 }
 
-fn rotations<'a>(
-    line_len: usize,
-) -> impl Parser<&'a str, Vec<Rotation<'a>>, ErrMode<ContextError>> {
+fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut rotations = vec![];
         for _ in 0..line_len {
@@ -282,9 +266,7 @@ mod tests {
     #[cfg(feature = "tracing")]
     #[test]
     fn should_parse() {
-        let s = include_str!(
-            "../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
-        );
+        let s = include_str!("../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
         test_parse(s);
     }
 }

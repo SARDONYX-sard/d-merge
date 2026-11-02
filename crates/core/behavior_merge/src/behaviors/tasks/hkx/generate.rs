@@ -23,11 +23,7 @@ pub(crate) fn generate_hkx_files(
     templates: BorrowedTemplateMap<'_>,
     behavior_index_map: BehaviorIndexMap<'_>,
 ) -> Result<(), Vec<Error>> {
-    let reporter = StatusReportCounter::new(
-        &config.status_report,
-        ReportType::GeneratingHkxFiles,
-        templates.len(),
-    );
+    let reporter = StatusReportCounter::new(&config.status_report, ReportType::GeneratingHkxFiles, templates.len());
 
     let results = templates
         .into_par_iter()
@@ -37,8 +33,7 @@ pub(crate) fn generate_hkx_files(
             let mut output_path = config.output_dir.join(inner_path);
 
             if let Some(output_dir_all) = output_path.parent() {
-                fs::create_dir_all(output_dir_all)
-                    .context(FailedIoSnafu { path: output_dir_all })?;
+                fs::create_dir_all(output_dir_all).context(FailedIoSnafu { path: output_dir_all })?;
             }
 
             let hkx_bytes = {
@@ -53,11 +48,7 @@ pub(crate) fn generate_hkx_files(
                 let mut class_map: ClassMap = serde_path_to_error::deserialize(template_json)
                     .map_err(|e| {
                         #[cfg(feature = "tracing")]
-                        tracing::error!(
-                            "template_path = {}\nerr_path = {:?}",
-                            output_path.display(),
-                            e.path()
-                        );
+                        tracing::error!("template_path = {}\nerr_path = {:?}", output_path.display(), e.path());
                         e.into_inner()
                     })
                     .with_context(|_| JsonToClassMapSnafu { path: output_path.clone() })?;
@@ -79,9 +70,8 @@ pub(crate) fn generate_hkx_files(
                     indexes.as_ref().and_then(|indexes| indexes.behavior_graph.as_deref())
                 {
                     use serde_hkx_features::id_maker::check_len_from_map;
-                    check_len_from_map(&class_map, behavior_graph_index).with_context(|_| {
-                        crate::errors::DedupEventVariableSnafu { path: output_path.clone() }
-                    })?;
+                    check_len_from_map(&class_map, behavior_graph_index)
+                        .with_context(|_| crate::errors::DedupEventVariableSnafu { path: output_path.clone() })?;
                 }
 
                 // NOTE: Since we will no longer be able to use `&mut` on `class_map` after this point, we must call it here.
@@ -110,8 +100,7 @@ pub(crate) fn generate_hkx_files(
             };
 
             output_path.set_extension("hkx");
-            fs::write(&output_path, hkx_bytes)
-                .with_context(|_| FailedIoSnafu { path: output_path.clone() })?;
+            fs::write(&output_path, hkx_bytes).with_context(|_| FailedIoSnafu { path: output_path.clone() })?;
 
             #[cfg(feature = "tracing")]
             tracing::info!("Generated: {}", output_path.display());
@@ -142,8 +131,7 @@ where
         // If pretty print fails, fall back to normal print
         let mut debug_path = output_file.to_path_buf();
         debug_path.set_extension("debug_json.log");
-        fs::write(&debug_path, format!("{template_json:#?}"))
-            .context(FailedIoSnafu { path: debug_path })?;
+        fs::write(&debug_path, format!("{template_json:#?}")).context(FailedIoSnafu { path: debug_path })?;
     }
 
     Ok(())
@@ -154,8 +142,7 @@ fn write_patched_xml(output_path: &Path, class_map: &ClassMap<'_>) -> Result<()>
 
     let mut class_map = class_map.clone();
     let ptr = class_map.sort_for_xml().with_context(|_| HkxSerSnafu { path: output_path })?;
-    let xml =
-        hkx_io::to_xml(&class_map, &ptr).with_context(|_| HkxSerSnafu { path: output_path })?;
+    let xml = hkx_io::to_xml(&class_map, &ptr).with_context(|_| HkxSerSnafu { path: output_path })?;
 
     let mut xml_path = output_path.to_path_buf();
     xml_path.set_extension("xml");

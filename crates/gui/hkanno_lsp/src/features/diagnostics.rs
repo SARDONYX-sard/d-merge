@@ -75,12 +75,7 @@ pub fn diagnostics(text: &str) -> Vec<Diagnostic> {
                     && node.text.is_none()
                 {
                     let start = node.space_after_time.map_or(time.span.end, |s| s.start);
-                    ctx.push(
-                        Span::new(start, ctx.line_len),
-                        Severity::Warning,
-                        "Text annotation is missing.",
-                        None,
-                    );
+                    ctx.push(Span::new(start, ctx.line_len), Severity::Warning, "Text annotation is missing.", None);
                 }
                 if let Some(text) = &node.text {
                     scar(&mut ctx, text);
@@ -102,19 +97,8 @@ struct LineCtx<'o> {
 }
 
 impl LineCtx<'_> {
-    fn push(
-        &mut self,
-        span: Span,
-        severity: Severity,
-        message: impl Into<String>,
-        code: Option<DiagnosticCode>,
-    ) {
-        self.out.push(Diagnostic {
-            range: span.on_line(self.line_no),
-            severity,
-            message: message.into(),
-            code,
-        });
+    fn push(&mut self, span: Span, severity: Severity, message: impl Into<String>, code: Option<DiagnosticCode>) {
+        self.out.push(Diagnostic { range: span.on_line(self.line_no), severity, message: message.into(), code });
     }
 
     /// The last char of the line (e.g., where a missing value would follow).
@@ -232,10 +216,8 @@ fn pie(ctx: &mut LineCtx, node: &PieNode) {
     let Some(name) = &ins.name else { return };
     let Some(def) = pie::find_native(name.value) else { return };
 
-    let provided = ins
-        .parameters
-        .as_ref()
-        .map_or(0, |params| params.items.iter().filter(|item| item.value.is_some()).count());
+    let provided =
+        ins.parameters.as_ref().map_or(0, |params| params.items.iter().filter(|item| item.value.is_some()).count());
     let expected = def.param_count();
 
     if provided < expected {
@@ -243,10 +225,7 @@ fn pie(ctx: &mut LineCtx, node: &PieNode) {
         ctx.push(
             Span::new(ins.prefix.span.start, end),
             Severity::Error,
-            format!(
-                "PIE instruction '{}' expects {expected} parameters, but {provided} provided.",
-                def.name
-            ),
+            format!("PIE instruction '{}' expects {expected} parameters, but {provided} provided.", def.name),
             None,
         );
     }
@@ -281,10 +260,7 @@ mod tests {
 
     #[test]
     fn pie_param_count() {
-        assert_eq!(
-            messages("0.1 PIE.@SGVB|x"),
-            ["PIE instruction 'SGVB' expects 2 parameters, but 1 provided."]
-        );
+        assert_eq!(messages("0.1 PIE.@SGVB|x"), ["PIE instruction 'SGVB' expects 2 parameters, but 1 provided."]);
         assert!(messages("0.1 PIE.@SGVB|x|1").is_empty());
     }
 

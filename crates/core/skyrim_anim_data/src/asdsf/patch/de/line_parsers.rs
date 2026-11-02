@@ -25,9 +25,7 @@ pub(crate) fn version_v3<'a>(input: &mut &'a str) -> winnow::ModalResult<&'a str
 ///
 /// # Returns
 /// diff, has original
-pub(crate) fn take_raw_diff<'a>(
-    input: &mut &'a str,
-) -> winnow::ModalResult<Option<(&'a str, bool)>> {
+pub(crate) fn take_raw_diff<'a>(input: &mut &'a str) -> winnow::ModalResult<Option<(&'a str, bool)>> {
     use crate::common_parser::comment::{open_comment, take_till_close};
 
     // Fast path: no OPEN comment ahead

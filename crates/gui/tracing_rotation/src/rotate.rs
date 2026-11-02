@@ -17,11 +17,7 @@ use crate::error::Result;
 /// # Errors
 /// Propagates any [`std::io::Error`] encountered during directory creation,
 /// file renaming, deletion, or file creation.
-pub(crate) fn rotate_files(
-    log_dir: impl AsRef<Path>,
-    file_name: &str,
-    max_files: usize,
-) -> Result<File> {
+pub(crate) fn rotate_files(log_dir: impl AsRef<Path>, file_name: &str, max_files: usize) -> Result<File> {
     let log_dir = log_dir.as_ref();
     let file_name_path = Path::new(file_name);
 
@@ -69,11 +65,7 @@ mod tests {
     use super::*;
 
     fn file_count(dir: &std::path::Path) -> usize {
-        fs::read_dir(dir)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_ok_and(|t| !t.is_dir()))
-            .count()
+        fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_type().is_ok_and(|t| !t.is_dir())).count()
     }
 
     #[test]
@@ -112,10 +104,8 @@ mod tests {
 
         rotate_files(dir, "app.log", 10)?;
 
-        let files: Vec<_> = fs::read_dir(dir)?
-            .filter_map(|e| e.ok())
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .collect();
+        let files: Vec<_> =
+            fs::read_dir(dir)?.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
 
         assert_eq!(files.len(), 2);
         assert!(files.iter().any(|n| n == "app.log"));

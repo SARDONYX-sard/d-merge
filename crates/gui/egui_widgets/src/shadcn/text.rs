@@ -87,8 +87,7 @@ impl egui::Widget for TextEdit<'_> {
         let cr = theme.corner_radius();
         let base_bg = interpolate_color(theme.background, theme.muted, 0.4);
 
-        let (outer_rect, outer_response) =
-            ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+        let (outer_rect, outer_response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
         let outer_hovered = outer_response.hovered() || ui.rect_contains_pointer(outer_rect);
         let (bg, border_color) = if outer_hovered {
             (interpolate_color(base_bg, theme.accent, 0.35), theme.input)
@@ -110,9 +109,7 @@ impl egui::Widget for TextEdit<'_> {
             egui::pos2(outer_rect.max.x - h_padding, outer_rect.max.y - v_padding),
         );
         let mut child_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(inner_rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            egui::UiBuilder::new().max_rect(inner_rect).layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
 
         let mut text_edit = egui::TextEdit::singleline(self.text)
@@ -158,11 +155,7 @@ impl Label {
 impl egui::Widget for Label {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let color = ShadcnTheme::get(ui.ctx()).foreground;
-        let galley = ui.painter().layout_no_wrap(
-            self.text.text().to_owned(),
-            egui::FontId::proportional(14.0),
-            color,
-        );
+        let galley = ui.painter().layout_no_wrap(self.text.text().to_owned(), egui::FontId::proportional(14.0), color);
 
         let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
         if ui.is_rect_visible(rect) {

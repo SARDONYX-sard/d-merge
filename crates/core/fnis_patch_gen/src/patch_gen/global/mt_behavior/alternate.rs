@@ -106,7 +106,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         },
     ));
 
-    patches.push( (
+    patches.push((
         json_path![FNIS_AA_MT_AUTO_GEN_5235, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {
@@ -128,7 +128,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
             priority,
         },
     ));
-    patches.push( (
+    patches.push((
         json_path![FNIS_AA_MT_AUTO_GEN_5232, "hkbBlendingTransitionEffect"],
         ValueWithPriority {
             patch: JsonPatch {

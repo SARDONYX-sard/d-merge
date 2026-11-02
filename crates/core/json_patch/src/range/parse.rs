@@ -17,9 +17,7 @@ use super::{Range, error::RangeError};
 pub fn parse_range(mut segment: &str) -> Result<Range, RangeError> {
     let input = &mut segment;
 
-    _parse_range
-        .parse_next(input)
-        .map_err(|_| RangeError::InvalidRange { range: segment.to_string() })
+    _parse_range.parse_next(input).map_err(|_| RangeError::InvalidRange { range: segment.to_string() })
 }
 
 fn _parse_range(input: &mut &str) -> ModalResult<Range> {

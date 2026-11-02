@@ -3,9 +3,8 @@ mod alternate;
 mod furniture_root;
 
 pub(crate) use alternate::{
-    FNIS_AA_MT_AUTO_GEN_5218, FNIS_AA_MT_AUTO_GEN_5219, FNIS_AA_MT_AUTO_GEN_5220,
-    FNIS_AA_MT_AUTO_GEN_5221, FNIS_AA_MT_AUTO_GEN_5222, FNIS_AA_MT_AUTO_GEN_5232,
-    FNIS_AA_MT_AUTO_GEN_5235,
+    FNIS_AA_MT_AUTO_GEN_5218, FNIS_AA_MT_AUTO_GEN_5219, FNIS_AA_MT_AUTO_GEN_5220, FNIS_AA_MT_AUTO_GEN_5221,
+    FNIS_AA_MT_AUTO_GEN_5222, FNIS_AA_MT_AUTO_GEN_5232, FNIS_AA_MT_AUTO_GEN_5235,
 };
 pub(crate) use furniture_root::{FNIS_FU_MT_5216, FNIS_GLOBAL_FU_MT_STATE_ID};
 
@@ -27,11 +26,7 @@ pub(crate) fn new_mt_global_patch<'a>(
     let mut one_patches = self::alternate::new_mt_global_patch(priority);
     let mut seq_patches = vec![];
 
-    self::furniture_root::new_mt_global_patch(
-        (&mut one_patches, &mut seq_patches),
-        anim_groups_states,
-        priority,
-    );
+    self::furniture_root::new_mt_global_patch((&mut one_patches, &mut seq_patches), anim_groups_states, priority);
 
     (one_patches, seq_patches)
 }

@@ -92,10 +92,7 @@ impl<'a> ClipAnimDiffPatch<'a> {
             if !self.trigger_names_patches.seq.is_empty() {
                 let patches = core::mem::take(&mut self.trigger_names_patches.seq);
                 let template_array = template.try_as_array_mut().map_err(|_| {
-                    JsonPatchError::unsupported_range_kind_from(
-                        &json_patch::json_path!["trigger_names"],
-                        &patches,
-                    )
+                    JsonPatchError::unsupported_range_kind_from(&json_patch::json_path!["trigger_names"], &patches)
                 })?;
                 apply_seq_array_directly(template_array, patches)?;
             }

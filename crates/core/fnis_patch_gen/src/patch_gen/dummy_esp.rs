@@ -29,10 +29,7 @@ where
 
     // 511 bytes check
     const {
-        assert!(
-            AUTHOR.to_bytes_with_nul().len() <= 512,
-            "Author string must be at most 511 bytes + null terminator"
-        );
+        assert!(AUTHOR.to_bytes_with_nul().len() <= 512, "Author string must be at most 511 bytes + null terminator");
         assert!(
             DESCRIPTION.to_bytes_with_nul().len() <= 512,
             "Description string must be at most 511 bytes + null terminator"

@@ -3,8 +3,13 @@
 use gui_shared::{
     fetch::FetchState,
     i18n::I18nKey,
-    mod_item::{self, ModItem},
-    settings::{DataMode, mod_list_ui::SortColumn},
+    settings::{
+        DataMode,
+        pages::patch::{
+            mod_item::{self, ModItem},
+            mod_list::SortColumn,
+        },
+    },
 };
 use mod_info::ModType;
 
@@ -64,25 +69,20 @@ impl App {
             if ui
                 .add_sized(
                     [90.0, 40.0],
-                    Button::new(self.i18n.t(I18nKey::NormalizeButton))
-                        .icon(Icon::TextAlignJustify)
-                        .full_width(),
+                    Button::new(self.i18n.t(I18nKey::NormalizeButton)).icon(Icon::TextAlignJustify).full_width(),
                 )
                 .on_hover_text(self.i18n.t(I18nKey::NormalizeHover))
                 .clicked()
             {
-                mod_item::reorder_mods_priorities(self.settings.mod_list_mut());
-                if matches!(self.settings.behavior.mode, DataMode::Manual) {
-                    mod_item::dedup_mods_by_id(self.settings.mod_list_mut());
+                mod_item::reorder_mods_priorities(self.settings.pages.patch.mod_list_mut());
+                if matches!(self.settings.pages.patch.behavior.mode, DataMode::Manual) {
+                    mod_item::dedup_mods_by_id(self.settings.pages.patch.mod_list_mut());
                 }
             }
 
             // -- Lock Button
             if self.is_locked {
-                let button = Button::new(self.i18n.t(I18nKey::LockButton))
-                    .icon(Icon::Lock)
-                    .full_width()
-                    .destructive();
+                let button = Button::new(self.i18n.t(I18nKey::LockButton)).icon(Icon::Lock).full_width().destructive();
                 let hover_text = self.i18n.t(I18nKey::LockButtonHover);
 
                 if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
@@ -96,23 +96,20 @@ impl App {
             if self.reload_button(ui) {
                 ui.add(egui::Spinner::new());
             }
-            ui.colored_label(
-                self.mod_list_msg.color.resolve(ui.visuals()),
-                &self.mod_list_msg.message,
-            );
+            ui.colored_label(self.mod_list_msg.color.resolve(ui.visuals()), &self.mod_list_msg.message);
         });
     }
 
     /// Shows `<selected> / <total> selected`, and `<hits> hits` while searching.
     fn selected_label(&self, ui: &mut egui::Ui, hits_count: usize) {
-        let selected_count = self.settings.mod_list().iter().filter(|item| item.enabled).count();
-        let total_count = self.settings.mod_list().len();
+        let selected_count = self.settings.pages.patch.mod_list().iter().filter(|item| item.enabled).count();
+        let total_count = self.settings.pages.patch.mod_list().len();
         let selected_label = self.i18n.t(I18nKey::SelectedLabel);
 
         ui.horizontal(|ui| {
             ui.label(format!("{selected_count} / {total_count} {selected_label}"));
 
-            if !self.settings.ui.mod_list.filter_text.trim().is_empty() {
+            if !self.settings.pages.patch.view_state.filter_text.trim().is_empty() {
                 ui.separator();
                 let hits_label = self.i18n.t(I18nKey::SearchHitsLabel);
                 ui.label(format!("{hits_count} {hits_label}"));
@@ -143,13 +140,13 @@ impl App {
         ui.add(Icon::Search);
         let search_hint = format!("{}...", self.i18n.t(I18nKey::SearchLabel));
         ui.add(
-            TextEdit::singleline(&mut self.settings.ui.mod_list.filter_text)
+            TextEdit::singleline(&mut self.settings.pages.patch.view_state.filter_text)
                 .hint_text(search_hint)
                 .desired_width(300.0),
         );
 
         if ui.add_sized([60.0, 40.0], Button::new(self.i18n.t(I18nKey::ClearButton))).clicked() {
-            self.settings.ui.mod_list.filter_text.clear();
+            self.settings.pages.patch.view_state.filter_text.clear();
         }
 
         let items = [
@@ -161,7 +158,7 @@ impl App {
             (Some(SortColumn::Priority), self.i18n.t(I18nKey::ColumnPriority)),
         ];
 
-        let filter_column = &mut self.settings.ui.mod_list.filter_column;
+        let filter_column = &mut self.settings.pages.patch.view_state.filter_column;
         let mut index = items.iter().position(|(column, _)| column == filter_column).unwrap_or(0);
         if ComboBox::from_id_salt("filter_column")
             .width(100.0)
@@ -176,11 +173,11 @@ impl App {
     ///
     /// Clicking the same column reverses direction; clicking a different column resets to ascending..
     fn toggle_sort(&mut self, column: SortColumn) {
-        if self.settings.ui.mod_list.sort_column == column {
-            self.settings.ui.mod_list.sort_asc = !self.settings.ui.mod_list.sort_asc;
+        if self.settings.pages.patch.view_state.sort_column == column {
+            self.settings.pages.patch.view_state.sort_asc = !self.settings.pages.patch.view_state.sort_asc;
         } else {
-            self.settings.ui.mod_list.sort_column = column;
-            self.settings.ui.mod_list.sort_asc = true;
+            self.settings.pages.patch.view_state.sort_column = column;
+            self.settings.pages.patch.view_state.sort_asc = true;
         }
     }
 
@@ -190,21 +187,21 @@ impl App {
     /// DnD reordering requires ascending-priority sort with no active filter
     /// (see [`App::is_dnd_allowed`]).
     fn unlock_readonly_table(&mut self) {
-        self.settings.ui.mod_list.sort_asc = true;
-        self.settings.ui.mod_list.sort_column = SortColumn::Priority;
-        self.settings.ui.mod_list.filter_text.clear();
+        self.settings.pages.patch.view_state.sort_asc = true;
+        self.settings.pages.patch.view_state.sort_column = SortColumn::Priority;
+        self.settings.pages.patch.view_state.filter_text.clear();
     }
 
     /// Returns the subset of mods that match the current filter text and column.
     ///
     /// When the filter is empty the full list is returned (cloned).
     fn filtered_mod_ids(&self) -> Vec<ModItem> {
-        if self.settings.ui.mod_list.filter_text.trim().is_empty() {
-            return self.settings.mod_list().to_vec();
+        if self.settings.pages.patch.view_state.filter_text.trim().is_empty() {
+            return self.settings.pages.patch.mod_list().to_vec();
         }
 
-        let text = self.settings.ui.mod_list.filter_text.trim().to_lowercase();
-        let matches_filter = |m: &&ModItem| match self.settings.ui.mod_list.filter_column {
+        let text = self.settings.pages.patch.view_state.filter_text.trim().to_lowercase();
+        let matches_filter = |m: &&ModItem| match self.settings.pages.patch.view_state.filter_column {
             None => {
                 m.id.to_lowercase().contains(&text)
                     || m.name.to_lowercase().contains(&text)
@@ -217,20 +214,20 @@ impl App {
             Some(SortColumn::Site) => m.site.to_lowercase().contains(&text),
             Some(SortColumn::Priority) => m.priority.to_string().contains(&text),
         };
-        self.settings.mod_list().iter().filter(matches_filter).cloned().collect()
+        self.settings.pages.patch.mod_list().iter().filter(matches_filter).cloned().collect()
     }
 
     /// Sorts `mods` in-place according to the current sort column and direction.
     fn sort_filtered_mods(&self, mods: &mut [ModItem]) {
         mods.sort_unstable_by(|a, b| {
-            let ord = match self.settings.ui.mod_list.sort_column {
+            let ord = match self.settings.pages.patch.view_state.sort_column {
                 SortColumn::Id => a.id.cmp(&b.id),
                 SortColumn::Name => a.name.cmp(&b.name),
                 SortColumn::ModType => a.mod_type.cmp(&b.mod_type),
                 SortColumn::Site => a.site.cmp(&b.site),
                 SortColumn::Priority => a.priority.cmp(&b.priority),
             };
-            if self.settings.ui.mod_list.sort_asc { ord } else { ord.reverse() }
+            if self.settings.pages.patch.view_state.sort_asc { ord } else { ord.reverse() }
         });
     }
 
@@ -239,9 +236,9 @@ impl App {
     /// DnD mutates the underlying list by position, so it is only safe when
     /// the displayed order matches the stored priority order exactly.
     fn is_dnd_allowed(&self) -> bool {
-        self.settings.ui.mod_list.filter_text.trim().is_empty()
-            && self.settings.ui.mod_list.sort_column == SortColumn::Priority
-            && self.settings.ui.mod_list.sort_asc
+        self.settings.pages.patch.view_state.filter_text.trim().is_empty()
+            && self.settings.pages.patch.view_state.sort_column == SortColumn::Priority
+            && self.settings.pages.patch.view_state.sort_asc
     }
 
     /// Renders the scroll area and [`egui_extras::TableBuilder`].
@@ -274,19 +271,16 @@ impl App {
                 let mod_type_width = text_width(ui, ModType::NemesisExt.as_str())
                     .max(text_width(ui, self.i18n.t(I18nKey::ColumnModType)))
                     + padding;
-                let priority_width =
-                    text_width(ui, &format!("{} ▲", self.i18n.t(I18nKey::ColumnPriority)))
-                        + padding;
+                let priority_width = text_width(ui, &format!("{} ▲", self.i18n.t(I18nKey::ColumnPriority))) + padding;
                 const CHECKBOX_WIDTH: f32 = 24.0;
                 let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
 
                 // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
                 // remainder column's width in sync with the window only when it is the last one.
                 let gaps = spacing.item_spacing.x * 6.0;
-                let site_width = (table_width
-                    - (CHECKBOX_WIDTH + id_width + name_width + mod_type_width + priority_width)
-                    - gaps)
-                    .max(80.0);
+                let site_width =
+                    (table_width - (CHECKBOX_WIDTH + id_width + name_width + mod_type_width + priority_width) - gaps)
+                        .max(80.0);
 
                 // | checkbox | id | name | mod type | site (fills the rest) | priority |
                 // NOTE: The column border is the resize handle: keep every column resizable.
@@ -308,20 +302,14 @@ impl App {
                             let mod_list = if self.last_fetch_was_empty {
                                 &mut vec![]
                             } else {
-                                self.settings.mod_list_mut()
+                                self.settings.pages.patch.mod_list_mut()
                             };
                             let mod_selection_anchor = &mut self.mod_selection_anchor;
 
                             if editable {
                                 dnd_table_body(&mut body, mod_list, widths, mod_selection_anchor);
                             } else {
-                                check_only_table_body(
-                                    &mut body,
-                                    filtered_mods,
-                                    mod_list,
-                                    widths,
-                                    mod_selection_anchor,
-                                );
+                                check_only_table_body(&mut body, filtered_mods, mod_list, widths, mod_selection_anchor);
                             }
                         });
                 });
@@ -336,12 +324,8 @@ impl App {
     /// `exact` for exactly one frame when `changed_width` is `true`, giving
     /// egui a concrete measurement to anchor the new layout.
     fn resizable_column(width: f32, changed_width: bool) -> egui_extras::Column {
-        if changed_width {
-            egui_extras::Column::exact(width)
-        } else {
-            egui_extras::Column::initial(width)
-        }
-        .resizable(true)
+        if changed_width { egui_extras::Column::exact(width) } else { egui_extras::Column::initial(width) }
+            .resizable(true)
     }
 
     /// Renders the table header row with sortable column buttons.
@@ -366,24 +350,21 @@ impl App {
     /// If the filter is empty, all mods are toggled.
     fn checkbox_header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>) {
         header.col(|ui| {
-            ui.with_layout(
-                egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-                |ui| {
-                    if ui.add(egui::Checkbox::without_text(&mut self.check_all)).clicked() {
-                        let check_all = self.check_all;
+            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+                if ui.add(egui::Checkbox::without_text(&mut self.check_all)).clicked() {
+                    let check_all = self.check_all;
 
-                        let filtered_ids: fast_hash::HashSet<_> =
-                            self.filtered_mod_ids().into_iter().map(|m| m.id).collect();
-                        let is_unfiltered = filtered_ids.is_empty();
+                    let filtered_ids: fast_hash::HashSet<_> =
+                        self.filtered_mod_ids().into_iter().map(|m| m.id).collect();
+                    let is_unfiltered = filtered_ids.is_empty();
 
-                        self.settings.mod_list_mut().iter_mut().for_each(|item| {
-                            if is_unfiltered || filtered_ids.contains(&item.id) {
-                                item.enabled = check_all;
-                            }
-                        });
-                    }
-                },
-            );
+                    self.settings.pages.patch.mod_list_mut().iter_mut().for_each(|item| {
+                        if is_unfiltered || filtered_ids.contains(&item.id) {
+                            item.enabled = check_all;
+                        }
+                    });
+                }
+            });
         });
     }
 
@@ -391,31 +372,23 @@ impl App {
     ///
     /// The button label gets a `▲` / `▼` suffix when this column is the
     /// active sort column.
-    fn header_button(
-        &mut self,
-        header: &mut egui_extras::TableRow<'_, '_>,
-        label: &str,
-        column: SortColumn,
-    ) {
+    fn header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>, label: &str, column: SortColumn) {
         header.col(|ui| {
-            ui.with_layout(
-                egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-                |ui| {
-                    let text = if self.settings.ui.mod_list.sort_column == column {
-                        if self.settings.ui.mod_list.sort_asc {
-                            format!("{label} ▲")
-                        } else {
-                            format!("{label} ▼")
-                        }
+            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+                let text = if self.settings.pages.patch.view_state.sort_column == column {
+                    if self.settings.pages.patch.view_state.sort_asc {
+                        format!("{label} ▲")
                     } else {
-                        label.to_string()
-                    };
-
-                    if ui.button(text).clicked() {
-                        self.toggle_sort(column);
+                        format!("{label} ▼")
                     }
-                },
-            );
+                } else {
+                    label.to_string()
+                };
+
+                if ui.button(text).clicked() {
+                    self.toggle_sort(column);
+                }
+            });
         });
     }
 }

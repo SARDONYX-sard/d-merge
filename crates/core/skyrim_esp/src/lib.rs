@@ -294,10 +294,7 @@ mod tests {
         let bytes = write_to_vec(&config);
 
         let actual_data_size = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-        assert_eq!(
-            actual_data_size, 18,
-            "Without CNAM/SNAM the body is only the HEDR sub_record (18 bytes)"
-        );
+        assert_eq!(actual_data_size, 18, "Without CNAM/SNAM the body is only the HEDR sub_record (18 bytes)");
         assert_eq!(bytes.len(), 24 + 18, "total file size mismatch");
 
         // Must still be a valid TES4 record.

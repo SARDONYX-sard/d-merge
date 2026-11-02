@@ -5,9 +5,11 @@ use std::sync::{Arc, atomic::Ordering};
 use behavior_merge::PatchMaps;
 use gui_shared::{
     i18n::I18nKey,
-    mod_item::ModItem,
     patch::phase,
-    settings::{BehaviorSettings, DataMode, behavior::ParserMode},
+    settings::pages::patch::{
+        behavior::{BehaviorSettings, DataMode, ParserMode},
+        mod_item::ModItem,
+    },
 };
 use mod_info::ModType;
 use rayon::{iter::Either, prelude::*};
@@ -20,16 +22,16 @@ impl App {
         self.patch_start_time = Some(std::time::Instant::now());
         self.patch_status.clear();
 
-        if self.settings.behavior.auto_remove_meshes {
+        if self.settings.pages.patch.behavior.auto_remove_meshes {
             self.remove_meshes_dir_all();
         }
 
-        let (skyrim_data_dir, is_vfs, mod_list) = match self.settings.behavior.mode {
+        let (skyrim_data_dir, is_vfs, mod_list) = match self.settings.pages.patch.behavior.mode {
             DataMode::Vfs => {
-                (&self.settings.vfs.skyrim_data_dir, true, &self.settings.vfs.mod_list)
+                (&self.settings.pages.patch.vfs.skyrim_data_dir, true, &self.settings.pages.patch.vfs.mod_list)
             }
             DataMode::Manual => {
-                (&self.settings.manual.skyrim_data_dir, false, &self.settings.manual.mod_list)
+                (&self.settings.pages.patch.manual.skyrim_data_dir, false, &self.settings.pages.patch.manual.mod_list)
             }
         };
         let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
@@ -41,13 +43,11 @@ impl App {
             skeleton_arm_fix,
             template_dir,
             ..
-        } = &self.settings.behavior;
+        } = &self.settings.pages.patch.behavior;
         let enable_debug_output = *enable_debug_output;
         let output_target = match target_runtime {
             Runtime::Le | Runtime::Enderal => behavior_merge::OutPutTarget::SkyrimLe,
-            Runtime::Se | Runtime::EnderalSe | Runtime::Vr => {
-                behavior_merge::OutPutTarget::SkyrimSe
-            }
+            Runtime::Se | Runtime::EnderalSe | Runtime::Vr => behavior_merge::OutPutTarget::SkyrimSe,
         };
 
         let patch_status = Arc::clone(&self.patch_status);
@@ -61,10 +61,10 @@ impl App {
         let ctx = ctx.clone();
         let config = behavior_merge::Config {
             resource_dir: template_dir.to_string().into(),
-            output_dir: self.settings.current_output_dir().to_owned().into(),
+            output_dir: self.settings.pages.patch.current_output_dir().to_owned().into(),
             output_target,
             status_report: Some(Box::new(move |status| patch_status.apply(status, &ctx))),
-            parser_mode: to_nemesis_parser_mode(self.settings.behavior.parser_mode),
+            parser_mode: to_nemesis_parser_mode(self.settings.pages.patch.behavior.parser_mode),
             hack_options: Some(behavior_merge::HackOptions::enable_all()),
             debug,
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
@@ -101,8 +101,8 @@ impl App {
     }
 
     fn remove_meshes_dir_all(&mut self) {
-        let output_dir = self.settings.current_output_dir().to_owned();
-        let skyrim_data_dir = self.settings.current_skyrim_data_dir();
+        let output_dir = self.settings.pages.patch.current_output_dir().to_owned();
+        let skyrim_data_dir = self.settings.pages.patch.current_skyrim_data_dir();
 
         if behavior_merge::cache_remover::is_dangerous_remove(&output_dir, skyrim_data_dir) {
             tracing::warn!(
@@ -112,10 +112,7 @@ impl App {
             return;
         }
 
-        self.notify.info(format!(
-            "0/6: {} `{output_dir}/meshes`",
-            self.i18n.t(I18nKey::RemovingMeshesMessage)
-        ));
+        self.notify.info(format!("0/6: {} `{output_dir}/meshes`", self.i18n.t(I18nKey::RemovingMeshesMessage)));
         behavior_merge::cache_remover::remove_meshes_dir_all(output_dir);
     }
 }
@@ -210,30 +207,21 @@ const fn to_nemesis_parser_mode(mode: ParserMode) -> behavior_merge::ParserMode 
 /// - Nemesis (vfs): e.g. `<skyrim data dir>/Nemesis_Engine/mod/aaaa`
 /// - FNIS: always the bare id
 fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> PatchMaps {
-    let (nemesis_entries, fnis_entries) =
-        mod_infos.par_iter().filter(|item| item.enabled).partition_map(|mod_item| {
-            let ModItem { id, priority, mod_type, .. } = mod_item;
-            let priority = *priority;
+    let (nemesis_entries, fnis_entries) = mod_infos.par_iter().filter(|item| item.enabled).partition_map(|mod_item| {
+        let ModItem { id, priority, mod_type, .. } = mod_item;
+        let priority = *priority;
 
-            match mod_type {
-                ModType::Nemesis => {
-                    let id = if is_vfs {
-                        format!("{skyrim_data_dir}/Nemesis_Engine/mod/{id}")
-                    } else {
-                        id.clone()
-                    };
-                    Either::Left((id, priority))
-                }
-                ModType::NemesisExt => {
-                    let id = if is_vfs {
-                        format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/{id}")
-                    } else {
-                        id.clone()
-                    };
-                    Either::Left((id, priority))
-                }
-                ModType::Fnis => Either::Right((id.clone(), priority)),
+        match mod_type {
+            ModType::Nemesis => {
+                let id = if is_vfs { format!("{skyrim_data_dir}/Nemesis_Engine/mod/{id}") } else { id.clone() };
+                Either::Left((id, priority))
             }
-        });
+            ModType::NemesisExt => {
+                let id = if is_vfs { format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/{id}") } else { id.clone() };
+                Either::Left((id, priority))
+            }
+            ModType::Fnis => Either::Right((id.clone(), priority)),
+        }
+    });
     PatchMaps { nemesis_entries, fnis_entries }
 }

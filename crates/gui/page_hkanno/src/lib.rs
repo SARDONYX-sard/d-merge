@@ -34,7 +34,7 @@ use egui_code_editor::{
 use egui_widgets::{notify::Notification, shadcn::Button};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    settings::hkanno::{EditorMode, HkannoSettings},
+    settings::{LspOptions, pages::hkanno::HkannoSettings, ui::editor::EditorMode},
 };
 use hkanno_lsp::features::code_action::code_action;
 
@@ -45,6 +45,7 @@ use self::{language::HkannoLanguage, tab::HkannoTab};
 pub struct HkannoPageCtx<'a> {
     /// Persisted page settings (`settings.hkanno`): options, preview toggle, keymap.
     pub settings: &'a mut HkannoSettings,
+    pub lsp_settings: &'a mut LspOptions,
     pub i18n: &'a I18nMap,
     /// The app's notification bar.
     pub notify: &'a mut Notification,
@@ -110,9 +111,7 @@ impl HkannoPage {
         egui::Panel::top("hkanno_tabs").frame(frame).show(ui, |ui| self.tab_bar(ui, &mut ctx));
         if !self.tabs.is_empty() {
             egui::Panel::top("hkanno_file_bar").frame(frame).show(ui, |ui| self.file_bar(ui, &ctx));
-            egui::Panel::top("hkanno_toolbar")
-                .frame(frame)
-                .show(ui, |ui| self.toolbar(ui, &mut ctx));
+            egui::Panel::top("hkanno_toolbar").frame(frame).show(ui, |ui| self.toolbar(ui, &mut ctx));
             self.problems(ui, &ctx);
             if ctx.settings.show_preview {
                 self.preview(ui, &ctx);
@@ -173,14 +172,9 @@ impl HkannoPage {
                 ui.horizontal(|ui| {
                     for (i, tab) in self.tabs.iter().enumerate() {
                         // `*` marks unsaved edits.
-                        let title = if tab.dirty {
-                            format!("{}*", tab.title())
-                        } else {
-                            tab.title().to_string()
-                        };
-                        let response = ui
-                            .add(Button::selectable(i == self.active, title))
-                            .on_hover_text(&tab.settings.input_path);
+                        let title = if tab.dirty { format!("{}*", tab.title()) } else { tab.title().to_string() };
+                        let response =
+                            ui.add(Button::selectable(i == self.active, title)).on_hover_text(&tab.settings.input_path);
                         if response.clicked() {
                             self.active = i;
                         }
@@ -203,9 +197,7 @@ impl HkannoPage {
                     .on_hover_text(ctx.i18n.t(I18nKey::HkannoOpenHover))
                     .clicked()
                 {
-                    open = rfd::FileDialog::new()
-                        .add_filter("Havok Animation", &["hkx", "xml"])
-                        .pick_files();
+                    open = rfd::FileDialog::new().add_filter("Havok Animation", &["hkx", "xml"]).pick_files();
                 }
             });
         });
@@ -222,9 +214,8 @@ impl HkannoPage {
     fn editor(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
 
-        let lsp = &ctx.settings.lsp;
-        let language =
-            HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
+        let lsp = &ctx.lsp_settings;
+        let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
         let features = EditorFeatures {
             completion: lsp.completion,
             hover: lsp.hover,
@@ -233,7 +224,7 @@ impl HkannoPage {
             inlay_hints: lsp.inlay_hints,
             signature_help: lsp.signature_help,
         };
-        let keymap = to_keymap(ctx.settings.editor_mode);
+        let keymap = to_keymap(ctx.lsp_settings.editor_mode);
         let show_preview = ctx.settings.show_preview;
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
@@ -285,19 +276,11 @@ impl HkannoPage {
 
         // Split borrows: the closure reads the document while `preview` is mutated.
         let HkannoTab { preview, text, original, bytes, settings, .. } = tab;
-        preview.poll(
-            ui.ctx(),
-            || tab::document(original, text).into_static(),
-            bytes,
-            &settings.input_path,
-            text,
-        );
+        preview.poll(ui.ctx(), || tab::document(original, text).into_static(), bytes, &settings.input_path, text);
 
         egui::Panel::right("hkanno_preview").resizable(true).default_size(520.0).show(ui, |ui| {
             match &preview.error {
-                Some(err) => {
-                    ui.colored_label(ui.visuals().error_fg_color, format!("{error_title}: {err}"))
-                }
+                Some(err) => ui.colored_label(ui.visuals().error_fg_color, format!("{error_title}: {err}")),
                 None => ui.weak(title),
             };
             preview.ui(ui);
@@ -306,8 +289,7 @@ impl HkannoPage {
 
     /// Bottom pane: diagnostics of the active tab with quick fixes.
     fn problems(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
-        let (show_diagnostics, show_fixes) =
-            (ctx.settings.lsp.diagnostics, ctx.settings.lsp.code_action);
+        let (show_diagnostics, show_fixes) = (ctx.lsp_settings.diagnostics, ctx.lsp_settings.code_action);
         let title = ctx.i18n.t(I18nKey::HkannoProblemsLabel);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
         if !show_diagnostics || tab.diagnostics.is_empty() {
@@ -327,20 +309,10 @@ impl HkannoPage {
                         ui.colored_label(severity.color(ui.visuals()), severity.icon());
 
                         // e.g., `Ln 5, Col 1: Missing z value in animmotion.` -> click jumps there.
-                        let pos =
-                            LinePos { line: diagnostic.line, column: diagnostic.columns.start };
-                        let location = format!(
-                            "Ln {}, Col {}: {}",
-                            pos.line + 1,
-                            pos.column + 1,
-                            diagnostic.message
-                        );
+                        let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
+                        let location = format!("Ln {}, Col {}: {}", pos.line + 1, pos.column + 1, diagnostic.message);
                         if ui.link(location).clicked() {
-                            egui_code_editor::set_cursor(
-                                ui.ctx(),
-                                id,
-                                pos.to_char_index(&tab.text),
-                            );
+                            egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
                         }
 
                         if show_fixes
@@ -367,11 +339,10 @@ impl HkannoPage {
     /// Opens files dropped onto the window (only while this page is shown).
     /// A `.txt` is imported into the active tab instead (see `import_txt`).
     fn handle_drop(&mut self, egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>) {
-        let dropped: Vec<std::path::PathBuf> = egui_ctx
-            .input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect());
-        let (txt, files): (Vec<_>, Vec<_>) = dropped
-            .into_iter()
-            .partition(|p| p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt")));
+        let dropped: Vec<std::path::PathBuf> =
+            egui_ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect());
+        let (txt, files): (Vec<_>, Vec<_>) =
+            dropped.into_iter().partition(|p| p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt")));
         if !files.is_empty() {
             self.open(files.iter().map(|p| p.display().to_string()), ctx);
         }
@@ -437,12 +408,7 @@ fn drop_overlay(ctx: &egui::Context, i18n: &I18nMap) {
     let rect = ctx.content_rect();
     let blue = egui::Color32::from_rgb(66, 165, 245);
     painter.rect_filled(rect, 0.0, blue.gamma_multiply(0.15));
-    painter.rect_stroke(
-        rect.shrink(4.0),
-        8.0,
-        egui::Stroke::new(3.0_f32, blue),
-        egui::StrokeKind::Inside,
-    );
+    painter.rect_stroke(rect.shrink(4.0), 8.0, egui::Stroke::new(3.0_f32, blue), egui::StrokeKind::Inside);
     painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

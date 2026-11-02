@@ -59,8 +59,7 @@ pub fn anim_sets(asdsf: &str) -> Result<Vec<AnimSet>, String> {
             Some(_) => {}
         }
         let file_count = lines.number()?;
-        let files: Vec<String> =
-            (0..file_count).map(|_| lines.next().map(str::to_string)).collect::<Result<_, _>>()?;
+        let files: Vec<String> = (0..file_count).map(|_| lines.next().map(str::to_string)).collect::<Result<_, _>>()?;
 
         for file in files {
             let start = lines.at;
@@ -106,9 +105,7 @@ impl<'a> Lines<'a> {
 
     fn number(&mut self) -> Result<usize, String> {
         let line = self.next()?;
-        line.trim()
-            .parse()
-            .map_err(|_| format!("line {}: expected a number, got `{line}`", self.at))
+        line.trim().parse().map_err(|_| format!("line {}: expected a number, got `{line}`", self.at))
     }
 
     fn skip(&mut self, n: usize) -> Result<(), String> {
@@ -124,7 +121,8 @@ mod tests {
 
     #[test]
     fn splits_sets() {
-        let txt = "2\nAData\\A.txt\nBData\\B.txt\n1\nx.txt\nV3\n1\ntrig\n1\nvar\n0\n1\n1\natk\n0\n1\nclip\n1\n1\n2\n3\n0\n";
+        let txt =
+            "2\nAData\\A.txt\nBData\\B.txt\n1\nx.txt\nV3\n1\ntrig\n1\nvar\n0\n1\n1\natk\n0\n1\nclip\n1\n1\n2\n3\n0\n";
         // the trailing `0`: project B has no sets.
         let sets = anim_sets(txt).unwrap();
         assert_eq!(sets.len(), 1);

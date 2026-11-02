@@ -90,11 +90,7 @@ pub struct VimOptions {
 
 impl Default for VimOptions {
     fn default() -> Self {
-        Self {
-            insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']],
-            escape_timeout: 0.5,
-            shift_width: 4,
-        }
+        Self { insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']], escape_timeout: 0.5, shift_width: 4 }
     }
 }
 
@@ -167,12 +163,8 @@ impl VimState {
         if let Some(message) = &self.message {
             return StatusLine { mode, text: message.clone() };
         }
-        let recording = self
-            .repeat
-            .recording
-            .as_ref()
-            .map(|(name, _)| format!("recording @{name}  "))
-            .unwrap_or_default();
+        let recording =
+            self.repeat.recording.as_ref().map(|(name, _)| format!("recording @{name}  ")).unwrap_or_default();
         let pending: String = self
             .pending
             .iter()
@@ -193,13 +185,7 @@ impl VimState {
     }
 
     /// Runs this frame's keys. Call **before** showing the `TextEdit` with id `id`.
-    pub(super) fn handle(
-        &mut self,
-        ui: &egui::Ui,
-        id: egui::Id,
-        text: &mut String,
-        view: View,
-    ) -> KeymapOutput {
+    pub(super) fn handle(&mut self, ui: &egui::Ui, id: egui::Id, text: &mut String, view: View) -> KeymapOutput {
         self.view = view;
         let inserting = self.mode == Mode::Insert;
         if !inserting {
@@ -276,9 +262,7 @@ impl VimState {
             Mode::Visual => range(lo, (hi + 1).min(buf.len())),
             Mode::VisualLine => range(buf.line_start(lo), buf.line_end(hi)),
             // The block is drawn by the editor (see `block_ranges`); egui has only one selection.
-            Mode::Normal | Mode::Insert | Mode::VisualBlock => {
-                CCursorRange::one(CCursor::new(self.cursor))
-            }
+            Mode::Normal | Mode::Insert | Mode::VisualBlock => CCursorRange::one(CCursor::new(self.cursor)),
         }
     }
 
@@ -286,11 +270,7 @@ impl VimState {
     fn feed(&mut self, key: VimKey, exec: &mut exec::Exec) {
         let in_command = self.prompt.is_none() && self.mode != Mode::Insert;
         // `q` ends a recording (and is not part of it).
-        if in_command
-            && self.pending.is_empty()
-            && key == VimKey::Char('q')
-            && self.repeat.recording.is_some()
-        {
+        if in_command && self.pending.is_empty() && key == VimKey::Char('q') && self.repeat.recording.is_some() {
             self.repeat.stop_recording();
             return;
         }
@@ -339,9 +319,7 @@ impl VimState {
                     && !self.repeat.replaying()
                     && !matches!(
                         command,
-                        Command::Simple(
-                            Simple::Repeat | Simple::Play(_) | Simple::Undo | Simple::Redo
-                        )
+                        Command::Simple(Simple::Repeat | Simple::Play(_) | Simple::Undo | Simple::Redo)
                     );
                 if repeatable {
                     if self.mode == Mode::Insert {

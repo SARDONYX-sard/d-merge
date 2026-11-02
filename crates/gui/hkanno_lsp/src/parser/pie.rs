@@ -67,13 +67,8 @@ mod tests {
         assert_eq!(ins.prefix.value, PiePrefix::Native);
         assert_eq!(ins.name.map(|n| n.value), Some("SGVB"));
 
-        let values: Vec<_> = ins
-            .parameters
-            .expect("parameters")
-            .items
-            .into_iter()
-            .map(|item| item.value.map(|v| v.value))
-            .collect();
+        let values: Vec<_> =
+            ins.parameters.expect("parameters").items.into_iter().map(|item| item.value.map(|v| v.value)).collect();
         assert_eq!(values, [Some("IsAttacking"), Some("1")]);
     }
 

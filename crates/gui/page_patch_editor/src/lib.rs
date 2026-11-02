@@ -10,7 +10,10 @@ mod crc;
 mod patch;
 
 use egui_widgets::{notify::Notification, shadcn::Button};
-use gui_shared::i18n::{I18nKey, I18nMap};
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::{pages, ui},
+};
 
 use self::{crc::CrcTool, patch::PatchTool};
 
@@ -23,9 +26,9 @@ pub struct PatchEditorPageCtx<'a> {
     /// `settings.behavior.template_dir`: the templates the patch tool lists.
     pub template_dir: &'a str,
     /// Persisted page state (`settings.patch_editor`).
-    pub settings: &'a mut gui_shared::settings::patch_editor::PatchEditorSettings,
+    pub settings: &'a mut pages::patch_editor::PatchEditorSettings,
     /// Editor settings shared with the hkanno editor: Normal / Vim keys, language features.
-    pub editor: &'a mut gui_shared::settings::hkanno::HkannoSettings,
+    pub editor: &'a mut ui::editor::LspOptions,
     /// Frame (background) of the page's panels, from the app theme.
     pub panel_frame: egui::Frame,
 }
@@ -53,9 +56,7 @@ impl PatchEditorPage {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
             ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
             ui.horizontal(|ui| {
-                for (tool, label) in
-                    [(Tool::Patch, I18nKey::NemesisPatchTab), (Tool::Crc, I18nKey::NemesisCrcTab)]
-                {
+                for (tool, label) in [(Tool::Patch, I18nKey::NemesisPatchTab), (Tool::Crc, I18nKey::NemesisCrcTab)] {
                     if ui.add(Button::selectable(self.tool == tool, i18n.t(label))).clicked() {
                         self.tool = tool;
                     }

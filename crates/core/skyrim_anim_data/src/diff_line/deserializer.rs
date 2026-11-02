@@ -48,29 +48,17 @@ struct Deserializer<'a> {
 
 impl<'de> Deserializer<'de> {
     const fn new(input: &'de str, priority: usize) -> Self {
-        Self {
-            input,
-            original: input,
-            output_patches: DiffLines::DEFAULT,
-            current: CurrentState::new(),
-            priority,
-        }
+        Self { input, original: input, output_patches: DiffLines::DEFAULT, current: CurrentState::new(), priority }
     }
 
-    fn parse_next<O>(
-        &mut self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
     /// Parse by argument parser no consume.
     ///
     /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::Context { err })?;
         Ok(res)
     }
@@ -82,17 +70,11 @@ impl<'de> Deserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::Context { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::Context { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::Readable { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::Readable { source: readable }
@@ -109,8 +91,7 @@ impl<'de> Deserializer<'de> {
             if diff_start {
                 self.current.set_range_start(start_index)?;
             }
-            let one_line =
-                self.parse_next(one_line.context(Expected(Description("one line: Str"))))?;
+            let one_line = self.parse_next(one_line.context(Expected(Description("one line: Str"))))?;
             if self.current.mode_code.is_some() {
                 self.current.push_one_line(one_line)?;
             }

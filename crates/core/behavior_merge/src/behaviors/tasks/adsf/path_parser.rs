@@ -140,8 +140,7 @@ pub(crate) struct ParsedAdsfPatchPath<'a> {
 /// Returns [`ParseError`] when the path does not contain the required ADSF
 /// structure or when the Nemesis mod ID cannot be extracted.
 pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<'a>, ParseError> {
-    let components: Vec<&'a str> =
-        path.components().filter_map(|component| component.as_os_str().to_str()).collect();
+    let components: Vec<&'a str> = path.components().filter_map(|component| component.as_os_str().to_str()).collect();
 
     let anim_data_index = components
         .iter()
@@ -152,8 +151,7 @@ pub(crate) fn parse_adsf_path<'a>(path: &'a Path) -> Result<ParsedAdsfPatchPath<
         return Err(ParseError::TooShortPathFormat { path: path.to_path_buf() });
     }
 
-    let path_str =
-        path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
+    let path_str = path.to_str().ok_or_else(|| ParseError::NonUtf8Path { path: path.to_path_buf() })?;
 
     let id = get_nemesis_id(path_str)?;
 
@@ -253,9 +251,7 @@ mod tests {
 
     #[test]
     fn test_txt_project_header_add() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/$header$/$header$.txt",
-        );
+        let parsed = parse("/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/$header$/$header$.txt");
 
         assert_eq!(
             parsed,
@@ -269,9 +265,7 @@ mod tests {
 
     #[test]
     fn test_anim_header_add() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultMale~3/$header$.txt",
-        );
+        let parsed = parse("/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/DefaultMale~3/$header$.txt");
 
         assert_eq!(
             parsed,
@@ -285,9 +279,8 @@ mod tests {
 
     #[test]
     fn test_anim_add() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/RunForward~slide$2.txt",
-        );
+        let parsed =
+            parse("/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/RunForward~slide$2.txt");
 
         assert_eq!(
             parsed,
@@ -301,9 +294,7 @@ mod tests {
 
     #[test]
     fn test_anim_indexed() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/Jump~42.txt",
-        );
+        let parsed = parse("/some/mods/Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/Jump~42.txt");
 
         assert_eq!(
             parsed,
@@ -317,9 +308,8 @@ mod tests {
 
     #[test]
     fn test_tk_dodge_indexed_anim() {
-        let parsed = parse(
-            "/some/mods/Nemesis_Engine/mod/tkds/animationdatasinglefile/FirstPerson~1/TKDodgeRight~348.txt",
-        );
+        let parsed =
+            parse("/some/mods/Nemesis_Engine/mod/tkds/animationdatasinglefile/FirstPerson~1/TKDodgeRight~348.txt");
 
         assert_eq!(
             parsed,
@@ -333,8 +323,7 @@ mod tests {
 
     #[test]
     fn test_motion_add() {
-        let parsed =
-            parse("Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/slide$10.txt");
+        let parsed = parse("Nemesis_Engine/mod/slide/animationdatasinglefile/Default~1/slide$10.txt");
 
         assert_eq!(
             parsed,
@@ -362,18 +351,15 @@ mod tests {
 
     #[test]
     fn test_invalid_missing_animationdatasinglefile() {
-        let err = parse_adsf_path(Path::new("Nemesis_Engine/mod/slide/invalid_path/file.txt"))
-            .unwrap_err();
+        let err = parse_adsf_path(Path::new("Nemesis_Engine/mod/slide/invalid_path/file.txt")).unwrap_err();
 
         assert!(matches!(err, ParseError::MissingAnimationData { .. }));
     }
 
     #[test]
     fn test_invalid_target_format() {
-        let err = parse_adsf_path(Path::new(
-            "Nemesis_Engine/mod/slide/animationdatasinglefile/BadTarget/file.txt",
-        ))
-        .unwrap_err();
+        let err = parse_adsf_path(Path::new("Nemesis_Engine/mod/slide/animationdatasinglefile/BadTarget/file.txt"))
+            .unwrap_err();
 
         assert!(matches!(err, ParseError::SplitTilde { .. }));
     }

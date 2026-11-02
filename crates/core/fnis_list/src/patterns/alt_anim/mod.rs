@@ -4,8 +4,7 @@ pub mod one_line;
 use winnow::{ModalResult, Parser, combinator::repeat, error::StrContext};
 
 use crate::patterns::alt_anim::one_line::{
-    AASet, AnimTrigger, parse_alt_anim_prefix_line, parse_alt_anim_set_line,
-    parse_alt_anim_trigger_line,
+    AASet, AnimTrigger, parse_alt_anim_prefix_line, parse_alt_anim_set_line, parse_alt_anim_trigger_line,
 };
 
 /// FNIS Alternate Animation
@@ -16,17 +15,11 @@ pub struct AlternateAnimation<'a> {
     pub trigger: Vec<AnimTrigger<'a>>,
 }
 
-pub(crate) fn parse_alternate_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<AlternateAnimation<'a>> {
-    parse_furniture_animations_inner
-        .context(StrContext::Label("Alterative Animation"))
-        .parse_next(input)
+pub(crate) fn parse_alternate_animation<'a>(input: &mut &'a str) -> ModalResult<AlternateAnimation<'a>> {
+    parse_furniture_animations_inner.context(StrContext::Label("Alterative Animation")).parse_next(input)
 }
 
-fn parse_furniture_animations_inner<'a>(
-    input: &mut &'a str,
-) -> ModalResult<AlternateAnimation<'a>> {
+fn parse_furniture_animations_inner<'a>(input: &mut &'a str) -> ModalResult<AlternateAnimation<'a>> {
     let prefix = parse_alt_anim_prefix_line.parse_next(input)?;
     let set = repeat(1.., parse_alt_anim_set_line).parse_next(input)?;
     let trigger = repeat(0.., parse_alt_anim_trigger_line).parse_next(input)?;

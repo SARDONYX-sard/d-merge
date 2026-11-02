@@ -11,9 +11,8 @@ use simd_json::json_typed;
 use crate::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        JsonPatchPairs, furniture::one_anim::new_push_values_seq_patch,
-        global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5222, kill_move::calculate_hash,
-        new_push_events_seq_patch,
+        JsonPatchPairs, furniture::one_anim::new_push_values_seq_patch, global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5222,
+        kill_move::calculate_hash, new_push_events_seq_patch,
     },
 };
 
@@ -27,8 +26,7 @@ pub(super) fn new_chair_patches<'a>(
     chair: &FNISChairAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 19] =
-        core::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [String; 19] = core::array::from_fn(|_| owned_data.next_class_name_attribute());
 
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
@@ -61,8 +59,7 @@ pub(super) fn new_chair_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map =
-        dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
+    let class_index_to_anim_object_map = dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
     one_patches.extend(start_animation.anim_objects.iter().enumerate().map(|(index, name)| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
         class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
@@ -108,11 +105,7 @@ pub(super) fn new_chair_patches<'a>(
     ));
 
     // $RI+1
-    one_patches.push(new_event_property_array_ri1(
-        &class_indexes[1],
-        &class_index_to_anim_object_map,
-        priority,
-    ));
+    one_patches.push(new_event_property_array_ri1(&class_indexes[1], &class_index_to_anim_object_map, priority));
 
     // $RI+2
     one_patches.push((
@@ -617,10 +610,7 @@ pub(super) fn new_chair_patches<'a>(
     seq_patches.push((
         json_path!["#1755", "hkbStateMachine", "states"],
         ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0]]),
-            },
+            patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, [class_indexes[0]]) },
             priority,
         },
     ));
@@ -645,10 +635,7 @@ fn new_event_property_array_ri1<'a>(
         .collect();
 
     (
-        vec![
-            Cow::Owned(class_index.to_string()),
-            Cow::Borrowed("hkbStateMachineEventPropertyArray"),
-        ],
+        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },

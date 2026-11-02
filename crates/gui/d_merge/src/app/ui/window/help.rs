@@ -7,7 +7,7 @@ use gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
     settings::{
-        support_pandora::{Pandora, PandoraVersion},
+        pages::patch::support_pandora::{Pandora, PandoraVersion},
         ui::FontMode,
     },
 };
@@ -33,8 +33,7 @@ impl App {
         // NOTE: `Window::open` holds `&mut bool` for the whole `show` call, which would conflict with
         // the closure capturing `&mut self`. `bool` is `Copy`, so go through a local.
         let mut open = true;
-        let size =
-            egui::vec2(self.settings.ui.window.width * 0.5, self.settings.ui.window.height * 0.85);
+        let size = egui::vec2(self.settings.ui.window.width * 0.8, self.settings.ui.window.height * 0.85);
 
         egui::Window::new(self.i18n.t(I18nKey::HelpButton))
             .open(&mut open)
@@ -114,12 +113,7 @@ impl App {
             (
                 self.i18n.t(I18nKey::LicenseLabel),
                 env!("CARGO_PKG_LICENSE"),
-                Some(concat!(
-                    env!("CARGO_PKG_REPOSITORY"),
-                    "/blob/",
-                    env!("CARGO_PKG_VERSION"),
-                    "/LICENSE"
-                )),
+                Some(concat!(env!("CARGO_PKG_REPOSITORY"), "/blob/", env!("CARGO_PKG_VERSION"), "/LICENSE")),
             ),
             (self.i18n.t(I18nKey::AuthorLabel), env!("CARGO_PKG_AUTHORS"), None),
         ];
@@ -144,22 +138,17 @@ impl App {
                 .on_hover_text(self.i18n.t(I18nKey::IssueReportHover))
                 .clicked()
             {
-                ui.ctx().open_url(egui::OpenUrl {
-                    url: self.settings.create_issue_link(),
-                    new_tab: true,
-                });
+                ui.ctx().open_url(egui::OpenUrl { url: self.settings.pages.patch.create_issue_link(), new_tab: true });
             }
 
             const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
-            ui.hyperlink_to(self.i18n.t(I18nKey::BugReportSeeIssues), ISSUE_URL)
-                .on_hover_text(ISSUE_URL);
+            ui.hyperlink_to(self.i18n.t(I18nKey::BugReportSeeIssues), ISSUE_URL).on_hover_text(ISSUE_URL);
         });
     }
 
     fn ui_font_section(&mut self, ui: &mut egui::Ui) {
         egui::Grid::new("font_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
-            ui.label(self.i18n.t(I18nKey::FontModeLabel))
-                .on_hover_text(self.i18n.t(I18nKey::FontModeHover));
+            ui.label(self.i18n.t(I18nKey::FontModeLabel)).on_hover_text(self.i18n.t(I18nKey::FontModeHover));
             let modes = [
                 (FontMode::Default, self.i18n.t(I18nKey::FontModeDefault)),
                 (FontMode::System, self.i18n.t(I18nKey::FontModeSystem)),
@@ -167,9 +156,8 @@ impl App {
             ];
             let font_mode = &mut self.settings.ui.font.mode; // disjoint field from `self.i18n`
             let mut index = modes.iter().position(|(m, _)| m == font_mode).unwrap_or(0);
-            let mode_changed = ComboBox::from_id_salt("font_mode")
-                .show_index(ui, &mut index, modes.len(), |i| modes[i].1)
-                .changed();
+            let mode_changed =
+                ComboBox::from_id_salt("font_mode").show_index(ui, &mut index, modes.len(), |i| modes[i].1).changed();
             if mode_changed {
                 *font_mode = modes[index].0;
             }
@@ -189,9 +177,7 @@ impl App {
                     let name_changed = ComboBox::from_id_salt("font_family")
                         .width(ui.available_width())
                         .search_hint(format!("{}...", self.i18n.t(I18nKey::SearchLabel)))
-                        .show_index(ui, &mut index, fonts.len(), |i| {
-                            fonts.get(i).map_or("", String::as_str)
-                        })
+                        .show_index(ui, &mut index, fonts.len(), |i| fonts.get(i).map_or("", String::as_str))
                         .changed();
                     if name_changed {
                         name.clone_from(&fonts[index]);
@@ -250,12 +236,7 @@ impl App {
 
     fn ui_background_section(&mut self, ui: &mut egui::Ui) {
         egui::Grid::new("background_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
-            if path_row(
-                ui,
-                &self.i18n,
-                &mut self.settings.ui.background_image.path,
-                &BACKGROUND_ROW,
-            ) {
+            if path_row(ui, &self.i18n, &mut self.settings.ui.background_image.path, &BACKGROUND_ROW) {
                 self.settings.ui.background_image.enabled = true;
                 self.reload_background(ui.ctx());
             }
@@ -269,53 +250,53 @@ impl App {
         });
     }
 
-    /// ```txt
     /// Pandora
-    /// Target version:      [ 4.4.0Beta ▼ ]
-    /// Import path: [ path    ] [Import]
-    /// Export path: [ path    ] [Export]
-    /// ```
+    /// Target version: [4.4.0Beta ▼]
+    /// output dir: [path] [Import] [Export]
     fn ui_pandora_section(&mut self, ui: &mut egui::Ui) {
         egui::Grid::new("pandora_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
-            ui.label(self.i18n.t(I18nKey::PandoraTargetVersionLabel))
-                .on_hover_text(self.i18n.t(I18nKey::PandoraTargetVersionHover));
-            let versions = [PandoraVersion::V4_4_0Beta];
-            let version = &mut self.settings.pandora.version;
-            let mut index = versions.iter().position(|v| v == version).unwrap_or(0);
-            if ComboBox::from_id_salt("pandora_version")
-                .show_index(ui, &mut index, versions.len(), |i| versions[i].to_static_str())
-                .changed()
             {
-                *version = versions[index];
+                ui.label(self.i18n.t(I18nKey::PandoraTargetVersionLabel))
+                    .on_hover_text(self.i18n.t(I18nKey::PandoraTargetVersionHover));
+
+                let versions = [PandoraVersion::V4_4_0Beta];
+                let version = &mut self.settings.pages.patch.pandora.version;
+                let mut index = versions.iter().position(|v| v == version).unwrap_or(0);
+
+                if ComboBox::from_id_salt("pandora_version")
+                    .show_index(ui, &mut index, versions.len(), |i| versions[i].to_static_str())
+                    .changed()
+                {
+                    *version = versions[index];
+                }
+                ui.end_row();
             }
+
+            ui.label(self.i18n.t(I18nKey::PandoraOutputDirLabel))
+                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover));
+
+            // NOTE: Right-to-left: buttons take their real width first, the text edit gets the rest.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                if ui
+                    .add(Button::new(self.i18n.t(I18nKey::PandoraExportLabel)))
+                    .on_hover_text(self.i18n.t(I18nKey::PandoraExportHover))
+                    .clicked()
+                {
+                    self.export_pandora();
+                }
+
+                if ui
+                    .add(Button::new(self.i18n.t(I18nKey::PandoraImportLabel)))
+                    .on_hover_text(self.i18n.t(I18nKey::PandoraImportHover))
+                    .clicked()
+                {
+                    self.import_pandora();
+                }
+
+                let width = ui.available_width();
+                ui.add(TextEdit::singleline(&mut self.settings.pages.patch.pandora.output_dir).desired_width(width));
+            });
             ui.end_row();
-
-            if folder_action_row(
-                ui,
-                &self.i18n,
-                &mut self.settings.pandora.import_path,
-                [
-                    I18nKey::PandoraImportPathLabel,
-                    I18nKey::PandoraImportLabel,
-                    I18nKey::PandoraImportHover,
-                ],
-            ) {
-                self.import_pandora();
-            }
-
-            // Fixed: the old code opened `import_path` from the *export* label button.
-            if folder_action_row(
-                ui,
-                &self.i18n,
-                &mut self.settings.pandora.export_path,
-                [
-                    I18nKey::PandoraExportPathLabel,
-                    I18nKey::PandoraExportLabel,
-                    I18nKey::PandoraExportHover,
-                ],
-            ) {
-                self.export_pandora();
-            }
         });
     }
 
@@ -337,9 +318,7 @@ impl App {
 
     fn reload_log(&mut self) {
         let dir = Path::new(self.settings.log.dir_path.as_str());
-        if let Err(err) =
-            tracing_rotation::global::change_log_path(dir, gui_shared::log::LOG_FILENAME)
-        {
+        if let Err(err) = tracing_rotation::global::change_log_path(dir, gui_shared::log::LOG_FILENAME) {
             tracing::error!(%err);
             self.notify.error(format!("Failed to reload log: {err}"));
         } else {
@@ -383,8 +362,8 @@ impl App {
     }
 
     fn import_pandora(&mut self) {
-        let path = self.settings.pandora.import_path.clone();
-        let version = self.settings.pandora.version;
+        let path = self.settings.pages.patch.pandora.output_dir.clone();
+        let version = self.settings.pages.patch.pandora.version;
         match Pandora::import_to(&path, &mut self.settings, version) {
             Ok(()) => {
                 self.notify.success(format!("Imported Pandora settings from {path}"));
@@ -394,9 +373,9 @@ impl App {
     }
 
     fn export_pandora(&mut self) {
-        let path = self.settings.pandora.export_path.clone();
-        let version = self.settings.pandora.version;
-        match Pandora::export_from(&path, &self.settings, version) {
+        let path = &self.settings.pages.patch.pandora.output_dir;
+        let version = self.settings.pages.patch.pandora.version;
+        match Pandora::export_from(path, &self.settings, version) {
             Ok(()) => {
                 self.notify.success(format!("Exported Pandora settings to {path}"));
             }
@@ -420,17 +399,10 @@ struct PathRow {
 const FONT_ROW: PathRow = PathRow {
     label: I18nKey::FontFileLabel,
     reload_hover: I18nKey::FontReloadHover,
-    picker: Picker::File {
-        filter: "font",
-        exts: &["ttc", "ttf", "tto"],
-        fallback_dir: "C:/Windows/Fonts",
-    },
+    picker: Picker::File { filter: "font", exts: &["ttc", "ttf", "tto"], fallback_dir: "C:/Windows/Fonts" },
 };
-const LOG_ROW: PathRow = PathRow {
-    label: I18nKey::LogDirPathLabel,
-    reload_hover: I18nKey::LogReloadHover,
-    picker: Picker::Folder,
-};
+const LOG_ROW: PathRow =
+    PathRow { label: I18nKey::LogDirPathLabel, reload_hover: I18nKey::LogReloadHover, picker: Picker::Folder };
 const I18N_ROW: PathRow = PathRow {
     label: I18nKey::I18nPathLabel,
     reload_hover: I18nKey::I18nReloadJsonHover,
@@ -453,17 +425,12 @@ fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow
                 .set_directory(start_dir(current, fallback_dir, false))
                 .add_filter(*filter, exts)
                 .pick_file(),
-            Picker::Folder => {
-                rfd::FileDialog::new().set_directory(start_dir(current, ".", true)).pick_folder()
-            }
+            Picker::Folder => rfd::FileDialog::new().set_directory(start_dir(current, ".", true)).pick_folder(),
         };
         picked.map(|p| p.display().to_string())
     }
 
-    if ui
-        .add(Button::new(i18n.t(row.label)))
-        .on_hover_text(i18n.t(I18nKey::OpenSelectedPathHover))
-        .clicked()
+    if ui.add(Button::new(i18n.t(row.label))).on_hover_text(i18n.t(I18nKey::OpenSelectedPathHover)).clicked()
         && let Err(err) = open_existing_dir_or_ancestor(Path::new(value.as_str()))
     {
         tracing::error!(err);
@@ -477,11 +444,7 @@ fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow
             value.clear();
         }
 
-        if ui
-            .add(Button::new(i18n.t(I18nKey::ReloadButton)))
-            .on_hover_text(i18n.t(row.reload_hover))
-            .clicked()
-        {
+        if ui.add(Button::new(i18n.t(I18nKey::ReloadButton))).on_hover_text(i18n.t(row.reload_hover)).clicked() {
             reload = true;
         }
 
@@ -499,49 +462,11 @@ fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow
     reload
 }
 
-/// `[label][ text edit ][Action]`. Returns `true` when a folder was picked.
-fn folder_action_row(
-    ui: &mut egui::Ui,
-    i18n: &I18nMap,
-    path: &mut String,
-    [label, action, action_hover]: [I18nKey; 3],
-) -> bool {
-    if ui
-        .add(Button::new(i18n.t(label)))
-        .on_hover_text(i18n.t(I18nKey::OpenSelectedPathHover))
-        .clicked()
-        && let Err(err) = open_existing_dir_or_ancestor(Path::new(path.as_str()))
-    {
-        tracing::error!(err);
-    }
-
-    let mut picked = false;
-
-    // Right-to-left: see `path_row`.
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-        if ui.add(Button::new(i18n.t(action))).on_hover_text(i18n.t(action_hover)).clicked()
-            && let Some(dir) = rfd::FileDialog::new().set_directory(path.as_str()).pick_folder()
-        {
-            *path = dir.display().to_string();
-            picked = true;
-        }
-
-        let width = ui.available_width();
-        ui.add(TextEdit::singleline(path).desired_width(width));
-    });
-
-    ui.end_row();
-    picked
-}
-
 /// IMPORTANT: Without canonicalizing, rfd cannot set the directory correctly.
 fn start_dir(current: &str, fallback: &str, current_is_dir: bool) -> PathBuf {
     let path = Path::new(current);
     let base = if current_is_dir { Some(path) } else { path.parent() };
-    base.map_or_else(
-        || PathBuf::from(fallback),
-        |p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()),
-    )
+    base.map_or_else(|| PathBuf::from(fallback), |p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
 }
 
 /// Draws the dimmed backdrop; the returned response tells whether it was clicked.

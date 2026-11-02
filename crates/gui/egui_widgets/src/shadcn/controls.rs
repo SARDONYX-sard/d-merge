@@ -50,8 +50,7 @@ impl egui::Widget for Checkbox<'_> {
             .get(&egui::TextStyle::Button)
             .cloned()
             .unwrap_or_else(|| egui::FontId::proportional(14.0));
-        let galley =
-            ui.painter().layout_no_wrap(text.text().to_owned(), label_font, theme.foreground);
+        let galley = ui.painter().layout_no_wrap(text.text().to_owned(), label_font, theme.foreground);
 
         let row_height = ui.spacing().interact_size.y.max(box_size);
         let desired = egui::vec2(box_size + galley.size().x + spacing, row_height);
@@ -87,12 +86,7 @@ impl egui::Widget for Checkbox<'_> {
 
             let cr = egui::CornerRadius::same(corner_radius as u8);
             painter.rect_filled(box_rect, cr, box_bg);
-            painter.rect_stroke(
-                box_rect,
-                cr,
-                egui::Stroke::new(1.0_f32, box_border),
-                egui::epaint::StrokeKind::Inside,
-            );
+            painter.rect_stroke(box_rect, cr, egui::Stroke::new(1.0_f32, box_border), egui::epaint::StrokeKind::Inside);
 
             if indeterminate {
                 // e.g., a directory whose files are only partly checked.
@@ -114,8 +108,7 @@ impl egui::Widget for Checkbox<'_> {
                 painter.add(egui::Shape::line(points, egui::Stroke::new(2.0_f32, check_color)));
             }
 
-            let text_pos =
-                egui::pos2(box_rect.max.x + spacing, rect.center().y - galley.size().y / 2.0);
+            let text_pos = egui::pos2(box_rect.max.x + spacing, rect.center().y - galley.size().y / 2.0);
             painter.galley(text_pos, galley, theme.foreground);
 
             if response.has_focus() {
@@ -167,14 +160,13 @@ impl egui::Widget for RadioButton {
         let anim_t = ui.ctx().animate_bool_responsive(response.id, checked);
 
         if ui.is_rect_visible(rect) {
-            let circle_border =
-                if response.is_pointer_button_down_on() || (!checked && response.hovered()) {
-                    theme.ring
-                } else if checked {
-                    theme.primary
-                } else {
-                    theme.input // Nova: border-input instead of border
-                };
+            let circle_border = if response.is_pointer_button_down_on() || (!checked && response.hovered()) {
+                theme.ring
+            } else if checked {
+                theme.primary
+            } else {
+                theme.input // Nova: border-input instead of border
+            };
 
             let painter = ui.painter();
             let center = egui::pos2(rect.min.x + outer_radius, rect.center().y);
@@ -186,15 +178,12 @@ impl egui::Widget for RadioButton {
                 painter.circle_filled(center, inner_radius * anim_t, theme.primary);
             }
 
-            let text_pos = egui::pos2(
-                rect.min.x + outer_radius * 2.0 + spacing,
-                rect.center().y - galley.size().y / 2.0,
-            );
+            let text_pos =
+                egui::pos2(rect.min.x + outer_radius * 2.0 + spacing, rect.center().y - galley.size().y / 2.0);
             painter.galley(text_pos, galley, theme.foreground);
 
             if response.has_focus() {
-                let ring_rect =
-                    egui::Rect::from_center_size(center, egui::Vec2::splat(outer_radius * 2.0));
+                let ring_rect = egui::Rect::from_center_size(center, egui::Vec2::splat(outer_radius * 2.0));
                 paint_focus_ring(painter, ring_rect, outer_radius, theme.ring);
             }
         }
@@ -241,9 +230,7 @@ impl ToggleGroup {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
                     for i in 0..len {
-                        if toggle_group_item(ui, &theme, i == *selected, get(i)).clicked()
-                            && *selected != i
-                        {
+                        if toggle_group_item(ui, &theme, i == *selected, get(i)).clicked() && *selected != i {
                             *selected = i;
                             changed = true;
                         }
@@ -332,10 +319,7 @@ impl std::fmt::Debug for Slider<'_> {
 }
 
 impl<'a> Slider<'a> {
-    pub fn new<Num: egui::emath::Numeric>(
-        value: &'a mut Num,
-        range: std::ops::RangeInclusive<Num>,
-    ) -> Self {
+    pub fn new<Num: egui::emath::Numeric>(value: &'a mut Num, range: std::ops::RangeInclusive<Num>) -> Self {
         let get_set_value = move |v: Option<f64>| {
             if let Some(v) = v {
                 *value = Num::from_f64(v);
@@ -411,10 +395,8 @@ impl egui::Widget for Slider<'_> {
             let total_height = handle_radius * 2.0 + 4.0;
             let width = self.width.unwrap_or_else(|| ui.available_width().min(200.0));
 
-            let (rect, mut response) = ui.allocate_exact_size(
-                egui::vec2(width, total_height),
-                egui::Sense::click_and_drag(),
-            );
+            let (rect, mut response) =
+                ui.allocate_exact_size(egui::vec2(width, total_height), egui::Sense::click_and_drag());
 
             let (start, end) = (*self.range.start(), *self.range.end());
             let span = end - start;
@@ -462,17 +444,11 @@ impl egui::Widget for Slider<'_> {
                 // Handle (Nova: border-ring on thumb)
                 let handle_center = egui::pos2(handle_x, track_y);
                 painter.circle_filled(handle_center, handle_radius, theme.background);
-                painter.circle_stroke(
-                    handle_center,
-                    handle_radius,
-                    egui::Stroke::new(2.0_f32, theme.ring),
-                );
+                painter.circle_stroke(handle_center, handle_radius, egui::Stroke::new(2.0_f32, theme.ring));
 
                 if response.has_focus() {
-                    let handle_rect = egui::Rect::from_center_size(
-                        handle_center,
-                        egui::Vec2::splat(handle_radius * 2.0),
-                    );
+                    let handle_rect =
+                        egui::Rect::from_center_size(handle_center, egui::Vec2::splat(handle_radius * 2.0));
                     paint_focus_ring(painter, handle_rect, handle_radius, theme.ring);
                 }
             }

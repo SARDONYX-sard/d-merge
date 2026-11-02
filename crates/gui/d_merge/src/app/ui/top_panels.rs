@@ -7,7 +7,7 @@ use gui_shared::{
     i18n::I18nKey,
     settings::{
         DataMode,
-        behavior::ParserMode,
+        pages::patch::behavior::ParserMode,
         ui::theme::{CustomTheme, Theme},
     },
 };
@@ -52,20 +52,16 @@ impl App {
         ui.add_enabled_ui(!is_fetching, |ui| {
             let items = [
                 (DataMode::Vfs, self.i18n.t(I18nKey::VfsMode), self.i18n.t(I18nKey::VfsModeHover)),
-                (
-                    DataMode::Manual,
-                    self.i18n.t(I18nKey::ManualMode),
-                    self.i18n.t(I18nKey::ManualModeHover),
-                ),
+                (DataMode::Manual, self.i18n.t(I18nKey::ManualMode), self.i18n.t(I18nKey::ManualModeHover)),
             ];
 
             for (mode, label, hover) in items {
                 if ui
-                    .add(RadioButton::new(self.settings.behavior.mode == mode, label))
+                    .add(RadioButton::new(self.settings.pages.patch.behavior.mode == mode, label))
                     .on_hover_text(hover)
                     .clicked()
                 {
-                    self.settings.behavior.mode = mode;
+                    self.settings.pages.patch.behavior.mode = mode;
                     self.update_mod_list();
                 }
             }
@@ -100,7 +96,7 @@ impl App {
                 make_runtimes()
             };
 
-            let runtime = &mut self.settings.behavior.target_runtime;
+            let runtime = &mut self.settings.pages.patch.behavior.target_runtime;
             let mut index = RUNTIMES.iter().position(|(r, _)| r == runtime).unwrap_or(0);
             if ComboBox::from_id_salt("target_runtime")
                 .width(100.0)
@@ -109,7 +105,7 @@ impl App {
             {
                 *runtime = RUNTIMES[index].0;
 
-                if self.settings.behavior.mode == DataMode::Vfs {
+                if self.settings.pages.patch.behavior.mode == DataMode::Vfs {
                     #[cfg(target_os = "windows")]
                     self.update_vfs_skyrim_data_dir_by_reg();
                 }
@@ -119,14 +115,13 @@ impl App {
 
     fn ui_parser_mode(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_top(|ui| {
-            ui.label(self.i18n.t(I18nKey::ParserModeLabel))
-                .on_hover_text(self.i18n.t(I18nKey::ParserModeHover));
+            ui.label(self.i18n.t(I18nKey::ParserModeLabel)).on_hover_text(self.i18n.t(I18nKey::ParserModeHover));
 
             let modes = [
                 (ParserMode::Strict, self.i18n.t(I18nKey::ParserModeStrict)),
                 (ParserMode::Lenient, self.i18n.t(I18nKey::ParserModeLenient)),
             ];
-            let parser_mode = &mut self.settings.behavior.parser_mode;
+            let parser_mode = &mut self.settings.pages.patch.behavior.parser_mode;
             let mut index = modes.iter().position(|(m, _)| m == parser_mode).unwrap_or(0);
             if ComboBox::from_id_salt("parser_mode")
                 .width(100.0)
@@ -142,26 +137,22 @@ impl App {
     fn ui_behavior_options(&mut self, ui: &mut egui::Ui) {
         for (value, label, hover) in [
             (
-                &mut self.settings.behavior.enable_debug_output,
+                &mut self.settings.pages.patch.behavior.enable_debug_output,
                 I18nKey::DebugOutput,
                 I18nKey::DebugOutputHover,
             ),
             (
-                &mut self.settings.behavior.auto_remove_meshes,
+                &mut self.settings.pages.patch.behavior.auto_remove_meshes,
                 I18nKey::AutoRemoveMeshes,
                 I18nKey::AutoRemoveMeshesHover,
             ),
             (
-                &mut self.settings.behavior.generate_fnis_esp,
+                &mut self.settings.pages.patch.behavior.generate_fnis_esp,
                 I18nKey::GenerateFnisEspLabel,
                 I18nKey::GenerateFnisEspHover,
             ),
-            (
-                &mut self.settings.behavior.skeleton_arm_fix,
-                I18nKey::ArmFixLabel,
-                I18nKey::ArmFixHover,
-            ),
-            (&mut self.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
+            (&mut self.settings.pages.patch.behavior.skeleton_arm_fix, I18nKey::ArmFixLabel, I18nKey::ArmFixHover),
+            (&mut self.settings.pages.patch.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
         ] {
             ui.add(Checkbox::new(value, self.i18n.t(label))).on_hover_text(self.i18n.t(hover));
         }
@@ -172,8 +163,7 @@ impl App {
     /// Shown in the page bar (see `router`), so the theme can be changed on every page.
     pub(crate) fn ui_theme_box(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_top(|ui| {
-            ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel)))
-                .on_hover_text(self.i18n.t(I18nKey::ThemeHover));
+            ui.add(Label::new(self.i18n.t(I18nKey::ThemeLabel))).on_hover_text(self.i18n.t(I18nKey::ThemeHover));
 
             let themes: [(Theme, &str); 4] = [
                 (Theme::System, self.i18n.t(I18nKey::ThemeSelectSystem)),
@@ -198,10 +188,8 @@ impl App {
 
     fn ui_bg_color_picker(&mut self, ui: &mut egui::Ui) {
         if matches!(self.settings.ui.theme, Theme::Custom) {
-            let button =
-                Button::selectable(self.show_theme_editor, self.i18n.t(I18nKey::ThemeEditorButton));
-            if ui.add(button).on_hover_text(self.i18n.t(I18nKey::ThemeEditorButtonHover)).clicked()
-            {
+            let button = Button::selectable(self.show_theme_editor, self.i18n.t(I18nKey::ThemeEditorButton));
+            if ui.add(button).on_hover_text(self.i18n.t(I18nKey::ThemeEditorButtonHover)).clicked() {
                 self.show_theme_editor ^= true;
             }
         }
@@ -253,14 +241,10 @@ impl App {
     fn ui_skyrim_dir_row(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui
-                .add_sized(
-                    [LABEL_WIDTH, BUTTON_HEIGHT],
-                    Button::new(self.i18n.t(I18nKey::SkyrimDataDirLabel)),
-                )
+                .add_sized([LABEL_WIDTH, BUTTON_HEIGHT], Button::new(self.i18n.t(I18nKey::SkyrimDataDirLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
-                && let Err(err) =
-                    open_existing_dir_or_ancestor(self.settings.current_skyrim_data_dir())
+                && let Err(err) = open_existing_dir_or_ancestor(self.settings.pages.patch.current_skyrim_data_dir())
             {
                 self.notify.error(err);
             }
@@ -271,34 +255,29 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        Button::new(self.i18n.t(I18nKey::SelectButton))
-                            .icon(Icon::FolderSearch)
-                            .full_width(),
+                        Button::new(self.i18n.t(I18nKey::SelectButton)).icon(Icon::FolderSearch).full_width(),
                     )
                     .clicked()
                 {
-                    let dialog = match find_existing_dir_or_ancestor(
-                        self.settings.current_skyrim_data_dir(),
-                    ) {
-                        Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
-                        Err(_) => rfd::FileDialog::new(),
-                    };
+                    let dialog =
+                        match find_existing_dir_or_ancestor(self.settings.pages.patch.current_skyrim_data_dir()) {
+                            Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
+                            Err(_) => rfd::FileDialog::new(),
+                        };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        *self.settings.current_skyrim_data_dir_mut() = dir.display().to_string();
+                        *self.settings.pages.patch.current_skyrim_data_dir_mut() = dir.display().to_string();
                         self.update_mod_list();
                     }
                 }
 
                 #[cfg(target_os = "windows")]
                 {
-                    if self.settings.behavior.mode == DataMode::Vfs {
+                    if self.settings.pages.patch.behavior.mode == DataMode::Vfs {
                         if ui
                             .add_sized(
                                 [BUTTON_WIDTH, BUTTON_HEIGHT],
-                                Button::new(self.i18n.t(I18nKey::AutoDetectButton))
-                                    .icon(Icon::ScanSearch)
-                                    .full_width(),
+                                Button::new(self.i18n.t(I18nKey::AutoDetectButton)).icon(Icon::ScanSearch).full_width(),
                             )
                             .on_hover_text(self.i18n.t(I18nKey::AutoDetectHover))
                             .clicked()
@@ -315,21 +294,19 @@ impl App {
                     ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
                 }
 
-                let response = match self.settings.behavior.mode {
+                let response = match self.settings.pages.patch.behavior.mode {
                     DataMode::Vfs => {
-                        if self.is_first_render
-                            && self.settings.vfs.skyrim_data_dir.trim().is_empty()
-                        {
+                        if self.is_first_render && self.settings.pages.patch.vfs.skyrim_data_dir.trim().is_empty() {
                             self.update_vfs_skyrim_data_dir_by_reg();
                             return;
                         }
 
-                        path_text_edit(ui, &mut self.settings.vfs.skyrim_data_dir, None)
+                        path_text_edit(ui, &mut self.settings.pages.patch.vfs.skyrim_data_dir, None)
                     }
 
                     DataMode::Manual => path_text_edit(
                         ui,
-                        &mut self.settings.manual.skyrim_data_dir,
+                        &mut self.settings.pages.patch.manual.skyrim_data_dir,
                         Some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
                     ),
                 };
@@ -351,15 +328,11 @@ impl App {
     fn ui_output_dir_row(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui
-                .add_sized(
-                    [LABEL_WIDTH, BUTTON_HEIGHT],
-                    Button::new(self.i18n.t(I18nKey::OutputDirLabel)),
-                )
+                .add_sized([LABEL_WIDTH, BUTTON_HEIGHT], Button::new(self.i18n.t(I18nKey::OutputDirLabel)))
                 .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover))
                 .clicked()
-                && let Err(err) = open_existing_dir_or_ancestor(std::path::Path::new(
-                    self.settings.current_output_dir(),
-                ))
+                && let Err(err) =
+                    open_existing_dir_or_ancestor(std::path::Path::new(self.settings.pages.patch.current_output_dir()))
             {
                 self.notify.error(err);
             }
@@ -370,33 +343,30 @@ impl App {
                 if ui
                     .add_sized(
                         [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        Button::new(self.i18n.t(I18nKey::SelectButton))
-                            .icon(Icon::FolderSearch)
-                            .full_width(),
+                        Button::new(self.i18n.t(I18nKey::SelectButton)).icon(Icon::FolderSearch).full_width(),
                     )
                     .clicked()
                 {
-                    let dialog = if self.settings.current_output_dir().is_empty() {
+                    let dialog = if self.settings.pages.patch.current_output_dir().is_empty() {
                         rfd::FileDialog::new()
                     } else {
-                        match find_existing_dir_or_ancestor(self.settings.current_output_dir()) {
+                        match find_existing_dir_or_ancestor(self.settings.pages.patch.current_output_dir()) {
                             Ok(abs_path) => rfd::FileDialog::new().set_directory(abs_path),
                             Err(err) => {
-                                self.notify
-                                    .error(format!("Couldn't find output dir or ancestor: {err}"));
+                                self.notify.error(format!("Couldn't find output dir or ancestor: {err}"));
                                 return;
                             }
                         }
                     };
 
                     if let Some(dir) = dialog.pick_folder() {
-                        *self.settings.current_output_dir_mut() = dir.display().to_string();
+                        *self.settings.pages.patch.current_output_dir_mut() = dir.display().to_string();
                     }
                 }
 
                 ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
 
-                path_text_edit(ui, self.settings.current_output_dir_mut(), None);
+                path_text_edit(ui, self.settings.pages.patch.current_output_dir_mut(), None);
             });
         });
     }

@@ -112,10 +112,8 @@ impl<'a> Cursor<'a> {
     pub(crate) fn until(&mut self, stops: &[char]) -> Option<Field<&'a str>> {
         let (start_byte, start_col) = (self.byte, self.col);
         self.bump_while(|c| !stops.contains(&c));
-        (self.col > start_col).then(|| Field {
-            value: &self.line[start_byte..self.byte],
-            span: Span::new(start_col, self.col),
-        })
+        (self.col > start_col)
+            .then(|| Field { value: &self.line[start_byte..self.byte], span: Span::new(start_col, self.col) })
     }
 
     /// Consumes the rest of the line.

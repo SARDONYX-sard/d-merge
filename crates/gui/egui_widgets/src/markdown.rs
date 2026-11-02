@@ -99,12 +99,7 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
             if link.has_focus() {
                 // Links have no focus look of their own; keyboard users need to see it.
                 let stroke = ui.visuals().selection.stroke;
-                ui.painter().rect_stroke(
-                    link.rect.expand(1.0),
-                    2.0,
-                    stroke,
-                    egui::StrokeKind::Outside,
-                );
+                ui.painter().rect_stroke(link.rect.expand(1.0), 2.0, stroke, egui::StrokeKind::Outside);
             }
             links.push(link);
             rest = after;

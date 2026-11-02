@@ -13,8 +13,7 @@ use crate::{
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead
 pub(crate) fn apply_remove<'a>(json: &mut Value<'a>, path: JsonPath<'a>) -> Result<()> {
-    remove(json, &path)
-        .ok_or_else(|| JsonPatchError::not_found_target_from(&path, Value::null()))?;
+    remove(json, &path).ok_or_else(|| JsonPatchError::not_found_target_from(&path, Value::null()))?;
     Ok(())
 }
 
@@ -161,10 +160,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Err(JsonPatchError::NotFoundTarget {
-                path: "missing".to_string(),
-                value: format!("{:#?}", Value::null()),
-            })
+            Err(JsonPatchError::NotFoundTarget { path: "missing".to_string(), value: format!("{:#?}", Value::null()) })
         );
     }
 }

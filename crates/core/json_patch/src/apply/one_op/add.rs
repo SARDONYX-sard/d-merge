@@ -13,11 +13,7 @@ use crate::{
 /// # Note
 /// - Support `Object` or `Array`
 /// - Unsupported range remove. use `apply_range` instead.
-pub(crate) fn apply_add<'value>(
-    json: &mut Value<'value>,
-    path: JsonPath<'value>,
-    value: Value<'value>,
-) -> Result<()> {
+pub(crate) fn apply_add<'value>(json: &mut Value<'value>, path: JsonPath<'value>, value: Value<'value>) -> Result<()> {
     if path.is_empty() {
         return Err(JsonPatchError::empty_pointer_from(&path, &value));
     }
@@ -32,9 +28,7 @@ pub(crate) fn apply_add<'value>(
                     return Ok(());
                 } else {
                     // Ensure the key exists, or create a new nested object
-                    target = map
-                        .entry(token.clone())
-                        .or_insert_with(|| Value::Object(Default::default()));
+                    target = map.entry(token.clone()).or_insert_with(|| Value::Object(Default::default()));
                 }
             }
             Value::Array(list) => {
@@ -73,13 +67,7 @@ pub(crate) fn apply_add<'value>(
                             ($n:ident, $try_exp:expr) => {
                                 match $try_exp {
                                     Ok(v) => *$n = v,
-                                    Err(err) => {
-                                        return Err(JsonPatchError::try_type_from(
-                                            err,
-                                            &[token],
-                                            &value,
-                                        ))
-                                    }
+                                    Err(err) => return Err(JsonPatchError::try_type_from(err, &[token], &value)),
                                 }
                             };
                         }
@@ -136,8 +124,7 @@ mod tests {
         });
 
         let value = Value::String(Cow::Borrowed("123 Main St"));
-        apply_add(&mut target, json_path!("user", "address"), value)
-            .unwrap_or_else(|err| panic!("{err}"));
+        apply_add(&mut target, json_path!("user", "address"), value).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["user"]["address"], "123 Main St");
     }
@@ -148,8 +135,7 @@ mod tests {
             "items": [1, 2, 3]
         });
         let value = Value::Static(StaticNode::U64(4));
-        apply_add(&mut target, json_path!("items", "3"), value)
-            .unwrap_or_else(|err| panic!("{err}"));
+        apply_add(&mut target, json_path!("items", "3"), value).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["items"][3], 4);
     }
@@ -163,8 +149,7 @@ mod tests {
         });
 
         let value = Value::Static(StaticNode::U64(4));
-        apply_add(&mut target, json_path!("data", "items", "3"), value)
-            .unwrap_or_else(|err| panic!("{err}"));
+        apply_add(&mut target, json_path!("data", "items", "3"), value).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(target["data"]["items"][3], 4);
     }

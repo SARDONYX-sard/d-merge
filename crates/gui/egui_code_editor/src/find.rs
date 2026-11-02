@@ -58,14 +58,7 @@ impl FindBar {
     /// Global keys. Call before the `TextEdit`. `editor_focus`: the editor has the keyboard.
     ///
     /// Only for [`Keymap::Normal`]: Vim uses these keys itself (e.g., `Ctrl+F` = page down).
-    pub(crate) fn handle_keys(
-        &mut self,
-        keymap: Keymap,
-        ui: &egui::Ui,
-        id: egui::Id,
-        text: &str,
-        editor_focus: bool,
-    ) {
+    pub(crate) fn handle_keys(&mut self, keymap: Keymap, ui: &egui::Ui, id: egui::Id, text: &str, editor_focus: bool) {
         if keymap != Keymap::Normal {
             self.open = None; // e.g., switched to Vim while the bar was open
             return;
@@ -166,9 +159,8 @@ impl FindBar {
         let chars: Vec<char> = text.chars().collect();
         let matcher = Matcher::new(&self.query);
         let total = matcher.as_ref().map_or(0, |m| m.count(&chars));
-        let current = self
-            .current_match(ui.ctx(), id, text)
-            .and_then(|range| matcher.as_ref()?.index_of(&chars, range.start));
+        let current =
+            self.current_match(ui.ctx(), id, text).and_then(|range| matcher.as_ref()?.index_of(&chars, range.start));
         let counter = match (total, current) {
             (0, _) if self.query.is_empty() => String::new(),
             (0, _) => "No results".to_string(),
@@ -184,8 +176,7 @@ impl FindBar {
             self.jump(ui.ctx(), id, text, !shift);
             self.focus_field = true;
         }
-        if ui.small_button("↑").on_hover_text("Previous match (Shift+Enter, Shift+F3)").clicked()
-        {
+        if ui.small_button("↑").on_hover_text("Previous match (Shift+Enter, Shift+F3)").clicked() {
             self.jump(ui.ctx(), id, text, false);
         }
         if ui.small_button("↓").on_hover_text("Next match (Enter, F3)").clicked() {
@@ -198,9 +189,7 @@ impl FindBar {
     fn goto_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
         let lines = text.split('\n').count();
         ui.label(format!("Go to line (1-{lines}):"));
-        let field = ui.add(
-            egui::TextEdit::singleline(&mut self.line).desired_width(60.0).id(id.with("goto_line")),
-        );
+        let field = ui.add(egui::TextEdit::singleline(&mut self.line).desired_width(60.0).id(id.with("goto_line")));
         self.take_focus(&field);
 
         let submitted = field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
@@ -217,13 +206,7 @@ impl FindBar {
     }
 
     /// `✖` button and `Esc` in the field: close and give the keyboard back to the editor.
-    fn close_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        id: egui::Id,
-        field: &egui::Response,
-        submitted: bool,
-    ) {
+    fn close_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, field: &egui::Response, submitted: bool) {
         let escape = field.lost_focus() && !submitted && ui.input(|i| i.key_pressed(Key::Escape));
         if ui.small_button("✖").on_hover_text("Close (Esc)").clicked() || escape {
             self.open = None;
@@ -262,8 +245,7 @@ impl FindBar {
     fn jump(&mut self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
         let Some(matcher) = Matcher::new(&self.query) else { return };
         let chars: Vec<char> = text.chars().collect();
-        let from =
-            self.current_match(ctx, id, text).or_else(|| selection(ctx, id)).map_or(0, |r| r.start);
+        let from = self.current_match(ctx, id, text).or_else(|| selection(ctx, id)).map_or(0, |r| r.start);
         if let Some(at) = find_from(&matcher, &chars, from, forward) {
             self.select(ctx, id, at..at + self.query.chars().count());
         }
@@ -297,10 +279,7 @@ fn selection(ctx: &egui::Context, id: egui::Id) -> Option<Range<usize>> {
 fn select(ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
     use egui::text::{CCursor, CCursorRange};
     let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
-    state.cursor.set_char_range(Some(CCursorRange::two(
-        CCursor::new(range.start),
-        CCursor::new(range.end),
-    )));
+    state.cursor.set_char_range(Some(CCursorRange::two(CCursor::new(range.start), CCursor::new(range.end))));
     state.store(ctx, id);
     ctx.data_mut(|data| data.insert_temp(crate::scroll_request_id(id), true));
 }

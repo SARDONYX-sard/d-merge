@@ -183,19 +183,7 @@ pub struct ModInfo {
 }
 
 // NOTE: Order follows the sequence in which the tools were created. The first one created was FNIS.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModType {
     /// GUI developers must add the following to the paths array in `behavior_merge::behavior_gen`.

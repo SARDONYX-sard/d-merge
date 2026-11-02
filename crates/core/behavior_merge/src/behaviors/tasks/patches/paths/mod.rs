@@ -35,9 +35,7 @@ impl<'a> NemesisPath<'a> {
                 TemplateKey::from_nemesis_file(template_name, *is_1st_person)
             }
             // Safety: Ext verifies that the parsing stage for creation begins with meshes.
-            NemesisPath::EngineExt { meshes_path } => {
-                TemplateKey::new(Cow::Owned(meshes_path.to_string()))
-            }
+            NemesisPath::EngineExt { meshes_path } => TemplateKey::new(Cow::Owned(meshes_path.to_string())),
         }
     }
 

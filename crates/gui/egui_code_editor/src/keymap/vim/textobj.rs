@@ -76,13 +76,7 @@ impl Buffer {
     }
 
     /// `i(` / `a(` (and `[`, `{`, `<`): the innermost pair around `i`, across lines.
-    pub(super) fn pair_object(
-        &self,
-        i: usize,
-        open: char,
-        close: char,
-        around: bool,
-    ) -> Option<Range<usize>> {
+    pub(super) fn pair_object(&self, i: usize, open: char, close: char, around: bool) -> Option<Range<usize>> {
         let open_at = self.enclosing_open(i, open, close)?;
         let close_at = self.matching_close(open_at, open, close)?;
         if around {
@@ -95,9 +89,7 @@ impl Buffer {
             start += 1;
         }
         let close_line_start = self.line_start(close_at);
-        if close_line_start > start
-            && self.chars[close_line_start..close_at].iter().all(|c| c.is_whitespace())
-        {
+        if close_line_start > start && self.chars[close_line_start..close_at].iter().all(|c| c.is_whitespace()) {
             end = close_line_start;
         }
         Some(start..end.max(start))

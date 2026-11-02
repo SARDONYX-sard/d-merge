@@ -18,9 +18,7 @@ pub struct FurnitureAnimation<'a> {
     pub animations: Vec<FNISAnimation<'a>>,
 }
 
-pub(crate) fn parse_furniture_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<FurnitureAnimation<'a>> {
+pub(crate) fn parse_furniture_animation<'a>(input: &mut &'a str) -> ModalResult<FurnitureAnimation<'a>> {
     parse_furniture_animations_inner
         .context(StrContext::Label("Furniture Animation"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -38,9 +36,7 @@ fu -a Kneel_Enter Kneel_Enter.hkx
         .parse_next(input)
 }
 
-fn parse_furniture_animations_inner<'a>(
-    input: &mut &'a str,
-) -> ModalResult<FurnitureAnimation<'a>> {
+fn parse_furniture_animations_inner<'a>(input: &mut &'a str) -> ModalResult<FurnitureAnimation<'a>> {
     use crate::combinator::{anim_types::FNISAnimType::*, flags::FNISAnimFlags};
 
     let seq_start_anim = parse_fnis_animation
@@ -57,10 +53,7 @@ fn parse_furniture_animations_inner<'a>(
     // NOTE: To avoid intermediate allocations of `Vec` caused by using `repeat`, manually perform the loop.
     loop {
         skip_ws_and_comments0.parse_next(input)?;
-        match parse_fnis_animation
-            .verify(|anim| matches!(anim.anim_type, SequencedContinued))
-            .parse_next(input)
-        {
+        match parse_fnis_animation.verify(|anim| matches!(anim.anim_type, SequencedContinued)).parse_next(input) {
             Ok(anim) => animations.push(anim),
             Err(winnow::error::ErrMode::Backtrack(_)) => break, // End if no further action.
             Err(e) => return Err(e),

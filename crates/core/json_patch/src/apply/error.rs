@@ -33,9 +33,7 @@ pub enum JsonPatchError {
     },
 
     /// The type of the patch operation is mismatched; expected a pure type.
-    #[snafu(display(
-        "Mismatch apply_patch type. Expected pure. but got {unexpected:?}\n{path}\n{value}"
-    ))]
+    #[snafu(display("Mismatch apply_patch type. Expected pure. but got {unexpected:?}\n{path}\n{value}"))]
     MismatchApplyType {
         /// The unexpected type encountered.
         unexpected: crate::Action,
@@ -81,10 +79,7 @@ pub enum JsonPatchError {
 
 impl JsonPatchError {
     /// Converts a JSON path and value to a string representation for error reporting.
-    fn format_path_value<'a>(
-        path: &[Cow<'a, str>],
-        value: impl core::fmt::Debug,
-    ) -> (String, String) {
+    fn format_path_value<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> (String, String) {
         (path.join("/"), format!("{value:#?}"))
     }
 
@@ -101,11 +96,7 @@ impl JsonPatchError {
     }
 
     /// Creates an `InvalidIndex` error with the specified index, path, and value.
-    pub fn invalid_index_from<'a>(
-        index: usize,
-        path: &[Cow<'a, str>],
-        value: impl core::fmt::Debug,
-    ) -> Self {
+    pub fn invalid_index_from<'a>(index: usize, path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::InvalidIndex { index: index.to_string(), path, value }
     }
@@ -121,10 +112,7 @@ impl JsonPatchError {
     }
 
     /// Creates an `UnsupportedRangeKind` error from the given path and value.
-    pub fn unsupported_range_kind_from<'a>(
-        path: &[Cow<'a, str>],
-        value: impl core::fmt::Debug,
-    ) -> Self {
+    pub fn unsupported_range_kind_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::UnsupportedRangeKind { path, value }
     }
@@ -142,11 +130,7 @@ impl JsonPatchError {
     }
 
     /// Creates a `TryType` error from the given source error, path, and value.
-    pub fn try_type_from<'a>(
-        source: TryTypeError,
-        path: &[Cow<'a, str>],
-        value: impl core::fmt::Debug,
-    ) -> Self {
+    pub fn try_type_from<'a>(source: TryTypeError, path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::TryType { source, path, value }
     }

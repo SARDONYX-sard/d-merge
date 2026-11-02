@@ -38,9 +38,9 @@ use crate::{
     behaviors::tasks::hkx::generate::write_patched_json,
     errors::{
         AnimPatchErrKind, AnimPatchErrSubKind, Error, FailedDiffLinesPatchSnafu, FailedIoSnafu,
-        FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu,
-        FailedParseEditAdsfClipAnimPatchSnafu, FailedParseEditAdsfClipMotionPatchSnafu,
-        FailedSerializeAdsfSnafu, MissingAdsfAnimClipSnafu, MissingAdsfMotionSnafu,
+        FailedParseAdsfAnimDataHeaderPatchSnafu, FailedParseAdsfPatchSnafu, FailedParseEditAdsfClipAnimPatchSnafu,
+        FailedParseEditAdsfClipMotionPatchSnafu, FailedSerializeAdsfSnafu, MissingAdsfAnimClipSnafu,
+        MissingAdsfMotionSnafu,
     },
 };
 
@@ -70,10 +70,8 @@ pub(crate) fn apply_adsf_patches(
     fnis_adsf_patches: Vec<AdsfPatch<'_>>,
 ) -> Vec<Error> {
     // 1/5 Parse ADSF patches.
-    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) = owned_anim_data_patches
-        .0
-        .par_iter()
-        .partition_map(|entry| match parse_anim_data_patch(entry, config) {
+    let (mut borrowed_patches, mut errors): (Vec<_>, Vec<Error>) =
+        owned_anim_data_patches.0.par_iter().partition_map(|entry| match parse_anim_data_patch(entry, config) {
             Ok(value) => Either::Left(value),
             Err(error) => Either::Right(error),
         });
@@ -104,9 +102,7 @@ pub(crate) fn apply_adsf_patches(
     let alt_adsf_bytes = bail!(read_adsf_file(config));
 
     let mut alt_adsf: AltAdsf = bail!(rmp_serde::from_slice(&alt_adsf_bytes).with_context(|_| {
-        crate::errors::FailedParseAdsfTemplateSnafu {
-            path: config.resource_dir.join(ADSF_INNER_PATH),
-        }
+        crate::errors::FailedParseAdsfTemplateSnafu { path: config.resource_dir.join(ADSF_INNER_PATH) }
     }));
 
     let mut project_names_header_patches = DiffLines::DEFAULT;
@@ -122,9 +118,7 @@ pub(crate) fn apply_adsf_patches(
 
         let anim_data = match alt_adsf.0.entry(Cow::Borrowed(adsf_patch.target)) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => {
-                entry.insert(skyrim_anim_data::adsf::alt::AltAnimData::default())
-            }
+            Entry::Vacant(entry) => entry.insert(skyrim_anim_data::adsf::alt::AltAnimData::default()),
         };
 
         match adsf_patch.patch {
@@ -150,9 +144,11 @@ pub(crate) fn apply_adsf_patches(
                     continue;
                 };
 
-                if let Err(error) = edit.patch.into_apply(block).with_context(|_| {
-                    FailedParseEditAdsfClipAnimPatchSnafu { path: edit.name_clip }
-                }) {
+                if let Err(error) = edit
+                    .patch
+                    .into_apply(block)
+                    .with_context(|_| FailedParseEditAdsfClipAnimPatchSnafu { path: edit.name_clip })
+                {
                     errors.push(error);
                 }
             }
@@ -168,18 +164,17 @@ pub(crate) fn apply_adsf_patches(
             PatchKind::EditMotion(edit) => {
                 let Some(block) = anim_data.clip_motion_blocks.get_mut(edit.clip_id) else {
                     errors.push(
-                        MissingAdsfMotionSnafu {
-                            target: adsf_patch.target.to_owned(),
-                            index: edit.clip_id.to_owned(),
-                        }
-                        .build(),
+                        MissingAdsfMotionSnafu { target: adsf_patch.target.to_owned(), index: edit.clip_id.to_owned() }
+                            .build(),
                     );
                     continue;
                 };
 
-                if let Err(error) = edit.patch.into_apply(block).with_context(|_| {
-                    FailedParseEditAdsfClipMotionPatchSnafu { path: edit.clip_id }
-                }) {
+                if let Err(error) = edit
+                    .patch
+                    .into_apply(block)
+                    .with_context(|_| FailedParseEditAdsfClipMotionPatchSnafu { path: edit.clip_id })
+                {
                     errors.push(error);
                 }
             }
@@ -215,15 +210,15 @@ fn parse_anim_data_patch<'a>(
     let parsed = parse_adsf_path(path)?;
 
     let patch = match parsed.parser_type {
-        ParserType::TxtProjectHeader => PatchKind::ProjectNamesHeader(
-            parse_lines_diff_patch(adsf_patch, priority).with_context(|_| {
+        ParserType::TxtProjectHeader => {
+            PatchKind::ProjectNamesHeader(parse_lines_diff_patch(adsf_patch, priority).with_context(|_| {
                 FailedDiffLinesPatchSnafu {
                     kind: AnimPatchErrKind::Adsf,
                     sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
                     path,
                 }
-            })?,
-        ),
+            })?)
+        }
 
         ParserType::AnimHeader => PatchKind::AnimDataHeader(
             parse_anim_header_diff_patch(adsf_patch)
@@ -249,10 +244,8 @@ fn parse_anim_data_patch<'a>(
             // patch. The explicit clip ID in the path is therefore part of
             // the add operation and must be preserved.
             if adsf_patch.contains("<!-- MOD_CODE") {
-                let patch =
-                    parse_clip_anim_diff_patch(adsf_patch, priority).with_context(|_| {
-                        FailedParseEditAdsfClipAnimPatchSnafu { path: path.clone() }
-                    })?;
+                let patch = parse_clip_anim_diff_patch(adsf_patch, priority)
+                    .with_context(|_| FailedParseEditAdsfClipAnimPatchSnafu { path: path.clone() })?;
 
                 PatchKind::EditAnim(EditAnim { patch, priority, name_clip })
             } else {
@@ -278,18 +271,14 @@ fn parse_anim_data_patch<'a>(
 
         ParserType::IndexedMotion { index } => {
             if adsf_patch.contains("<!-- MOD_CODE") {
-                let patch =
-                    parse_clip_motion_diff_patch(adsf_patch, priority).with_context(|_| {
-                        FailedParseEditAdsfClipMotionPatchSnafu { path: path.clone() }
-                    })?;
+                let patch = parse_clip_motion_diff_patch(adsf_patch, priority)
+                    .with_context(|_| FailedParseEditAdsfClipMotionPatchSnafu { path: path.clone() })?;
 
                 PatchKind::EditMotion(EditMotion { patch, priority, clip_id: index })
             } else {
                 let patch = match config.parser_mode {
                     crate::ParserMode::Strict => parse_clip_motion_block_patch::<true>(adsf_patch),
-                    crate::ParserMode::Lenient => {
-                        parse_clip_motion_block_patch::<false>(adsf_patch)
-                    }
+                    crate::ParserMode::Lenient => parse_clip_motion_block_patch::<false>(adsf_patch),
                 }
                 .with_context(|_| FailedParseAdsfPatchSnafu { path: path.clone() })?;
 
@@ -331,34 +320,29 @@ fn read_adsf_file(config: &Config) -> Result<Vec<u8>, Error> {
 /// # Errors
 ///
 /// Returns an error when serialization or file writing fails.
-fn write_alt_adsf_file(
-    path: impl AsRef<Path>,
-    alt_adsf: AltAdsf,
-    patches: DiffLines,
-) -> Result<(), Error> {
+fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: AltAdsf, patches: DiffLines) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let serialized = serialize_alt_adsf(alt_adsf, (!patches.is_empty()).then_some(patches))
-        .with_context(|_| FailedSerializeAdsfSnafu {
+    let serialized = serialize_alt_adsf(alt_adsf, (!patches.is_empty()).then_some(patches)).with_context(|_| {
+        FailedSerializeAdsfSnafu {
             kind: AnimPatchErrKind::Adsf,
             sub_kind: AnimPatchErrSubKind::ProjectNamesHeader,
             path,
-        })?;
+        }
+    })?;
 
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
 
-    std::fs::write(path, serialized)
-        .with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
+    std::fs::write(path, serialized).with_context(|_| FailedIoSnafu { path: path.to_path_buf() })?;
     #[cfg(feature = "tracing")]
     tracing::info!("Generated: {}", path.display());
     Ok(())
 }
 
 fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
-    let mut path =
-        config.output_dir.join(".d_merge").join(".debug").join("patches").join(ADSF_INNER_PATH);
+    let mut path = config.output_dir.join(".d_merge").join(".debug").join("patches").join(ADSF_INNER_PATH);
 
     path.set_extension("patch.json");
 
@@ -393,11 +377,7 @@ mod tests {
         sort_patches_by_priority(
             &mut patches,
             &PatchMaps {
-                nemesis_entries: ids
-                    .iter()
-                    .enumerate()
-                    .map(|(priority, &id)| (id.to_string(), priority))
-                    .collect(),
+                nemesis_entries: ids.iter().enumerate().map(|(priority, &id)| (id.to_string(), priority)).collect(),
                 ..Default::default()
             },
         );

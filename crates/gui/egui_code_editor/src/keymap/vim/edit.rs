@@ -3,21 +3,12 @@
 
 use std::ops::Range;
 
-use super::{
-    Mode, VimState, buffer::Buffer, command::Operator, exec::Exec, keys::VimKey,
-    registers::Register,
-};
+use super::{Mode, VimState, buffer::Buffer, command::Operator, exec::Exec, keys::VimKey, registers::Register};
 
 impl VimState {
     /// Applies `op` to `range`. For linewise ranges, `range` only marks the first/last line;
     /// whole lines are used.
-    pub(super) fn operate(
-        &mut self,
-        op: Operator,
-        range: Range<usize>,
-        linewise: bool,
-        exec: &mut Exec,
-    ) {
+    pub(super) fn operate(&mut self, op: Operator, range: Range<usize>, linewise: bool, exec: &mut Exec) {
         let buf = &exec.buf;
         let (start, end) = if linewise {
             (buf.line_start(range.start), buf.line_end(range.end))
@@ -35,12 +26,10 @@ impl VimState {
             }
             Operator::Delete => {
                 self.yank(buf.slice(start..end), linewise, false, exec);
-                let delete =
-                    if linewise { with_line_break(&exec.buf, start, end) } else { start..end };
+                let delete = if linewise { with_line_break(&exec.buf, start, end) } else { start..end };
                 exec.edit(self.cursor, delete.clone(), "");
                 let at = delete.start.min(exec.buf.len());
-                self.cursor =
-                    if linewise { exec.buf.first_non_blank(at) } else { exec.buf.clamp_normal(at) };
+                self.cursor = if linewise { exec.buf.first_non_blank(at) } else { exec.buf.clamp_normal(at) };
             }
             Operator::Change => {
                 self.yank(buf.slice(start..end), linewise, false, exec);
@@ -55,8 +44,7 @@ impl VimState {
                 self.cursor = exec.buf.first_non_blank(exec.buf.nth_line_start(first));
             }
             Operator::Lower | Operator::Upper | Operator::ToggleCase => {
-                let changed: String =
-                    buf.chars[start..end].iter().flat_map(|&c| change_case(c, op)).collect();
+                let changed: String = buf.chars[start..end].iter().flat_map(|&c| change_case(c, op)).collect();
                 exec.edit(self.cursor, start..end, &changed);
                 self.cursor = start;
             }
@@ -81,11 +69,7 @@ impl VimState {
             .split('\n')
             .map(|line| {
                 if right {
-                    if line.is_empty() {
-                        String::new()
-                    } else {
-                        format!("{}{line}", " ".repeat(width))
-                    }
+                    if line.is_empty() { String::new() } else { format!("{}{line}", " ".repeat(width)) }
                 } else if let Some(rest) = line.strip_prefix('\t') {
                     rest.to_string()
                 } else {
@@ -169,8 +153,7 @@ impl VimState {
         let buf = &exec.buf;
         let end_of_line = buf.line_end(self.cursor);
         // The number under the cursor, else the next one on the line.
-        let Some(digit) = (self.cursor..end_of_line).find(|&j| buf.chars[j].is_ascii_digit())
-        else {
+        let Some(digit) = (self.cursor..end_of_line).find(|&j| buf.chars[j].is_ascii_digit()) else {
             return;
         };
         let mut start = digit;
@@ -199,11 +182,7 @@ impl VimState {
     /// it is linewise.
     fn visual_range(&self, buf: &Buffer) -> (Range<usize>, bool) {
         let (lo, hi) = (self.anchor.min(self.cursor), self.anchor.max(self.cursor));
-        if self.mode == Mode::VisualLine {
-            (lo..hi, true)
-        } else {
-            (lo..(hi + 1).min(buf.len()), false)
-        }
+        if self.mode == Mode::VisualLine { (lo..hi, true) } else { (lo..(hi + 1).min(buf.len()), false) }
     }
 
     /// Visual-mode keys that act on the selection right away. Returns `false` if `key` is not
@@ -265,9 +244,7 @@ impl VimState {
                 self.cursor = lo;
                 self.operate(Operator::Delete, range, linewise, exec);
                 // Deleted up to the line end: the cursor stepped back onto the char before.
-                let at_line_end = !register.linewise
-                    && lo >= exec.buf.line_end(lo)
-                    && lo > exec.buf.line_start(lo);
+                let at_line_end = !register.linewise && lo >= exec.buf.line_end(lo) && lo > exec.buf.line_start(lo);
                 self.paste_register(&register, at_line_end, 1, exec);
             }
             // The other end of the selection.

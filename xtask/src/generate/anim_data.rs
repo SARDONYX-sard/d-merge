@@ -17,20 +17,14 @@ pub(crate) fn run(ws: &Path) -> Result {
 
     // ── animationdatasinglefile ──────────────────────────────────────────────
     let txt = std::fs::read_to_string(txt_dir.join("animationdatasinglefile.txt"))?;
-    let adsf = skyrim_anim_data::adsf::normal::de::parse_adsf(&txt)
-        .map_err(|err| format!("Failed to parse adsf:\n{err}"))?;
+    let adsf =
+        skyrim_anim_data::adsf::normal::de::parse_adsf(&txt).map_err(|err| format!("Failed to parse adsf:\n{err}"))?;
     let alt_adsf: AltAdsf = adsf.into();
 
     let mut keys: Vec<_> = alt_adsf.0.keys().collect();
     keys.sort_unstable();
-    write(
-        &debug_dir.join("animationdatasinglefile_keys.json"),
-        &serde_json::to_string_pretty(&keys)?,
-    )?;
-    write(
-        &debug_dir.join("animationdatasinglefile.json"),
-        &serde_json::to_string_pretty(&alt_adsf)?,
-    )?;
+    write(&debug_dir.join("animationdatasinglefile_keys.json"), &serde_json::to_string_pretty(&keys)?)?;
+    write(&debug_dir.join("animationdatasinglefile.json"), &serde_json::to_string_pretty(&alt_adsf)?)?;
     write(&bin_dir.join("animationdatasinglefile.bin"), &rmp_serde::to_vec(&alt_adsf)?)?;
 
     // ── animationsetdatasinglefile ───────────────────────────────────────────
@@ -44,18 +38,10 @@ pub(crate) fn run(ws: &Path) -> Result {
         .txt_projects
         .0
         .iter()
-        .map(|(header, sets)| {
-            (header.to_string(), sets.0.keys().map(ToString::to_string).collect())
-        })
+        .map(|(header, sets)| (header.to_string(), sets.0.keys().map(ToString::to_string).collect()))
         .collect();
-    write(
-        &debug_dir.join("animationsetdatasinglefile_structure.json"),
-        &serde_json::to_string_pretty(&structure)?,
-    )?;
-    write(
-        &debug_dir.join("animationsetdatasinglefile.json"),
-        &serde_json::to_string_pretty(&alt_asdsf)?,
-    )?;
+    write(&debug_dir.join("animationsetdatasinglefile_structure.json"), &serde_json::to_string_pretty(&structure)?)?;
+    write(&debug_dir.join("animationsetdatasinglefile.json"), &serde_json::to_string_pretty(&alt_asdsf)?)?;
     write(&bin_dir.join("animationsetdatasinglefile.bin"), &rmp_serde::to_vec(&alt_asdsf)?)?;
     Ok(())
 }

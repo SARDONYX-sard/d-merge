@@ -45,18 +45,10 @@ impl Exec {
 }
 
 impl VimState {
-    pub(super) fn execute(
-        &mut self,
-        command: Command,
-        count: usize,
-        explicit_count: bool,
-        exec: &mut Exec,
-    ) {
+    pub(super) fn execute(&mut self, command: Command, count: usize, explicit_count: bool, exec: &mut Exec) {
         match command {
             Command::Move(motion) => {
-                let Some((target, _)) =
-                    self.motion_target(motion, count, explicit_count, &exec.buf, false)
-                else {
+                let Some((target, _)) = self.motion_target(motion, count, explicit_count, &exec.buf, false) else {
                     return;
                 };
                 if motion.is_jump() {
@@ -65,16 +57,11 @@ impl VimState {
                 if !matches!(motion, Motion::Up | Motion::Down) {
                     self.desired_col = None;
                 }
-                self.cursor = if self.mode == Mode::Normal {
-                    exec.buf.clamp_normal(target)
-                } else {
-                    target.min(exec.buf.len())
-                };
+                self.cursor =
+                    if self.mode == Mode::Normal { exec.buf.clamp_normal(target) } else { target.min(exec.buf.len()) };
             }
             Command::Operate(op, target) => {
-                if let Some((range, linewise)) =
-                    self.target_range(op, target, count, explicit_count, &exec.buf)
-                {
+                if let Some((range, linewise)) = self.target_range(op, target, count, explicit_count, &exec.buf) {
                     self.operate(op, range, linewise, exec);
                 }
             }
@@ -154,9 +141,7 @@ impl VimState {
             Simple::DeleteToEnd => self.operate(Operator::Delete, cur..line_end, false, exec),
             Simple::ChangeToEnd => self.operate(Operator::Change, cur..line_end, false, exec),
             Simple::YankLine => {
-                if let Some((range, _)) =
-                    self.target_range(Operator::Yank, Target::Line, count, false, &exec.buf)
-                {
+                if let Some((range, _)) = self.target_range(Operator::Yank, Target::Line, count, false, &exec.buf) {
                     self.operate(Operator::Yank, range, true, exec);
                 }
             }
@@ -209,8 +194,7 @@ impl VimState {
             Simple::Reselect => {
                 if let Some((mode, anchor, cursor)) = self.last_visual {
                     let len = exec.buf.len();
-                    (self.mode, self.anchor, self.cursor) =
-                        (mode, anchor.min(len), cursor.min(len));
+                    (self.mode, self.anchor, self.cursor) = (mode, anchor.min(len), cursor.min(len));
                 }
             }
             Simple::CommandLine => {
@@ -227,11 +211,8 @@ impl VimState {
             Simple::Hover => exec.output.show_hover = true,
             Simple::OpenUrl => self.open_url(exec),
             Simple::GoTo { references } => {
-                exec.output.command = Some(if references {
-                    EditorCommand::FindReferences
-                } else {
-                    EditorCommand::GoToDefinition
-                });
+                exec.output.command =
+                    Some(if references { EditorCommand::FindReferences } else { EditorCommand::GoToDefinition });
             }
             Simple::Increment { up } => self.increment(count, up, exec),
             Simple::SetMark(name) => self.marks.set(name, cur),
@@ -246,8 +227,7 @@ impl VimState {
                     self.cursor = exec.buf.clamp_normal(at.min(exec.buf.len()));
                 } else {
                     // No more jumps in this text: the host may go back to another one.
-                    let command =
-                        if older { EditorCommand::JumpBack } else { EditorCommand::JumpForward };
+                    let command = if older { EditorCommand::JumpBack } else { EditorCommand::JumpForward };
                     exec.output.command = Some(command);
                 }
             }
@@ -285,10 +265,8 @@ impl VimState {
                 exec.output.changed = true;
             }
             None => {
-                self.message = Some(
-                    if undo { "Already at oldest change" } else { "Already at newest change" }
-                        .to_string(),
-                );
+                self.message =
+                    Some(if undo { "Already at oldest change" } else { "Already at newest change" }.to_string());
             }
         }
     }

@@ -19,9 +19,11 @@ impl VimState {
                 // e.g., `jk`: `j` was typed earlier and is in the text; remove it, then leave.
                 // (Checked: the user may have clicked elsewhere in between.)
                 if let Some(prev) = cur.checked_sub(1)
-                    && exec.buf.chars.get(prev).is_some_and(|&first| {
-                        self.options.insert_escapes.contains(&[first, second])
-                    })
+                    && exec
+                        .buf
+                        .chars
+                        .get(prev)
+                        .is_some_and(|&first| self.options.insert_escapes.contains(&[first, second]))
                 {
                     exec.edit(cur, prev..cur, "");
                     self.cursor = prev;

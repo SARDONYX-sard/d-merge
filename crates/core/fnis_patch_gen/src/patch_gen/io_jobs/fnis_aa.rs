@@ -5,9 +5,7 @@ use rayon::prelude::*;
 
 use crate::{
     errors::Error,
-    patch_gen::alternate::{
-        FnisAASlotConfigJob, aa_config::BaseMap, oar_json::new_fnis_aa_slot_config_json,
-    },
+    patch_gen::alternate::{FnisAASlotConfigJob, aa_config::BaseMap, oar_json::new_fnis_aa_slot_config_json},
 };
 
 /// Resolves each slot's base and writes its `config.json` in parallel.
@@ -30,13 +28,8 @@ pub(crate) fn run(jobs: Vec<FnisAASlotConfigJob>, base_map: Option<&BaseMap>) ->
             // duplicate priorities. To avoid those warnings, we ensure uniqueness here.
             let fallback_priority = i32::MAX - (i as i32);
 
-            let config = new_fnis_aa_slot_config_json(
-                &job.group_config_dir,
-                job.group_name,
-                job.slot,
-                base,
-                fallback_priority,
-            );
+            let config =
+                new_fnis_aa_slot_config_json(&job.group_config_dir, job.group_name, job.slot, base, fallback_priority);
             super::write_file(&job.output_path, config.as_bytes()).err()
         })
         .collect()

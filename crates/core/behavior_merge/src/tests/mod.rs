@@ -14,7 +14,7 @@ async fn merge_test() -> Result<(), Box<dyn std::error::Error>> {
         nemesis_excludes: &[
             "dmco", // Avoid conflicts between SE and AE.
             "tkuc", // This is because TkDodge and RE attempt to add to the same pointer, causing an error.
-                   //
+                    //
         ],
         ..Default::default()
     });

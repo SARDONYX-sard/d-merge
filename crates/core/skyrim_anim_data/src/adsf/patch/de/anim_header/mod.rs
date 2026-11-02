@@ -11,10 +11,7 @@ use crate::adsf::normal::AnimDataHeader;
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AnimHeaderDiffPatch<'a> {
     lead_int: Option<Cow<'a, str>>,
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(deserialize = "DiffProjectAssets<'a>: serde::Deserialize<'de>"))
-    )]
+    #[cfg_attr(feature = "serde", serde(bound(deserialize = "DiffProjectAssets<'a>: serde::Deserialize<'de>")))]
     project_assets: Option<DiffProjectAssets<'a>>,
 }
 
@@ -55,9 +52,7 @@ impl<'a> AnimHeaderDiffPatch<'a> {
                         anim_data_header.project_assets.extend(project_assets.values);
                     } else {
                         // In-bounds → insert at the middle
-                        anim_data_header
-                            .project_assets
-                            .splice(range.start..range.start, project_assets.values);
+                        anim_data_header.project_assets.splice(range.start..range.start, project_assets.values);
                     }
                 }
                 Op::Replace => {

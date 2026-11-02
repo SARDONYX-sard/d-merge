@@ -49,8 +49,7 @@ pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String) -> KeymapOu
     });
     let Some(op) = op else { return KeymapOutput::default() };
 
-    let Some(range) = egui::TextEdit::load_state(ui.ctx(), id).and_then(|s| s.cursor.char_range())
-    else {
+    let Some(range) = egui::TextEdit::load_state(ui.ctx(), id).and_then(|s| s.cursor.char_range()) else {
         return KeymapOutput::default();
     };
     let primary = LinePos::from_char_index(text, range.primary.index.0);
@@ -71,15 +70,9 @@ pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String) -> KeymapOu
 
 /// The edited text and the new cursor ends, or `None` when nothing changes (e.g., moving the
 /// first line up).
-fn apply(
-    text: &str,
-    op: LineOp,
-    primary: LinePos,
-    secondary: LinePos,
-) -> Option<(String, LinePos, LinePos)> {
+fn apply(text: &str, op: LineOp, primary: LinePos, secondary: LinePos) -> Option<(String, LinePos, LinePos)> {
     let mut lines: Vec<&str> = text.split('\n').collect();
-    let (start, end) =
-        if primary.line <= secondary.line { (primary, secondary) } else { (secondary, primary) };
+    let (start, end) = if primary.line <= secondary.line { (primary, secondary) } else { (secondary, primary) };
     let first = start.line;
     // A selection that ends at column 0 of a later line does not touch that line.
     let last = if end.column == 0 && end.line > start.line { end.line - 1 } else { end.line };
@@ -142,35 +135,19 @@ mod tests {
     fn line_ops() {
         let text = "a\nb\nc";
         assert_eq!(run(text, LineOp::Delete, pos(1, 0)), Some(("a\nc".into(), pos(1, 0))));
-        assert_eq!(
-            run(text, LineOp::Move { up: true }, pos(1, 0)),
-            Some(("b\na\nc".into(), pos(0, 0)))
-        );
-        assert_eq!(
-            run(text, LineOp::Move { up: false }, pos(1, 0)),
-            Some(("a\nc\nb".into(), pos(2, 0)))
-        );
+        assert_eq!(run(text, LineOp::Move { up: true }, pos(1, 0)), Some(("b\na\nc".into(), pos(0, 0))));
+        assert_eq!(run(text, LineOp::Move { up: false }, pos(1, 0)), Some(("a\nc\nb".into(), pos(2, 0))));
         assert_eq!(run(text, LineOp::Move { up: true }, pos(0, 0)), None);
-        assert_eq!(
-            run(text, LineOp::Copy { up: false }, pos(1, 1)),
-            Some(("a\nb\nb\nc".into(), pos(2, 1)))
-        );
-        assert_eq!(
-            run(text, LineOp::Copy { up: true }, pos(1, 1)),
-            Some(("a\nb\nb\nc".into(), pos(1, 1)))
-        );
-        assert_eq!(
-            run(text, LineOp::Insert { above: false }, pos(0, 1)),
-            Some(("a\n\nb\nc".into(), pos(1, 0)))
-        );
+        assert_eq!(run(text, LineOp::Copy { up: false }, pos(1, 1)), Some(("a\nb\nb\nc".into(), pos(2, 1))));
+        assert_eq!(run(text, LineOp::Copy { up: true }, pos(1, 1)), Some(("a\nb\nb\nc".into(), pos(1, 1))));
+        assert_eq!(run(text, LineOp::Insert { above: false }, pos(0, 1)), Some(("a\n\nb\nc".into(), pos(1, 0))));
         assert_eq!(run("a", LineOp::Delete, pos(0, 0)), Some((String::new(), pos(0, 0))));
     }
 
     #[test]
     fn selection_ending_at_column_zero_skips_that_line() {
         // `a\n` selected (to the start of `b`): only `a` moves.
-        let (text, primary, secondary) =
-            apply("a\nb\nc", LineOp::Move { up: false }, pos(1, 0), pos(0, 0)).unwrap();
+        let (text, primary, secondary) = apply("a\nb\nc", LineOp::Move { up: false }, pos(1, 0), pos(0, 0)).unwrap();
         assert_eq!(text, "b\na\nc");
         assert_eq!((primary, secondary), (pos(2, 0), pos(1, 0)));
     }

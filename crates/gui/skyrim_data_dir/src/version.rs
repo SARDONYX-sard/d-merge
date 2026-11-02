@@ -102,12 +102,7 @@ where
     #[link(name = "version")]
     unsafe extern "system" {
         fn GetFileVersionInfoSizeW(lptstrFilename: *const u16, lpdwHandle: *mut u32) -> u32;
-        fn GetFileVersionInfoW(
-            lptstrFilename: *const u16,
-            dwHandle: u32,
-            dwLen: u32,
-            lpData: *mut c_void,
-        ) -> i32;
+        fn GetFileVersionInfoW(lptstrFilename: *const u16, dwHandle: u32, dwLen: u32, lpData: *mut c_void) -> i32;
         fn VerQueryValueW(
             pBlock: *const c_void,
             lpSubBlock: *const u16,
@@ -135,8 +130,7 @@ where
         dwFileDateLS: u32,
     }
 
-    let wide: Vec<u16> =
-        path.as_ref().as_os_str().encode_wide().chain(core::iter::once(0)).collect();
+    let wide: Vec<u16> = path.as_ref().as_os_str().encode_wide().chain(core::iter::once(0)).collect();
 
     unsafe {
         let mut handle = 0_u32;
@@ -152,8 +146,7 @@ where
 
         let mut lp_buffer: *mut c_void = ptr::null_mut();
         let mut len = 0_u32;
-        let sub_block: Vec<u16> =
-            OsStr::new("\\").encode_wide().chain(std::iter::once(0)).collect();
+        let sub_block: Vec<u16> = OsStr::new("\\").encode_wide().chain(std::iter::once(0)).collect();
 
         if VerQueryValueW(data.as_ptr().cast(), sub_block.as_ptr(), &mut lp_buffer, &mut len) == 0 {
             return Err(VersionError);

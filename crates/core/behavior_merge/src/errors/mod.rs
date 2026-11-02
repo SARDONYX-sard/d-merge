@@ -86,35 +86,22 @@ pub enum Error {
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile anim_data_header(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseAdsfAnimDataHeaderPatch {
-        source: skyrim_anim_data::adsf::patch::de::error::Error,
-        path: PathBuf,
-    },
+    FailedParseAdsfAnimDataHeaderPatch { source: skyrim_anim_data::adsf::patch::de::error::Error, path: PathBuf },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile edit anim(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseEditAdsfClipAnimPatch {
-        source: skyrim_anim_data::adsf::patch::de::error::Error,
-        path: PathBuf,
-    },
+    FailedParseEditAdsfClipAnimPatch { source: skyrim_anim_data::adsf::patch::de::error::Error, path: PathBuf },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile edit motion(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseEditAdsfClipMotionPatch {
-        source: skyrim_anim_data::adsf::patch::de::error::Error,
-        path: PathBuf,
-    },
+    FailedParseEditAdsfClipMotionPatch { source: skyrim_anim_data::adsf::patch::de::error::Error, path: PathBuf },
 
     /// Failed to find an animation block identified by its target and clip name.
-    #[snafu(display(
-        "[animationdatasinglefile animation not found] target: {target}, name_clip: {name_clip}"
-    ))]
+    #[snafu(display("[animationdatasinglefile animation not found] target: {target}, name_clip: {name_clip}"))]
     MissingAdsfAnimClip { target: String, name_clip: String },
 
     /// Failed to find a motion block identified by its target and index.
-    #[snafu(display(
-        "[animationdatasinglefile motion not found] target: {target}, index: {index}"
-    ))]
+    #[snafu(display("[animationdatasinglefile motion not found] target: {target}, index: {index}"))]
     MissingAdsfMotion { target: String, index: String },
 
     /// Failed to parse asdsf patch
@@ -123,10 +110,7 @@ pub enum Error {
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationsetdatasinglefile edit(Replace/Remove) patch Parse Error]{}:\n{source}", path.display()))]
-    FailedParseEditAsdsfPatch {
-        source: skyrim_anim_data::asdsf::patch::de::error::Error,
-        path: PathBuf,
-    },
+    FailedParseEditAsdsfPatch { source: skyrim_anim_data::asdsf::patch::de::error::Error, path: PathBuf },
 
     /// Failed to parse adsf patch
     #[snafu(display("[animationdatasinglefile add patch Parse Error]{}:\n{source}", path.display()))]

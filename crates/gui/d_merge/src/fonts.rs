@@ -169,13 +169,14 @@ pub(crate) fn apply_system_font(ctx: &Context, family_name: &str) -> Result<(), 
             .select_family_by_name(family_name)
             .map_err(|_| FontError::Warn(format!("System font family not found: {family_name}")))?;
 
-        let handle = family.fonts().first().ok_or_else(|| {
-            FontError::Warn(format!("System font family contains no fonts: {family_name}"))
-        })?;
+        let handle = family
+            .fonts()
+            .first()
+            .ok_or_else(|| FontError::Warn(format!("System font family contains no fonts: {family_name}")))?;
 
-        let font = handle.load().map_err(|err| {
-            FontError::Error(format!("Failed to load system font {family_name}: {err}"))
-        })?;
+        let font = handle
+            .load()
+            .map_err(|err| FontError::Error(format!("Failed to load system font {family_name}: {err}")))?;
 
         let bytes = font
             .copy_font_data()
@@ -201,18 +202,17 @@ pub(crate) fn apply_system_font(ctx: &Context, family_name: &str) -> Result<(), 
 pub(crate) fn apply_font_file(ctx: &Context, path: &Path) -> Result<(), FontError> {
     let cache = FONT_CACHE.get_or_init(DashMap::new);
 
-    let canonical = path.canonicalize().map_err(|err| {
-        FontError::Error(format!("Failed to canonicalize font path {}: {err}", path.display()))
-    })?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|err| FontError::Error(format!("Failed to canonicalize font path {}: {err}", path.display())))?;
 
     let key = FontKey::File(canonical.clone());
 
     let bytes = if let Some(bytes) = cache.get(&key) {
         Arc::clone(&bytes)
     } else {
-        let data = std::fs::read(&canonical).map_err(|err| {
-            FontError::Error(format!("Failed to read font file {}: {err}", canonical.display()))
-        })?;
+        let data = std::fs::read(&canonical)
+            .map_err(|err| FontError::Error(format!("Failed to read font file {}: {err}", canonical.display())))?;
 
         let bytes = Arc::new(data);
 

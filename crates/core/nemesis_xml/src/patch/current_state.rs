@@ -78,11 +78,7 @@ impl<'de> CurrentState<'de> {
     pub(super) fn judge_operation(&self) -> Op {
         self.mode_code.map_or(Op::Remove, |_| {
             if self.is_passed_original {
-                if self.patches.is_empty() && self.seq_values.is_empty() {
-                    Op::Remove
-                } else {
-                    Op::Replace
-                }
+                if self.patches.is_empty() && self.seq_values.is_empty() { Op::Remove } else { Op::Replace }
             } else {
                 Op::Add
             }

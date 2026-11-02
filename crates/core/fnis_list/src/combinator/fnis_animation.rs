@@ -103,10 +103,7 @@ mod tests {
 
     #[test]
     fn test_parse_fnis_animation_valid() {
-        let parsed = must_parse(
-            parse_fnis_animation,
-            "+ -o,k MyCheerSA3 MyCheerAnim2.hkx AnimObjectIronSword\n",
-        );
+        let parsed = must_parse(parse_fnis_animation, "+ -o,k MyCheerSA3 MyCheerAnim2.hkx AnimObjectIronSword\n");
         assert_eq!(
             parsed,
             FNISAnimation {

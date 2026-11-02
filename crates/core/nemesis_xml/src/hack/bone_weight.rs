@@ -11,23 +11,14 @@ use crate::helpers::{
 
 /// Matches `<hkparam name="boneWeights" numelements="0"></hkparam>` (with surrounding whitespace).
 fn bone_weight_empty_hkparam(input: &mut &str) -> ModalResult<()> {
-    (
-        multispace0,
-        "<hkparam name=\"boneWeights\" numelements=\"0\">",
-        multispace0,
-        "</hkparam>",
-        multispace0,
-    )
+    (multispace0, "<hkparam name=\"boneWeights\" numelements=\"0\">", multispace0, "</hkparam>", multispace0)
         .void()
         .parse_next(input)
 }
 
 /// Peeks that after the empty hkparam a `MOD_CODE ~colisc~` comment follows.
 pub(crate) fn bone_weight_then_mod_code(input: &mut &str) -> ModalResult<()> {
-    (
-        bone_weight_empty_hkparam,
-        comment_kind.verify(|kind| matches!(kind, CommentKind::ModCode("colisc"))),
-    )
+    (bone_weight_empty_hkparam, comment_kind.verify(|kind| matches!(kind, CommentKind::ModCode("colisc"))))
         .void()
         .parse_next(input)
 }

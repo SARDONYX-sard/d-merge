@@ -17,7 +17,8 @@
 //! Source: [Developers Manual For SCAR 2.0+](https://github.com/max-su-2019/SCAR/blob/main/docs/EN/Developers%20Manual%20For%20SCAR%202.0%2B.md)
 
 /// Link to the SCAR developer manual (shown in hovers).
-pub(crate) const MANUAL_URL: &str = "https://github.com/max-su-2019/SCAR/blob/main/docs/EN/Developers%20Manual%20For%20SCAR%202.0%2B.md";
+pub(crate) const MANUAL_URL: &str =
+    "https://github.com/max-su-2019/SCAR/blob/main/docs/EN/Developers%20Manual%20For%20SCAR%202.0%2B.md";
 
 /// `SCAR_ActionData` (the text before the JSON body).
 pub(crate) const ACTION_DATA: &str = "SCAR_ActionData";
@@ -40,8 +41,7 @@ pub(crate) const ACTION_TYPES: [(&str, &str); 9] = [
 ];
 
 /// Built-in idle animations for `IdleAnimation`.
-pub(crate) const BUILTIN_IDLES: [&str; 3] =
-    ["ADXP_NPCPowerAttack", "ADXP_NPCNormalAttack", "ADXP_NPCPowerAttack_H2H"];
+pub(crate) const BUILTIN_IDLES: [&str; 3] = ["ADXP_NPCPowerAttack", "ADXP_NPCNormalAttack", "ADXP_NPCPowerAttack_H2H"];
 
 /// What a JSON key holds.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -292,11 +292,7 @@ pub(crate) fn check_action_data(json: &str) -> Vec<Problem> {
         }
     };
     let Some(object) = value.as_object() else {
-        return vec![problem(
-            true,
-            "SCAR_ActionData must be a JSON object `{...}`.".to_string(),
-            None,
-        )];
+        return vec![problem(true, "SCAR_ActionData must be a JSON object `{...}`.".to_string(), None)];
     };
 
     let mut problems = Vec::new();
@@ -332,25 +328,13 @@ pub(crate) fn check_action_data(json: &str) -> Vec<Problem> {
         _ => {}
     }
     if has("StartAngle") != has("EndAngle") {
-        problems.push(problem(
-            false,
-            "`StartAngle` and `EndAngle` are used together.".to_string(),
-            None,
-        ));
+        problems.push(problem(false, "`StartAngle` and `EndAngle` are used together.".to_string(), None));
     }
     if has("CoolDownAlias") && !has("IdleAnimation") {
-        problems.push(problem(
-            false,
-            "`CoolDownAlias` is meant to be used with `IdleAnimation`.".to_string(),
-            None,
-        ));
+        problems.push(problem(false, "`CoolDownAlias` is meant to be used with `IdleAnimation`.".to_string(), None));
     }
     if has("ConditionsAlias") && !has("AttackData") {
-        problems.push(problem(
-            false,
-            "`ConditionsAlias` is meant to be used with `AttackData`.".to_string(),
-            None,
-        ));
+        problems.push(problem(false, "`ConditionsAlias` is meant to be used with `AttackData`.".to_string(), None));
     }
     problems
 }
@@ -361,9 +345,7 @@ fn check_value(key: &ActionKey, value: &serde_json::Value) -> Option<String> {
         ValueKind::String => (!value.is_string()).then(|| format!("`{name}` must be a string.")),
         ValueKind::ActionType => {
             let valid = value.as_str().is_some_and(|t| ACTION_TYPES.iter().any(|(v, _)| *v == t));
-            (!valid).then(|| {
-                format!("`{name}` must be one of RA, RPA, LA, LPA, DA, DPA, BA, BPA, IDLE.")
-            })
+            (!valid).then(|| format!("`{name}` must be one of RA, RPA, LA, LPA, DA, DPA, BA, BPA, IDLE."))
         }
         ValueKind::PositiveInt => {
             let valid = value.as_u64().is_some_and(|n| n > 0);
@@ -388,9 +370,7 @@ fn check_value(key: &ActionKey, value: &serde_json::Value) -> Option<String> {
 pub(crate) fn check_combo_start(text: &str) -> Option<String> {
     let suffix = text.trim_end().strip_prefix(COMBO_START)?.strip_prefix('.')?;
     let valid = suffix.parse::<f64>().is_ok_and(|chance| (0.0..=100.0).contains(&chance));
-    (!valid).then(|| {
-        format!("`SCAR_ComboStart.<chance>` needs a chance from 0 to 100, but got `{suffix}`.")
-    })
+    (!valid).then(|| format!("`SCAR_ComboStart.<chance>` needs a chance from 0 to 100, but got `{suffix}`."))
 }
 
 #[cfg(test)]
@@ -405,14 +385,8 @@ mod tests {
             json_position("{\"Type\":\"RA\", \""),
             JsonPos::Key { quoted: true, used: vec!["Type".to_string()] }
         );
-        assert_eq!(
-            json_position("{\"Type\":\""),
-            JsonPos::Value { key: "Type".to_string(), quoted: true }
-        );
-        assert_eq!(
-            json_position("{\"Chance\": "),
-            JsonPos::Value { key: "Chance".to_string(), quoted: false }
-        );
+        assert_eq!(json_position("{\"Type\":\""), JsonPos::Value { key: "Type".to_string(), quoted: true });
+        assert_eq!(json_position("{\"Chance\": "), JsonPos::Value { key: "Chance".to_string(), quoted: false });
         assert_eq!(json_position("{\"Chance\":3"), JsonPos::Other);
     }
 

@@ -61,12 +61,9 @@ fn fail(msg: &str) -> ExitCode {
 
 fn help(name: Option<&str>) -> Result {
     let tasks: Vec<&Task> = match name {
-        Some(name) => vec![
-            TASKS
-                .iter()
-                .find(|task| task.name == name)
-                .ok_or_else(|| format!("unknown task `{name}`"))?,
-        ],
+        Some(name) => {
+            vec![TASKS.iter().find(|task| task.name == name).ok_or_else(|| format!("unknown task `{name}`"))?]
+        }
         None => TASKS.iter().collect(),
     };
     println!("usage: cargo x <task> [options]\n");
@@ -99,8 +96,7 @@ Generates code or assets from the resources (builds the heavy crates on first us
 /// `gen` needs heavy crates (`behavior_merge`, ...), so it is a separate binary built with the
 /// `gen` feature: `cargo x release` stays fast and `cargo x gen` still just works.
 fn run_gen(args: &[String]) -> Result {
-    let mut cargo_args =
-        vec!["run", "-q", "-p", "xtask", "--bin", "xtask-gen", "--features", "gen", "--"];
+    let mut cargo_args = vec!["run", "-q", "-p", "xtask", "--bin", "xtask-gen", "--features", "gen", "--"];
     cargo_args.extend(args.iter().map(String::as_str));
     cmd::run("cargo", &cargo_args)
 }

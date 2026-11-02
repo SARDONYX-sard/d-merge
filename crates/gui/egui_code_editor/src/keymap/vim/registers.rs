@@ -27,13 +27,7 @@ pub(super) struct Registers {
 
 impl Registers {
     /// Stores a yanked (`is_yank`) or deleted text into register `name` (`None`: unnamed only).
-    pub(super) fn store(
-        &mut self,
-        name: Option<char>,
-        register: Register,
-        is_yank: bool,
-        ctx: &egui::Context,
-    ) {
+    pub(super) fn store(&mut self, name: Option<char>, register: Register, is_yank: bool, ctx: &egui::Context) {
         match name {
             Some('_') => return,
             Some(c) if c.is_ascii_lowercase() => self.set_named(c, register.clone()),
@@ -62,9 +56,7 @@ impl Registers {
     pub(super) fn get(&self, name: Option<char>) -> &Register {
         match name {
             Some('0') => &self.last_yank,
-            Some(c) if c.is_ascii_alphabetic() => {
-                self.named(c.to_ascii_lowercase()).unwrap_or(&self.unnamed)
-            }
+            Some(c) if c.is_ascii_alphabetic() => self.named(c.to_ascii_lowercase()).unwrap_or(&self.unnamed),
             _ => &self.unnamed,
         }
     }

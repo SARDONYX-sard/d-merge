@@ -73,12 +73,7 @@ where
     let level = level.into();
 
     let handle = {
-        let this = RotationBuilder {
-            log_dir,
-            log_file: log_name.to_string(),
-            max_files,
-            initial_level: level.into(),
-        };
+        let this = RotationBuilder { log_dir, log_file: log_name.to_string(), max_files, initial_level: level.into() };
 
         let file = crate::rotate::rotate_files(&this.log_dir, &this.log_file, this.max_files)?;
         let writer = crate::SwappableWriter::new(file);

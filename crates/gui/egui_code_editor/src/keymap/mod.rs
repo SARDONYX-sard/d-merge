@@ -79,9 +79,7 @@ impl StatusMode {
         match self {
             Self::Normal => egui::Color32::from_rgb(97, 175, 239),
             Self::Insert => egui::Color32::from_rgb(152, 195, 121),
-            Self::Visual | Self::VisualLine | Self::VisualBlock => {
-                egui::Color32::from_rgb(198, 120, 221)
-            }
+            Self::Visual | Self::VisualLine | Self::VisualBlock => egui::Color32::from_rgb(198, 120, 221),
             Self::Command => egui::Color32::from_rgb(229, 192, 123),
         }
     }
@@ -161,12 +159,7 @@ impl KeymapState {
     }
 
     /// Char index to draw a block cursor at, if the keymap wants one.
-    pub(crate) fn block_cursor(
-        &self,
-        keymap: Keymap,
-        current: Option<usize>,
-        text: &str,
-    ) -> Option<usize> {
+    pub(crate) fn block_cursor(&self, keymap: Keymap, current: Option<usize>, text: &str) -> Option<usize> {
         match keymap {
             Keymap::Normal => None,
             Keymap::Vim => self.vim.block_cursor(current, text),
@@ -182,11 +175,7 @@ impl KeymapState {
     }
 
     /// Char ranges of a block selection to draw, one per line (Vim `Ctrl+V`).
-    pub(crate) fn block_selection(
-        &self,
-        keymap: Keymap,
-        text: &str,
-    ) -> Option<Vec<std::ops::Range<usize>>> {
+    pub(crate) fn block_selection(&self, keymap: Keymap, text: &str) -> Option<Vec<std::ops::Range<usize>>> {
         match keymap {
             Keymap::Normal => None,
             Keymap::Vim => self.vim.block_ranges(text),

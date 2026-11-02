@@ -26,14 +26,11 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
     } = DEFAULT_FEMALE;
 
     let keys = {
-        let mut sorted_entries: Vec<_> =
-            ALT_GROUPS.into_iter().map(|(&key, group)| (group.id, key)).collect();
+        let mut sorted_entries: Vec<_> = ALT_GROUPS.into_iter().map(|(&key, group)| (group.id, key)).collect();
         sorted_entries.par_sort_by_key(|&(id, _)| id);
 
-        let mut keys: Vec<Value> = sorted_entries
-            .iter()
-            .map(|&(_, key)| Value::String(Cow::Owned(format!("FNISaa{key}"))))
-            .collect();
+        let mut keys: Vec<Value> =
+            sorted_entries.iter().map(|&(_, key)| Value::String(Cow::Owned(format!("FNISaa{key}")))).collect();
 
         keys.par_extend(
             sorted_entries
@@ -90,10 +87,7 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
         ),
         (
             json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
-            ValueWithPriority {
-                patch: JsonPatch { action: Action::SeqPush, value: keys.into() },
-                priority,
-            },
+            ValueWithPriority { patch: JsonPatch { action: Action::SeqPush, value: keys.into() }, priority },
         ),
     ]
 }

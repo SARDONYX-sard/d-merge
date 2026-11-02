@@ -50,14 +50,11 @@ impl Version {
             "minor" | "2" => next(major, minor + 1, 0),
             "patch" | "3" => next(major, minor, patch + 1),
             "pre" => {
-                let (tag, n) =
-                    self.pre.clone().ok_or_else(|| format!("{self} is not a prerelease"))?;
+                let (tag, n) = self.pre.clone().ok_or_else(|| format!("{self} is not a prerelease"))?;
                 Self { pre: Some((tag, n + 1)), ..self.clone() }
             }
             _ => match level.strip_prefix("pre=") {
-                Some(tag) if !tag.is_empty() => {
-                    Self { pre: Some((tag.to_string(), 0)), ..self.clone() }
-                }
+                Some(tag) if !tag.is_empty() => Self { pre: Some((tag.to_string(), 0)), ..self.clone() },
                 _ => return Err(format!("unknown level `{level}`").into()),
             },
         })

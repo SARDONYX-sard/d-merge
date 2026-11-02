@@ -36,24 +36,20 @@ pub(crate) fn apply_patches<'t, 'p: 't>(
         None => 0,
     };
 
-    let status_reporter =
-        StatusReportCounter::new(status_report, ReportType::ApplyingPatches, total);
+    let status_reporter = StatusReportCounter::new(status_report, ReportType::ApplyingPatches, total);
 
     // Step 1: Remove templates and build working set
     let working_set: Vec<_> = borrowed_patches
         .0
         .into_iter()
-        .filter_map(|(key, patches)| {
-            templates.remove(&key).map(|(_, template)| (key, patches, template))
-        })
+        .filter_map(|(key, patches)| templates.remove(&key).map(|(_, template)| (key, patches, template)))
         .collect();
 
     // Step 2: Apply patches in parallel
     let (results, updated_templates): (Vec<_>, Vec<_>) = working_set
         .into_par_iter()
         .map(|(key, patches, mut template_value)| {
-            let patch_results =
-                apply_to_one_template(config, &key, &mut template_value, patches, &status_reporter);
+            let patch_results = apply_to_one_template(config, &key, &mut template_value, patches, &status_reporter);
             (patch_results, (key, template_value))
         })
         .unzip();
@@ -117,25 +113,20 @@ fn apply_to_one_template<'a, 'b: 'a>(
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn write_debug_json_patch(
-    output_dir: &Path,
-    key: &TemplateKey,
-    patches: &HkxPatchMaps,
-) -> Result<(), Error> {
+fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPatchMaps) -> Result<(), Error> {
     use snafu::ResultExt as _;
 
     use crate::errors::FailedIoSnafu;
 
-    let mut output_path =
-        output_dir.join(".d_merge").join(".debug").join("patches").join(key.as_meshes_inner_path());
+    let mut output_path = output_dir.join(".d_merge").join(".debug").join("patches").join(key.as_meshes_inner_path());
     output_path.set_extension("patch.json");
 
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
     }
 
-    let json = sonic_rs::to_string_pretty(patches)
-        .with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
+    let json =
+        sonic_rs::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
 
     Ok(())

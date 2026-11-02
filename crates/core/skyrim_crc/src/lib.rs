@@ -52,9 +52,7 @@ mod tests {
     use super::*;
 
     const _: () = {
-        assert!(
-            calc_crc32(r"meshes\actors\character\animations\animatedweddingscene") == 1633210473
-        );
+        assert!(calc_crc32(r"meshes\actors\character\animations\animatedweddingscene") == 1633210473);
         assert!(calc_crc32(r"paired_weddingringandkiss") == 292817474);
 
         assert!(calc_crc32(r"meshes\actors\dragon\animations") == 0xdc1dddf3); // 3692944883

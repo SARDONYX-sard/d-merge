@@ -54,8 +54,7 @@ impl Language for NemesisXml<'_> {
         let is_id = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$' || c == '#';
         if chars.get(column).is_some_and(|&c| is_id(c)) {
             let start = chars[..column].iter().rposition(|&c| !is_id(c)).map_or(0, |i| i + 1);
-            let end =
-                chars[column..].iter().position(|&c| !is_id(c)).map_or(chars.len(), |i| column + i);
+            let end = chars[column..].iter().position(|&c| !is_id(c)).map_or(chars.len(), |i| column + i);
             let word: String = chars[start..end].iter().collect();
             if let Some((id, doc)) = self.pointers.iter().find(|(id, _)| *id == word) {
                 return Some(format!("**{id}**: {doc}"));
@@ -66,11 +65,7 @@ impl Language for NemesisXml<'_> {
     }
 
     /// `hkbClipGenerator.mode: String` for the field of the cursor line.
-    fn signature_help(
-        &self,
-        line: &str,
-        _column: usize,
-    ) -> Option<egui_code_editor::SignatureHelp> {
+    fn signature_help(&self, line: &str, _column: usize) -> Option<egui_code_editor::SignatureHelp> {
         let (class, field) = self.field_of_line(line)?;
         Some(egui_code_editor::SignatureHelp {
             label: format!("{class}.{}: {}", field.name, type_label(field)),
@@ -185,9 +180,7 @@ impl NemesisXml<'_> {
         let (name, value) = rest.split_once('"')?;
         let value = value.split_once('>')?.1;
         let field = self.fields?.1.iter().find(|f| f.name == name)?;
-        if value.contains('<')
-            || (field.kind != TypeKind::Pointer && field.sub_kind != TypeKind::Pointer)
-        {
+        if value.contains('<') || (field.kind != TypeKind::Pointer && field.sub_kind != TypeKind::Pointer) {
             return None;
         }
         let typed = value.rsplit(char::is_whitespace).next().unwrap_or_default();
@@ -249,10 +242,7 @@ impl NemesisXml<'_> {
             .filter(|values| !values.is_empty());
         let (values, doc): (Vec<&str>, &str) = match schema_values {
             Some(values) => (values.to_vec(), "class schema"),
-            None => (
-                self.values.get(field)?.iter().map(String::as_str).collect(),
-                "used in the template",
-            ),
+            None => (self.values.get(field)?.iter().map(String::as_str).collect(), "used in the template"),
         };
         // The token after the last `|` (flags) or the start of the value.
         let typed = value.rsplit('|').next().unwrap_or_default().trim_start();
@@ -305,9 +295,7 @@ pub(crate) fn field_values(behavior: &Behavior) -> FieldValues {
             let Some((value, _)) = rest.split_once("</hkparam>") else { continue };
             for token in value.split('|').map(str::trim) {
                 let is_enum = token.chars().next().is_some_and(|c| c.is_ascii_uppercase())
-                    && token
-                        .chars()
-                        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+                    && token.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
                     && token.contains('_');
                 if is_enum {
                     values.entry(field.to_string()).or_default().insert(token.to_string());
@@ -321,12 +309,10 @@ pub(crate) fn field_values(behavior: &Behavior) -> FieldValues {
 /// `(id, "class name")` of every object (the template's and the new ones).
 pub(crate) fn pointer_items(behavior: &Behavior) -> Vec<(String, String)> {
     let new = behavior.added.iter().map(|(id, text)| {
-        let class =
-            text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map_or("", |(c, _)| c);
+        let class = text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map_or("", |(c, _)| c);
         (id.clone(), format!("{class} (new)"))
     });
-    let template =
-        behavior.objects.iter().map(|o| (o.id.clone(), format!("{} {}", o.class, o.name)));
+    let template = behavior.objects.iter().map(|o| (o.id.clone(), format!("{} {}", o.class, o.name)));
     new.chain(template).collect()
 }
 

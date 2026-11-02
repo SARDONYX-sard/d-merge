@@ -1,8 +1,8 @@
+pub mod error;
 pub mod fetch;
 pub mod fs;
 pub mod i18n;
 pub mod log;
-pub mod mod_item;
 pub mod patch;
 pub mod settings;
 
@@ -26,4 +26,28 @@ fn ico_to_rgba(bytes: &[u8]) -> (Vec<u8>, [u32; 2]) {
     let width = image.width();
     let height = image.height();
     (image.rgba_data().to_vec(), [width, height])
+}
+
+pub const CURRENT_VERSION: semver::Version = semver::Version::new(
+    parse_u64(env!("CARGO_PKG_VERSION_MAJOR")),
+    parse_u64(env!("CARGO_PKG_VERSION_MINOR")),
+    parse_u64(env!("CARGO_PKG_VERSION_PATCH")),
+);
+
+/// Parses an unsigned decimal integer in a const context.
+///
+/// Panics at compile time if the input is empty or contains a non-digit.
+const fn parse_u64(s: &str) -> u64 {
+    let bytes = s.as_bytes();
+    assert!(!bytes.is_empty(), "empty version component");
+
+    let mut i = 0;
+    let mut acc: u64 = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        assert!(b.is_ascii_digit(), "non-digit in version component");
+        acc = acc * 10 + (b - b'0') as u64;
+        i += 1;
+    }
+    acc
 }

@@ -39,8 +39,7 @@ pub(super) enum VimKey {
 ///
 /// e.g., `d`/`u` half page, `f`/`b` page, `e`/`y` scroll a line, `a`/`x` increment,
 /// `o`/`i` jump list, `r` redo, `v` visual, `n`/`p` down/up, `w` (ignored, no windows)
-const NORMAL_CTRL: &[char] =
-    &['a', 'b', 'd', 'e', 'f', 'i', 'n', 'o', 'p', 'r', 'u', 'v', 'w', 'x', 'y'];
+const NORMAL_CTRL: &[char] = &['a', 'b', 'd', 'e', 'f', 'i', 'n', 'o', 'p', 'r', 'u', 'v', 'w', 'x', 'y'];
 
 /// `Ctrl` + letter combinations Vim uses in Insert mode.
 const INSERT_CTRL: &[char] = &['w', 'u', 't', 'd'];
@@ -83,8 +82,7 @@ pub(super) fn take(
         let mut keys = Vec::new();
         input.events.retain(|event| match event {
             egui::Event::Key { key, pressed, modifiers, .. } => {
-                let ctrl_letter =
-                    (modifiers.ctrl && !modifiers.alt).then(|| letter(*key)).flatten();
+                let ctrl_letter = (modifiers.ctrl && !modifiers.alt).then(|| letter(*key)).flatten();
                 let escape = *key == egui::Key::Escape
                     || (modifiers.ctrl && *key == egui::Key::OpenBracket)
                     || ctrl_letter == Some('c');

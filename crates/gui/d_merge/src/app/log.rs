@@ -142,14 +142,10 @@ fn log_layout(line: &str) -> egui::text::LayoutJob {
     let rest = parts.next().unwrap_or("");
 
     let font_id = FontId::monospace(13.0);
-    let normal =
-        TextFormat { font_id: font_id.clone(), color: Color32::GRAY, ..Default::default() };
+    let normal = TextFormat { font_id: font_id.clone(), color: Color32::GRAY, ..Default::default() };
 
-    let tracing_color = TextFormat {
-        font_id: font_id.clone(),
-        color: tracing_level_color(level),
-        ..Default::default()
-    };
+    let tracing_color =
+        TextFormat { font_id: font_id.clone(), color: tracing_level_color(level), ..Default::default() };
 
     job.append(time_stamp, 0.0, tracing_color.clone());
     job.append(" ", 0.0, normal.clone());
@@ -160,8 +156,7 @@ fn log_layout(line: &str) -> egui::text::LayoutJob {
     let gray = TextFormat { font_id: font_id.clone(), color: Color32::GRAY, ..Default::default() };
     if let Some(pos) = rest.find(": ") {
         let (location, message) = rest.split_at(pos + 1);
-        let location_color =
-            TextFormat { font_id, color: Color32::LIGHT_GREEN, ..Default::default() };
+        let location_color = TextFormat { font_id, color: Color32::LIGHT_GREEN, ..Default::default() };
 
         job.append(location, 0.0, location_color);
         job.append(" ", 0.0, gray.clone());

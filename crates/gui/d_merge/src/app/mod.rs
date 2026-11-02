@@ -136,12 +136,11 @@ impl App {
     pub(crate) fn new(settings: Settings, theme_manager: ThemeManager) -> Self {
         let log_window_info = settings.log.window.clone();
         let mut notify = Notification::default();
-        let hkanno = HkannoPage::restore(&settings.hkanno, &mut notify);
-        let i18n =
-            I18nMap::load_with_fallback(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
-                tracing::error!("Failed to load i18n map: {e}\nFallback to default");
-                I18nMap::new()
-            });
+        let hkanno = HkannoPage::restore(&settings.pages.hkanno, &mut notify);
+        let i18n = I18nMap::load_with_fallback(settings.ui.i18n_path.as_str()).unwrap_or_else(|e| {
+            tracing::error!("Failed to load i18n map: {e}\nFallback to default");
+            I18nMap::new()
+        });
 
         Self {
             settings,
@@ -225,8 +224,11 @@ impl App {
     /// Persists everything on shutdown.
     pub(crate) fn on_exit(&mut self) {
         self.settings.log.window = self.log_window_info.read().clone();
-        self.hkanno.store(&mut self.settings.hkanno);
-        self.settings.save();
+        self.hkanno.store(&mut self.settings.pages.hkanno);
+
+        if let Err(e) = self.settings.save() {
+            tracing::error!("Failed to save settings: {e}");
+        }
     }
 }
 pub(crate) fn update_window_geometry(

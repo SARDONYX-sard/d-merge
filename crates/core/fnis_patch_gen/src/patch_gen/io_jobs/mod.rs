@@ -131,20 +131,16 @@ fn partition_jobs(
 
 pub(super) fn write_file(output_path: &std::path::Path, bytes: &[u8]) -> Result<(), Error> {
     if let Some(parent) = output_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| Error::FNISHkxIoError { path: parent.to_path_buf(), source: e })?;
+        std::fs::create_dir_all(parent).map_err(|e| Error::FNISHkxIoError { path: parent.to_path_buf(), source: e })?;
     }
-    std::fs::write(output_path, bytes)
-        .map_err(|e| Error::FNISHkxIoError { path: output_path.into(), source: e })
+    std::fs::write(output_path, bytes).map_err(|e| Error::FNISHkxIoError { path: output_path.into(), source: e })
 }
 
 /// Creates a mirrored `female/` copy of a `male/` HKX job.
 ///
 /// Returns `None` when `job.kind` is not `FnisAA { is_male_subdir: true, .. }`.
 fn mirror_male_to_female(job: &ConversionJob) -> Option<ConversionJob> {
-    let AnimKind::FnisAA { is_male_subdir: true, prefix, group_name, slot_count, priority } =
-        &job.kind
-    else {
+    let AnimKind::FnisAA { is_male_subdir: true, prefix, group_name, slot_count, priority } = &job.kind else {
         return None;
     };
 

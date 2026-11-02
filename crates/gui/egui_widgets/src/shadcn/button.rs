@@ -180,12 +180,7 @@ impl egui::Widget for Button {
 
             painter.rect_filled(rect, cr, bg);
             if let Some(border) = border {
-                painter.rect_stroke(
-                    rect,
-                    cr,
-                    egui::Stroke::new(1.0_f32, border),
-                    egui::epaint::StrokeKind::Inside,
-                );
+                painter.rect_stroke(rect, cr, egui::Stroke::new(1.0_f32, border), egui::epaint::StrokeKind::Inside);
             }
 
             let icon_square = egui::vec2(icon_size, icon_size);
@@ -197,16 +192,12 @@ impl egui::Widget for Button {
                 Some(icon) => {
                     let total_w = icon_size + icon_gap + text_galley.size().x;
                     let start_x = rect.center().x - total_w / 2.0;
-                    let icon_rect = egui::Rect::from_min_size(
-                        egui::pos2(start_x, rect.center().y - icon_size / 2.0),
-                        icon_square,
-                    );
+                    let icon_rect =
+                        egui::Rect::from_min_size(egui::pos2(start_x, rect.center().y - icon_size / 2.0), icon_square);
                     paint_icon(painter, icon_rect, icon, fg);
 
-                    let text_pos = egui::pos2(
-                        start_x + icon_size + icon_gap,
-                        rect.center().y - text_galley.size().y / 2.0,
-                    );
+                    let text_pos =
+                        egui::pos2(start_x + icon_size + icon_gap, rect.center().y - text_galley.size().y / 2.0);
                     painter.galley(text_pos, text_galley, fg);
                 }
                 None => {

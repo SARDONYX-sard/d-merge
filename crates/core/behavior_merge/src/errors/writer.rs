@@ -36,9 +36,7 @@ pub(crate) async fn write_errors(options: &crate::Config, errors: &[Error]) -> R
         let mut error_output = options.output_dir.join(".d_merge");
         let _ = fs::create_dir_all(&error_output).await;
         error_output.push("d_merge_errors.log");
-        fs::write(&error_output, errors)
-            .await
-            .with_context(|_| FailedIoSnafu { path: error_output })?;
+        fs::write(&error_output, errors).await.with_context(|_| FailedIoSnafu { path: error_output })?;
     }
 
     Ok(())

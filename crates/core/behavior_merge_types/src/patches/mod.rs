@@ -42,9 +42,7 @@ pub struct PatchCollection<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorPatchesMap<'a>(
-    pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, fast_hash::RandomState>,
-);
+pub struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, fast_hash::RandomState>);
 
 impl<'a> BehaviorPatchesMap<'a> {
     #[inline]
@@ -99,9 +97,7 @@ pub struct BehaviorIndexes {
 /// - key: template_name
 /// - value: [`BehaviorIndexes`]
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorIndexMap<'a>(
-    pub DashMap<TemplateKey<'a>, BehaviorIndexes, fast_hash::RandomState>,
-);
+pub struct BehaviorIndexMap<'a>(pub DashMap<TemplateKey<'a>, BehaviorIndexes, fast_hash::RandomState>);
 impl<'a> BehaviorIndexMap<'a> {
     /// Create `Self`
     #[inline]

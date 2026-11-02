@@ -71,9 +71,7 @@ fn take_count(keys: &[VimKey]) -> (Option<usize>, &[VimKey]) {
     let digits = keys
         .iter()
         .enumerate()
-        .take_while(
-            |(i, k)| matches!(k, VimKey::Char(c) if c.is_ascii_digit() && !(*i == 0 && *c == '0')),
-        )
+        .take_while(|(i, k)| matches!(k, VimKey::Char(c) if c.is_ascii_digit() && !(*i == 0 && *c == '0')))
         .count();
     if digits == 0 {
         return (None, keys);
@@ -161,12 +159,8 @@ const fn motion(keys: &[VimKey]) -> Step<Motion> {
         [Char('h') | VimKey::Left | VimKey::Backspace, ..] => Motion::Left,
         [Char('l' | ' ') | VimKey::Right, ..] => Motion::Right,
         // No wrapping, so display lines are lines: `gj` = `j`, `g0` = `0`, ...
-        [Char('j') | VimKey::Down | Ctrl('n'), ..] | [Char('g'), Char('j') | VimKey::Down, ..] => {
-            Motion::Down
-        }
-        [Char('k') | VimKey::Up | Ctrl('p'), ..] | [Char('g'), Char('k') | VimKey::Up, ..] => {
-            Motion::Up
-        }
+        [Char('j') | VimKey::Down | Ctrl('n'), ..] | [Char('g'), Char('j') | VimKey::Down, ..] => Motion::Down,
+        [Char('k') | VimKey::Up | Ctrl('p'), ..] | [Char('g'), Char('k') | VimKey::Up, ..] => Motion::Up,
         [Char('w'), ..] => Motion::WordForward { big: false },
         [Char('W'), ..] => Motion::WordForward { big: true },
         [Char('b'), ..] => Motion::WordBackward { big: false },
@@ -201,9 +195,7 @@ const fn motion(keys: &[VimKey]) -> Step<Motion> {
         [Char(k @ ('f' | 't' | 'F' | 'T')), Char(ch), ..] => {
             Motion::Find { forward: matches!(k, 'f' | 't'), till: matches!(k, 't' | 'T'), ch: *ch }
         }
-        [Char(k @ ('\'' | '`')), Char(name), ..] => {
-            Motion::Mark { name: *name, linewise: *k == '\'' }
-        }
+        [Char(k @ ('\'' | '`')), Char(name), ..] => Motion::Mark { name: *name, linewise: *k == '\'' },
         [Char('g'), Char('g'), ..] => Motion::FileStart,
         [Char('g'), Char('e'), ..] => Motion::WordEndBackward { big: false },
         [Char('g'), Char('E'), ..] => Motion::WordEndBackward { big: true },
@@ -307,12 +299,7 @@ mod tests {
     fn counts_and_operators() {
         assert_eq!(
             parse(&keys("3j")),
-            Parse::Done {
-                command: Command::Move(Motion::Down),
-                count: 3,
-                explicit_count: true,
-                register: None
-            }
+            Parse::Done { command: Command::Move(Motion::Down), count: 3, explicit_count: true, register: None }
         );
         assert!(matches!(
             parse(&keys("2dd")),
@@ -320,44 +307,29 @@ mod tests {
         ));
         assert_eq!(
             command("ciw"),
-            Command::Operate(
-                Operator::Change,
-                Target::Object { kind: ObjectKind::Word, around: false }
-            )
+            Command::Operate(Operator::Change, Target::Object { kind: ObjectKind::Word, around: false })
         );
         assert_eq!(command("gUU"), Command::Operate(Operator::Upper, Target::Line));
         assert_eq!(command("gugu"), Command::Operate(Operator::Lower, Target::Line));
         assert_eq!(command(">>"), Command::Operate(Operator::Indent, Target::Line));
         assert_eq!(
             command("da("),
-            Command::Operate(
-                Operator::Delete,
-                Target::Object { kind: ObjectKind::Pair('(', ')'), around: true }
-            )
+            Command::Operate(Operator::Delete, Target::Object { kind: ObjectKind::Pair('(', ')'), around: true })
         );
         assert_eq!(
             command("dt,"),
-            Command::Operate(
-                Operator::Delete,
-                Target::Motion(Motion::Find { forward: true, till: true, ch: ',' })
-            )
+            Command::Operate(Operator::Delete, Target::Motion(Motion::Find { forward: true, till: true, ch: ',' }))
         );
     }
 
     #[test]
     fn registers_and_two_key_commands() {
-        assert!(matches!(
-            parse(&keys("\"a2yy")),
-            Parse::Done { register: Some('a'), count: 2, .. }
-        ));
+        assert!(matches!(parse(&keys("\"a2yy")), Parse::Done { register: Some('a'), count: 2, .. }));
         assert_eq!(command("qa"), Command::Simple(Simple::Record('a')));
         assert_eq!(command("@@"), Command::Simple(Simple::Play('@')));
         assert_eq!(command("gx"), Command::Simple(Simple::OpenUrl));
         assert_eq!(command("gg"), Command::Move(Motion::FileStart));
-        assert_eq!(
-            command("zt"),
-            Command::Simple(Simple::ScrollCursor { to: ScrollTo::Top, first_non_blank: false })
-        );
+        assert_eq!(command("zt"), Command::Simple(Simple::ScrollCursor { to: ScrollTo::Top, first_non_blank: false }));
     }
 
     #[test]

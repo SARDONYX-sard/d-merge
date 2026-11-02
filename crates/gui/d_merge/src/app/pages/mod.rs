@@ -22,7 +22,7 @@ impl App {
     pub(crate) fn ui_convert_page(&mut self, ui: &mut egui::Ui) {
         let ctx = ConvertPageCtx {
             panel_frame: self.panel_frame(),
-            settings: &mut self.settings.convert,
+            settings: &mut self.settings.pages.convert,
             i18n: &self.i18n,
             notify: &mut self.notify,
             runtime: &self.async_rt,
@@ -33,7 +33,8 @@ impl App {
     pub(crate) fn ui_hkanno_page(&mut self, ui: &mut egui::Ui) {
         let ctx = HkannoPageCtx {
             panel_frame: self.panel_frame(),
-            settings: &mut self.settings.hkanno,
+            settings: &mut self.settings.pages.hkanno,
+            lsp_settings: &mut self.settings.ui.lsp,
             i18n: &self.i18n,
             notify: &mut self.notify,
         };
@@ -45,9 +46,9 @@ impl App {
             panel_frame: self.panel_frame(),
             i18n: &self.i18n,
             notify: &mut self.notify,
-            template_dir: &self.settings.behavior.template_dir,
-            settings: &mut self.settings.patch_editor,
-            editor: &mut self.settings.hkanno,
+            template_dir: &self.settings.pages.patch.behavior.template_dir,
+            settings: &mut self.settings.pages.patch_editor,
+            editor: &mut self.settings.ui.lsp,
         };
         self.patch_editor.ui(ui, ctx);
     }

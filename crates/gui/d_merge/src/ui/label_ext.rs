@@ -33,8 +33,7 @@ impl CellAlign {
 
 /// Add a label truncated to fit within `width`; the full text is a tooltip only when truncated.
 pub(crate) fn label_with_hover(ui: &mut Ui, text: &str, width: f32, align: CellAlign) {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::hover());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::hover());
     // Off-screen rows (most of a long list): nothing to draw or hover.
     if !ui.is_rect_visible(rect) {
         return;
@@ -56,10 +55,8 @@ pub(crate) fn label_with_hover(ui: &mut Ui, text: &str, width: f32, align: CellA
 /// Add a hyperlink truncated to fit within `width`; the full URL is a tooltip only when truncated.
 /// Always left-aligned (URLs are not centered or right-aligned).
 pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(width, ROW_HEIGHT),
-        egui::Sense::click() | egui::Sense::hover(),
-    );
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::click() | egui::Sense::hover());
     if url.trim().is_empty() || !ui.is_rect_visible(rect) {
         return;
     }
@@ -70,11 +67,7 @@ pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
 
-    let color = if hovered {
-        ui.visuals().hyperlink_color
-    } else {
-        ui.visuals().hyperlink_color.gamma_multiply(0.85)
-    };
+    let color = if hovered { ui.visuals().hyperlink_color } else { ui.visuals().hyperlink_color.gamma_multiply(0.85) };
 
     let shown = truncate_to_width(ui, url, width);
     let is_truncated = matches!(shown, Cow::Owned(_));
@@ -90,10 +83,7 @@ pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
         let text_width = galley.size().x.min(width);
         let underline_y = text_pos.y + 5.0;
         painter.line_segment(
-            [
-                egui::pos2(rect.left(), underline_y),
-                egui::pos2(rect.left() + text_width, underline_y),
-            ],
+            [egui::pos2(rect.left(), underline_y), egui::pos2(rect.left() + text_width, underline_y)],
             egui::Stroke::new(1.0_f32, color),
         );
     }

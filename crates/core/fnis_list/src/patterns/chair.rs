@@ -25,9 +25,7 @@ pub struct FNISChairAnimation<'a> {
     pub sequenced: Vec<&'a str>,
 }
 
-pub(crate) fn parse_fnis_chair_animation<'a>(
-    input: &mut &'a str,
-) -> ModalResult<FNISChairAnimation<'a>> {
+pub(crate) fn parse_fnis_chair_animation<'a>(input: &mut &'a str) -> ModalResult<FNISChairAnimation<'a>> {
     seq!(FNISChairAnimation{
             _: space0,
             start: parse_fnis_animation.verify(|anim| {
@@ -97,10 +95,7 @@ mod tests {
                     anim_event: "PlayFluteSitting",
                     anim_file: "PlayFluteSittingStart.hkx",
                     anim_objects: vec!["AnimObjectFlute"],
-                    flag_set: FNISAnimFlagSet {
-                        flags: FNISAnimFlags::AnimObjects,
-                        ..Default::default()
-                    },
+                    flag_set: FNISAnimFlagSet { flags: FNISAnimFlags::AnimObjects, ..Default::default() },
                     anim_vars: vec![],
                     motions: vec![],
                     rotations: vec![],

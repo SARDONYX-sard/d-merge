@@ -37,7 +37,7 @@ use egui_widgets::{
 use gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
-    settings::convert::{ConvertSettings, OutFormat, SelectionType},
+    settings::pages::convert::{ConvertSettings, OutputFormat, SelectionType},
 };
 
 use self::{task::ConvertTask, tree::TreeView};
@@ -68,9 +68,7 @@ pub struct ConvertPage {
 
 impl std::fmt::Debug for ConvertPage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ConvertPage")
-            .field("running", &self.task.is_running())
-            .finish_non_exhaustive()
+        f.debug_struct("ConvertPage").field("running", &self.task.is_running()).finish_non_exhaustive()
     }
 }
 
@@ -81,9 +79,7 @@ impl ConvertPage {
         handle_drop(ui.ctx(), ctx.settings);
 
         // NOTE: Bottom panel first, then the central area (egui panel order).
-        egui::Panel::bottom("convert_actions")
-            .frame(ctx.panel_frame)
-            .show(ui, |ui| self.output_ui(ui, &mut ctx));
+        egui::Panel::bottom("convert_actions").frame(ctx.panel_frame).show(ui, |ui| self.output_ui(ui, &mut ctx));
 
         egui::CentralPanel::default().frame(ctx.panel_frame).show(ui, |ui| {
             self.inputs_header(ui, &mut ctx);
@@ -118,16 +114,8 @@ impl ConvertPage {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // Right-to-left: the last tab first.
                 let tabs = [
-                    (
-                        SelectionType::Tree,
-                        I18nKey::ConvertSelectionTree,
-                        I18nKey::ConvertSelectionTreeHover,
-                    ),
-                    (
-                        SelectionType::Files,
-                        I18nKey::ConvertSelectionFiles,
-                        I18nKey::ConvertSelectionFilesHover,
-                    ),
+                    (SelectionType::Tree, I18nKey::ConvertSelectionTree, I18nKey::ConvertSelectionTreeHover),
+                    (SelectionType::Files, I18nKey::ConvertSelectionFiles, I18nKey::ConvertSelectionFilesHover),
                 ];
                 for (kind, label, hover) in tabs {
                     let current = &mut ctx.settings.selection_type;
@@ -153,17 +141,14 @@ impl ConvertPage {
             let settings = &mut *ctx.settings;
             match settings.selection_type {
                 SelectionType::Files | SelectionType::Dir => {
-                    let add_files =
-                        Button::new(i18n.t(I18nKey::ConvertAddFiles)).icon(Icon::FilePlus);
+                    let add_files = Button::new(i18n.t(I18nKey::ConvertAddFiles)).icon(Icon::FilePlus);
                     if ui.add(add_files).clicked()
-                        && let Some(files) = dialog(&settings.selected_files)
-                            .add_filter("Havok", &INPUT_EXTENSIONS)
-                            .pick_files()
+                        && let Some(files) =
+                            dialog(&settings.selected_files).add_filter("Havok", &INPUT_EXTENSIONS).pick_files()
                     {
                         add_paths(&mut settings.selected_files, files.iter().map(|p| p.as_path()));
                     }
-                    let add_dirs =
-                        Button::new(i18n.t(I18nKey::ConvertAddDirs)).icon(Icon::FolderPlus);
+                    let add_dirs = Button::new(i18n.t(I18nKey::ConvertAddDirs)).icon(Icon::FolderPlus);
                     if ui.add(add_dirs).clicked()
                         && let Some(dirs) = dialog(&settings.selected_files).pick_folders()
                     {
@@ -171,8 +156,7 @@ impl ConvertPage {
                     }
                 }
                 SelectionType::Tree => {
-                    let add_roots =
-                        Button::new(i18n.t(I18nKey::ConvertAddRootDirs)).icon(Icon::FolderPlus);
+                    let add_roots = Button::new(i18n.t(I18nKey::ConvertAddRootDirs)).icon(Icon::FolderPlus);
                     if ui.add(add_roots).clicked()
                         && let Some(dirs) = dialog(&settings.tree_roots).pick_folders()
                     {
@@ -180,19 +164,13 @@ impl ConvertPage {
                     }
 
                     let tree = &mut self.tree;
-                    let select_label = if tree.has_checked() {
-                        I18nKey::ConvertUnselectAll
-                    } else {
-                        I18nKey::ConvertSelectAll
-                    };
+                    let select_label =
+                        if tree.has_checked() { I18nKey::ConvertUnselectAll } else { I18nKey::ConvertSelectAll };
                     if ui.add(Button::new(i18n.t(select_label))).clicked() {
                         tree.toggle_select_all();
                     }
-                    let expand_label = if tree.is_any_expanded() {
-                        I18nKey::ConvertCollapseAll
-                    } else {
-                        I18nKey::ConvertExpandAll
-                    };
+                    let expand_label =
+                        if tree.is_any_expanded() { I18nKey::ConvertCollapseAll } else { I18nKey::ConvertExpandAll };
                     if ui.add(Button::new(i18n.t(expand_label))).clicked() {
                         tree.toggle_expand_all();
                     }
@@ -287,19 +265,12 @@ impl ConvertPage {
         let label = if running {
             ctx.i18n.t(I18nKey::ConvertingButton).to_string()
         } else {
-            format!(
-                "{} ({count}) → {}",
-                ctx.i18n.t(I18nKey::ConvertButton),
-                ctx.settings.format.label()
-            )
+            format!("{} ({count}) → {}", ctx.i18n.t(I18nKey::ConvertButton), ctx.settings.format.label())
         };
         let button = Button::new(label).primary().full_width().min_size(egui::vec2(0.0, 40.0));
         let response = ui.add_enabled(!running && count > 0, button);
-        let response = if count == 0 {
-            response.on_disabled_hover_text(ctx.i18n.t(I18nKey::ConvertNoInput))
-        } else {
-            response
-        };
+        let response =
+            if count == 0 { response.on_disabled_hover_text(ctx.i18n.t(I18nKey::ConvertNoInput)) } else { response };
         if response.clicked() {
             self.start_convert(ui.ctx(), ctx);
         }
@@ -318,14 +289,7 @@ impl ConvertPage {
             return;
         }
 
-        self.task.start(
-            ctx.runtime,
-            egui_ctx,
-            inputs,
-            settings.output.clone(),
-            settings.format,
-            roots,
-        );
+        self.task.start(ctx.runtime, egui_ctx, inputs, settings.output.clone(), settings.format, roots);
     }
 }
 
@@ -338,10 +302,9 @@ fn handle_drop(egui_ctx: &egui::Context, settings: &mut ConvertSettings) {
     }
     match settings.selection_type {
         // Directory Tree: dropped directories become roots (files have no tree).
-        SelectionType::Tree => add_paths(
-            &mut settings.tree_roots,
-            dropped.iter().map(|p| p.as_path()).filter(|p| p.is_dir()),
-        ),
+        SelectionType::Tree => {
+            add_paths(&mut settings.tree_roots, dropped.iter().map(|p| p.as_path()).filter(|p| p.is_dir()));
+        }
         SelectionType::Files | SelectionType::Dir => add_paths(
             &mut settings.selected_files,
             dropped.iter().map(|p| p.as_path()).filter(|p| p.is_dir() || is_input_file(p)),
@@ -354,7 +317,7 @@ fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
     ui.label(ctx.i18n.t(I18nKey::ConvertOutputFormatLabel));
     ui.horizontal(|ui| {
         let format = &mut ctx.settings.format;
-        for kind in OutFormat::ALL {
+        for kind in OutputFormat::ALL {
             if ui.add(Button::selectable(*format == kind, kind.label())).clicked() {
                 *format = kind;
             }
@@ -365,17 +328,13 @@ fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
 
 /// `Output: [Next to each input] [Select] [📂]`
 fn output_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::ConvertOutputLabel))
-        .on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
+    ui.label(ctx.i18n.t(I18nKey::ConvertOutputLabel)).on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
 
     let output = &mut ctx.settings.output;
     // Right-to-left: the buttons take their width first, the text edit gets the rest.
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         let open = Button::new("").icon(Icon::FolderOpen);
-        if ui
-            .add_enabled(!output.is_empty(), open)
-            .on_hover_text(ctx.i18n.t(I18nKey::ConvertOpenOutputHover))
-            .clicked()
+        if ui.add_enabled(!output.is_empty(), open).on_hover_text(ctx.i18n.t(I18nKey::ConvertOpenOutputHover)).clicked()
             && let Err(err) = open_existing_dir_or_ancestor(Path::new(output.as_str()))
         {
             tracing::error!(err);
@@ -387,9 +346,7 @@ fn output_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
         }
         let width = ui.available_width();
         ui.add(
-            TextEdit::singleline(output)
-                .hint_text(ctx.i18n.t(I18nKey::ConvertOutputPlaceholder))
-                .desired_width(width),
+            TextEdit::singleline(output).hint_text(ctx.i18n.t(I18nKey::ConvertOutputPlaceholder)).desired_width(width),
         )
         .on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
     });
@@ -424,13 +381,7 @@ fn drop_zone(ui: &mut egui::Ui, hint: &str) {
     let corners = [r.left_top(), r.right_top(), r.right_bottom(), r.left_bottom(), r.left_top()];
     let stroke = egui::Stroke::new(1.5_f32, color);
     ui.painter().extend(egui::Shape::dashed_line(&corners, stroke, 8.0, 6.0));
-    ui.painter().text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
-        hint,
-        egui::FontId::proportional(18.0),
-        color,
-    );
+    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, hint, egui::FontId::proportional(18.0), color);
 }
 
 /// Blue overlay while files are dragged over the window.
@@ -443,12 +394,7 @@ fn drop_overlay(ctx: &egui::Context, i18n: &I18nMap) {
     let rect = ctx.content_rect();
     let blue = egui::Color32::from_rgb(66, 165, 245);
     painter.rect_filled(rect, 0.0, blue.gamma_multiply(0.15));
-    painter.rect_stroke(
-        rect.shrink(4.0),
-        8.0,
-        egui::Stroke::new(3.0_f32, blue),
-        egui::StrokeKind::Inside,
-    );
+    painter.rect_stroke(rect.shrink(4.0), 8.0, egui::Stroke::new(3.0_f32, blue), egui::StrokeKind::Inside);
     painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

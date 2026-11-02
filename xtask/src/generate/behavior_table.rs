@@ -108,11 +108,7 @@ pub(crate) fn run(ws: &Path) -> crate::Result {
     // -------------------------------
     // Common processor for all groups
     // -------------------------------
-    fn process_entries(
-        entries: &[Entry],
-        root_dir: &Path,
-        errors: &mut Vec<String>,
-    ) -> Vec<NewEntry> {
+    fn process_entries(entries: &[Entry], root_dir: &Path, errors: &mut Vec<String>) -> Vec<NewEntry> {
         entries
             .par_iter()
             .map(|entry| match get_behavior(root_dir, entry) {
@@ -149,8 +145,8 @@ pub(crate) fn run(ws: &Path) -> crate::Result {
         default.set_extension("xml");
 
         let default_root_index = get_default_root_state(&default)?;
-        let master_root_index = get_master_root_behavior(&master)
-            .ok_or_else(|| format!("master not found: {}", master.display()))?;
+        let master_root_index =
+            get_master_root_behavior(&master).ok_or_else(|| format!("master not found: {}", master.display()))?;
         let (master_behavior_graph_index, master_string_data_index, master_value_set_index) =
             get_master_behavior_graph_data(&master)
                 .ok_or_else(|| format!("master_info not found: {}", master.display()))?;
@@ -180,10 +176,7 @@ pub(crate) fn run(ws: &Path) -> crate::Result {
             .collect();
 
         if class.is_empty() || class.len() > 2 {
-            return Err(format!(
-                "unexpected number of hkbCharacterStringData classes: {}",
-                class.len()
-            ));
+            return Err(format!("unexpected number of hkbCharacterStringData classes: {}", class.len()));
         }
 
         class[0]
@@ -197,9 +190,8 @@ pub(crate) fn run(ws: &Path) -> crate::Result {
         let string = std::fs::read_to_string(master).ok()?;
         let class_map: serde_hkx_features::ClassMap = serde_hkx::from_str(&string).ok()?;
 
-        let (_, root) = class_map
-            .par_iter()
-            .find_first(|(_, class)| matches!(class, Classes::hkRootLevelContainer(_)))?;
+        let (_, root) =
+            class_map.par_iter().find_first(|(_, class)| matches!(class, Classes::hkRootLevelContainer(_)))?;
 
         if let Classes::hkRootLevelContainer(container) = root
             && let Some(variant) = container.m_namedVariants.first()

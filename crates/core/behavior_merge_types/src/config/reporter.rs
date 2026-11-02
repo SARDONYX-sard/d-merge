@@ -62,10 +62,7 @@ impl<'a> StatusReportCounter<'a> {
         if let Some(status_reporter) = self.status_reporter {
             match self.kind {
                 ReportType::GeneratingFnisPatches => {
-                    (status_reporter)(Status::GeneratingFnisPatches {
-                        index: done,
-                        total: self.total,
-                    });
+                    (status_reporter)(Status::GeneratingFnisPatches { index: done, total: self.total });
                 }
                 ReportType::ReadingPatches => {
                     (status_reporter)(Status::ReadingPatches { index: done, total: self.total });
@@ -77,10 +74,7 @@ impl<'a> StatusReportCounter<'a> {
                     (status_reporter)(Status::ApplyingPatches { index: done, total: self.total });
                 }
                 ReportType::GeneratingHkxFiles => {
-                    (status_reporter)(Status::GeneratingHkxFiles {
-                        index: done,
-                        total: self.total,
-                    });
+                    (status_reporter)(Status::GeneratingHkxFiles { index: done, total: self.total });
                 }
             };
         }

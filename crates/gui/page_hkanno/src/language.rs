@@ -6,9 +6,7 @@
 use std::ops::Range;
 
 use egui::Color32;
-use egui_code_editor::{
-    CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp,
-};
+use egui_code_editor::{CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp};
 use hkanno_lsp::features::{self, completion::CompletionKind, highlight::TokenKind};
 
 /// hkanno for the editor.
@@ -77,10 +75,8 @@ impl Language for HkannoLanguage {
         if !self.code_action {
             return Vec::new();
         }
-        let mut on_line: Vec<_> = features::diagnostics::diagnostics(text)
-            .into_iter()
-            .filter(|d| d.range.line == line)
-            .collect();
+        let mut on_line: Vec<_> =
+            features::diagnostics::diagnostics(text).into_iter().filter(|d| d.range.line == line).collect();
         // The problem under the cursor first.
         on_line.sort_by_key(|d| !(d.range.span.start..=d.range.span.end).contains(&column));
         on_line
@@ -97,9 +93,7 @@ impl Language for HkannoLanguage {
 }
 
 /// `hkanno_lsp` diagnostics -> editor diagnostics.
-pub(super) fn to_editor_diagnostics(
-    diagnostics: &[features::diagnostics::Diagnostic],
-) -> Vec<Diagnostic> {
+pub(super) fn to_editor_diagnostics(diagnostics: &[features::diagnostics::Diagnostic]) -> Vec<Diagnostic> {
     diagnostics
         .iter()
         .map(|d| Diagnostic {

@@ -61,10 +61,7 @@ impl serde::Serialize for Rgba {
         if self.a == 255 {
             serializer.serialize_str(&format!("#{:02X}{:02X}{:02X}", self.r, self.g, self.b,))
         } else {
-            serializer.serialize_str(&format!(
-                "#{:02X}{:02X}{:02X}{:02X}",
-                self.r, self.g, self.b, self.a,
-            ))
+            serializer.serialize_str(&format!("#{:02X}{:02X}{:02X}{:02X}", self.r, self.g, self.b, self.a,))
         }
     }
 }
@@ -85,12 +82,7 @@ impl<'de> serde::Deserialize<'de> for Rgba {
         }
 
         match s.len() {
-            6 => Ok(Self {
-                r: parse_hex(&s[0..2])?,
-                g: parse_hex(&s[2..4])?,
-                b: parse_hex(&s[4..6])?,
-                a: 255,
-            }),
+            6 => Ok(Self { r: parse_hex(&s[0..2])?, g: parse_hex(&s[2..4])?, b: parse_hex(&s[4..6])?, a: 255 }),
             8 => Ok(Self {
                 r: parse_hex(&s[0..2])?,
                 g: parse_hex(&s[2..4])?,
@@ -103,10 +95,11 @@ impl<'de> serde::Deserialize<'de> for Rgba {
 }
 
 /// Theme color
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
     /// System default: follows the OS theme setting. This is the default if `theme` is `None`.
+    #[default]
     System,
 
     /// Dark background.

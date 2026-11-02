@@ -13,19 +13,14 @@
 
 use std::ops::Range;
 
-use super::{
-    Mode, VimState, buffer::Buffer, command::Operator, exec::Exec, keys::VimKey,
-    registers::Register,
-};
+use super::{Mode, VimState, buffer::Buffer, command::Operator, exec::Exec, keys::VimKey, registers::Register};
 
 /// Width of a tab in display columns (egui's monospace tab).
 pub(crate) const TAB_WIDTH: usize = 4;
 
 /// Display column of char `col` of `line` (a tab advances to the next multiple of [`TAB_WIDTH`]).
 fn vcol(line: &[char], col: usize) -> usize {
-    line.iter()
-        .take(col)
-        .fold(0, |v, &c| if c == '\t' { (v / TAB_WIDTH + 1) * TAB_WIDTH } else { v + 1 })
+    line.iter().take(col).fold(0, |v, &c| if c == '\t' { (v / TAB_WIDTH + 1) * TAB_WIDTH } else { v + 1 })
 }
 
 /// The char of `line` covering display column `target` (`line.len()` past the end).
@@ -140,11 +135,7 @@ impl VimState {
 
     /// The block as text: its lines joined by `\n`.
     fn block_text(&self, buf: &Buffer) -> String {
-        self.block_ranges_in(buf)
-            .into_iter()
-            .map(|range| buf.slice(range))
-            .collect::<Vec<_>>()
-            .join("\n")
+        self.block_ranges_in(buf).into_iter().map(|range| buf.slice(range)).collect::<Vec<_>>().join("\n")
     }
 
     fn block_yank(&mut self, exec: &Exec) {
@@ -156,8 +147,7 @@ impl VimState {
     fn block_delete(&mut self, yank: bool, exec: &mut Exec) {
         let (first, _, left, _) = self.block(&exec.buf);
         if yank {
-            let register =
-                Register { text: self.block_text(&exec.buf), linewise: false, block: true };
+            let register = Register { text: self.block_text(&exec.buf), linewise: false, block: true };
             self.registers.store(self.active_register, register, false, &exec.ctx);
         }
         exec.snapshot(self.cursor);
@@ -182,10 +172,8 @@ impl VimState {
     fn block_case(&self, op: Operator, exec: &mut Exec) {
         exec.snapshot(self.cursor);
         for range in self.block_ranges_in(&exec.buf).into_iter().rev() {
-            let changed: String = exec.buf.chars[range.clone()]
-                .iter()
-                .flat_map(|&c| super::edit::change_case(c, op))
-                .collect();
+            let changed: String =
+                exec.buf.chars[range.clone()].iter().flat_map(|&c| super::edit::change_case(c, op)).collect();
             exec.buf.replace(range, &changed);
         }
         exec.output.changed = true;
@@ -204,14 +192,7 @@ impl VimState {
 
     /// `I` / `A` / `c`: Insert mode on the first line; the typed text is copied to the other
     /// lines when Insert mode is left ([`Self::finish_block_insert`]).
-    fn start_block_insert(
-        &mut self,
-        first: usize,
-        last: usize,
-        column: usize,
-        append: bool,
-        exec: &mut Exec,
-    ) {
+    fn start_block_insert(&mut self, first: usize, last: usize, column: usize, append: bool, exec: &mut Exec) {
         let start = exec.buf.nth_line_start(first);
         let end = exec.buf.line_end(start);
         let width = vcol(&exec.buf.chars[start..end], end - start);
@@ -221,14 +202,12 @@ impl VimState {
         let chars = &exec.buf.chars[start..exec.buf.line_end(start)];
         self.cursor = start + col_at(chars, column);
         self.mode = Mode::Insert;
-        self.block_insert =
-            (last > first).then_some(BlockInsert { lines: (first + 1, last), column, append });
+        self.block_insert = (last > first).then_some(BlockInsert { lines: (first + 1, last), column, append });
     }
 
     /// Copies `typed` (the text typed on the first line) to the other lines of the block.
     pub(super) fn finish_block_insert(&mut self, typed: Option<&str>, exec: &mut Exec) {
-        let Some(BlockInsert { lines: (first, last), column, append }) = self.block_insert.take()
-        else {
+        let Some(BlockInsert { lines: (first, last), column, append }) = self.block_insert.take() else {
             return;
         };
         // Only plain one-line insertions are repeated, like Vim.

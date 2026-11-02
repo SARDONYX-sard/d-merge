@@ -101,13 +101,7 @@ impl PatchProgress {
             _ => None,
         };
         if let Some(key) = progress_key {
-            return format!(
-                "[{}/{steps}] {} ({}/{})",
-                snapshot.phase,
-                i18n.t(key),
-                snapshot.index,
-                snapshot.total,
-            );
+            return format!("[{}/{steps}] {} ({}/{})", snapshot.phase, i18n.t(key), snapshot.index, snapshot.total,);
         }
 
         match snapshot.phase {

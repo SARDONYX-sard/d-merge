@@ -23,9 +23,7 @@ use crate::adsf::normal::{ClipMotionBlock, Rotation, Translation, de::from_word_
 /// until an empty line or end of input, and `rotation_len` is replaced with
 /// the number of entries actually read.
 #[inline]
-pub fn parse_clip_motion_block_patch<const STRICT: bool>(
-    input: &str,
-) -> Result<ClipMotionBlock<'_>, ReadableError> {
+pub fn parse_clip_motion_block_patch<const STRICT: bool>(input: &str) -> Result<ClipMotionBlock<'_>, ReadableError> {
     let mut de = PatchDeserializer::from_str(input);
     clip_motion_block_patch::<STRICT>(&mut de).map_err(|err| de.finish_error(err))
 }
@@ -35,23 +33,18 @@ fn clip_motion_block_patch<'a, const STRICT: bool>(
 ) -> Result<ClipMotionBlock<'a>, Error> {
     de.parse_next(multispace0)?;
 
-    let clip_id =
-        de.parse_next(super::common::one_line.context(Expected(Description("clip_id: str"))))?;
+    let clip_id = de.parse_next(super::common::one_line.context(Expected(Description("clip_id: str"))))?;
 
-    let duration = de.parse_next(
-        super::common::verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))),
-    )?;
+    let duration =
+        de.parse_next(super::common::verify_line_parses_to::<f32>.context(Expected(Description("duration: f32"))))?;
 
-    let translation_len =
-        de.parse_next(parse_one_line.context(Expected(Description("translation_len: usize"))))?;
+    let translation_len = de.parse_next(parse_one_line.context(Expected(Description("translation_len: usize"))))?;
 
     let translations = translations(de, translation_len)?;
 
-    let rotation_len =
-        de.parse_next(parse_one_line.context(Expected(Description("rotation_len: usize"))))?;
+    let rotation_len = de.parse_next(parse_one_line.context(Expected(Description("rotation_len: usize"))))?;
 
-    let rotations =
-        if STRICT { read_rotations_strict(de, rotation_len)? } else { read_rotations_lenient(de)? };
+    let rotations = if STRICT { read_rotations_strict(de, rotation_len)? } else { read_rotations_lenient(de)? };
 
     de.parse_next(multispace0)?;
 
@@ -65,10 +58,7 @@ fn clip_motion_block_patch<'a, const STRICT: bool>(
     })
 }
 
-fn translations<'a>(
-    de: &mut PatchDeserializer<'a>,
-    line_len: usize,
-) -> Result<Vec<Translation<'a>>, Error> {
+fn translations<'a>(de: &mut PatchDeserializer<'a>, line_len: usize) -> Result<Vec<Translation<'a>>, Error> {
     let mut translations = Vec::with_capacity(line_len);
 
     for _ in 0..line_len {
@@ -92,29 +82,18 @@ fn translations<'a>(
     Ok(translations)
 }
 
-fn read_rotations_strict<'a>(
-    de: &mut PatchDeserializer<'a>,
-    expected: usize,
-) -> Result<Vec<Rotation<'a>>, Error> {
+fn read_rotations_strict<'a>(de: &mut PatchDeserializer<'a>, expected: usize) -> Result<Vec<Rotation<'a>>, Error> {
     let mut rotations = Vec::with_capacity(expected);
 
     while rotations.len() < expected {
         if de.input.is_empty() {
-            return Err(Error::UnexpectedEnd {
-                field: "rotations",
-                expected,
-                actual: rotations.len(),
-            });
+            return Err(Error::UnexpectedEnd { field: "rotations", expected, actual: rotations.len() });
         }
 
         let rotation = de.parse_next(rotation_line)?;
 
         if rotation.time.is_empty() {
-            return Err(Error::InvalidLength {
-                field: "rotations",
-                expected,
-                actual: rotations.len(),
-            });
+            return Err(Error::InvalidLength { field: "rotations", expected, actual: rotations.len() });
         }
 
         rotations.push(rotation);
@@ -178,8 +157,7 @@ mod tests {
 1
 1 0 0 0 1";
 
-        let motion =
-            parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(
             motion,
@@ -210,8 +188,7 @@ aaaa$0
 2 0 0 1 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(
@@ -234,8 +211,7 @@ aaaa$0
 1 0 0 0 1
 ";
 
-        let err = parse_clip_motion_block_patch::<true>(input)
-            .expect_err("strict mode must reject fewer rotations");
+        let err = parse_clip_motion_block_patch::<true>(input).expect_err("strict mode must reject fewer rotations");
 
         let message = err.to_string();
 
@@ -258,8 +234,7 @@ aaaa$0
 3 0 1 0 0
 ";
 
-        let err = parse_clip_motion_block_patch::<true>(input)
-            .expect_err("strict mode must reject more rotations");
+        let err = parse_clip_motion_block_patch::<true>(input).expect_err("strict mode must reject more rotations");
 
         let message = err.to_string();
 
@@ -276,8 +251,7 @@ aaaa$0
 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<true>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 0);
         assert!(motion.rotations.is_empty());
@@ -299,8 +273,7 @@ aaaa$0
 2 0 0 1 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(
@@ -324,8 +297,7 @@ aaaa$0
 2 0 0 1 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(
@@ -350,8 +322,7 @@ aaaa$0
 3 0 1 0 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 3);
         assert_eq!(
@@ -377,8 +348,7 @@ aaaa$0
 
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(
@@ -401,8 +371,7 @@ aaaa$0
 1 0 0 0 1
 2 0 0 1 0";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(
@@ -426,8 +395,7 @@ aaaa$0
 2 0 0 1 0
 ";
 
-        let motion =
-            parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
+        let motion = parse_clip_motion_block_patch::<false>(input).unwrap_or_else(|err| panic!("{err}"));
 
         assert_eq!(motion.rotation_len, 2);
         assert_eq!(

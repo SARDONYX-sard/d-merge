@@ -19,15 +19,11 @@ fn match_segment_inner(p: &[char], n: &[char]) -> bool {
         // Name exhausted — match only if remaining pattern is all `*`
         (_, []) => p.iter().all(|&c| c == '*'),
         // `*` matches zero chars (skip `*`) or one more char (advance name)
-        (['*', p_rest @ ..], _) => {
-            match_segment_inner(p_rest, n) || match_segment_inner(p, &n[1..])
-        }
+        (['*', p_rest @ ..], _) => match_segment_inner(p_rest, n) || match_segment_inner(p, &n[1..]),
         // `?` matches exactly one char
         (['?', p_rest @ ..], [_, n_rest @ ..]) => match_segment_inner(p_rest, n_rest),
         // Literal character — case-insensitive
-        ([pc, p_rest @ ..], [nc, n_rest @ ..]) => {
-            pc.eq_ignore_ascii_case(nc) && match_segment_inner(p_rest, n_rest)
-        }
+        ([pc, p_rest @ ..], [nc, n_rest @ ..]) => pc.eq_ignore_ascii_case(nc) && match_segment_inner(p_rest, n_rest),
     }
 }
 

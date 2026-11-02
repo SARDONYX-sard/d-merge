@@ -66,10 +66,7 @@ pub(super) enum Op {
     SeqPush,
 }
 
-pub(crate) fn into_patch_map(
-    raw_diffs: Vec<RawDiff<'_>>,
-    priority: usize,
-) -> Result<ClipMotionDiffPatch<'_>> {
+pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Result<ClipMotionDiffPatch<'_>> {
     let mut patches = ClipMotionDiffPatch::default();
 
     for raw in raw_diffs {
@@ -134,9 +131,7 @@ pub(crate) fn into_patch_map(
                     verify_line_parses_to::<usize>
                         .context(Expected(Description("translations_len: usize")))
                         .parse_next(&mut input)
-                        .map_err(|err| {
-                            ReadableError::from_display(err, raw.text, raw.text.len() - input.len())
-                        })?;
+                        .map_err(|err| ReadableError::from_display(err, raw.text, raw.text.len() - input.len()))?;
 
                     // If `len` is the only parameter, then the patch consists only of the difference in `len`.
                     // Since `len` can be automatically determined using `Vec::len`, this is unnecessary.
@@ -149,15 +144,13 @@ pub(crate) fn into_patch_map(
                     raw.text
                 };
 
-                let (v, delete_len) =
-                    translation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
-                let action =
-                    make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
+                let (v, delete_len) = translation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
+                let action = make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
 
-                patches.translations_patches.seq.push(ValueWithPriority {
-                    patch: json_patch::JsonPatch { action, value: v.into() },
-                    priority,
-                });
+                patches
+                    .translations_patches
+                    .seq
+                    .push(ValueWithPriority { patch: json_patch::JsonPatch { action, value: v.into() }, priority });
             }
 
             // -------------------------
@@ -195,9 +188,7 @@ pub(crate) fn into_patch_map(
                     verify_line_parses_to::<usize>
                         .context(Expected(Description("rotations_len: usize")))
                         .parse_next(&mut input)
-                        .map_err(|err| {
-                            ReadableError::from_display(err, raw.text, raw.text.len() - input.len())
-                        })?;
+                        .map_err(|err| ReadableError::from_display(err, raw.text, raw.text.len() - input.len()))?;
 
                     // If `len` is the only parameter, then the patch consists only of the difference in `len`.
                     // Since `len` can be automatically determined using `Vec::len`, this is unnecessary.
@@ -210,24 +201,20 @@ pub(crate) fn into_patch_map(
                     raw.text
                 };
 
-                let (v, delete_len) =
-                    rotation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
-                let action =
-                    make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
+                let (v, delete_len) = rotation.parse(input).map_err(|e| ReadableError::from_parse(e))?;
+                let action = make_seq_action(op, raw.seq_index, raw.original_len, v.len() + delete_len);
 
-                patches.rotations_patches.seq.push(ValueWithPriority {
-                    patch: json_patch::JsonPatch { action, value: v.into() },
-                    priority,
-                });
+                patches
+                    .rotations_patches
+                    .seq
+                    .push(ValueWithPriority { patch: json_patch::JsonPatch { action, value: v.into() }, priority });
             }
 
             failure => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("unknown pattern: {failure:?}");
 
-                return Err(Error::NotFoundApplyTarget {
-                    kind: format!("unknown pattern: {failure:?}"),
-                });
+                return Err(Error::NotFoundApplyTarget { kind: format!("unknown pattern: {failure:?}") });
             }
         }
     }
@@ -242,15 +229,13 @@ const fn make_seq_action(
     new_len: usize,
 ) -> json_patch::Action {
     match (seq_index, original_len) {
-        (Some(start), _) => json_patch::Action::Seq {
-            op: to_json_patch_op(op),
-            range: Range { start, end: start + new_len },
-        },
+        (Some(start), _) => {
+            json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start, end: start + new_len } }
+        }
         // Diff starts from `*_len`, meaning the whole array is replaced.
-        (None, Some(_)) => json_patch::Action::Seq {
-            op: to_json_patch_op(op),
-            range: Range { start: 0, end: new_len },
-        },
+        (None, Some(_)) => {
+            json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start: 0, end: new_len } }
+        }
         (None, None) => json_patch::Action::SeqPush,
     }
 }

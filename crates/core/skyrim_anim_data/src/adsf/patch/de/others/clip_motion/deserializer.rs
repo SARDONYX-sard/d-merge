@@ -23,10 +23,7 @@ use crate::{
 ///
 /// # Errors
 /// Parse failed.
-pub fn parse_clip_motion_diff_patch(
-    adsf_patch: &str,
-    priority: usize,
-) -> Result<ClipMotionDiffPatch<'_>> {
+pub fn parse_clip_motion_diff_patch(adsf_patch: &str, priority: usize) -> Result<ClipMotionDiffPatch<'_>> {
     let mut patcher_de = PatchDeserializer::new(adsf_patch);
     patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
 
@@ -94,10 +91,7 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(
-        &mut self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
     }
 
@@ -108,17 +102,11 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::Context { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::Context { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::Readable { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::Readable { source: readable }
@@ -127,11 +115,7 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     fn message_to_readable_err(&self, err: impl core::fmt::Display) -> Error {
         Error::Readable {
-            source: ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            source: ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         }
     }
 
@@ -219,9 +203,7 @@ impl<'de> PatchDeserializer<'de> {
         use winnow::error::{StrContext::Expected, StrContextValue::Description};
 
         self.maybe_capture_diff()?;
-        let len = self.parse_next(
-            parse_one_line::<usize>.context(Expected(Description("length_line: usize"))),
-        )?;
+        let len = self.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
         #[cfg(feature = "tracing")]
         tracing::trace!("{:?}, line Length = {len}", self.path);
         Ok(len)
@@ -239,9 +221,10 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_line_f32(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        let _value = self.parse_next(parse_one_line::<f32>.context(
-            winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("f32")),
-        ))?;
+        let _value = self.parse_next(
+            parse_one_line::<f32>
+                .context(winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("f32"))),
+        )?;
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_value);
 
@@ -251,12 +234,11 @@ impl<'de> PatchDeserializer<'de> {
     /// parse `<time: f32> <text: str>\n`
     fn parse_annotation(&mut self) -> Result<()> {
         self.parse_next(
-            winnow::ascii::float::<_, f32, _>
-                .context(StrContext::Expected(StrContextValue::Description("f32"))),
+            winnow::ascii::float::<_, f32, _>.context(StrContext::Expected(StrContextValue::Description("f32"))),
         )?;
-        self.parse_next(space1.context(StrContext::Expected(StrContextValue::Description(
-            "space between time & text",
-        ))))?;
+        self.parse_next(
+            space1.context(StrContext::Expected(StrContextValue::Description("space between time & text"))),
+        )?;
 
         let _s = self.parse_next(winnow::ascii::till_line_ending)?;
         // In the case of patches, this may not be present, so `opt`
@@ -302,9 +284,7 @@ impl<'de> PatchDeserializer<'de> {
 
 /// Returns
 /// (diff, has_original, original_len)
-pub(crate) fn take_raw_diff<'a>(
-    input: &mut &'a str,
-) -> winnow::ModalResult<Option<(&'a str, bool, Option<usize>)>> {
+pub(crate) fn take_raw_diff<'a>(input: &mut &'a str) -> winnow::ModalResult<Option<(&'a str, bool, Option<usize>)>> {
     use crate::common_parser::comment::{open_comment, take_till_close, take_till_original};
 
     // Fast path: no OPEN comment ahead
@@ -351,10 +331,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::{
-        adsf::patch::de::others::clip_motion::ClipMotionDiffPatch,
-        asdsf::patch::de::NonNestedArrayDiff,
-    };
+    use crate::{adsf::patch::de::others::clip_motion::ClipMotionDiffPatch, asdsf::patch::de::NonNestedArrayDiff};
 
     // #[quick_tracing::init]
     #[test]

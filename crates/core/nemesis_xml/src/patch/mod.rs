@@ -103,20 +103,14 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(
-        &mut self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
     }
 
     /// Parse by argument parser no consume.
     ///
     /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(
-        &self,
-        mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
-    ) -> Result<O> {
+    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
         let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::ContextError { err })?;
         Ok(res)
     }
@@ -128,17 +122,11 @@ impl<'de> PatchDeserializer<'de> {
     #[cold]
     fn to_readable_err(&self, err: Error) -> Error {
         let readable = match err {
-            Error::ContextError { err } => ReadableError::from_context(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            Error::ContextError { err } => {
+                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
+            }
             Error::ReadableError { source } => source,
-            err => ReadableError::from_display(
-                err,
-                self.original,
-                self.original.len() - self.input.len(),
-            ),
+            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
         };
 
         Error::ReadableError { source: readable }
@@ -180,9 +168,7 @@ impl<'de> PatchDeserializer<'de> {
         let mut obj = Object::new();
         obj.insert("__ptr".into(), ptr_index.into());
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
-            if self.hack_options.bone_weight_outside_hkparam
-                && self.try_hack_bone_weight_seq_push()?
-            {
+            if self.hack_options.bone_weight_outside_hkparam && self.try_hack_bone_weight_seq_push()? {
                 continue;
             }
 
@@ -236,21 +222,22 @@ impl<'de> PatchDeserializer<'de> {
 
         let field_info = self.current.field_info.ok_or(Error::MissingFieldInfo)?;
 
-        let (field_name, field_type, _) =
-            match self.parse_next(field_start_tag(field_info)) {
-                Ok(ret) => ret,
-                Err(err) => {
-                    if self.hack_options.cast_ragdoll_event
-                        && self.current.path.last().is_some_and(|s| {
-                            s.eq_ignore_ascii_case("BSRagdollContactListenerModifier")
-                        })
-                    {
-                        self.parse_next(do_hack_cast_ragdoll_event)?
-                    } else {
-                        return Err(err);
-                    }
+        let (field_name, field_type, _) = match self.parse_next(field_start_tag(field_info)) {
+            Ok(ret) => ret,
+            Err(err) => {
+                if self.hack_options.cast_ragdoll_event
+                    && self
+                        .current
+                        .path
+                        .last()
+                        .is_some_and(|s| s.eq_ignore_ascii_case("BSRagdollContactListenerModifier"))
+                {
+                    self.parse_next(do_hack_cast_ragdoll_event)?
+                } else {
+                    return Err(err);
                 }
-            };
+            }
+        };
 
         self.current.path.push(field_name.into());
 
@@ -576,10 +563,8 @@ impl<'de> PatchDeserializer<'de> {
         let mut patch_path = self.current.path.clone();
         patch_path.push("boneWeights".into());
 
-        self.output_patches.insert(
-            patch_path,
-            JsonPatch { action: Action::SeqPush, value: BorrowedValue::Array(Box::new(floats)) },
-        );
+        self.output_patches
+            .insert(patch_path, JsonPatch { action: Action::SeqPush, value: BorrowedValue::Array(Box::new(floats)) });
 
         Ok(true)
     }
@@ -669,10 +654,7 @@ impl<'de> PatchDeserializer<'de> {
             if matches!(op, Op::Add) && self.parse_peek(opt(end_tag("hkparam")))?.is_some() {
                 self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
             } else {
-                self.output_patches.insert(
-                    path,
-                    JsonPatch { action: Action::Seq { op, range: new_range }, value },
-                );
+                self.output_patches.insert(path, JsonPatch { action: Action::Seq { op, range: new_range }, value });
             }
 
             self.current.clear_flags();
@@ -681,11 +663,11 @@ impl<'de> PatchDeserializer<'de> {
 
         // one diff pattern
         let (op, patches) = self.current.take_patches();
-        self.output_patches.par_extend(patches.into_par_iter().map(
-            |CurrentJsonPatch { path, value }| {
-                (path, JsonPatch { action: Action::Pure { op }, value })
-            },
-        ));
+        self.output_patches.par_extend(
+            patches
+                .into_par_iter()
+                .map(|CurrentJsonPatch { path, value }| (path, JsonPatch { action: Action::Pure { op }, value })),
+        );
 
         Ok(())
     }
@@ -832,10 +814,7 @@ mod tests {
         );
         hash_map.insert(
             json_path!["#0009", "hkbProjectStringData", "characterFilenames"],
-            JsonPatch {
-                action: Action::Seq { op: Op::Remove, range: 11..13 },
-                value: json_typed!(borrowed, null),
-            },
+            JsonPatch { action: Action::Seq { op: Op::Remove, range: 11..13 }, value: json_typed!(borrowed, null) },
         );
 
         assert_eq!(actual, hash_map);
@@ -876,10 +855,7 @@ mod tests {
 
         hash_map.insert(
             json_path,
-            JsonPatch {
-                action: Action::Seq { op: Op::Remove, range: 5..7 },
-                value: Default::default(),
-            },
+            JsonPatch { action: Action::Seq { op: Op::Remove, range: 5..7 }, value: Default::default() },
         );
         assert_eq!(actual, hash_map);
     }
@@ -940,21 +916,15 @@ mod tests {
 			<hkparam name="anotherBoneIndex">#2520</hkparam>
 		</hkobject>
         "###;
-        let (actual, _) = parse_nemesis_patch(
-            nemesis_xml,
-            Some(HackOptions { cast_ragdoll_event: true, ..Default::default() }),
-        )
-        .unwrap_or_else(|e| panic!("{e}"));
+        let (actual, _) =
+            parse_nemesis_patch(nemesis_xml, Some(HackOptions { cast_ragdoll_event: true, ..Default::default() }))
+                .unwrap_or_else(|e| panic!("{e}"));
 
-        let json_path =
-            json_path!["#2521", "BSRagdollContactListenerModifier", "contactEvent", "id"];
+        let json_path = json_path!["#2521", "BSRagdollContactListenerModifier", "contactEvent", "id"];
 
         let mut hash_map = HashMap::default();
 
-        hash_map.insert(
-            json_path,
-            JsonPatch { action: Action::Pure { op: Op::Replace }, value: 0.into() },
-        );
+        hash_map.insert(json_path, JsonPatch { action: Action::Pure { op: Op::Replace }, value: 0.into() });
         assert_eq!(actual, hash_map);
     }
 
@@ -981,10 +951,7 @@ mod tests {
         let mut expected = HashMap::default();
         expected.insert(
             json_path!["#0119", "hkbBoneWeightArray", "boneWeights"],
-            JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]),
-            },
+            JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]) },
         );
         assert_eq!(actual, expected);
     }

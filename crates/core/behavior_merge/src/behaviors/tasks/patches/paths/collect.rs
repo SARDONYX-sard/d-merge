@@ -24,9 +24,7 @@ pub(crate) enum Category {
 ///
 /// # Note
 /// Sub dirs are walked in parallel, and this can also be called inside `rayon::par_iter` per mod directory.
-pub(crate) fn collect_nemesis_paths(
-    mod_dir: &Path,
-) -> impl ParallelIterator<Item = (Category, PathBuf)> + '_ {
+pub(crate) fn collect_nemesis_paths(mod_dir: &Path) -> impl ParallelIterator<Item = (Category, PathBuf)> + '_ {
     jwalk_glob::walk_files(mod_dir).filter_map(move |path| {
         let category = classify(mod_dir, &path)?;
         Some((category, path))
@@ -62,9 +60,7 @@ fn is_txt_file(file_name: impl AsRef<Path>) -> bool {
 /// # Assumption.
 /// - The file is a file with a txt extension.
 fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
-    path.as_ref()
-        .file_stem()
-        .is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
+    path.as_ref().file_stem().is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
 }
 
 /// It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
@@ -77,8 +73,7 @@ fn is_manifest_patch(path: &Path) -> bool {
             .is_some_and(|name| name.eq_ignore_ascii_case(expected))
     };
 
-    name_eq(Some(path), "horseproject.txt")
-        && name_eq(path.parent(), "HorseProjectData~HorseProject")
+    name_eq(Some(path), "horseproject.txt") && name_eq(path.parent(), "HorseProjectData~HorseProject")
 }
 
 #[cfg(test)]
@@ -96,10 +91,7 @@ mod tests {
     fn test_classify_nemesis_patch_file() {
         assert_eq!(classify_in_mod("shout_behavior/#id$0.txt"), Some(Category::Nemesis));
         assert_eq!(classify_in_mod("_1stperson/0_master/#0106.txt"), Some(Category::Nemesis));
-        assert_eq!(
-            classify_in_mod("meshes/actors/character/behaviors/foo/#0001.txt"),
-            Some(Category::Nemesis)
-        );
+        assert_eq!(classify_in_mod("meshes/actors/character/behaviors/foo/#0001.txt"), Some(Category::Nemesis));
     }
 
     #[test]
@@ -130,11 +122,6 @@ mod tests {
         assert_eq!(classify_in_mod("info.ini"), None);
 
         // It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
-        assert_eq!(
-            classify_in_mod(
-                "animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt"
-            ),
-            None
-        );
+        assert_eq!(classify_in_mod("animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt"), None);
     }
 }

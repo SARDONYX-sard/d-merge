@@ -60,9 +60,7 @@ pub fn from_xml(xml: &str) -> Result<ClassMap<'_>, DeError> {
 /// # Errors
 /// The JSON does not describe valid classes.
 #[inline(never)]
-pub fn from_json_value(
-    value: simd_json::BorrowedValue<'_>,
-) -> Result<ClassMap<'_>, simd_json::Error> {
+pub fn from_json_value(value: simd_json::BorrowedValue<'_>) -> Result<ClassMap<'_>, simd_json::Error> {
     simd_json::serde::from_borrowed_value(value)
 }
 
@@ -130,8 +128,7 @@ pub fn to_xml(classes: &ClassMap<'_>, top_ptr: &Pointer<'_>) -> Result<String, S
 #[inline(never)]
 pub fn template_bin_to_xml(bytes: &[u8]) -> Result<String, String> {
     use serde_hkx::HavokSort as _;
-    let value: simd_json::BorrowedValue<'_> =
-        rmp_serde::from_slice(bytes).map_err(|e| e.to_string())?;
+    let value: simd_json::BorrowedValue<'_> = rmp_serde::from_slice(bytes).map_err(|e| e.to_string())?;
     let mut classes = from_json_value(value).map_err(|e| e.to_string())?;
     let top = classes.sort_for_xml().map_err(|e| e.to_string())?;
     let xml = to_xml(&classes, &top).map_err(|e| e.to_string())?;

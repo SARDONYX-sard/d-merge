@@ -116,17 +116,12 @@ fn expand(pattern: &str, is_dir: bool) -> Vec<PathBuf> {
         }
     }
 
-    let pat_after_root = std::path::Path::new(pattern)
-        .strip_prefix(&root)
-        .unwrap_or_else(|_| std::path::Path::new(pattern));
+    let pat_after_root =
+        std::path::Path::new(pattern).strip_prefix(&root).unwrap_or_else(|_| std::path::Path::new(pattern));
 
     // NOTE: Accept both `/` and `\` regardless of the platform.
-    let mut components: Vec<&str> = pat_after_root
-        .to_str()
-        .unwrap_or_default()
-        .split(['/', '\\'])
-        .filter(|s| !s.is_empty())
-        .collect();
+    let mut components: Vec<&str> =
+        pat_after_root.to_str().unwrap_or_default().split(['/', '\\']).filter(|s| !s.is_empty()).collect();
     // `**/**` is the same as `**`. (Also required by `expand_components`.)
     components.dedup_by(|a, b| *a == "**" && *b == "**");
 
@@ -149,8 +144,7 @@ mod tests {
 
     impl TempTree {
         fn new(name: &str, dirs: &[&str], files: &[&str]) -> Self {
-            let root =
-                std::env::temp_dir().join(format!("jwalk_glob_{name}_{}", std::process::id()));
+            let root = std::env::temp_dir().join(format!("jwalk_glob_{name}_{}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
             for dir in dirs {
                 fs::create_dir_all(root.join(dir)).unwrap();
@@ -166,12 +160,7 @@ mod tests {
         }
 
         fn relative(&self, paths: Vec<PathBuf>) -> Vec<String> {
-            paths
-                .iter()
-                .map(|path| {
-                    path.strip_prefix(&self.0).unwrap().to_string_lossy().replace('\\', "/")
-                })
-                .collect()
+            paths.iter().map(|path| path.strip_prefix(&self.0).unwrap().to_string_lossy().replace('\\', "/")).collect()
         }
     }
 
@@ -227,13 +216,7 @@ mod tests {
         let actual = tree.relative(glob_dirs(&tree.pattern("mods/**/Data")));
         assert_eq!(
             actual,
-            [
-                "mods/Data",
-                "mods/FNISFlyer/Data",
-                "mods/TKDodge/Data",
-                "mods/a/b/Data",
-                "mods/a/b/c/Data",
-            ]
+            ["mods/Data", "mods/FNISFlyer/Data", "mods/TKDodge/Data", "mods/a/b/Data", "mods/a/b/c/Data",]
         );
 
         // `**/**` is the same as `**`.

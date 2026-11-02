@@ -2,7 +2,11 @@
 
 use std::sync::Arc;
 
-use gui_shared::{fetch::FetchState, i18n::I18nKey, mod_item, settings::DataMode};
+use gui_shared::{
+    fetch::FetchState,
+    i18n::I18nKey,
+    settings::{DataMode, pages::patch::mod_item},
+};
 
 use crate::app::App;
 
@@ -18,8 +22,8 @@ impl App {
 
         *self.fetch_state.write() = FetchState::Fetching;
 
-        let dir = self.settings.current_skyrim_data_dir().to_owned();
-        let use_vfs = self.settings.behavior.mode == DataMode::Vfs;
+        let dir = self.settings.pages.patch.current_skyrim_data_dir().to_owned();
+        let use_vfs = self.settings.pages.patch.behavior.mode == DataMode::Vfs;
         let state = Arc::clone(&self.fetch_state);
         let fetched_mod_info = Arc::clone(&self.fetched_mod_info);
 
@@ -29,9 +33,7 @@ impl App {
             // NOTE: If rayon saturates all CPU threads the UI freezes.
             // `mod_info::get_all` must not spawn unbounded rayon work internally.
             let new_state = match mod_info::get_all(&dir, use_vfs) {
-                Ok(mod_info) if mod_info.is_empty() => {
-                    FetchState::Empty { elapsed: start_time.elapsed() }
-                }
+                Ok(mod_info) if mod_info.is_empty() => FetchState::Empty { elapsed: start_time.elapsed() },
                 Ok(mod_info) => {
                     *fetched_mod_info.write() = mod_info;
                     FetchState::Done { elapsed: start_time.elapsed() }
@@ -63,21 +65,19 @@ impl App {
                 drop(state);
 
                 let mod_info = core::mem::take(&mut *self.fetched_mod_info.write());
-                let new_mods = mod_item::inherit_reorder_cast(self.settings.mod_list(), mod_info);
+                let new_mods = mod_item::inherit_reorder_cast(self.settings.pages.patch.mod_list(), mod_info);
                 self.check_all = new_mods.iter().all(|m| m.enabled);
-                *self.settings.mod_list_mut() = new_mods;
+                *self.settings.pages.patch.mod_list_mut() = new_mods;
 
                 // Reset to Idle so this branch is not re-entered next frame.
                 *self.fetch_state.write() = FetchState::Idle;
                 self.last_fetch_was_empty = false;
 
-                self.mod_list_msg.success(format!(
-                    "{} ({elapsed_secs:.2} s)",
-                    self.i18n.t(I18nKey::ModsListFetchStateDone)
-                ));
+                self.mod_list_msg
+                    .success(format!("{} ({elapsed_secs:.2} s)", self.i18n.t(I18nKey::ModsListFetchStateDone)));
 
-                if self.settings.behavior.auto_run {
-                    self.settings.mod_list_mut().iter_mut().for_each(|m| m.enabled = true);
+                if self.settings.pages.patch.behavior.auto_run {
+                    self.settings.pages.patch.mod_list_mut().iter_mut().for_each(|m| m.enabled = true);
                     self.patch(ctx);
                 }
             }
@@ -89,10 +89,8 @@ impl App {
                 *self.fetch_state.write() = FetchState::Idle;
                 self.last_fetch_was_empty = true;
 
-                self.mod_list_msg.info(format!(
-                    "{} ({elapsed_secs:.2} s)",
-                    self.i18n.t(I18nKey::ModsListFetchStateEmpty)
-                ));
+                self.mod_list_msg
+                    .info(format!("{} ({elapsed_secs:.2} s)", self.i18n.t(I18nKey::ModsListFetchStateEmpty)));
             }
 
             FetchState::Error { elapsed } => {
@@ -101,10 +99,8 @@ impl App {
 
                 *self.fetch_state.write() = FetchState::Idle;
 
-                self.mod_list_msg.error(format!(
-                    "{} ({elapsed_secs:.2} s)",
-                    self.i18n.t(I18nKey::ModsListFetchStateError)
-                ));
+                self.mod_list_msg
+                    .error(format!("{} ({elapsed_secs:.2} s)", self.i18n.t(I18nKey::ModsListFetchStateError)));
             }
 
             FetchState::Idle => {}
@@ -121,11 +117,11 @@ impl App {
     /// The registry read only works on Windows.  On other platforms the error
     /// branch fires immediately and shows a "platform not supported" message.
     pub(crate) fn update_vfs_skyrim_data_dir_by_reg(&mut self) {
-        match skyrim_data_dir::get_skyrim_data_dir(self.settings.behavior.target_runtime) {
+        match skyrim_data_dir::get_skyrim_data_dir(self.settings.pages.patch.behavior.target_runtime) {
             Ok(dir) => {
                 let new_path = dir.display().to_string();
-                if self.settings.vfs.skyrim_data_dir != new_path {
-                    self.settings.vfs.skyrim_data_dir = new_path;
+                if self.settings.pages.patch.vfs.skyrim_data_dir != new_path {
+                    self.settings.pages.patch.vfs.skyrim_data_dir = new_path;
                     self.update_mod_list();
                 }
             }

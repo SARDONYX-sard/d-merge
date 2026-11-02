@@ -82,20 +82,13 @@ impl CompletionPopup {
     /// Decides whether the edit made this frame should (re)open the popup.
     ///
     /// e.g., typing `.` after `PIE` opens it; typing while it is open refreshes (filters) it.
-    pub(super) fn on_text_changed(
-        &mut self,
-        ui: &egui::Ui,
-        language: &dyn Language,
-        text: &str,
-        cursor: LinePos,
-    ) {
+    pub(super) fn on_text_changed(&mut self, ui: &egui::Ui, language: &dyn Language, text: &str, cursor: LinePos) {
         let triggers = language.completion_triggers();
         let typed_trigger = ui.input(|i| {
             i.events.iter().any(|event| match event {
-                egui::Event::Text(s) => s
-                    .chars()
-                    .last()
-                    .is_some_and(|c| triggers.contains(&c) || c.is_alphanumeric() || c == '_'),
+                egui::Event::Text(s) => {
+                    s.chars().last().is_some_and(|c| triggers.contains(&c) || c.is_alphanumeric() || c == '_')
+                }
                 _ => false,
             })
         });
@@ -149,20 +142,14 @@ impl CompletionPopup {
         } else {
             (anchor.left_top(), egui::Align2::LEFT_BOTTOM, above)
         };
-        let doc = list
-            .items
-            .get(self.selected)
-            .map(|item| item.documentation.as_str())
-            .filter(|d| !d.is_empty());
+        let doc = list.items.get(self.selected).map(|item| item.documentation.as_str()).filter(|d| !d.is_empty());
         let doc_room = if doc.is_some() { DOC_HEIGHT } else { 0.0 };
         let list_height = (room - doc_room - 32.0).clamp(60.0, 400.0);
         let follow = self.scrolled_to != Some(self.selected);
 
-        egui::Area::new(id.with("completion"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(pos)
-            .pivot(pivot)
-            .show(ctx, |ui| {
+        egui::Area::new(id.with("completion")).order(egui::Order::Foreground).fixed_pos(pos).pivot(pivot).show(
+            ctx,
+            |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     ui.set_max_width(480.0);
                     // Popups are a separate layer: set the always-visible, solid scroll bars here too.
@@ -171,14 +158,11 @@ impl CompletionPopup {
                     egui::ScrollArea::vertical()
                         .id_salt("items")
                         .max_height(list_height)
-                        .scroll_bar_visibility(
-                            egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
-                        )
+                        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                         .show(ui, |ui| {
                             for (i, item) in list.items.iter().enumerate() {
                                 let label = format!("{} {}", item.icon, item.label);
-                                let response =
-                                    ui.add(egui::Button::selectable(i == self.selected, label));
+                                let response = ui.add(egui::Button::selectable(i == self.selected, label));
                                 // Keep the keyboard-selected one in view.
                                 if i == self.selected && follow {
                                     response.scroll_to_me(None);
@@ -193,15 +177,13 @@ impl CompletionPopup {
                     // Documentation of the selected candidate, below the list.
                     if let Some(doc) = doc {
                         ui.separator();
-                        egui::ScrollArea::vertical().id_salt("doc").max_height(DOC_HEIGHT).show(
-                            ui,
-                            |ui| {
-                                egui_widgets::markdown::markdown(ui, doc);
-                            },
-                        );
+                        egui::ScrollArea::vertical().id_salt("doc").max_height(DOC_HEIGHT).show(ui, |ui| {
+                            egui_widgets::markdown::markdown(ui, doc);
+                        });
                     }
                 });
-            });
+            },
+        );
         self.scrolled_to = Some(self.selected);
 
         clicked

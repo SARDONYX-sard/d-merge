@@ -23,8 +23,7 @@ pub fn serialize_alt_adsf(
 ) -> Result<String, SerializeError> {
     let mut output = String::new();
 
-    let mut project_names: Vec<_> =
-        alt_adsf.0.par_iter().map(|(k, _)| to_adsf_key(k.clone())).collect();
+    let mut project_names: Vec<_> = alt_adsf.0.par_iter().map(|(k, _)| to_adsf_key(k.clone())).collect();
 
     if let Some(patches) = project_names_patches {
         patches.into_apply(&mut project_names)?;
@@ -51,10 +50,7 @@ pub fn serialize_alt_adsf(
         let count = counter.entry(base.to_string()).or_insert(1);
         let name = if *count == 1 { format!("{base}~1") } else { format!("{base}~{count}") };
 
-        let anim_data = alt_adsf
-            .0
-            .get(name.as_str())
-            .ok_or_else(|| SerializeError::MissingAnimData { name })?;
+        let anim_data = alt_adsf.0.get(name.as_str()).ok_or_else(|| SerializeError::MissingAnimData { name })?;
 
         output.push_str(&serialize_anim_data(anim_data, &mut clip_id_manager, &mut clip_id_map)?);
     }
@@ -80,11 +76,7 @@ fn serialize_anim_data<'a>(
     let has_motion_data = !(base_len == 0 && add_clip_len == 0);
 
     // Serialize header
-    output.push_str(&serialize_anim_header(
-        &anim_data.header,
-        has_motion_data,
-        anim_data.to_line_range(),
-    ));
+    output.push_str(&serialize_anim_header(&anim_data.header, has_motion_data, anim_data.to_line_range()));
 
     for block in &anim_data.add_clip_anim_blocks {
         let new_id = clip_id_manager.next_id();
@@ -107,14 +99,10 @@ fn serialize_anim_data<'a>(
     if has_motion_data {
         for block in &anim_data.add_clip_motion_blocks {
             if let Some(&new_id) = clip_id_map.get(block.clip_id.as_ref()) {
-                output
-                    .push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
+                output.push_str(&serialize_clip_motion_block(block, Some(new_id.to_string().into())));
             } else {
                 let new_id = clip_id_manager.next_id();
-                output.push_str(&serialize_clip_motion_block(
-                    block,
-                    new_id.map(|id| id.to_string().into()),
-                ));
+                output.push_str(&serialize_clip_motion_block(block, new_id.map(|id| id.to_string().into())));
             }
         }
 
@@ -126,11 +114,7 @@ fn serialize_anim_data<'a>(
     Ok(output)
 }
 
-fn serialize_anim_header(
-    header: &AnimDataHeader,
-    has_motion_data: bool,
-    line_range: usize,
-) -> String {
+fn serialize_anim_header(header: &AnimDataHeader, has_motion_data: bool, line_range: usize) -> String {
     let mut output = String::new();
 
     output.push_str(&line_range.to_string());
@@ -170,18 +154,13 @@ mod tests {
     use super::*;
 
     fn normalize_to_crlf(input: &str) -> std::borrow::Cow<'_, str> {
-        if input.contains("\r\n") {
-            input.into()
-        } else {
-            input.replace("\r", "").replace("\n", "\r\n").into()
-        }
+        if input.contains("\r\n") { input.into() } else { input.replace("\r", "").replace("\n", "\r\n").into() }
     }
 
     #[test]
     fn test_serialize_alt_adsf() {
-        let alt_adsf_bytes = include_bytes!(
-            "../../../../../../resource/assets/templates/meshes/animationdatasinglefile.bin"
-        );
+        let alt_adsf_bytes =
+            include_bytes!("../../../../../../resource/assets/templates/meshes/animationdatasinglefile.bin");
         let alt_adsf = rmp_serde::from_slice(alt_adsf_bytes).unwrap();
         let actual = serialize_alt_adsf(alt_adsf, None).unwrap();
 
@@ -201,9 +180,7 @@ mod tests {
     fn alt_adsf_keeps_max_clip_id() {
         use crate::adsf::alt::AltAdsf;
 
-        let input = include_str!(
-            "../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt"
-        );
+        let input = include_str!("../../../../../../resource/xml/templates/meshes/animationdatasinglefile.txt");
         let adsf = crate::adsf::normal::de::parse_adsf(input).unwrap_or_else(|err| {
             panic!("Failed to parse adsf:\n{err}");
         });
@@ -213,11 +190,7 @@ mod tests {
             adsf.0
                 .par_values()
                 .filter_map(|anim_data| {
-                    anim_data
-                        .clip_anim_blocks
-                        .par_values()
-                        .filter_map(|block| block.clip_id.parse::<u64>().ok())
-                        .max()
+                    anim_data.clip_anim_blocks.par_values().filter_map(|block| block.clip_id.parse::<u64>().ok()).max()
                 })
                 .max()
         }

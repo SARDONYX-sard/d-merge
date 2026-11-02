@@ -53,9 +53,7 @@ enum ParsedFlag<'a> {
 /// # Errors
 /// Pair and KillMove animations require a duration specified by `D<time>`.
 /// If this is missing, the parser will return an error.
-pub(super) fn parse_anim_flags<'a>(
-    input: &mut &'a str,
-) -> ModalResult<FNISPairAndKillMoveAnimFlagSet<'a>> {
+pub(super) fn parse_anim_flags<'a>(input: &mut &'a str) -> ModalResult<FNISPairAndKillMoveAnimFlagSet<'a>> {
     preceded("-", __parse_anim_flags)
         .context(StrContext::Label("FNIS Paired & KillMove Animation Flags"))
         .context(StrContext::Expected(StrContextValue::Description(
@@ -111,8 +109,7 @@ fn parse_anim_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
 }
 
 fn parse_anim_flag_param<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
-    alt((preceded(Caseless("D"), float).map(ParsedFlag::DurationTime), parse_trigger_flag))
-        .parse_next(input)
+    alt((preceded(Caseless("D"), float).map(ParsedFlag::DurationTime), parse_trigger_flag)).parse_next(input)
 }
 
 /// Parse a simple animation flag, ensuring it does not accidentally
@@ -148,13 +145,11 @@ fn parse_anim_flag_simple_strict(input: &mut &str) -> ModalResult<FNISAnimFlags>
 /// - `T2_killactor/3.333` -> `ParsedFlag::Trigger2` (event includes `"2_"`)
 fn parse_trigger_flag<'a>(input: &mut &'a str) -> ModalResult<ParsedFlag<'a>> {
     parse_trigger_options
-        .map(|trig: Trigger<'a>| {
-            if trig.event.starts_with("2_") {
-                ParsedFlag::Trigger2(trig)
-            } else {
-                ParsedFlag::Trigger(trig)
-            }
-        })
+        .map(
+            |trig: Trigger<'a>| {
+                if trig.event.starts_with("2_") { ParsedFlag::Trigger2(trig) } else { ParsedFlag::Trigger(trig) }
+            },
+        )
         .parse_next(input)
 }
 

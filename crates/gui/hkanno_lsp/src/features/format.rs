@@ -27,26 +27,17 @@ pub fn format_line(line: &str) -> String {
     let number = |value: f64| format!("{value:.6}");
 
     // `None` parts are skipped, present ones are joined by exactly one space.
-    let join =
-        |parts: &[Option<String>]| parts.iter().flatten().cloned().collect::<Vec<_>>().join(" ");
+    let join = |parts: &[Option<String>]| parts.iter().flatten().cloned().collect::<Vec<_>>().join(" ");
     let field = |f: Option<crate::parser::Field<f64>>| f.map(|f| number(f.value));
 
     match parse_line(line, Syntax::Core) {
-        LineNode::Rotation(n) => {
-            join(&[field(n.time), n.event.map(|_| "animrotation".to_string()), field(n.degrees)])
+        LineNode::Rotation(n) => join(&[field(n.time), n.event.map(|_| "animrotation".to_string()), field(n.degrees)]),
+        LineNode::Motion(n) => {
+            join(&[field(n.time), n.event.map(|_| "animmotion".to_string()), field(n.x), field(n.y), field(n.z)])
         }
-        LineNode::Motion(n) => join(&[
-            field(n.time),
-            n.event.map(|_| "animmotion".to_string()),
-            field(n.x),
-            field(n.y),
-            field(n.z),
-        ]),
         LineNode::Text(n) => join(&[field(n.time), n.text.map(|t| t.value.to_string())]),
         LineNode::TrackName(n) => format!("trackName: {}", n.name.map_or("", |n| n.value)),
-        LineNode::Comment(n) => {
-            join(&[Some("#".to_string()), n.comment.map(|c| c.value.to_string())])
-        }
+        LineNode::Comment(n) => join(&[Some("#".to_string()), n.comment.map(|c| c.value.to_string())]),
         // Unreachable with `Syntax::Core`; keep the line untouched just in case.
         LineNode::IFrame(_) | LineNode::Pie(_) => line.to_string(),
     }

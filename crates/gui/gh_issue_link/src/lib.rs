@@ -60,8 +60,7 @@ impl<'a> EnvInfo<'a> {
 
         let os = System::long_os_version();
         let ver = System::kernel_version();
-        let os =
-            format!("{} {}", os.as_deref().unwrap_or("Unknown OS"), ver.as_deref().unwrap_or(""));
+        let os = format!("{} {}", os.as_deref().unwrap_or("Unknown OS"), ver.as_deref().unwrap_or(""));
 
         Self { cpu, dram, os }
     }
@@ -79,20 +78,13 @@ impl<'a> EnvInfo<'a> {
 ///
 /// println!("{}", new_gh_issue_link("0.1.0", Runtime::Se, Some("1.6.1170.0")));
 /// ```
-pub fn new_gh_issue_link(
-    d_merge_version: &str,
-    skyrim_runtime: Runtime,
-    skyrim_version: Option<&str>,
-) -> String {
+pub fn new_gh_issue_link(d_merge_version: &str, skyrim_runtime: Runtime, skyrim_version: Option<&str>) -> String {
     let base_url = "https://github.com/SARDONYX-sard/d-merge/issues/new";
     let template = "bug-report.yaml";
     let labels = "bug";
 
-    let mut url = format!(
-        "{base_url}?assignees=&labels={}%2CNeeds+Triage&template={}",
-        encode(labels),
-        encode(template)
-    );
+    let mut url =
+        format!("{base_url}?assignees=&labels={}%2CNeeds+Triage&template={}", encode(labels), encode(template));
 
     let mut append_param = |key: &str, v: &str| {
         url.push('&');
@@ -139,9 +131,6 @@ mod tests {
         let env = EnvInfo::new(&sys);
         println!("env: {env:#?}");
 
-        println!(
-            "GitHub issue link:\n{}",
-            new_gh_issue_link("0.1.0", Runtime::Se, Some("1.6.1170.0"))
-        );
+        println!("GitHub issue link:\n{}", new_gh_issue_link("0.1.0", Runtime::Se, Some("1.6.1170.0")));
     }
 }

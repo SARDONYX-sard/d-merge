@@ -62,12 +62,8 @@ impl App {
                             log_lines.write().clear();
                         }
                         if ui.add(Button::new("Copy")).clicked() {
-                            let text = log_lines
-                                .read()
-                                .iter()
-                                .map(|log| log.raw.as_str())
-                                .collect::<Vec<_>>()
-                                .join("\n");
+                            let text =
+                                log_lines.read().iter().map(|log| log.raw.as_str()).collect::<Vec<_>>().join("\n");
                             ui.ctx().copy_text(text);
                         }
                     });

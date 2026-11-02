@@ -57,8 +57,7 @@ mod tests {
     #[test]
     fn test_parse_md_data_valid() {
         let parsed = must_parse(parse_md_data, "MD 2.5 0 0 30");
-        const EXPECTED: Translation =
-            Translation { time: Cow::Borrowed("2.5"), text: Cow::Borrowed("0 0 30") };
+        const EXPECTED: Translation = Translation { time: Cow::Borrowed("2.5"), text: Cow::Borrowed("0 0 30") };
 
         assert_eq!(parsed, EXPECTED);
     }

@@ -27,12 +27,8 @@ fn main() -> Result<(), eframe::Error> {
         Err(e) => (settings::Settings::default(), Some(e)),
     };
 
-    let _ = tracing_rotation::global::init_with_level(
-        settings.log.dir_path.as_str(),
-        LOG_FILENAME,
-        5,
-        settings.log.level,
-    );
+    let _ =
+        tracing_rotation::global::init_with_level(settings.log.dir_path.as_str(), LOG_FILENAME, 5, settings.log.level);
 
     std::panic::set_hook(Box::new(|info| {
         tracing::error!(?info);
@@ -80,11 +76,7 @@ fn create_native_options(settings: &settings::Settings) -> eframe::NativeOptions
             maximized: Some(settings.ui.window.maximized),
             inner_size: Some(egui::vec2(settings.ui.window.width, settings.ui.window.height)),
             resizable: Some(true),
-            icon: Some(std::sync::Arc::new(egui::IconData {
-                rgba: icon_rgba,
-                width: icon_width,
-                height: icon_height,
-            })),
+            icon: Some(std::sync::Arc::new(egui::IconData { rgba: icon_rgba, width: icon_width, height: icon_height })),
             ..Default::default()
         },
         ..Default::default()

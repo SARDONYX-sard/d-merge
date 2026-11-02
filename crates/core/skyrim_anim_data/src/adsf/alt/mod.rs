@@ -83,11 +83,7 @@ impl<'a> From<Adsf<'a>> for AltAdsf<'a> {
 
             let count = counter.entry(base.to_string()).or_insert(1);
 
-            let key = if *count == 1 {
-                Str::Owned(format!("{base}~1"))
-            } else {
-                Str::Owned(format!("{base}~{count}"))
-            };
+            let key = if *count == 1 { Str::Owned(format!("{base}~1")) } else { Str::Owned(format!("{base}~{count}")) };
 
             *count += 1;
             map.insert(key, anim.into());
@@ -197,19 +193,15 @@ impl AltAnimData<'_> {
 
     pub(crate) fn clip_anim_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize =
-            self.clip_anim_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
-        let add_len: usize =
-            self.add_clip_anim_blocks.par_iter().map(|block| block.to_line_len()).sum();
+        let len: usize = self.clip_anim_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
+        let add_len: usize = self.add_clip_anim_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 
     pub(crate) fn clip_motion_blocks_line_len(&self) -> usize {
         // NOTE: `.zip()` is not used here because it must be the same length.
-        let len: usize =
-            self.clip_motion_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
-        let add_len: usize =
-            self.add_clip_motion_blocks.par_iter().map(|block| block.to_line_len()).sum();
+        let len: usize = self.clip_motion_blocks.par_iter().map(|(_, block)| block.to_line_len()).sum();
+        let add_len: usize = self.add_clip_motion_blocks.par_iter().map(|block| block.to_line_len()).sum();
         len + add_len
     }
 }
@@ -234,11 +226,8 @@ impl<'a> From<AnimData<'a>> for AltAnimData<'a> {
             .map(|block| (format!("{}~{}", block.name, block.clip_id).into(), block))
             .collect();
 
-        let clip_motion_blocks: IndexMap<_, _> = anim
-            .clip_motion_blocks
-            .into_par_iter()
-            .map(|block| (block.clip_id.clone(), block))
-            .collect();
+        let clip_motion_blocks: IndexMap<_, _> =
+            anim.clip_motion_blocks.into_par_iter().map(|block| (block.clip_id.clone(), block)).collect();
 
         AltAnimData {
             header: anim.header,

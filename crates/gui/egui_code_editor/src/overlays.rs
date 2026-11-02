@@ -32,11 +32,7 @@ pub(super) fn signature_box(
                 ui.horizontal(|ui| {
                     for (i, param) in help.params.iter().enumerate() {
                         let text = egui::RichText::new(param).monospace();
-                        ui.label(if i == help.active {
-                            text.strong().underline()
-                        } else {
-                            text.weak()
-                        });
+                        ui.label(if i == help.active { text.strong().underline() } else { text.weak() });
                     }
                 });
                 if let Some(doc) = &help.documentation {
@@ -54,13 +50,7 @@ pub(super) fn signature_box(
 ///
 /// Real inline hints would need virtual text inside the galley, which breaks egui's
 /// char-index <-> position mapping, so they are shown at the line end instead.
-pub(super) fn inlay_hints(
-    ui: &egui::Ui,
-    galley: &Galley,
-    galley_pos: Pos2,
-    language: &dyn Language,
-    text: &str,
-) {
+pub(super) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, language: &dyn Language, text: &str) {
     let painter = ui.painter();
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let color = ui.visuals().weak_text_color().gamma_multiply(0.8);
@@ -156,8 +146,7 @@ pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
                 continue;
             }
             let left = row_rect.left() + glyph.pos.x;
-            let rect =
-                egui::Rect::from_x_y_ranges(left..=left + glyph.advance_width, row_rect.y_range());
+            let rect = egui::Rect::from_x_y_ranges(left..=left + glyph.advance_width, row_rect.y_range());
             if leading {
                 painter.rect_filled(rect, 0.0, RAINBOW[level % RAINBOW.len()].gamma_multiply(0.07));
                 if is_tab {
@@ -172,31 +161,19 @@ pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
                 }
             }
             let mark = if is_tab { "→" } else { "·" };
-            painter.text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                mark,
-                font.clone(),
-                mark_color,
-            );
+            painter.text(rect.center(), egui::Align2::CENTER_CENTER, mark, font.clone(), mark_color);
         }
     }
 }
 
 /// A rectangular selection (Vim `Ctrl+V`): one char range per line, drawn like a selection.
-pub(super) fn block_selection(
-    ui: &egui::Ui,
-    galley: &Galley,
-    galley_pos: Pos2,
-    ranges: &[std::ops::Range<usize>],
-) {
+pub(super) fn block_selection(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, ranges: &[std::ops::Range<usize>]) {
     // Painted over the text (unlike egui's own selection), so it must stay see-through.
     let fill = ui.visuals().selection.bg_fill.gamma_multiply(0.35);
     for range in ranges.iter().filter(|r| !r.is_empty()) {
         let start = galley.pos_from_cursor(egui::text::CCursor::new(range.start));
         let end = galley.pos_from_cursor(egui::text::CCursor::new(range.end));
-        let rect =
-            egui::Rect::from_min_max(start.left_top(), egui::pos2(end.left(), start.bottom()));
+        let rect = egui::Rect::from_min_max(start.left_top(), egui::pos2(end.left(), start.bottom()));
         ui.painter().rect_filled(rect.translate(galley_pos.to_vec2()), 0.0, fill);
     }
 }
@@ -214,8 +191,8 @@ pub(super) fn block_cursor(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, ind
         space_width
     };
 
-    let rect = egui::Rect::from_min_size(left.left_top(), egui::vec2(width, left.height()))
-        .translate(galley_pos.to_vec2());
+    let rect =
+        egui::Rect::from_min_size(left.left_top(), egui::vec2(width, left.height())).translate(galley_pos.to_vec2());
     let color = ui.visuals().text_cursor.stroke.color;
     ui.painter().rect_filled(rect, 0.0, color.gamma_multiply(0.5));
 }

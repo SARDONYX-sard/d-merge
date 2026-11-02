@@ -18,11 +18,7 @@ pub(crate) fn run(program: &str, args: &[&str]) -> Result {
 /// Runs `git args..` and returns its stdout, trimmed. e.g., `git(&["rev-parse", "HEAD"])`
 pub(crate) fn git(args: &[&str]) -> Result<String> {
     println!("> git {}", args.join(" "));
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(workspace_root())
-        .stderr(Stdio::inherit())
-        .output()?;
+    let output = Command::new("git").args(args).current_dir(workspace_root()).stderr(Stdio::inherit()).output()?;
     if !output.status.success() {
         return Err(format!("`git {}` failed ({})", args.join(" "), output.status).into());
     }

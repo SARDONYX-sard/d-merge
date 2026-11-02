@@ -17,22 +17,12 @@ use nemesis_xml as _;
 #[test]
 #[ignore = "needs local mod files"]
 fn template_fields_are_known() {
-    let template =
-        std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
+    let template = std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
     let problems: Vec<_> = objects(&template)
         .iter()
-        .flat_map(|o| {
-            nemesis_diff::check_fields(o.text)
-                .into_iter()
-                .map(|p| format!("{}: {}", o.id, p.message))
-        })
+        .flat_map(|o| nemesis_diff::check_fields(o.text).into_iter().map(|p| format!("{}: {}", o.id, p.message)))
         .collect();
-    assert!(
-        problems.is_empty(),
-        "{} problems, e.g. {:?}",
-        problems.len(),
-        &problems[..problems.len().min(5)]
-    );
+    assert!(problems.is_empty(), "{} problems, e.g. {:?}", problems.len(), &problems[..problems.len().min(5)]);
 }
 
 #[test]
@@ -66,9 +56,7 @@ fn real_mod_round_trip() {
         if let Err(err) = validate(&changed.patch) {
             invalid.push(format!("{} (mod's own file parses: {original_ok}): {err}", changed.id));
         }
-        if original_ok
-            && resolve(&changed.patch, View::Mod) != normalize(&resolve(original, View::Mod))
-        {
+        if original_ok && resolve(&changed.patch, View::Mod) != normalize(&resolve(original, View::Mod)) {
             mismatched.push(changed.id.clone());
         }
     }
@@ -101,17 +89,11 @@ fn real_asdsf_round_trip() {
     let dir = PathBuf::from(std::env::var("NEMESIS_DIFF_ASDSF_MOD").unwrap());
     let code = std::env::var("NEMESIS_DIFF_CODE").unwrap();
 
-    let (mut checked, mut missing, mut different, mut other_base) =
-        (0, Vec::new(), Vec::new(), Vec::new());
+    let (mut checked, mut missing, mut different, mut other_base) = (0, Vec::new(), Vec::new(), Vec::new());
     for project in std::fs::read_dir(&dir).unwrap().flatten().filter(|e| e.path().is_dir()) {
         for file in std::fs::read_dir(project.path()).unwrap().flatten() {
-            let id = format!(
-                "{}/{}",
-                project.file_name().to_string_lossy(),
-                file.file_name().to_string_lossy()
-            );
-            let patch =
-                String::from_utf8_lossy(&std::fs::read(file.path()).unwrap()).replace("\r\n", "\n");
+            let id = format!("{}/{}", project.file_name().to_string_lossy(), file.file_name().to_string_lossy());
+            let patch = String::from_utf8_lossy(&std::fs::read(file.path()).unwrap()).replace("\r\n", "\n");
             let Some(set) = sets.iter().find(|s| s.id().eq_ignore_ascii_case(&id)) else {
                 missing.push(id);
                 continue;
@@ -120,8 +102,7 @@ fn real_asdsf_round_trip() {
             let original = resolve(&patch, View::Original);
             if original != set.text {
                 let line = original.lines().zip(set.text.lines()).position(|(a, b)| a != b);
-                let at =
-                    line.unwrap_or_else(|| original.lines().count().min(set.text.lines().count()));
+                let at = line.unwrap_or_else(|| original.lines().count().min(set.text.lines().count()));
                 // The mod was made against another version of the template: report only.
                 other_base.push(format!(
                     "{id}: original side differs at line {} (patch: {:?}, template: {:?})",
@@ -148,23 +129,19 @@ fn real_asdsf_round_trip() {
 #[ignore = "needs local mod files"]
 fn real_add_event_and_variable() {
     use nemesis_diff::vars::{VariableType, add_event, add_variable, names};
-    let template =
-        std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
+    let template = std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
     let all = objects(&template);
     let of = |class: &str| all.iter().find(|o| o.class == class).unwrap().text;
     let (string_data, graph_data, value_set) =
         (of("hkbBehaviorGraphStringData"), of("hkbBehaviorGraphData"), of("hkbVariableValueSet"));
 
     let (s, g) = add_event(string_data, graph_data, "MyEvent").unwrap();
-    let (s, g, v) =
-        add_variable(&s, &g, value_set, "myVar", VariableType::Real, 1_045_220_557).unwrap();
+    let (s, g, v) = add_variable(&s, &g, value_set, "myVar", VariableType::Real, 1_045_220_557).unwrap();
     assert_eq!(names(&s, "eventNames").last().map(String::as_str), Some("MyEvent"));
     assert_eq!(names(&s, "variableNames").last().map(String::as_str), Some("myVar"));
 
     // string / graph data: the event and the variable arrays; value set: the value.
-    for (original, edited, blocks) in
-        [(string_data, &s, 2), (graph_data, &g, 2), (value_set, &v, 1)]
-    {
+    for (original, edited, blocks) in [(string_data, &s, 2), (graph_data, &g, 2), (value_set, &v, 1)] {
         let patch = nemesis_diff::object_patch("mymod", original, edited).unwrap();
         validate(&patch).unwrap_or_else(|e| panic!("{e}\n{patch}"));
         assert_eq!(patch.matches("<!-- CLOSE -->").count(), blocks, "{patch}");
@@ -175,8 +152,7 @@ fn real_add_event_and_variable() {
 #[test]
 #[ignore = "needs local mod files"]
 fn template_pointers_are_valid() {
-    let template =
-        std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
+    let template = std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
     let all = objects(&template);
     let classes: fast_hash::HashMap<&str, &str> = all.iter().map(|o| (o.id, o.class)).collect();
     let class_of = |id: &str| classes.get(id).map(|c| (*c).to_string());
@@ -188,10 +164,5 @@ fn template_pointers_are_valid() {
                 .map(|p| format!("{}: {}", o.id, p.message))
         })
         .collect();
-    assert!(
-        problems.is_empty(),
-        "{} problems, e.g. {:?}",
-        problems.len(),
-        &problems[..problems.len().min(5)]
-    );
+    assert!(problems.is_empty(), "{} problems, e.g. {:?}", problems.len(), &problems[..problems.len().min(5)]);
 }

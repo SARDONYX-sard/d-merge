@@ -55,11 +55,7 @@ impl Prompt {
             PromptKind::SearchBackward => '?',
         };
         match self.matches {
-            Some(n) => format!(
-                "{prefix}{}    [{n} {}]",
-                self.text,
-                if n == 1 { "match" } else { "matches" }
-            ),
+            Some(n) => format!("{prefix}{}    [{n} {}]", self.text, if n == 1 { "match" } else { "matches" }),
             None => format!("{prefix}{}", self.text),
         }
     }
@@ -152,12 +148,7 @@ impl VimState {
 
     /// `n` (`same_direction: true`) / `N`: the match `count` steps away from the cursor,
     /// wrapping around. Shows `[i/n]` (or "not found") in the status line.
-    pub(super) fn search_target(
-        &mut self,
-        same_direction: bool,
-        count: usize,
-        buf: &Buffer,
-    ) -> Option<usize> {
+    pub(super) fn search_target(&mut self, same_direction: bool, count: usize, buf: &Buffer) -> Option<usize> {
         let Some(last) = &self.search else {
             self.message = Some("No previous search".to_string());
             return None;
@@ -203,9 +194,7 @@ impl VimState {
 /// The URL around `at`: the non-blank word, without surrounding brackets/quotes and trailing
 /// punctuation. e.g., `see <https://example.com/a>.` -> `https://example.com/a`
 fn url_at(chars: &[char], at: usize) -> Option<String> {
-    let is_delimiter = |c: char| {
-        c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '(' | ')' | '[' | ']' | '`')
-    };
+    let is_delimiter = |c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '(' | ')' | '[' | ']' | '`');
     if chars.get(at).is_none_or(|&c| is_delimiter(c)) {
         return None;
     }

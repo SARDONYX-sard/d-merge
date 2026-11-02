@@ -41,11 +41,7 @@ impl History {
 
     /// The object to go back (`older`) / forward to, from `current`.
     pub(super) fn walk(&mut self, older: bool, current: &str) -> Option<String> {
-        let (from, to) = if older {
-            (&mut self.back, &mut self.forward)
-        } else {
-            (&mut self.forward, &mut self.back)
-        };
+        let (from, to) = if older { (&mut self.back, &mut self.forward) } else { (&mut self.forward, &mut self.back) };
         let target = from.pop()?;
         to.push(current.to_string());
         Some(target)
@@ -59,9 +55,8 @@ pub(super) fn key_request(ui: &egui::Ui, editor: egui::Id, text: &str) -> Option
     if !ui.memory(|m| m.has_focus(editor)) {
         return None;
     }
-    let (references, go_to) = ui.input_mut(|i| {
-        (i.consume_key(Modifiers::SHIFT, Key::F12), i.consume_key(Modifiers::NONE, Key::F12))
-    });
+    let (references, go_to) =
+        ui.input_mut(|i| (i.consume_key(Modifiers::SHIFT, Key::F12), i.consume_key(Modifiers::NONE, Key::F12)));
     if !(references || go_to) {
         return None;
     }
@@ -71,10 +66,7 @@ pub(super) fn key_request(ui: &egui::Ui, editor: egui::Id, text: &str) -> Option
 }
 
 /// Vim `gd` / `gD` / `Ctrl+O` / `Ctrl+I` (the keymap reports them as commands).
-pub(super) fn command_request(
-    output: &egui_code_editor::CodeEditorOutput,
-    text: &str,
-) -> Option<Request> {
+pub(super) fn command_request(output: &egui_code_editor::CodeEditorOutput, text: &str) -> Option<Request> {
     use egui_code_editor::EditorCommand;
     let id = || output.cursor.and_then(|pos| pointer_at(text, pos));
     match output.command? {
@@ -152,17 +144,13 @@ fn contains_token(text: &str, token: &str) -> bool {
 }
 
 /// The references window. Returns the referrer that was clicked.
-pub(super) fn references_window(
-    ctx: &egui::Context,
-    references: &mut References,
-) -> Option<String> {
+pub(super) fn references_window(ctx: &egui::Context, references: &mut References) -> Option<String> {
     let (id, list) = references.as_ref()?;
     let mut open = true;
     let mut picked = None;
-    egui::Window::new(format!("References: {id} ({})", list.len()))
-        .open(&mut open)
-        .default_height(300.0)
-        .show(ctx, |ui| {
+    egui::Window::new(format!("References: {id} ({})", list.len())).open(&mut open).default_height(300.0).show(
+        ctx,
+        |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for (other, class) in list {
                     let text = egui::RichText::new(format!("{other}  {class}")).monospace();
@@ -171,7 +159,8 @@ pub(super) fn references_window(
                     }
                 }
             });
-        });
+        },
+    );
     if !open {
         *references = None;
     }

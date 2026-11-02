@@ -22,8 +22,7 @@ pub(super) fn new_offset_arm_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 5] =
-        std::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [String; 5] = std::array::from_fn(|_| owned_data.next_class_name_attribute());
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = animation.flag_set.flags;
@@ -43,12 +42,7 @@ pub(super) fn new_offset_arm_patches<'a>(
     let right_offset_state_name = format!("FNIS_RightOffset{class_index_0_id}");
     let left_offset_state_name = format!("FNIS_LeftOffset{class_index_1_id}");
 
-    seq_patches.extend(new_push_events_seq_patch(
-        &[animation.anim_event.into()],
-        "#0083",
-        "#0085",
-        priority,
-    ));
+    seq_patches.extend(new_push_events_seq_patch(&[animation.anim_event.into()], "#0083", "#0085", priority));
 
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
@@ -72,8 +66,7 @@ pub(super) fn new_offset_arm_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map =
-        dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
+    let class_index_to_anim_object_map = dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
     one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
         class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
@@ -121,11 +114,7 @@ pub(super) fn new_offset_arm_patches<'a>(
     // #$RI+1$  hkbClipGenerator
     one_patches.push({
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
-        let mode = if flags.contains(FNISAnimFlags::Acyclic) {
-            "MODE_SINGLE_PLAY"
-        } else {
-            "MODE_LOOPING"
-        };
+        let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
         (
             vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbClipGenerator")],
@@ -166,11 +155,8 @@ pub(super) fn new_offset_arm_patches<'a>(
             mt_behavior::FNIS_AA_MT_AUTO_GEN_5219
         };
         // $h|null|#5218$
-        let exit_notify_events = if flags.contains(FNISAnimFlags::HeadTracking) {
-            "#0000"
-        } else {
-            mt_behavior::FNIS_AA_MT_AUTO_GEN_5218
-        };
+        let exit_notify_events =
+            if flags.contains(FNISAnimFlags::HeadTracking) { "#0000" } else { mt_behavior::FNIS_AA_MT_AUTO_GEN_5218 };
         // $-o|#5147|#5152$
         let transition = if flags.contains(FNISAnimFlags::AnimObjects) { "#5147" } else { "#5152" };
 
@@ -203,11 +189,7 @@ pub(super) fn new_offset_arm_patches<'a>(
     // #$RI+3$  hkbClipGenerator
     one_patches.push({
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
-        let mode = if flags.contains(FNISAnimFlags::Acyclic) {
-            "MODE_SINGLE_PLAY"
-        } else {
-            "MODE_LOOPING"
-        };
+        let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
         (
             vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbClipGenerator")],
@@ -276,10 +258,7 @@ fn new_event_property_array<'a>(
     }
 
     (
-        vec![
-            Cow::Owned(class_index.to_string()),
-            Cow::Borrowed("hkbStateMachineEventPropertyArray"),
-        ],
+        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },

@@ -145,9 +145,7 @@ impl<'a> OnePatchMap<'a> {
     }
 
     /// Consumes this map and returns the underlying `DashMap` of patches.
-    pub fn into_inner(
-        self,
-    ) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
+    pub fn into_inner(self) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
         self.patches
     }
 }
@@ -155,9 +153,7 @@ impl<'a> OnePatchMap<'a> {
 /// A map that stores array field patches per JSON path,
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default)]
-pub struct SeqPatchMap<'a>(
-    pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, fast_hash::RandomState>,
-);
+pub struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, fast_hash::RandomState>);
 
 impl<'a> SeqPatchMap<'a> {
     /// Inserts a value for the given JSON path.
@@ -240,11 +236,8 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
                 M: serde::de::MapAccess<'de>,
             {
                 let patches = DashMap::<_, _, fast_hash::RandomState>::default();
-                while let Some((key, value)) =
-                    access.next_entry::<String, ValueWithPriority<'de>>()?
-                {
-                    let json_path =
-                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                while let Some((key, value)) = access.next_entry::<String, ValueWithPriority<'de>>()? {
+                    let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     patches.insert(json_path, value);
                 }
                 Ok(OnePatchMap { patches })
@@ -293,11 +286,8 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             {
                 let map = DashMap::<_, _, fast_hash::RandomState>::default();
 
-                while let Some((key, value)) =
-                    access.next_entry::<String, Vec<ValueWithPriority<'de>>>()?
-                {
-                    let json_path =
-                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                while let Some((key, value)) = access.next_entry::<String, Vec<ValueWithPriority<'de>>>()? {
+                    let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     map.insert(json_path, value);
                 }
 

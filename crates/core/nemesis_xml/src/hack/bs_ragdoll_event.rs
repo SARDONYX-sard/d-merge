@@ -29,9 +29,7 @@ use crate::{
 ///
 /// # Errors
 /// Returns an error if the expected malformed field tag is not present at the current input.
-pub fn do_hack_cast_ragdoll_event<'a>(
-    input: &mut &'a str,
-) -> ModalResult<(&'a str, FieldType, Option<u64>)> {
+pub fn do_hack_cast_ragdoll_event<'a>(input: &mut &'a str) -> ModalResult<(&'a str, FieldType, Option<u64>)> {
     field_start_open_tag.parse_next(input)?; // <hkparam name=
     let (field_name, field_type) = delimited(
         "\"",

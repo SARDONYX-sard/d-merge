@@ -18,9 +18,7 @@ pub(crate) fn one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     Ok(line.into())
 }
 
-pub(crate) fn lines<'a>(
-    read_len: usize,
-) -> impl Parser<&'a str, Vec<Str<'a>>, ErrMode<ContextError>> {
+pub(crate) fn lines<'a>(read_len: usize) -> impl Parser<&'a str, Vec<Str<'a>>, ErrMode<ContextError>> {
     move |input: &mut &'a str| {
         let mut lines = vec![];
         for _ in 0..read_len {

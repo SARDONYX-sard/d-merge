@@ -23,10 +23,6 @@ pub struct LogSettings {
 
 impl Default for LogSettings {
     fn default() -> Self {
-        Self {
-            dir_path: crate::log::LOG_DIR.into(),
-            level: LogLevel::Info,
-            window: WindowGeometry::default(),
-        }
+        Self { dir_path: crate::log::LOG_DIR.into(), level: LogLevel::Info, window: WindowGeometry::default() }
     }
 }

@@ -51,9 +51,7 @@ use self::{
 };
 pub use self::{
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
-    language::{
-        CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp,
-    },
+    language::{CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp},
     layout::line_job,
     status::status_line,
 };
@@ -158,10 +156,7 @@ pub struct CodeEditor<'a> {
 
 impl std::fmt::Debug for CodeEditor<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodeEditor")
-            .field("id", &self.id)
-            .field("keymap", &self.keymap)
-            .finish_non_exhaustive()
+        f.debug_struct("CodeEditor").field("id", &self.id).field("keymap", &self.keymap).finish_non_exhaustive()
     }
 }
 
@@ -222,25 +217,11 @@ impl<'a> CodeEditor<'a> {
     }
 
     pub fn show(self, ui: &mut egui::Ui, state: &mut CodeEditorState) -> CodeEditorOutput {
-        let Self {
-            id,
-            text,
-            language,
-            diagnostics,
-            features,
-            keymap,
-            desired_rows,
-            line_numbers,
-            whitespace,
-        } = self;
+        let Self { id, text, language, diagnostics, features, keymap, desired_rows, line_numbers, whitespace } = self;
         let mut has_focus = ui.memory(|m| m.has_focus(id));
         // egui drops a widget's focus on `Esc` before we run, but Vim needs that key
         // (e.g., to leave Visual mode): take the focus back.
-        if !has_focus
-            && state.had_focus
-            && keymap == Keymap::Vim
-            && ui.input(|i| i.key_pressed(egui::Key::Escape))
-        {
+        if !has_focus && state.had_focus && keymap == Keymap::Vim && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             ui.memory_mut(|m| m.request_focus(id));
             has_focus = true;
         }
@@ -251,9 +232,8 @@ impl<'a> CodeEditor<'a> {
         let mut fix = state.quick_fix.handle_keys(ui);
         if has_focus
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Period))
-            && let Some(index) = egui::TextEdit::load_state(ui.ctx(), id)
-                .and_then(|s| s.cursor.char_range())
-                .map(|r| r.primary.index.0)
+            && let Some(index) =
+                egui::TextEdit::load_state(ui.ctx(), id).and_then(|s| s.cursor.char_range()).map(|r| r.primary.index.0)
         {
             let pos = LinePos::from_char_index(text, index);
             state.quick_fix.open(language.quick_fixes(text, pos.line, pos.column));
@@ -326,9 +306,9 @@ impl<'a> CodeEditor<'a> {
         changed |= response.changed();
         // egui reports the cursor only while the editor has the focus; a jump from outside (e.g., a
         // problems list, `set_cursor`) arrives one frame before the focus does, so read the state.
-        let cursor_range = output.cursor_range.or_else(|| {
-            egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range())
-        });
+        let cursor_range = output
+            .cursor_range
+            .or_else(|| egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range()));
         let cursor_index = cursor_range.map(|range| range.primary.index.0);
         let mut cursor = cursor_index.map(|i| LinePos::from_char_index(text, i));
 
@@ -346,9 +326,8 @@ impl<'a> CodeEditor<'a> {
             state.completion.close();
         }
 
-        let anchor = cursor_index.map(|i| {
-            output.galley.pos_from_cursor(CCursor::new(i)).translate(output.galley_pos.to_vec2())
-        });
+        let anchor =
+            cursor_index.map(|i| output.galley.pos_from_cursor(CCursor::new(i)).translate(output.galley_pos.to_vec2()));
         let clicked = anchor.is_some_and(|anchor| state.completion.ui(ui.ctx(), id, anchor));
         if (clicked || accept_key)
             && let Some(accepted) = state.completion.accept(text)
@@ -383,13 +362,7 @@ impl<'a> CodeEditor<'a> {
         }
         if let Some(width) = gutter {
             let current = cursor.map(|c| c.line);
-            overlays::line_numbers(
-                ui,
-                galley,
-                galley_pos,
-                gutter_left..gutter_left + width,
-                current,
-            );
+            overlays::line_numbers(ui, galley, galley_pos, gutter_left..gutter_left + width, current);
         }
         if let Some(ranges) = state.keymap.block_selection(keymap, text) {
             overlays::block_selection(ui, galley, galley_pos, &ranges);
@@ -409,8 +382,7 @@ impl<'a> CodeEditor<'a> {
                         ui.scroll_to_rect_animation(cursor, Some(align), instant());
                     }
                     Some(Scroll::Lines(lines)) => {
-                        let row_height =
-                            galley.rows.first().map_or(16.0, |row| row.rect().height());
+                        let row_height = galley.rows.first().map_or(16.0, |row| row.rect().height());
                         #[expect(clippy::cast_precision_loss, reason = "a few lines")]
                         ui.scroll_with_delta(egui::vec2(0.0, -(lines as f32) * row_height));
                     }
@@ -458,13 +430,7 @@ impl<'a> CodeEditor<'a> {
             let index = galley.cursor_from_pos(pos - galley_pos).index.0;
             LinePos::from_char_index(text, index)
         });
-        CodeEditorOutput {
-            changed,
-            cursor,
-            command: keys.command,
-            response: response.clone(),
-            pointer,
-        }
+        CodeEditorOutput { changed, cursor, command: keys.command, response: response.clone(), pointer }
     }
 }
 
@@ -476,13 +442,9 @@ fn visible_lines(ui: &egui::Ui, galley: &egui::Galley, galley_pos: egui::Pos2) -
     const EPS: f32 = 0.5; // rounding of the scroll offset
     let clip = ui.clip_rect();
     let rows = &galley.rows;
-    let first =
-        rows.iter().position(|r| galley_pos.y + r.rect().min.y >= clip.top() - EPS).unwrap_or(0);
-    let last = rows
-        .iter()
-        .rposition(|r| galley_pos.y + r.rect().max.y <= clip.bottom() + EPS)
-        .unwrap_or(first)
-        .max(first);
+    let first = rows.iter().position(|r| galley_pos.y + r.rect().min.y >= clip.top() - EPS).unwrap_or(0);
+    let last =
+        rows.iter().rposition(|r| galley_pos.y + r.rect().max.y <= clip.bottom() + EPS).unwrap_or(first).max(first);
     View { first_line: first, lines: last - first + 1 }
 }
 
@@ -510,10 +472,7 @@ pub(crate) fn scroll_request_id(id: egui::Id) -> egui::Id {
 /// Selects `range` (char indices) in the editor `id` and focuses it.
 fn set_selection(ctx: &egui::Context, id: egui::Id, range: std::ops::Range<usize>) {
     let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
-    state.cursor.set_char_range(Some(CCursorRange::two(
-        CCursor::new(range.start),
-        CCursor::new(range.end),
-    )));
+    state.cursor.set_char_range(Some(CCursorRange::two(CCursor::new(range.start), CCursor::new(range.end))));
     state.store(ctx, id);
     ctx.memory_mut(|mem| mem.request_focus(id));
 }

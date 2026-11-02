@@ -75,9 +75,7 @@ pub(crate) fn run(jobs: Vec<ConversionJob>, output_target: OutPutTarget) -> Vec<
         });
 
     // Stage 3: write
-    errors.par_extend(
-        converted.into_par_iter().filter_map(|b| super::write_file(&b.output_path, &b.bytes).err()),
-    );
+    errors.par_extend(converted.into_par_iter().filter_map(|b| super::write_file(&b.output_path, &b.bytes).err()));
 
     errors
 }
@@ -145,26 +143,18 @@ fn read(job: ConversionJob, output_target: OutPutTarget) -> Option<Result<Conver
         }
     };
 
-    Some(Ok(ConversionBytes {
-        input_path: actual_input.into_owned(),
-        output_path: job.output_path,
-        bytes,
-    }))
+    Some(Ok(ConversionBytes { input_path: actual_input.into_owned(), output_path: job.output_path, bytes }))
 }
 
-fn convert(
-    input_path: &Path,
-    bytes: &mut Vec<u8>,
-    output_target: OutPutTarget,
-) -> Result<(), Error> {
+fn convert(input_path: &Path, bytes: &mut Vec<u8>, output_target: OutPutTarget) -> Result<(), Error> {
     use hkx_io::HkxHeader;
 
     if bytes.is_empty() {
         return Ok(());
     }
 
-    let class_map = hkx_io::from_bytes(bytes)
-        .map_err(|e| Error::HkxDeError { path: input_path.to_path_buf(), source: e })?;
+    let class_map =
+        hkx_io::from_bytes(bytes).map_err(|e| Error::HkxDeError { path: input_path.to_path_buf(), source: e })?;
 
     let header = match output_target {
         OutPutTarget::SkyrimLe => HkxHeader::new_skyrim_le(),
@@ -177,11 +167,7 @@ fn convert(
     Ok(())
 }
 
-fn check_header(
-    header: [u8; 17],
-    input_path: &Path,
-    output_format: OutPutTarget,
-) -> Result<OutPutTarget, Error> {
+fn check_header(header: [u8; 17], input_path: &Path, output_format: OutPutTarget) -> Result<OutPutTarget, Error> {
     const TAG_MAGIC: [u8; 8] = [0x1E, 0x0D, 0xB0, 0xCA, 0xCE, 0xFA, 0x11, 0xD0];
     if header[0..8] == TAG_MAGIC {
         #[cfg(feature = "tracing")]
@@ -213,11 +199,9 @@ fn check_header(
     match header[16] {
         4 => Ok(OutPutTarget::SkyrimLe),
         8 => Ok(OutPutTarget::SkyrimSe),
-        n => Err(Error::FNISHkxInvalidHeader {
-            input_path: input_path.to_path_buf(),
-            target: output_format,
-            actual: n,
-        }),
+        n => {
+            Err(Error::FNISHkxInvalidHeader { input_path: input_path.to_path_buf(), target: output_format, actual: n })
+        }
     }
 }
 
@@ -269,18 +253,11 @@ pub(crate) fn prepare_conversion_jobs(
 
 /// Prepare a single conversion job for the behavior file itself.
 #[must_use]
-pub(crate) fn prepare_behavior_conversion_job(
-    owned_data: &OwnedFnisInjection,
-    config: &Config,
-) -> Option<AnimIoJob> {
+pub(crate) fn prepare_behavior_conversion_job(owned_data: &OwnedFnisInjection, config: &Config) -> Option<AnimIoJob> {
     match owned_data.to_behavior_path() {
         Ok((input_path, output_inner)) => {
             let output_path = config.output_dir.join(output_inner);
-            Some(AnimIoJob::Hkx(ConversionJob {
-                input_path,
-                output_path,
-                kind: AnimKind::Standard,
-            }))
+            Some(AnimIoJob::Hkx(ConversionJob { input_path, output_path, kind: AnimKind::Standard }))
         }
         Err(_err) => {
             #[cfg(feature = "tracing")]
