@@ -2311,6 +2311,7 @@ dependencies = [
 name = "gui_shared"
 version = "2.8.0"
 dependencies = [
+ "egui_code_editor",
  "fast_hash",
  "gh_issue_link",
  "gui_shared_derive",

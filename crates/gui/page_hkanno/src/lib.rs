@@ -249,6 +249,7 @@ impl HkannoPage {
                     .diagnostics(&tab.editor_diagnostics)
                     .features(features)
                     .keymap(keymap)
+                    .labels(gui_shared::i18n::editor_labels(ctx.i18n))
                     .show(ui, &mut tab.editor)
             })
             .inner;

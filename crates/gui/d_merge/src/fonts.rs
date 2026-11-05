@@ -228,14 +228,19 @@ pub(crate) fn apply_font_file(ctx: &Context, path: &Path) -> Result<(), FontErro
 
 /// Builds an egui font definition using the provided font data.
 ///
-/// The font is inserted with the highest priority in both proportional and
-/// monospace families.
+/// The font comes first in the proportional family. In the monospace family (code editors) it
+/// only comes first if it **is** monospaced: with a proportional font (e.g., the default Microsoft
+/// YaHei) `i` and `W` would have different widths and columns would not line up. It then stays
+/// right after egui's monospaced font, as the fallback for what that one lacks (e.g., Japanese).
 fn build_font_definitions(font_data: Arc<Vec<u8>>) -> FontDefinitions {
     let mut defs = FontDefinitions::default();
+    let is_monospace =
+        font_kit::font::Font::from_bytes(Arc::clone(&font_data), 0).is_ok_and(|font| font.is_monospace());
 
     defs.font_data.insert("user_font".into(), FontData::from_owned(font_data.to_vec()).into());
     defs.families.entry(FontFamily::Proportional).or_default().insert(0, "user_font".into());
-    defs.families.entry(FontFamily::Monospace).or_default().insert(0, "user_font".into());
+    let monospace = defs.families.entry(FontFamily::Monospace).or_default();
+    monospace.insert(usize::from(!is_monospace).min(monospace.len()), "user_font".into());
     add_symbol_fallback(&mut defs);
 
     defs

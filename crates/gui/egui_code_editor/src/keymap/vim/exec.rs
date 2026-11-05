@@ -210,6 +210,7 @@ impl VimState {
             Simple::SearchWord { forward, whole } => self.search_word(forward, whole, &exec.buf),
             Simple::Hover => exec.output.show_hover = true,
             Simple::OpenUrl => self.open_url(exec),
+            Simple::ToggleExplorer => exec.output.command = Some(EditorCommand::ToggleExplorer),
             Simple::GoTo { references } => {
                 exec.output.command =
                     Some(if references { EditorCommand::FindReferences } else { EditorCommand::GoToDefinition });

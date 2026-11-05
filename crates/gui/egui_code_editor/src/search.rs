@@ -8,7 +8,7 @@
 use std::ops::Range;
 
 /// A compiled search pattern.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub(crate) struct Matcher {
     pattern: Vec<char>,
     ignore_case: bool,

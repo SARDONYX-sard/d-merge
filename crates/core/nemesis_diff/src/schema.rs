@@ -21,6 +21,156 @@ pub fn xml_fields(class: &str) -> impl Iterator<Item = &'static FieldSchema> {
     find_class_schema(class).into_iter().flat_map(|c| c.fields.iter()).filter(|f| !f.serialize_ignored)
 }
 
+/// The array element at a position of an object's text, for "which index is this?" hovers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArrayElement<'a> {
+    /// The array field, e.g. `eventNames`.
+    pub field: &'a str,
+    pub index: usize,
+    /// The element count it declares (`numelements`).
+    pub len: Option<usize>,
+}
+
+/// Which element of which array is at 0-based `line` / `column` (chars) of an object.
+///
+/// Havok XML writes an array as `<hkparam name=".." numelements="N">` and its elements as one of:
+/// ```text
+/// <hkparam name="children" numelements="3">
+///     #0105 #0106         <- whitespace separated values, any number per line
+///     #0107
+/// </hkparam>
+/// <hkparam name="eventNames" numelements="2">
+///     <hkcstring>moveStart</hkcstring>       <- one per line
+///     <hkcstring>moveStop</hkcstring>
+/// </hkparam>
+/// <hkparam name="eventInfos" numelements="1">
+///     <hkobject>                             <- a block; any line inside it counts as this element
+///         <hkparam name="flags">0</hkparam>
+///     </hkobject>
+/// </hkparam>
+/// <hkparam name="translations" numelements="1">(0.0 0.0 0.0 0.0)</hkparam>   <- on one line
+/// ```
+/// e.g., on `#0106` above: `children`, index 1.
+pub fn array_element(object: &str, line: usize, column: usize) -> Option<ArrayElement<'_>> {
+    /// An open tag around the current line. `count`: the elements seen so far (arrays only).
+    enum Open<'a> {
+        Object,
+        Field { name: &'a str, len: Option<usize>, count: Option<usize> },
+    }
+    let mut stack: Vec<Open<'_>> = Vec::new();
+    let token_at = |tokens: &[std::ops::Range<usize>]| tokens.iter().position(|t| t.start <= column && column <= t.end);
+
+    for (line_no, text) in object.lines().enumerate().take(line + 1) {
+        let here = line_no == line;
+        let trimmed = text.trim();
+        if trimmed.starts_with("<hkobject") {
+            if let Some(Open::Field { count: Some(count), .. }) = stack.last_mut() {
+                *count += 1;
+            }
+            if !trimmed.ends_with("/>") {
+                stack.push(Open::Object);
+            }
+        } else if trimmed.starts_with("</hkobject>") || trimmed.starts_with("</hkparam>") {
+            stack.pop();
+        } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
+            let name = attribute(rest, "name").unwrap_or_default();
+            let numelements = attribute(rest, "numelements");
+            let len = numelements.and_then(|n| n.parse().ok());
+            if let Some(start) = text.find('>').filter(|_| trimmed.contains("</hkparam>")) {
+                // Everything on one line: `<hkparam name="x" numelements="2">#01 #02</hkparam>`.
+                if here && numelements.is_some() {
+                    let end = text.find("</hkparam>").unwrap_or(text.len());
+                    let offset = text[..=start].chars().count();
+                    let tokens = array_tokens(&text[start + 1..end]);
+                    let tokens: Vec<_> = tokens.into_iter().map(|t| t.start + offset..t.end + offset).collect();
+                    if let Some(index) = token_at(&tokens) {
+                        return Some(ArrayElement { field: name, index, len });
+                    }
+                }
+            } else if !trimmed.ends_with("/>") {
+                stack.push(Open::Field { name, len, count: numelements.map(|_| 0) });
+            }
+        } else if !trimmed.starts_with("<!--")
+            && let Some(Open::Field { name, len, count: Some(count) }) = stack.last_mut()
+        {
+            let tokens = array_tokens(text);
+            if here {
+                let index = *count + token_at(&tokens)?;
+                return Some(ArrayElement { field: name, index, len: *len });
+            }
+            *count += tokens.len();
+        }
+
+        if here {
+            // Inside an `<hkobject>` element: the innermost array around it.
+            let object_above = stack.iter().rposition(|open| matches!(open, Open::Object))?;
+            return stack[..object_above].iter().rev().find_map(|open| match open {
+                Open::Field { name, len, count: Some(count) } => {
+                    Some(ArrayElement { field: name, index: count.saturating_sub(1), len: *len })
+                }
+                _ => None,
+            });
+        }
+    }
+    None
+}
+
+/// The elements in the text of an array line, as char ranges.
+///
+/// e.g., `  #01 #02` -> `2..5, 6..9`; `(1 2 3 4) (5 6 7 8)` -> two vectors;
+/// a tag such as `<hkcstring>a b</hkcstring>` is one element.
+fn array_tokens(text: &str) -> Vec<std::ops::Range<usize>> {
+    let mut tokens = Vec::new();
+    let is_tag = text.trim_start().starts_with('<');
+    let mut start = None;
+    let mut in_parens = false;
+    let mut chars = 0;
+    for (i, c) in text.chars().enumerate() {
+        chars = i + 1;
+        if c == '(' {
+            in_parens = true;
+        } else if c == ')' {
+            in_parens = false;
+        }
+        if c.is_whitespace() && !in_parens && !(is_tag && start.is_some()) {
+            if let Some(from) = start.take() {
+                tokens.push(from..i);
+            }
+        } else if start.is_none() && !c.is_whitespace() {
+            start = Some(i);
+        }
+    }
+    if let Some(from) = start {
+        tokens.push(from..chars);
+    }
+    tokens
+}
+
+/// The fields a new object has to write but does not (its own level only, not nested objects).
+///
+/// e.g., a `hkbEventProperty`-like class without `id` -> `["id"]`.
+/// Havok's XML reader needs every field of a class, unlike Nemesis patches that only change some.
+pub fn missing_fields(object: &str) -> Vec<&'static str> {
+    let Some(class) = object.lines().next().and_then(|line| attribute(line, "class")) else { return Vec::new() };
+    // `depth` = open tags below the top `<hkobject>`: only 0 is the object's own level.
+    let mut depth = 0_usize;
+    let mut written: Vec<&str> = Vec::new();
+    for line in object.lines().skip(1) {
+        let trimmed = line.trim();
+        if trimmed.starts_with("</hkobject>") || trimmed.starts_with("</hkparam>") {
+            depth = depth.saturating_sub(1);
+        } else if trimmed.starts_with("<hkobject") {
+            depth += usize::from(!trimmed.ends_with("/>"));
+        } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
+            if depth == 0 {
+                written.extend(attribute(rest, "name"));
+            }
+            depth += usize::from(!trimmed.contains("</hkparam>") && !trimmed.ends_with("/>"));
+        }
+    }
+    xml_fields(class).map(|field| field.name).filter(|name| !written.contains(name)).collect()
+}
+
 /// Is `class` `base` or one of its subclasses?
 pub fn is_subclass(class: &str, base: &str) -> bool {
     let mut current = Some(class);
@@ -150,7 +300,7 @@ pub struct PointerProblem {
 ///
 /// `class_of` returns a target's class; it must be the field's pointer class or a subclass, e.g.
 /// `variableBindingSet` -> `hkbVariableBindingSet`. Nemesis variables (`$...$`) are not checked.
-pub fn check_pointers(object: &str, class_of: &dyn Fn(&str) -> Option<String>) -> Vec<PointerProblem> {
+pub fn check_pointers<'c>(object: &str, class_of: &dyn Fn(&str) -> Option<&'c str>) -> Vec<PointerProblem> {
     let mut problems = Vec::new();
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
@@ -168,7 +318,7 @@ pub fn check_pointers(object: &str, class_of: &dyn Fn(&str) -> Option<String>) -
                 None => {
                     problems.push(PointerProblem { line: line_no, message: format!("`{pointer}` does not exist.") });
                 }
-                Some(actual) if !is_subclass(&actual, expected) => problems.push(PointerProblem {
+                Some(actual) if !is_subclass(actual, expected) => problems.push(PointerProblem {
                     line: line_no,
                     message: format!("`{}` expects `{expected}`, but `{pointer}` is `{actual}`.", field.name),
                 }),
@@ -205,6 +355,31 @@ pub fn check_pointers(object: &str, class_of: &dyn Fn(&str) -> Option<String>) -
 mod tests {
     use super::*;
 
+    #[test]
+    fn finds_array_elements() {
+        let object = "<hkobject name=\"#1\" class=\"x\">\n<hkparam name=\"a\" numelements=\"3\">\n\t#01 #02\n\t#03\n</hkparam>\n<hkparam name=\"b\" numelements=\"2\">\n<hkobject>\n<hkparam name=\"flags\">0</hkparam>\n</hkobject>\n<hkobject>\n<hkparam name=\"flags\">1</hkparam>\n</hkobject>\n</hkparam>\n<hkparam name=\"c\" numelements=\"2\">(1 2) (3 4)</hkparam>\n<hkparam name=\"d\">1</hkparam>\n</hkobject>\n";
+        let element = |line, column| array_element(object, line, column).map(|e| (e.field, e.index));
+        assert_eq!(element(2, 1), Some(("a", 0)));
+        assert_eq!(element(2, 5), Some(("a", 1)));
+        assert_eq!(element(3, 2), Some(("a", 2)));
+        assert_eq!(element(7, 3), Some(("b", 0)));
+        assert_eq!(element(10, 3), Some(("b", 1)));
+        // `<hkparam name="c" numelements="2">` is 34 chars.
+        assert_eq!(element(13, 36), Some(("c", 0)));
+        assert_eq!(element(13, 40), Some(("c", 1)));
+        assert_eq!(element(14, 2), None);
+    }
+
+    #[test]
+    fn skeleton_has_no_missing_fields_and_passes_the_parser() {
+        let text = skeleton("hkbClipGenerator", "#mymod$0").unwrap();
+        assert_eq!(missing_fields(&text), Vec::<&str>::new());
+        crate::validate(&text).unwrap();
+
+        let without = text.lines().filter(|l| !l.contains("\"mode\"")).collect::<Vec<_>>().join("\n");
+        assert_eq!(missing_fields(&without), ["mode"]);
+    }
+
     const OBJECT: &str = "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">
 \t\t\t<hkparam name=\"variableBindingSet\">#0001</hkparam>
 \t\t\t<hkparam name=\"modifiers\" numelements=\"2\">
@@ -232,8 +407,8 @@ mod tests {
     fn pointer_classes() {
         assert!(is_subclass("hkbClipGenerator", "hkbGenerator"));
         let class_of = |id: &str| match id {
-            "#0001" => Some("hkbClipGenerator".to_string()), // not a binding set
-            "#0105" => Some("hkbEvaluateExpressionModifier".to_string()),
+            "#0001" => Some("hkbClipGenerator"), // not a binding set
+            "#0105" => Some("hkbEvaluateExpressionModifier"),
             _ => None,
         };
         let problems = check_pointers(OBJECT, &class_of);

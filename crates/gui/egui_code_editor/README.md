@@ -27,7 +27,25 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 | `Tab` / `Enter`      | Accept completion                        |
 | `Shift+Alt+F`        | Format document                          |
 | `Ctrl+.`             | Quick fix menu (`↑`/`↓`, `Enter`, `Esc`) |
+| `Ctrl+Shift+P`       | Command palette (see below)              |
+| `F12` / `Ctrl+click` | Go to definition (`Language::definition`) |
+| `Shift+F12`          | Find references (`Language::references`) |
 | Mouse rest on a word | Hover (diagnostics + docs)               |
+
+## Command palette and host API
+
+`Ctrl+Shift+P` lists the editor's commands and the host's, like Monaco's `editor.addAction`:
+
+```rust,ignore
+let output = CodeEditor::new("doc", &mut text)
+    .language(&language)                                     // `Language::definition`, `references`, ...
+    .labels(translated_labels)                               // `EditorLabels`: menu texts
+    .actions(&[EditorAction { id: "save", label: "Save" }])  // added to the palette
+    .show(ui, &mut state);
+
+if output.action == Some("save") { /* it only reports the id: the host decides what it does */ }
+if let Some(navigation) = output.navigation { /* open the `Location`, or list the `References` */ }
+```
 
 ## Normal keymap (VS Code keys)
 
@@ -212,12 +230,13 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 
 ### Other
 
-| Key  | Action                                                                                                                           |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `K`  | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
-| `gx` | Open the URL under the cursor                                                                                                    |
-| `gd` | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
-| `gD` | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
+| Key        | Action                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `K`        | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
+| `gx`       | Open the URL under the cursor                                                                                                    |
+| `gd`       | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
+| `gD`       | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
+| `<Space>e` | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                       |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 

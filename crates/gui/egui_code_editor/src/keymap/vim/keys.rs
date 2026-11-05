@@ -70,6 +70,13 @@ impl InsertEscape {
     }
 }
 
+/// At most this many auto-repeats of one key run per frame (Normal / Visual mode).
+///
+/// A held key sends about 30 events a second. When frames are slower than that they pile up, and
+/// the editor would keep moving (or, at the end of a line, seem frozen) after the key is released.
+/// Dropping the excess cannot lose real typing: only the OS's auto-repeat events are dropped.
+const MAX_REPEATS_PER_FRAME: usize = 4;
+
 /// Removes the keys Vim handles from `ui`'s input and returns them in order.
 pub(super) fn take(
     ui: &egui::Ui,
@@ -80,8 +87,11 @@ pub(super) fn take(
     ui.input_mut(|input| {
         let now = input.time;
         let mut keys = Vec::new();
+        // The `Text` event of a letter comes right after its `Key` event, which has the repeat flag.
+        let mut repeated = false;
         input.events.retain(|event| match event {
-            egui::Event::Key { key, pressed, modifiers, .. } => {
+            egui::Event::Key { key, pressed, modifiers, repeat, .. } => {
+                repeated = *repeat;
                 let ctrl_letter = (modifiers.ctrl && !modifiers.alt).then(|| letter(*key)).flatten();
                 let escape = *key == egui::Key::Escape
                     || (modifiers.ctrl && *key == egui::Key::OpenBracket)
@@ -124,12 +134,14 @@ pub(super) fn take(
                     return false;
                 }
                 if *pressed && let Some(vim_key) = map_key(*key) {
-                    keys.push(vim_key);
+                    push_key(&mut keys, vim_key, repeated);
                 }
                 false // swallow: Normal mode must not edit text by itself
             }
             egui::Event::Text(text) if !insert_mode => {
-                keys.extend(text.chars().map(VimKey::Char));
+                for c in text.chars() {
+                    push_key(&mut keys, VimKey::Char(c), repeated);
+                }
                 false
             }
             egui::Event::Text(text) if insert_mode => {
@@ -167,6 +179,13 @@ pub(super) fn take(
         });
         keys
     })
+}
+
+/// Adds `key`, unless it is an auto-repeat beyond [`MAX_REPEATS_PER_FRAME`].
+fn push_key(keys: &mut Vec<VimKey>, key: VimKey, repeated: bool) {
+    if !repeated || keys.iter().rev().take_while(|k| **k == key).count() < MAX_REPEATS_PER_FRAME {
+        keys.push(key);
+    }
 }
 
 /// `A`..`Z` -> `'a'`..`'z'`.

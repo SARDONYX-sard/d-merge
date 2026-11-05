@@ -11,11 +11,13 @@
 //! Adding edits the string data, graph data (and value set) objects at once; see
 //! [`nemesis_diff::vars`]. Template entries cannot be removed (other mods index them).
 
+use std::rc::Rc;
+
 use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::vars::{self, VariableType};
 
-use super::PatchTool;
+use super::{PatchTool, tree::Graph};
 
 const STRING_DATA: &str = "hkbBehaviorGraphStringData";
 const GRAPH_DATA: &str = "hkbBehaviorGraphData";
@@ -29,10 +31,8 @@ pub(super) struct Names {
     /// How many of each the template has (the rest are this mod's).
     template_events: usize,
     template_variables: usize,
-    /// `(id, "class name")` for the `#` completion (new objects change it too).
-    pub(super) pointers: Vec<(String, String)>,
-    /// New object -> the objects pointing to it (where it is linked).
-    pub(super) parents: fast_hash::HashMap<String, Vec<String>>,
+    /// The pointers between all objects.
+    pub(super) graph: Rc<Graph>,
 }
 
 /// Inputs of the "add" rows.
@@ -52,13 +52,15 @@ impl Default for NewNames {
 
 impl PatchTool {
     /// The active behavior's events / variables (recomputed after edits).
-    pub(super) fn names(&mut self) -> &Names {
+    ///
+    /// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
+    pub(super) fn names(&mut self) -> Rc<Names> {
         let active = self.active;
         if self.names.as_ref().is_some_and(|(cached, _)| *cached != active) {
             self.names = None;
         }
         let behavior = &self.workspace.behaviors[active];
-        &self.names.get_or_insert_with(|| (active, names_of(behavior))).1
+        Rc::clone(&self.names.get_or_insert_with(|| (active, Rc::new(names_of(behavior)))).1)
     }
 
     pub(super) fn vars_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
@@ -74,8 +76,8 @@ impl PatchTool {
         }
         let filter = self.filter.to_lowercase();
         let names = self.names();
-        let (events, template_events) = (names.events.clone(), names.template_events);
-        let (variables, template_variables) = (names.variables.clone(), names.template_variables);
+        let (events, template_events) = (&names.events, names.template_events);
+        let (variables, template_variables) = (&names.variables, names.template_variables);
 
         // `[Events (279)] [Variables (78)]`: one list at a time, its "add" row always on top.
         ui.horizontal(|ui| {
@@ -109,7 +111,7 @@ impl PatchTool {
                 }
             });
             ui.separator();
-            name_rows(ui, &variables, template_variables, &filter, &mut |i| {
+            name_rows(ui, variables, template_variables, &filter, &mut |i| {
                 action = Some(Action::RemoveVariable(i));
             });
         } else {
@@ -120,14 +122,14 @@ impl PatchTool {
                 }
             });
             ui.separator();
-            name_rows(ui, &events, template_events, &filter, &mut |i| {
+            name_rows(ui, events, template_events, &filter, &mut |i| {
                 action = Some(Action::RemoveEvent(i));
             });
         }
 
         let Some(action) = action else { return };
         let ids = Ids { string_data, graph_data, value_set };
-        match self.apply(action, &ids, &events, &variables) {
+        match self.apply(action, &ids, events, variables) {
             Ok(()) => {
                 self.names = None;
                 self.editor_for = None; // the open object may be one of them
@@ -201,10 +203,9 @@ impl PatchTool {
 }
 
 fn names_of(behavior: &super::Behavior) -> Names {
-    let pointers = super::language::pointer_items(behavior);
-    let parents = super::tree::new_object_parents(behavior);
+    let graph = Rc::new(Graph::new(behavior));
     let Some(id) = behavior.object_of_class(STRING_DATA) else {
-        return Names { pointers, parents, ..Names::default() };
+        return Names { graph, ..Names::default() };
     };
     let current = behavior.text(id).unwrap_or_default();
     let template = behavior.template_object(id).map(|o| o.text.as_str()).unwrap_or_default();
@@ -213,8 +214,7 @@ fn names_of(behavior: &super::Behavior) -> Names {
         variables: vars::names(current, "variableNames"),
         template_events: vars::names(template, "eventNames").len(),
         template_variables: vars::names(template, "variableNames").len(),
-        pointers,
-        parents,
+        graph,
     }
 }
 

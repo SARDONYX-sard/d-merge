@@ -1,3 +1,22 @@
+//! Pushing to an array that is **empty** in the template.
+//!
+//! An empty array is written on one line, so a Nemesis patch can only replace that whole line:
+//! ```xml
+//! <!-- MOD_CODE ~colisc~ OPEN -->
+//! <hkparam name="boneWeights" numelements="2">
+//!     1.0 1.0
+//! </hkparam>
+//! <!-- ORIGINAL -->
+//! <hkparam name="boneWeights" numelements="0"></hkparam>
+//! <!-- CLOSE -->
+//! ```
+//! This hack only handles `boneWeights` of the mod `colisc`, but the situation is general: any
+//! patch that pushes to an array with `numelements="0"` looks like this. How to support it for
+//! every array is undecided.
+//!
+//! Note: Pandora v4 reports such a patch as an error, as the empty `<hkparam>` is not valid XML
+//! for its patcher.
+
 use simd_json::borrowed::Array;
 use winnow::{
     ModalResult, Parser,

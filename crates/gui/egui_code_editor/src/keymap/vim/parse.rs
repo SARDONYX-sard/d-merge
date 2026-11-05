@@ -51,6 +51,16 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
         OpParse::None => {}
     }
 
+    // ── leader ───────────────────────────────────────────────────────────────
+    // `<Space>` is the "leader" key (a prefix for editor commands), as in most Neovim setups,
+    // so its Vim meaning (same as `l`) only remains after an operator: `d<Space>`.
+    match after_count {
+        [VimKey::Char(' ')] => return Parse::Incomplete,
+        [VimKey::Char(' '), VimKey::Char('e'), ..] => return done(Command::Simple(Simple::ToggleExplorer), None),
+        [VimKey::Char(' '), ..] => return Parse::Invalid,
+        _ => {}
+    }
+
     // ── motion ───────────────────────────────────────────────────────────────
     match motion(after_count) {
         Step::Done(m) => return done(Command::Move(m), None),
@@ -293,6 +303,15 @@ mod tests {
             Parse::Done { command, .. } => command,
             other => panic!("{s}: {other:?}"),
         }
+    }
+
+    #[test]
+    fn space_is_a_leader_key() {
+        assert_eq!(parse(&keys(" ")), Parse::Incomplete);
+        assert_eq!(command(" e"), Command::Simple(Simple::ToggleExplorer));
+        assert_eq!(parse(&keys(" x")), Parse::Invalid);
+        // After an operator it is still a motion.
+        assert_eq!(command("d "), Command::Operate(Operator::Delete, Target::Motion(Motion::Right)));
     }
 
     #[test]

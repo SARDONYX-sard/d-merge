@@ -2,6 +2,8 @@
 //!
 //! Positions are char indices and are not moved by later edits (they are clamped when used).
 
+use std::collections::VecDeque;
+
 /// Jumps kept at most (the oldest are dropped).
 const MAX_JUMPS: usize = 100;
 
@@ -10,7 +12,7 @@ pub(super) struct Marks {
     /// `a`..`z`
     named: Vec<(char, usize)>,
     /// Positions jumped *from*, oldest first.
-    jumps: Vec<usize>,
+    jumps: VecDeque<usize>,
     /// Where `Ctrl+O` / `Ctrl+I` are in `jumps` (`jumps.len()` = after the newest).
     jump_pos: usize,
     /// Position before the latest jump (`''`).
@@ -41,11 +43,11 @@ impl Marks {
     /// Records `from` before a jump (e.g., `G`, `/foo`, `%`).
     pub(super) fn push_jump(&mut self, from: usize) {
         self.jumps.truncate(self.jump_pos);
-        if self.jumps.last() != Some(&from) {
-            self.jumps.push(from);
+        if self.jumps.iter().last() != Some(&from) {
+            self.jumps.push_back(from);
         }
         if self.jumps.len() > MAX_JUMPS {
-            self.jumps.remove(0);
+            self.jumps.pop_front();
         }
         self.jump_pos = self.jumps.len();
         self.previous = Some(from);
@@ -58,8 +60,8 @@ impl Marks {
                 return None;
             }
             // Leaving the newest end: remember where we are, so `Ctrl+I` can come back.
-            if self.jump_pos == self.jumps.len() && self.jumps.last() != Some(&current) {
-                self.jumps.push(current);
+            if self.jump_pos == self.jumps.len() && self.jumps.iter().last() != Some(&current) {
+                self.jumps.push_back(current);
             }
             self.jump_pos -= 1;
         } else {

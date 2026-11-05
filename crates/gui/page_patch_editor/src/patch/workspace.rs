@@ -64,6 +64,9 @@ pub(crate) struct Behavior {
     /// Write as NemesisExt even if Nemesis supports it.
     pub(crate) force_ext: bool,
     pub(crate) objects: Vec<TemplateObject>,
+    /// `id` -> index in `objects`. The lookups run for every object in several places, so a scan
+    /// of `objects` (a few thousand) each time would be quadratic.
+    object_index: fast_hash::HashMap<String, u32>,
     /// Edited template objects: id -> object text.
     pub(crate) edits: BTreeMap<String, String>,
     /// New objects: `#code$N` -> object text.
@@ -71,6 +74,46 @@ pub(crate) struct Behavior {
     /// `animationsetdatasinglefile`: the "objects" are anim sets (`Project~Data/file.txt`), patched
     /// as `Nemesis_Engine/mod/<code>/animationsetdatasinglefile/<id>`. No new objects.
     pub(crate) asdsf: bool,
+}
+
+/// The patch directory of a mod, given its root (what a mod manager installs).
+///
+/// e.g., `mods/Paraglider` containing `Nemesis_Engine/mod/para/` -> `.../Nemesis_Engine/mod/para`.
+/// A directory that is not a mod root is returned as is. If a mod has several codes, the first one
+/// by name is taken.
+///
+/// The root is also where a later anim set generator finds `meshes/**/animations/*.hkx`.
+fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
+    let code_dir = ["Nemesis_Engine", "Nemesis_EngineExt"].iter().find_map(|engine| {
+        let entries = std::fs::read_dir(selected.join(engine).join("mod")).ok()?;
+        entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).min()
+    });
+    code_dir.map_or(std::borrow::Cow::Borrowed(selected), std::borrow::Cow::Owned)
+}
+
+/// `id` -> position, for [`Behavior::template_object`].
+fn index_objects(objects: &[TemplateObject]) -> fast_hash::HashMap<String, u32> {
+    #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion objects")]
+    objects.iter().enumerate().map(|(index, object)| (object.id.clone(), index as u32)).collect()
+}
+
+/// One object of [`Behavior::texts`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ObjectText<'a> {
+    /// e.g. `#0106`, `#mymod$0`
+    pub(crate) id: &'a str,
+    /// e.g. `hkbClipGenerator`
+    pub(crate) class: &'a str,
+    /// The template's `name` field, e.g. `GetUpModList` (`""` for new objects).
+    pub(crate) name: &'a str,
+    pub(crate) text: &'a str,
+    pub(crate) is_new: bool,
+    pub(crate) is_edited: bool,
+}
+
+/// `<hkobject name="#m$0" class="hkbClipGenerator" ...>` -> `hkbClipGenerator` (`""` if missing).
+fn class_attribute(text: &str) -> &str {
+    text.split_once("class=\"").and_then(|(_, rest)| rest.split('"').next()).unwrap_or_default()
 }
 
 /// File stem of the anim set data template (`meshes/animationsetdatasinglefile.bin|txt`).
@@ -94,13 +137,14 @@ impl Behavior {
                 .map_err(error)?
                 .into_iter()
                 .map(|set| TemplateObject { id: set.id(), class: set.project, name: set.file, text: set.text })
-                .collect();
+                .collect::<Vec<_>>();
             return Ok(Self {
                 name: ASDSF.to_string(),
                 template_path: template_path.to_path_buf(),
                 meshes_path: meshes_path(template_path),
                 nemesis: Some((ASDSF.to_string(), false)),
                 force_ext: false,
+                object_index: index_objects(&objects),
                 objects,
                 edits: BTreeMap::new(),
                 added: BTreeMap::new(),
@@ -119,13 +163,15 @@ impl Behavior {
             Some((_, true)) => format!("_1stperson/{stem}"),
             _ => stem,
         };
+        let objects: Vec<_> = objects(&xml).into_iter().map(index).collect();
         Ok(Self {
             name,
             template_path: template_path.to_path_buf(),
             meshes_path,
             nemesis,
             force_ext: false,
-            objects: objects(&xml).into_iter().map(index).collect(),
+            object_index: index_objects(&objects),
+            objects,
             edits: BTreeMap::new(),
             added: BTreeMap::new(),
             asdsf: false,
@@ -178,16 +224,36 @@ impl Behavior {
     }
 
     /// The class of object `id` (a template object or a new one).
-    pub(crate) fn class_of(&self, id: &str) -> Option<String> {
+    pub(crate) fn class_of(&self, id: &str) -> Option<&str> {
         if let Some(text) = self.added.get(id) {
-            let class = text.split_once("class=\"")?.1.split('"').next()?;
-            return Some(class.to_string());
+            return Some(class_attribute(text));
         }
-        self.template_object(id).map(|o| o.class.clone())
+        self.template_object(id).map(|o| o.class.as_str())
+    }
+
+    /// Every object with its current text: the new ones first, then the template's.
+    pub(crate) fn texts(&self) -> impl Iterator<Item = ObjectText<'_>> {
+        let new = self.added.iter().map(|(id, text)| ObjectText {
+            id,
+            class: class_attribute(text),
+            name: "",
+            text,
+            is_new: true,
+            is_edited: false,
+        });
+        let template = self.objects.iter().map(|o| ObjectText {
+            id: &o.id,
+            class: &o.class,
+            name: &o.name,
+            text: self.edits.get(&o.id).unwrap_or(&o.text),
+            is_new: false,
+            is_edited: self.edits.contains_key(&o.id),
+        });
+        new.chain(template)
     }
 
     pub(crate) fn template_object(&self, id: &str) -> Option<&TemplateObject> {
-        self.objects.iter().find(|o| o.id == id)
+        self.object_index.get(id).map(|&index| &self.objects[index as usize])
     }
 
     /// The current text of `id`: its edit, a new object, or the template object.
@@ -339,14 +405,17 @@ impl Workspace {
         Ok(())
     }
 
-    /// Imports a mod: `.../Nemesis_Engine/mod/<code>` or `.../Nemesis_EngineExt/mod/<code>`.
+    /// Imports a mod. `selected` is its root (see [`mod_dir_of`]) or
+    /// `.../Nemesis_Engine/mod/<code>` or `.../Nemesis_EngineExt/mod/<code>`.
     ///
     /// Each patch folder is resolved to a template xml under `template_root`:
     /// - `<name>/`, `_1stperson/<name>/`: by Nemesis' template table
     /// - `meshes/.../<x>.bin/` (NemesisExt): by that path (`.bin` -> `.xml`)
     ///
     /// Returns `(workspace, code, folders without a template)`.
-    pub(crate) fn import(mod_dir: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
+    pub(crate) fn import(selected: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
+        let mod_dir = mod_dir_of(selected);
+        let mod_dir = mod_dir.as_ref();
         let code = mod_dir.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let mut workspace = Self {
             info: std::fs::read_to_string(mod_dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default(),

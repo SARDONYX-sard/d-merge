@@ -4,7 +4,7 @@
 //! - `# heading`
 //! - `- list item`
 //! - fenced code blocks (```` ``` ````)
-//! - inline `` `code` `` and `[text](url)` links
+//! - inline `` `code` ``, `**bold**` and `[text](url)` links
 //!
 //! Anything else is shown as plain text. A full CommonMark renderer would be overkill here.
 
@@ -66,22 +66,19 @@ fn code_block(ui: &mut egui::Ui, code: &str) {
         });
 }
 
-/// One line with `` `code` `` and `[text](url)` spans.
+/// One line with `` `code` ``, `**bold**` and `[text](url)` spans.
+///
+/// e.g., `**hkbClipGenerator.mode**: `Enum(Int8)`` -> bold, plain `: `, code.
 fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
     ui.spacing_mut().item_spacing.x = 0.0;
 
     let mut rest = text;
     while !rest.is_empty() {
         // Find the next special span.
-        let next_code = rest.find('`');
-        let next_link = rest.find('[');
-        let next = match (next_code, next_link) {
-            (Some(c), Some(l)) => c.min(l),
-            (Some(i), None) | (None, Some(i)) => i,
-            (None, None) => {
-                ui.label(rest);
-                return;
-            }
+        let next = [rest.find('`'), rest.find('['), rest.find("**")].into_iter().flatten().min();
+        let Some(next) = next else {
+            ui.label(rest);
+            return;
         };
 
         if next > 0 {
@@ -94,6 +91,11 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
         {
             ui.label(egui::RichText::new(&after[..end]).code());
             rest = &after[end + 1..];
+        } else if let Some(after) = rest.strip_prefix("**")
+            && let Some(end) = after.find("**")
+        {
+            ui.label(egui::RichText::new(&after[..end]).strong());
+            rest = &after[end + 2..];
         } else if let Some((label, url, after)) = parse_link(rest) {
             let link = ui.hyperlink_to(label, url);
             if link.has_focus() {
@@ -104,7 +106,7 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
             links.push(link);
             rest = after;
         } else {
-            // A lone `` ` `` or `[`: print it and move on.
+            // A lone `` ` ``, `[` or `*`: print it and move on.
             let (c, after) = rest.split_at(1);
             ui.label(c);
             rest = after;

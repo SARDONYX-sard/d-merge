@@ -230,6 +230,8 @@ pub(super) enum Simple {
     OpenUrl,
     /// `gd` / `gD`: ask the host to go to the definition / list the references.
     GoTo { references: bool },
+    /// `<Space>e`: ask the host to move the keyboard to its file / object tree (like `:NvimTreeToggle`).
+    ToggleExplorer,
     /// `Ctrl+A` (`up`) / `Ctrl+X`: add / subtract `count` to the number at or after the cursor
     Increment { up: bool },
     /// `m<c>`

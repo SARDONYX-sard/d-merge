@@ -7,7 +7,7 @@
 //! # Coordinates
 //! `column`s are 0-based **char** indices inside one line (same as egui's `CCursor`, not bytes).
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use egui::Color32;
 
@@ -42,6 +42,27 @@ pub trait Language {
         None
     }
 
+    /// Like [`Self::hover`], with the **whole document** for languages whose docs depend on the
+    /// surrounding lines (e.g., which array the hovered element is in). `line` is 0-based.
+    fn hover_at(&self, text: &str, line: usize, column: usize) -> Option<String> {
+        self.hover(text.split('\n').nth(line)?, column)
+    }
+
+    /// LSP `textDocument/definition`: where the symbol at `line` / `column` of the **whole document**
+    /// `text` is defined. Used by `F12`, `Ctrl+click`, Vim `gd` and the right-click menu.
+    fn definition(&self, text: &str, line: usize, column: usize) -> Option<Location<'_>> {
+        let _ = (text, line, column);
+        None
+    }
+
+    /// LSP `textDocument/references`: who uses the symbol at `line` / `column`.
+    /// `None` = no symbol there; an empty list = a symbol nobody uses.
+    /// Used by `Shift+F12`, Vim `gD` and the right-click menu.
+    fn references(&self, text: &str, line: usize, column: usize) -> Option<References<'_>> {
+        let _ = (text, line, column);
+        None
+    }
+
     /// The signature being typed at `column`.
     fn signature_help(&self, line: &str, column: usize) -> Option<SignatureHelp> {
         let _ = (line, column);
@@ -68,6 +89,28 @@ pub trait Language {
     }
 }
 
+/// A place in some document, for [`Language::definition`] / [`Language::references`].
+///
+/// The editor only has one text, so it hands locations to its host to open
+/// (see [`crate::Navigation`]). Strings are usually borrowed from the language's own data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location<'a> {
+    /// The document, in terms the host understands. e.g., an object id such as `#0106`.
+    pub document: Cow<'a, str>,
+    /// 0-based line.
+    pub line: usize,
+    /// One line for lists. e.g., `hkbClipGenerator`
+    pub detail: Cow<'a, str>,
+}
+
+/// Result of [`Language::references`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct References<'a> {
+    /// What was asked about, for the title of a list. e.g., `#0106`, `$eventID[moveStart]$`
+    pub symbol: Cow<'a, str>,
+    pub locations: Vec<Location<'a>>,
+}
+
 /// One quick fix: replace `columns` of `line` with `new_text`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuickFix {
@@ -81,7 +124,7 @@ pub struct QuickFix {
 }
 
 /// How serious a [`Diagnostic`] is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Severity {
     Error,
     Warning,
@@ -106,7 +149,7 @@ impl Severity {
 }
 
 /// An underlined problem.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Diagnostic {
     /// 0-based line.
     pub line: usize,

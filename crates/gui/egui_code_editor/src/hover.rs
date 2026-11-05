@@ -210,15 +210,13 @@ impl HoverPopup {
 /// Diagnostics at `index` + the language's docs, or `None` if there is nothing to show.
 fn content(index: usize, ctx: &HoverCtx<'_>) -> Option<Content> {
     let pos = LinePos::from_char_index(ctx.text, index);
-    let line = ctx.text.split('\n').nth(pos.line).unwrap_or_default();
-
     let problems: Vec<(Severity, String)> = ctx
         .diagnostics
         .iter()
         .filter(|d| d.line == pos.line && d.columns.start <= pos.column && pos.column <= d.columns.end)
         .map(|d| (d.severity, d.message.clone()))
         .collect();
-    let docs = if ctx.with_docs { ctx.language.hover(line, pos.column) } else { None };
+    let docs = if ctx.with_docs { ctx.language.hover_at(ctx.text, pos.line, pos.column) } else { None };
 
     (!problems.is_empty() || docs.is_some()).then_some(Content { problems, docs })
 }

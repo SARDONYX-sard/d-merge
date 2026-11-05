@@ -131,6 +131,9 @@ pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
     let painter = ui.painter();
     let mark_color = ui.visuals().weak_text_color().gamma_multiply(0.6);
     let font = egui::TextStyle::Monospace.resolve(ui.style());
+    // Laid out once and reused: there are hundreds of marks on screen, every frame.
+    let tab_mark = painter.layout_no_wrap("→".to_string(), font.clone(), mark_color);
+    let space_mark = painter.layout_no_wrap("·".to_string(), font, mark_color);
 
     for placed in &galley.rows {
         let row_rect = placed.rect().translate(galley_pos.to_vec2());
@@ -160,8 +163,8 @@ pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
                     }
                 }
             }
-            let mark = if is_tab { "→" } else { "·" };
-            painter.text(rect.center(), egui::Align2::CENTER_CENTER, mark, font.clone(), mark_color);
+            let mark = if is_tab { &tab_mark } else { &space_mark };
+            painter.galley(rect.center() - mark.size() / 2.0, std::sync::Arc::clone(mark), mark_color);
         }
     }
 }

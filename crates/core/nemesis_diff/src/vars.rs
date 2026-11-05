@@ -73,6 +73,21 @@ pub fn names(object: &str, param: &str) -> Vec<String> {
         .collect()
 }
 
+/// The 0-based line of `name` in array `param` of `object` (ignoring ASCII case, as Nemesis does),
+/// to open the place an event or variable is defined at.
+///
+/// e.g., `eventNames` + `moveStop` -> the line of `<hkcstring>moveStop</hkcstring>`
+pub fn name_line(object: &str, param: &str, name: &str) -> Option<usize> {
+    let open = format!("<hkparam name=\"{param}\"");
+    let mut lines = object.lines().enumerate();
+    lines.find(|(_, line)| line.trim_start().starts_with(&open))?;
+    let (line, _) = lines.take_while(|(_, line)| !line.trim_start().starts_with("</hkparam>")).find(|(_, line)| {
+        let value = line.trim().strip_prefix("<hkcstring>").and_then(|v| v.strip_suffix("</hkcstring>"));
+        value.is_some_and(|value| value.eq_ignore_ascii_case(name))
+    })?;
+    Some(line)
+}
+
 /// Appends an element (lines relative to the element indent) to array `param` of `object`.
 pub fn push(object: &str, param: &str, element: &[&str]) -> Option<String> {
     let mut array = Array::find(object, param)?;
@@ -226,6 +241,8 @@ mod tests {
     #[test]
     fn add_and_remove() {
         assert_eq!(names(STRING_DATA, "eventNames"), ["moveStart", "moveStop"]);
+        assert_eq!(name_line(STRING_DATA, "eventNames", "movestop"), Some(3));
+        assert_eq!(name_line(STRING_DATA, "variableNames", "moveStop"), None);
 
         let (string_data, graph_data) = add_event(STRING_DATA, GRAPH_DATA, "MyEvent").unwrap();
         assert_eq!(names(&string_data, "eventNames"), ["moveStart", "moveStop", "MyEvent"]);

@@ -1,4 +1,5 @@
-//! The patch preview: the `#XXXX.txt` of the open object, drawn like a git diff.
+//! The patch preview's data: the `#XXXX.txt` of the open object, split into lines to draw like a
+//! git diff (see [`super::ui::preview`]).
 //!
 //! ```text
 //! Patch preview  ▲ ▼  2/5  ✔
@@ -12,7 +13,7 @@
 
 /// What a preview line is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
+pub(super) enum Kind {
     Common,
     /// `<!-- MOD_CODE ~..~ OPEN -->` of block N.
     Open(usize),
@@ -25,9 +26,12 @@ enum Kind {
 #[derive(Debug, Default)]
 pub(super) struct Preview {
     lines: Vec<(Kind, String)>,
+    /// Chars of the longest line: the width of the horizontal scroll.
+    longest_line: usize,
     blocks: usize,
-    /// The block ▲ / ▼ moved to (0-based), and a pending scroll to it.
+    /// The block ▲ / ▼ moved to (0-based).
     pub(super) current: usize,
+    /// A pending scroll to `current`.
     scroll_to_current: bool,
 }
 
@@ -36,6 +40,7 @@ impl Preview {
         let mut lines = Vec::new();
         let mut kind = Kind::Common;
         let mut blocks = 0;
+        let mut longest_line = 0;
         for line in patch.lines() {
             let trimmed = line.trim();
             let line_kind = if trimmed.starts_with("<!-- MOD_CODE ~") {
@@ -51,9 +56,23 @@ impl Preview {
             } else {
                 kind
             };
-            lines.push((line_kind, line.replace('\t', "    ")));
+            let line = line.replace('\t', "    ");
+            longest_line = longest_line.max(line.chars().count());
+            lines.push((line_kind, line));
         }
-        Self { lines, blocks, current: 0, scroll_to_current: false }
+        Self { lines, longest_line, blocks, current: 0, scroll_to_current: false }
+    }
+
+    pub(super) fn lines(&self) -> &[(Kind, String)] {
+        &self.lines
+    }
+
+    pub(super) const fn longest_line(&self) -> usize {
+        self.longest_line
+    }
+
+    pub(super) const fn blocks(&self) -> usize {
+        self.blocks
     }
 
     /// Keeps the ▲ / ▼ position (clamped) after the patch was recomputed.
@@ -61,76 +80,22 @@ impl Preview {
         self.current = current.min(self.blocks.saturating_sub(1));
     }
 
-    /// `▲ ▼ 2/5`: moves the current block (and scrolls to it).
-    pub(super) fn nav_ui(&mut self, ui: &mut egui::Ui, hover: &str) {
+    /// ▲ / ▼: the previous / next block, wrapping around, and a scroll to it.
+    pub(super) const fn step(&mut self, forward: bool) {
         if self.blocks == 0 {
             return;
         }
-        for (forward, glyph) in [(false, "▲"), (true, "▼")] {
-            if ui.small_button(glyph).on_hover_text(hover).clicked() {
-                self.current = if forward {
-                    (self.current + 1) % self.blocks
-                } else {
-                    (self.current + self.blocks - 1) % self.blocks
-                };
-                self.scroll_to_current = true;
-            }
-        }
-        ui.label(format!("{}/{}", self.current + 1, self.blocks));
+        self.current =
+            if forward { (self.current + 1) % self.blocks } else { (self.current + self.blocks - 1) % self.blocks };
+        self.scroll_to_current = true;
     }
 
-    /// The lines (only the visible ones are laid out). Returns the block whose `↶` was clicked.
-    pub(super) fn ui(&mut self, ui: &mut egui::Ui, revert_hover: &str) -> Option<usize> {
-        let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
-        let green = egui::Color32::from_rgb(46, 160, 67).gamma_multiply(0.18);
-        let red = egui::Color32::from_rgb(248, 81, 73).gamma_multiply(0.18);
-        let current_tint = ui.visuals().selection.bg_fill.gamma_multiply(0.35);
-
-        let mut scroll = egui::ScrollArea::both().auto_shrink(false);
-        if std::mem::take(&mut self.scroll_to_current)
-            && let Some(row) = self.lines.iter().position(|(k, _)| *k == Kind::Open(self.current))
-        {
-            #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
-            let offset = (row as f32 - 2.0).max(0.0) * row_height;
-            scroll = scroll.vertical_scroll_offset(offset);
+    /// The pending scroll: the row of the current block's `OPEN` line, which goes to the top.
+    pub(super) fn take_scroll_row(&mut self) -> Option<usize> {
+        if !std::mem::take(&mut self.scroll_to_current) {
+            return None;
         }
-
-        let mut revert = None;
-        let current = self.current;
-        scroll.show_rows(ui, row_height, self.lines.len(), |ui, range| {
-            for (kind, text) in &self.lines[range] {
-                let (rect, _) = ui
-                    .allocate_exact_size(egui::vec2(ui.available_width().max(600.0), row_height), egui::Sense::hover());
-                let fill = match kind {
-                    Kind::New => Some(green),
-                    Kind::Old => Some(red),
-                    Kind::Open(i) if *i == current => Some(current_tint),
-                    _ => None,
-                };
-                if let Some(fill) = fill {
-                    ui.painter().rect_filled(rect, 0.0, fill);
-                }
-                // `↶` at the start of each block, like git's conflict buttons.
-                let gutter = egui::Rect::from_min_size(rect.min, egui::vec2(20.0, row_height));
-                if let Kind::Open(i) = kind
-                    && ui.put(gutter, egui::Button::new("↶").small()).on_hover_text(revert_hover).clicked()
-                {
-                    revert = Some(*i);
-                }
-                let color = match kind {
-                    Kind::Open(_) | Kind::Marker => ui.visuals().weak_text_color(),
-                    _ => ui.visuals().text_color(),
-                };
-                ui.painter().text(
-                    rect.left_center() + egui::vec2(24.0, 0.0),
-                    egui::Align2::LEFT_CENTER,
-                    text,
-                    egui::TextStyle::Monospace.resolve(ui.style()),
-                    color,
-                );
-            }
-        });
-        revert
+        self.lines.iter().position(|(kind, _)| *kind == Kind::Open(self.current))
     }
 }
 
@@ -138,15 +103,51 @@ impl Preview {
 mod tests {
     use super::*;
 
+    const PATCH: &str = "a\n<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- ORIGINAL -->\nc\n<!-- CLOSE -->\nd\n\
+                         <!-- MOD_CODE ~m~ OPEN -->\n\t\tlong line\n<!-- CLOSE -->\n";
+
     #[test]
     fn splits_blocks() {
-        let patch = "a\n<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- ORIGINAL -->\nc\n<!-- CLOSE -->\nd\n";
-        let preview = Preview::new(patch);
+        let preview = Preview::new(PATCH);
         let kinds: Vec<_> = preview.lines.iter().map(|(k, _)| *k).collect();
         assert_eq!(
             kinds,
-            [Kind::Common, Kind::Open(0), Kind::New, Kind::Marker, Kind::Old, Kind::Marker, Kind::Common]
+            [
+                Kind::Common,
+                Kind::Open(0),
+                Kind::New,
+                Kind::Marker,
+                Kind::Old,
+                Kind::Marker,
+                Kind::Common,
+                Kind::Open(1),
+                Kind::New,
+                Kind::Marker
+            ]
         );
-        assert_eq!(preview.blocks, 1);
+        assert_eq!(preview.blocks, 2);
+        assert_eq!(preview.longest_line, "<!-- MOD_CODE ~m~ OPEN -->".len());
+    }
+
+    #[test]
+    fn steps_wrap_and_scroll_to_the_open_line() {
+        let mut preview = Preview::new(PATCH);
+        assert_eq!(preview.take_scroll_row(), None);
+        preview.step(true);
+        assert_eq!(preview.current, 1);
+        assert_eq!(preview.take_scroll_row(), Some(7));
+        assert_eq!(preview.take_scroll_row(), None); // only once
+        preview.step(true);
+        assert_eq!(preview.current, 0);
+        preview.step(false);
+        assert_eq!(preview.current, 1);
+    }
+
+    #[test]
+    fn no_blocks_nothing_to_step() {
+        let mut preview = Preview::new("a\n");
+        preview.step(true);
+        assert_eq!(preview.current, 0);
+        assert_eq!(preview.take_scroll_row(), None);
     }
 }

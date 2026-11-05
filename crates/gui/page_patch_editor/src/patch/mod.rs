@@ -18,13 +18,17 @@
 mod language;
 mod navigate;
 mod preview;
+mod template_tree;
 mod tree;
+mod ui;
 mod vars_panel;
 mod workspace;
 
-use std::{path::Path, time::Instant};
+use std::{path::Path, rc::Rc, time::Instant};
 
-use egui_code_editor::{CodeEditor, CodeEditorState, Diagnostic, EditorCommand, EditorFeatures, Keymap, Severity};
+use egui_code_editor::{
+    CodeEditor, CodeEditorState, Diagnostic, EditorAction, EditorCommand, EditorFeatures, Keymap, Navigation, Severity,
+};
 use egui_widgets::{
     notify::Notification,
     shadcn::{Button, Checkbox, TextEdit},
@@ -80,11 +84,16 @@ pub(crate) struct PatchTool {
     field_problems: Vec<Diagnostic>,
     /// One label per changed block of the selected object (its `↶` revert buttons).
     preview_view: Option<preview::Preview>,
-    /// `Shift+F12`: who points to an object.
-    references: navigate::References,
+    /// `Shift+F12`: who uses a symbol.
+    references: Option<navigate::ReferenceList>,
     history: navigate::History,
-    /// The `#id` the editor's right-click menu was opened on.
-    menu_target: Option<String>,
+    /// The keyboard goes to the editor on the next frame, and the cursor to this place.
+    /// (An editor's id depends on its object, so this can only be done once the object is open.)
+    focus_editor: Option<FocusAt>,
+    /// The keyboard is in the object tree (Vim `Space e`).
+    tree_focus: bool,
+    /// The flat object list after its filter, cached: it is drawn every frame.
+    list: Option<ObjectList>,
 
     /// Normal / Vim keys of the object editor.
     editor_mode: EditorMode,
@@ -108,9 +117,29 @@ pub(crate) struct PatchTool {
     /// The events / variables panel shows variables (else events).
     show_variables: bool,
     /// `(behavior, names)` of the events / variables panel and the completion.
-    names: Option<(usize, vars_panel::Names)>,
+    names: Option<(usize, Rc<vars_panel::Names>)>,
+    /// Directories opened / closed in the template picker's tree.
+    picker_toggled: fast_hash::HashSet<String>,
     new_names: vars_panel::NewNames,
     vars_error: Option<String>,
+}
+
+/// Where the cursor goes when the editor gets the keyboard back.
+#[derive(Debug, Clone, Copy)]
+enum FocusAt {
+    /// Where it was in that object (e.g., going back with `Ctrl+O`).
+    Keep,
+    /// A 0-based line (e.g., go to definition).
+    Line(usize),
+}
+
+/// See [`PatchTool::list`].
+#[derive(Debug)]
+struct ObjectList {
+    graph: Rc<tree::Graph>,
+    filter: String,
+    changed_only: bool,
+    rows: Vec<tree::Node>,
 }
 
 impl PatchTool {
@@ -217,10 +246,20 @@ impl PatchTool {
         while let Some(target) = self.history.walk(older, &current) {
             if self.workspace.behaviors[self.active].text(&target).is_some() {
                 self.selected = Some(target);
+                self.focus_editor = Some(FocusAt::Keep);
                 return;
             }
             current = target;
         }
+    }
+
+    /// Opens `document` at `line` (go to definition, a click in the references window).
+    fn open_location(&mut self, current: &str, document: &str, line: usize) {
+        if document != current {
+            self.history.visit(current);
+            document.clone_into(self.selected.get_or_insert_default());
+        }
+        self.focus_editor = Some(FocusAt::Line(line));
     }
 
     fn mark_dirty(&mut self) {
@@ -329,30 +368,13 @@ impl PatchTool {
                 ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
                 return;
             }
-            let filter = self.picker_filter.to_lowercase();
-            let shown: Vec<&TemplateEntry> = self.catalog.iter().filter(|e| e.meshes_path.contains(&filter)).collect();
-            let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
-            egui::ScrollArea::vertical().max_height(220.0).auto_shrink([false, true]).show_rows(
-                ui,
-                row_height,
-                shown.len(),
-                |ui, range| {
-                    for entry in &shown[range] {
-                        ui.horizontal(|ui| {
-                            let text = egui::RichText::new(&entry.meshes_path).monospace();
-                            if ui.add(egui::Button::selectable(false, text)).clicked() {
-                                picked = Some(entry.path.clone());
-                            }
-                            if entry.nemesis {
-                                ui.weak("Nemesis");
-                            } else {
-                                ui.colored_label(ui.visuals().warn_fg_color, "Ext")
-                                    .on_hover_text(i18n.t(I18nKey::NemesisExtOnlyWarning));
-                            }
-                        });
-                    }
-                },
-            );
+            // No filter: as a directory tree. A filter wants all the matches at once.
+            let clicked = if self.picker_filter.is_empty() {
+                ui::template_picker::tree_ui(ui, &self.catalog, &mut self.picker_toggled, i18n)
+            } else {
+                ui::template_picker::filtered_ui(ui, &self.catalog, &self.picker_filter, i18n)
+            };
+            picked = clicked.map(Path::to_path_buf);
         });
         if let Some(path) = picked {
             self.add_behavior(&path, notify, i18n);
@@ -545,72 +567,117 @@ impl PatchTool {
         }
         ui.separator();
 
+        // Clicking any text field takes the keyboard out of the tree.
+        if ui.memory(|m| m.focused().is_some()) {
+            self.tree_focus = false;
+        }
+        let graph = Rc::clone(&self.names().graph);
+        let changed_only = self.changed_only;
+
         // Tree (from the root container) unless filtering: a filter wants the flat list.
-        if self.tree_view && self.filter.is_empty() {
-            let behavior = &self.workspace.behaviors[self.active];
-            let changed_only = self.changed_only;
-            egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-                tree::tree_ui(ui, behavior, &mut self.selected, &mut self.tree, changed_only);
-            });
+        let asdsf = self.workspace.behaviors[self.active].asdsf;
+        if self.tree_view && self.filter.is_empty() && !asdsf {
+            if self.tree_focus {
+                ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+                let inputs = ui::tree::read_keys(ui, &mut self.tree.leader);
+                if self.tree.apply_inputs(&inputs, &graph, &mut self.selected, changed_only) {
+                    self.leave_tree();
+                }
+            }
+            let flags = (changed_only, self.tree_focus);
+            ui::tree::tree_ui(ui, &graph, &mut self.selected, &mut self.tree, flags, i18n);
             return;
         }
 
-        let _ = self.names(); // where new objects are linked (cached)
-        let rows = self.rows();
+        self.refresh_list(&graph);
+        if self.tree_focus {
+            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            self.list_keys(ui, &graph);
+        }
+        let rows = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
         egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
-            for (marker, id, class, name) in &rows[range] {
-                let text = egui::RichText::new(format!("{marker} {id}  {class}  {name}")).monospace();
-                let selected = self.selected.as_deref() == Some(id.as_str());
+            for &node in &rows[range] {
+                let id = graph.id(node);
+                let text = egui::RichText::new(graph.label(node)).monospace();
+                let selected = self.selected.as_deref() == Some(id);
                 let response = ui.add(egui::Button::selectable(selected, text));
                 if response.clicked() {
-                    self.selected = Some(id.clone());
+                    id.clone_into(self.selected.get_or_insert_default());
                 }
-                let changed = *marker != ' ';
                 response.context_menu(|ui| {
-                    if let Some(action) = row_menu(ui, i18n, *marker == '+', changed) {
-                        menu_action = Some((id.clone(), action));
+                    if let Some(action) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
+                        menu_action = Some((node, action));
                     }
                 });
             }
         });
-        if let Some((id, action)) = menu_action {
+        if let Some((node, action)) = menu_action {
+            let id = graph.id(node);
             match action {
-                RowAction::Duplicate => self.new_object(Some(&id)),
-                RowAction::CopyId => ui.ctx().copy_text(id),
-                RowAction::RevertOrDelete => self.revert_or_delete(&id),
+                RowAction::Duplicate => self.new_object(Some(id)),
+                RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
+                RowAction::RevertOrDelete => self.revert_or_delete(id),
             }
         }
     }
 
-    /// `(marker, id, class, name)`: new objects first, then the template's (`●` = edited).
-    fn rows(&self) -> Vec<(char, String, String, String)> {
-        let behavior = &self.workspace.behaviors[self.active];
-        let filter = self.filter.to_lowercase();
-        let matches = |id: &str, class: &str, name: &str| {
-            filter.is_empty()
-                || id.to_lowercase().contains(&filter)
-                || class.to_lowercase().contains(&filter)
-                || name.to_lowercase().contains(&filter)
-        };
+    /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
+    fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
+        self.tree_focus = true;
+        self.tree_view = true;
+        self.show_vars = false;
+        self.filter.clear();
+        ui.memory_mut(|m| m.surrender_focus(editor));
+    }
 
-        // A new object shows where it is linked: `← #0106` (or a warning).
-        let parents = self.names.as_ref().map(|(_, names)| &names.parents);
-        let added = behavior.added.iter().map(|(id, text)| {
-            let class = text.split_once("class=\"").and_then(|(_, r)| r.split_once('"')).map(|(c, _)| c);
-            let linked = match parents.and_then(|p| p.get(id)) {
-                Some(from) => format!("← {}", from.join(", ")),
-                None => "⚠ not linked".to_string(),
-            };
-            ('+', id.clone(), class.unwrap_or_default().to_string(), linked)
+    /// The keyboard goes back to the editor.
+    const fn leave_tree(&mut self) {
+        self.tree_focus = false;
+        self.focus_editor = Some(FocusAt::Keep);
+    }
+
+    /// The flat list has the same keys as the tree, without the folding.
+    fn list_keys(&mut self, ui: &egui::Ui, graph: &tree::Graph) {
+        let rows = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+        let selected = self.selected.as_deref();
+        let mut current = rows.iter().position(|&node| selected == Some(graph.id(node))).unwrap_or(0);
+        let mut leave = false;
+        for input in ui::tree::read_keys(ui, &mut self.tree.leader) {
+            leave |= input == tree::TreeInput::Leave;
+            current = input.step(current, rows.len()).unwrap_or(current);
+        }
+        if let Some(&node) = rows.get(current) {
+            graph.id(node).clone_into(self.selected.get_or_insert_default());
+        }
+        if leave {
+            self.leave_tree();
+        }
+    }
+
+    /// Recomputes the flat list when the objects, the filter or "changed only" changed.
+    ///
+    /// New objects come first and show where they are linked: `+ #mymod$0  hkbFoo  ← #0106`.
+    fn refresh_list(&mut self, graph: &Rc<tree::Graph>) {
+        let fresh = self.list.as_ref().is_some_and(|list| {
+            Rc::ptr_eq(&list.graph, graph) && list.filter == self.filter && list.changed_only == self.changed_only
         });
-        let template =
-            behavior.objects.iter().filter(|o| !self.changed_only || behavior.edits.contains_key(&o.id)).map(|o| {
-                let marker = if behavior.edits.contains_key(&o.id) { '●' } else { ' ' };
-                (marker, o.id.clone(), o.class.clone(), o.name.clone())
-            });
-        added.chain(template).filter(|(_, id, class, name)| matches(id, class, name)).collect()
+        if fresh {
+            return;
+        }
+        let filter = self.filter.to_lowercase();
+        let rows = graph
+            .nodes()
+            .filter(|&node| !self.changed_only || graph.is_changed(node))
+            .filter(|&node| filter.is_empty() || graph.label(node).to_lowercase().contains(&filter))
+            .collect();
+        self.list = Some(ObjectList {
+            graph: Rc::clone(graph),
+            filter: self.filter.clone(),
+            changed_only: self.changed_only,
+            rows,
+        });
     }
 
     /// Deletes a new object, or drops the edits of a template object.
@@ -688,13 +755,27 @@ impl PatchTool {
             self.editor_for = Some(key);
         }
 
+        let editor_id = egui_code_editor::editor_id(("nemesis_object", &id));
+        if let Some(at) = self.focus_editor.take() {
+            let index = match at {
+                FocusAt::Line(line) => {
+                    egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.editor_text)
+                }
+                FocusAt::Keep => egui::TextEdit::load_state(ui.ctx(), editor_id)
+                    .and_then(|state| state.cursor.char_range())
+                    .map_or(0, |range| range.primary.index.0),
+            };
+            egui_code_editor::set_cursor(ui.ctx(), editor_id, index);
+        }
+
         let code = self.mod_code.trim().to_string();
         if self.preview.is_none() {
             let patch = self.workspace.behaviors[self.active].patch(&code, &id);
             let behavior = &self.workspace.behaviors[self.active];
             let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(patch));
             self.preview = Some((patch, check));
-            self.field_problems = field_diagnostics(&self.editor_text, &self.workspace.behaviors[self.active]);
+            let behavior = &self.workspace.behaviors[self.active];
+            self.field_problems = field_diagnostics(&self.editor_text, behavior, behavior.added.contains_key(&id));
             let current = self.preview_view.as_ref().map_or(0, |v| v.current);
             self.preview_view =
                 self.preview.as_ref().and_then(|(patch, _)| patch.as_deref()).map(preview::Preview::new);
@@ -713,7 +794,7 @@ impl PatchTool {
                 ui.horizontal(|ui| {
                     ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
                     if let Some(view) = &mut self.preview_view {
-                        view.nav_ui(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
+                        ui::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                     }
                     match check {
                         _ if patch.is_none() => {
@@ -729,13 +810,12 @@ impl PatchTool {
                     }
                 });
                 if let Some(view) = &mut self.preview_view {
-                    revert = view.ui(ui, i18n.t(I18nKey::NemesisRevertHunkHover));
+                    revert = ui::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover));
                 }
             });
         }
         // `$eventID[` / `$variableID[` complete with the behavior's names.
         let names = self.names();
-        let (events, variables, pointers) = (names.events.clone(), names.variables.clone(), names.pointers.clone());
         // Enum / flag values only depend on the template: computed once per behavior.
         if self.field_values.as_ref().is_none_or(|(active, _)| *active != self.active) {
             let values = language::field_values(&self.workspace.behaviors[self.active]);
@@ -746,7 +826,15 @@ impl PatchTool {
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
         let fields = context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice()));
-        let language = NemesisXml { events: &events, variables: &variables, values, pointers: &pointers, fields };
+        let behavior = &self.workspace.behaviors[self.active];
+        let language = NemesisXml {
+            events: &names.events,
+            variables: &names.variables,
+            values,
+            graph: &names.graph,
+            fields,
+            behavior,
+        };
         let features = EditorFeatures {
             completion: self.lsp.completion,
             hover: self.lsp.hover,
@@ -759,9 +847,13 @@ impl PatchTool {
             EditorMode::Normal => Keymap::Normal,
             EditorMode::Vim => Keymap::Vim,
         };
-        // `F12` / `Shift+F12` before the editor (its keymap would take them).
-        let editor_id = egui_code_editor::editor_id(("nemesis_object", &id));
-        let mut nav = navigate::key_request(ui, editor_id, &self.editor_text);
+        // What the editor asked for: done after it, as `language` still borrows the behavior there.
+        let mut changed = false;
+        let mut command = None;
+        let mut definition = None;
+        let labels = gui_shared::i18n::editor_labels(i18n);
+        let actions = editor_actions(i18n);
+        let mut focus_tree_action = false;
         egui::CentralPanel::default().show(ui, |ui| {
             // `Keys: [Vim ▼]`, and the Vim status line under the editor.
             ui.horizontal(|ui| {
@@ -782,6 +874,10 @@ impl PatchTool {
                 {
                     self.show_lsp_options = !self.show_lsp_options;
                 }
+                // A new object has no preview panel: the parser's verdict goes here.
+                if is_new && let Some((_, Err(err))) = &self.preview {
+                    ui.colored_label(ui.visuals().error_fg_color, format!("✖ {err}"));
+                }
             });
             if self.show_lsp_options {
                 lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
@@ -796,48 +892,51 @@ impl PatchTool {
                     .diagnostics(&self.field_problems)
                     .features(features)
                     .keymap(keymap)
+                    .labels(labels)
+                    .actions(&actions)
                     .show(ui, &mut self.editor);
                 if let Some(cursor) = output.cursor {
                     self.cursor_line = cursor.line;
                 }
-                // `Ctrl+click` / right-click menu on a `#id`.
-                let labels = (i18n.t(I18nKey::NemesisGoToDefinition), i18n.t(I18nKey::NemesisFindReferences));
-                if let Some(request) =
-                    navigate::pointer_request(&output, &self.editor_text, &mut self.menu_target, labels)
-                {
-                    nav = Some(request);
-                }
-                if let Some(request) = navigate::command_request(&output, &self.editor_text) {
-                    nav = Some(request);
-                }
-                // Vim `:w`: save the work now.
-                if output.command == Some(EditorCommand::Save) {
-                    self.dirty_since = Instant::now().checked_sub(SAVE_DELAY);
-                }
-                if output.changed {
-                    self.workspace.behaviors[self.active].set_text(&id, self.editor_text.clone());
-                    self.preview = None;
-                    self.mark_dirty();
+                changed = output.changed;
+                command = output.command;
+                focus_tree_action = output.action == Some(ACTION_FOCUS_TREE);
+                // Kept past the borrows of this frame, so owned here.
+                match output.navigation {
+                    Some(Navigation::Definition(location)) => {
+                        definition = Some((location.document.into_owned(), location.line));
+                    }
+                    Some(Navigation::References(references)) => self.references = Some(references.into()),
+                    None => {}
                 }
             });
         });
 
-        match nav {
-            Some(navigate::Request::GoTo(target)) if self.workspace.behaviors[self.active].text(&target).is_some() => {
-                self.history.visit(&id);
-                self.selected = Some(target);
-            }
-            Some(navigate::Request::Back) => self.walk_history(true, &id),
-            Some(navigate::Request::Forward) => self.walk_history(false, &id),
-            Some(navigate::Request::References(target)) => {
-                let list = navigate::references(&self.workspace.behaviors[self.active], &target);
-                self.references = Some((target, list));
-            }
-            _ => {}
+        if changed {
+            self.workspace.behaviors[self.active].set_text(&id, self.editor_text.clone());
+            self.preview = None;
+            self.mark_dirty();
         }
-        if let Some(target) = navigate::references_window(ui.ctx(), &mut self.references) {
-            self.history.visit(&id);
-            self.selected = Some(target);
+        match command {
+            // Vim `:w`: save the work now.
+            Some(EditorCommand::Save) => self.dirty_since = Instant::now().checked_sub(SAVE_DELAY),
+            Some(EditorCommand::JumpBack) => self.walk_history(true, &id),
+            Some(EditorCommand::JumpForward) => self.walk_history(false, &id),
+            Some(EditorCommand::ToggleExplorer) => self.enter_tree(ui, editor_id),
+            Some(EditorCommand::GoToDefinition | EditorCommand::FindReferences) | None => {}
+        }
+        if focus_tree_action {
+            self.enter_tree(ui, editor_id);
+        }
+        if let Some((document, line)) = definition {
+            self.open_location(&id, &document, line);
+        }
+        if let Some((document, line)) = ui::references::references_window(ui.ctx(), &mut self.references) {
+            if document != id {
+                self.history.visit(&id);
+                document.clone_into(self.selected.get_or_insert_default());
+            }
+            self.focus_editor = Some(FocusAt::Line(line));
         }
 
         let behavior = &mut self.workspace.behaviors[self.active];
@@ -854,20 +953,34 @@ impl PatchTool {
 
 /// [`nemesis_diff::check_fields`] (names) and [`nemesis_diff::schema::check_pointers`] (pointer
 /// targets: they exist and have the right class) as editor underlines (the trimmed line).
-fn field_diagnostics(text: &str, behavior: &workspace::Behavior) -> Vec<Diagnostic> {
+///
+/// `is_new`: also the fields it lacks. A new object is written as is, so it must be complete,
+/// while an edited template object starts complete and its patch only holds the changes.
+fn field_diagnostics(text: &str, behavior: &workspace::Behavior, is_new: bool) -> Vec<Diagnostic> {
     let lines: Vec<&str> = text.lines().collect();
     let class_of = |id: &str| behavior.class_of(id);
     let names = nemesis_diff::check_fields(text).into_iter().map(|p| (p.line, p.message, Severity::Warning));
     let pointers =
         nemesis_diff::schema::check_pointers(text, &class_of).into_iter().map(|p| (p.line, p.message, Severity::Error));
+    let missing = if is_new { nemesis_diff::schema::missing_fields(text) } else { Vec::new() };
+    let missing = missing.into_iter().map(|field| (0, format!("Missing field `{field}`."), Severity::Warning));
     names
         .chain(pointers)
+        .chain(missing)
         .map(|(line_no, message, severity)| {
             let line = lines.get(line_no).copied().unwrap_or_default();
             let start = line.chars().take_while(|c| c.is_whitespace()).count();
             Diagnostic { line: line_no, columns: start..line.chars().count(), severity, message }
         })
         .collect()
+}
+
+/// The id of the palette's "focus the object tree" command.
+const ACTION_FOCUS_TREE: &str = "focus_tree";
+
+/// This page's commands in the editor's palette.
+fn editor_actions(i18n: &I18nMap) -> [EditorAction<'_>; 1] {
+    [EditorAction { id: ACTION_FOCUS_TREE, label: i18n.t(I18nKey::NemesisFocusTree) }]
 }
 
 /// What a row's right-click menu asked for.

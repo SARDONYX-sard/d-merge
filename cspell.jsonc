@@ -50,6 +50,7 @@
     "indexmap",
     "Jwalk",
     "Keymap",
+    "Linewise",
     "Lucide",
     "maturin",
     "mimalloc",

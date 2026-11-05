@@ -155,7 +155,7 @@ fn template_pointers_are_valid() {
     let template = std::fs::read_to_string(std::env::var("NEMESIS_DIFF_TEMPLATE").unwrap()).unwrap();
     let all = objects(&template);
     let classes: fast_hash::HashMap<&str, &str> = all.iter().map(|o| (o.id, o.class)).collect();
-    let class_of = |id: &str| classes.get(id).map(|c| (*c).to_string());
+    let class_of = |id: &str| classes.get(id).copied();
     let problems: Vec<_> = all
         .iter()
         .flat_map(|o| {

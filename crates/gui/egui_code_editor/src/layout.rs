@@ -17,8 +17,49 @@ use super::{
     search::Matcher,
 };
 
+/// The last galley, to not rebuild it while only the cursor moves.
+///
+/// Building one means highlighting every line of the text, per char. `TextEdit` asks for it every
+/// frame, so without this, holding Vim `j` in a document of a few thousand lines lags behind the
+/// keys. Part of [`crate::CodeEditorState`].
+#[derive(Debug, Default)]
+pub(super) struct LayoutCache {
+    key: u64,
+    galley: Option<Arc<egui::Galley>>,
+}
+
+/// [`layout`], reused while everything it depends on is the same.
+pub(super) fn cached(
+    cache: &mut LayoutCache,
+    ui: &egui::Ui,
+    text: &str,
+    language: &dyn Language,
+    diagnostics: &[Diagnostic],
+    search: Option<&Matcher>,
+) -> Arc<egui::Galley> {
+    use std::hash::{Hash, Hasher};
+
+    let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+    // The glyph width changes with the fonts (a galley does not get invalidated by `set_fonts`).
+    let glyph_width = ui.fonts_mut(|fonts| fonts.glyph_width(&font_id, '0'));
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (text, diagnostics, search).hash(&mut hasher);
+    (font_id.size.to_bits(), glyph_width.to_bits(), ui.pixels_per_point().to_bits()).hash(&mut hasher);
+    (ui.visuals().dark_mode, ui.visuals().text_color()).hash(&mut hasher);
+    let key = hasher.finish();
+
+    if cache.key == key
+        && let Some(galley) = &cache.galley
+    {
+        return Arc::clone(galley);
+    }
+    let galley = layout(ui, text, language, diagnostics, search);
+    *cache = LayoutCache { key, galley: Some(Arc::clone(&galley)) };
+    galley
+}
+
 /// Builds the galley for `text`.
-pub(super) fn layout(
+fn layout(
     ui: &egui::Ui,
     text: &str,
     language: &dyn Language,

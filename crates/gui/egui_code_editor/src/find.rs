@@ -55,6 +55,23 @@ impl FindBar {
         (self.open == Some(Kind::Find)).then(|| Matcher::new(&self.query)).flatten()
     }
 
+    /// Opens the find bar, pre-filled with a one-line selection like VS Code.
+    pub(crate) fn open_find(&mut self, ctx: &egui::Context, id: egui::Id, text: &str) {
+        let selection = selection(ctx, id);
+        if let Some(range) = selection.clone().filter(|r| !r.is_empty()) {
+            let selected: String = text.chars().skip(range.start).take(range.len()).collect();
+            if !selected.contains('\n') {
+                self.query = selected;
+            }
+        }
+        self.open_as(Kind::Find, selection.as_ref());
+    }
+
+    pub(crate) fn open_go_to_line(&mut self, ctx: &egui::Context, id: egui::Id) {
+        self.line.clear();
+        self.open_as(Kind::GotoLine, selection(ctx, id).as_ref());
+    }
+
     /// Global keys. Call before the `TextEdit`. `editor_focus`: the editor has the keyboard.
     ///
     /// Only for [`Keymap::Normal`]: Vim uses these keys itself (e.g., `Ctrl+F` = page down).
@@ -81,18 +98,10 @@ impl FindBar {
         let selection = selection(ui.ctx(), id);
 
         if find {
-            // Pre-fill with a one-line selection, like VS Code.
-            if let Some(range) = selection.clone().filter(|r| !r.is_empty()) {
-                let selected: String = text.chars().skip(range.start).take(range.len()).collect();
-                if !selected.contains('\n') {
-                    self.query = selected;
-                }
-            }
-            self.open_as(Kind::Find, selection.as_ref());
+            self.open_find(ui.ctx(), id, text);
         }
         if goto {
-            self.line.clear();
-            self.open_as(Kind::GotoLine, selection.as_ref());
+            self.open_go_to_line(ui.ctx(), id);
         }
         if word && let Some(at) = selection.as_ref().map(|r| r.start) {
             let chars: Vec<char> = text.chars().collect();

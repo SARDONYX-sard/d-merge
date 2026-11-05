@@ -645,6 +645,45 @@ pub enum I18nKey {
     /// Show the objects as a tree from hkRootLevelContainer, following their #pointers. (A filter shows the flat list.)
     NemesisTreeViewHover,
 
+    /// Not linked
+    NemesisNotLinked,
+
+    /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
+    NemesisNotLinkedHover,
+
+    /// Expand all below
+    NemesisExpandAllBelow,
+
+    /// Collapse all below
+    NemesisCollapseAllBelow,
+
+    /// j / k: move, h / l: fold, Enter: back to the editor
+    NemesisTreeKeysHint,
+
+    /// Focus Object Tree
+    NemesisFocusTree,
+
+    /// Type a command
+    EditorPaletteHint,
+
+    /// Find
+    EditorFind,
+
+    /// Go to Line
+    EditorGoToLine,
+
+    /// Quick Fix
+    EditorQuickFix,
+
+    /// Format Document
+    EditorFormat,
+
+    /// Show Hover
+    EditorShowHover,
+
+    /// Trigger Suggest
+    EditorCompletion,
+
     /// Objects
     NemesisObjectsTab,
 
@@ -993,5 +1032,20 @@ impl I18nMap {
         let text = sonic_rs::to_string_pretty(&map).context(SerializeJsonSnafu { path })?;
         std::fs::write(path, text).context(WriteFileSnafu { path })?;
         Ok(())
+    }
+}
+
+/// The translated texts of the code editor's menus (right click, `Ctrl+Shift+P`).
+pub fn editor_labels(i18n: &I18nMap) -> egui_code_editor::EditorLabels<'_> {
+    egui_code_editor::EditorLabels {
+        go_to_definition: i18n.t(I18nKey::NemesisGoToDefinition),
+        find_references: i18n.t(I18nKey::NemesisFindReferences),
+        find: i18n.t(I18nKey::EditorFind),
+        go_to_line: i18n.t(I18nKey::EditorGoToLine),
+        quick_fix: i18n.t(I18nKey::EditorQuickFix),
+        format: i18n.t(I18nKey::EditorFormat),
+        show_hover: i18n.t(I18nKey::EditorShowHover),
+        completion: i18n.t(I18nKey::EditorCompletion),
+        palette_hint: i18n.t(I18nKey::EditorPaletteHint),
     }
 }
