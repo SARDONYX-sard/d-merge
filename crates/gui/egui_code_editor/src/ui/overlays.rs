@@ -5,12 +5,12 @@
 
 use egui::{Color32, Galley, Pos2};
 
-use super::{language::Language, text_pos::LinePos};
+use crate::{language::Language, text_pos::LinePos};
 
 /// Signature help box just above the cursor line.
 ///
 /// e.g., `animmotion <x: f32> <y: f32> <z: f32>` with the active parameter emphasized.
-pub(super) fn signature_box(
+pub(crate) fn signature_box(
     ctx: &egui::Context,
     id: egui::Id,
     cursor_rect: egui::Rect,
@@ -50,7 +50,7 @@ pub(super) fn signature_box(
 ///
 /// Real inline hints would need virtual text inside the galley, which breaks egui's
 /// char-index <-> position mapping, so they are shown at the line end instead.
-pub(super) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, language: &dyn Language, text: &str) {
+pub(crate) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, language: &dyn Language, text: &str) {
     let painter = ui.painter();
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let color = ui.visuals().weak_text_color().gamma_multiply(0.8);
@@ -67,7 +67,7 @@ pub(super) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lang
 }
 
 /// Width of the line number gutter for `text`: room for its largest number (at least 3 digits).
-pub(super) fn gutter_width(ui: &egui::Ui, text: &str) -> f32 {
+pub(crate) fn gutter_width(ui: &egui::Ui, text: &str) -> f32 {
     let lines = text.split('\n').count();
     let digits = lines.to_string().len().max(3);
     let font = egui::TextStyle::Monospace.resolve(ui.style());
@@ -78,7 +78,7 @@ pub(super) fn gutter_width(ui: &egui::Ui, text: &str) -> f32 {
 }
 
 /// Line numbers right-aligned in the gutter `x_range`; the cursor line is brighter.
-pub(super) fn line_numbers(
+pub(crate) fn line_numbers(
     ui: &egui::Ui,
     galley: &Galley,
     galley_pos: Pos2,
@@ -104,7 +104,7 @@ pub(super) fn line_numbers(
 }
 
 /// Faint background behind the cursor line.
-pub(super) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, line: usize) {
+pub(crate) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, line: usize) {
     let Some(row) = galley.rows.get(line) else { return };
     let rect = row.rect().translate(galley_pos.to_vec2());
     let rect = egui::Rect::from_x_y_ranges(ui.clip_rect().x_range(), rect.y_range());
@@ -119,7 +119,7 @@ pub(super) fn current_line(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lin
 /// →   →   <hkparam ...>      tabs: `→`, spaces: `·`
 /// ████████                   leading indent: one tint per level (a tab, or 4 spaces)
 /// ```
-pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
+pub(crate) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
     // Yellow, green, purple, blue: the indent-rainbow palette, very faint.
     const RAINBOW: [Color32; 4] = [
         Color32::from_rgb(255, 255, 64),
@@ -170,7 +170,7 @@ pub(super) fn whitespace(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2) {
 }
 
 /// A rectangular selection (Vim `Ctrl+V`): one char range per line, drawn like a selection.
-pub(super) fn block_selection(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, ranges: &[std::ops::Range<usize>]) {
+pub(crate) fn block_selection(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, ranges: &[std::ops::Range<usize>]) {
     // Painted over the text (unlike egui's own selection), so it must stay see-through.
     let fill = ui.visuals().selection.bg_fill.gamma_multiply(0.35);
     for range in ranges.iter().filter(|r| !r.is_empty()) {
@@ -182,7 +182,7 @@ pub(super) fn block_selection(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, 
 }
 
 /// Vim's block cursor (Normal / Visual mode) over the char at `index`.
-pub(super) fn block_cursor(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, index: usize) {
+pub(crate) fn block_cursor(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, index: usize) {
     let left = galley.pos_from_cursor(egui::text::CCursor::new(index));
     let right = galley.pos_from_cursor(egui::text::CCursor::new(index + 1));
 

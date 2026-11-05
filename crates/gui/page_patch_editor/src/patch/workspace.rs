@@ -91,6 +91,9 @@ fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
     code_dir.map_or(std::borrow::Cow::Borrowed(selected), std::borrow::Cow::Owned)
 }
 
+/// The class of the object holding the event and variable names.
+pub(crate) const STRING_DATA: &str = "hkbBehaviorGraphStringData";
+
 /// `id` -> position, for [`Behavior::template_object`].
 fn index_objects(objects: &[TemplateObject]) -> fast_hash::HashMap<String, u32> {
     #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion objects")]
@@ -229,6 +232,30 @@ impl Behavior {
             return Some(class_attribute(text));
         }
         self.template_object(id).map(|o| o.class.as_str())
+    }
+
+    /// One object with its current text, if it exists.
+    pub(crate) fn object_text(&self, id: &str) -> Option<ObjectText<'_>> {
+        if let Some((id, text)) = self.added.get_key_value(id) {
+            return Some(ObjectText {
+                id,
+                class: class_attribute(text),
+                name: "",
+                text,
+                is_new: true,
+                is_edited: false,
+            });
+        }
+        let object = self.template_object(id)?;
+        let edit = self.edits.get(id);
+        Some(ObjectText {
+            id: &object.id,
+            class: &object.class,
+            name: &object.name,
+            text: edit.unwrap_or(&object.text),
+            is_new: false,
+            is_edited: edit.is_some(),
+        })
     }
 
     /// Every object with its current text: the new ones first, then the template's.

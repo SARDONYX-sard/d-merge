@@ -12,48 +12,113 @@
 //!       #0097 hkbClipGenerator    (dimmed: expanded at another place above)
 //! ```
 //! Objects can have several parents and pointers can form cycles, so each object only expands
-//! under the first parent a depth-first walk meets ([`Graph::first_parent`]); elsewhere it is a
+//! under the first parent a depth-first walk meets ([`Entry::first_parent`]); elsewhere it is a
 //! dimmed leaf.
 //!
-//! # Why it is split into [`Graph`] and rows
-//! A behavior has thousands of objects and this is drawn every frame.
-//! - [`Graph`]: the whole file, rebuilt only after an edit. It knows what is reachable no matter
-//!   what is expanded, so the "not linked" count does not depend on the tree's open nodes.
-//! - rows ([`TreeState::rows`]): the currently expanded nodes as a flat list, rebuilt only when
-//!   something changes. Only the rows on screen are drawn.
+//! # What is recomputed when
+//! A behavior has thousands of objects, its text changes on every key press, and the tree is drawn
+//! every frame. So each layer only does the work its input change requires:
+//!
+//! | Change                      | Work                                                       |
+//! | --------------------------- | ---------------------------------------------------------- |
+//! | a frame                     | draws the rows on screen                                   |
+//! | typing, pointers unchanged  | re-reads that one object's text ([`Graph::update`])        |
+//! | a pointer added / removed   | also a walk over the node numbers (no text): [`Graph::finish_updates`] |
+//! | a node opened / closed      | rebuilds the flat rows ([`TreeState::rows`])               |
+//!
+//! The walk does not depend on what is expanded, so neither does the "not linked" count.
 
-use std::rc::Rc;
+use std::{
+    collections::BTreeMap,
+    rc::Rc,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use fast_hash::{HashMap, HashSet};
 
 use super::workspace::{Behavior, ObjectText};
 
-/// Index of an object in [`Graph`]. Only valid for the graph it came from (edits renumber).
+/// Index of an object in [`Graph`]. Stable for the life of the graph, also across edits.
 pub(super) type Node = u32;
 
-/// The pointers between all objects of a behavior. Rebuilt after every edit.
-#[derive(Debug, Default)]
-pub(super) struct Graph {
-    /// New objects first, then the template's, e.g. `["#mymod$0", "#0090", "#0091"]`.
-    ids: Vec<Rc<str>>,
-    index: HashMap<Rc<str>, Node>,
-    /// e.g. `● #0106  hkbModifierList  GetUpModList`, `+ #mymod$0  hkbClipGenerator  ← #0106`
-    labels: Vec<Box<str>>,
-    /// Where the text after the id starts in each label (`hkbModifierList  GetUpModList`), which
-    /// is also the description of the object in hovers and completion.
-    doc_starts: Vec<u32>,
-    children: Vec<Vec<Node>>,
-    /// The parent an object expands under (`None`: the root, or not reachable from it).
-    first_parent: Vec<Option<Node>>,
-    /// Edited or new.
-    changed: Vec<bool>,
-    /// New objects are `0..new_objects`.
-    new_objects: usize,
+/// A number no earlier state of any graph had, so that a cache can tell "is this still what I was
+/// built from?", also after switching to another behavior's graph.
+fn next_generation() -> u64 {
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    LAST.fetch_add(1, Ordering::Relaxed) + 1
+}
+
+/// One id seen in the behavior.
+#[derive(Debug, Clone)]
+struct Entry {
+    id: Rc<str>,
+    /// `false`: only a pointer mentions this id (a typo, a deleted object, one not added yet).
+    /// Such a node has no text. Keeping it means adding that object later needs no search for who
+    /// mentions it.
+    exists: bool,
+    /// A `#code$N` object of this mod (not in the template).
+    is_new: bool,
+    /// A template object with edits.
+    is_edited: bool,
+    /// e.g. `● #0106  hkbModifierList  GetUpModList`, `+ #mymod$0  hkbClipGenerator   ← #0106`
+    label: String,
+    /// Where the text after the id starts in `label` (`hkbModifierList  GetUpModList`).
+    doc_start: u32,
+    /// Where the `← #0106` part of a new object starts in `label`.
+    links_start: u32,
+    /// The nodes this object's text mentions, first occurrence order.
+    children: Vec<Node>,
+    /// The objects mentioning this id, sorted.
+    parents: Vec<Node>,
+    /// The parent it expands under (`None`: the root, or not reachable from it).
+    first_parent: Option<Node>,
+    /// Reachable from the root.
+    reachable: bool,
     /// Changed, or (transitively) points to a changed object: the "changed only" tree.
-    relevant: Vec<bool>,
+    relevant: bool,
+}
+
+impl Entry {
+    fn new(id: &str) -> Self {
+        Self {
+            id: Rc::from(id),
+            exists: false,
+            is_new: false,
+            is_edited: false,
+            label: String::new(),
+            doc_start: 0,
+            links_start: 0,
+            children: Vec::new(),
+            parents: Vec::new(),
+            first_parent: None,
+            reachable: false,
+            relevant: false,
+        }
+    }
+
+    const fn is_changed(&self) -> bool {
+        self.is_new || self.is_edited
+    }
+}
+
+/// The pointers between all objects of a behavior. See the module docs for what updates when.
+#[derive(Debug, Clone, Default)]
+pub(super) struct Graph {
+    entries: Vec<Entry>,
+    index: HashMap<Rc<str>, Node>,
+    /// New objects by id, for the list order and the "not linked" check.
+    new_nodes: BTreeMap<Rc<str>, Node>,
+    /// Template objects in file order.
+    template_nodes: Vec<Node>,
     root: Option<Node>,
     /// New objects the root does not reach: Nemesis would never use them.
     unlinked: Vec<Node>,
+    /// A pointer or a "changed" state differs from the last [`Self::finish_updates`].
+    links_dirty: bool,
+    /// Changes with anything, e.g. a label.
+    generation: u64,
+    /// Changes when the shape of the tree does: links, "changed" states, which objects exist.
+    tree_generation: u64,
 }
 
 impl Graph {
@@ -65,127 +130,117 @@ impl Graph {
         Self::from_objects(&objects, root)
     }
 
-    /// `objects` must have the new ones first ([`Behavior::texts`]).
     fn from_objects(objects: &[ObjectText<'_>], root: Option<&str>) -> Self {
-        let ids: Vec<Rc<str>> = objects.iter().map(|object| Rc::from(object.id)).collect();
-        let index: HashMap<Rc<str>, Node> = ids.iter().enumerate().map(|(i, id)| (Rc::clone(id), node(i))).collect();
-        let children: Vec<Vec<Node>> = objects
-            .iter()
-            .map(|object| pointers(object.text, object.id).iter().filter_map(|id| index.get(*id).copied()).collect())
-            .collect();
-        let changed: Vec<bool> = objects.iter().map(|object| object.is_new || object.is_edited).collect();
-        let new_objects = objects.iter().filter(|object| object.is_new).count();
-        let root = root.and_then(|id| index.get(id).copied());
-
-        let (reachable, first_parent) = walk_from(root, &children);
-        let relevant = relevant_nodes(&children, &changed);
-        let (labels, doc_starts) = object_labels(objects, &children, new_objects);
-        let unlinked = (0..new_objects).filter(|&i| !reachable[i]).map(node).collect();
-
-        Self { ids, index, labels, doc_starts, children, first_parent, changed, new_objects, relevant, root, unlinked }
+        let mut graph = Self::default();
+        for object in objects {
+            graph.update(object.id, Some(*object));
+        }
+        graph.root = root.and_then(|id| graph.node_of(id));
+        graph.finish_updates();
+        graph
     }
 
-    pub(super) fn id(&self, node: Node) -> &str {
-        &self.ids[node as usize]
+    /// Takes in the current state of one object: `None` = it no longer exists.
+    /// Call [`Self::finish_updates`] after the last one of a batch.
+    pub(super) fn update(&mut self, id: &str, object: Option<ObjectText<'_>>) {
+        self.generation = next_generation();
+        let node = self.intern(id);
+        match object {
+            Some(object) => self.set_object(node, object),
+            None => self.remove_object(node),
+        }
     }
 
-    pub(super) fn label(&self, node: Node) -> &str {
-        &self.labels[node as usize]
+    /// Recomputes what depends on the links, if any changed. Only looks at node numbers, not text.
+    pub(super) fn finish_updates(&mut self) {
+        if !std::mem::take(&mut self.links_dirty) {
+            return;
+        }
+        self.walk_from_root();
+        self.compute_relevant();
+        self.unlinked = self.new_nodes.values().copied().filter(|&node| !self.entry(node).reachable).collect();
+        self.tree_generation = next_generation();
     }
 
-    /// e.g. `hkbModifierList  GetUpModList`
-    pub(super) fn doc(&self, node: Node) -> &str {
-        &self.labels[node as usize][self.doc_starts[node as usize] as usize..]
+    /// The node of `id`, adding one if this is the first time it is seen.
+    fn intern(&mut self, id: &str) -> Node {
+        if let Some(&node) = self.index.get(id) {
+            return node;
+        }
+        let node = node_at(self.entries.len());
+        let entry = Entry::new(id);
+        self.index.insert(Rc::clone(&entry.id), node);
+        self.entries.push(entry);
+        node
     }
 
-    pub(super) fn node_of(&self, id: &str) -> Option<Node> {
-        self.index.get(id).copied()
-    }
-
-    /// Every object, new ones first.
-    pub(super) fn nodes(&self) -> impl Iterator<Item = Node> {
-        (0..self.ids.len()).map(node)
-    }
-
-    pub(super) fn is_changed(&self, node: Node) -> bool {
-        self.changed[node as usize]
-    }
-
-    pub(super) const fn is_new(&self, node: Node) -> bool {
-        (node as usize) < self.new_objects
-    }
-
-    pub(super) fn unlinked(&self) -> &[Node] {
-        &self.unlinked
-    }
-
-    /// `node`'s children in the tree being shown.
-    fn shown_children(&self, node: Node, changed_only: bool) -> impl Iterator<Item = Node> {
-        self.children[node as usize]
-            .iter()
-            .copied()
-            .filter(move |&child| !changed_only || self.relevant[child as usize])
-    }
-}
-
-/// `usize` -> [`Node`]. (A behavior has far fewer than 4 billion objects.)
-#[expect(clippy::cast_possible_truncation, reason = "see above")]
-const fn node(index: usize) -> Node {
-    index as Node
-}
-
-/// What the root reaches, and the parent each object was first reached from.
-fn walk_from(root: Option<Node>, children: &[Vec<Node>]) -> (Vec<bool>, Vec<Option<Node>>) {
-    fn visit(node: Node, children: &[Vec<Node>], reachable: &mut [bool], first_parent: &mut [Option<Node>]) {
-        reachable[node as usize] = true;
-        for &child in &children[node as usize] {
-            if !reachable[child as usize] {
-                first_parent[child as usize] = Some(node);
-                visit(child, children, reachable, first_parent);
+    fn set_object(&mut self, node: Node, object: ObjectText<'_>) {
+        let entry = &mut self.entries[node as usize];
+        if !entry.exists || entry.is_edited != object.is_edited {
+            self.links_dirty = true;
+        }
+        let appeared = !entry.exists;
+        entry.exists = true;
+        entry.is_new = object.is_new;
+        entry.is_edited = object.is_edited;
+        if appeared {
+            if object.is_new {
+                self.new_nodes.insert(Rc::clone(&entry.id), node);
+            } else {
+                self.template_nodes.push(node);
             }
         }
-    }
-    let mut reachable = vec![false; children.len()];
-    let mut first_parent = vec![None; children.len()];
-    if let Some(root) = root {
-        visit(root, children, &mut reachable, &mut first_parent);
-    }
-    (reachable, first_parent)
-}
 
-/// For each object: is it changed, or does it (transitively) point to a changed object?
-fn relevant_nodes(children: &[Vec<Node>], changed: &[bool]) -> Vec<bool> {
-    fn visit(node: Node, children: &[Vec<Node>], changed: &[bool], memo: &mut [Option<bool>]) -> bool {
-        if let Some(known) = memo[node as usize] {
-            return known;
-        }
-        memo[node as usize] = Some(false); // a cycle back here adds nothing
-        let mut relevant = changed[node as usize];
-        for &child in &children[node as usize] {
-            relevant |= visit(child, children, changed, memo);
-        }
-        memo[node as usize] = Some(relevant);
-        relevant
+        let children: Vec<Node> = pointers(object.text, object.id).into_iter().map(|id| self.intern(id)).collect();
+        self.set_children(node, children);
+        self.set_label(node, object);
     }
-    let mut memo = vec![None; children.len()];
-    (0..children.len()).map(|i| visit(node(i), children, changed, &mut memo)).collect()
-}
 
-/// The list text of every object, and where its description starts. See [`Graph::labels`].
-fn object_labels(objects: &[ObjectText<'_>], children: &[Vec<Node>], new_objects: usize) -> (Vec<Box<str>>, Vec<u32>) {
-    // Who points to each new object: its label tells where it is linked.
-    let mut linked_from: Vec<Vec<&str>> = vec![Vec::new(); new_objects];
-    for (i, targets) in children.iter().enumerate() {
-        for &target in targets {
-            if let Some(from) = linked_from.get_mut(target as usize) {
-                from.push(objects[i].id);
+    /// Only new objects can be deleted. The node stays, in case something still mentions the id.
+    fn remove_object(&mut self, node: Node) {
+        let entry = &mut self.entries[node as usize];
+        if !entry.exists {
+            return;
+        }
+        entry.exists = false;
+        entry.is_edited = false;
+        entry.label.clear();
+        let id = Rc::clone(&entry.id);
+        self.new_nodes.remove(&id);
+        self.links_dirty = true;
+        self.set_children(node, Vec::new());
+    }
+
+    /// Replaces `node`'s children and updates the parents of those added and removed.
+    fn set_children(&mut self, node: Node, children: Vec<Node>) {
+        if self.entry(node).children == children {
+            return; // the usual case: typing that does not touch a pointer
+        }
+        self.links_dirty = true;
+        let old = std::mem::replace(&mut self.entries[node as usize].children, children);
+
+        let new_set: HashSet<Node> = self.entry(node).children.iter().copied().collect();
+        let old_set: HashSet<Node> = old.iter().copied().collect();
+        for &removed in old.iter().filter(|child| !new_set.contains(child)) {
+            let parents = &mut self.entries[removed as usize].parents;
+            if let Ok(at) = parents.binary_search(&node) {
+                parents.remove(at);
+            }
+            self.refresh_links_text(removed);
+        }
+        for i in 0..self.entry(node).children.len() {
+            let added = self.entry(node).children[i];
+            if !old_set.contains(&added) {
+                let parents = &mut self.entries[added as usize].parents;
+                if let Err(at) = parents.binary_search(&node) {
+                    parents.insert(at, node);
+                }
+                self.refresh_links_text(added);
             }
         }
     }
 
-    let mut labels = Vec::with_capacity(objects.len());
-    let mut doc_starts = Vec::with_capacity(objects.len());
-    for (i, object) in objects.iter().enumerate() {
+    fn set_label(&mut self, node: Node, object: ObjectText<'_>) {
         let marker = if object.is_new {
             '+'
         } else if object.is_edited {
@@ -193,18 +248,150 @@ fn object_labels(objects: &[ObjectText<'_>], children: &[Vec<Node>], new_objects
         } else {
             ' '
         };
-        let head = format!("{marker} {}  ", object.id);
-        let (class, name) = (object.class, field_name(object.text).unwrap_or(object.name));
-        let tail = match linked_from.get(i) {
-            Some(from) if from.is_empty() => format!("{class}  ⚠ not linked"),
-            Some(from) => format!("{class}  {name} ← {}", from.join(", ")),
-            None => format!("{class}  {name}"),
-        };
-        #[expect(clippy::cast_possible_truncation, reason = "an id is far shorter than 4 GiB")]
-        doc_starts.push(head.len() as u32);
-        labels.push(format!("{head}{tail}").into_boxed_str());
+        let name = field_name(object.text).unwrap_or(object.name);
+        let entry = &mut self.entries[node as usize];
+        entry.label.clear();
+        entry.label.extend([marker, ' ']);
+        entry.label.push_str(object.id);
+        entry.label.push_str("  ");
+        entry.doc_start = text_offset(entry.label.len());
+        entry.label.push_str(object.class);
+        entry.label.push_str("  ");
+        entry.label.push_str(name);
+        entry.links_start = text_offset(entry.label.len());
+        self.refresh_links_text(node);
     }
-    (labels, doc_starts)
+
+    /// The end of a new object's label: where it is linked, e.g. ` ← #0106, #0107`.
+    fn refresh_links_text(&mut self, node: Node) {
+        let entry = self.entry(node);
+        if !entry.exists || !entry.is_new {
+            return;
+        }
+        let mut links = String::new();
+        for (i, &parent) in entry.parents.iter().enumerate() {
+            links.push_str(if i == 0 { " ← " } else { ", " });
+            links.push_str(&self.entry(parent).id);
+        }
+        if links.is_empty() {
+            links.push_str(" ⚠ not linked");
+        }
+        let entry = &mut self.entries[node as usize];
+        entry.label.truncate(entry.links_start as usize);
+        entry.label.push_str(&links);
+    }
+
+    /// Depth-first from the root: what it reaches, and from which parent first.
+    fn walk_from_root(&mut self) {
+        fn visit(graph: &mut Graph, node: Node) {
+            graph.entries[node as usize].reachable = true;
+            for i in 0..graph.entry(node).children.len() {
+                let child = graph.entry(node).children[i];
+                let entry = graph.entry(child);
+                if entry.exists && !entry.reachable {
+                    graph.entries[child as usize].first_parent = Some(node);
+                    visit(graph, child);
+                }
+            }
+        }
+        for entry in &mut self.entries {
+            entry.reachable = false;
+            entry.first_parent = None;
+        }
+        if let Some(root) = self.root {
+            visit(self, root);
+        }
+    }
+
+    fn compute_relevant(&mut self) {
+        fn visit(graph: &mut Graph, node: Node, memo: &mut [Option<bool>]) -> bool {
+            if let Some(known) = memo[node as usize] {
+                return known;
+            }
+            memo[node as usize] = Some(false); // a cycle back here adds nothing
+            let entry = graph.entry(node);
+            let mut relevant = entry.exists && entry.is_changed();
+            for i in 0..graph.entry(node).children.len() {
+                let child = graph.entry(node).children[i];
+                relevant |= visit(graph, child, memo);
+            }
+            memo[node as usize] = Some(relevant);
+            graph.entries[node as usize].relevant = relevant;
+            relevant
+        }
+        let mut memo = vec![None; self.entries.len()];
+        for i in 0..self.entries.len() {
+            visit(self, node_at(i), &mut memo);
+        }
+    }
+
+    fn entry(&self, node: Node) -> &Entry {
+        &self.entries[node as usize]
+    }
+
+    pub(super) fn id(&self, node: Node) -> &str {
+        &self.entry(node).id
+    }
+
+    pub(super) fn label(&self, node: Node) -> &str {
+        &self.entry(node).label
+    }
+
+    /// e.g. `hkbModifierList  GetUpModList`: the object in hovers and completion.
+    pub(super) fn doc(&self, node: Node) -> &str {
+        let entry = self.entry(node);
+        &entry.label[entry.doc_start as usize..]
+    }
+
+    /// The node of an **existing** object.
+    pub(super) fn node_of(&self, id: &str) -> Option<Node> {
+        self.index.get(id).copied().filter(|&node| self.entry(node).exists)
+    }
+
+    /// Every object: the new ones first, then the template's.
+    pub(super) fn nodes(&self) -> impl Iterator<Item = Node> {
+        self.new_nodes.values().chain(&self.template_nodes).copied()
+    }
+
+    pub(super) fn is_changed(&self, node: Node) -> bool {
+        self.entry(node).is_changed()
+    }
+
+    pub(super) fn is_new(&self, node: Node) -> bool {
+        self.entry(node).is_new
+    }
+
+    pub(super) fn unlinked(&self) -> &[Node] {
+        &self.unlinked
+    }
+
+    pub(super) const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub(super) const fn tree_generation(&self) -> u64 {
+        self.tree_generation
+    }
+
+    /// `node`'s children in the tree being shown.
+    fn shown_children(&self, node: Node, changed_only: bool) -> impl Iterator<Item = Node> {
+        self.entry(node).children.iter().copied().filter(move |&child| {
+            let entry = self.entry(child);
+            entry.exists && (!changed_only || entry.relevant)
+        })
+    }
+}
+
+/// `usize` -> [`Node`]. (A behavior has far fewer than 4 billion objects.)
+#[expect(clippy::cast_possible_truncation, reason = "see above")]
+const fn node_at(index: usize) -> Node {
+    index as Node
+}
+
+/// A byte offset in a label. (A label is far shorter than 4 GiB.)
+#[expect(clippy::cast_possible_truncation, reason = "see above")]
+const fn text_offset(len: usize) -> u32 {
+    len as u32
 }
 
 /// A line of the tree on screen.
@@ -288,11 +475,12 @@ fn apply_input(input: TreeInput, rows: &[Row], cursor: usize) -> Effect {
 /// Tree state kept between frames.
 #[derive(Debug, Default)]
 pub(super) struct TreeState {
-    /// Nodes the user opened / closed, by id so it survives edits. Others: [`Self::default_open`].
+    /// Nodes the user opened / closed, by id so it survives switching behaviors.
+    /// Others: [`Self::default_open`].
     open: HashMap<Rc<str>, bool>,
     rows: Vec<Row>,
-    /// What `rows` was built from: the graph and "changed only".
-    built_for: Option<(Rc<Graph>, bool)>,
+    /// What `rows` was built from: [`Graph::tree_generation`] and "changed only".
+    built_for: Option<(u64, bool)>,
     /// The row of the selected object.
     pub(super) cursor: usize,
     /// The selection `rows` was revealed for (to notice a selection made elsewhere, e.g. Vim `gd`).
@@ -319,7 +507,7 @@ impl TreeState {
     }
 
     pub(super) fn set_open(&mut self, graph: &Graph, node: Node, open: bool) {
-        self.open.insert(Rc::clone(&graph.ids[node as usize]), open);
+        self.open.insert(Rc::clone(&graph.entry(node).id), open);
         self.built_for = None;
     }
 
@@ -329,16 +517,15 @@ impl TreeState {
         while let Some(current) = stack.pop() {
             self.set_open(graph, current, open);
             stack.extend(
-                graph.children[current as usize].iter().filter(|&&c| graph.first_parent[c as usize] == Some(current)),
+                graph.entry(current).children.iter().filter(|&&c| graph.entry(c).first_parent == Some(current)),
             );
         }
     }
 
     /// Rebuilds the rows if needed and shows `selected` if it changed (opens its parents).
-    pub(super) fn prepare(&mut self, graph: &Rc<Graph>, selected: Option<&str>, changed_only: bool) {
+    pub(super) fn prepare(&mut self, graph: &Graph, selected: Option<&str>, changed_only: bool) {
         let revealed = self.reveal(graph, selected, changed_only);
-        let stale =
-            self.built_for.as_ref().is_none_or(|(built, only)| !Rc::ptr_eq(built, graph) || *only != changed_only);
+        let stale = self.built_for != Some((graph.tree_generation(), changed_only));
         if stale {
             self.rebuild_rows(graph, changed_only);
         }
@@ -350,26 +537,26 @@ impl TreeState {
     /// Opens the parents of `selected` if it is a new selection. Returns whether it was.
     fn reveal(&mut self, graph: &Graph, selected: Option<&str>, changed_only: bool) -> bool {
         let new_selection = selected.filter(|id| self.revealed.as_deref() != Some(*id));
-        let Some((id, &target)) = new_selection.and_then(|id| graph.index.get_key_value(id)) else { return false };
-        self.revealed = Some(Rc::clone(id));
-        let mut parent = graph.first_parent[target as usize];
+        let Some(target) = new_selection.and_then(|id| graph.node_of(id)) else { return false };
+        self.revealed = Some(Rc::clone(&graph.entry(target).id));
+        let mut parent = graph.entry(target).first_parent;
         while let Some(node) = parent {
             if !self.is_open(graph, node, changed_only) {
                 self.set_open(graph, node, true);
             }
-            parent = graph.first_parent[node as usize];
+            parent = graph.entry(node).first_parent;
         }
         true
     }
 
-    fn rebuild_rows(&mut self, graph: &Rc<Graph>, changed_only: bool) {
+    fn rebuild_rows(&mut self, graph: &Graph, changed_only: bool) {
         let mut rows = std::mem::take(&mut self.rows);
         rows.clear();
         if let Some(root) = graph.root {
             self.push_rows(graph, root, 0, changed_only, &mut rows);
         }
         self.rows = rows;
-        self.built_for = Some((Rc::clone(graph), changed_only));
+        self.built_for = Some((graph.tree_generation(), changed_only));
     }
 
     fn push_rows(&self, graph: &Graph, node: Node, depth: u16, changed_only: bool, rows: &mut Vec<Row>) {
@@ -380,7 +567,7 @@ impl TreeState {
             return;
         }
         for child in graph.shown_children(node, changed_only) {
-            if graph.first_parent[child as usize] == Some(node) {
+            if graph.entry(child).first_parent == Some(node) {
                 self.push_rows(graph, child, depth + 1, changed_only, rows);
             } else {
                 rows.push(Row { node: child, depth: depth + 1, expandable: false, open: false, dimmed: true });
@@ -404,7 +591,7 @@ impl TreeState {
     pub(super) fn apply_inputs(
         &mut self,
         inputs: &[TreeInput],
-        graph: &Rc<Graph>,
+        graph: &Graph,
         selected: &mut Option<String>,
         changed_only: bool,
     ) -> bool {
@@ -432,9 +619,8 @@ impl TreeState {
     fn select_cursor(&mut self, graph: &Graph, selected: &mut Option<String>) {
         self.scroll_to = Some(self.cursor);
         if let Some(row) = self.rows.get(self.cursor) {
-            let id = graph.id(row.node);
-            self.revealed = graph.index.get_key_value(id).map(|(id, _)| Rc::clone(id));
-            id.clone_into(selected.get_or_insert_default());
+            self.revealed = Some(Rc::clone(&graph.entry(row.node).id));
+            graph.id(row.node).clone_into(selected.get_or_insert_default());
         }
     }
 
@@ -484,25 +670,44 @@ fn pointers<'a>(text: &'a str, own: &str) -> Vec<&'a str> {
 mod tests {
     use super::*;
 
-    fn object<'a>(id: &'a str, text: &'a str, is_new: bool) -> ObjectText<'a> {
-        ObjectText { id, class: "c", name: "", text, is_new, is_edited: false }
+    fn template<'a>(id: &'a str, text: &'a str) -> ObjectText<'a> {
+        ObjectText { id, class: "c", name: "", text, is_new: false, is_edited: false }
+    }
+
+    fn new_object<'a>(id: &'a str, text: &'a str) -> ObjectText<'a> {
+        ObjectText { id, class: "c", name: "", text, is_new: true, is_edited: false }
     }
 
     /// `#new0` is reached through `#b`, `#new1` through nothing. `#c` is shared by `#a` and `#b`.
-    fn sample() -> Rc<Graph> {
+    fn sample() -> Graph {
         let objects = [
-            object("#new0", "", true),
-            object("#new1", "", true),
-            object("#root", "#a #b", false),
-            object("#a", "#c", false),
-            object("#b", "#c #new0", false),
-            object("#c", "", false),
+            new_object("#new0", ""),
+            new_object("#new1", ""),
+            template("#root", "#a #b"),
+            template("#a", "#c"),
+            template("#b", "#c #new0"),
+            template("#c", ""),
         ];
-        Rc::new(Graph::from_objects(&objects, Some("#root")))
+        Graph::from_objects(&objects, Some("#root"))
     }
 
     fn ids<'a>(graph: &'a Graph, state: &TreeState) -> Vec<&'a str> {
         state.rows().iter().map(|row| graph.id(row.node)).collect()
+    }
+
+    fn unlinked(graph: &Graph) -> Vec<&str> {
+        graph.unlinked().iter().map(|&node| graph.id(node)).collect()
+    }
+
+    /// Everything open: the whole tree as `(id, dimmed)`.
+    fn whole_tree(graph: &Graph) -> Vec<(String, bool)> {
+        let mut state = TreeState::default();
+        state.prepare(graph, None, false);
+        if let Some(root) = graph.root {
+            state.set_open_below(graph, root, true);
+        }
+        state.prepare(graph, None, false);
+        state.rows().iter().map(|row| (graph.id(row.node).to_owned(), row.dimmed)).collect()
     }
 
     #[test]
@@ -515,36 +720,102 @@ mod tests {
     #[test]
     fn unlinked_does_not_depend_on_open_nodes() {
         let graph = sample();
-        let unlinked: Vec<_> = graph.unlinked().iter().map(|&node| graph.id(node)).collect();
-        assert_eq!(unlinked, ["#new1"]);
+        assert_eq!(unlinked(&graph), ["#new1"]);
 
         let mut state = TreeState::default();
         state.prepare(&graph, None, false);
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"]); // only the root starts open
-        assert_eq!(graph.unlinked().len(), 1);
+        assert_eq!(unlinked(&graph), ["#new1"]);
     }
 
     #[test]
     fn labels_tell_where_new_objects_are_linked() {
         let graph = sample();
-        assert_eq!(graph.label(0), "+ #new0  c   ← #b");
-        assert_eq!(graph.doc(0), "c   ← #b");
-        assert_eq!(graph.label(1), "+ #new1  c  ⚠ not linked");
+        let new0 = graph.node_of("#new0").unwrap();
+        assert_eq!(graph.label(new0), "+ #new0  c   ← #b");
+        assert_eq!(graph.doc(new0), "c   ← #b");
+        assert_eq!(graph.label(graph.node_of("#new1").unwrap()), "+ #new1  c   ⚠ not linked");
     }
 
     /// `#c` has two parents: it expands under the first one and is dimmed under the other.
     #[test]
     fn shared_objects_expand_once() {
-        let graph = sample();
-        let mut state = TreeState::default();
-        state.prepare(&graph, None, false);
-        let root = graph.node_of("#root").unwrap();
-        state.set_open_below(&graph, root, true);
-        state.prepare(&graph, None, false);
+        let tree = whole_tree(&sample());
+        let expected = [("#root", false), ("#a", false), ("#c", false), ("#b", false), ("#c", true), ("#new0", false)];
+        assert_eq!(tree, expected.map(|(id, dimmed)| (id.to_owned(), dimmed)));
+    }
 
+    /// Updating one object at a time must give what building from scratch gives.
+    #[test]
+    fn updates_match_a_full_build() {
+        let mut graph = sample();
+
+        // Link the unlinked object.
+        graph.update("#a", Some(template("#a", "#c #new1")));
+        graph.finish_updates();
+        assert!(unlinked(&graph).is_empty());
+        assert_eq!(graph.label(graph.node_of("#new1").unwrap()), "+ #new1  c   ← #a");
+
+        // Add one that was mentioned before it existed.
+        graph.update("#c", Some(template("#c", "#new2")));
+        graph.update("#new2", Some(new_object("#new2", "")));
+        graph.finish_updates();
+        assert_eq!(graph.label(graph.node_of("#new2").unwrap()), "+ #new2  c   ← #c");
+
+        // Delete one: it leaves the list and the tree.
+        graph.update("#new0", None);
+        graph.finish_updates();
+        assert!(graph.node_of("#new0").is_none());
+
+        let fresh = Graph::from_objects(
+            &[
+                new_object("#new1", ""),
+                new_object("#new2", ""),
+                template("#root", "#a #b"),
+                template("#a", "#c #new1"),
+                template("#b", "#c #new0"),
+                template("#c", "#new2"),
+            ],
+            Some("#root"),
+        );
+        assert_eq!(whole_tree(&graph), whole_tree(&fresh));
+        assert_eq!(unlinked(&graph), unlinked(&fresh));
+        let ids_of = |graph: &Graph| graph.nodes().map(|node| graph.id(node).to_owned()).collect::<Vec<_>>();
+        assert_eq!(ids_of(&graph)[..2], ["#new1", "#new2"]);
+        assert_eq!(ids_of(&graph).len(), ids_of(&fresh).len());
+    }
+
+    /// Typing that leaves the pointers alone must not cost a walk or a rebuild of the rows.
+    #[test]
+    fn typing_keeps_the_tree_generation() {
+        let mut graph = sample();
+        let tree_generation = graph.tree_generation();
+        let generation = graph.generation();
+
+        graph.update("#a", Some(template("#a", "#c <hkparam name=\"name\">x</hkparam>")));
+        graph.finish_updates();
+
+        assert_eq!(graph.tree_generation(), tree_generation);
+        assert_ne!(graph.generation(), generation);
+        assert_eq!(graph.label(graph.node_of("#a").unwrap()), "  #a  c  x");
+
+        // The first edit of an object does change the tree: it joins "changed only".
+        let edited = ObjectText { is_edited: true, ..template("#a", "#c") };
+        graph.update("#a", Some(edited));
+        graph.finish_updates();
+        assert_ne!(graph.tree_generation(), tree_generation);
+    }
+
+    #[test]
+    fn changed_only_shows_the_way_to_changes() {
+        let mut graph = sample();
+        let edited = ObjectText { is_edited: true, ..template("#c", "") };
+        graph.update("#c", Some(edited));
+        graph.finish_updates();
+        let mut state = TreeState::default();
+        state.prepare(&graph, None, true);
+        // `#new0` is new, `#c` edited; `#a`, `#b` lead to them.
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#c", "#b", "#c", "#new0"]);
-        let dimmed: Vec<_> = state.rows().iter().map(|row| row.dimmed).collect();
-        assert_eq!(dimmed, [false, false, false, false, true, false]);
     }
 
     #[test]

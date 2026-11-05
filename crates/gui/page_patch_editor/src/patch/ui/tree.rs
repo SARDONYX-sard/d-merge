@@ -1,7 +1,5 @@
 //! Draws the object tree and reads its keys. The logic is in [`crate::patch::tree`].
 
-use std::rc::Rc;
-
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState};
@@ -68,7 +66,7 @@ enum RowEvent {
 /// `focused`: the keyboard is in the tree: the selected row gets a frame.
 pub(in crate::patch) fn tree_ui(
     ui: &mut egui::Ui,
-    graph: &Rc<Graph>,
+    graph: &Graph,
     selected: &mut Option<String>,
     state: &mut TreeState,
     (changed_only, focused): (bool, bool),

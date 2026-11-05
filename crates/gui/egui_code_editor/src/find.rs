@@ -28,7 +28,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
+pub(crate) enum Kind {
     Find,
     GotoLine,
 }
@@ -37,16 +37,16 @@ enum Kind {
 #[derive(Debug, Default)]
 pub(crate) struct FindBar {
     /// `Some` while the bar is shown.
-    open: Option<Kind>,
-    query: String,
-    line: String,
+    pub(crate) open: Option<Kind>,
+    pub(crate) query: String,
+    pub(crate) line: String,
     /// Focus the input field on the next draw.
-    focus_field: bool,
+    pub(crate) focus_field: bool,
     /// Char index the incremental search starts from (the cursor when the bar opened).
-    origin: usize,
+    pub(crate) origin: usize,
     /// The match selected last. Remembered here because egui collapses the selection of an
     /// unfocused `TextEdit` to its end, so the editor's selection cannot tell where it starts.
-    current: Option<Range<usize>>,
+    pub(crate) current: Option<Range<usize>>,
 }
 
 impl FindBar {
@@ -120,123 +120,14 @@ impl FindBar {
         }
     }
 
-    /// Draws the bar at the top right of `editor_rect` (the visible part of the editor), and
-    /// marks the current match (the editor shows no selection while the bar has the focus).
-    pub(crate) fn ui(
-        &mut self,
-        ui: &egui::Ui,
-        id: egui::Id,
-        editor_rect: egui::Rect,
-        text: &str,
-        (galley, galley_pos): (&egui::Galley, egui::Pos2),
-    ) {
-        let Some(kind) = self.open else { return };
-        let ctx = ui.ctx();
-        if kind == Kind::Find
-            && let Some(current) = self.current_match(ctx, id, text)
-        {
-            crate::overlays::block_selection(ui, galley, galley_pos, &[current]);
-        }
-
-        egui::Area::new(id.with("find_bar"))
-            .order(egui::Order::Foreground)
-            .pivot(egui::Align2::RIGHT_TOP)
-            .fixed_pos(editor_rect.right_top() + egui::vec2(-16.0, 4.0))
-            .show(ctx, |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.horizontal(|ui| match kind {
-                        Kind::Find => self.find_ui(ui, id, text),
-                        Kind::GotoLine => self.goto_ui(ui, id, text),
-                    });
-                });
-            });
-    }
-
-    /// `[query] 2/5 ↑ ↓ ✖`
-    fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
-        let field = ui.add(
-            egui::TextEdit::singleline(&mut self.query)
-                .hint_text("Find")
-                .desired_width(200.0)
-                .id(id.with("find_query")),
-        );
-        self.take_focus(&field);
-        if field.changed() {
-            self.select_from_origin(ui.ctx(), id, text);
-        }
-
-        let chars: Vec<char> = text.chars().collect();
-        let matcher = Matcher::new(&self.query);
-        let total = matcher.as_ref().map_or(0, |m| m.count(&chars));
-        let current =
-            self.current_match(ui.ctx(), id, text).and_then(|range| matcher.as_ref()?.index_of(&chars, range.start));
-        let counter = match (total, current) {
-            (0, _) if self.query.is_empty() => String::new(),
-            (0, _) => "No results".to_string(),
-            (total, Some(current)) => format!("{current}/{total}"),
-            (total, None) => format!("?/{total}"),
-        };
-        ui.label(egui::RichText::new(counter).weak());
-
-        let (enter, shift) = ui.input(|i| (i.key_pressed(Key::Enter), i.modifiers.shift));
-        // A single-line `TextEdit` gives up the focus on `Enter`: take it back.
-        let submitted = field.lost_focus() && enter;
-        if submitted {
-            self.jump(ui.ctx(), id, text, !shift);
-            self.focus_field = true;
-        }
-        if ui.small_button("↑").on_hover_text("Previous match (Shift+Enter, Shift+F3)").clicked() {
-            self.jump(ui.ctx(), id, text, false);
-        }
-        if ui.small_button("↓").on_hover_text("Next match (Enter, F3)").clicked() {
-            self.jump(ui.ctx(), id, text, true);
-        }
-        self.close_ui(ui, id, &field, submitted);
-    }
-
-    /// `Go to line (1-120): [42] ✖`
-    fn goto_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
-        let lines = text.split('\n').count();
-        ui.label(format!("Go to line (1-{lines}):"));
-        let field = ui.add(egui::TextEdit::singleline(&mut self.line).desired_width(60.0).id(id.with("goto_line")));
-        self.take_focus(&field);
-
-        let submitted = field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
-        if submitted {
-            if let Ok(line) = self.line.trim().parse::<usize>() {
-                let line = line.clamp(1, lines) - 1;
-                let index = crate::text_pos::LinePos { line, column: 0 }.to_char_index(text);
-                crate::set_cursor(ui.ctx(), id, index); // also focuses the editor
-            }
-            self.open = None;
-            return;
-        }
-        self.close_ui(ui, id, &field, submitted);
-    }
-
-    /// `✖` button and `Esc` in the field: close and give the keyboard back to the editor.
-    fn close_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, field: &egui::Response, submitted: bool) {
-        let escape = field.lost_focus() && !submitted && ui.input(|i| i.key_pressed(Key::Escape));
-        if ui.small_button("✖").on_hover_text("Close (Esc)").clicked() || escape {
-            self.open = None;
-            ui.memory_mut(|m| m.request_focus(id));
-        }
-    }
-
-    fn open_as(&mut self, kind: Kind, selection: Option<&Range<usize>>) {
+    pub(crate) fn open_as(&mut self, kind: Kind, selection: Option<&Range<usize>>) {
         self.open = Some(kind);
         self.focus_field = true;
         self.origin = selection.map_or(0, |r| r.start);
     }
 
-    fn take_focus(&mut self, field: &egui::Response) {
-        if std::mem::take(&mut self.focus_field) {
-            field.request_focus();
-        }
-    }
-
     /// While typing: select the first match at or after where the search started.
-    fn select_from_origin(&mut self, ctx: &egui::Context, id: egui::Id, text: &str) {
+    pub(crate) fn select_from_origin(&mut self, ctx: &egui::Context, id: egui::Id, text: &str) {
         let Some(matcher) = Matcher::new(&self.query) else { return };
         let chars: Vec<char> = text.chars().collect();
         let at = if matcher.matches_at(&chars, self.origin) {
@@ -251,7 +142,7 @@ impl FindBar {
 
     /// Selects the next (`forward`) or previous match, wrapping around. It starts from the
     /// current match, or from the cursor once the user moved it.
-    fn jump(&mut self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
+    pub(crate) fn jump(&mut self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
         let Some(matcher) = Matcher::new(&self.query) else { return };
         let chars: Vec<char> = text.chars().collect();
         let from = self.current_match(ctx, id, text).or_else(|| selection(ctx, id)).map_or(0, |r| r.start);
@@ -260,14 +151,14 @@ impl FindBar {
         }
     }
 
-    fn select(&mut self, ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
+    pub(crate) fn select(&mut self, ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
         select(ctx, id, range.clone());
         self.current = Some(range);
     }
 
     /// [`Self::current`] while it is still valid: the cursor is at its end (not moved by the
     /// user) and the text there still matches.
-    fn current_match(&self, ctx: &egui::Context, id: egui::Id, text: &str) -> Option<Range<usize>> {
+    pub(crate) fn current_match(&self, ctx: &egui::Context, id: egui::Id, text: &str) -> Option<Range<usize>> {
         let current = self.current.clone()?;
         let matcher = Matcher::new(&self.query)?;
         let cursor = selection(ctx, id)?;
@@ -277,7 +168,7 @@ impl FindBar {
 }
 
 /// The selection of the editor `id` as a sorted char range.
-fn selection(ctx: &egui::Context, id: egui::Id) -> Option<Range<usize>> {
+pub(crate) fn selection(ctx: &egui::Context, id: egui::Id) -> Option<Range<usize>> {
     let range = egui::TextEdit::load_state(ctx, id)?.cursor.char_range()?;
     let (a, b) = (range.primary.index.0, range.secondary.index.0);
     Some(a.min(b)..a.max(b))
@@ -285,7 +176,7 @@ fn selection(ctx: &egui::Context, id: egui::Id) -> Option<Range<usize>> {
 
 /// Selects `range` in the editor and scrolls it into view, **without** taking the focus
 /// (the user keeps typing in the find field).
-fn select(ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
+pub(crate) fn select(ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
     use egui::text::{CCursor, CCursorRange};
     let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
     state.cursor.set_char_range(Some(CCursorRange::two(CCursor::new(range.start), CCursor::new(range.end))));

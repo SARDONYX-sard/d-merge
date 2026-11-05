@@ -35,7 +35,6 @@ pub mod keymap;
 pub mod language;
 pub mod languages;
 mod layout;
-mod overlays;
 mod palette;
 mod quick_fix;
 mod search;
@@ -53,7 +52,7 @@ use self::{
     palette::{Palette, PaletteContext},
     quick_fix::QuickFixMenu,
     text_pos::LinePos,
-    ui::palette::PaletteInput,
+    ui::{overlays, palette::PaletteInput},
 };
 pub use self::{
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
@@ -379,12 +378,7 @@ impl<'a> CodeEditor<'a> {
 
         // ── 4. Overlays ──────────────────────────────────────────────────────────
         let (galley, galley_pos) = (&output.galley, output.galley_pos);
-        if let Some(cursor) = cursor {
-            overlays::current_line(ui, galley, galley_pos, cursor.line);
-        }
-        if whitespace {
-            overlays::whitespace(ui, galley, galley_pos);
-        }
+        draw_text_background(ui, (galley, galley_pos), cursor.map(|cursor| cursor.line), whitespace);
         if let Some(anchor) = anchor
             && let Some(clicked) = state.quick_fix.ui(ui.ctx(), id, anchor)
         {
@@ -425,12 +419,8 @@ impl<'a> CodeEditor<'a> {
                 diagnostics: underlines,
                 with_docs: features.hover,
             };
-            if (keys.show_hover || triggers.hover)
-                && let Some(index) = cursor_index
-            {
-                state.hover.open_at(index, &hover); // e.g., Vim `K`
-            }
-            state.hover.ui(ui, &hover);
+            let open_at = cursor_index.filter(|_| keys.show_hover || triggers.hover); // e.g., Vim `K`
+            state.hover.show(ui, &hover, open_at);
         }
         if features.signature_help
             && response.has_focus()
@@ -484,6 +474,21 @@ fn scroll_to_cursor(ui: &egui::Ui, id: egui::Id, cursor: egui::Rect, galley: &eg
             ui.scroll_with_delta(egui::vec2(0.0, -(lines as f32) * row_height));
         }
         None => {}
+    }
+}
+
+/// What goes behind the text: the cursor line's tint and the whitespace marks.
+fn draw_text_background(
+    ui: &egui::Ui,
+    (galley, galley_pos): (&egui::Galley, egui::Pos2),
+    cursor_line: Option<usize>,
+    whitespace: bool,
+) {
+    if let Some(line) = cursor_line {
+        overlays::current_line(ui, galley, galley_pos, line);
+    }
+    if whitespace {
+        overlays::whitespace(ui, galley, galley_pos);
     }
 }
 
