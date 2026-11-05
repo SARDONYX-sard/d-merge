@@ -4,7 +4,7 @@
 //! Nemesis matches patches by object id, and ids stay valid when the template text changes
 //! (positions would not). Only the changed objects are stored, so a 1.5 MB template costs nothing.
 //!
-//! # On disk (`<output>/.d_merge/caches/patch_editor/nemesis/<code>/`)
+//! # On disk (`./.d_merge/caches/patch_editor/nemesis/<code>/`, see [`CACHE_ROOT`])
 //! ```text
 //! info.ini                      name / author / site
 //! meshes~actors~draugr~behaviors~draugrbehavior.bin/
@@ -96,6 +96,46 @@ pub(crate) struct RefObject {
     pub(crate) text: String,
 }
 
+/// Where the works are kept: for each profile of the app, not in the mods.
+pub(crate) const CACHE_ROOT: &str = "./.d_merge/caches/patch_editor/nemesis";
+
+/// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
+const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
+
+/// The root of the Nemesis mod at `selected`: itself, or what it is the patch directory of.
+/// `None`: it is no Nemesis mod.
+///
+/// e.g. `mods/Paraglider` containing `Nemesis_Engine/mod/para/` -> itself;
+/// `mods/Paraglider/Nemesis_Engine/mod/para` -> `mods/Paraglider`.
+pub(crate) fn mod_root_of(selected: &Path) -> Option<PathBuf> {
+    let has_code = |engine: &str| {
+        read_dir(&selected.join(engine).join("mod")).is_ok_and(|mut codes| codes.any(|path| path.is_dir()))
+    };
+    if ENGINES.iter().any(|engine| has_code(engine)) {
+        return Some(selected.to_path_buf());
+    }
+    let is_named = |path: &Path, name: &str| path.file_name().is_some_and(|found| found.eq_ignore_ascii_case(name));
+    let mods = selected.parent().filter(|path| is_named(path, "mod"))?;
+    let engine = mods.parent().filter(|path| ENGINES.iter().any(|name| is_named(path, name)))?;
+    engine.parent().map(Path::to_path_buf)
+}
+
+/// The directories of `code` in the mod at `root`, of the engines it has.
+fn code_dirs(root: &Path, code: &str) -> Vec<PathBuf> {
+    let dirs = ENGINES.iter().map(|engine| root.join(engine).join("mod").join(code));
+    dirs.filter(|dir| dir.is_dir()).collect()
+}
+
+/// A patch directory of `code` in the mod at `root`, if it has one.
+pub(crate) fn patch_dir_of_code(root: &Path, code: &str) -> Option<PathBuf> {
+    code_dirs(root, code).into_iter().next()
+}
+
+/// The code of the mod at `selected` (its root or a patch directory). See [`mod_dir_of`].
+pub(crate) fn code_of(selected: &Path) -> String {
+    mod_dir_of(selected).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
 /// The patch directory of a mod, given its root (what a mod manager installs).
 ///
 /// e.g., `mods/Paraglider` containing `Nemesis_Engine/mod/para/` -> `.../Nemesis_Engine/mod/para`.
@@ -104,7 +144,7 @@ pub(crate) struct RefObject {
 ///
 /// The root is also where a later anim set generator finds `meshes/**/animations/*.hkx`.
 fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
-    let code_dir = ["Nemesis_Engine", "Nemesis_EngineExt"].iter().find_map(|engine| {
+    let code_dir = ENGINES.iter().find_map(|engine| {
         let entries = std::fs::read_dir(selected.join(engine).join("mod")).ok()?;
         entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).min()
     });
@@ -528,14 +568,19 @@ pub(crate) struct Workspace {
     pub(crate) ref_mods: Vec<String>,
     /// What was open when it was saved. See [`Session`].
     pub(crate) session: Session,
+    /// The files of the mod this work read or wrote, relative to the mod's root: what the next export
+    /// replaces. e.g. `Nemesis_Engine/mod/para/0_master/#0106.txt`
+    pub(crate) owned: std::collections::BTreeSet<String>,
 }
 
 /// What was open in a work, to go back to it when it is opened again.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub(crate) struct Session {
-    /// The mod read into the work.
+    /// The root of the mod the work was read from. Empty: it was made here.
     pub(crate) mod_dir: String,
+    /// Where it is exported to: the mod's root, unless changed.
+    pub(crate) output: String,
     /// The behavior shown, by name.
     pub(crate) active: String,
     /// The object shown.
@@ -558,6 +603,7 @@ pub(crate) struct SessionTab {
 struct WorkspaceFile {
     ref_mods: Vec<String>,
     session: Session,
+    owned: std::collections::BTreeSet<String>,
 }
 
 /// The patch directories of the mod at `selected`: all its codes, if it is a mod's root, else itself.
@@ -565,7 +611,7 @@ struct WorkspaceFile {
 /// e.g. `mods/a` containing `Nemesis_Engine/mod/amco` -> that; `.../mod/amco` -> the same.
 fn patch_dirs_of(selected: &Path) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    for engine in ["Nemesis_Engine", "Nemesis_EngineExt"] {
+    for engine in ENGINES {
         if let Ok(codes) = read_dir(&selected.join(engine).join("mod")) {
             dirs.extend(codes.filter(|path| path.is_dir()));
         }
@@ -600,14 +646,29 @@ impl Workspace {
         }
     }
 
-    /// `<output>/.d_merge/caches/patch_editor/nemesis/<code>`
-    pub(crate) fn cache_dir(output: &Path, code: &str) -> PathBuf {
-        output.join(".d_merge").join("caches").join("patch_editor").join("nemesis").join(code)
+    /// `<root>/<code>`. `root`: [`CACHE_ROOT`], except in tests.
+    pub(crate) fn cache_dir(root: &Path, code: &str) -> PathBuf {
+        root.join(code)
+    }
+
+    /// Is there a work with this code?
+    pub(crate) fn exists(root: &Path, code: &str) -> bool {
+        Self::cache_dir(root, code).is_dir()
+    }
+
+    /// Where the work with this code came from and goes to, if there is one.
+    pub(crate) fn cached_session(root: &Path, code: &str) -> Option<Session> {
+        let dir = Self::cache_dir(root, code);
+        if !dir.is_dir() {
+            return None;
+        }
+        let file = std::fs::read_to_string(dir.join(WORKSPACE_FILE)).unwrap_or_default();
+        Some(sonic_rs::from_str::<WorkspaceFile>(&file).unwrap_or_default().session)
     }
 
     /// Loads a cached workspace (an empty one if there is none).
-    pub(crate) fn load(output: &Path, code: &str) -> Result<Self, String> {
-        let dir = Self::cache_dir(output, code);
+    pub(crate) fn load(root: &Path, code: &str) -> Result<Self, String> {
+        let dir = Self::cache_dir(root, code);
         let mut workspace = Self::default();
         if !dir.is_dir() {
             return Ok(workspace);
@@ -636,18 +697,20 @@ impl Workspace {
         let file: WorkspaceFile = sonic_rs::from_str(&file).unwrap_or_default();
         workspace.ref_mods = file.ref_mods;
         workspace.session = file.session;
+        workspace.owned = file.owned;
         workspace.reload_refs();
         Ok(workspace)
     }
 
     /// Writes the whole workspace to its cache dir (replacing what was there).
-    pub(crate) fn save(&self, output: &Path, code: &str) -> Result<(), String> {
-        let dir = Self::cache_dir(output, code);
+    pub(crate) fn save(&self, root: &Path, code: &str) -> Result<(), String> {
+        let dir = Self::cache_dir(root, code);
         if dir.is_dir() {
             std::fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
         write(&dir.join("info.ini"), &info_ini(&self.info))?;
-        let file = WorkspaceFile { ref_mods: self.ref_mods.clone(), session: self.session.clone() };
+        let file =
+            WorkspaceFile { ref_mods: self.ref_mods.clone(), session: self.session.clone(), owned: self.owned.clone() };
         let file = sonic_rs::to_string_pretty(&file).map_err(|e| e.to_string())?;
         write(&dir.join(WORKSPACE_FILE), &file)?;
         for behavior in &self.behaviors {
@@ -672,16 +735,29 @@ impl Workspace {
     ///
     /// Returns `(workspace, code, folders without a template)`.
     pub(crate) fn import(selected: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
-        let mod_dir = mod_dir_of(selected);
-        let mod_dir = mod_dir.as_ref();
-        let code = mod_dir.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        let mut workspace = Self {
-            info: std::fs::read_to_string(mod_dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default(),
-            behaviors: Vec::new(),
-            ref_mods: Vec::new(),
-            session: Session::default(),
-        };
+        let code = code_of(selected);
+        let root = mod_root_of(selected);
+        // A mod has its patches for templates Nemesis does not know in the other engine's directory.
+        // Reading one of them would lose the other's at the next export to the same place.
+        let dirs = root.as_ref().map_or_else(|| vec![selected.to_path_buf()], |root| code_dirs(root, &code));
+        let info = dirs.iter().find_map(|dir| std::fs::read_to_string(dir.join("info.ini")).ok());
+        let mut workspace = Self { info: info.map(|info| parse_info(&info)).unwrap_or_default(), ..Self::default() };
         let mut skipped = Vec::new();
+        for dir in &dirs {
+            workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped)?;
+        }
+        Ok((workspace, code, skipped))
+    }
+
+    /// Reads a `Nemesis_Engine/mod/<code>`-like directory into the work. `root`: the mod's root, what
+    /// [`Self::owned`] is relative to.
+    fn read_patch_dir(
+        &mut self,
+        mod_dir: &Path,
+        root: Option<&Path>,
+        template_root: &Path,
+        skipped: &mut Vec<String>,
+    ) -> Result<(), String> {
         for folder in patch_folders(mod_dir) {
             let relative = folder.strip_prefix(mod_dir).unwrap_or(&folder);
             let relative = relative.to_string_lossy().replace('\\', "/");
@@ -698,8 +774,9 @@ impl Workspace {
                 skipped.push(relative);
                 continue;
             };
-            let mut behavior = Behavior::open(&template)?;
-            behavior.force_ext = relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
+            let at = self.open_behavior(&template, &meshes_path)?;
+            let behavior = &mut self.behaviors[at];
+            behavior.force_ext |= relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 let id = file_stem(&file);
                 let text = resolve(&read_text(&file)?, View::Mod);
@@ -708,16 +785,33 @@ impl Workspace {
                 } else {
                     behavior.added.insert(id, text);
                 }
+                self.owned.extend(root.and_then(|root| file.strip_prefix(root).ok()).map(owned_key));
             }
-            workspace.behaviors.push(behavior);
         }
-        if let Some(asdsf) = import_asdsf(mod_dir, template_root, &mut skipped)? {
-            workspace.behaviors.push(asdsf);
+        if !self.behaviors.iter().any(|behavior| behavior.asdsf)
+            && let Some(asdsf) = import_asdsf(mod_dir, template_root, skipped)?
+        {
+            self.behaviors.push(asdsf);
+            self.own_anim_files(&mod_dir.join(ASDSF), root);
         }
-        if let Some(adsf) = import_adsf(mod_dir, template_root)? {
-            workspace.behaviors.push(adsf);
+        if !self.behaviors.iter().any(|behavior| behavior.adsf)
+            && let Some(adsf) = import_adsf(mod_dir, template_root)?
+        {
+            self.behaviors.push(adsf);
+            self.own_anim_files(&mod_dir.join(ADSF), root);
         }
-        Ok((workspace, code, skipped))
+        Ok(())
+    }
+
+    /// The files read from an animation data directory: `<dir>/<project>/<file>`.
+    fn own_anim_files(&mut self, dir: &Path, root: Option<&Path>) {
+        let Some(root) = root else { return };
+        let Ok(projects) = read_dir(dir) else { return };
+        for project in projects.filter(|path| path.is_dir()) {
+            let Ok(files) = read_dir(&project) else { continue };
+            let files = files.filter(|path| path.is_file());
+            self.owned.extend(files.filter_map(|file| file.strip_prefix(root).ok().map(owned_key)));
+        }
     }
 
     /// The anim set files per project of the template: the keys of its json, `txt_projects`.
@@ -760,38 +854,68 @@ impl Workspace {
         Ok(&mut self.behaviors[at])
     }
 
-    /// Writes the mod under `<output>` (replacing `Nemesis_Engine/mod/<code>` and
-    /// `Nemesis_EngineExt/mod/<code>`): each behavior to its [`Behavior::patch_dir`], `info.ini`
-    /// to each mod root used. Returns the files written and the patches d-merge's Nemesis parser
-    /// rejects (`behavior/#id: error`).
-    pub(crate) fn export(&self, output: &Path, code: &str, mode: ParserMode) -> Result<(usize, Vec<String>), String> {
-        let roots = [
-            output.join("Nemesis_Engine").join("mod").join(code),
-            output.join("Nemesis_EngineExt").join("mod").join(code),
-        ];
-        for root in roots.iter().filter(|r| r.is_dir()) {
-            std::fs::remove_dir_all(root).map_err(|e| format!("{}: {e}", root.display()))?;
+    /// Writes the mod under `<output>`: each behavior to its [`Behavior::patch_dir`], `info.ini` to
+    /// each mod root used. Returns the files written and the patches d-merge's Nemesis parser rejects
+    /// (`behavior/#id: error`).
+    ///
+    /// By default `<output>` is the mod it was read from, so only [`Self::owned`] is replaced: what
+    /// this work did not read stays (a readme, the patches of a template that is not installed).
+    pub(crate) fn export(
+        &mut self,
+        output: &Path,
+        code: &str,
+        mode: ParserMode,
+    ) -> Result<(usize, Vec<String>), String> {
+        for file in &self.owned {
+            remove_owned(output, file)?;
         }
+        self.owned.clear();
         let mut info = nemesis_diff::info_ini(&self.info.name, &self.info.author, &self.info.site, false);
         info.truncate(info.trim_end().len());
 
         let (mut written, mut invalid) = (0, Vec::new());
         for behavior in &self.behaviors {
-            let dir = output.join(behavior.patch_dir(code));
+            let relative = behavior.patch_dir(code);
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };
                 if let Err(err) = behavior.validate(id, &patch, mode) {
                     invalid.push(format!("{}/{id}: {err}", behavior.name));
                 }
-                write(&dir.join(behavior.patch_file(id)), &patch)?;
+                let file = Path::new(&relative).join(behavior.patch_file(id));
+                write(&output.join(&file), &patch)?;
+                self.owned.insert(owned_key(&file));
                 written += 1;
             }
         }
+        let roots = ENGINES.map(|engine| output.join(engine).join("mod").join(code));
         for root in roots.iter().filter(|r| r.is_dir()) {
             write(&root.join("info.ini"), &info)?;
         }
         Ok((written, invalid))
     }
+}
+
+/// e.g. `Nemesis_Engine\\mod\\para\\0_master\\#0106.txt` -> `Nemesis_Engine/mod/para/0_master/#0106.txt`
+fn owned_key(relative: &Path) -> String {
+    relative.to_string_lossy().replace('\\', "/")
+}
+
+/// Removes a file of [`Workspace::owned`], and the directories this leaves empty.
+fn remove_owned(output: &Path, file: &str) -> Result<(), String> {
+    let path = output.join(file);
+    match std::fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("{}: {err}", path.display())),
+    }
+    let mut dir = path.parent();
+    while let Some(parent) = dir.filter(|parent| *parent != output) {
+        if std::fs::remove_dir(parent).is_err() {
+            break; // Not empty, or not there.
+        }
+        dir = parent.parent();
+    }
+    Ok(())
 }
 
 /// The template of animation data, `.bin` or `.txt`. (`.bin` if neither exists: clip data needs none.)
@@ -823,7 +947,7 @@ fn import_adsf(mod_dir: &Path, template_root: &Path) -> Result<Option<Behavior>,
 ///
 /// An edit of a set of the template is read as the edited set. Every other file (`tkuc$New.txt`,
 /// `$header$.txt`, a project the template does not have) is kept as it is: the export replaces the
-/// mod's folder, so what is not kept would be lost.
+/// files read, so what is not kept would be lost.
 fn import_asdsf(mod_dir: &Path, template_root: &Path, skipped: &mut Vec<String>) -> Result<Option<Behavior>, String> {
     let dir = mod_dir.join(ASDSF);
     if !dir.is_dir() {
@@ -1053,6 +1177,7 @@ mod tests {
         let output = dir.join("out");
         let session = Session {
             mod_dir: "D:/mods/a".to_owned(),
+            output: "D:/mods/b".to_owned(),
             active: workspace.behaviors[0].name.clone(),
             selected: Some("#0106".to_owned()),
             tabs: vec![SessionTab {
@@ -1065,6 +1190,8 @@ mod tests {
         workspace.save(&output, "upatch").unwrap();
         let loaded = Workspace::load(&output, "upatch").unwrap();
         assert_eq!(loaded.session, session);
+        assert_eq!(Workspace::cached_session(&output, "upatch"), Some(session));
+        assert_eq!(Workspace::cached_session(&output, "none"), None);
         let reloaded = loaded.behaviors[0].is_ref("#amco$0");
         let ref_count = loaded.ref_mods.len();
         std::fs::remove_dir_all(&dir).unwrap();
@@ -1079,7 +1206,7 @@ mod tests {
         assert!(reloaded);
     }
 
-    /// The export replaces the mod's folder: an anim set file that is no edit of the template must
+    /// The export replaces the files read: an anim set file that is no edit of the template must
     /// come out as it went in. Real mods have `tkuc$New.txt` and `$header$.txt`.
     #[test]
     fn anim_set_files_that_are_no_edits_are_kept() {
@@ -1104,6 +1231,78 @@ mod tests {
         assert_eq!(new_set, set);
         assert_eq!(header, "1\nNew.txt\n");
         behavior.validate("AData~A/m$New.txt", &new_set, ParserMode::Strict).unwrap();
+    }
+
+    /// By default a mod is exported to where it was read from: what the work did not read must stay,
+    /// and what it no longer has must go.
+    #[test]
+    fn an_export_only_replaces_what_the_work_read() {
+        let dir = std::env::temp_dir().join(format!("d_merge_export_owned_{}", std::process::id()));
+        let root = dir.join("mod");
+        let write = |path: &Path, text: &str| {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let set = "V3\n0\n0\n0\n1\n1\n2\n7891816\n";
+        write(
+            &dir.join("templates/meshes/animationsetdatasinglefile.txt"),
+            &format!("1\nAData\\A.txt\n1\nx.txt\n{set}"),
+        );
+        let code_dir = root.join("Nemesis_Engine/mod/abcd");
+        let (patch, readme, unknown) = (
+            code_dir.join(ASDSF).join("AData~A/abcd$New.txt"),
+            code_dir.join("readme.md"),
+            code_dir.join("no_such_template/#0001.txt"),
+        );
+        write(&patch, set);
+        write(&readme, "keep");
+        write(&unknown, "keep");
+
+        let (mut workspace, code, skipped) = Workspace::import(&root, &dir.join("templates")).unwrap();
+        let exported = workspace.export(&root, &code, ParserMode::Strict).map(|(written, _)| written);
+        let was_written = patch.is_file();
+        let kept = (readme.is_file(), unknown.is_file());
+
+        // The object is removed from the work: its file goes with it, and its folder that is left empty.
+        workspace.behaviors[0].added.clear();
+        workspace.export(&root, &code, ParserMode::Strict).unwrap();
+        let removed = (patch.is_file(), code_dir.join(ASDSF).is_dir());
+        let kept_after = (readme.is_file(), unknown.is_file());
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(code, "abcd");
+        assert_eq!(skipped, ["no_such_template"]);
+        assert_eq!(exported, Ok(1));
+        assert!(was_written);
+        assert_eq!(kept, (true, true));
+        assert_eq!(removed, (false, false));
+        assert_eq!(kept_after, (true, true));
+    }
+
+    #[test]
+    fn a_mod_is_found_from_its_root_or_patch_directory() {
+        let dir = std::env::temp_dir().join(format!("d_merge_mod_root_{}", std::process::id()));
+        let root = dir.join("Paraglider");
+        let (nemesis, ext) = (root.join("Nemesis_Engine/mod/para"), root.join("Nemesis_EngineExt/mod/para"));
+        std::fs::create_dir_all(&nemesis).unwrap();
+        std::fs::create_dir_all(&ext).unwrap();
+        std::fs::create_dir_all(dir.join("NotAMod/sub")).unwrap();
+
+        let from_root = mod_root_of(&root);
+        let from_patch_dir = mod_root_of(&nemesis);
+        let from_ext = mod_root_of(&ext);
+        let not_a_mod = (mod_root_of(&dir.join("NotAMod")), mod_root_of(&dir.join("NotAMod/sub")));
+        let both = code_dirs(&root, "para");
+        let codes = (code_of(&root), code_of(&nemesis));
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(from_root.as_ref(), Some(&root));
+        assert_eq!(from_patch_dir.as_ref(), Some(&root));
+        assert_eq!(from_ext.as_ref(), Some(&root));
+        assert_eq!(not_a_mod, (None, None));
+        assert_eq!(both, [nemesis, ext]);
+        assert_eq!(codes.0, "para");
+        assert_eq!(codes.1, "para");
     }
 
     #[test]

@@ -72,6 +72,11 @@ impl PatchEditorPage {
         self.patch.resolve_now(request, template_dir, i18n.t(I18nKey::NemesisUserPatchName))
     }
 
+    /// A mod was written since the last call, so that the conflict check can follow.
+    pub const fn take_mod_written(&mut self) -> bool {
+        self.patch.take_mod_written()
+    }
+
     /// Opens or closes the window of the user patch.
     pub fn toggle_user_patch(&mut self) {
         self.patch.toggle_user_patch();

@@ -80,8 +80,8 @@ impl PatchTool {
         }
         let mut event = None;
         let available = if view.preview.is_some() { ui.available_height() / 2.0 } else { ui.available_height() };
-        let scroll =
-            egui::ScrollArea::both().id_salt("user_patch_rows").max_height(available).auto_shrink([false, true]);
+        // Filling the window, as a window shrinks to its contents and then resists a drag.
+        let scroll = egui::ScrollArea::both().id_salt("user_patch_rows").max_height(available).auto_shrink(false);
         scroll.show(ui, |ui| {
             for group in view.rows.chunk_by(|a, b| a.behavior == b.behavior) {
                 ui.add(

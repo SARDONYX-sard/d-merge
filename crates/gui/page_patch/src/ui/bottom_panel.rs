@@ -32,7 +32,8 @@ impl PatchView<'_> {
                 });
 
                 let is_fetching = self.page.fetch.is_fetching();
-                ui.add_enabled_ui(!is_fetching, |ui| {
+                // A check is a merge too, and there is one at a time.
+                ui.add_enabled_ui(!is_fetching && !self.page.conflicts.is_scanning(), |ui| {
                     let label = if is_fetching {
                         self.ctx.i18n.t(I18nKey::PatchFetchingButton)
                     } else {
@@ -51,6 +52,7 @@ impl PatchView<'_> {
                         );
                     }
                 });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| self.pandora_button(ui));
             });
         });
     }

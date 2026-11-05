@@ -17,14 +17,44 @@ use std::path::Path;
 use gui_shared::patch::ResolveRequest;
 use nemesis_diff::{
     View,
-    conflict::{apply_block, block_of_change, replacing_blocks},
+    conflict::{apply_block_over, block_of_change, replacing_blocks},
     resolve,
 };
 
 use super::workspace::{ADSF, ASDSF, Workspace, nemesis_folder, read_text};
 
-/// Where the change ended up: to show it. `(behavior, object)`
-pub(super) type Resolved = (usize, String);
+/// Where the change ended up: to show it.
+#[derive(Debug)]
+pub(super) struct Resolved {
+    /// In `Workspace::behaviors`.
+    pub(super) behavior: usize,
+    /// e.g. `#0106`
+    pub(super) id: String,
+    /// The 0-based line in the object, if it is known.
+    pub(super) line: Option<usize>,
+}
+
+/// The name of the animation data behavior of this target, if it is one. e.g. [`ADSF`]
+fn anim_stem(target: &str) -> Option<&'static str> {
+    let file = target.rsplit('/').next().unwrap_or_default();
+    let stem = file.strip_suffix(".bin").unwrap_or(file);
+    [ADSF, ASDSF].into_iter().find(|known| stem.eq_ignore_ascii_case(known))
+}
+
+/// The object the request is about, opened if its behavior is not yet: where the user can do by hand
+/// what [`apply`] could not. `None`: it is not in the template.
+pub(super) fn object_of(workspace: &mut Workspace, template_root: &Path, request: &ResolveRequest) -> Option<Resolved> {
+    let (behavior, id) = if let Some(stem) = anim_stem(&request.target) {
+        let id = anim_file_of(&request.path)?;
+        workspace.anim_behavior(stem, template_root).ok()?;
+        (workspace.behaviors.iter().position(|behavior| behavior.name == stem)?, id)
+    } else {
+        let at = workspace.open_behavior(&template_root.join(&request.target), &request.target).ok()?;
+        (at, request.path.split('/').next()?.to_owned())
+    };
+    workspace.behaviors[behavior].text(&id)?;
+    Some(Resolved { behavior, id, line: None })
+}
 
 /// See the module docs.
 ///
@@ -36,12 +66,10 @@ pub(super) fn apply(
     template_root: &Path,
     request: &ResolveRequest,
 ) -> Result<Resolved, String> {
-    let file = request.target.rsplit('/').next().unwrap_or_default();
-    let stem = file.strip_suffix(".bin").unwrap_or(file);
-    if stem.eq_ignore_ascii_case(ADSF) || stem.eq_ignore_ascii_case(ASDSF) {
-        return apply_anim_data(workspace, template_root, request, stem);
+    match anim_stem(&request.target) {
+        Some(stem) => apply_anim_data(workspace, template_root, request, stem),
+        None => apply_behavior(workspace, template_root, request),
     }
-    apply_behavior(workspace, template_root, request)
 }
 
 /// `DefaultMale~1/Idle~348/play_back_speed` -> `DefaultMale~1/Idle~348.txt`
@@ -61,15 +89,14 @@ fn apply_anim_data(
 ) -> Result<Resolved, String> {
     let id = anim_file_of(&request.path).ok_or_else(|| format!("{}: no file in this path", request.path))?;
     let text = read_text(&Path::new(&request.mod_dir).join(stem).join(&id))?;
-    let name = if stem.eq_ignore_ascii_case(ADSF) { ADSF } else { ASDSF };
-    let behavior = workspace.anim_behavior(name, template_root)?;
+    let behavior = workspace.anim_behavior(stem, template_root)?;
     if behavior.template_object(&id).is_some() {
         behavior.set_text(&id, resolve(&text, View::Mod));
     } else {
         behavior.added.insert(id.clone(), text);
     }
-    let at = workspace.behaviors.iter().position(|behavior| behavior.name == name).unwrap_or(0);
-    Ok((at, id))
+    let behavior = workspace.behaviors.iter().position(|behavior| behavior.name == stem).unwrap_or(0);
+    Ok(Resolved { behavior, id, line: None })
 }
 
 fn apply_behavior(
@@ -92,15 +119,16 @@ fn apply_behavior(
     if replacing_blocks(&patch).is_none() {
         // A new object: the file is the object.
         behavior.added.insert(id.to_owned(), patch);
-        return Ok((at, id.to_owned()));
+        return Ok(Resolved { behavior: at, id: id.to_owned(), line: None });
     }
     let block = block_of_change(&patch, &request.path)
         .ok_or_else(|| format!("{}: this mod's file has no such change", request.path))?;
     let current = behavior.text(id).ok_or_else(|| format!("{id}: not in the template"))?;
-    let edited = apply_block(current, &block)
+    let template = behavior.template_object(id).ok_or_else(|| format!("{id}: not in the template"))?;
+    let (edited, line) = apply_block_over(&template.text, current, &block)
         .ok_or_else(|| format!("{}: the lines this change replaces are not in the object", request.path))?;
     behavior.set_text(id, edited);
-    Ok((at, id.to_owned()))
+    Ok(Resolved { behavior: at, id: id.to_owned(), line: Some(line) })
 }
 
 #[cfg(test)]

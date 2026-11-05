@@ -16,6 +16,7 @@
 
 mod conflicts;
 mod fetch;
+mod hidden;
 mod run;
 mod ui;
 mod visible_mods;
@@ -57,6 +58,9 @@ pub struct PatchPageCtx<'a> {
     pub show_log_window: &'a AtomicBool,
 }
 
+/// How often the app looks whether a check that is running has ended.
+const SCAN_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
+
 /// What [`PatchPage::poll`] needs. It runs on every page: a merge goes on while another is shown.
 #[derive(Debug)]
 pub struct PatchPollCtx<'a> {
@@ -83,10 +87,17 @@ pub struct PatchPage {
     /// The page was not drawn yet: reads the mod list and finds the Skyrim directory.
     first_frame: bool,
     conflicts: ConflictScan,
+    /// A mod was written: the check is to be done again, once nothing is running.
+    /// See [`Self::follow_written_mod`].
+    rescan_wanted: bool,
+    /// The running check is such a one: nobody asked for it, so it says nothing.
+    is_background_scan: bool,
     /// A conflict's value to keep, for the Patch Editor. See [`Self::take_resolve`].
     resolve: Option<ResolveRequest>,
     /// See [`Self::take_user_patch_toggle`].
     user_patch_toggle: bool,
+    /// The window of `ui::pandora` is open.
+    pandora_open: bool,
 }
 
 impl Default for PatchPage {
@@ -100,9 +111,12 @@ impl Default for PatchPage {
             prev_table_width: 0.0,
             list_message: Notification::default(),
             first_frame: true,
-            conflicts: ConflictScan::default(),
+            conflicts: ConflictScan::with_hidden(hidden::load()),
+            rescan_wanted: false,
+            is_background_scan: false,
             resolve: None,
             user_patch_toggle: false,
+            pandora_open: false,
         }
     }
 }
@@ -116,9 +130,29 @@ impl PatchPage {
         if self.run.poll(ctx.notify, ctx.i18n) {
             self.conflicts.on_merge_ended();
         }
-        if let Some(count) = self.conflicts.poll() {
+        if let Some(count) = self.conflicts.poll()
+            && !std::mem::take(&mut self.is_background_scan)
+        {
             ctx.notify.success(format!("{}: {count}", ctx.i18n.t(I18nKey::ConflictDone)));
         }
+        if self.conflicts.is_scanning() {
+            // The worker that reads the files has no way to wake the app.
+            egui_ctx.request_repaint_after(SCAN_POLL_INTERVAL);
+        }
+        if self.rescan_wanted && self.conflicts.can_follow() && !self.run.is_running() && !self.conflicts.is_scanning()
+        {
+            self.is_background_scan = true;
+            self.start_scan(egui_ctx, ctx.settings, ctx.runtime, true);
+        }
+    }
+
+    /// A mod was written: the check follows in the background, as it was asked for with these mods.
+    ///
+    /// The mod list needs no check at all: a new load order or a mod turned off only changes the
+    /// flags. Only a mod turned on that the last check did not see waits for the button, as that is
+    /// the user's to decide: the check has no business running while mods are being picked.
+    pub const fn follow_written_mod(&mut self) {
+        self.rescan_wanted = true;
     }
 
     /// The user asked for the window of the user patch: the app gives that to the Patch Editor.
@@ -131,16 +165,29 @@ impl PatchPage {
         self.resolve.take()
     }
 
-    /// Lets the merge write what each mod changes, then reads that. See [`conflicts`].
+    /// The user asked for the check.
     fn scan_conflicts(
         &mut self,
         egui_ctx: &egui::Context,
         settings: &PatchSettings,
         runtime: &tokio::runtime::Runtime,
     ) {
+        self.start_scan(egui_ctx, settings, runtime, false);
+    }
+
+    /// Lets the merge write what each mod changes, then reads that. See [`conflicts`].
+    /// `quiet`: nothing is said of its progress.
+    fn start_scan(
+        &mut self,
+        egui_ctx: &egui::Context,
+        settings: &PatchSettings,
+        runtime: &tokio::runtime::Runtime,
+        quiet: bool,
+    ) {
         if self.run.is_running() || self.conflicts.is_scanning() {
             return;
         }
+        self.rescan_wanted = false;
         let is_vfs = settings.behavior.mode == DataMode::Vfs;
         let data_dir = settings.current_skyrim_data_dir();
         let mods = settings.mod_list().iter().filter(|item| item.enabled).map(|item| ScannedMod {
@@ -159,7 +206,7 @@ impl PatchPage {
             });
         }
         self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods);
-        self.run.start_patch_json(egui_ctx, settings, runtime);
+        self.run.start_patch_json(egui_ctx, settings, runtime, quiet);
     }
 
     /// Reads the mod list of the current mode in the background.

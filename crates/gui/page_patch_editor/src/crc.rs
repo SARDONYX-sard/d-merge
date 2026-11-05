@@ -89,7 +89,8 @@ impl CrcTool {
     /// `Nemesis mod: [..] [Select]   [Filter]`
     fn mod_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         ui.horizontal(|ui| {
-            ui.label(i18n.t(I18nKey::CrcModDirLabel));
+            let hover = i18n.t(I18nKey::CrcModDirHover);
+            ui.label(i18n.t(I18nKey::CrcModDirLabel)).on_hover_text(hover);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(
                     TextEdit::singleline(&mut self.filter)
@@ -105,7 +106,8 @@ impl CrcTool {
                     TextEdit::singleline(&mut self.mod_dir)
                         .hint_text(i18n.t(I18nKey::CrcModDirHint))
                         .desired_width(ui.available_width()),
-                );
+                )
+                .on_hover_text(hover);
             });
         });
     }

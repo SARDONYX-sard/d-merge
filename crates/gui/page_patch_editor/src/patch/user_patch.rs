@@ -9,9 +9,17 @@
 
 use std::path::{Path, PathBuf};
 
-use gui_shared::patch::{ResolveRequest, USER_PATCH_CODE, USER_PATCH_OUTPUT};
+use gui_shared::{
+    patch::{ResolveRequest, USER_PATCH_CODE, USER_PATCH_OUTPUT},
+    settings::pages::patch::behavior::ParserMode,
+};
 
-use super::{PatchTool, preview::Preview, resolve, workspace::Workspace};
+use super::{
+    PatchTool,
+    preview::Preview,
+    resolve,
+    workspace::{CACHE_ROOT, Workspace},
+};
 
 /// One changed object of the user patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +47,16 @@ pub(super) fn rows(workspace: &Workspace) -> Vec<Row> {
     rows
 }
 
+/// Keeps the user patch, and writes the mod. Saved again after: what the export wrote is part of the
+/// work. Returns the patches d-merge's parser rejects.
+fn save_and_export(workspace: &mut Workspace, mode: ParserMode) -> Result<Vec<String>, String> {
+    let cache = Path::new(CACHE_ROOT);
+    workspace.save(cache, USER_PATCH_CODE)?;
+    let invalid = workspace.export(Path::new(USER_PATCH_OUTPUT), USER_PATCH_CODE, mode)?.1;
+    workspace.save(cache, USER_PATCH_CODE)?;
+    Ok(invalid)
+}
+
 /// The window's state. See the module docs.
 #[derive(Debug, Default)]
 pub(super) struct UserPatchView {
@@ -62,26 +80,24 @@ impl PatchTool {
 
     /// Does the editor have the user patch open?
     fn has_user_patch_open(&self) -> bool {
-        self.loaded_for.as_ref().is_some_and(|(output, code)| output == USER_PATCH_OUTPUT && code == USER_PATCH_CODE)
+        self.loaded_for.as_deref() == Some(USER_PATCH_CODE)
     }
 
     /// Changes the user patch, saves it, and writes the mod. See the module docs.
     fn change_user_patch(&mut self, change: impl FnOnce(&mut Workspace) -> Result<(), String>) -> Result<(), String> {
-        let path = Path::new(USER_PATCH_OUTPUT);
         let invalid = if self.has_user_patch_open() {
             change(&mut self.workspace)?;
             self.reset_names();
             self.editor_for = None;
             self.preview = None;
             self.dirty_since = None;
-            self.workspace.save(path, USER_PATCH_CODE)?;
-            self.workspace.export(path, USER_PATCH_CODE, self.parser_mode)?.1
+            save_and_export(&mut self.workspace, self.parser_mode)?
         } else {
-            let mut workspace = Workspace::load(path, USER_PATCH_CODE)?;
+            let mut workspace = Workspace::load(Path::new(CACHE_ROOT), USER_PATCH_CODE)?;
             change(&mut workspace)?;
-            workspace.save(path, USER_PATCH_CODE)?;
-            workspace.export(path, USER_PATCH_CODE, self.parser_mode)?.1
+            save_and_export(&mut workspace, self.parser_mode)?
         };
+        self.mod_written = true;
         if self.user_patch.open {
             self.refresh_user_patch();
         }
@@ -115,7 +131,7 @@ impl PatchTool {
         self.user_patch.rows = if self.has_user_patch_open() {
             rows(&self.workspace)
         } else {
-            Workspace::load(Path::new(USER_PATCH_OUTPUT), USER_PATCH_CODE)
+            Workspace::load(Path::new(CACHE_ROOT), USER_PATCH_CODE)
                 .map_or_else(|_| Vec::new(), |workspace| rows(&workspace))
         };
         self.user_patch.seen_revision = self.edit_revision;

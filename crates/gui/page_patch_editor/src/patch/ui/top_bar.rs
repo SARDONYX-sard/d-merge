@@ -2,36 +2,51 @@
 //! are set once.
 //!
 //! ```text
-//! ▶ mymod  D:/mods/out                                        [Export]
+//! [File v] > mymod  D:/mods/out                [Open work data] [User Patch] [Export]
 //! ```
-//! Unfolded (also at the start while something is missing): the output, the mod to read, the mods
-//! it depends on, and the mod's `info.ini`. The list of behaviors is in [`super::behaviors`].
+//! Unfolded: where it is exported to, the mod it was read from, where the work is kept, the mods it
+//! depends on, and the mod's `info.ini`. The list of behaviors is in [`super::behaviors`].
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use egui_widgets::{
     PathActions, PathRow,
     notify::Notification,
     shadcn::{Button, Icon, TextEdit},
 };
-use gui_shared::i18n::{I18nKey, I18nMap};
-use nemesis_diff::is_valid_mod_code;
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::pages::patch_editor::RecentWork,
+};
 
-use crate::patch::PatchTool;
+use crate::patch::{
+    PatchTool,
+    new_work::NewWork,
+    workspace::{CACHE_ROOT, Workspace},
+};
 
 /// See [`PathRow`].
-const PATH_ACTIONS: PathActions =
+pub(super) const PATH_ACTIONS: PathActions =
     PathActions { open: gui_shared::fs::open_dir_of, pick: gui_shared::fs::pick_folder_from };
+
+/// What was picked in the `File` menu.
+#[derive(Debug)]
+enum FileAction {
+    New,
+    Open,
+    Recent(RecentWork),
+    Close,
+}
 
 impl PatchTool {
     /// The one line, and the details if unfolded.
     pub(in crate::patch) fn project_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         ui.horizontal(|ui| {
+            self.file_menu(ui, i18n, notify);
             let chevron = if self.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
             let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.export_button(ui, i18n, notify);
-                self.open_recent_menu(ui, i18n);
                 if ui
                     .add(Button::new(i18n.t(I18nKey::UserPatchTitle)))
                     .on_hover_text(i18n.t(I18nKey::UserPatchHover))
@@ -39,8 +54,9 @@ impl PatchTool {
                 {
                     self.toggle_user_patch();
                 }
+                self.open_cache_button(ui, i18n, notify);
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    toggle |= self.project_summary(ui, i18n);
+                    toggle |= self.project_summary(ui);
                 });
             });
             if toggle {
@@ -52,27 +68,48 @@ impl PatchTool {
         }
     }
 
-    /// `Open Recent`, like VS Code's: a work comes back with the tabs it had open.
-    fn open_recent_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let mut picked = None;
-        ui.menu_button(i18n.t(I18nKey::NemesisOpenRecent), |ui| {
-            if self.recent.is_empty() {
-                ui.weak(i18n.t(I18nKey::NemesisOpenRecentEmpty));
-            }
-            for work in &self.recent {
-                if ui.button(format!("{}  {}", work.mod_code, work.output)).clicked() {
-                    picked = Some(work.clone());
+    /// `New`, `Open`, `Open Recent`, `Close`, like VS Code's.
+    fn file_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let mut action = None;
+        ui.menu_button(i18n.t(I18nKey::NemesisFileMenu), |ui| {
+            let mut item = |ui: &mut egui::Ui, label, hover, picked| {
+                if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
+                    action = Some(picked);
                     ui.close();
                 }
+            };
+            item(ui, I18nKey::NemesisNewWork, I18nKey::NemesisNewWorkHover, FileAction::New);
+            item(ui, I18nKey::NemesisOpenMod, I18nKey::NemesisOpenModHover, FileAction::Open);
+            ui.menu_button(i18n.t(I18nKey::NemesisOpenRecent), |ui| {
+                if let Some(work) = recent_list(ui, &self.recent, i18n) {
+                    action = Some(FileAction::Recent(work));
+                    ui.close();
+                }
+            });
+            ui.separator();
+            if ui
+                .button(i18n.t(I18nKey::NemesisCloseWork))
+                .on_hover_text(i18n.t(I18nKey::NemesisCloseWorkHover))
+                .clicked()
+            {
+                action = Some(FileAction::Close);
+                ui.close();
             }
         });
-        if let Some(work) = picked {
-            self.open_recent(&work);
+        match action {
+            Some(FileAction::New) => {
+                self.close_work(notify, i18n);
+                self.new_work = Some(NewWork::default());
+            }
+            Some(FileAction::Open) => self.pick_mod(notify, i18n),
+            Some(FileAction::Recent(work)) => self.open_recent(&work, notify, i18n),
+            Some(FileAction::Close) => self.close_work(notify, i18n),
+            None => {}
         }
     }
 
     fn export_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let ready = self.loaded_for.is_some() && !self.workspace.behaviors.is_empty();
+        let ready = !self.output.trim().is_empty() && !self.workspace.behaviors.is_empty();
         if ui
             .add_enabled(ready, Button::new(i18n.t(I18nKey::NemesisExport)).primary())
             .on_disabled_hover_text(i18n.t(I18nKey::NemesisExportDisabledHover))
@@ -82,64 +119,46 @@ impl PatchTool {
         }
     }
 
-    /// `mymod  D:/mods/out`, or `✖` if the code is not valid. Returns whether it was clicked.
-    fn project_summary(&self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
-        let code = self.mod_code.trim();
-        let mut clicked = false;
-        if !is_valid_mod_code(code) {
-            ui.colored_label(ui.visuals().error_fg_color, "✖").on_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid));
-        }
-        let name = if code.is_empty() { i18n.t(I18nKey::NemesisModCodeLabel) } else { code };
-        clicked |= ui.add(egui::Label::new(egui::RichText::new(name).strong()).sense(egui::Sense::click())).clicked();
+    /// `mymod  D:/mods/out`. Returns whether it was clicked.
+    fn project_summary(&self, ui: &mut egui::Ui) -> bool {
+        let name = egui::RichText::new(self.mod_code.trim()).strong();
+        let mut clicked = ui.add(egui::Label::new(name).sense(egui::Sense::click())).clicked();
         let output = egui::RichText::new(self.output.trim()).weak();
         clicked |= ui.add(egui::Label::new(output).truncate().sense(egui::Sense::click())).clicked();
         clicked
     }
 
-    /// The output, the mod to read and the mod's `info.ini`.
+    /// The directories, and the mod's `info.ini`.
     fn project_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let select = i18n.t(I18nKey::SelectButton);
-        let output = PathRow::new(i18n.t(I18nKey::NemesisOutputLabel), select, PATH_ACTIONS)
-            .hover(i18n.t(I18nKey::NemesisOutputHover))
+        let output = PathRow::new(i18n.t(I18nKey::NemesisOutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+            .help(i18n.t(I18nKey::NemesisOutputHover))
             .show(ui, &mut self.output);
         if let Some(err) = output.open_error {
             notify.error(err);
         }
-        let mod_row = PathRow::new(i18n.t(I18nKey::NemesisModDirLabel), select, PATH_ACTIONS)
-            .hover(i18n.t(I18nKey::NemesisImportModHover))
-            .show(ui, &mut self.mod_dir);
-        if let Some(err) = mod_row.open_error {
-            notify.error(err);
+        if output.changed {
+            self.mark_dirty();
         }
-        // Reading a mod replaces the work: only on a choice, or `Enter` in the field.
-        if (mod_row.picked || mod_row.submitted) && !self.mod_dir.trim().is_empty() {
-            let dir = PathBuf::from(self.mod_dir.trim());
-            self.import(&dir, notify, i18n);
-        }
-
+        self.source_row(ui, i18n, notify);
+        self.cache_row(ui, i18n, notify);
         self.ref_mods_row(ui, i18n);
 
         ui.horizontal_wrapped(|ui| {
-            ui.label(i18n.t(I18nKey::NemesisModCodeLabel));
-            let code = ui.add(
-                TextEdit::singleline(&mut self.mod_code)
-                    .hint_text(i18n.t(I18nKey::NemesisModCodeHint))
-                    .desired_width(70.0),
-            );
-            if !self.mod_code.is_empty() && !is_valid_mod_code(self.mod_code.trim()) {
-                code.on_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid));
-                ui.colored_label(ui.visuals().error_fg_color, "✖");
-            }
+            // Fixed: it is in the ids of the new objects and the names of the folders.
+            let hover = i18n.t(I18nKey::NemesisModCodeHover);
+            ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
+            ui.strong(self.mod_code.trim()).on_hover_text(hover);
 
             let info = &mut self.workspace.info;
             let mut changed = false;
-            for (label, value, width) in [
-                (I18nKey::NemesisNameLabel, &mut info.name, 260.0),
-                (I18nKey::NemesisAuthorLabel, &mut info.author, 130.0),
-                (I18nKey::NemesisSiteLabel, &mut info.site, 320.0),
+            for (label, hover, value, width) in [
+                (I18nKey::NemesisNameLabel, I18nKey::NemesisNameHover, &mut info.name, 260.0),
+                (I18nKey::NemesisAuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
+                (I18nKey::NemesisSiteLabel, I18nKey::NemesisSiteHover, &mut info.site, 320.0),
             ] {
-                ui.label(i18n.t(label));
-                changed |= ui.add(TextEdit::singleline(value).desired_width(width)).changed();
+                ui.label(i18n.t(label)).on_hover_text(i18n.t(hover));
+                let field = ui.add(TextEdit::singleline(value).desired_width(width));
+                changed |= field.on_hover_text(i18n.t(hover)).changed();
             }
             if changed {
                 self.mark_dirty();
@@ -147,7 +166,61 @@ impl PatchTool {
         });
     }
 
-    /// `References: [amco ✖] [+]`: the mods this one depends on, see `Workspace::ref_mods`.
+    /// `[Read from] D:/mods/Paraglider  [Reload]`, if the work was read from a mod.
+    fn source_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        if self.mod_dir.trim().is_empty() {
+            return;
+        }
+        let mut reload = false;
+        let error = PathRow::new(i18n.t(I18nKey::NemesisModDirLabel), "", PATH_ACTIONS)
+            .hover(i18n.t(I18nKey::NemesisSourceHover))
+            .show_read_only(ui, self.mod_dir.trim(), |ui| {
+                let button = Button::new(i18n.t(I18nKey::NemesisReload)).icon(Icon::RefreshCcw);
+                reload = ui.add(button).on_hover_text(i18n.t(I18nKey::NemesisReloadHover)).clicked();
+            });
+        if let Some(err) = error {
+            notify.error(err);
+        }
+        if reload {
+            self.reload_from_mod(notify, i18n);
+        }
+    }
+
+    /// `[Work data] D:/d_merge/.d_merge/caches/patch_editor/nemesis/mymod`: decided by the code.
+    fn cache_row(&self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let error = PathRow::new(i18n.t(I18nKey::NemesisCacheDirLabel), "", PATH_ACTIONS)
+            .hover(i18n.t(I18nKey::NemesisCacheDirHover))
+            .show_read_only(ui, &self.cache_dir().to_string_lossy(), |_| {});
+        if let Some(err) = error {
+            notify.error(err);
+        }
+    }
+
+    /// `Open work data`, always in reach. Its hover says where that is.
+    pub(super) fn open_cache_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let button = Button::new(i18n.t(I18nKey::NemesisOpenCacheDir)).icon(Icon::FolderOpen);
+        let response = ui.add(button).on_hover_ui(|ui| {
+            ui.label(i18n.t(I18nKey::NemesisCacheDirHover));
+            ui.monospace(self.cache_dir().to_string_lossy());
+        });
+        if response.clicked() {
+            // A new work has no directory until its first save.
+            self.save_now(notify, i18n);
+            if let Err(err) = gui_shared::fs::open_dir_of(&self.cache_dir().to_string_lossy()) {
+                notify.error(err);
+            }
+        }
+    }
+
+    /// The directory of the open work, or of all the works if none is open.
+    fn cache_dir(&self) -> std::path::PathBuf {
+        let root = Path::new(CACHE_ROOT);
+        let dir =
+            self.loaded_for.as_deref().map_or_else(|| root.to_path_buf(), |code| Workspace::cache_dir(root, code));
+        std::path::absolute(&dir).unwrap_or(dir)
+    }
+
+    /// `References: [amco x] [+]`: the mods this one depends on, see `Workspace::ref_mods`.
     fn ref_mods_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let mut remove = None;
         let mut add = false;
@@ -178,4 +251,18 @@ impl PatchTool {
         self.editor_for = None;
         self.mark_dirty();
     }
+}
+
+/// The works opened lately. Returns the one clicked.
+pub(super) fn recent_list(ui: &mut egui::Ui, recent: &[RecentWork], i18n: &I18nMap) -> Option<RecentWork> {
+    if recent.is_empty() {
+        ui.weak(i18n.t(I18nKey::NemesisOpenRecentEmpty));
+    }
+    let mut picked = None;
+    for work in recent {
+        if ui.button(format!("{}  {}", work.mod_code, work.output)).clicked() {
+            picked = Some(work.clone());
+        }
+    }
+    picked
 }

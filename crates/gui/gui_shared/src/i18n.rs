@@ -379,6 +379,12 @@ pub enum I18nKey {
     /// output dir:
     PandoraOutputDirLabel,
 
+    /// Takes the settings of Pandora Behaviour Engine into d-merge's VFS mode, or gives them to it.
+    PandoraButtonHover,
+
+    /// The directory with Pandora's Settings.json and Pandora_Engine\ActiveMods.json. Import reads them from here and Export writes them here. Only used for these two buttons. The button on the left opens the directory.
+    PandoraDirHover,
+
     /// Imports Pandora settings into the d-merge VFS configuration.
     ///
     /// # Targets
@@ -516,7 +522,7 @@ pub enum I18nKey {
     /// Output:
     NemesisOutputLabel,
 
-    /// The mod's directory. Export writes Nemesis_Engine/mod/<code> here, and the work in progress is kept in .d_merge/caches/patch_editor/nemesis.
+    /// The root directory of the mod Export writes to, e.g. D:\MO2\mods\MyMod: by default the mod that was opened. Export writes <here>\Nemesis_Engine\mod\<mod code> (Nemesis_EngineExt for NemesisExt templates), replacing only the files this work read or wrote. The button on the left opens the directory.
     NemesisOutputHover,
 
     /// Mod code:
@@ -552,13 +558,10 @@ pub enum I18nKey {
     /// Add Behavior…
     NemesisAddBehavior,
 
-    /// Load a Nemesis mod (…/Nemesis_Engine/mod/<code>) to keep working on it.
-    NemesisImportModHover,
-
     /// Export
     NemesisExport,
 
-    /// Set the output directory and a valid mod code first.
+    /// Set the output directory and add a behavior first.
     NemesisExportDisabledHover,
 
     /// Exported
@@ -606,7 +609,7 @@ pub enum I18nKey {
     /// d-merge's Nemesis parser accepts this patch.
     NemesisParserOk,
 
-    /// Add a behavior (a template xml) or import a mod to start.
+    /// Add a behavior (template xml) to start.
     NemesisNoBehavior,
 
     /// Select an object on the left.
@@ -654,7 +657,7 @@ pub enum I18nKey {
     /// Collapse all below
     NemesisCollapseAllBelow,
 
-    /// j / k: move, h / l: fold, Enter: back to the editor
+    /// j / k: move, h / l: fold, o: open / close, Enter: back to the editor
     NemesisTreeKeysHint,
 
     /// Inline diff
@@ -726,6 +729,21 @@ pub enum I18nKey {
     /// Takes this value into the user patch and opens it in the Patch Editor, to change it by hand. Export it there when done.
     ConflictEditHover,
 
+    /// Hide
+    ConflictHide,
+
+    /// Leaves this operation of this mod out of the merge, as if the mod did not do it, like MO2's mohidden. The mod's files do not change. The flags change at once, what is generated at the next patch. Animation data goes by the whole file. Off with Apply User Patch.
+    ConflictHideHover,
+
+    /// Show
+    ConflictUnhide,
+
+    /// This operation counts again.
+    ConflictUnhideHover,
+
+    /// hidden
+    ConflictHidden,
+
     /// The value is in the user patch
     ConflictResolved,
 
@@ -735,7 +753,7 @@ pub enum I18nKey {
     /// Apply User Patch
     UserPatchApply,
 
-    /// Merges what the conflict tool decided, kept in ./.d_merge/user_patch, after every mod. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this profile.
+    /// Merges what the conflict tool decided, kept in ./.d_merge/user_patch, after every mod, and leaves out the operations hidden there. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this profile.
     UserPatchApplyHover,
 
     /// User Patch
@@ -783,7 +801,7 @@ pub enum I18nKey {
     /// References:
     NemesisRefMods,
 
-    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from). Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
+    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from): the root of each, or its patch directory. Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
     NemesisRefModsHover,
 
     /// Read only: an object of a referenced mod.
@@ -870,7 +888,109 @@ pub enum I18nKey {
     /// Generated animation data
     NemesisAnimDataDone,
 
-    /// Mod
+    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0), so it cannot be changed once the work is made.
+    NemesisModCodeHover,
+
+    /// The mod's name, as mod lists show it (name in info.ini).
+    NemesisNameHover,
+
+    /// Who made the mod (author in info.ini).
+    NemesisAuthorHover,
+
+    /// The URL of the mod's page (site in info.ini).
+    NemesisSiteHover,
+
+    /// Variable name
+    NemesisNewVariableHint,
+
+    /// The new variable's name, e.g. myVar: no spaces, and not one that exists, whatever its case. Patches refer to it as $variableID[myVar]$.
+    NemesisNewVariableHover,
+
+    /// The type of its value: BOOL, the whole numbers INT8 / INT16 / INT32, or REAL for decimals.
+    NemesisNewVariableTypeHover,
+
+    /// Its initial value, by type. BOOL: true or false. INT: a whole number, e.g. 1. REAL: a decimal, e.g. 0.2.
+    NemesisNewVariableValueHover,
+
+    /// Event name
+    NemesisNewEventHint,
+
+    /// The new event's name, e.g. myEvent: no spaces, and not one that exists, whatever its case. Patches refer to it as $eventID[myEvent]$.
+    NemesisNewEventHover,
+
+    /// The project the clips go to, as <name>~<number>, e.g. DefaultMale~1.
+    NemesisClipActorHover,
+
+    /// The clip's name, e.g. Attack, without / \ ~ $. With a count of 2 or more: Attack_0, Attack_1, ...
+    NemesisClipNameHover,
+
+    /// How many clips to add: their ids are numbered after what exists.
+    NemesisClipCountHover,
+
+    /// A directory to list the CRC32 of every .hkx under it, e.g. the mod's root D:\MO2\mods\MyMod. Any directory will do, or drop one here.
+    CrcModDirHover,
+
+    /// File
+    NemesisFileMenu,
+
+    /// Make a new patch mod, or open an existing one to edit it.
+    NemesisStartHint,
+
+    /// New
+    NemesisNewWork,
+
+    /// Make a new patch mod.
+    NemesisNewWorkHover,
+
+    /// Open a mod…
+    NemesisOpenMod,
+
+    /// Open a Nemesis mod to edit it: its root (where Nemesis_Engine is), e.g. D:\MO2\mods\Paraglider, or its patch directory, e.g. ...\Nemesis_Engine\mod\para. If it has been opened before, the work goes on with its edits that are not exported yet.
+    NemesisOpenModHover,
+
+    /// Close
+    NemesisCloseWork,
+
+    /// Back to the start screen. The work is kept, and comes back from Open Recent.
+    NemesisCloseWorkHover,
+
+    /// Cancel
+    NemesisCancel,
+
+    /// Choose the output directory.
+    NemesisOutputMissing,
+
+    /// There is already a work with this mod code: open it, or choose another code.
+    NemesisWorkExists,
+
+    /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
+    NemesisNotAMod,
+
+    /// A work on another mod had this mod code: it was replaced by this mod
+    NemesisWorkReplaced,
+
+    /// Neither its work nor its mod is there any more, so it left the list
+    NemesisRecentMissing,
+
+    /// Work data
+    NemesisCacheDirLabel,
+
+    /// Where the work in progress is saved automatically, for each mod code. Decided by the app.
+    NemesisCacheDirHover,
+
+    /// Open work data
+    NemesisOpenCacheDir,
+
+    /// The mod this work was read from. Click to open it.
+    NemesisSourceHover,
+
+    /// Reload from the mod
+    NemesisReload,
+
+    /// Reads the mod again. Discards the edits that are not exported.
+    NemesisReloadHover,
+
+    /// Read from
     NemesisModDirLabel,
 
     /// Focus Object Tree
@@ -899,6 +1019,12 @@ pub enum I18nKey {
 
     /// Revert this change
     EditorRevertChange,
+
+    /// Show Preview
+    EditorShowPreview,
+
+    /// Hide Preview
+    EditorHidePreview,
 
     /// Show the selected object in the tree
     NemesisLocateSelected,
@@ -1115,12 +1241,6 @@ pub enum I18nKey {
 
     /// Format
     HkannoFormatButton,
-
-    /// Show Preview
-    HkannoShowPreview,
-
-    /// Hide Preview
-    HkannoHidePreview,
 
     /// Annotation
     HkannoAnnotationLabel,

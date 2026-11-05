@@ -28,6 +28,8 @@ pub(crate) struct PatchRun {
     progress: Arc<PatchProgress>,
     /// It only writes what each mod changes: its end is no "patched" for the user.
     is_scan: bool,
+    /// A check nobody asked for, in the background: it says nothing.
+    is_quiet: bool,
 }
 
 impl PatchRun {
@@ -42,6 +44,7 @@ impl PatchRun {
     ) {
         self.started = Some(std::time::Instant::now());
         self.is_scan = false;
+        self.is_quiet = false;
         self.progress.clear();
 
         if settings.behavior.auto_remove_meshes {
@@ -68,9 +71,11 @@ impl PatchRun {
         ctx: &egui::Context,
         settings: &PatchSettings,
         runtime: &tokio::runtime::Runtime,
+        quiet: bool,
     ) {
         self.started = Some(std::time::Instant::now());
         self.is_scan = true;
+        self.is_quiet = quiet;
         self.progress.clear();
         let _no_old_files = std::fs::remove_dir_all(crate::conflicts::debug_patches_dir(settings.current_output_dir()));
         self.spawn(
@@ -115,6 +120,7 @@ impl PatchRun {
         };
         let progress = Arc::clone(&self.progress);
         let ctx = ctx.clone();
+        let debug_only = debug.patch_json_only;
         let config = behavior_merge::Config {
             resource_dir: template_dir.to_string().into(),
             output_dir: settings.current_output_dir().to_owned().into(),
@@ -126,6 +132,12 @@ impl PatchRun {
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
             skeleton_arm_fix: *skeleton_arm_fix,
+            // A conflict check sees them, to tell what is hidden.
+            hidden_patches: if settings.behavior.apply_user_patch && !debug_only {
+                crate::hidden::load()
+            } else {
+                behavior_merge::HiddenPatches::default()
+            },
         };
 
         runtime.spawn(behavior_merge::behavior_gen(patches, config));
@@ -138,7 +150,7 @@ impl PatchRun {
 
         let phase_now = self.progress.phase.load(Ordering::Relaxed);
         let text = self.progress.text(i18n, started);
-        if !text.is_empty() && !(self.is_scan && phase_now == phase::DONE) {
+        if !self.is_quiet && !text.is_empty() && !(self.is_scan && phase_now == phase::DONE) {
             notify.set(text, self.progress.color());
         }
         if matches!(phase_now, phase::DONE | phase::ERROR) {

@@ -471,6 +471,8 @@ pub(super) enum TreeInput {
     Close,
     /// `l`, Right: open the node, or (already open) go into it.
     Open,
+    /// `o`: open the node, or close it if it is open. The cursor stays.
+    Toggle,
     /// `Enter`, `Esc`, `Space e`: back to the editor.
     Leave,
 }
@@ -486,7 +488,7 @@ impl TreeInput {
             Self::Previous => Some(current.saturating_sub(1)),
             Self::First => Some(0),
             Self::Last => Some(last),
-            Self::Close | Self::Open | Self::Leave => None,
+            Self::Close | Self::Open | Self::Toggle | Self::Leave => None,
         }
     }
 }
@@ -516,6 +518,10 @@ fn apply_input(input: TreeInput, rows: &[Row], cursor: usize) -> Effect {
         TreeInput::Open => match row {
             Some(row) if row.open => Effect::Cursor(TreeInput::Next.step(cursor, rows.len()).unwrap_or(cursor)),
             Some(row) if row.expandable => Effect::SetOpen(row.node, true),
+            _ => Effect::None,
+        },
+        TreeInput::Toggle => match row {
+            Some(row) if row.expandable => Effect::SetOpen(row.node, !row.open),
             _ => Effect::None,
         },
         TreeInput::Leave => Effect::Leave,
@@ -1093,6 +1099,10 @@ mod tests {
         assert_eq!(apply_input(TreeInput::Open, &rows, 2), Effect::None); // a leaf
         assert_eq!(apply_input(TreeInput::Close, &rows, 0), Effect::SetOpen(0, false));
         assert_eq!(apply_input(TreeInput::Close, &rows, 2), Effect::Cursor(0)); // to the parent
+
+        assert_eq!(apply_input(TreeInput::Toggle, &rows, 0), Effect::SetOpen(0, false));
+        assert_eq!(apply_input(TreeInput::Toggle, &rows, 1), Effect::SetOpen(1, true));
+        assert_eq!(apply_input(TreeInput::Toggle, &rows, 2), Effect::None); // a leaf
 
         assert_eq!(apply_input(TreeInput::Next, &[], 0), Effect::Cursor(0)); // nothing to show
         assert_eq!(apply_input(TreeInput::Close, &[], 0), Effect::None);

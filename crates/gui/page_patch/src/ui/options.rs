@@ -204,7 +204,7 @@ impl PatchView<'_> {
 }
 
 /// See [`PathRow`].
-const PATH_ACTIONS: PathActions =
+pub(super) const PATH_ACTIONS: PathActions =
     PathActions { open: gui_shared::fs::open_dir_of, pick: gui_shared::fs::pick_folder_from };
 
 /// `Auto`, where it applies; else its space. Returns whether it was clicked.

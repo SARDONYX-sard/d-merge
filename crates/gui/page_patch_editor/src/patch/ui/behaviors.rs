@@ -82,9 +82,10 @@ impl PatchTool {
         }
     }
 
-    /// The mod of the bar above, or else asks for one.
+    /// The mod the work was read from, or else the one it makes, or else asks for one.
     fn open_anim_data_for_mod(&mut self) {
-        let chosen = Some(self.mod_dir.trim()).filter(|dir| !dir.is_empty()).map(PathBuf::from);
+        let dirs = [self.mod_dir.trim(), self.output.trim()];
+        let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
         if let Some(root) = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder()) {
             self.open_anim_data_dialog(&root);
         }

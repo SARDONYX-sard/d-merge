@@ -76,6 +76,9 @@ pub(crate) fn apply_adsf_patches(
             Err(error) => Either::Right(error),
         });
 
+    if !config.hidden_patches.is_empty() {
+        borrowed_patches.retain(|patch| !is_hidden(patch, config));
+    }
     borrowed_patches.par_extend(fnis_adsf_patches);
 
     // 2/5 Sort and resolve patch conflicts by priority.
@@ -203,6 +206,21 @@ pub(crate) fn apply_adsf_patches(
     bail!(write_alt_adsf_file(output_path, alt_adsf, project_names_header_patches,));
 
     errors
+}
+
+/// Is the file of this patch hidden? See `HiddenPatches`. What adds is not.
+fn is_hidden(patch: &AdsfPatch<'_>, config: &Config) -> bool {
+    let name = match &patch.patch {
+        PatchKind::EditAnim(edit) => edit.name_clip,
+        PatchKind::SpecifiedAnim { name_clip, .. } => name_clip,
+        PatchKind::EditMotion(edit) => edit.clip_id,
+        PatchKind::SpecifiedMotion { index, .. } => index,
+        _ => return false,
+    };
+    // An id is a mod code, or the path up to it.
+    let code = patch.id.rsplit(['/', '\\']).next().unwrap_or(patch.id);
+    let rules = config.hidden_patches.rules_of(code, ADSF_INNER_PATH);
+    rules.is_some_and(|rules| rules.hides_file(patch.target, name))
 }
 
 fn parse_anim_data_patch<'a>(

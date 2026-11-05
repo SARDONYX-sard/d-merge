@@ -2,14 +2,10 @@
 
 use std::path::{Path, PathBuf};
 
-use egui::Color32;
 use gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
-    settings::{
-        pages::patch::support_pandora::{Pandora, PandoraVersion},
-        ui::FontMode,
-    },
+    settings::ui::FontMode,
 };
 
 use crate::{
@@ -25,64 +21,48 @@ impl App {
         if !self.show_help {
             return;
         }
-        if help_overlay(ctx).clicked() {
-            self.show_help = false;
-            return;
-        }
-
-        // NOTE: `Window::open` holds `&mut bool` for the whole `show` call, which would conflict with
-        // the closure capturing `&mut self`. `bool` is `Copy`, so go through a local.
+        // Owned: the content borrows `self` mutably.
+        let title: egui::WidgetText = self.i18n.t(I18nKey::HelpButton).into();
         let mut open = true;
-        let size = egui::vec2(self.settings.ui.window.width * 0.8, self.settings.ui.window.height * 0.85);
+        egui_widgets::show_modal(ctx, title, &mut open, |ui| {
+            egui::ScrollArea::vertical().id_salt("help_window_scroll").show(ui, |ui| {
+                fn section_title(ui: &mut egui::Ui, title: &str) {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(title).strong().size(20.0));
+                    ui.add_space(4.0);
+                }
 
-        egui::Window::new(self.i18n.t(I18nKey::HelpButton))
-            .open(&mut open)
-            .collapsible(false)
-            .fixed_size(size)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical().id_salt("help_window_scroll").show(ui, |ui| {
-                    fn section_title(ui: &mut egui::Ui, title: &str) {
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new(title).strong().size(20.0));
-                        ui.add_space(4.0);
-                    }
+                fn section_separator(ui: &mut egui::Ui) {
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+                }
 
-                    fn section_separator(ui: &mut egui::Ui) {
-                        ui.add_space(8.0);
-                        ui.separator();
-                        ui.add_space(8.0);
-                    }
+                section_title(ui, "About");
+                self.ui_help_info(ui);
+                section_separator(ui);
 
-                    section_title(ui, "About");
-                    self.ui_help_info(ui);
-                    section_separator(ui);
+                section_title(ui, self.i18n.t(I18nKey::BugReportTitleLabel));
+                self.ui_bug_report(ui);
+                section_separator(ui);
 
-                    section_title(ui, self.i18n.t(I18nKey::BugReportTitleLabel));
-                    self.ui_bug_report(ui);
-                    section_separator(ui);
+                section_title(ui, self.i18n.t(I18nKey::FontTitleLabel));
+                self.ui_font_section(ui);
+                section_separator(ui);
 
-                    section_title(ui, self.i18n.t(I18nKey::FontTitleLabel));
-                    self.ui_font_section(ui);
-                    section_separator(ui);
+                section_title(ui, self.i18n.t(I18nKey::LoggingTitleLabel));
+                self.ui_log_section(ui);
+                section_separator(ui);
 
-                    section_title(ui, self.i18n.t(I18nKey::LoggingTitleLabel));
-                    self.ui_log_section(ui);
-                    section_separator(ui);
+                section_title(ui, self.i18n.t(I18nKey::I18nTitleLabel));
+                self.ui_translation_section(ui);
+                section_separator(ui);
 
-                    section_title(ui, self.i18n.t(I18nKey::I18nTitleLabel));
-                    self.ui_translation_section(ui);
-                    section_separator(ui);
-
-                    section_title(ui, self.i18n.t(I18nKey::BackgroundTitleLabel));
-                    self.ui_background_section(ui);
-                    section_separator(ui);
-
-                    section_title(ui, "Pandora");
-                    self.ui_pandora_section(ui);
-                    section_separator(ui);
-                });
+                section_title(ui, self.i18n.t(I18nKey::BackgroundTitleLabel));
+                self.ui_background_section(ui);
+                section_separator(ui);
             });
+        });
 
         self.show_help &= open;
     }
@@ -253,56 +233,6 @@ impl App {
         });
     }
 
-    /// Pandora
-    /// Target version: [4.4.0Beta ▼]
-    /// output dir: [path] [Import] [Export]
-    fn ui_pandora_section(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("pandora_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
-            {
-                ui.label(self.i18n.t(I18nKey::PandoraTargetVersionLabel))
-                    .on_hover_text(self.i18n.t(I18nKey::PandoraTargetVersionHover));
-
-                let versions = [PandoraVersion::V4_4_0Beta];
-                let version = &mut self.settings.pages.patch.pandora.version;
-                let mut index = versions.iter().position(|v| v == version).unwrap_or(0);
-
-                if ComboBox::from_id_salt("pandora_version")
-                    .show_index(ui, &mut index, versions.len(), |i| versions[i].to_static_str())
-                    .changed()
-                {
-                    *version = versions[index];
-                }
-                ui.end_row();
-            }
-
-            ui.label(self.i18n.t(I18nKey::PandoraOutputDirLabel))
-                .on_hover_text(self.i18n.t(I18nKey::OpenSelectedPathHover));
-
-            // NOTE: Right-to-left: buttons take their real width first, the text edit gets the rest.
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                if ui
-                    .add(Button::new(self.i18n.t(I18nKey::PandoraExportLabel)))
-                    .on_hover_text(self.i18n.t(I18nKey::PandoraExportHover))
-                    .clicked()
-                {
-                    self.export_pandora();
-                }
-
-                if ui
-                    .add(Button::new(self.i18n.t(I18nKey::PandoraImportLabel)))
-                    .on_hover_text(self.i18n.t(I18nKey::PandoraImportHover))
-                    .clicked()
-                {
-                    self.import_pandora();
-                }
-
-                let width = ui.available_width();
-                ui.add(TextEdit::singleline(&mut self.settings.pages.patch.pandora.output_dir).desired_width(width));
-            });
-            ui.end_row();
-        });
-    }
-
     fn apply_font(&mut self, ctx: &egui::Context) {
         let Err(err) = crate::fonts::set_fonts(ctx, &self.settings.ui.font) else {
             return;
@@ -361,28 +291,6 @@ impl App {
                 }
                 Err(err) => self.notify.error(err.to_string()),
             }
-        }
-    }
-
-    fn import_pandora(&mut self) {
-        let path = self.settings.pages.patch.pandora.output_dir.clone();
-        let version = self.settings.pages.patch.pandora.version;
-        match Pandora::import_to(&path, &mut self.settings, version) {
-            Ok(()) => {
-                self.notify.success(format!("Imported Pandora settings from {path}"));
-            }
-            Err(err) => self.notify.error(err),
-        }
-    }
-
-    fn export_pandora(&mut self) {
-        let path = &self.settings.pages.patch.pandora.output_dir;
-        let version = self.settings.pages.patch.pandora.version;
-        match Pandora::export_from(path, &self.settings, version) {
-            Ok(()) => {
-                self.notify.success(format!("Exported Pandora settings to {path}"));
-            }
-            Err(err) => self.notify.error(err),
         }
     }
 }
@@ -472,17 +380,4 @@ fn start_dir(current: &str, fallback: &str, current_is_dir: bool) -> PathBuf {
     let path = Path::new(current);
     let base = if current_is_dir { Some(path) } else { path.parent() };
     base.map_or_else(|| PathBuf::from(fallback), |p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
-}
-
-/// Draws the dimmed backdrop; the returned response tells whether it was clicked.
-fn help_overlay(ctx: &egui::Context) -> egui::Response {
-    egui::Area::new(egui::Id::unique("help_overlay_bg"))
-        .order(egui::Order::Background)
-        .fixed_pos(ctx.content_rect().min)
-        .show(ctx, |ui| {
-            let rect = ui.ctx().content_rect();
-            ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(160));
-            ui.allocate_response(rect.size(), egui::Sense::click())
-        })
-        .inner
 }

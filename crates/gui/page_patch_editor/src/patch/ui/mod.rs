@@ -10,6 +10,7 @@ pub(super) mod preview;
 mod problems;
 pub(super) mod references;
 mod search;
+mod start_screen;
 pub(super) mod template_picker;
 mod top_bar;
 pub(super) mod tree;

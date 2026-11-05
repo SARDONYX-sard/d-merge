@@ -354,14 +354,17 @@ impl PatchTool {
             .collapsible(false)
             .show(ctx, |ui| {
                 egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
-                    ui.label(i18n.t(I18nKey::NemesisClipActor));
-                    ui.add(TextEdit::singleline(&mut form.folder).desired_width(220.0));
+                    let hover = i18n.t(I18nKey::NemesisClipActorHover);
+                    ui.label(i18n.t(I18nKey::NemesisClipActor)).on_hover_text(hover);
+                    ui.add(TextEdit::singleline(&mut form.folder).desired_width(220.0)).on_hover_text(hover);
                     ui.end_row();
-                    ui.label(i18n.t(I18nKey::NemesisClipName));
-                    ui.add(TextEdit::singleline(&mut form.name).desired_width(220.0));
+                    let hover = i18n.t(I18nKey::NemesisClipNameHover);
+                    ui.label(i18n.t(I18nKey::NemesisClipName)).on_hover_text(hover);
+                    ui.add(TextEdit::singleline(&mut form.name).desired_width(220.0)).on_hover_text(hover);
                     ui.end_row();
-                    ui.label(i18n.t(I18nKey::NemesisClipCount));
-                    ui.add(egui::DragValue::new(&mut form.count).range(1..=999));
+                    let hover = i18n.t(I18nKey::NemesisClipCountHover);
+                    ui.label(i18n.t(I18nKey::NemesisClipCount)).on_hover_text(hover);
+                    ui.add(egui::DragValue::new(&mut form.count).range(1..=999)).on_hover_text(hover);
                     ui.end_row();
                 });
                 create =

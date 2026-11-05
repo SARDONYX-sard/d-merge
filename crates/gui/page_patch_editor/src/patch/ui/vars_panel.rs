@@ -52,7 +52,10 @@ impl PatchTool {
         if self.show_variables {
             ui.horizontal(|ui| {
                 let new = &mut self.new_names;
-                ui.add(TextEdit::singleline(&mut new.variable).desired_width(110.0));
+                let name = TextEdit::singleline(&mut new.variable)
+                    .hint_text(i18n.t(I18nKey::NemesisNewVariableHint))
+                    .desired_width(110.0);
+                ui.add(name).on_hover_text(i18n.t(I18nKey::NemesisNewVariableHover));
                 egui::ComboBox::from_id_salt("nemesis_var_type")
                     .width(70.0)
                     .selected_text(type_label(new.kind))
@@ -60,8 +63,11 @@ impl PatchTool {
                         for kind in VariableType::ALL {
                             ui.selectable_value(&mut new.kind, kind, type_label(kind));
                         }
-                    });
-                ui.add(TextEdit::singleline(&mut new.value).hint_text("0").desired_width(50.0));
+                    })
+                    .response
+                    .on_hover_text(i18n.t(I18nKey::NemesisNewVariableTypeHover));
+                ui.add(TextEdit::singleline(&mut new.value).hint_text("0").desired_width(50.0))
+                    .on_hover_text(i18n.t(I18nKey::NemesisNewVariableValueHover));
                 let enabled = value_set.is_some();
                 if ui.add_enabled(enabled, Button::new(i18n.t(I18nKey::NemesisAdd)).small()).clicked() {
                     action = Some(Action::AddVariable);
@@ -77,7 +83,10 @@ impl PatchTool {
             action = name_rows(ui, i18n, list, &filter, &mut self.new_names.renaming).or(action);
         } else {
             ui.horizontal(|ui| {
-                ui.add(TextEdit::singleline(&mut self.new_names.event).desired_width(140.0));
+                let name = TextEdit::singleline(&mut self.new_names.event)
+                    .hint_text(i18n.t(I18nKey::NemesisNewEventHint))
+                    .desired_width(140.0);
+                ui.add(name).on_hover_text(i18n.t(I18nKey::NemesisNewEventHover));
                 if ui.add(Button::new(i18n.t(I18nKey::NemesisAdd)).small()).clicked() {
                     action = Some(Action::AddEvent);
                 }

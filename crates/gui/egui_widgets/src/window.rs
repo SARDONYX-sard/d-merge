@@ -26,6 +26,74 @@ const GAP: f32 = 4.0;
 /// For how many frames after opening a window is placed: its size settles in the first few.
 const PLACING_FRAMES: u8 = 3;
 
+/// How much of the app's window a [`show_modal`] takes: width, height.
+const MODAL_SHARE: Vec2 = Vec2::new(0.8, 0.85);
+
+/// What dims the app behind a [`show_modal`].
+const MODAL_OVERLAY_ALPHA: u8 = 160;
+
+/// A window that takes most of the app's, in its center, with the rest dimmed: for what is read at
+/// length. It closes with its `x`, `Esc`, or a click beside it, which all set `open` to `false`.
+///
+/// Returns what `content` returned, unless it is closed.
+pub fn show_modal<R>(
+    ctx: &egui::Context,
+    title: impl Into<egui::WidgetText>,
+    open: &mut bool,
+    content: impl FnOnce(&mut egui::Ui) -> R,
+) -> Option<R> {
+    if !*open {
+        return None;
+    }
+    if modal_overlay(ctx).clicked() || ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
+        *open = false;
+        return None;
+    }
+    let size = ctx.content_rect().size() * MODAL_SHARE;
+    egui::Window::new(title)
+        .open(open)
+        .collapsible(false)
+        .fixed_size(size)
+        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+        .show(ctx, |ui| {
+            let inner = content(ui);
+            // A window takes the size of its contents, and is centered with that: however little
+            // they are, it stays large and in the center.
+            ui.allocate_space(ui.available_size());
+            inner
+        })
+        .and_then(|response| response.inner)
+}
+
+/// Draws the dimmed backdrop. The response tells whether it was clicked.
+fn modal_overlay(ctx: &egui::Context) -> egui::Response {
+    egui::Area::new(egui::Id::NULL.with("modal_overlay"))
+        .order(egui::Order::Background)
+        .fixed_pos(ctx.content_rect().min)
+        .show(ctx, |ui| {
+            let rect = ui.ctx().content_rect();
+            ui.painter().rect_filled(rect, 0.0, egui::Color32::from_black_alpha(MODAL_OVERLAY_ALPHA));
+            ui.allocate_response(rect.size(), egui::Sense::click())
+        })
+        .inner
+}
+
+/// A bar to drag up and down, between two parts of a window. Returns how far it was dragged.
+///
+/// `height`: what it takes of the layout.
+pub fn vertical_splitter(ui: &mut egui::Ui, height: f32) -> f32 {
+    let size = egui::vec2(ui.available_width(), height);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::drag());
+    let response = response.on_hover_cursor(egui::CursorIcon::ResizeVertical);
+    let stroke = if response.hovered() || response.dragged() {
+        ui.visuals().widgets.hovered.fg_stroke
+    } else {
+        ui.visuals().widgets.noninteractive.bg_stroke
+    };
+    ui.painter().hline(rect.x_range(), rect.center().y, stroke);
+    response.drag_delta().y
+}
+
 /// A window that goes next to the pointer each time it opens, and stays where it is moved to until it
 /// is closed. It stays a little away from the edges of the screen, where its border can be reached.
 ///
@@ -87,6 +155,63 @@ mod tests {
     use super::*;
 
     const SCREEN: Rect = Rect { min: pos2(0.0, 0.0), max: pos2(1000.0, 800.0) };
+
+    /// Draws a modal for a frame, with `events`. Returns what it shows, if it does.
+    fn modal_frame(ctx: &egui::Context, open: &mut bool, events: Vec<egui::Event>) -> Option<Rect> {
+        let input = egui::RawInput { screen_rect: Some(SCREEN), events, ..Default::default() };
+        let mut shown = None;
+        let mut output = ctx.run_ui(input, |ui| {
+            let ctx = ui.ctx().clone();
+            shown = show_modal(&ctx, "Modal", open, |ui| ui.max_rect());
+        });
+        output.textures_delta.clear(); // egui insists on them being taken
+        shown
+    }
+
+    #[test]
+    fn a_modal_is_large_and_in_the_center() {
+        let ctx = egui::Context::default();
+        let mut open = true;
+        for _ in 0..3 {
+            modal_frame(&ctx, &mut open, Vec::new());
+        }
+        let rect = modal_frame(&ctx, &mut open, Vec::new()).unwrap();
+        // The title bar and the frame are around what `content` is given.
+        assert!((rect.center() - SCREEN.center()).length() < 24.0, "{rect:?}");
+        assert!((rect.width() - 800.0).abs() < 24.0, "{rect:?}");
+        assert!((rect.height() - 680.0).abs() < 60.0, "{rect:?}");
+        assert!(open);
+    }
+
+    #[test]
+    fn a_modal_closes_with_a_click_beside_it_or_esc() {
+        let click = |pressed| egui::Event::PointerButton {
+            pos: pos2(5.0, 5.0),
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let ctx = egui::Context::default();
+        let mut open = true;
+        modal_frame(&ctx, &mut open, Vec::new());
+        modal_frame(&ctx, &mut open, vec![egui::Event::PointerMoved(pos2(5.0, 5.0))]);
+        modal_frame(&ctx, &mut open, vec![click(true)]);
+        modal_frame(&ctx, &mut open, vec![click(false)]);
+        modal_frame(&ctx, &mut open, Vec::new());
+        assert!(!open, "a click beside it");
+
+        let mut open = true;
+        let esc = egui::Event::Key {
+            key: egui::Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        modal_frame(&ctx, &mut open, vec![esc]);
+        assert!(!open, "Esc");
+        assert!(modal_frame(&ctx, &mut open, Vec::new()).is_none(), "closed: nothing is drawn");
+    }
     const SIZE: Vec2 = Vec2::new(300.0, 200.0);
 
     fn covers_the_click(at: Pos2, pointer: Pos2) -> bool {

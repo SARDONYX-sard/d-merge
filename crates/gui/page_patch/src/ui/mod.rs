@@ -6,6 +6,7 @@ mod dnd_table;
 mod label_ext;
 mod mod_list;
 mod options;
+mod pandora;
 
 use crate::{PatchPage, PatchPageCtx};
 
@@ -32,6 +33,7 @@ impl PatchPage {
         view.ui_bottom_panel(ui);
         view.ui_mod_list(ui); // the central panel must be the last one
         view.ui_conflict_window(ui.ctx());
+        view.ui_pandora_window(ui.ctx());
         view.page.first_frame = false;
     }
 }

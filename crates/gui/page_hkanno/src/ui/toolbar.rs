@@ -88,7 +88,7 @@ impl HkannoPage {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let show = &mut ctx.settings.show_preview;
-                let label = if *show { I18nKey::HkannoHidePreview } else { I18nKey::HkannoShowPreview };
+                let label = if *show { I18nKey::EditorHidePreview } else { I18nKey::EditorShowPreview };
                 if ui.add(Button::new(i18n.t(label))).clicked() {
                     *show = !*show;
                 }

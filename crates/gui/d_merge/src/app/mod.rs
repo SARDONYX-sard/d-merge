@@ -148,6 +148,9 @@ impl App {
     pub(crate) fn frame_begin(&mut self, ctx: &egui::Context) {
         // ── Background task polling ───────────────────────────────────────────
         self.paint_background(ctx);
+        if self.patch_editor.take_mod_written() {
+            self.patch.follow_written_mod();
+        }
         let patch_ctx = PatchPollCtx {
             settings: &mut self.settings.pages.patch,
             i18n: &self.i18n,

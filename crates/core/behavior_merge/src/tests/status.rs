@@ -66,6 +66,7 @@ pub(crate) fn fastest_config() -> Config {
         skyrim_data_dir_glob: Some("../../../dummy/fnis_test_mods/*".into()),
         generate_fnis_esp: true,
         skeleton_arm_fix: true,
+        hidden_patches: Default::default(),
     }
 }
 
@@ -83,5 +84,6 @@ pub(crate) fn slow_debug_config() -> Config {
         skyrim_data_dir_glob: Some("../../../dummy/fnis_test_mods/*".into()),
         generate_fnis_esp: true,
         skeleton_arm_fix: true,
+        hidden_patches: Default::default(),
     }
 }

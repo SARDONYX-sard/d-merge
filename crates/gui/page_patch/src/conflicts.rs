@@ -18,6 +18,9 @@
 //!
 //! `animationdatasinglefile` and `animationsetdatasinglefile` are lists of every mod's patches
 //! (see [`read_anim_data`]), where each field that is not `null` is a change.
+//!
+//! An operation can be hidden, see [`HiddenPatches`]. The check does not leave it out of the files,
+//! so hiding and showing it needs no new scan: the flags just stop counting it.
 
 use std::{
     collections::BTreeMap,
@@ -26,6 +29,7 @@ use std::{
     sync::Arc,
 };
 
+use behavior_merge::HiddenPatches;
 use fast_hash::HashMap;
 use gui_shared::{patch::USER_PATCH_MOD_DIR, settings::pages::patch::mod_item::ModItem};
 use parking_lot::Mutex;
@@ -44,6 +48,18 @@ pub(crate) struct ScannedMod {
     pub(crate) priority: usize,
     /// Its directory, where its patch files are. `None`: FNIS, whose patches are generated.
     pub(crate) dir: Option<String>,
+}
+
+impl ScannedMod {
+    /// What hidden operations name it by: its folder. e.g. `D:/mods/a/Nemesis_Engine/mod/para` -> `para`
+    pub(crate) fn code(&self) -> Option<&str> {
+        Path::new(self.dir.as_deref()?).file_name()?.to_str()
+    }
+
+    fn hides(&self, point: &Point, hidden: Option<&HiddenPatches>) -> bool {
+        let Some((hidden, code)) = hidden.zip(self.code()) else { return false };
+        hidden.contains(code, &point.target, &point.path)
+    }
 }
 
 /// What one mod puts somewhere.
@@ -124,12 +140,20 @@ impl Conflicts {
     /// The flags of the mods, by `ModItem::id`, for the load order now: `priority_of` gives a mod's
     /// priority, `None` if it is off now.
     ///
-    /// The highest priority wins a point. Those with its value are not overridden by it.
-    pub(crate) fn marks(&self, priority_of: impl Fn(&str) -> Option<usize>) -> HashMap<String, Mark> {
+    /// The highest priority wins a point. Those with its value are not overridden by it. What is in
+    /// `hidden` is as if the mod did not do it.
+    pub(crate) fn marks(
+        &self,
+        priority_of: impl Fn(&str) -> Option<usize>,
+        hidden: Option<&HiddenPatches>,
+    ) -> HashMap<String, Mark> {
         let mut marks: HashMap<String, Mark> = HashMap::default();
         for point in &self.points {
             let enabled = point.values.iter().filter_map(|value| {
                 let owner = &self.mods[value.owner as usize];
+                if owner.hides(point, hidden) {
+                    return None;
+                }
                 priority_of(&owner.id).map(|priority| (priority, owner, value.hash))
             });
             let Some((_, winner, hash)) = enabled.clone().max_by_key(|(priority, ..)| *priority) else { continue };
@@ -458,15 +482,53 @@ pub(crate) struct ConflictScan {
     /// The conflict shown in detail: `(target, path)`. The same path can be in two templates, e.g.
     /// the 1st and the 3rd person's `0_master`.
     selected: Option<(Box<str>, Box<str>)>,
+    /// How much of the window the list takes, once the bar below it was dragged.
+    pub(crate) list_share: Option<f32>,
+    /// All that is hidden, see [`crate::hidden`].
+    hidden: HiddenPatches,
+    /// `apply_user_patch` is on: what is hidden counts.
+    hidden_applies: bool,
+    /// Changes with [`Self::hidden`], for [`Self::refresh_marks`].
+    hidden_revision: u64,
+    /// Why what is hidden could not be saved.
+    pub(crate) hidden_error: Option<String>,
 }
 
 impl ConflictScan {
+    pub(crate) fn with_hidden(hidden: HiddenPatches) -> Self {
+        Self { hidden, hidden_applies: true, ..Self::default() }
+    }
+
+    /// What is hidden, if it counts.
+    fn applied_hidden(&self) -> Option<&HiddenPatches> {
+        self.hidden_applies.then_some(&self.hidden)
+    }
+
+    /// Is this mod's operation at `point` hidden?
+    pub(crate) fn is_hidden(&self, owner: &ScannedMod, point: &Point) -> bool {
+        owner.hides(point, Some(&self.hidden))
+    }
+
+    /// Hides the mod's operation at `point`, or shows it again. It counts at once for the flags, and
+    /// for what is generated at the next merge.
+    pub(crate) fn toggle_hidden(&mut self, mod_code: &str, point: &Point) {
+        self.hidden.toggle(mod_code, &point.target, &point.path);
+        self.hidden_revision += 1;
+        self.hidden_error = crate::hidden::save(&self.hidden).err();
+    }
+
     pub(crate) const fn is_scanning(&self) -> bool {
         self.waiting.is_some() || self.is_reading
     }
 
     pub(crate) const fn is_stale(&self) -> bool {
         self.stale
+    }
+
+    /// Can a check follow what changed by itself? There is a result to keep up to date, and the mods
+    /// that are on now are the ones it saw.
+    pub(crate) const fn can_follow(&self) -> bool {
+        self.current.is_some() && !self.stale
     }
 
     /// The merge is told to write the files: after it ends, [`Self::on_merge_ended`] reads them.
@@ -500,13 +562,15 @@ impl ConflictScan {
     /// a hash then: a list has a few hundred mods.
     ///
     /// `user_patch`: its priority, if it is merged: it is not in `list`.
-    pub(crate) fn refresh_marks(&mut self, list: &[ModItem], user_patch: Option<usize>) {
+    /// `hidden_applies`: `apply_user_patch` is on.
+    pub(crate) fn refresh_marks(&mut self, list: &[ModItem], user_patch: Option<usize>, hidden_applies: bool) {
+        self.hidden_applies = hidden_applies;
         let Some(found) = &self.current else { return };
         let mut hasher = DefaultHasher::new();
         for item in list.iter().filter(|item| item.enabled) {
             (&item.id, item.priority).hash(&mut hasher);
         }
-        user_patch.hash(&mut hasher);
+        (user_patch, hidden_applies, self.hidden_revision).hash(&mut hasher);
         let hash = hasher.finish() | 1; // never the 0 of "computed again"
         if hash == self.marks_for {
             return;
@@ -517,7 +581,8 @@ impl ConflictScan {
         if let Some(priority) = user_patch {
             self.priorities.insert(USER_PATCH_MOD_DIR.to_owned(), priority);
         }
-        self.marks = found.marks(|id| self.priorities.get(id).copied());
+        let hidden = self.hidden_applies.then_some(&self.hidden);
+        self.marks = found.marks(|id| self.priorities.get(id).copied(), hidden);
         self.stale = self.priorities.keys().any(|id| !found.mods.iter().any(|scanned| scanned.id == *id));
     }
 
@@ -533,12 +598,25 @@ impl ConflictScan {
         self.marks.get(mod_id).copied().unwrap_or_default()
     }
 
-    /// The mod that is on now and comes last among those at `point`.
+    /// Do the mods that are on now still disagree at `point`, with what is hidden gone?
+    pub(crate) fn is_contested(&self, found: &Conflicts, point: &Point) -> bool {
+        let hidden = self.applied_hidden();
+        let mut left = point.values.iter().filter(|value| {
+            let owner = &found.mods[value.owner as usize];
+            self.priorities.contains_key(&owner.id) && !owner.hides(point, hidden)
+        });
+        let first = left.next().map(|value| value.hash);
+        left.any(|value| Some(value.hash) != first)
+    }
+
+    /// The mod that is on now and comes last among those at `point`, with what is hidden gone.
     pub(crate) fn winner_of<'a>(&self, found: &'a Conflicts, point: &Point) -> Option<&'a ScannedMod> {
+        let hidden = self.applied_hidden();
         point
             .values
             .iter()
             .map(|value| &found.mods[value.owner as usize])
+            .filter(|owner| !owner.hides(point, hidden))
             .filter_map(|owner| self.priorities.get(&owner.id).map(|priority| (*priority, owner)))
             .max_by_key(|(priority, _)| *priority)
             .map(|(_, owner)| owner)
@@ -560,6 +638,57 @@ mod tests {
                 dir: Some(format!("D:/mods/{id}")),
             })
             .collect()
+    }
+
+    /// Hiding the winner's operation: the conflict is gone from the flags, and the mod that lost keeps
+    /// the place, with no new scan. Only that mod's only there.
+    #[test]
+    fn a_hidden_operation_is_no_conflict() {
+        let found = read(&behavior("false", "true"), "meshes/m.bin");
+        let priority = |id: &str| match id {
+            "low" => Some(1),
+            "high" => Some(2),
+            _ => None,
+        };
+        let mut hidden = HiddenPatches::default();
+
+        let before = found.marks(priority, Some(&hidden));
+        assert_eq!(before["high"], Mark { wins: 1, loses: 0 });
+        assert_eq!(before["low"], Mark { wins: 0, loses: 1 });
+
+        hidden.toggle("high", "meshes/m.bin", "#1/C/a");
+        assert!(found.marks(priority, Some(&hidden)).is_empty());
+        assert!(found.marks(priority, None).contains_key("high"), "`apply_user_patch` is off");
+
+        hidden.toggle("high", "meshes/m.bin", "#1/C/a");
+        assert_eq!(found.marks(priority, Some(&hidden))["high"], Mark { wins: 1, loses: 0 });
+    }
+
+    #[test]
+    fn the_winner_and_the_flags_follow_what_is_hidden() {
+        let found = Arc::new(read(&behavior("false", "true"), "meshes/m.bin"));
+        let item = |id: &str, priority| ModItem { id: id.into(), enabled: true, priority, ..Default::default() };
+        let list = [item("low", 1), item("high", 2)];
+        let mut scan = ConflictScan::with_hidden(HiddenPatches::default());
+        scan.current = Some(Arc::clone(&found));
+        scan.refresh_marks(&list, None, true);
+        let point = &found.points[0];
+        assert_eq!(scan.winner_of(&found, point).map(|winner| winner.id.as_str()), Some("high"));
+        assert!(scan.is_contested(&found, point));
+
+        // Not `toggle_hidden`: a test must not write the app's file.
+        scan.hidden.toggle("high", &point.target, &point.path);
+        scan.hidden_revision += 1;
+        scan.refresh_marks(&list, None, true);
+        assert_eq!(scan.winner_of(&found, point).map(|winner| winner.id.as_str()), Some("low"));
+        assert!(!scan.is_contested(&found, point));
+        assert_eq!(scan.mark_of("high"), Mark::default());
+        assert_eq!(scan.mark_of("low"), Mark::default());
+
+        // The switch is off: it counts as if nothing were hidden.
+        scan.refresh_marks(&list, None, false);
+        assert_eq!(scan.winner_of(&found, point).map(|winner| winner.id.as_str()), Some("high"));
+        assert_eq!(scan.mark_of("high"), Mark { wins: 1, loses: 0 });
     }
 
     fn read(json: &str, target: &str) -> Conflicts {
@@ -608,17 +737,17 @@ mod tests {
                 _ => None,
             }
         };
-        let marks = found.marks(order(1, 2));
+        let marks = found.marks(order(1, 2), None);
         assert_eq!(marks["high"].glyph(), "+");
         assert_eq!(marks["low"].glyph(), "-");
 
         // Moved in the list: no new scan needed.
-        let marks = found.marks(order(2, 1));
+        let marks = found.marks(order(2, 1), None);
         assert_eq!(marks["low"].glyph(), "+");
         assert_eq!(marks["high"].glyph(), "-");
 
         // Turned off: nothing to disagree with.
-        assert!(found.marks(|id| (id == "low").then_some(1)).is_empty());
+        assert!(found.marks(|id| (id == "low").then_some(1), None).is_empty());
     }
 
     #[test]
@@ -751,6 +880,7 @@ mod tests {
             skyrim_data_dir_glob: None,
             generate_fnis_esp: false,
             skeleton_arm_fix: false,
+            hidden_patches: Default::default(),
         };
         let dir = debug_patches_dir(&output);
         let _no_old_files = std::fs::remove_dir_all(&dir);
@@ -765,7 +895,7 @@ mod tests {
         let start = Instant::now();
         let priorities: HashMap<&str, usize> =
             found.mods.iter().map(|item| (item.id.as_str(), item.priority)).collect();
-        let marks = found.marks(|id| priorities.get(id).copied());
+        let marks = found.marks(|id| priorities.get(id).copied(), None);
         println!("{} mods have flags, computed in {:?}", marks.len(), start.elapsed());
         for point in found.points.iter().step_by((found.points.len() / 12).max(1)).take(14) {
             println!("{} {}", point.target, point.path);

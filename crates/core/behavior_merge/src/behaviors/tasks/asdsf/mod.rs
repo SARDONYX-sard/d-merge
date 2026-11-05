@@ -54,6 +54,9 @@ pub(crate) fn apply_asdsf_patches(
             Ok(v) => Either::Left(v),
             Err(e) => Either::Right(e),
         });
+    if !config.hidden_patches.is_empty() {
+        borrowed_patches.retain(|patch| !is_hidden(patch, config));
+    }
     borrowed_patches.par_extend(fnis_asdsf_patches);
 
     // 2/5 Sort by priority ids.(to vec 2 loop) => borrowed_map
@@ -148,6 +151,19 @@ pub(crate) fn apply_asdsf_patches(
     bail!(write_alt_asdsf_file(output_path, alt_adsf, txt_project_header_patches, sub_txt_header_patch_map,));
 
     errors
+}
+
+/// Is the file of this patch hidden? See `HiddenPatches`. The headers only add.
+fn is_hidden(patch: &AsdsfPatch<'_>, config: &Config) -> bool {
+    let name = match &patch.patch {
+        PatchKind::AddAnimSet { file_name, .. } => file_name.as_ref(),
+        PatchKind::EditAnimSet(edit) => edit.file_name,
+        _ => return false,
+    };
+    // An id is a mod code, or the path up to it.
+    let code = patch.id.rsplit(['/', '\\']).next().unwrap_or(patch.id);
+    let rules = config.hidden_patches.rules_of(code, ASDSF_INNER_PATH);
+    rules.is_some_and(|rules| rules.hides_file(patch.target, name))
 }
 
 fn parse_anim_data_patch<'a>(

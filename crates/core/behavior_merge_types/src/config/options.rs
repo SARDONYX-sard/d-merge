@@ -1,6 +1,6 @@
 use std::{fmt, path::PathBuf};
 
-use crate::config::{Status, StatusReporterFn};
+use crate::config::{HiddenPatches, Status, StatusReporterFn};
 
 /// A configuration structure used to specify various directories and a status report callback.
 ///
@@ -79,6 +79,11 @@ pub struct Config {
     /// # Notes
     /// - Equivalent to FNIS's `SKELETON arm fix` for XPMSSE (v5.06).
     pub skeleton_arm_fix: bool,
+
+    /// Operations of the Nemesis mods to leave out, see [`HiddenPatches`].
+    ///
+    /// A conflict check leaves this empty: it has to see them, to tell what is hidden.
+    pub hidden_patches: HiddenPatches,
 }
 
 impl Config {

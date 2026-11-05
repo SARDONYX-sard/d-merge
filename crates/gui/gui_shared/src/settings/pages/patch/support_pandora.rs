@@ -12,7 +12,7 @@ use mod_info::ModType;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::settings::Settings;
+use super::PatchSettings;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -51,7 +51,7 @@ pub struct PandoraSettings {
 /// Pandora application settings.
 ///
 /// The theme has no corresponding d-merge setting and is therefore not
-/// imported into [`Settings`].
+/// imported into [`PatchSettings`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PandoraAppSettings {
     pub theme: i32,
@@ -97,7 +97,7 @@ impl Pandora {
     /// Returns an error if Pandora files cannot be read or parsed, if the
     /// selected Pandora version is unsupported, or if duplicate Pandora mod
     /// codes are found.
-    pub fn import_to<P>(root: P, settings: &mut Settings, version: PandoraVersion) -> Result<(), String>
+    pub fn import_to<P>(root: P, settings: &mut PatchSettings, version: PandoraVersion) -> Result<(), String>
     where
         P: AsRef<Path>,
     {
@@ -111,7 +111,7 @@ impl Pandora {
     ///
     /// Returns an error if the Pandora configuration cannot be generated or
     /// written, or if the selected Pandora version is unsupported.
-    pub fn export_from<P>(root: P, settings: &Settings, version: PandoraVersion) -> Result<(), String>
+    pub fn export_from<P>(root: P, settings: &PatchSettings, version: PandoraVersion) -> Result<(), String>
     where
         P: AsRef<Path>,
     {
@@ -176,14 +176,14 @@ impl Pandora {
         Ok(())
     }
 
-    fn from_settings(settings: &Settings, version: PandoraVersion) -> Result<Self, String> {
+    fn from_settings(settings: &PatchSettings, version: PandoraVersion) -> Result<Self, String> {
         match version {
             PandoraVersion::V4_4_0Beta => Self::from_settings_v4_4_0_beta(settings),
         }
     }
 
-    fn from_settings_v4_4_0_beta(settings: &Settings) -> Result<Self, String> {
-        let vfs = &settings.pages.patch.vfs;
+    fn from_settings_v4_4_0_beta(settings: &PatchSettings) -> Result<Self, String> {
+        let vfs = &settings.vfs;
 
         let pandora_settings = PandoraSettings {
             app: PandoraAppSettings { theme: 0 }, // System: 0
@@ -211,9 +211,9 @@ impl Pandora {
         Ok(Self { settings: pandora_settings, active_mods })
     }
 
-    fn apply_to(&self, settings: &mut Settings) -> Result<(), String> {
-        settings.pages.patch.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
-        settings.pages.patch.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
+    fn apply_to(&self, settings: &mut PatchSettings) -> Result<(), String> {
+        settings.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
+        settings.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
 
         let mut seen = HashSet::with_capacity_and_hasher(self.active_mods.len(), RandomState::default());
 
@@ -232,7 +232,7 @@ impl Pandora {
         let mut nemesis = Vec::new();
         let mut other = Vec::new();
 
-        for mut item in settings.pages.patch.vfs.mod_list.drain(..) {
+        for mut item in settings.vfs.mod_list.drain(..) {
             if item.mod_type == ModType::Nemesis {
                 if let Some(&(order, active)) = pandora_order.get(item.id.as_str()) {
                     item.enabled = active;
@@ -255,10 +255,10 @@ impl Pandora {
             a_order.cmp(&b_order).then_with(|| a.id.cmp(&b.id))
         });
 
-        settings.pages.patch.vfs.mod_list = nemesis;
-        settings.pages.patch.vfs.mod_list.extend(other);
+        settings.vfs.mod_list = nemesis;
+        settings.vfs.mod_list.extend(other);
 
-        settings.pages.patch.vfs.mod_list.iter_mut().enumerate().for_each(|(priority, item)| {
+        settings.vfs.mod_list.iter_mut().enumerate().for_each(|(priority, item)| {
             item.priority = priority;
         });
 

@@ -25,6 +25,7 @@ mod inline_diff;
 mod language;
 mod names;
 mod navigate;
+mod new_work;
 mod preview;
 mod resolve;
 mod search;
@@ -55,14 +56,14 @@ use gui_shared::{
 };
 use nemesis_diff::is_valid_mod_code;
 
-use self::workspace::{Behavior, Session, SessionTab, TemplateEntry, Workspace};
+use self::workspace::{Behavior, CACHE_ROOT, Session, SessionTab, TemplateEntry, Workspace};
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
 
-/// `work` goes first in the list, once.
+/// `work` goes first in the list, once. A code is one work, wherever it is exported to.
 fn remember_recent(recent: &mut Vec<RecentWork>, work: RecentWork) {
-    recent.retain(|other| *other != work);
+    recent.retain(|other| other.mod_code != work.mod_code);
     recent.insert(0, work);
     recent.truncate(MAX_RECENT);
 }
@@ -77,8 +78,12 @@ const SAVE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
     output: String,
-    /// The mod read into the work: its root, or a `Nemesis_Engine/mod/<code>` directory.
+    /// The root of the mod the work was read from. Empty: it was made here.
     mod_dir: String,
+    /// See [`Self::take_mod_written`].
+    mod_written: bool,
+    /// See [`new_work`]. `Some`: its form is shown on the start screen.
+    new_work: Option<new_work::NewWork>,
     mod_code: String,
     /// `settings.behavior.template_dir` (`.bin` or `.xml` templates under `meshes/`).
     template_dir: String,
@@ -97,7 +102,7 @@ pub(crate) struct PatchTool {
     restored: bool,
     workspace: Workspace,
     /// `(output, code)` the workspace belongs to (`None` = not on disk yet).
-    loaded_for: Option<(String, String)>,
+    loaded_for: Option<String>,
     /// Unsaved edits since this time.
     dirty_since: Option<Instant>,
 
@@ -130,6 +135,8 @@ pub(crate) struct PatchTool {
     inline_diff: InlineDiff,
     /// Show `inline_diff`. From the settings.
     show_inline_diff: bool,
+    /// Show preview diff. From the settings.
+    show_preview: bool,
     /// The preview scrolls to and highlights the editor's cursor line. From the settings.
     follow_preview: bool,
     /// One label per changed block of the selected object (its `↶` revert buttons).
@@ -262,13 +269,21 @@ impl PatchTool {
     }
 
     /// Before the work is synced: the user patch is a work of its own.
-    fn switch_to_user_patch(&mut self) {
+    fn switch_to_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         if !std::mem::take(&mut self.pending_user_patch) {
             return;
         }
-        gui_shared::patch::USER_PATCH_CODE.clone_into(&mut self.mod_code);
-        gui_shared::patch::USER_PATCH_OUTPUT.clone_into(&mut self.output);
-        self.mod_dir.clear();
+        let (code, output) = (gui_shared::patch::USER_PATCH_CODE, gui_shared::patch::USER_PATCH_OUTPUT);
+        self.switch_work(code, output, "", notify, i18n);
+    }
+
+    /// Goes to the work of `code`: [`Self::sync_workspace`] loads it, and what it saved of the output
+    /// and the source wins over these. The current work is saved first, while these are still its own.
+    fn switch_work(&mut self, code: &str, output: &str, source: &str, notify: &mut Notification, i18n: &I18nMap) {
+        self.save_now(notify, i18n);
+        code.clone_into(&mut self.mod_code);
+        output.clone_into(&mut self.output);
+        source.clone_into(&mut self.mod_dir);
     }
 
     /// After the work is synced: takes the value in, and shows where it went.
@@ -286,17 +301,28 @@ impl PatchTool {
         // What the value points to is that mod's.
         self.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);
         let root = PathBuf::from(&self.template_dir);
-        match resolve::apply(&mut self.workspace, &root, &request) {
-            Ok((active, id)) => {
-                self.workspace.reload_refs(); // a behavior may have been opened
-                self.reset_names();
-                self.active = active;
-                self.editor_for = None;
-                self.object_changed(&id);
-                self.selected = Some(id);
-            }
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed))),
-        }
+        let shown = resolve::apply(&mut self.workspace, &root, &request).map_or_else(
+            |err| {
+                notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed)));
+                // It is for the user to edit: all the more if it could not be taken in.
+                resolve::object_of(&mut self.workspace, &root, &request)
+            },
+            Some,
+        );
+        let Some(resolve::Resolved { behavior, id, line }) = shown else { return };
+        self.workspace.reload_refs(); // a behavior may have been opened
+        self.reset_names();
+        self.active = behavior;
+        self.editor_for = None;
+        self.object_changed(&id);
+        self.selected = Some(id);
+        // Picking another value of the object shown has no other sign of having gone anywhere.
+        self.focus_editor = line.map(FocusAt::Line);
+    }
+
+    /// A mod was written since the last call: what the conflict check found may be old.
+    pub(crate) const fn take_mod_written(&mut self) -> bool {
+        std::mem::replace(&mut self.mod_written, false)
     }
 
     /// Follows the patch page's setting. A change takes effect on the shown object at once.
@@ -329,17 +355,22 @@ impl PatchTool {
             self.mod_dir.clone_from(&settings.mod_dir);
             self.mod_code.clone_from(&settings.mod_code);
             self.recent.clone_from(&settings.recent);
+            // A work that is gone: the start screen rather than an empty work.
+            if !Workspace::exists(Path::new(CACHE_ROOT), self.mod_code.trim()) {
+                self.close_work(notify, i18n);
+            }
             // What is set once stays out of the way, unless it still has to be set.
-            self.project_open = settings.output.trim().is_empty() || !is_valid_mod_code(settings.mod_code.trim());
+            self.project_open = false;
             self.behaviors_open = true;
             self.trees =
                 settings.tree_open.iter().map(|(path, open)| (path.clone(), tree::TreeState::restored(open))).collect();
         }
         self.show_inline_diff = settings.inline_diff;
         self.follow_preview = settings.follow_preview;
+        self.show_preview = settings.show_preview;
         self.changed_only = settings.changed_only;
         self.tree_view = settings.tree_view;
-        self.switch_to_user_patch();
+        self.switch_to_user_patch(notify, i18n);
         self.sync_workspace(notify, i18n);
         self.take_in_resolution(notify, i18n);
         self.draw(ui, i18n, notify);
@@ -356,6 +387,7 @@ impl PatchTool {
             settings.recent.clone_from(&self.recent);
         }
         settings.inline_diff = self.show_inline_diff;
+        settings.show_preview = self.show_preview;
         settings.follow_preview = self.follow_preview;
         settings.changed_only = self.changed_only;
         settings.tree_view = self.tree_view;
@@ -371,6 +403,10 @@ impl PatchTool {
     }
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        if self.loaded_for.is_none() {
+            self.start_screen(ui, i18n, notify);
+            return;
+        }
         self.project_bar(ui, i18n, notify);
         ui.separator();
         self.template_picker_window(ui.ctx(), i18n, notify);
@@ -395,33 +431,30 @@ impl PatchTool {
 
     // ── Workspace on disk ────────────────────────────────────────────────────
 
-    /// Loads the cache of `(output, code)` when they change, and saves pending edits.
+    /// Loads the work of the code when it changes, and saves pending edits.
     fn sync_workspace(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let key = (self.output.trim().to_string(), self.mod_code.trim().to_string());
-        let usable = !key.0.is_empty() && is_valid_mod_code(&key.1);
-
-        if usable && self.loaded_for.as_ref() != Some(&key) {
+        let code = self.mod_code.trim();
+        if is_valid_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
+            let code = code.to_owned();
             self.save_now(notify, i18n); // the previous workspace
-            if self.loaded_for.is_none() && !self.workspace.behaviors.is_empty() {
-                // Work done before the output was set: keep it and write it there.
-                self.dirty_since = Some(Instant::now());
-            } else {
-                match Workspace::load(Path::new(&key.0), &key.1) {
-                    Ok(workspace) => {
-                        self.workspace = workspace;
-                        self.reset_names();
-                        self.tabs.clear();
-                    }
-                    Err(err) => {
-                        notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed)));
-                    }
+            match Workspace::load(Path::new(CACHE_ROOT), &code) {
+                Ok(workspace) => {
+                    self.workspace = workspace;
+                    self.reset_names();
+                    self.tabs.clear();
                 }
-                self.editor_for = None;
-                self.selected = None;
-                self.restore_session();
+                Err(err) => {
+                    notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed)));
+                }
             }
-            remember_recent(&mut self.recent, RecentWork { output: key.0.clone(), mod_code: key.1.clone() });
-            self.loaded_for = Some(key);
+            self.editor_for = None;
+            self.selected = None;
+            self.restore_session();
+            remember_recent(
+                &mut self.recent,
+                RecentWork { output: self.output.trim().to_owned(), mod_code: code.clone() },
+            );
+            self.loaded_for = Some(code);
         }
 
         // What is open is part of the work: back to it when it is opened again.
@@ -438,14 +471,16 @@ impl PatchTool {
     }
 
     fn save_now(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let Some((output, code)) = &self.loaded_for else { return };
+        let Some(code) = self.loaded_for.clone() else { return };
         if self.dirty_since.take().is_none() {
             return;
         }
         self.workspace.session = self.current_session();
-        if let Err(err) = self.workspace.save(Path::new(output), code) {
+        if let Err(err) = self.workspace.save(Path::new(CACHE_ROOT), &code) {
             notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
         }
+        // The output may have changed.
+        remember_recent(&mut self.recent, RecentWork { output: self.output.trim().to_owned(), mod_code: code });
     }
 
     /// What is open now, to write with the work.
@@ -454,6 +489,7 @@ impl PatchTool {
         let name_of = |at: usize| behaviors.get(at).map_or_else(String::new, |behavior| behavior.name.clone());
         Session {
             mod_dir: self.mod_dir.clone(),
+            output: self.output.clone(),
             active: name_of(self.active),
             selected: self.selected.clone(),
             tabs: self
@@ -481,14 +517,129 @@ impl PatchTool {
         if !session.mod_dir.is_empty() {
             self.mod_dir = session.mod_dir;
         }
+        if !session.output.is_empty() {
+            self.output = session.output;
+        }
         self.session_seen = (self.active, self.selected.clone());
     }
 
-    /// Opens a work of the list of recent ones: [`Self::sync_workspace`] does the rest.
-    fn open_recent(&mut self, work: &RecentWork) {
-        work.output.clone_into(&mut self.output);
-        work.mod_code.clone_into(&mut self.mod_code);
+    /// Opens a work of the list of recent ones. If its cache is gone, the mod it was exported to is
+    /// read instead; if that is gone too, it leaves the list.
+    fn open_recent(&mut self, work: &RecentWork, notify: &mut Notification, i18n: &I18nMap) {
+        if Workspace::exists(Path::new(CACHE_ROOT), &work.mod_code) {
+            self.switch_work(&work.mod_code, &work.output, "", notify, i18n);
+        } else if let Some(dir) = workspace::patch_dir_of_code(Path::new(&work.output), &work.mod_code) {
+            self.open_mod(&dir, notify, i18n);
+        } else {
+            notify.warn(format!("{}: {} ({})", i18n.t(I18nKey::NemesisRecentMissing), work.mod_code, work.output));
+            self.recent.retain(|other| other.mod_code != work.mod_code);
+        }
+    }
+
+    /// Back to the start screen. The work stays in its cache.
+    fn close_work(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        self.save_now(notify, i18n);
+        self.workspace = Workspace::default();
+        self.reset_names();
+        self.tabs.clear();
+        self.loaded_for = None;
+        self.mod_code.clear();
+        self.output.clear();
         self.mod_dir.clear();
+        self.active = 0;
+        self.selected = None;
+        self.editor_for = None;
+        self.project_open = false;
+    }
+
+    /// `New` of the start screen: the work's first save makes it exist.
+    fn create_work(&mut self, code: String, output: String) {
+        self.new_work = None;
+        self.mod_code = code;
+        self.output = output;
+        self.mod_dir.clear();
+        self.project_open = true; // Its name and author are still to be set.
+        self.dirty_since.get_or_insert_with(Instant::now);
+    }
+
+    /// The folder dialog for [`Self::open_mod`].
+    fn pick_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        if let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder() {
+            self.open_mod(&dir, notify, i18n);
+        }
+    }
+
+    /// Opens a mod (its root or a patch directory), like VS Code a folder: the work on it goes on if
+    /// there is one, with its unexported edits. Else it is read, and exported back to where it is.
+    fn open_mod(&mut self, selected: &Path, notify: &mut Notification, i18n: &I18nMap) {
+        let not_a_mod = |notify: &mut Notification| {
+            notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), selected.display()));
+        };
+        let Some(root) = workspace::mod_root_of(selected) else { return not_a_mod(notify) };
+        let code = workspace::code_of(selected);
+        if !is_valid_mod_code(&code) {
+            return not_a_mod(notify);
+        }
+        let source = root.display().to_string();
+        let is_source = |path: &str| path.eq_ignore_ascii_case(&source);
+        match Workspace::cached_session(Path::new(CACHE_ROOT), &code) {
+            Some(session) if is_source(&session.mod_dir) || is_source(&session.output) => {
+                self.switch_work(&code, &source, &source, notify, i18n);
+                return;
+            }
+            Some(_) => notify.warn(format!("{}: {code}", i18n.t(I18nKey::NemesisWorkReplaced))),
+            None => {}
+        }
+        self.read_mod(selected, source, notify, i18n);
+    }
+
+    /// Replaces the work by what is in the mod at `selected`. Returns whether it could be read.
+    fn read_mod(&mut self, selected: &Path, source: String, notify: &mut Notification, i18n: &I18nMap) -> bool {
+        match Workspace::import(selected, Path::new(&self.template_dir)) {
+            Ok((workspace, code, skipped)) => {
+                self.save_now(notify, i18n);
+                self.workspace = workspace;
+                self.reset_names();
+                self.tabs.clear();
+                self.mod_code.clone_from(&code);
+                self.output.clone_from(&source);
+                self.mod_dir = source;
+                self.new_work = None;
+                // What was read is the work, rather than what may be in the cache.
+                remember_recent(&mut self.recent, RecentWork { output: self.output.clone(), mod_code: code.clone() });
+                self.loaded_for = Some(code);
+                self.mark_dirty();
+                self.active = 0;
+                self.selected = None;
+                self.editor_for = None;
+                if !skipped.is_empty() {
+                    notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
+                }
+                true
+            }
+            Err(err) => {
+                notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed)));
+                false
+            }
+        }
+    }
+
+    /// `Reload from the mod`: discards the work's edits. Where it is exported to and the mods it
+    /// refers to are not in the mod, so they stay.
+    fn reload_from_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(code) = self.loaded_for.clone() else { return };
+        let source = self.mod_dir.trim().to_owned();
+        let Some(dir) = workspace::patch_dir_of_code(Path::new(&source), &code) else {
+            notify.error(format!("{}: {source}", i18n.t(I18nKey::NemesisNotAMod)));
+            return;
+        };
+        let (output, refs) = (self.output.clone(), self.workspace.ref_mods.clone());
+        if self.read_mod(&dir, source, notify, i18n) {
+            self.output = output;
+            self.workspace.ref_mods = refs;
+            self.workspace.reload_refs();
+            self.reset_names();
+        }
     }
 
     /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object (skips deleted ones).
@@ -748,37 +899,17 @@ impl PatchTool {
         }
     }
 
-    fn import(&mut self, dir: &Path, notify: &mut Notification, i18n: &I18nMap) {
-        match Workspace::import(dir, Path::new(&self.template_dir)) {
-            Ok((workspace, code, skipped)) => {
-                self.save_now(notify, i18n);
-                self.workspace = workspace;
-                self.reset_names();
-                self.tabs.clear();
-                self.mod_code = code;
-                // Write it to `(output, code)` instead of loading what may be there.
-                self.loaded_for = (!self.output.trim().is_empty() && is_valid_mod_code(&self.mod_code))
-                    .then(|| (self.output.trim().to_string(), self.mod_code.clone()));
-                self.mark_dirty();
-                self.active = 0;
-                self.selected = None;
-                self.editor_for = None;
-                if !skipped.is_empty() {
-                    notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
-                }
-            }
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed))),
-        }
-    }
-
     fn export(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         self.save_now(notify, i18n);
-        let Some((output, code)) = &self.loaded_for else { return };
-        match self.workspace.export(Path::new(output), code, self.parser_mode) {
+        let Some(code) = self.loaded_for.clone() else { return };
+        let output = self.output.trim().to_owned();
+        let exported = self.workspace.export(Path::new(&output), &code, self.parser_mode);
+        self.mod_written |= exported.is_ok();
+        match exported {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
                 "{} ({written}): {}",
                 i18n.t(I18nKey::NemesisExported),
-                Path::new(output).join("Nemesis_Engine").join("mod").join(code).display()
+                Path::new(&output).join("Nemesis_Engine").join("mod").join(&code).display()
             )),
             Ok((_, invalid)) => notify.warn(format!(
                 "{} ({}):\n{}",
@@ -788,6 +919,9 @@ impl PatchTool {
             )),
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
+        // What it wrote is what the next export replaces.
+        self.dirty_since.get_or_insert_with(Instant::now);
+        self.save_now(notify, i18n);
     }
 
     /// The keyboard goes to the object tree (Vim `Space e`, or the palette).

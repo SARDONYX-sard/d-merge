@@ -154,13 +154,18 @@ fn line_key(line: &str) -> &str {
     line
 }
 
-/// `text` (a whole object) with `block` applied, found by the lines it replaces, as near as possible
-/// to where they were: other changes may have moved them.
+/// `text` (a whole object) with `block` applied, and the 0-based line it went to. It is found by the
+/// lines it replaces, as near as possible to where they were: other changes may have moved them.
+///
+/// Both are compared [`crate::normalize`]d: a template may have the pointers of an array on one line,
+/// where a mod has one per line. e.g. `#0338 #0340` holds what `#0338` replaces.
 ///
 /// `None`: those lines are not there. e.g., a mod made for another version of the template.
-pub fn apply_block(text: &str, block: &Replaced) -> Option<String> {
+pub fn apply_block(text: &str, block: &Replaced) -> Option<(String, usize)> {
+    let text = crate::normalize(text);
+    let original = crate::normalize(&block.original);
     let lines: Vec<&str> = text.split('\n').collect();
-    let original: Vec<&str> = block.original.lines().collect();
+    let original: Vec<&str> = original.lines().collect();
     let fits = |at: usize| {
         lines
             .get(at..at + original.len())
@@ -175,7 +180,18 @@ pub fn apply_block(text: &str, block: &Replaced) -> Option<String> {
     }
     out.push_str(&block.text);
     out.push_str(&lines[at + original.len()..].join("\n"));
-    Some(out)
+    Some((out, at))
+}
+
+/// [`apply_block`] on an object that may already be changed there: the value picked before is what
+/// the block's lines became, so it gives way to this one. The object's other changes stay.
+///
+/// e.g. `#0338` was replaced by `#flinch$2`, and now `#zcbe$107` is picked for that place.
+pub fn apply_block_over(template: &str, text: &str, block: &Replaced) -> Option<(String, usize)> {
+    apply_block(text, block).or_else(|| {
+        (0..crate::hunks(template, text).len())
+            .find_map(|index| apply_block(&crate::revert_hunk(template, text, index), block))
+    })
 }
 
 #[cfg(test)]
@@ -238,10 +254,66 @@ mod tests {
         };
         // The flags are written in another order, and other lines moved it.
         let text = "a\nb\nc\n\t<hkparam name=\"f\">B|A</hkparam>\nd\n";
-        assert_eq!(apply_block(text, &block).as_deref(), Some("a\nb\nc\n\t<hkparam name=\"f\">C</hkparam>\nd\n"));
+        let (applied, line) = apply_block(text, &block).unwrap();
+        assert_eq!(applied, "a\nb\nc\n\t<hkparam name=\"f\">C</hkparam>\nd\n");
+        assert_eq!(line, 3);
         assert_eq!(apply_block("gone\n", &block), None);
 
         let first = Replaced { lines: 0..1, original: "t0\n".into(), text: "n\n".into() };
-        assert_eq!(apply_block("t0\nt1", &first).as_deref(), Some("n\nt1"));
+        assert_eq!(apply_block("t0\nt1\n", &first), Some(("n\nt1\n".to_owned(), 0)));
+    }
+
+    /// As in `0_master`'s `#2489`: the template has `#0338 #0340` on one line, the mods one per line.
+    #[test]
+    fn takes_in_values_for_pointers_on_one_line_one_after_the_other() {
+        const PATH: &str = "#0106/hkbModifierList/modifiers/[0:1]";
+        let template =
+            object("\t\t\t<hkparam name=\"modifiers\" numelements=\"2\">\n\t\t\t\t#0338 #0340\n\t\t\t</hkparam>\n");
+        let patch = |value: &str| {
+            object(&format!(
+                "\t\t\t<hkparam name=\"modifiers\" numelements=\"2\">\n{OPEN}\t\t\t\t{value}\n{ORIGINAL}\t\t\t\t#0338\n{CLOSE}\t\t\t\t#0340\n\t\t\t</hkparam>\n"
+            ))
+        };
+        let wanted = |value: &str| {
+            object(&format!(
+                "\t\t\t<hkparam name=\"modifiers\" numelements=\"2\">\n\t\t\t\t{value}\n\t\t\t\t#0340\n\t\t\t</hkparam>\n"
+            ))
+        };
+        let first = block_of_change(&patch("#flinch$2"), PATH).unwrap();
+        let (taken, line) = apply_block_over(&template, &template, &first).unwrap();
+        assert_eq!(taken, wanted("#flinch$2"));
+        assert_eq!(line, 2);
+
+        // Another mod's value for the same place, then the first one again.
+        let second = block_of_change(&patch("#zcbe$107"), PATH).unwrap();
+        let (taken, _) = apply_block_over(&template, &taken, &second).unwrap();
+        assert_eq!(taken, wanted("#zcbe$107"));
+        let (taken, _) = apply_block_over(&template, &taken, &first).unwrap();
+        assert_eq!(taken, wanted("#flinch$2"));
+
+        // What it writes changes that element only.
+        let written = crate::object_patch("upatch", &template, &taken).unwrap();
+        assert!(written.contains("#flinch$2\n"), "{written}");
+        assert!(written.contains("<!-- ORIGINAL -->\n\t\t\t\t#0338\n"), "{written}");
+    }
+
+    #[test]
+    fn another_change_of_the_object_stays_when_a_place_is_picked_again() {
+        let template = object("\t\t\t<hkparam name=\"a\">0</hkparam>\n\t\t\t<hkparam name=\"b\">0</hkparam>\n");
+        let edited = object("\t\t\t<hkparam name=\"a\">1</hkparam>\n\t\t\t<hkparam name=\"b\">2</hkparam>\n");
+        // Blocks next to nothing else: one hunk per field needs a line between them.
+        let template = template
+            .replace("\t\t\t<hkparam name=\"b\">", "\t\t\t<hkparam name=\"c\">9</hkparam>\n\t\t\t<hkparam name=\"b\">");
+        let edited = edited
+            .replace("\t\t\t<hkparam name=\"b\">", "\t\t\t<hkparam name=\"c\">9</hkparam>\n\t\t\t<hkparam name=\"b\">");
+        let block = Replaced {
+            lines: 3..4,
+            original: "\t\t\t<hkparam name=\"b\">0</hkparam>\n".into(),
+            text: "\t\t\t<hkparam name=\"b\">7</hkparam>\n".into(),
+        };
+        // `line_key` goes by the field, so a value picked for a field fits at once.
+        let (taken, _) = apply_block_over(&template, &edited, &block).unwrap();
+        assert!(taken.contains("name=\"a\">1<"), "{taken}");
+        assert!(taken.contains("name=\"b\">7<"), "{taken}");
     }
 }

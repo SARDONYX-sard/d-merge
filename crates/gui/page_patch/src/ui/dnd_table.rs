@@ -28,7 +28,13 @@ impl RowConflicts<'_> {
             ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::hover());
             return;
         }
-        let color = if mark.loses > 0 { ui.visuals().warn_fg_color } else { egui::Color32::from_rgb(100, 200, 120) };
+        let color = if mark.wins > 0 && mark.loses > 0 {
+            ui.visuals().warn_fg_color
+        } else if mark.loses > 0 {
+            ui.visuals().error_fg_color
+        } else {
+            egui::Color32::from_rgb(100, 200, 120)
+        };
         let (wins, loses) = self.hovers;
         let hover = format!("{wins}: {}\n{loses}: {}", mark.wins, mark.loses);
         // Not selectable: it would take the clicks, and with them the row's right-click menu.

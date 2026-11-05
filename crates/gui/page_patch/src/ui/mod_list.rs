@@ -25,7 +25,7 @@ impl PatchView<'_> {
         let settings = &*self.ctx.settings;
         let user_patch =
             crate::run::uses_user_patch(settings).then(|| crate::run::user_patch_priority(settings.mod_list()));
-        self.page.conflicts.refresh_marks(settings.mod_list(), user_patch);
+        self.page.conflicts.refresh_marks(settings.mod_list(), user_patch, settings.behavior.apply_user_patch);
         egui::CentralPanel::default().frame(self.ctx.panel_frame).show(ui, |ui| {
             ui.add_space(10.0);
             self.render_toolbar(ui, rows.is_some());

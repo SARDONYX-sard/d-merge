@@ -47,7 +47,7 @@ impl PatchTool {
         // No preview for a new object: it is written as is.
         let behavior = &self.workspace.behaviors[self.active];
         let is_new = behavior.added.contains_key(&id) || behavior.is_ref(&id);
-        let preview_event = if is_new { None } else { self.preview_panel(ui, i18n) };
+        let preview_event = if is_new || !self.show_preview { None } else { self.preview_panel(ui, i18n) };
         let result = self.editor_panel(ui, i18n, &id);
 
         if let Some(view) = &mut self.preview_view {
@@ -167,6 +167,20 @@ impl PatchTool {
                     let diff = Button::selectable(self.show_inline_diff, "").icon(Icon::Diff).small();
                     if ui.add(diff).on_hover_text(i18n.t(I18nKey::NemesisInlineDiffHover)).clicked() {
                         self.show_inline_diff = !self.show_inline_diff;
+                    }
+                    let diff_split = Button::selectable(self.show_preview, "").icon(Icon::Diff).small();
+                    if ui
+                        .add(diff_split)
+                        .on_hover_text({
+                            if self.show_preview {
+                                i18n.t(I18nKey::EditorHidePreview)
+                            } else {
+                                i18n.t(I18nKey::EditorShowPreview)
+                            }
+                        })
+                        .clicked()
+                    {
+                        self.show_preview = !self.show_preview;
                     }
                     egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
                 });

@@ -1,7 +1,7 @@
 //! Patch Editor page settings.
 //!
-//! Only what is needed to find the work in progress again: the work itself is kept next to the
-//! mod (`<output>/.d_merge/caches/patch_editor/nemesis/<mod_code>/`), not here.
+//! Only what is needed to find the work in progress again: the work itself is kept in
+//! `./.d_merge/caches/patch_editor/nemesis/<mod_code>/`, not here.
 
 use std::collections::BTreeMap;
 
@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 pub struct PatchEditorSettings {
     /// The mod's directory (`Nemesis_Engine/mod/<code>` is exported into it).
     pub output: String,
-    /// The mod read into the work (its root, or `Nemesis_Engine/mod/<code>`). Empty: none.
+    /// The root of the mod the work was read from. Empty: it was made in the editor.
     pub mod_dir: String,
     /// Nemesis mod code of the work in progress (e.g. `mymod`).
     pub mod_code: String,
@@ -22,6 +22,8 @@ pub struct PatchEditorSettings {
     pub inline_diff: bool,
     /// The patch preview scrolls to and highlights the editor's cursor line.
     pub follow_preview: bool,
+    /// Show preview or not
+    pub show_preview: bool,
     /// The object list only shows what changed.
     pub changed_only: bool,
     /// The object list is a tree (else a flat list).
@@ -51,6 +53,7 @@ impl PatchEditorSettings {
             mod_code: String::new(),
             inline_diff: false,
             follow_preview: false,
+            show_preview: false,
             changed_only: false,
             tree_view: false,
             tree_open: BTreeMap::new(),
@@ -61,6 +64,6 @@ impl PatchEditorSettings {
 
 impl Default for PatchEditorSettings {
     fn default() -> Self {
-        Self { inline_diff: true, follow_preview: true, ..Self::empty() }
+        Self { inline_diff: true, follow_preview: true, show_preview: true, ..Self::empty() }
     }
 }

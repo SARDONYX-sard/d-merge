@@ -13,7 +13,7 @@ const INDENT: f32 = 12.0;
 /// mouse moved), so only another key ends it. Kept by the caller between frames.
 pub(in crate::patch) fn read_keys(ui: &egui::Ui, leader: &mut bool) -> Vec<TreeInput> {
     use egui::{Key, Modifiers};
-    const BINDINGS: [(Key, TreeInput); 10] = [
+    const BINDINGS: [(Key, TreeInput); 11] = [
         (Key::J, TreeInput::Next),
         (Key::ArrowDown, TreeInput::Next),
         (Key::K, TreeInput::Previous),
@@ -22,6 +22,7 @@ pub(in crate::patch) fn read_keys(ui: &egui::Ui, leader: &mut bool) -> Vec<TreeI
         (Key::ArrowLeft, TreeInput::Close),
         (Key::L, TreeInput::Open),
         (Key::ArrowRight, TreeInput::Open),
+        (Key::O, TreeInput::Toggle),
         (Key::Enter, TreeInput::Leave),
         (Key::Escape, TreeInput::Leave),
     ];

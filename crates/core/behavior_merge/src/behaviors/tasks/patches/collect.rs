@@ -1,7 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
+use behavior_merge_types::config::HiddenRules;
 use fast_hash::HashMap;
-use json_patch::ValueWithPriority;
+use json_patch::{JsonPatch, ValueWithPriority, json_path::JsonPath};
 use nemesis_xml::patch::{PatchesMap, parse_nemesis_patch};
 use rayon::{iter::Either, prelude::*};
 use snafu::{OptionExt as _, ResultExt as _};
@@ -97,7 +98,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     // 1/3: Parse each file in parallel into thread-local data (no shared map, no lock).
     //
     // NOTE: `partition_map` into `Vec` keeps the input order, so the later steps are deterministic.
-    let (parsed, errors): (Vec<ParsedPatch<'a>>, Vec<Error>) = owned_patches
+    let (parsed, errors): (Vec<ParsedPatch<'a, '_>>, Vec<Error>) = owned_patches
         .par_iter()
         .map(|(path, (xml, priority))| {
             reporter.increment();
@@ -109,16 +110,16 @@ pub(crate) fn collect_borrowed_patches<'a>(
         });
 
     // 2/3: Group by template (sequential: only moves `Vec`s).
-    let mut by_template: HashMap<TemplateKey<'static>, TemplatePatches<'a>> = HashMap::default();
+    let mut by_template: HashMap<TemplateKey<'static>, TemplatePatches<'a, '_>> = HashMap::default();
     for (key, maps) in raw_borrowed_patches.0 {
         by_template.entry(key).or_default().base = maps;
     }
-    for ParsedPatch { key, indexes, patches, priority } in parsed {
+    for ParsedPatch { key, indexes, patches, priority, hidden } in parsed {
         // Store indexes for nemesis variable to replace
         if let Some(indexes) = indexes {
             behavior_index_map.insert(key.clone(), indexes);
         }
-        by_template.entry(key).or_default().files.push((patches, priority));
+        by_template.entry(key).or_default().files.push((patches, priority, hidden));
     }
 
     // 3/3: Resolve priorities per template in parallel.
@@ -126,14 +127,14 @@ pub(crate) fn collect_borrowed_patches<'a>(
     let borrowed_patches = by_template
         .into_par_iter()
         .map(|(key, TemplatePatches { base, files })| {
-            for (patches, priority) in files {
+            for (patches, priority, hidden) in files {
                 for (json_path, value) in patches {
-                    let is_seq = matches!(value.action, json_patch::Action::Seq { .. } | json_patch::Action::SeqPush);
-                    let value = ValueWithPriority::new(value, priority);
-                    if is_seq {
-                        base.seq.insert(json_path, value);
-                    } else {
-                        base.one.insert(json_path, value); // Pure: no add and remove because of single value
+                    let Some(hidden) = hidden else {
+                        insert_patch(&base, json_path, value, priority);
+                        continue;
+                    };
+                    for left in hidden.apply(&json_path, value) {
+                        insert_patch(&base, json_path.clone(), left, priority);
                     }
                 }
             }
@@ -144,25 +145,54 @@ pub(crate) fn collect_borrowed_patches<'a>(
     (PatchCollection { borrowed_patches: BehaviorPatchesMap(borrowed_patches), behavior_index_map }, errors)
 }
 
+fn insert_patch<'a>(base: &HkxPatchMaps<'a>, path: JsonPath<'a>, patch: JsonPatch<'a>, priority: usize) {
+    let is_seq = matches!(patch.action, json_patch::Action::Seq { .. } | json_patch::Action::SeqPush);
+    let patch = ValueWithPriority::new(patch, priority);
+    if is_seq {
+        base.seq.insert(path, patch);
+    } else {
+        base.one.insert(path, patch); // Pure: no add and remove because of single value
+    }
+}
+
+/// The mod code in the path of a patch file.
+///
+/// e.g. `/some/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt` -> `flinch`
+fn mod_code_of(path: &Path) -> Option<&str> {
+    let parts: Vec<_> = path.iter().collect();
+    let is_engine = |part: &&std::ffi::OsStr| {
+        ["Nemesis_Engine", "Nemesis_EngineExt"].iter().any(|engine| part.eq_ignore_ascii_case(engine))
+    };
+    let engine = parts.iter().rposition(is_engine)?;
+    parts.get(engine + 2)?.to_str()
+}
+
 /// One parsed Nemesis patch file.
-struct ParsedPatch<'a> {
+struct ParsedPatch<'a, 'c> {
     key: TemplateKey<'static>,
     /// Indexes used to replace Nemesis variables.
     indexes: Option<BehaviorIndexes>,
     patches: PatchesMap<'a>,
     priority: usize,
+    /// What is hidden of its mod in its template.
+    hidden: Option<&'c HiddenRules>,
 }
 
 /// Patches targeting one template.
 #[derive(Default)]
-struct TemplatePatches<'a> {
+struct TemplatePatches<'a, 'c> {
     /// Already collected patches (e.g. FNIS)
     base: HkxPatchMaps<'a>,
     /// Parsed Nemesis patch files in input order.
-    files: Vec<(PatchesMap<'a>, usize)>,
+    files: Vec<(PatchesMap<'a>, usize, Option<&'c HiddenRules>)>,
 }
 
-fn parse_one_patch<'a>(path: &Path, xml: &'a str, priority: usize, config: &Config) -> Result<ParsedPatch<'a>> {
+fn parse_one_patch<'a, 'c>(
+    path: &Path,
+    xml: &'a str,
+    priority: usize,
+    config: &'c Config,
+) -> Result<ParsedPatch<'a, 'c>> {
     // NOTE: The root class index is returned only if it is `hkbBehaviorGraphStringData`.
     let (patches, parsed_string_data_index) =
         parse_nemesis_patch(xml, config.hack_options.map(Into::into)).with_context(|_| NemesisXmlErrSnafu { path })?;
@@ -180,5 +210,25 @@ fn parse_one_patch<'a>(path: &Path, xml: &'a str, priority: usize, config: &Conf
             .map(|index| BehaviorIndexes { string_data: Cow::Owned(index.to_string()), behavior_graph: None }),
     };
 
-    Ok(ParsedPatch { key, indexes, patches, priority })
+    let hidden = if config.hidden_patches.is_empty() {
+        None
+    } else {
+        let target = key.as_meshes_inner_path().to_string_lossy();
+        mod_code_of(path).and_then(|code| config.hidden_patches.rules_of(code, &target))
+    };
+
+    Ok(ParsedPatch { key, indexes, patches, priority, hidden })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_the_mod_code_of_a_patch_file() {
+        let code = |path: &str| mod_code_of(Path::new(path)).map(str::to_owned);
+        assert_eq!(code("/a/Nemesis_Engine/mod/flinch/_1stperson/0_master/#0106.txt").as_deref(), Some("flinch"));
+        assert_eq!(code("/a/nemesis_engineext/mod/para/meshes/x.bin/#1.txt").as_deref(), Some("para"));
+        assert_eq!(code("/a/b/#1.txt"), None);
+    }
 }

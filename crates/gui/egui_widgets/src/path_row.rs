@@ -30,6 +30,8 @@ pub struct PathRow<'a> {
     select: &'a str,
     actions: PathActions,
     hover: Option<&'a str>,
+    /// See [`Self::help`].
+    field_hover: Option<&'a str>,
     hint: Option<&'a str>,
 }
 
@@ -57,12 +59,20 @@ impl<'a> PathRow<'a> {
 
     /// `label`: the button on the left, `select`: the one that opens the dialog.
     pub const fn new(label: &'a str, select: &'a str, actions: PathActions) -> Self {
-        Self { label, select, actions, hover: None, hint: None }
+        Self { label, select, actions, hover: None, field_hover: None, hint: None }
     }
 
     /// The label button's hover text.
     pub const fn hover(mut self, hover: &'a str) -> Self {
         self.hover = Some(hover);
+        self
+    }
+
+    /// What to enter: the hover text of both the label button and the field, which is what one looks
+    /// at when not knowing what to enter.
+    pub const fn help(mut self, help: &'a str) -> Self {
+        self.hover = Some(help);
+        self.field_hover = Some(help);
         self
     }
 
@@ -75,6 +85,30 @@ impl<'a> PathRow<'a> {
     /// Draws the row.
     pub fn show(self, ui: &mut egui::Ui, path: &mut String) -> PathRowOutput {
         self.show_with(ui, path, |_| {})
+    }
+
+    /// Draws a row of a directory that is not chosen here: the path as text, then `trailing` (right to
+    /// left) in place of the select button. Returns why the label button could not open it, if so.
+    pub fn show_read_only(self, ui: &mut egui::Ui, path: &str, trailing: impl FnOnce(&mut egui::Ui)) -> Option<String> {
+        let mut open_error = None;
+        ui.horizontal(|ui| {
+            let size = [Self::LABEL_WIDTH, Self::BUTTON_SIZE[1]];
+            let mut open = ui.add_sized(size, Button::new(self.label));
+            if let Some(hover) = self.hover {
+                open = open.on_hover_text(hover);
+            }
+            if open.clicked() {
+                open_error = (self.actions.open)(path).err();
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(Self::RIGHT_MARGIN);
+                trailing(ui);
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.add(egui::Label::new(egui::RichText::new(path).weak()).truncate());
+                });
+            });
+        });
+        open_error
     }
 
     /// Draws the row, with `trailing` between the field and the select button (right to left).
@@ -111,7 +145,10 @@ impl<'a> PathRow<'a> {
                 if let Some(hint) = self.hint {
                     field = field.hint_text(hint);
                 }
-                let field = ui.add(field);
+                let mut field = ui.add(field);
+                if let Some(help) = self.field_hover {
+                    field = field.on_hover_text(help);
+                }
                 output.changed |= field.changed();
                 output.submitted = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
             });
