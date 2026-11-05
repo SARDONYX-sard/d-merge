@@ -30,7 +30,7 @@ impl App {
             let theme = &mut self.settings.ui.theme;
             let mut index = themes.iter().position(|(t, _)| t == theme).unwrap_or(0);
             if ComboBox::from_id_salt("theme")
-                .width(100.0)
+                .width(120.0)
                 .show_index(ui, &mut index, themes.len(), |i| themes[i].1)
                 .changed()
             {

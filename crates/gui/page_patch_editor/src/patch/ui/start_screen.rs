@@ -82,7 +82,7 @@ impl PatchTool {
         let (mut create, mut cancel) = (false, false);
         ui.horizontal(|ui| {
             create = ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();
-            cancel = ui.add(Button::new(i18n.t(I18nKey::NemesisCancel))).clicked();
+            cancel = ui.add(Button::new(i18n.t(I18nKey::CancelButton))).clicked();
             // Nothing to complain about before anything is typed.
             if let Some(problem) = problem.filter(|_| !form.code.is_empty()) {
                 ui.colored_label(ui.visuals().warn_fg_color, i18n.t(problem));

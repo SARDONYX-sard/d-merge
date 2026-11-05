@@ -47,7 +47,7 @@ impl HkannoPage {
             }
 
             let dirty = self.tabs.get(self.active).is_some_and(|tab| tab.dirty);
-            if ui.add_enabled(dirty, Button::new(i18n.t(I18nKey::HkannoRevertButton))).clicked() {
+            if ui.add_enabled(dirty, Button::new(i18n.t(I18nKey::RevertButton))).clicked() {
                 self.show_revert = true;
             }
 
@@ -109,7 +109,7 @@ impl HkannoPage {
         }
         let Some(path) = dialog.save_file() else { return };
         match tab.export_txt(&path) {
-            Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::HkannoExported), path.display())),
+            Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::ExportedMessage), path.display())),
             Err(err) => {
                 let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoSaveFailed));
                 tracing::error!("{msg}");

@@ -508,7 +508,7 @@ impl PatchTool {
                     self.tabs.clear();
                 }
                 Err(err) => {
-                    notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed)));
+                    notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage)));
                 }
             }
             self.editor_for = None;
@@ -701,7 +701,7 @@ impl PatchTool {
                 true
             }
             Err(err) => {
-                notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed)));
+                notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage)));
                 false
             }
         }
@@ -846,12 +846,10 @@ impl PatchTool {
             view.keep_current(current);
         }
         // The parser reads the patch, whose lines are the preview's: back to the editor's.
-        if let Err(error) = &check
-            && let Some(problem) = diagnostics::parser_problem(error)
-        {
-            let line = self.preview_view.as_ref().and_then(|view| view.editor_line_of(problem.line, &self.editor_text));
-            let line = line.unwrap_or(problem.line);
-            diagnostics::add_parser_problem(&mut self.field_problems, &self.editor_text, line, &problem);
+        if let Err(error) = &check {
+            let view = self.preview_view.as_ref();
+            let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.editor_text));
+            diagnostics::add_parser_error(&mut self.field_problems, &self.editor_text, error, to_editor_line);
         }
         self.preview = Some((patch, check));
         self.inline_diff = behavior
@@ -994,7 +992,7 @@ impl PatchTool {
                 self.selected = None; // an id of the other behavior
                 self.mark_dirty();
             }
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisLoadFailed))),
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
         }
     }
 
@@ -1007,7 +1005,7 @@ impl PatchTool {
         match exported {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
                 "{} ({written}): {}",
-                i18n.t(I18nKey::NemesisExported),
+                i18n.t(I18nKey::ExportedMessage),
                 Path::new(&output).join("Nemesis_Engine").join("mod").join(&code).display()
             )),
             Ok((_, invalid)) => notify.warn(format!(

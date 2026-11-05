@@ -565,7 +565,7 @@ pub enum I18nKey {
     NemesisExportDisabledHover,
 
     /// Exported
-    NemesisExported,
+    ExportedMessage,
 
     /// Export failed
     NemesisExportFailed,
@@ -574,7 +574,7 @@ pub enum I18nKey {
     NemesisRejected,
 
     /// Failed to load
-    NemesisLoadFailed,
+    LoadFailedMessage,
 
     /// Failed to save the work in progress
     NemesisSaveFailed,
@@ -595,7 +595,7 @@ pub enum I18nKey {
     NemesisDuplicate,
 
     /// Revert
-    NemesisRevert,
+    RevertButton,
 
     /// Discard the changes of this object (a new object is removed).
     NemesisRevertHover,
@@ -634,10 +634,10 @@ pub enum I18nKey {
     NemesisCopyId,
 
     /// Go to Definition
-    NemesisGoToDefinition,
+    EditorGoToDefinition,
 
     /// Find References
-    NemesisFindReferences,
+    EditorFindReferences,
 
     /// Tree
     NemesisTreeView,
@@ -667,7 +667,7 @@ pub enum I18nKey {
     NemesisInlineDiffHover,
 
     /// Close
-    NemesisCloseTab,
+    CloseButton,
 
     /// Close Others
     NemesisCloseOtherTabs,
@@ -942,9 +942,6 @@ pub enum I18nKey {
     /// Back to the start screen. The work is kept, and comes back from Open Recent.
     NemesisCloseWorkHover,
 
-    /// Cancel
-    NemesisCancel,
-
     /// Choose the output directory.
     NemesisOutputMissing,
 
@@ -1015,16 +1012,16 @@ pub enum I18nKey {
     NemesisMergeRemoves,
 
     /// Next tab (Vim: Space l, gt, :tabn)
-    NemesisNextTab,
+    EditorNextTab,
 
     /// Previous tab (Vim: Space h, gT, :tabp)
-    NemesisPreviousTab,
+    EditorPreviousTab,
 
-    /// Close tab (Vim: :tabc, :q)
-    NemesisCloseCurrentTab,
+    /// Close tab (Vim: Space c, :tabc, :q)
+    EditorCloseTab,
 
-    /// Show or hide the patch preview (Vim: Space p, :preview)
-    NemesisTogglePreview,
+    /// Show or hide the preview (Vim: Space p, :preview)
+    EditorTogglePreview,
 
     /// Show or hide the inline diff (Vim: Space d, :diff)
     NemesisToggleInlineDiff,
@@ -1045,6 +1042,9 @@ pub enum I18nKey {
     /// - Not compatible with Pandora v4.
     NemesisKeptArrayHover,
 
+    /// This tab has unsaved changes. Save it first, or close it with ✖.
+    HkannoTabUnsaved,
+
     /// Check
     NemesisCheck,
 
@@ -1052,10 +1052,10 @@ pub enum I18nKey {
     NemesisCheckAll,
 
     /// Expand all
-    NemesisExpandAll,
+    ExpandAllButton,
 
     /// Collapse all
-    NemesisCollapseAll,
+    CollapseAllButton,
 
     /// Checks without opening them. Animation data: counts that say something else than what is there, and clip ids that are not the ones in the file names; patches that edit are left out, as the merge counts for them. Behaviors: the fields and pointers of what the mod changes, and d-merge's parser on its patches.
     NemesisCheckHover,
@@ -1281,12 +1281,6 @@ pub enum I18nKey {
     /// Unselect All
     ConvertUnselectAll,
 
-    /// Expand All
-    ConvertExpandAll,
-
-    /// Collapse All
-    ConvertCollapseAll,
-
     // ── hkanno editor page ──────────────────────────────────────────────────
     /// Open
     HkannoOpenButton,
@@ -1306,9 +1300,6 @@ pub enum I18nKey {
     /// Copy Output Path
     HkannoTabCopyOutputPath,
 
-    /// Close
-    HkannoTabClose,
-
     /// Save
     HkannoSaveButton,
 
@@ -1317,9 +1308,6 @@ pub enum I18nKey {
 
     /// Save failed
     HkannoSaveFailed,
-
-    /// Failed to load
-    HkannoLoadFailed,
 
     /// Import .txt…
     HkannoImportTxt,
@@ -1335,12 +1323,6 @@ pub enum I18nKey {
 
     /// Imported
     HkannoImported,
-
-    /// Exported
-    HkannoExported,
-
-    /// Revert
-    HkannoRevertButton,
 
     /// Discard the edits and restore the annotations of the original file?
     HkannoRevertConfirm,
@@ -1507,8 +1489,8 @@ impl I18nMap {
 /// egui, so it cannot build that struct itself.
 pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 15] {
     [
-        i18n.t(I18nKey::NemesisGoToDefinition),
-        i18n.t(I18nKey::NemesisFindReferences),
+        i18n.t(I18nKey::EditorGoToDefinition),
+        i18n.t(I18nKey::EditorFindReferences),
         i18n.t(I18nKey::EditorFind),
         i18n.t(I18nKey::EditorGoToLine),
         i18n.t(I18nKey::EditorQuickFix),

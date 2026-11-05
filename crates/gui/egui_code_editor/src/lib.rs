@@ -115,7 +115,7 @@ pub enum EditorCommand {
     NextTab,
     /// Vim `<Space>h`, `gT`, `:tabp`: the host's previous tab.
     PreviousTab,
-    /// Vim `:tabc`, `:q`: close the host's tab.
+    /// Vim `<Space>c`, `:tabc`, `:q`: close the host's tab.
     CloseTab,
     /// Vim `<Space>p`, `:preview`: show or hide what the host shows beside the editor.
     TogglePreview,
@@ -129,6 +129,63 @@ pub enum EditorCommand {
 pub enum Navigation<'a> {
     Definition(Location<'a>),
     References(References<'a>),
+}
+
+impl EditorCommand {
+    const ALL: [Self; 11] = [
+        Self::Save,
+        Self::GoToDefinition,
+        Self::FindReferences,
+        Self::JumpBack,
+        Self::JumpForward,
+        Self::ToggleExplorer,
+        Self::NextTab,
+        Self::PreviousTab,
+        Self::CloseTab,
+        Self::TogglePreview,
+        Self::ToggleInlineDiff,
+    ];
+
+    const fn action_id(self) -> &'static str {
+        match self {
+            Self::Save => "save",
+            Self::GoToDefinition => "go_to_definition",
+            Self::FindReferences => "find_references",
+            Self::JumpBack => "jump_back",
+            Self::JumpForward => "jump_forward",
+            Self::ToggleExplorer => "toggle_explorer",
+            Self::NextTab => "next_tab",
+            Self::PreviousTab => "previous_tab",
+            Self::CloseTab => "close_tab",
+            Self::TogglePreview => "toggle_preview",
+            Self::ToggleInlineDiff => "toggle_inline_diff",
+        }
+    }
+
+    fn from_action_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|command| command.action_id() == id)
+    }
+
+    /// This command in the palette (`Ctrl+Shift+P`). Picking it comes back as
+    /// [`CodeEditorOutput::command`], the same as its key.
+    pub const fn action(self, label: &str) -> EditorAction<'_> {
+        EditorAction { id: self.action_id(), label }
+    }
+}
+
+/// `Ctrl+PageDown`: `Some(true)`, the next tab. `Ctrl+PageUp`: `Some(false)`, the previous one. As in
+/// VS Code, in every keymap. For a host with tabs to ask before showing its editor.
+pub fn tab_switch_keys(ui: &egui::Ui) -> Option<bool> {
+    use egui::{Key, Modifiers};
+    ui.input_mut(|input| {
+        if input.consume_key(Modifiers::COMMAND, Key::PageDown) {
+            Some(true)
+        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) {
+            Some(false)
+        } else {
+            None
+        }
+    })
 }
 
 /// Per-document state that is not part of the text. Keep one per open document.
@@ -240,7 +297,7 @@ pub struct CodeEditor<'a> {
     actions: &'a [EditorAction<'a>],
     inline_diff: Option<&'a InlineDiff>,
     read_only: bool,
-    host_commands: bool,
+    host_commands: &'a [EditorCommand],
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -266,12 +323,13 @@ impl<'a> CodeEditor<'a> {
             actions: &[],
             inline_diff: None,
             read_only: false,
-            host_commands: false,
+            host_commands: &[],
         }
     }
 
-    /// The host acts on [`EditorCommand`]'s tabs, tree and preview, so Vim's list of keys offers them.
-    pub const fn host_commands(mut self, host_commands: bool) -> Self {
+    /// What the host acts on, so Vim's list of keys offers them. e.g., a host without a tree has no
+    /// [`EditorCommand::ToggleExplorer`].
+    pub const fn host_commands(mut self, host_commands: &'a [EditorCommand]) -> Self {
         self.host_commands = host_commands;
         self
     }
@@ -463,7 +521,10 @@ impl<'a> CodeEditor<'a> {
         CodeEditorOutput {
             changed,
             cursor,
-            command: input.keys.command,
+            // A command of the palette asks for the same as its key.
+            command: input.keys.command.or_else(|| {
+                input.picked.and_then(palette::Picked::host_action).and_then(EditorCommand::from_action_id)
+            }),
             response: response.clone(),
             pointer,
             navigation,
@@ -583,7 +644,7 @@ fn show_which_key(
     state: &mut CodeEditorState,
     keymap: Keymap,
     visible: egui::Rect,
-    host_commands: bool,
+    host_commands: &[EditorCommand],
 ) {
     let Some(prefix) = state.keymap.which_key_prefix(keymap) else {
         state.which_key_waiting = None;
@@ -1351,6 +1412,14 @@ mod tests {
         frames.frame(Vec::new());
         shift_right_in_vim(&mut frames);
         assert_eq!(frames.text, "\ta");
+    }
+
+    #[test]
+    fn a_command_of_the_palette_is_the_command() {
+        for command in EditorCommand::ALL {
+            assert_eq!(EditorCommand::from_action_id(command.action("label").id), Some(command));
+        }
+        assert_eq!(EditorCommand::from_action_id("of_the_host"), None);
     }
 
     #[test]

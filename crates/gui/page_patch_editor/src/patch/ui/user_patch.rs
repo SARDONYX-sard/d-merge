@@ -88,7 +88,7 @@ impl PatchTool {
             self.confirm_clear = ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked();
             return;
         }
-        if ui.add(Button::new(i18n.t(I18nKey::NemesisCancel))).clicked() {
+        if ui.add(Button::new(i18n.t(I18nKey::CancelButton))).clicked() {
             self.confirm_clear = false;
         }
         let sure = Button::new(i18n.t(I18nKey::UserPatchClearConfirm)).icon(Icon::Trash).destructive();

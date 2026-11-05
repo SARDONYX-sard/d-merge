@@ -70,6 +70,9 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
         [VimKey::Char(' '), VimKey::Char('w'), ..] => {
             return done(Command::Simple(Simple::Format { save: true }), None);
         }
+        [VimKey::Char(' '), VimKey::Char('c'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::CloseTab)), None);
+        }
         [VimKey::Char(' '), VimKey::Char('p'), ..] => {
             return done(Command::Simple(Simple::Ask(EditorCommand::TogglePreview)), None);
         }
@@ -380,6 +383,7 @@ mod tests {
         assert_eq!(command(" w"), Command::Simple(Simple::Format { save: true }));
         assert_eq!(command(" l"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
         assert_eq!(command(" h"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
+        assert_eq!(command(" c"), Command::Simple(Simple::Ask(EditorCommand::CloseTab)));
         assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));
         assert_eq!(command(" d"), Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)));
         assert_eq!(parse(&keys(" ")), Parse::Incomplete);

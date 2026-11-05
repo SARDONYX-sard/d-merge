@@ -101,7 +101,7 @@ impl ConvertPage {
                         tree.toggle_select_all();
                     }
                     let expand_label =
-                        if tree.is_any_expanded() { I18nKey::ConvertCollapseAll } else { I18nKey::ConvertExpandAll };
+                        if tree.is_any_expanded() { I18nKey::CollapseAllButton } else { I18nKey::ExpandAllButton };
                     if ui.add(Button::new(i18n.t(expand_label))).clicked() {
                         tree.toggle_expand_all();
                     }

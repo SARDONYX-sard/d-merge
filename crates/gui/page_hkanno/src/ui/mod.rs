@@ -19,6 +19,10 @@ use crate::{
     tab::{self, HkannoTab, replace_columns},
 };
 
+/// What this page's editor acts on: see [`HkannoPage::apply_command`].
+const HOST_COMMANDS: [EditorCommand; 4] =
+    [EditorCommand::NextTab, EditorCommand::PreviousTab, EditorCommand::CloseTab, EditorCommand::TogglePreview];
+
 impl HkannoPage {
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, mut ctx: HkannoPageCtx<'_>) {
@@ -105,7 +109,17 @@ impl HkannoPage {
     /// The text editor of the active tab (+ the keymap status line, e.g., `-- INSERT --`).
     fn editor(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
+        if let Some(forward) = egui_code_editor::tab_switch_keys(ui) {
+            self.step_tab(ui, forward);
+        }
 
+        let i18n = ctx.i18n;
+        let actions = [
+            EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab)),
+            EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab)),
+            EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab)),
+            EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
+        ];
         let lsp = &ctx.lsp_settings;
         let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
         let features = EditorFeatures {
@@ -139,7 +153,9 @@ impl HkannoPage {
                     .diagnostics(&tab.editor_diagnostics)
                     .features(features)
                     .keymap(keymap)
-                    .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)))
+                    .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
+                    .actions(&actions)
+                    .host_commands(&HOST_COMMANDS)
                     .show(ui, &mut tab.editor)
             })
             .inner;
@@ -154,8 +170,51 @@ impl HkannoPage {
                 tab.preview.jump_from_editor_line(cursor.line);
             }
         }
-        if command == Some(EditorCommand::Save) {
-            self.save_active(ctx); // e.g., Vim `:w`
+        if let Some(command) = command {
+            self.apply_command(command, ui, ctx);
+        }
+    }
+
+    /// Does what the editor asked for. e.g., Vim `:w`, `<Space>l`, or the palette.
+    fn apply_command(&mut self, command: EditorCommand, ui: &egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
+        match command {
+            EditorCommand::Save => self.save_active(ctx),
+            EditorCommand::NextTab => self.step_tab(ui, true),
+            EditorCommand::PreviousTab => self.step_tab(ui, false),
+            EditorCommand::CloseTab => self.close_active_from_keyboard(ui, ctx),
+            EditorCommand::TogglePreview => ctx.settings.show_preview = !ctx.settings.show_preview,
+            EditorCommand::GoToDefinition
+            | EditorCommand::FindReferences
+            | EditorCommand::JumpBack
+            | EditorCommand::JumpForward
+            | EditorCommand::ToggleExplorer
+            | EditorCommand::ToggleInlineDiff => {}
+        }
+    }
+
+    /// The next or previous tab, with the keyboard going along to its editor.
+    fn step_tab(&mut self, ui: &egui::Ui, forward: bool) {
+        if let Some(next) = crate::neighbor_tab(self.active, self.tabs.len(), forward) {
+            self.active = next;
+            self.focus_active_editor(ui);
+        }
+    }
+
+    /// `:q` and the like are quick to press and, unlike `✖`, close without looking at the tab, so
+    /// unsaved edits stop them, as in Vim. There is no way to get these edits back.
+    fn close_active_from_keyboard(&mut self, ui: &egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
+        if self.tabs.get(self.active).is_some_and(|tab| tab.dirty) {
+            ctx.notify.error(ctx.i18n.t(I18nKey::HkannoTabUnsaved).to_owned());
+            return;
+        }
+        self.close(self.active);
+        self.focus_active_editor(ui);
+    }
+
+    fn focus_active_editor(&self, ui: &egui::Ui) {
+        if let Some(tab) = self.tabs.get(self.active) {
+            let id = tab.editor_id();
+            ui.memory_mut(|memory| memory.request_focus(id));
         }
     }
 
@@ -273,7 +332,7 @@ fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
         ui.ctx().copy_text(output.to_string());
     }
     ui.separator();
-    ui.button(i18n.t(I18nKey::HkannoTabClose)).clicked()
+    ui.button(i18n.t(I18nKey::CloseButton)).clicked()
 }
 
 /// Settings enum -> editor enum.

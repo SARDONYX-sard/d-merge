@@ -100,11 +100,11 @@ impl PatchTool {
     fn list_toggles(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
         if asdsf {
             let collapse = Button::new("").icon(Icon::ChevronRight).small();
-            if ui.add(collapse).on_hover_text(i18n.t(I18nKey::NemesisCollapseAll)).clicked() {
+            if ui.add(collapse).on_hover_text(i18n.t(I18nKey::CollapseAllButton)).clicked() {
                 self.anim_folders_open.clear();
             }
             let expand = Button::new("").icon(Icon::ChevronDown).small();
-            self.anim_expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::NemesisExpandAll)).clicked();
+            self.anim_expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::ExpandAllButton)).clicked();
         }
         if !asdsf {
             let tree = Button::selectable(self.tree_view, "").icon(Icon::ListTree).small();
@@ -491,7 +491,7 @@ fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> O
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
     let revert = changed && {
         ui.separator();
-        let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::NemesisRevert };
+        let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
         ui.add(Button::new(i18n.t(label)).destructive()).clicked()
     };
     [

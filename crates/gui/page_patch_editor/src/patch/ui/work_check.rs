@@ -14,13 +14,17 @@
 //! | Behavior  | Checked                 | What                                                    |
 //! | --------- | ----------------------- | ------------------------------------------------------- |
 //! | anim data | the files of the row    | counts and clip ids, see [`anim_lines::problems`]        |
+//! | anim sets | the files of the row    | the above, and d-merge's parser on what the mod changes  |
 //! | others    | what the mod changes    | fields, pointers, and d-merge's parser on its patch      |
 //!
 //! The window keeps up as they are corrected, one object at a time:
 //! see [`PatchTool::refresh_work_check`].
 
 use egui_code_editor::{Diagnostic, Severity};
-use gui_shared::i18n::{I18nKey, I18nMap};
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::pages::patch::behavior::ParserMode,
+};
 
 use super::anim_tree::FileKind;
 use crate::patch::{
@@ -84,23 +88,26 @@ fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>) -> Vec<
     let (id, text) = (object.id, object.text);
     let to_row = |line, message, severity| CheckRow { id: id.to_owned(), line, message, severity };
     if behavior.is_anim_data() {
-        let found = anim_lines::problems(behavior.adsf, id, text);
+        let mut found: Vec<Diagnostic> = anim_lines::diagnostics(behavior.adsf, id, text);
+        // Clip data has its counts checked above, as d-merge counts them itself: see `validate_adsf`.
+        if behavior.asdsf {
+            add_parser_check(&mut found, behavior, code, object);
+        }
         return found.into_iter().map(|problem| to_row(problem.line, problem.message, problem.severity)).collect();
     }
     let mut found: Vec<Diagnostic> = diagnostics::field_diagnostics(text, behavior, object.is_new, code);
-    // As the editor does: the parser reads the patch, whose lines are not the object's.
-    if let Some(patch) = behavior.patch(code, id)
-        && let Err(error) = nemesis_diff::validate(&patch)
-    {
-        match diagnostics::parser_problem(&error) {
-            Some(problem) => {
-                let line = Preview::new(&patch).editor_line_of(problem.line, text).unwrap_or(problem.line);
-                diagnostics::add_parser_problem(&mut found, text, line, &problem);
-            }
-            None => found.push(Diagnostic { line: 0, columns: 0..0, severity: Severity::Error, message: error }),
-        }
-    }
+    add_parser_check(&mut found, behavior, code, object);
     found.into_iter().map(|problem| to_row(problem.line, problem.message, problem.severity)).collect()
+}
+
+/// As the editor does: the parser reads the patch, whose lines are not the object's.
+fn add_parser_check(found: &mut Vec<Diagnostic>, behavior: &Behavior, code: &str, object: &ObjectText<'_>) {
+    let Some(patch) = behavior.patch(code, object.id) else { return };
+    // (The mode is for the clip data, which does not come here.)
+    if let Err(error) = behavior.validate(object.id, &patch, ParserMode::Strict) {
+        let to_editor_line = |line| Preview::new(&patch).editor_line_of(line, object.text);
+        diagnostics::add_parser_error(found, object.text, &error, to_editor_line);
+    }
 }
 
 /// The problems of the files of `scope`, by file.
@@ -271,6 +278,20 @@ mod tests {
         let other = "Female~1/Bad~m$0.txt";
         tool.refresh_work_check(other);
         assert_eq!(rows(&tool), 1);
+    }
+
+    /// A new animation set the parser rejects has to say why.
+    #[test]
+    fn an_animation_set_has_the_parser_on_it() {
+        // (The clip data's needs no file, and nothing here reads the sets of the template.)
+        let mut asdsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        (asdsf.adsf, asdsf.asdsf) = (false, true);
+        let id = "DefaultMaleData~DefaultMale/m$Start.txt";
+        asdsf.added.insert(id.to_owned(), "V3\nabc\ndef\n".to_owned());
+
+        let rows = run(&asdsf, "m", &CheckScope::All);
+        let row = rows.iter().find(|row| row.message.contains("triggers_len")).expect("the parser's reason");
+        assert_eq!((row.id.as_str(), row.line, row.severity), (id, 1, Severity::Error));
     }
 
     /// A Nemesis patch: the fields of what the mod changes, and the parser on its patch.

@@ -11,6 +11,7 @@
 //! compares the two over every key, so that a new command cannot be left out of the list.
 
 use super::{keys::VimKey, parse::take_count};
+use crate::EditorCommand;
 
 /// A key that waits for another, with a list to show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,10 +36,10 @@ impl Prefix {
         }
     }
 
-    /// What the list shows. `host_commands`: the host acts on the commands it is asked for; without
-    /// it their keys do nothing, so they are not offered.
-    pub(crate) fn hints(self, host_commands: bool) -> impl Iterator<Item = &'static WhichKey> {
-        self.bindings().iter().filter(move |binding| host_commands || !binding.needs_host)
+    /// What the list shows. `host_commands`: what the host acts on; the keys of the rest do nothing,
+    /// so they are not offered.
+    pub(crate) fn hints(self, host_commands: &[EditorCommand]) -> impl Iterator<Item = &'static WhichKey> {
+        self.bindings().iter().filter(move |binding| binding.needs.is_none_or(|needs| host_commands.contains(&needs)))
     }
 }
 
@@ -49,8 +50,8 @@ pub(crate) struct WhichKey {
     keys: &'static str,
     /// What it does. In English, like the keys themselves and the rest of Vim's prompt.
     pub(crate) text: &'static str,
-    /// Only does something if the host acts on [`crate::EditorCommand`] (e.g., the tabs).
-    pub(crate) needs_host: bool,
+    /// Only does something if the host acts on this command (e.g., the tabs).
+    needs: Option<EditorCommand>,
 }
 
 impl WhichKey {
@@ -61,29 +62,30 @@ impl WhichKey {
 }
 
 const fn own(keys: &'static str, text: &'static str) -> WhichKey {
-    WhichKey { keys, text, needs_host: false }
+    WhichKey { keys, text, needs: None }
 }
 
-const fn host(keys: &'static str, text: &'static str) -> WhichKey {
-    WhichKey { keys, text, needs_host: true }
+const fn host(keys: &'static str, command: EditorCommand, text: &'static str) -> WhichKey {
+    WhichKey { keys, text, needs: Some(command) }
 }
 
 const LEADER: &[WhichKey] = &[
     own(" f", "Format"),
     own(" w", "Format and save"),
-    host(" l", "Next tab"),
-    host(" h", "Previous tab"),
-    host(" p", "Show or hide the preview"),
-    host(" d", "Show or hide the inline diff"),
-    host(" e", "Move to the tree"),
+    host(" l", EditorCommand::NextTab, "Next tab"),
+    host(" h", EditorCommand::PreviousTab, "Previous tab"),
+    host(" c", EditorCommand::CloseTab, "Close the tab"),
+    host(" p", EditorCommand::TogglePreview, "Show or hide the preview"),
+    host(" d", EditorCommand::ToggleInlineDiff, "Show or hide the inline diff"),
+    host(" e", EditorCommand::ToggleExplorer, "Move to the tree"),
 ];
 
 const G: &[WhichKey] = &[
     own("gg", "First line"),
     own("gd", "Go to definition"),
     own("gD", "Find references"),
-    host("gt", "Next tab"),
-    host("gT", "Previous tab"),
+    host("gt", EditorCommand::NextTab, "Next tab"),
+    host("gT", EditorCommand::PreviousTab, "Previous tab"),
     own("gx", "Open the URL under the cursor"),
     own("ge", "End of the previous word"),
     own("gE", "End of the previous WORD"),
@@ -143,12 +145,13 @@ mod tests {
     }
 
     #[test]
-    fn a_host_without_commands_is_offered_what_works() {
-        let keys = |prefix: Prefix, host| prefix.hints(host).map(WhichKey::key).collect::<Vec<_>>();
-        assert_eq!(keys(Prefix::Leader, false), ["f", "w"]);
-        assert!(keys(Prefix::Leader, true).contains(&"l"));
-        assert!(!keys(Prefix::G, false).contains(&"t"));
-        assert!(keys(Prefix::G, false).contains(&"d"));
+    fn a_host_is_offered_what_it_acts_on() {
+        let keys = |prefix: Prefix, host: &[EditorCommand]| prefix.hints(host).map(WhichKey::key).collect::<Vec<_>>();
+        assert_eq!(keys(Prefix::Leader, &[]), ["f", "w"]);
+        assert_eq!(keys(Prefix::Leader, &[EditorCommand::NextTab]), ["f", "w", "l"]);
+        assert!(!keys(Prefix::G, &[]).contains(&"t"));
+        assert!(keys(Prefix::G, &[EditorCommand::NextTab]).contains(&"t"));
+        assert!(keys(Prefix::G, &[]).contains(&"d"), "the language answers that");
     }
 
     #[test]

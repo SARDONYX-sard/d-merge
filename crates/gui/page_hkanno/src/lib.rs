@@ -98,7 +98,7 @@ impl HkannoPage {
 
     /// Opens `paths`; already open files just become active.
     fn open(&mut self, paths: impl IntoIterator<Item = String>, ctx: &mut HkannoPageCtx<'_>) {
-        let failed = ctx.i18n.t(I18nKey::HkannoLoadFailed);
+        let failed = ctx.i18n.t(I18nKey::LoadFailedMessage);
         for path in paths {
             if let Some(index) = self.tabs.iter().position(|t| t.settings.input_path == path) {
                 self.active = index;
@@ -143,12 +143,20 @@ impl HkannoPage {
         match tab.import_txt(path) {
             Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::HkannoImported), path.display())),
             Err(err) => {
-                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoLoadFailed));
+                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::LoadFailedMessage));
                 tracing::error!("{msg}");
                 ctx.notify.error(msg);
             }
         }
     }
+}
+
+/// The tab next to `active` of `len` tabs, around the ends. `None`: there is no other.
+const fn neighbor_tab(active: usize, len: usize, forward: bool) -> Option<usize> {
+    if len < 2 {
+        return None;
+    }
+    Some(if forward { (active + 1) % len } else { (active + len - 1) % len })
 }
 
 /// Dropped paths split into `(annotation texts, files to open)`.
@@ -161,6 +169,15 @@ fn split_dropped(paths: Vec<std::path::PathBuf>) -> (Vec<std::path::PathBuf>, Ve
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    #[test]
+    fn the_next_tab_goes_around() {
+        assert_eq!(super::neighbor_tab(0, 3, true), Some(1));
+        assert_eq!(super::neighbor_tab(2, 3, true), Some(0));
+        assert_eq!(super::neighbor_tab(0, 3, false), Some(2));
+        assert_eq!(super::neighbor_tab(0, 1, true), None);
+        assert_eq!(super::neighbor_tab(0, 0, false), None);
+    }
 
     use super::*;
 

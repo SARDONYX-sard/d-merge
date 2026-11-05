@@ -21,24 +21,15 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 /// The ids of the palette's "go back" and "go forward".
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
-/// The palette's commands that Vim has keys for: see [`action_command`].
-const ACTION_NEXT_TAB: &str = "next_tab";
-const ACTION_PREVIOUS_TAB: &str = "previous_tab";
-const ACTION_CLOSE_TAB: &str = "close_tab";
-const ACTION_PREVIEW: &str = "toggle_preview";
-const ACTION_INLINE_DIFF: &str = "toggle_inline_diff";
-
-/// What a command of the palette asks for.
-fn action_command(action: Option<&str>) -> Option<EditorCommand> {
-    Some(match action? {
-        ACTION_NEXT_TAB => EditorCommand::NextTab,
-        ACTION_PREVIOUS_TAB => EditorCommand::PreviousTab,
-        ACTION_CLOSE_TAB => EditorCommand::CloseTab,
-        ACTION_PREVIEW => EditorCommand::TogglePreview,
-        ACTION_INLINE_DIFF => EditorCommand::ToggleInlineDiff,
-        _ => return None,
-    })
-}
+/// What this editor acts on: see [`crate::patch::PatchTool::apply_editor_result`].
+const HOST_COMMANDS: [EditorCommand; 6] = [
+    EditorCommand::NextTab,
+    EditorCommand::PreviousTab,
+    EditorCommand::CloseTab,
+    EditorCommand::TogglePreview,
+    EditorCommand::ToggleInlineDiff,
+    EditorCommand::ToggleExplorer,
+];
 
 impl PatchTool {
     pub(in crate::patch) fn object_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
@@ -65,7 +56,7 @@ impl PatchTool {
             return;
         }
         // `Ctrl+PageDown` / `Ctrl+PageUp`, as in VS Code, in every keymap.
-        if let Some(forward) = tab_keys(ui) {
+        if let Some(forward) = egui_code_editor::tab_switch_keys(ui) {
             self.step_tab(&id, forward);
             ui.ctx().request_repaint();
             return;
@@ -224,11 +215,11 @@ impl PatchTool {
             EditorAction { id: ACTION_FOCUS_TREE, label: i18n.t(I18nKey::NemesisFocusTree) },
             EditorAction { id: ACTION_BACK, label: i18n.t(I18nKey::NemesisGoBack) },
             EditorAction { id: ACTION_FORWARD, label: i18n.t(I18nKey::NemesisGoForward) },
-            EditorAction { id: ACTION_NEXT_TAB, label: i18n.t(I18nKey::NemesisNextTab) },
-            EditorAction { id: ACTION_PREVIOUS_TAB, label: i18n.t(I18nKey::NemesisPreviousTab) },
-            EditorAction { id: ACTION_CLOSE_TAB, label: i18n.t(I18nKey::NemesisCloseCurrentTab) },
-            EditorAction { id: ACTION_PREVIEW, label: i18n.t(I18nKey::NemesisTogglePreview) },
-            EditorAction { id: ACTION_INLINE_DIFF, label: i18n.t(I18nKey::NemesisToggleInlineDiff) },
+            EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab)),
+            EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab)),
+            EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab)),
+            EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
+            EditorCommand::ToggleInlineDiff.action(i18n.t(I18nKey::NemesisToggleInlineDiff)),
         ];
 
         let mut result = EditorResult::default();
@@ -281,7 +272,7 @@ impl PatchTool {
                     .features(features)
                     .keymap(keymap)
                     .labels(labels)
-                    .host_commands(true)
+                    .host_commands(&HOST_COMMANDS)
                     .actions(&actions)
                     .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
                     .show(ui, &mut self.editor);
@@ -290,7 +281,7 @@ impl PatchTool {
                 }
                 result.changed = output.changed;
                 result.inline_revert = output.inline_revert;
-                result.command = output.command.or_else(|| action_command(output.action));
+                result.command = output.command;
                 result.focus_tree = output.action == Some(ACTION_FOCUS_TREE);
                 result.walk_history = match output.action {
                     Some(ACTION_BACK) => Some(true),
@@ -371,20 +362,6 @@ fn split_preview_button(ui: &mut egui::Ui, i18n: &I18nMap, show_preview: &mut bo
     }
 }
 
-/// `Ctrl+PageDown`: `Some(true)`. `Ctrl+PageUp`: `Some(false)`.
-fn tab_keys(ui: &egui::Ui) -> Option<bool> {
-    use egui::{Key, Modifiers};
-    ui.input_mut(|input| {
-        if input.consume_key(Modifiers::COMMAND, Key::PageDown) {
-            Some(true)
-        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) {
-            Some(false)
-        } else {
-            None
-        }
-    })
-}
-
 /// `Alt+←` or the mouse's back button: `Some(true)`. `Alt+→` or its forward button: `Some(false)`.
 /// As in VS Code, in every keymap: going to a definition is only useful if you can come back.
 fn history_keys(ui: &egui::Ui) -> Option<bool> {
@@ -404,8 +381,9 @@ fn history_keys(ui: &egui::Ui) -> Option<bool> {
     })
 }
 
-/// `[ #0106 GetUpModList ✖ ] [ ● #0200 Root ✖ ]`. See [`crate::patch::editor_tabs`].
+/// `[ GetUpModList ✖ ] [ ● Root ✖ ]`. See [`crate::patch::editor_tabs`].
 ///
+/// Only the name, to keep the tabs short: the hover has the whole label, and the tree follows the tab.
 /// A click shows a tab, a double click pins it, a middle click or `✖` closes it.
 fn tab_bar(
     ui: &mut egui::Ui,
@@ -421,12 +399,12 @@ fn tab_bar(
             for tab in tabs.of(behavior) {
                 let node = graph.node_of(&tab.id);
                 let marker = if node.is_some_and(|node| graph.is_changed(node)) { "● " } else { "" };
-                let name = node.map_or("", |node| graph.short_name(node));
-                let text = egui::RichText::new(format!("{marker}{} {name}", tab.id)).small();
+                let name = tab_name(node.map_or("", |node| graph.short_name(node)), &tab.id);
+                let text = egui::RichText::new(format!("{marker}{name}")).small();
                 // Italic: the preview tab, which the next opened object replaces.
                 let text = if tab.pinned { text } else { text.italics() };
-                let response =
-                    ui.add(Button::selectable(tab.id == current, text)).on_hover_text(graph_label(graph, node));
+                let hover = node.map_or(tab.id.as_str(), |node| graph.label(node));
+                let response = ui.add(Button::selectable(tab.id == current, text)).on_hover_text(hover);
                 if response.clicked() {
                     event = Some(TabEvent::Show(tab.id.clone()));
                 }
@@ -447,7 +425,7 @@ fn tab_bar(
 fn tab_menu(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, pinned: bool) -> Option<TabEvent> {
     let items = [
         (I18nKey::NemesisKeepOpen, !pinned, TabEvent::KeepOpen(id.to_owned())),
-        (I18nKey::NemesisCloseTab, true, TabEvent::Close(id.to_owned())),
+        (I18nKey::CloseButton, true, TabEvent::Close(id.to_owned())),
         (I18nKey::NemesisCloseOtherTabs, true, TabEvent::CloseOthers(id.to_owned())),
         (I18nKey::NemesisCloseTabsRight, true, TabEvent::CloseToTheRight(id.to_owned())),
         (I18nKey::NemesisCloseAllTabs, true, TabEvent::CloseAll),
@@ -467,9 +445,12 @@ fn tab_menu(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, pinned: bool) -> Option
     picked
 }
 
-/// The whole label of a node, for the tab's hover.
-fn graph_label(graph: &Graph, node: Option<crate::patch::tree::Node>) -> String {
-    node.map_or_else(String::new, |node| graph.label(node).to_owned())
+/// What a tab says: the object's name, or the last part of the id of what has none, such as a file of
+/// the animation data.
+///
+/// e.g., `("GetUpModList", "#0106")` -> `GetUpModList`, `("", "AData~A/m$New.txt")` -> `m$New.txt`
+fn tab_name<'a>(name: &'a str, id: &'a str) -> &'a str {
+    if name.is_empty() { id.rsplit('/').next().unwrap_or(id) } else { name }
 }
 
 /// The language features the settings turn on. The lines of the animation data have no form to
@@ -526,4 +507,16 @@ fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions,
                 ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_tab_says_the_name() {
+        assert_eq!(tab_name("GetUpModList", "#0106"), "GetUpModList");
+        assert_eq!(tab_name("", "#0106"), "#0106");
+        assert_eq!(tab_name("", "AData~A/m$New.txt"), "m$New.txt");
+    }
 }

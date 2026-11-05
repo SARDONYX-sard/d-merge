@@ -239,6 +239,7 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | `<Space>e`      | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                                                                         |
 | `<Space>l` `gt` | Next tab (`EditorCommand::NextTab` for the host)                                                                                                                                   |
 | `<Space>h` `gT` | Previous tab (`EditorCommand::PreviousTab` for the host)                                                                                                                           |
+| `<Space>c`      | Close the tab (`EditorCommand::CloseTab` for the host)                                                                                                                             |
 | `<Space>f`      | Format the document                                                                                                                                                                |
 | `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                                                                                |
 | `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                                                                   |
@@ -247,7 +248,7 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 
 Pressing `<Space>` or `g` and then waiting for a moment lists what can follow them. Keys that need the
-host (tabs, preview, tree) are only listed with `CodeEditor::host_commands(true)`.
+host (tabs, preview, tree) are only listed if it says it acts on them: `CodeEditor::host_commands`.
 
 ### Ex commands
 

@@ -1,7 +1,7 @@
 //! Draws the list of what can follow a key that waits for another. See
 //! [`crate::keymap::Prefix`] for the list, and [`wait`] for when it shows.
 
-use crate::keymap::Prefix;
+use crate::{EditorCommand, keymap::Prefix};
 
 /// Someone who knows the keys has pressed the next one by then: the list would only flash.
 const DELAY_SECONDS: f64 = 0.8;
@@ -26,7 +26,13 @@ pub(crate) fn wait(waiting: &mut Waiting, prefix: Prefix, now: f64) -> Option<f6
 
 /// `area`: the visible part of the editor. The list is at its bottom right, over the text, and lets
 /// the pointer through.
-pub(crate) fn show(ctx: &egui::Context, id: egui::Id, area: egui::Rect, prefix: Prefix, host_commands: bool) {
+pub(crate) fn show(
+    ctx: &egui::Context,
+    id: egui::Id,
+    area: egui::Rect,
+    prefix: Prefix,
+    host_commands: &[EditorCommand],
+) {
     egui::Area::new(id.with("which_key"))
         .order(egui::Order::Foreground)
         .interactable(false)
