@@ -1029,6 +1029,22 @@ pub enum I18nKey {
     /// Show or hide the inline diff (Vim: Space d, :diff)
     NemesisToggleInlineDiff,
 
+    /// # Nemesis special syntax: Empty Array push pattern
+    /// Adds elements to an array that is empty in the template. Its line stays as it is and the elements follow it, so the array is not replaced and several mods can add to it.
+    ///
+    /// # Example
+    /// ```xml
+    /// <hkparam name="eventNames" numelements="0"></hkparam>
+    /// <!-- MOD_CODE ~mymod~ OPEN -->
+    ///     <hkcstring>Hi</hkcstring>
+    /// </hkparam>
+    /// <!-- CLOSE -->
+    /// ```
+    ///
+    /// # Notes
+    /// - Not compatible with Pandora v4.
+    NemesisKeptArrayHover,
+
     /// Check
     NemesisCheck,
 

@@ -226,6 +226,7 @@
   "nemesis_close_current_tab": "タブを閉じる (Vim: :tabc, :q)",
   "nemesis_toggle_preview": "パッチのプレビューを切り替え (Vim: Space p, :preview)",
   "nemesis_toggle_inline_diff": "インライン差分を切り替え (Vim: Space d, :diff)",
+  "nemesis_kept_array_hover": "# Nemesis特殊構文: Empty Array push pattern\nテンプレートで空の配列に要素を追加します。元の行はそのまま残して後ろに要素を続けるため、配列を置き換えず、複数の mod から追加できます。\n\n# Example\n```xml\n<hkparam name=\"eventNames\" numelements=\"0\"></hkparam>\n<!-- MOD_CODE ~mymod~ OPEN -->\n    <hkcstring>Hi</hkcstring>\n</hkparam>\n<!-- CLOSE -->\n```\n\n# Notes\n- Pandora v4 とは互換性がありません。",
   "nemesis_expand_all": "すべて展開",
   "nemesis_collapse_all": "すべて折りたたむ",
   "nemesis_check_all": "すべて診断",

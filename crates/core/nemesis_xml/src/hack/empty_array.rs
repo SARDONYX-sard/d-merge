@@ -4,7 +4,7 @@
 //! Mods write it in one of two ways. In both, `numelements="0"` says that the template has no
 //! elements, so all of them are new: it is a push, which lets several mods add to the same array.
 //!
-//! The usual form, which is valid XML: the line is replaced.
+//! The form where the line is replaced, which is valid XML.
 //! ```xml
 //! <!-- MOD_CODE ~id~ OPEN -->
 //! <hkparam name="boneWeights" numelements="2">
@@ -15,8 +15,9 @@
 //! <!-- CLOSE -->
 //! ```
 //!
-//! The form where the line is kept and the elements follow it, as `Precision Creatures` does. It
-//! is not valid XML, so it needs [`crate::hack::HackOptions`]. Pandora v4 reports it as an error.
+//! The form where the line is kept and the elements follow it, which is Nemesis' usual syntax and the
+//! one the patch editor writes (e.g., `Precision Creatures`). It is not valid XML, so it needs
+//! [`crate::hack::HackOptions`]. Pandora v4 reports it as an error.
 //! ```xml
 //! <hkparam name="boneWeights" numelements="0"></hkparam>
 //! <!-- MOD_CODE ~colisc~ OPEN -->

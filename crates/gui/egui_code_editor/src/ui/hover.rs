@@ -4,6 +4,9 @@ use egui::{Galley, Pos2, Rect, text::CCursor};
 
 use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, MAX_HEIGHT, Open, POPUP_MARGIN, SCROLL_STEP, content};
 
+/// The width of the popup's border while the keyboard is in it.
+const FOCUSED_BORDER: f32 = 2.0;
+
 impl HoverPopup {
     /// Handles the keys meant for the popup, and closes it on other keys or a click outside it.
     ///
@@ -188,7 +191,7 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open) -> Rect {
         .fixed_pos(open.anchor.left_bottom())
         .constrain(true)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
+            popup_frame(ui.style(), open.focused).show(ui, |ui| {
                 // Has the keyboard while no link does, so that it leaves the editor.
                 let popup = ui.allocate_response(egui::Vec2::ZERO, egui::Sense::focusable_noninteractive());
                 let mut area = egui::ScrollArea::vertical().id_salt("hover_scroll").max_height(MAX_HEIGHT);
@@ -217,6 +220,13 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open) -> Rect {
         })
         .response
         .rect
+}
+
+/// The popup's frame. With the keyboard in the popup its border stands out: keys go there, not to the
+/// editor.
+fn popup_frame(style: &egui::Style, focused: bool) -> egui::Frame {
+    let frame = egui::Frame::popup(style);
+    if focused { frame.stroke(egui::Stroke::new(FOCUSED_BORDER, style.visuals.selection.bg_fill)) } else { frame }
 }
 
 /// The problems, then the docs. Returns the links in the docs.
@@ -255,4 +265,19 @@ fn char_at(galley: &Galley, galley_pos: Pos2, pointer: Pos2) -> Option<usize> {
 /// Screen rect of the char at `index` (zero width, row height).
 fn char_rect(galley: &Galley, galley_pos: Pos2, index: usize) -> Rect {
     galley.pos_from_cursor(CCursor::new(index)).translate(galley_pos.to_vec2())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_border_stands_out_with_the_keyboard_in_the_popup() {
+        let style = egui::Style::default();
+        let normal = popup_frame(&style, false).stroke;
+        let focused = popup_frame(&style, true).stroke;
+        assert!(focused.width > normal.width);
+        assert_eq!(focused.color, style.visuals.selection.bg_fill);
+        assert_eq!(normal, egui::Frame::popup(&style).stroke);
+    }
 }

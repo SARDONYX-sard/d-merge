@@ -117,6 +117,10 @@ pub(crate) struct NemesisXml<'a> {
     pub(crate) fields: Option<(&'a str, &'a [&'static FieldSchema])>,
     /// The array of pointers the cursor line is an element of: what its objects have to be.
     pub(crate) pointer_field: Option<&'static FieldSchema>,
+    /// The hover of a push to an empty array that keeps its line (translated).
+    pub(crate) kept_array_hover: &'a str,
+    /// The cursor line is in an array of strings: its elements are `<hkcstring>`.
+    pub(crate) in_string_array: bool,
     /// Every object, for go-to-definition and find-references.
     pub(crate) behavior: &'a Behavior,
 }
@@ -176,6 +180,12 @@ impl Language for NemesisXml<'_> {
             && let Some(field) = fields.iter().find(|field| field.name == name)
         {
             doc.push_str(&field_hover(&class, field));
+        }
+        if nemesis_diff::is_in_kept_array(text, line_no) {
+            if !doc.is_empty() {
+                doc.push_str("\n\n");
+            }
+            doc.push_str(self.kept_array_hover);
         }
         let doc = doc.trim_end();
         (!doc.is_empty()).then(|| doc.to_owned())
@@ -275,6 +285,7 @@ impl Language for NemesisXml<'_> {
     fn complete(&self, line: &str, column: usize) -> CompletionList {
         let before: String = line.chars().take(column).collect();
         self.nemesis_variable(line, &before, column)
+            .or_else(|| self.in_string_array.then(|| string_element(&before, column)).flatten())
             .or_else(|| self.field_name(line, &before, column))
             .or_else(|| self.pointer_value(&before, column))
             .or_else(|| self.integer_value(&before, column))
@@ -598,6 +609,21 @@ fn pointer_item(graph: &Graph, node: super::tree::Node) -> CompletionItem {
     item(id, "→", id.to_owned(), graph.doc(node).to_owned())
 }
 
+/// On an empty line of an array of strings, or `<`, `<hk`, ...: the tag of its elements, with the
+/// cursor where the string goes.
+///
+/// e.g., `\t\t\t\t<hk|` -> `\t\t\t\t<hkcstring>|</hkcstring>`
+fn string_element(before: &str, column: usize) -> Option<CompletionList> {
+    const OPEN: &str = "<hkcstring>";
+    let typed = before.trim_start();
+    if !OPEN.starts_with(typed) && !OPEN[1..].starts_with(typed) {
+        return None;
+    }
+    let mut element = item("hkcstring", "▪", format!("{OPEN}</hkcstring>"), "An element of the array".to_owned());
+    element.select = Some(OPEN.len()..OPEN.len());
+    Some(CompletionList { replace: column - typed.chars().count()..column, items: vec![element] })
+}
+
 pub(super) fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
     CompletionItem { label: label.to_string(), icon, insert, select: None, documentation }
 }
@@ -634,6 +660,19 @@ fn value_range(insert: &str) -> Option<Range<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completes_the_tag_of_a_string_element() {
+        for before in ["\t\t\t\t", "\t\t\t\t<", "\t\t\t\t<hk", "\t\t\t\thkc", "\t\t\t\t<hkcstring"] {
+            let column = before.chars().count();
+            let list = string_element(before, column).unwrap();
+            assert_eq!(list.replace, 4..column, "{before:?}");
+            assert_eq!(list.items[0].insert, "<hkcstring></hkcstring>");
+            assert_eq!(list.items[0].select, Some(11..11), "between the tags");
+        }
+        assert!(string_element("\t\t\t\t<hkcstring>a", 16).is_none(), "in the string");
+        assert!(string_element("\t\t\t\t<hkparam", 12).is_none());
+    }
 
     #[test]
     fn finds_symbols() {

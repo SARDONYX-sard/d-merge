@@ -225,6 +225,8 @@ struct Array {
 
 impl Array {
     fn find(object: &str, param: &str) -> Option<Self> {
+        // A push that kept the line of the empty array has its elements after it.
+        let object = crate::open_kept_arrays(object);
         let lines: Vec<&str> = object.lines().collect();
         let open = format!("<hkparam name=\"{param}\"");
         let at = lines.iter().position(|line| line.trim_start().starts_with(&open))?;
@@ -347,6 +349,11 @@ mod tests {
         let (string_data, graph_data) = add_event(STRING_DATA, GRAPH_DATA, "MyEvent").unwrap();
         assert_eq!(names(&string_data, "eventNames"), ["moveStart", "moveStop", "MyEvent"]);
         assert_eq!(Array::find(&graph_data, "eventInfos").unwrap().elements.len(), 2);
+
+        // The array is empty in the template, and the element follows its line.
+        let kept = "\t\t\t<hkparam name=\"eventNames\" numelements=\"0\"></hkparam>\n\t\t\t\t<hkcstring>Hi</hkcstring>\n\t\t\t</hkparam>\n";
+        let array = Array::find(kept, "eventNames").unwrap();
+        assert_eq!(array.elements, [["\t\t\t\t<hkcstring>Hi</hkcstring>"]]);
 
         let (string_data, graph_data, value_set) =
             add_variable(&string_data, &graph_data, VALUE_SET, "myVar", VariableType::Real, 1_045_220_557).unwrap();

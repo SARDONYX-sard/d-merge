@@ -15,7 +15,7 @@
 //! Nemesis' markers (`<!-- MOD_CODE ~id~ OPEN -->`, ...) stay as they are: the mod's author may have
 //! them at any indentation, and the parser does not mind.
 
-use crate::{CLOSE, ORIGINAL, normalize};
+use crate::{CLOSE, ORIGINAL, normalize, open_kept_arrays};
 
 /// How deep a top-level object is in a file: `<hkpackfile>`, `<hksection>`, then the object.
 const OBJECT_DEPTH: usize = 2;
@@ -24,9 +24,11 @@ const OBJECT_DEPTH: usize = 2;
 /// the indentation of what follows the mistake would be wrong everywhere.
 pub fn format_object(text: &str) -> Option<String> {
     let normalized = normalize(text);
+    // The tags of a push that kept the line of an empty array only balance like this.
+    let balanced = open_kept_arrays(&normalized);
     let mut out = String::with_capacity(normalized.len() + normalized.len() / 8);
     let mut depth = OBJECT_DEPTH;
-    for line in normalized.lines() {
+    for (line, balanced) in normalized.lines().zip(balanced.lines()) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             out.push('\n');
@@ -37,7 +39,7 @@ pub fn format_object(text: &str) -> Option<String> {
             out.push('\n');
             continue;
         }
-        let (opened, closed) = if trimmed.starts_with("<!--") { (0, 0) } else { tags_of(trimmed) };
+        let (opened, closed) = if trimmed.starts_with("<!--") { (0, 0) } else { tags_of(balanced.trim()) };
         let indent = if trimmed.starts_with("</") { depth.checked_sub(1)? } else { depth };
         out.extend(std::iter::repeat_n('\t', indent));
         out.push_str(trimmed);
@@ -121,6 +123,20 @@ mod tests {
             "\t\t<hkobject name=\"#1\" class=\"a\">\n<!-- MOD_CODE ~m~ OPEN -->\n\t\t\t<hkparam name=\"a\">1</hkparam>\n\
              \t<!-- ORIGINAL -->\n\t\t\t<hkparam name=\"a\">0</hkparam>\n<!-- CLOSE -->\n\t\t</hkobject>\n"
         );
+    }
+
+    /// A push to an empty array that keeps its line: see `kept_array`.
+    #[test]
+    fn a_kept_line_and_its_elements() {
+        let formatted = "\t\t<hkobject name=\"#1\" class=\"a\">\n\
+                         \t\t\t<hkparam name=\"a\" numelements=\"0\"></hkparam>\n\
+                         \t\t\t\t<hkcstring>Hi</hkcstring>\n\
+                         \t\t\t</hkparam>\n\
+                         \t\t\t<hkparam name=\"b\" numelements=\"0\"></hkparam>\n\
+                         \t\t</hkobject>\n";
+        assert_eq!(format_object(formatted).as_deref(), Some(formatted));
+        let flat: String = formatted.lines().map(|line| format!("{} \n", line.trim())).collect();
+        assert_eq!(format_object(&flat).as_deref(), Some(formatted));
     }
 
     #[test]

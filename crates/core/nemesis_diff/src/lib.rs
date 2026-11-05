@@ -23,6 +23,7 @@
 pub mod asdsf;
 pub mod conflict;
 mod format;
+mod kept_array;
 pub mod schema;
 pub mod vars;
 
@@ -30,7 +31,10 @@ use std::{fmt::Write as _, ops::Range};
 
 use fast_hash::{HashMap, HashSet};
 
-pub use self::format::format_object;
+pub use self::{
+    format::format_object,
+    kept_array::{is_in_kept_array, open_kept_arrays},
+};
 
 /// One top-level `<hkobject name="#0106" class="..">` of a behavior xml.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,11 +214,13 @@ pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
     out
 }
 
-/// `edited` with each `numelements="N"` set back to the template's value for the same field (the
-/// k-th `<hkparam name="x" numelements=` of a name matches the template's k-th).
+/// `edited` with the `<hkparam ... numelements=` lines as a patch has to write them. The k-th such line
+/// of a name matches the template's k-th.
 ///
-/// Nemesis / d-merge count the elements themselves, and a changed `<hkparam ...>` line would
-/// become a patch block where the parsers do not accept one.
+/// - The count goes back to the template's value: Nemesis / d-merge count the elements themselves, and
+///   a changed `<hkparam ...>` line would become a patch block where the parsers do not accept one.
+/// - An array that is empty in the template keeps its line, however its elements were written, so
+///   that the patch only adds them instead of replacing the array: see [`kept_array`].
 pub fn align_numelements(template: &str, edited: &str) -> String {
     const KEY: &str = " numelements=\"";
     let field = |line: &str| -> Option<String> {
@@ -225,28 +231,69 @@ pub fn align_numelements(template: &str, edited: &str) -> String {
         let at = line.find(KEY)? + KEY.len();
         Some(line[at..].split('"').next()?.to_string())
     };
-    // field name -> its `numelements` values in template order
-    let mut template_counts: HashMap<String, Vec<String>> = HashMap::default();
+    // field name -> its `numelements` values in template order, and the line if it is an empty array
+    let mut template_counts: HashMap<String, Vec<(String, Option<&str>)>> = HashMap::default();
     for line in template.lines() {
         if let (Some(name), Some(n)) = (field(line), count(line)) {
-            template_counts.entry(name).or_default().push(n);
+            let empty = line.trim_end().ends_with("\"0\"></hkparam>").then_some(line);
+            template_counts.entry(name).or_default().push((n, empty));
         }
     }
 
+    let lines: Vec<&str> = edited.split_inclusive('\n').collect();
     let mut seen: HashMap<String, usize> = HashMap::default();
     let mut out = String::with_capacity(edited.len());
-    for line in edited.split_inclusive('\n') {
-        let aligned = field(line).and_then(|name| {
+    let mut at = 0;
+    while at < lines.len() {
+        let line = lines[at];
+        at += 1;
+        let template_field = field(line).and_then(|name| {
             let k = seen.entry(name.clone()).or_default();
-            let original = template_counts.get(&name)?.get(*k)?;
+            let found = template_counts.get(&name)?.get(*k)?;
             *k += 1;
-            let current = count(line)?;
-            (current != *original)
-                .then(|| line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1))
+            Some(found)
         });
+        let Some((original, empty)) = template_field else {
+            out.push_str(line);
+            continue;
+        };
+        if let Some(kept) = *empty
+            && let Some(skip) = keep_empty_array_line(kept, line, &lines[at..], &mut out)
+        {
+            at += skip;
+            continue;
+        }
+        let aligned = count(line)
+            .filter(|current| current != original)
+            .map(|current| line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1));
         out.push_str(aligned.as_deref().unwrap_or(line));
     }
     out
+}
+
+/// Writes an array that is empty in the template the way that keeps its line (`kept`). Returns how
+/// many lines of `rest` it took care of. `None`: it did not write anything: this is that line, or the
+/// array does not close yet.
+///
+/// e.g., for `numelements="0"></hkparam>`
+/// - `numelements="0">`, `<hkcstring>a</hkcstring>`, `</hkparam>`: the line, and the rest as it is
+/// - `numelements="0">`, `</hkparam>`: the line alone, since nothing is added
+/// - `numelements="0"><hkcstring>a</hkcstring></hkparam>`: the line, the element, `</hkparam>`
+fn keep_empty_array_line(kept: &str, line: &str, rest: &[&str], out: &mut String) -> Option<usize> {
+    let indent = &kept[..kept.len() - kept.trim_start().len()];
+    if line.contains("</hkparam>") {
+        let (_, value) = line.split_once('>')?;
+        let (value, _) = value.rsplit_once("</hkparam>")?;
+        let value = value.trim();
+        if value.is_empty() {
+            return None;
+        }
+        let _ = writeln!(out, "{kept}\n{indent}\t{value}\n{indent}</hkparam>");
+        return Some(0);
+    }
+    let end = kept_array::array_end(rest)?;
+    let _ = writeln!(out, "{kept}");
+    Some(if end.has_elements { 0 } else { end.close + 1 })
 }
 
 /// What a patch file means: the edited object (`Mod`) or the template object (`Original`).
@@ -448,7 +495,9 @@ pub fn apply_patches<'a>(template: &str, patches: impl IntoIterator<Item = (&'a 
 /// # Errors
 /// The parse error, readable.
 pub fn validate(patch: &str) -> Result<(), String> {
-    nemesis_xml::patch::parse_nemesis_patch(patch, None).map(|_| ()).map_err(|err| err.to_string())
+    // The push to an empty array that keeps its line: see `kept_array`.
+    let hacks = nemesis_xml::hack::HackOptions { empty_array_outside_hkparam: true, ..Default::default() };
+    nemesis_xml::patch::parse_nemesis_patch(patch, Some(hacks)).map(|_| ()).map_err(|err| err.to_string())
 }
 
 /// A class or field name the Havok class table does not know.
@@ -464,6 +513,7 @@ pub struct FieldProblem {
 pub fn check_fields(object: &str) -> Vec<FieldProblem> {
     use nemesis_xml::patch::class_schema::{ClassSchema, TypeKind, find_class_schema};
 
+    let object = open_kept_arrays(object);
     let mut problems = Vec::new();
     // Open objects: (class name, its schema if known).
     let mut objects: Vec<(&str, Option<&'static ClassSchema>)> = Vec::new();
@@ -624,6 +674,67 @@ mod tests {
         assert!(patch.contains("<hkparam name=\"modifiers\" numelements=\"3\">"), "{patch}");
         assert_eq!(patch.matches("<!-- CLOSE -->").count(), 1, "{patch}");
         validate(&patch).unwrap();
+    }
+
+    const EMPTY_ARRAY: &str = "\t\t<hkobject name=\"#0106\" class=\"hkbCharacterStringData\" signature=\"0x655b42bc\">\n\
+                               \t\t\t<hkparam name=\"characterPropertyNames\" numelements=\"0\"></hkparam>\n\
+                               \t\t</hkobject>\n";
+    const EMPTY_LINE: &str = "numelements=\"0\"></hkparam>\n";
+
+    /// What every way of writing the elements of `EMPTY_ARRAY` has to come to.
+    const PUSH: &str = "\t\t<hkobject name=\"#0106\" class=\"hkbCharacterStringData\" signature=\"0x655b42bc\">\n\
+                        \t\t\t<hkparam name=\"characterPropertyNames\" numelements=\"0\"></hkparam>\n\
+                        <!-- MOD_CODE ~mymod~ OPEN -->\n\
+                        \t\t\t\t<hkcstring>Hi</hkcstring>\n\
+                        \t\t\t</hkparam>\n\
+                        <!-- CLOSE -->\n\
+                        \t\t</hkobject>\n";
+
+    #[test]
+    fn a_push_to_an_empty_array_keeps_its_line() {
+        for written in [
+            // Nemesis' way.
+            "numelements=\"0\"></hkparam>\n\t\t\t\t<hkcstring>Hi</hkcstring>\n\t\t\t</hkparam>\n",
+            // The XML way, whatever it counts.
+            "numelements=\"0\">\n\t\t\t\t<hkcstring>Hi</hkcstring>\n\t\t\t</hkparam>\n",
+            "numelements=\"1\">\n\t\t\t\t<hkcstring>Hi</hkcstring>\n\t\t\t</hkparam>\n",
+            // On one line.
+            "numelements=\"1\"><hkcstring>Hi</hkcstring></hkparam>\n",
+        ] {
+            let edited = EMPTY_ARRAY.replace(EMPTY_LINE, written);
+            assert_eq!(object_patch("mymod", EMPTY_ARRAY, &edited).as_deref(), Some(PUSH), "{written}");
+        }
+    }
+
+    #[test]
+    fn a_push_to_an_empty_array_passes_the_check_and_is_a_push() {
+        validate(PUSH).unwrap();
+        let hacks = nemesis_xml::hack::HackOptions { empty_array_outside_hkparam: true, ..Default::default() };
+        let (patches, _) = nemesis_xml::patch::parse_nemesis_patch(PUSH, Some(hacks)).unwrap();
+        assert!(format!("{patches:?}").contains("SeqPush"), "several mods can add to it: {patches:?}");
+    }
+
+    #[test]
+    fn a_push_to_an_empty_array_survives_reading_the_patch_back() {
+        let edited = resolve(PUSH, View::Mod);
+        assert_eq!(object_patch("mymod", EMPTY_ARRAY, &edited).as_deref(), Some(PUSH));
+    }
+
+    #[test]
+    fn an_empty_array_with_nothing_in_it_is_not_a_change() {
+        for written in
+            [EMPTY_LINE, "numelements=\"0\">\n\t\t\t</hkparam>\n", "numelements=\"0\">\n\t\t\t\t\n\t\t\t</hkparam>\n"]
+        {
+            let edited = EMPTY_ARRAY.replace(EMPTY_LINE, written);
+            assert_eq!(object_patch("mymod", EMPTY_ARRAY, &edited), None, "{written}");
+        }
+    }
+
+    /// Its elements must not be told apart from a typo in the field names.
+    #[test]
+    fn a_kept_line_has_no_problems_in_its_fields() {
+        let edited = resolve(PUSH, View::Mod);
+        assert_eq!(check_fields(&edited), []);
     }
 
     #[test]

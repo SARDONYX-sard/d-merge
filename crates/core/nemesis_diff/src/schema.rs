@@ -99,9 +99,11 @@ pub fn array_element(object: &str, line: usize, column: usize) -> Option<ArrayEl
     let mut stack: Vec<Open<'_>> = Vec::new();
     let token_at = |tokens: &[std::ops::Range<usize>]| tokens.iter().position(|t| t.start <= column && column <= t.end);
 
-    for (line_no, text) in object.lines().enumerate().take(line + 1) {
+    // Only for the structure: the names come from `object`, which they borrow.
+    let balanced = crate::open_kept_arrays(object);
+    for (line_no, (text, balanced)) in object.lines().zip(balanced.lines()).enumerate().take(line + 1) {
         let here = line_no == line;
-        let trimmed = text.trim();
+        let trimmed = balanced.trim();
         if trimmed.starts_with("<hkobject") {
             if let Some(Open::Field { count: Some(count), .. }) = stack.last_mut() {
                 *count += 1;
@@ -111,7 +113,7 @@ pub fn array_element(object: &str, line: usize, column: usize) -> Option<ArrayEl
             }
         } else if trimmed.starts_with("</hkobject>") || trimmed.starts_with("</hkparam>") {
             stack.pop();
-        } else if let Some(rest) = trimmed.strip_prefix("<hkparam") {
+        } else if let Some(rest) = text.trim().strip_prefix("<hkparam") {
             let name = attribute(rest, "name").unwrap_or_default();
             let numelements = attribute(rest, "numelements");
             let len = numelements.and_then(|n| n.parse().ok());
@@ -269,6 +271,7 @@ pub fn is_subclass(class: &str, base: &str) -> bool {
 /// The class (and its XML fields) of the innermost `<hkobject>` open at 0-based `line` of an
 /// object text. A classless nested `<hkobject>` gets the class from its field's type.
 pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static FieldSchema>)> {
+    let object = crate::open_kept_arrays(object);
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
     for text in object.lines().take(line) {
@@ -284,6 +287,23 @@ pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static 
 ///
 /// e.g. the line of `#0107` in `<hkparam name="modifiers" numelements="2">\n#0107\n#0108\n</hkparam>`
 pub fn open_pointer_field(object: &str, line: usize) -> Option<&'static FieldSchema> {
+    open_field(object, line).filter(|field| holds_pointers(field))
+}
+
+/// Does `field` hold pointers: itself, or as an array of them?
+pub fn holds_pointers(field: &FieldSchema) -> bool {
+    field.kind == TypeKind::Pointer || field.sub_kind == TypeKind::Pointer
+}
+
+/// Is `field` an array of strings, whose elements are `<hkcstring>a</hkcstring>`?
+pub const fn holds_strings(field: &FieldSchema) -> bool {
+    matches!(field.kind, TypeKind::Array | TypeKind::SimpleArray)
+        && matches!(field.sub_kind, TypeKind::CString | TypeKind::StringPtr)
+}
+
+/// The field whose opening line is above 0-based `line`, and whose closing line is not, if any.
+pub fn open_field(object: &str, line: usize) -> Option<&'static FieldSchema> {
+    let object = crate::open_kept_arrays(object);
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
     let mut open: Vec<Option<&'static FieldSchema>> = Vec::new();
@@ -292,8 +312,7 @@ pub fn open_pointer_field(object: &str, line: usize) -> Option<&'static FieldSch
         if let Some(rest) = trimmed.strip_prefix("<hkparam") {
             if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
                 let name = attribute(rest, "name").unwrap_or_default();
-                let field = field_of(objects.last().copied().flatten(), name);
-                open.push(field.filter(|field| field.kind == TypeKind::Pointer || field.sub_kind == TypeKind::Pointer));
+                open.push(field_of(objects.last().copied().flatten(), name));
             }
         } else if trimmed.starts_with("</hkparam>") {
             open.pop();
@@ -428,6 +447,7 @@ pub fn check_pointers<'c>(
     own_code: &str,
     class_of: &dyn Fn(&str) -> Option<&'c str>,
 ) -> Vec<PointerProblem> {
+    let object = crate::open_kept_arrays(object);
     let mut problems = Vec::new();
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
@@ -489,6 +509,27 @@ mod tests {
     use super::*;
 
     /// The completion of a line of an array has to know the array.
+    #[test]
+    fn an_array_of_strings_is_known_by_its_open_field() {
+        let object = "\t\t<hkobject name=\"#0106\" class=\"hkbCharacterStringData\" signature=\"0x655b42bc\">\n\t\t\t<hkparam name=\"characterPropertyNames\" numelements=\"0\">\n\t\t\t\t\n\t\t\t</hkparam>\n\t\t\t<hkparam name=\"name\">a</hkparam>\n\t\t</hkobject>\n";
+        let field = open_field(object, 2).unwrap();
+        assert_eq!(field.name, "characterPropertyNames");
+        assert!(holds_strings(field));
+        assert!(open_field(object, 4).is_none(), "closed");
+    }
+
+    /// The line of the template stays, and the elements follow it.
+    #[test]
+    fn a_kept_line_is_open_for_its_elements() {
+        let object = "\t\t<hkobject name=\"#0106\" class=\"hkbCharacterStringData\" signature=\"0x655b42bc\">\n\t\t\t<hkparam name=\"characterPropertyNames\" numelements=\"0\"></hkparam>\n\t\t\t\t<hkcstring>Hi</hkcstring>\n\t\t\t\t<\n\t\t\t</hkparam>\n\t\t\t<hkparam name=\"name\">a</hkparam>\n\t\t</hkobject>\n";
+        assert!(holds_strings(open_field(object, 3).unwrap()), "where the next one goes");
+        assert!(open_field(object, 5).is_none(), "closed");
+        assert_eq!(field_context(object, 5).unwrap().0, "hkbCharacterStringData");
+
+        let element = array_element(object, 2, 8).unwrap();
+        assert_eq!((element.field, element.index), ("characterPropertyNames", 0));
+    }
+
     #[test]
     fn a_line_of_an_array_of_pointers_knows_what_it_points_to() {
         let object = "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"variableBindingSet\">null</hkparam>\n\t\t\t<hkparam name=\"modifiers\" numelements=\"2\">\n\t\t\t\t#0107\n\t\t\t\t#0108\n\t\t\t</hkparam>\n\t\t\t<hkparam name=\"enable\">true</hkparam>\n\t\t</hkobject>\n";

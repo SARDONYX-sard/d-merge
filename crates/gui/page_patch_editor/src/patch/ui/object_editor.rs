@@ -189,7 +189,7 @@ impl PatchTool {
         let values = self.field_values();
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
-        let pointer_field = nemesis_diff::schema::open_pointer_field(&self.editor_text, self.cursor_line);
+        let open_field = nemesis_diff::schema::open_field(&self.editor_text, self.cursor_line);
         let language = NemesisXml {
             code_action: self.lsp.code_action,
             events: &names.usable_events,
@@ -198,7 +198,9 @@ impl PatchTool {
             values: &values,
             graph: &names.graph,
             fields: context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice())),
-            pointer_field,
+            pointer_field: open_field.filter(|field| nemesis_diff::schema::holds_pointers(field)),
+            kept_array_hover: i18n.t(I18nKey::NemesisKeptArrayHover),
+            in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
             // After name, id, speed, crop start, crop end and the count.
             behavior: &self.workspace.behaviors[self.active],
         };
