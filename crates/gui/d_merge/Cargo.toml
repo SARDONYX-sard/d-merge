@@ -3,17 +3,17 @@ name = "d_merge"
 # The app's version: this crate reads it with `env!("CARGO_PKG_VERSION")`.
 # Other crates stay at 0.0.0, so that a version bump does not rebuild them.
 version.workspace = true
-description = "Diff & Merge hkx patcher"
+description       = "Diff & Merge hkx patcher"
 
-authors.workspace = true
-categories = ["development-tools"]
-edition.workspace = true
-keywords = ["skyrim"]
-license = "GPL-3.0-or-later"
-readme = "../../../README.md"
-repository.workspace = true
+authors.workspace      = true
+categories             = ["development-tools"]
+edition.workspace      = true
+keywords               = ["skyrim"]
+license                = "GPL-3.0-or-later"
+readme                 = "../../../README.md"
+repository.workspace   = true
 rust-version.workspace = true
-build = "build.rs"
+build                  = "build.rs"
 
 
 [build-dependencies]
@@ -31,29 +31,29 @@ eframe = { workspace = true, features = [
   "glow",
   "links",
 ] }
-egui = { workspace = true, features = ["monochrome_emoji_fonts"] }
-egui_flex = { workspace = true }
+egui        = { workspace = true, features = ["monochrome_emoji_fonts"] }
+egui_flex   = { workspace = true }
 egui_router = { workspace = true }
-image = { workspace = true, features = ["jpeg", "png"] }
+image       = { workspace = true, features = ["jpeg", "png"] }
 # ---
 
-dashmap = { workspace = true }
-dark-light = { workspace = true }
-font-kit = { workspace = true }
-mimalloc = { workspace = true, optional = true }
+dashmap     = { workspace = true }
+dark-light  = { workspace = true }
+font-kit    = { workspace = true }
+mimalloc    = { workspace = true, optional = true }
 parking_lot = { workspace = true }
-snafu = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+snafu       = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
 
 # workspace members
-egui_widgets = { workspace = true }
-page_convert = { workspace = true }
+egui_widgets      = { workspace = true }
+page_convert      = { workspace = true }
 page_patch_editor = { workspace = true }
-page_hkanno = { workspace = true }
-page_patch = { workspace = true }
-tracing_rotation = { workspace = true }
-gui_shared = { path = "../gui_shared", features = ["tracing"] }
+page_hkanno       = { workspace = true }
+page_patch        = { workspace = true }
+tracing_rotation  = { workspace = true }
+gui_shared        = { path = "../gui_shared", features = ["tracing"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { workspace = true, features = ["wayland", "x11"] }

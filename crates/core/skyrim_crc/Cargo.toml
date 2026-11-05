@@ -1,19 +1,19 @@
 [package]
-name = "skyrim_crc"
-version = "0.0.0"
+name        = "skyrim_crc"
+version     = "0.0.0"
 description = "D merge core"
 
-authors.workspace = true
-categories = ["development-tools"]
-edition.workspace = true
-keywords = ["skyrim"]
-license = "MIT OR Apache-2.0"
-readme = "../../../README.md"
-repository.workspace = true
+authors.workspace      = true
+categories             = ["development-tools"]
+edition.workspace      = true
+keywords               = ["skyrim"]
+license                = "MIT OR Apache-2.0"
+readme                 = "../../../README.md"
+repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-crc = { workspace = true }
+crc   = { workspace = true }
 rayon = { workspace = true }
 
 [lints]

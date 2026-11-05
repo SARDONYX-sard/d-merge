@@ -1,26 +1,26 @@
 [package]
-name = "tracing_rotation"
-version = "0.0.0"
+name        = "tracing_rotation"
+version     = "0.0.0"
 description = "Rotation file tracing global subscriber"
 
-authors.workspace = true
-categories = ["development-tools"]
-edition.workspace = true
-keywords = ["tracing"]
-license = "MIT OR Apache-2.0"
-readme = "../../../README.md"
-repository.workspace = true
+authors.workspace      = true
+categories             = ["development-tools"]
+edition.workspace      = true
+keywords               = ["tracing"]
+license                = "MIT OR Apache-2.0"
+readme                 = "../../../README.md"
+repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-chrono = { workspace = true }
-parking_lot = { workspace = true }
-snafu = { workspace = true } # Implement error types
-tracing = { workspace = true }
+chrono             = { workspace = true }
+parking_lot        = { workspace = true }
+snafu              = { workspace = true } # Implement error types
+tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-temp-dir = { workspace = true }
+temp-dir          = { workspace = true }
 pretty_assertions = { workspace = true }
 
 [lints]

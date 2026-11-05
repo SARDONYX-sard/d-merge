@@ -1,20 +1,20 @@
 [package]
-name = "gh_issue_link"
-version = "0.0.0"
+name        = "gh_issue_link"
+version     = "0.0.0"
 description = "D merge issue link generator"
 
-authors.workspace = true
-categories = ["development-tools"]
-edition.workspace = true
-keywords = ["skyrim"]
-license = "MIT OR Apache-2.0"
-readme = "../../../README.md"
-repository.workspace = true
+authors.workspace      = true
+categories             = ["development-tools"]
+edition.workspace      = true
+keywords               = ["skyrim"]
+license                = "MIT OR Apache-2.0"
+readme                 = "../../../README.md"
+repository.workspace   = true
 rust-version.workspace = true
 
 
 [dependencies]
-sysinfo = { workspace = true }
+sysinfo     = { workspace = true }
 urlencoding = { workspace = true }
 
 # workspace members

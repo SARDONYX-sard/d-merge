@@ -1,20 +1,20 @@
 [package]
-name = "fnis_list"
-version = "0.0.0"
+name        = "fnis_list"
+version     = "0.0.0"
 description = "Parser for FNIS's List.txt"
 
-authors.workspace = true
-categories.workspace = true
-edition.workspace = true
-keywords = ["parser"]
-license.workspace = true
-readme.workspace = true
-repository.workspace = true
+authors.workspace      = true
+categories.workspace   = true
+edition.workspace      = true
+keywords               = ["parser"]
+license.workspace      = true
+readme.workspace       = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
 bitflags = { workspace = true }
-winnow = { workspace = true }
+winnow   = { workspace = true }
 
 # workspace members
 skyrim_anim_data = { workspace = true }

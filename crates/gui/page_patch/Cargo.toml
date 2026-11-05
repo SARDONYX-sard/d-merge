@@ -1,35 +1,35 @@
 [package]
-name = "page_patch"
-version = "0.0.0"
+name        = "page_patch"
+version     = "0.0.0"
 description = "D Merge GUI: patch page (mod list, options, running the merge)"
 
-authors.workspace = true
-categories = ["gui"]
-edition.workspace = true
-keywords = ["skyrim", "egui"]
-license = "GPL-3.0-or-later"
-readme = "../../../README.md"
-repository.workspace = true
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["skyrim", "egui"]
+license                = "GPL-3.0-or-later"
+readme                 = "../../../README.md"
+repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-egui = { workspace = true }
-egui_dnd = { workspace = true }
+egui        = { workspace = true }
+egui_dnd    = { workspace = true }
 egui_extras = { workspace = true }
 parking_lot = { workspace = true }
-rayon = { workspace = true }
-sonic-rs = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+rayon       = { workspace = true }
+sonic-rs    = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
 
 # workspace members
-fast_hash = { workspace = true }
-behavior_merge = { workspace = true, features = ["tracing"] }
-nemesis_diff = { workspace = true }
-egui_widgets = { workspace = true }
-gui_shared = { workspace = true }
-mod_info = { workspace = true }
-skyrim_data_dir = { workspace = true, features = ["serde"] }
+fast_hash        = { workspace = true }
+behavior_merge   = { workspace = true, features = ["tracing"] }
+nemesis_diff     = { workspace = true }
+egui_widgets     = { workspace = true }
+gui_shared       = { workspace = true }
+mod_info         = { workspace = true }
+skyrim_data_dir  = { workspace = true, features = ["serde"] }
 tracing_rotation = { workspace = true }
 
 [lints]
