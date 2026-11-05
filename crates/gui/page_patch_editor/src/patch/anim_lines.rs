@@ -526,6 +526,11 @@ pub(super) struct AnimDataLanguage<'a> {
 }
 
 impl Language for AnimDataLanguage<'_> {
+    /// Its lines have no indentation. As the rest of the patch editor.
+    fn indent(&self) -> egui_code_editor::Indent {
+        egui_code_editor::Indent::Tab(4)
+    }
+
     /// The markers are colored like in XML.
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(std::ops::Range<usize>, egui::Color32)> {
         Xml.highlight(line, visuals)

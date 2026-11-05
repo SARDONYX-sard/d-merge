@@ -64,7 +64,7 @@ pub use self::{
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
-        CompletionItem, CompletionList, Diagnostic, Language, Location, QuickFix, References, Severity, SignatureHelp,
+        CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References, Severity, SignatureHelp,
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},
@@ -116,8 +116,6 @@ pub enum EditorCommand {
     PreviousTab,
     /// Vim `:tabc`, `:q`: close the host's tab.
     CloseTab,
-    /// Vim `<Space>f`, `:fmt`: format the document. The editor does this itself.
-    Format,
     /// Vim `<Space>p`, `:preview`: show or hide what the host shows beside the editor.
     TogglePreview,
     /// Vim `<Space>d`, `:diff`: show or hide the changes inside the editor.
@@ -153,6 +151,10 @@ pub struct CodeEditorState {
     menu_target: Option<LinePos>,
     /// The selection the right button was pressed on, while that button is down.
     held_selection: Option<CCursorRange>,
+    /// What one level of indentation is, for the status bar (drawn before the editor).
+    indent: Indent,
+    /// The Vim key that waits for another, and since when.
+    which_key_waiting: ui::which_key::Waiting,
     /// `(errors, warnings)` for the status bar.
     status_problems: (usize, usize),
     /// The cursor and how many chars are selected, for the status bar (drawn before the editor).
@@ -237,6 +239,7 @@ pub struct CodeEditor<'a> {
     actions: &'a [EditorAction<'a>],
     inline_diff: Option<&'a InlineDiff>,
     read_only: bool,
+    host_commands: bool,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -262,7 +265,14 @@ impl<'a> CodeEditor<'a> {
             actions: &[],
             inline_diff: None,
             read_only: false,
+            host_commands: false,
         }
+    }
+
+    /// The host acts on [`EditorCommand`]'s tabs, tree and preview, so Vim's list of keys offers them.
+    pub const fn host_commands(mut self, host_commands: bool) -> Self {
+        self.host_commands = host_commands;
+        self
     }
 
     /// Everything but changing the text: the cursor, selecting, copying, hover, go to definition.
@@ -347,6 +357,7 @@ impl<'a> CodeEditor<'a> {
             actions,
             inline_diff,
             read_only,
+            host_commands,
         } = self;
         let original = read_only.then(|| text.clone());
         let frame = EditorFrame {
@@ -358,9 +369,12 @@ impl<'a> CodeEditor<'a> {
             inline_diff,
         };
 
+        state.indent = language.indent();
+        state.keymap.vim_options_mut().indent = state.indent;
         let input = read_input(frame, ui, state, text, &labels, actions);
+        tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {
-            let asked = input.triggers.format || input.keys.command == Some(EditorCommand::Format);
+            let asked = input.triggers.format || input.keys.format;
             apply_format(frame, ui, text, asked)
         };
         let navigate_keys = match input.keys.command {
@@ -406,7 +420,9 @@ impl<'a> CodeEditor<'a> {
         if let Some(cursor) = anchor {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
-        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text, placed);
+        let visible = response.rect.intersect(ui.clip_rect());
+        state.find.ui(ui, id, visible, text, placed);
+        show_which_key(ui, id, state, keymap, visible, host_commands);
         state.view = visible_lines(ui, placed.0, placed.1);
         state.had_focus = response.has_focus();
         if let Some(index) = state.keymap.block_cursor(keymap, cursor_index, text) {
@@ -539,6 +555,44 @@ fn keep_cursor_line(ctx: &egui::Context, id: egui::Id, text: &str, cursor: LineP
     let index = cursor.to_char_index(text);
     edit.cursor.set_char_range(Some(CCursorRange::one(CCursor::new(index))));
     edit.store(ctx, id);
+}
+
+/// egui's `TextEdit` always inserts a tab character for `Tab`: where the language indents with spaces,
+/// it gets those instead. What the keymap or a popup wanted the key for is gone from the input by now.
+fn tab_key_follows_indent(ui: &egui::Ui, id: egui::Id, indent: Indent) {
+    let Indent::Spaces(width) = indent else { return };
+    if !ui.memory(|memory| memory.has_focus(id)) {
+        return;
+    }
+    ui.input_mut(|input| {
+        for event in &mut input.events {
+            if let egui::Event::Key { key: egui::Key::Tab, pressed: true, modifiers, .. } = event
+                && modifiers.is_none()
+            {
+                *event = egui::Event::Text(" ".repeat(width));
+            }
+        }
+    });
+}
+
+/// The list of what can follow a Vim key that waits for another, once it has waited for a moment.
+fn show_which_key(
+    ui: &egui::Ui,
+    id: egui::Id,
+    state: &mut CodeEditorState,
+    keymap: Keymap,
+    visible: egui::Rect,
+    host_commands: bool,
+) {
+    let Some(prefix) = state.keymap.which_key_prefix(keymap) else {
+        state.which_key_waiting = None;
+        return;
+    };
+    let now = ui.input(|input| input.time);
+    match ui::which_key::wait(&mut state.which_key_waiting, prefix, now) {
+        Some(left) => ui.ctx().request_repaint_after_secs(left as f32),
+        None => ui::which_key::show(ui.ctx(), id, visible, prefix, host_commands),
+    }
 }
 
 /// Step 2: the `TextEdit`, with the syntax colors, underlines and search matches.
@@ -1047,6 +1101,25 @@ mod tests {
         state: CodeEditorState,
         id: egui::Id,
         rect: egui::Rect,
+        keymap: Keymap,
+        command: Option<EditorCommand>,
+        language: &'static dyn Language,
+    }
+
+    /// A language that indents with tabs.
+    struct Tabbed;
+    impl Language for Tabbed {
+        fn indent(&self) -> Indent {
+            Indent::Tab(4)
+        }
+    }
+
+    /// A language whose form is easy to tell.
+    struct Upper;
+    impl Language for Upper {
+        fn format(&self, text: &str) -> Option<String> {
+            Some(text.to_uppercase())
+        }
     }
 
     impl Frames {
@@ -1057,6 +1130,9 @@ mod tests {
                 state: CodeEditorState::default(),
                 id: egui::Id::NULL,
                 rect: egui::Rect::NOTHING,
+                keymap: Keymap::Normal,
+                command: None,
+                language: &Upper,
             };
             frames.frame(Vec::new());
             frames.ctx.memory_mut(|memory| memory.request_focus(frames.id));
@@ -1067,8 +1143,11 @@ mod tests {
         fn frame(&mut self, events: Vec<egui::Event>) {
             let raw = egui::RawInput { events, ..Default::default() };
             let (text, state, id, rect) = (&mut self.text, &mut self.state, &mut self.id, &mut self.rect);
+            let (keymap, command, language) = (self.keymap, &mut self.command, self.language);
             let mut output = self.ctx.run_ui(raw, |ui| {
-                let response = CodeEditor::new("editor", text).show(ui, state).response;
+                let shown = CodeEditor::new("editor", text).language(language).keymap(keymap).show(ui, state);
+                *command = shown.command;
+                let response = shown.response;
                 *id = response.id;
                 *rect = response.rect;
             });
@@ -1131,6 +1210,86 @@ mod tests {
         frames.button(egui::PointerButton::Secondary, elsewhere, true);
         let selection = frames.selection();
         assert!(selection.is_empty() && selection.start > 12, "{selection:?}");
+    }
+
+    fn press_tab(frames: &mut Frames) {
+        frames.frame(vec![egui::Event::Key {
+            key: egui::Key::Tab,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        }]);
+    }
+
+    fn shift_right_in_vim(frames: &mut Frames) {
+        frames.keymap = Keymap::Vim;
+        frames.frame(vec![egui::Event::Text(">".to_owned())]);
+        frames.frame(vec![egui::Event::Text(">".to_owned())]);
+    }
+
+    #[test]
+    fn indents_as_the_language_does() {
+        let mut frames = Frames::new("a");
+        press_tab(&mut frames);
+        assert_eq!(frames.text, "a    ", "at the cursor, which is at the end");
+        assert_eq!(frames.state.indent.to_string(), "Spaces: 4");
+
+        let mut frames = Frames::new("a");
+        frames.language = &Tabbed;
+        frames.frame(Vec::new());
+        press_tab(&mut frames);
+        assert_eq!(frames.text, "a\t");
+        assert_eq!(frames.state.indent.to_string(), "Tab: 4");
+    }
+
+    #[test]
+    fn vim_shifts_as_the_language_does() {
+        let mut frames = Frames::new("a");
+        shift_right_in_vim(&mut frames);
+        assert_eq!(frames.text, "    a");
+
+        let mut frames = Frames::new("a");
+        frames.language = &Tabbed;
+        frames.frame(Vec::new());
+        shift_right_in_vim(&mut frames);
+        assert_eq!(frames.text, "\ta");
+    }
+
+    #[test]
+    fn a_key_that_waits_starts_the_list_of_keys() {
+        let mut frames = Frames::new("first");
+        frames.keymap = Keymap::Vim;
+        frames.frame(vec![egui::Event::Text(" ".to_owned())]);
+        assert!(matches!(frames.state.which_key_waiting, Some((keymap::Prefix::Leader, _))));
+
+        frames.frame(vec![egui::Event::Text("z".to_owned())]);
+        assert_eq!(frames.state.which_key_waiting, None, "not a command: the keys are dropped");
+
+        frames.frame(vec![egui::Event::Text("g".to_owned())]);
+        assert!(matches!(frames.state.which_key_waiting, Some((keymap::Prefix::G, _))));
+    }
+
+    #[test]
+    fn vim_space_w_formats_then_saves() {
+        let mut frames = Frames::new("first\nsecond");
+        frames.keymap = Keymap::Vim;
+        frames.frame(vec![egui::Event::Text(" ".to_owned())]);
+        assert_eq!(frames.text, "first\nsecond", "a leader key, waiting");
+
+        frames.frame(vec![egui::Event::Text("w".to_owned())]);
+        assert_eq!(frames.text, "FIRST\nSECOND");
+        assert_eq!(frames.command, Some(EditorCommand::Save), "the host saves what is formatted");
+    }
+
+    #[test]
+    fn vim_space_f_only_formats() {
+        let mut frames = Frames::new("first");
+        frames.keymap = Keymap::Vim;
+        frames.frame(vec![egui::Event::Text(" ".to_owned())]);
+        frames.frame(vec![egui::Event::Text("f".to_owned())]);
+        assert_eq!(frames.text, "FIRST");
+        assert_eq!(frames.command, None);
     }
 
     #[test]

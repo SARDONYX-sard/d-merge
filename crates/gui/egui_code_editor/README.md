@@ -240,10 +240,14 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | `<Space>l` `gt` | Next tab (`EditorCommand::NextTab` for the host)                                                                                 |
 | `<Space>h` `gT` | Previous tab (`EditorCommand::PreviousTab` for the host)                                                                         |
 | `<Space>f`      | Format the document                                                                                                              |
+| `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                              |
 | `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                 |
 | `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                 |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
+
+Pressing `<Space>` or `g` and then waiting for a moment lists what can follow them. Keys that need the
+host (tabs, preview, tree) are only listed with `CodeEditor::host_commands(true)`.
 
 ### Ex commands
 

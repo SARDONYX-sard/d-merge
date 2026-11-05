@@ -65,7 +65,10 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
             return done(Command::Simple(Simple::Ask(EditorCommand::PreviousTab)), None);
         }
         [VimKey::Char(' '), VimKey::Char('f'), ..] => {
-            return done(Command::Simple(Simple::Ask(EditorCommand::Format)), None);
+            return done(Command::Simple(Simple::Format { save: false }), None);
+        }
+        [VimKey::Char(' '), VimKey::Char('w'), ..] => {
+            return done(Command::Simple(Simple::Format { save: true }), None);
         }
         [VimKey::Char(' '), VimKey::Char('p'), ..] => {
             return done(Command::Simple(Simple::Ask(EditorCommand::TogglePreview)), None);
@@ -93,7 +96,7 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
 }
 
 /// Leading digits (`0` alone is the `0` motion, not a count).
-fn take_count(keys: &[VimKey]) -> (Option<usize>, &[VimKey]) {
+pub(super) fn take_count(keys: &[VimKey]) -> (Option<usize>, &[VimKey]) {
     let digits = keys
         .iter()
         .enumerate()
@@ -373,7 +376,8 @@ mod tests {
     fn what_the_host_is_asked_for() {
         assert_eq!(command("gt"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
         assert_eq!(command("gT"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
-        assert_eq!(command(" f"), Command::Simple(Simple::Ask(EditorCommand::Format)));
+        assert_eq!(command(" f"), Command::Simple(Simple::Format { save: false }));
+        assert_eq!(command(" w"), Command::Simple(Simple::Format { save: true }));
         assert_eq!(command(" l"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
         assert_eq!(command(" h"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
         assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));

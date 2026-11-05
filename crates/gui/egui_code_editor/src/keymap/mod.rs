@@ -14,6 +14,7 @@
 pub(crate) mod normal;
 pub(crate) mod vim;
 
+pub(crate) use self::vim::which_key::Prefix;
 pub use self::vim::VimOptions;
 use crate::{EditorCommand, search::Matcher};
 
@@ -34,6 +35,8 @@ pub(crate) struct KeymapOutput {
     pub(crate) changed: bool,
     /// A request for the host (e.g., Vim `:w` -> save).
     pub(crate) command: Option<EditorCommand>,
+    /// Format the document, before the host gets `command` (Vim `<Space>f`, `<Space>w`).
+    pub(crate) format: bool,
     /// Open the hover popup at the text cursor (e.g., Vim `K`).
     pub(crate) show_hover: bool,
     /// How the view should scroll (e.g., Vim `G`: bring the cursor into view; `zz`: center it).
@@ -141,6 +144,13 @@ impl KeymapState {
     }
 
     /// Hide egui's blinking text cursor (the keymap draws a block cursor instead).
+    pub(crate) fn which_key_prefix(&self, keymap: Keymap) -> Option<Prefix> {
+        match keymap {
+            Keymap::Normal => None,
+            Keymap::Vim => self.vim.which_key_prefix(),
+        }
+    }
+
     pub(crate) fn hides_text_cursor(&self, keymap: Keymap) -> bool {
         match keymap {
             Keymap::Normal => false,

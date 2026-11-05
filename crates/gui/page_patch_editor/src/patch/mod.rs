@@ -930,12 +930,7 @@ impl PatchTool {
             }
             Some(EditorCommand::TogglePreview) => self.show_preview = !self.show_preview,
             Some(EditorCommand::ToggleInlineDiff) => self.show_inline_diff = !self.show_inline_diff,
-            Some(
-                EditorCommand::ToggleExplorer
-                | EditorCommand::GoToDefinition
-                | EditorCommand::FindReferences
-                | EditorCommand::Format,
-            )
+            Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
         if let Some(older) = result.walk_history {

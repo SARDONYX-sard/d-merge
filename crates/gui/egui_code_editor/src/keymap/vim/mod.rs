@@ -37,6 +37,7 @@ mod prompt;
 mod registers;
 mod repeat;
 mod textobj;
+pub(super) mod which_key;
 
 use egui::text::{CCursor, CCursorRange};
 
@@ -84,13 +85,13 @@ pub struct VimOptions {
     /// Max seconds between the two chars (like Vim's `timeoutlen`).
     /// Slower typing inserts both chars normally, so e.g. `jj` can still be typed.
     pub escape_timeout: f64,
-    /// Spaces per `>` / `<` / `Ctrl+T` (Vim's `shiftwidth`). Default: 4.
-    pub shift_width: usize,
+    /// What `>` inserts and `<` removes. Follows [`crate::Language::indent`].
+    pub indent: crate::Indent,
 }
 
 impl Default for VimOptions {
     fn default() -> Self {
-        Self { insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']], escape_timeout: 0.5, shift_width: 4 }
+        Self { insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']], escape_timeout: 0.5, indent: crate::Indent::default() }
     }
 }
 
@@ -148,6 +149,11 @@ impl VimState {
 
     /// Status line: the mode badge and the details next to it.
     /// e.g., (`Insert`, ``), (`Command`, `:w`), (`Normal`, `recording @a  2d`)
+    /// The key the pending keys wait on, if it has a list of what can follow.
+    pub(crate) fn which_key_prefix(&self) -> Option<which_key::Prefix> {
+        which_key::waiting_prefix(&self.pending)
+    }
+
     pub(crate) fn status(&self) -> StatusLine {
         let mode = match self.mode {
             _ if self.prompt.is_some() => StatusMode::Command,

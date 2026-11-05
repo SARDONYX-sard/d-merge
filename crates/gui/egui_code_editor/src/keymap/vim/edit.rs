@@ -59,9 +59,15 @@ impl VimState {
         self.registers.store(self.active_register, register, is_yank, &exec.ctx);
     }
 
-    /// `>` (`right`) / `<` on lines `first..=last`, by `shift_width` spaces.
+    /// `>` (`right`) / `<` on lines `first..=last`, by one level of [`VimOptions::indent`]. `<` also
+    /// takes what the other kind of indentation left.
+    ///
+    /// [`VimOptions::indent`]: super::VimOptions::indent
     pub(super) fn shift_lines(&self, first: usize, last: usize, right: bool, exec: &mut Exec) {
-        let width = self.options.shift_width.max(1);
+        let (unit, width) = match self.options.indent {
+            crate::Indent::Tab(width) => ("\t".to_owned(), width.max(1)),
+            crate::Indent::Spaces(width) => (" ".repeat(width.max(1)), width.max(1)),
+        };
         let start = exec.buf.nth_line_start(first);
         let end = exec.buf.line_end(exec.buf.nth_line_start(last));
         let block = exec.buf.slice(start..end);
@@ -69,7 +75,7 @@ impl VimState {
             .split('\n')
             .map(|line| {
                 if right {
-                    if line.is_empty() { String::new() } else { format!("{}{line}", " ".repeat(width)) }
+                    if line.is_empty() { String::new() } else { format!("{unit}{line}") }
                 } else if let Some(rest) = line.strip_prefix('\t') {
                     rest.to_string()
                 } else {

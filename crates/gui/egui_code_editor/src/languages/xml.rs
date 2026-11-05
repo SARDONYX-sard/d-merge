@@ -12,13 +12,18 @@ use std::ops::Range;
 
 use egui::Color32;
 
-use crate::language::Language;
+use crate::language::{Indent, Language};
 
 /// XML highlighter. e.g., `CodeEditor::new(..).language(&Xml)` or [`crate::line_job`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Xml;
 
 impl Language for Xml {
+    /// Havok XML files are indented with tabs.
+    fn indent(&self) -> Indent {
+        Indent::Tab(4)
+    }
+
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
         let palette = Palette::new(visuals.dark_mode);
         let chars: Vec<char> = line.chars().collect();

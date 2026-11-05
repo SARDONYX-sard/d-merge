@@ -212,6 +212,12 @@ impl VimState {
             Simple::OpenUrl => self.open_url(exec),
             Simple::ToggleExplorer => exec.output.command = Some(EditorCommand::ToggleExplorer),
             Simple::Ask(command) => exec.output.command = Some(command),
+            Simple::Format { save } => {
+                exec.output.format = true;
+                if save {
+                    exec.output.command = Some(EditorCommand::Save);
+                }
+            }
             Simple::GoTo { references } => {
                 exec.output.command =
                     Some(if references { EditorCommand::FindReferences } else { EditorCommand::GoToDefinition });

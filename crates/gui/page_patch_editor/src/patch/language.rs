@@ -181,6 +181,11 @@ impl Language for NemesisXml<'_> {
         (!doc.is_empty()).then(|| doc.to_owned())
     }
 
+    /// As the templates are.
+    fn indent(&self) -> egui_code_editor::Indent {
+        Xml.indent()
+    }
+
     /// Indents as the templates do, so that it adds nothing to the patch.
     fn format(&self, text: &str) -> Option<String> {
         nemesis_diff::format_object(text)

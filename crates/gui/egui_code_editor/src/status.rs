@@ -1,7 +1,7 @@
 //! The status bar under an editor, like VS Code's:
 //!
 //! ```text
-//! [ NORMAL ]  recording @a  2d  ✖ 1 ⚠ 2        Ln 12, Col 5 (3 selected)   UTF-8   LF
+//! [ NORMAL ]  recording @a  2d  ✖ 1 ⚠ 2        Ln 12, Col 5 (3 selected)   Tab: 4   UTF-8   LF
 //! ```
 //! The left part is the keymap's (e.g., Vim's mode badge and `:w`, `/foo [2/5]`); keymaps without
 //! modes have none. The right part says where the cursor is and what the text is.
@@ -30,6 +30,7 @@ pub fn status_line(ui: &mut egui::Ui, state: &CodeEditorState, keymap: Keymap, t
             ui.spacing_mut().item_spacing.x = 16.0;
             ui.weak(line_ending(text));
             ui.weak("UTF-8");
+            ui.weak(state.indent.to_string());
             if let Some((cursor, selected)) = state.status_cursor {
                 ui.weak(cursor_text(text, cursor, selected));
             }

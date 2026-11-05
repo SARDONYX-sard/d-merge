@@ -46,6 +46,7 @@ impl VimState {
                 exec.output.command = Some(EditorCommand::Save);
             }
             "noh" | "nohl" | "nohlsearch" => self.hlsearch = false,
+            "fmt" | "format" => exec.output.format = true,
             _ if host_command(command).is_some() => exec.output.command = host_command(command),
             "u" | "undo" => self.undo_redo(true, exec),
             "red" | "redo" => self.undo_redo(false, exec),
@@ -189,7 +190,6 @@ fn host_command(command: &str) -> Option<EditorCommand> {
         "tabn" | "tabnext" | "bn" | "bnext" => EditorCommand::NextTab,
         "tabp" | "tabprevious" | "tabN" | "tabNext" | "bp" | "bprevious" => EditorCommand::PreviousTab,
         "tabc" | "tabclose" | "bd" | "bdelete" | "q" | "quit" => EditorCommand::CloseTab,
-        "fmt" | "format" => EditorCommand::Format,
         "preview" | "pre" => EditorCommand::TogglePreview,
         "diff" => EditorCommand::ToggleInlineDiff,
         _ => return None,
@@ -249,7 +249,6 @@ mod tests {
         assert_eq!(host_command("tabn"), Some(EditorCommand::NextTab));
         assert_eq!(host_command("bprevious"), Some(EditorCommand::PreviousTab));
         assert_eq!(host_command("q"), Some(EditorCommand::CloseTab));
-        assert_eq!(host_command("fmt"), Some(EditorCommand::Format));
         assert_eq!(host_command("preview"), Some(EditorCommand::TogglePreview));
         assert_eq!(host_command("diff"), Some(EditorCommand::ToggleInlineDiff));
         assert_eq!(host_command("d"), None, "delete a line");

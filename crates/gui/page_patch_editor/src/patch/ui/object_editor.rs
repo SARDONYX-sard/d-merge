@@ -279,6 +279,7 @@ impl PatchTool {
                     .features(features)
                     .keymap(keymap)
                     .labels(labels)
+                    .host_commands(true)
                     .actions(&actions)
                     .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
                     .show(ui, &mut self.editor);

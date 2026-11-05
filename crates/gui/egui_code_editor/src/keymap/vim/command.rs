@@ -232,6 +232,8 @@ pub(super) enum Simple {
     GoTo { references: bool },
     /// `<Space>e`: ask the host to move the keyboard to its file / object tree (like `:NvimTreeToggle`).
     ToggleExplorer,
+    /// `<Space>f`: format the document. `<Space>w`: and save it (`save`).
+    Format { save: bool },
     /// `<Space>l`, `<Space>h`, `gt`, `gT`, `<Space>p`, `<Space>d`: ask the host for it.
     Ask(crate::EditorCommand),
     /// `Ctrl+A` (`up`) / `Ctrl+X`: add / subtract `count` to the number at or after the cursor

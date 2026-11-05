@@ -8,3 +8,4 @@ pub(crate) mod hover;
 pub(crate) mod overlays;
 pub(crate) mod palette;
 pub(crate) mod quick_fix;
+pub(crate) mod which_key;

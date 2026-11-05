@@ -11,6 +11,31 @@ use std::{borrow::Cow, ops::Range};
 
 use egui::Color32;
 
+/// One level of indentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Indent {
+    /// A tab character, as wide as this many columns. e.g., Havok XML
+    Tab(usize),
+    /// This many spaces.
+    Spaces(usize),
+}
+
+impl Default for Indent {
+    fn default() -> Self {
+        Self::Spaces(4)
+    }
+}
+
+impl std::fmt::Display for Indent {
+    /// e.g., `Tab: 4`, `Spaces: 4`
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Tab(width) => write!(f, "Tab: {width}"),
+            Self::Spaces(width) => write!(f, "Spaces: {width}"),
+        }
+    }
+}
+
 /// Language services used by [`super::CodeEditor`].
 ///
 /// Methods receive **one line** (no `\n`) unless stated otherwise, because every feature the
@@ -80,6 +105,11 @@ pub trait Language {
     fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<String> {
         let _ = line_no;
         self.inlay_hints(line)
+    }
+
+    /// What one level of indentation is: what `Tab` and Vim's `>` insert, shown in the status bar.
+    fn indent(&self) -> Indent {
+        Indent::default()
     }
 
     /// Formats the **whole document**. `None` = this language has no formatter.
