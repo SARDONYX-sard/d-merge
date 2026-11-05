@@ -159,6 +159,16 @@ mod tests {
 
     use super::*;
 
+    /// The parser reads a block on its own: its error still says the place in the patch, and why.
+    #[test]
+    fn a_wrong_attack_trigger_says_where_and_why() {
+        let patch = "V3\n0\n0\n1\n<!-- MOD_CODE ~m~ OPEN -->\nattackStat1\n<!-- ORIGINAL -->\nattackStart1\n<!-- CLOSE -->\n0\n0\n0\n";
+        let error = validate_asdsf("Project~P/_Set.txt", patch).unwrap_err();
+        let problem = super::super::diagnostics::parser_problem(&error).unwrap();
+        assert_eq!(problem.line, 5, "{error}");
+        assert!(problem.message.contains("attackStart"), "{error}");
+    }
+
     fn validate_adsf(id: &str, patch: &str) -> Result<(), String> {
         super::validate_adsf(id, patch, ParserMode::Strict)
     }

@@ -197,9 +197,6 @@ impl PatchTool {
         };
         let anim_data = self.workspace.behaviors[self.active].is_anim_data();
         let anim_language = AnimDataLanguage {
-            is_adsf: self.workspace.behaviors[self.active].adsf,
-            id,
-            code_action: self.lsp.code_action,
             roles: &self.anim_roles,
             cursor_line: self.cursor_line,
             trigger_names: &self.trigger_names,

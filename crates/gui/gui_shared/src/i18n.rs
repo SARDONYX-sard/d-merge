@@ -1057,7 +1057,7 @@ pub enum I18nKey {
     /// Collapse all
     CollapseAllButton,
 
-    /// Checks without opening them. Animation data: counts that say something else than what is there, and clip ids that are not the ones in the file names; patches that edit are left out, as the merge counts for them. Behaviors: the fields and pointers of what the mod changes, and d-merge's parser on its patches.
+    /// Checks without opening them. Animation data: d-merge's parser on its patches. Behaviors: the fields and pointers of what the mod changes, and d-merge's parser on its patches.
     NemesisCheckHover,
 
     /// Check results

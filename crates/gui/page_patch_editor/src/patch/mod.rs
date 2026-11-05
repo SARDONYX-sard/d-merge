@@ -832,7 +832,7 @@ impl PatchTool {
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
         self.field_problems = if behavior.is_anim_data() {
             self.anim_roles = anim_lines::roles(behavior.adsf, id, &self.editor_text);
-            anim_lines::diagnostics(behavior.adsf, id, &self.editor_text)
+            Vec::new() // Only the parser's, below: see `anim_lines`.
         } else if behavior.is_ref(id) {
             Vec::new() // not this mod's to fix
         } else {

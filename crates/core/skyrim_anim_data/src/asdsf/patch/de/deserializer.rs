@@ -32,7 +32,7 @@ pub fn parse_anim_set_diff_patch(asdsf_patch: &str, priority: usize) -> Result<D
     let mut patcher_de = PatchDeserializer::new(asdsf_patch);
     patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
 
-    super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
+    super::raw_diff::into_patch_map(asdsf_patch, patcher_de.raw_diffs, priority)
 }
 
 /// Nemesis patch deserializer

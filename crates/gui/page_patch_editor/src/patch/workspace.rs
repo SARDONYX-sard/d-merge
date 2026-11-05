@@ -23,7 +23,7 @@ use std::{
 };
 
 use gui_shared::settings::pages::patch::behavior::ParserMode;
-use nemesis_diff::{View, XmlObject, normalize, object_patch, objects, resolve};
+use nemesis_diff::{View, XmlObject, apply_to_template, normalize, object_patch, objects, resolve};
 use rayon::prelude::*;
 
 /// Mod metadata (`info.ini`).
@@ -879,11 +879,11 @@ impl Workspace {
             behavior.force_ext |= relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 let id = file_stem(&file);
-                let text = resolve(&read_text(&file)?, View::Mod);
-                if behavior.template_object(&id).is_some() {
-                    behavior.set_text(&id, text);
+                let patch = read_text(&file)?;
+                if let Some(template) = behavior.template_object(&id).map(|object| object.text.clone()) {
+                    behavior.set_text(&id, apply_to_template(&patch, &template));
                 } else {
-                    behavior.added.insert(id, text);
+                    behavior.added.insert(id, resolve(&patch, View::Mod));
                 }
                 self.owned.extend(root.and_then(|root| file.strip_prefix(root).ok()).map(owned_key));
             }
@@ -1098,7 +1098,10 @@ fn import_asdsf(mod_dir: &Path, template_root: &Path, skipped: &mut Vec<String>)
             let template_id =
                 behavior.objects.iter().find(|o| o.id.eq_ignore_ascii_case(&wanted)).map(|o| o.id.clone());
             match template_id {
-                Some(id) => behavior.set_text(&id, resolve(&read_text(&file)?, View::Mod)),
+                Some(id) => {
+                    let template = behavior.template_object(&id).map(|object| object.text.clone()).unwrap_or_default();
+                    behavior.set_text(&id, apply_to_template(&read_text(&file)?, &template));
+                }
                 None => {
                     behavior.added.insert(wanted, read_text(&file)?);
                 }

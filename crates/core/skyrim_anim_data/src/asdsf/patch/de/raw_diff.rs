@@ -6,7 +6,7 @@ use winnow::{
     ModalResult, Parser as _,
     ascii::{Caseless, line_ending, multispace0, till_line_ending},
     combinator::{alt, repeat},
-    error::{StrContext::*, StrContextValue::*},
+    error::{ContextError, ErrMode, ParseError, StrContext::*, StrContextValue::*},
 };
 use winnow_ext::ReadableError;
 
@@ -52,11 +52,16 @@ pub(super) enum Op {
     SeqPush,
 }
 
-pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Result<DiffPatchAnimSetData<'_>> {
+/// `original`: the whole patch that `raw_diffs` are parts of, for the place of an error.
+pub(crate) fn into_patch_map<'a>(
+    original: &'a str,
+    raw_diffs: Vec<RawDiff<'a>>,
+    priority: usize,
+) -> Result<DiffPatchAnimSetData<'a>> {
     let mut patches = DiffPatchAnimSetData::default();
 
     for mut raw in raw_diffs {
-        let value = normalize_diff(&mut raw, priority)?;
+        let value = normalize_diff(original, &mut raw, priority)?;
 
         let path = raw.path;
         let is_seq_patch = !matches!(value.patch.action, json_patch::Action::Pure { .. });
@@ -89,34 +94,48 @@ pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Re
     Ok(patches)
 }
 
-fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWithPriority<'a>> {
+/// An error of parsing `text`, a part of `original`, at its place in `original`: line 1 of a block says
+/// nothing about where in the patch that is.
+fn readable_in<'a>(
+    original: &'a str,
+    text: &'a str,
+) -> impl Fn(ParseError<&str, ContextError>) -> ReadableError + Copy + 'a {
+    move |error| {
+        let start = (text.as_ptr() as usize).saturating_sub(original.as_ptr() as usize).min(original.len());
+        let position = start + error.offset();
+        ReadableError::from_context(ErrMode::Backtrack(error.into_inner()), original, position)
+    }
+}
+
+fn normalize_diff<'a>(original: &'a str, raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWithPriority<'a>> {
+    let readable = readable_in(original, raw.text);
     let last = raw.path.last().map(|s| s.as_ref());
     let op = raw.op;
 
     let (range, value) = match (raw.category, op, last) {
         (ArrayType::Condition, Op::Replace, Some("variable_name")) => {
-            (None, one_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+            (None, one_line.parse(raw.text).map_err(readable)?.into())
         }
         (ArrayType::Condition, Op::Replace, Some("value_a" | "value_b")) => {
-            (None, parse_one_line::<i32>.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+            (None, parse_one_line::<i32>.parse(raw.text).map_err(readable)?.into())
         }
         (ArrayType::Condition, _, None) => {
-            let conditions = conditions.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let conditions = conditions.parse(raw.text).map_err(readable)?;
             let range = raw.seq_index.map(|start| Range { start, end: start + conditions.len() });
             (range, conditions.into())
         }
 
         // attack
         (ArrayType::Attack, Op::Replace, Some("attack_trigger")) => {
-            (None, attack_trigger_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+            (None, attack_trigger_line.parse(raw.text).map_err(readable)?.into())
         }
         (ArrayType::Attack, Op::Replace, Some("is_contextual")) => {
-            (None, num_bool_line.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+            (None, num_bool_line.parse(raw.text).map_err(readable)?.into())
         }
 
         // Attack array
         (ArrayType::Attack, Op::Add | Op::Replace | Op::Remove, None) => {
-            let attacks = attacks.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let attacks = attacks.parse(raw.text).map_err(readable)?;
             let range = raw.seq_index.map(|start| Range { start, end: start + attacks.len() });
             (range, attacks_to_borrowed_value(attacks))
         }
@@ -130,11 +149,11 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         (ArrayType::ClipName, Op::SeqPush, _) => {
             // has unknown num bool, then maybe attack array patch
             let value = if is_attack_array_patch(raw.text) {
-                let attacks = attacks.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+                let attacks = attacks.parse(raw.text).map_err(readable)?;
                 raw.path.clear();
                 attacks_to_borrowed_value(attacks)
             } else {
-                let clip_names = clip_names_lines.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?; // clip_names
+                let clip_names = clip_names_lines.parse(raw.text).map_err(readable)?; // clip_names
                 raw.path.pop(); // remove `clip_name` from `["attack", "[9]", "clip_names", "clip_name"]`
                 clip_names.into()
             };
@@ -149,7 +168,7 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         // clip_names
         // - path: `["[9]", "clip_names"]`
         (ArrayType::Trigger, _, _) | (ArrayType::ClipName, _, Some("clip_names")) => {
-            let vec_str = till_ending_str_lines.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let vec_str = till_ending_str_lines.parse(raw.text).map_err(readable)?;
             let range = raw.seq_index.map(|start| Range { start, end: start + vec_str.len() });
             (range, vec_str.into())
         }
@@ -160,17 +179,17 @@ fn normalize_diff<'a>(raw: &mut RawDiff<'a>, priority: usize) -> Result<ValueWit
         // - 2 lines: Replacing `hashed_path` and `hashed_file_name`
         // - 3 lines: Replacing the anim_info itself
         (ArrayType::AnimInfo, Op::Replace, Some("hashed_path")) if raw.text.par_lines().count() == 3 => {
-            let anim_infos = anim_infos.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let anim_infos = anim_infos.parse(raw.text).map_err(readable)?;
             let range = raw.seq_index.map(|start| Range { start, end: start + anim_infos.len() });
             (range, anim_infos.into())
         }
 
         (ArrayType::AnimInfo, Op::Replace, Some("hashed_path" | "hashed_file_name" | "ascii_extension")) => {
-            (None, verify_line_parses_to::<u32>.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?.into())
+            (None, verify_line_parses_to::<u32>.parse(raw.text).map_err(readable)?.into())
         }
 
         (ArrayType::AnimInfo, Op::SeqPush, None) => {
-            let anim_infos = anim_infos.parse(raw.text).map_err(|e| ReadableError::from_parse(e))?;
+            let anim_infos = anim_infos.parse(raw.text).map_err(readable)?;
             let range = raw.seq_index.map(|start| Range { start, end: start + anim_infos.len() });
             (range, anim_infos.into())
         }
@@ -324,6 +343,9 @@ fn clip_names_lines<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
 /// Parse attack trigger line starting with `attackStart`, `attackPowerStart`, `bashStart` or `bashPowerStart`.
 fn attack_trigger_line<'i>(input: &mut &'i str) -> winnow::ModalResult<&'i str> {
     alt((Caseless("attackStart"), Caseless("attackPowerStart"), Caseless("bashStart"), Caseless("bashPowerStart")))
+        .context(Expected(Description(
+            "attack_trigger: starts with attackStart, attackPowerStart, bashStart or bashPowerStart",
+        )))
         .parse_next(input)?;
 
     till_line_ending.parse_next(input)

@@ -13,8 +13,7 @@
 //!
 //! | Behavior  | Checked                 | What                                                    |
 //! | --------- | ----------------------- | ------------------------------------------------------- |
-//! | anim data | the files of the row    | counts and clip ids, see [`anim_lines::problems`]        |
-//! | anim sets | the files of the row    | the above, and d-merge's parser on what the mod changes  |
+//! | anim data | the files of the row    | d-merge's parser on what the mod changes                 |
 //! | others    | what the mod changes    | fields, pointers, and d-merge's parser on its patch      |
 //!
 //! The window keeps up as they are corrected, one object at a time:
@@ -28,7 +27,7 @@ use gui_shared::{
 
 use super::anim_tree::FileKind;
 use crate::patch::{
-    PatchTool, anim_lines, diagnostics,
+    PatchTool, diagnostics,
     preview::Preview,
     workspace::{Behavior, ObjectText},
 };
@@ -83,39 +82,37 @@ const fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
     behavior.is_anim_data() || object.is_new || object.is_edited
 }
 
-/// The problems of one object.
-fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>) -> Vec<CheckRow> {
+/// The problems of one object. `mode`: the patch page's, which the parser checks by.
+fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>, mode: ParserMode) -> Vec<CheckRow> {
     let (id, text) = (object.id, object.text);
-    let to_row = |line, message, severity| CheckRow { id: id.to_owned(), line, message, severity };
-    if behavior.is_anim_data() {
-        let mut found: Vec<Diagnostic> = anim_lines::diagnostics(behavior.adsf, id, text);
-        // Clip data has its counts checked above, as d-merge counts them itself: see `validate_adsf`.
-        if behavior.asdsf {
-            add_parser_check(&mut found, behavior, code, object);
-        }
-        return found.into_iter().map(|problem| to_row(problem.line, problem.message, problem.severity)).collect();
+    // Animation data only has the parser's word: see `anim_lines`.
+    let mut found: Vec<Diagnostic> = if behavior.is_anim_data() {
+        Vec::new()
+    } else {
+        diagnostics::field_diagnostics(text, behavior, object.is_new, code)
+    };
+    // As the editor does: the parser reads the patch, whose lines are not the object's.
+    if let Some(patch) = behavior.patch(code, id)
+        && let Err(error) = behavior.validate(id, &patch, mode)
+    {
+        let to_editor_line = |line| Preview::new(&patch).editor_line_of(line, text);
+        diagnostics::add_parser_error(&mut found, text, &error, to_editor_line);
     }
-    let mut found: Vec<Diagnostic> = diagnostics::field_diagnostics(text, behavior, object.is_new, code);
-    add_parser_check(&mut found, behavior, code, object);
-    found.into_iter().map(|problem| to_row(problem.line, problem.message, problem.severity)).collect()
-}
-
-/// As the editor does: the parser reads the patch, whose lines are not the object's.
-fn add_parser_check(found: &mut Vec<Diagnostic>, behavior: &Behavior, code: &str, object: &ObjectText<'_>) {
-    let Some(patch) = behavior.patch(code, object.id) else { return };
-    // (The mode is for the clip data, which does not come here.)
-    if let Err(error) = behavior.validate(object.id, &patch, ParserMode::Strict) {
-        let to_editor_line = |line| Preview::new(&patch).editor_line_of(line, object.text);
-        diagnostics::add_parser_error(found, object.text, &error, to_editor_line);
-    }
+    let to_row = |problem: Diagnostic| CheckRow {
+        id: id.to_owned(),
+        line: problem.line,
+        message: problem.message,
+        severity: problem.severity,
+    };
+    found.into_iter().map(to_row).collect()
 }
 
 /// The problems of the files of `scope`, by file.
-fn run(behavior: &Behavior, code: &str, scope: &CheckScope) -> Vec<CheckRow> {
+fn run(behavior: &Behavior, code: &str, scope: &CheckScope, mode: ParserMode) -> Vec<CheckRow> {
     let objects = behavior.texts().filter(|object| {
         !behavior.is_ref(object.id) && is_checked(behavior, object) && scope.contains(behavior.adsf, object.id)
     });
-    let mut rows: Vec<CheckRow> = objects.flat_map(|object| object_rows(behavior, code, &object)).collect();
+    let mut rows: Vec<CheckRow> = objects.flat_map(|object| object_rows(behavior, code, &object, mode)).collect();
     sort_rows(&mut rows);
     rows
 }
@@ -141,7 +138,7 @@ pub(super) fn check_items(ui: &mut egui::Ui, i18n: &I18nMap) -> Option<bool> {
 impl PatchTool {
     /// Checks the files of `scope` of the active behavior, and opens the window.
     pub(in crate::patch) fn start_work_check(&mut self, scope: CheckScope) {
-        let rows = run(&self.workspace.behaviors[self.active], self.mod_code.trim(), &scope);
+        let rows = run(&self.workspace.behaviors[self.active], self.mod_code.trim(), &scope, self.parser_mode);
         self.work_check = Some(WorkCheck { behavior: self.active, scope, rows });
     }
 
@@ -155,7 +152,7 @@ impl PatchTool {
             !behavior.is_ref(object.id) && is_checked(behavior, object) && check.scope.contains(behavior.adsf, id)
         });
         if let Some(object) = object {
-            check.rows.extend(object_rows(behavior, self.mod_code.trim(), &object));
+            check.rows.extend(object_rows(behavior, self.mod_code.trim(), &object, self.parser_mode));
             sort_rows(&mut check.rows);
         }
     }
@@ -225,24 +222,22 @@ mod tests {
     fn clip_data() -> Behavior {
         let mut adsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
         let mut add = |id: &str, text: &str| adsf.added.insert(id.to_owned(), text.to_owned());
-        add("Male~1/Bad~m$0.txt", "Bad\nm$0\n1\n0\n0\n7\n");
+        add("Male~1/Bad~m$0.txt", "Bad\nm$0\nnot a speed\n0\n0\n0\n");
         add("Male~1/Good~m$1.txt", "Good\nm$1\n1\n0\n0\n0\n");
-        add("Male~1/m$2.txt", "other$9\n1\n0\n0\n");
-        add("Female~1/Bad~m$0.txt", "Bad\nm$0\n1\n0\n0\n5\n");
-        // A patch that edits: the merge counts, see `anim_lines`.
-        add("Male~1/Edit~348.txt", "Edit\n348\n1\n0\n0\n7\n<!-- MOD_CODE ~m~ OPEN -->\n<!-- CLOSE -->\n");
+        add("Male~1/m$2.txt", "m$2\nnot a duration\n0\n0\n");
+        add("Female~1/Bad~m$0.txt", "Bad\nm$0\nnot a speed\n0\n0\n0\n");
         adsf
     }
 
-    fn found(scope: &CheckScope) -> Vec<(String, usize)> {
-        run(&clip_data(), "m", scope).into_iter().map(|row| (row.id, row.line)).collect()
+    fn found(scope: &CheckScope) -> Vec<String> {
+        run(&clip_data(), "m", scope, ParserMode::Strict).into_iter().map(|row| row.id).collect()
     }
 
     #[test]
     fn it_goes_through_what_was_asked_for() {
-        let bad_male = ("Male~1/Bad~m$0.txt".to_owned(), 5);
-        let motion = ("Male~1/m$2.txt".to_owned(), 0);
-        let bad_female = ("Female~1/Bad~m$0.txt".to_owned(), 5);
+        let bad_male = "Male~1/Bad~m$0.txt".to_owned();
+        let motion = "Male~1/m$2.txt".to_owned();
+        let bad_female = "Female~1/Bad~m$0.txt".to_owned();
 
         assert_eq!(found(&CheckScope::All), [bad_female, bad_male.clone(), motion.clone()]);
         assert_eq!(found(&CheckScope::Folder("Male~1".to_owned())), [bad_male.clone(), motion.clone()]);
@@ -252,11 +247,22 @@ mod tests {
         assert!(found(&CheckScope::Folder("None~1".to_owned())).is_empty());
     }
 
+    /// The count is the parser's to check, in the mode of the patch page.
+    #[test]
+    fn the_mode_of_the_patch_page_decides() {
+        let mut adsf = clip_data();
+        adsf.added.clear();
+        adsf.added.insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
+        assert_eq!(run(&adsf, "m", &CheckScope::All, ParserMode::Strict).len(), 1);
+        assert!(run(&adsf, "m", &CheckScope::All, ParserMode::Lenient).is_empty());
+    }
+
     #[test]
     fn a_correction_leaves_the_list_and_a_new_mistake_comes_in() {
         let mut tool = PatchTool::default();
         tool.workspace.behaviors.push(clip_data());
         tool.mod_code = "m".to_owned();
+        tool.parser_mode = ParserMode::Strict;
         tool.start_work_check(CheckScope::Folder("Male~1".to_owned()));
         let rows = |tool: &PatchTool| tool.work_check.as_ref().unwrap().rows.len();
         assert_eq!(rows(&tool), 2);
@@ -266,7 +272,7 @@ mod tests {
         tool.refresh_work_check(motion);
         assert_eq!(rows(&tool), 1);
 
-        tool.workspace.behaviors[0].added.insert(motion.to_owned(), "wrong\n1\n0\n0\n".to_owned());
+        tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
         tool.refresh_work_check(motion);
         assert_eq!(rows(&tool), 2);
 
@@ -289,7 +295,7 @@ mod tests {
         let id = "DefaultMaleData~DefaultMale/m$Start.txt";
         asdsf.added.insert(id.to_owned(), "V3\nabc\ndef\n".to_owned());
 
-        let rows = run(&asdsf, "m", &CheckScope::All);
+        let rows = run(&asdsf, "m", &CheckScope::All, ParserMode::Strict);
         let row = rows.iter().find(|row| row.message.contains("triggers_len")).expect("the parser's reason");
         assert_eq!((row.id.as_str(), row.line, row.severity), (id, 1, Severity::Error));
     }
@@ -306,10 +312,10 @@ mod tests {
         let mut behavior = Behavior::open(&template).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
 
-        assert!(run(&behavior, "m", &CheckScope::All).is_empty(), "nothing changed");
+        assert!(run(&behavior, "m", &CheckScope::All, ParserMode::Strict).is_empty(), "nothing changed");
         let typo = object.replace("userData", "typoField");
         behavior.set_text("#0100", typo);
-        let rows = run(&behavior, "m", &CheckScope::All);
+        let rows = run(&behavior, "m", &CheckScope::All, ParserMode::Strict);
         assert!(rows.iter().any(|row| row.id == "#0100" && row.line == 1), "{rows:?}");
         assert!(rows.iter().all(|row| row.id != "#0101"), "{rows:?}");
     }

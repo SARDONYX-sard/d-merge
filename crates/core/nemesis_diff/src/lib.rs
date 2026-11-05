@@ -342,6 +342,98 @@ pub fn resolve(patch: &str, view: View) -> String {
     out
 }
 
+/// A patch file's block: `old` lines from line `at` of what the patch says the template is, replaced
+/// by `new`.
+struct PatchBlock<'a> {
+    at: usize,
+    old: usize,
+    new: Vec<&'a str>,
+}
+
+fn patch_blocks(patch: &str) -> Vec<PatchBlock<'_>> {
+    let (mut blocks, mut at) = (Vec::new(), 0);
+    let mut current: Option<(PatchBlock<'_>, bool)> = None; // (the block, in its `ORIGINAL`)
+    for line in patch.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("<!-- MOD_CODE ~") && trimmed.ends_with("OPEN -->") {
+            current = Some((PatchBlock { at, old: 0, new: Vec::new() }, false));
+        } else if trimmed == ORIGINAL {
+            if let Some((_, in_original)) = &mut current {
+                *in_original = true;
+            }
+        } else if trimmed == CLOSE {
+            blocks.extend(current.take().map(|(block, _)| block));
+        } else {
+            match &mut current {
+                Some((block, false)) => block.new.push(line),
+                Some((block, true)) => {
+                    block.old += 1;
+                    at += 1;
+                }
+                None => at += 1,
+            }
+        }
+    }
+    blocks
+}
+
+/// Where lines `at..at + len` of `old` are in `new`, whose differences are `hunks`. `None`: some of them
+/// are not there as they are.
+fn place_of_lines(hunks: &[Hunk], at: usize, len: usize) -> Option<Range<usize>> {
+    let mut shift = 0_isize;
+    for hunk in hunks {
+        if hunk.old.end <= at {
+            shift = hunk.new.end.cast_signed() - hunk.old.end.cast_signed();
+        } else if hunk.old.start >= at + len {
+            break;
+        } else {
+            return None;
+        }
+    }
+    let start = at.saturating_add_signed(shift);
+    Some(start..start + len)
+}
+
+/// What a patch file makes of `template`: its blocks, and nothing else.
+///
+/// A mod's file is a copy of the object as its author had it, which may not be the template: d-merge
+/// and Nemesis only read the blocks, so the lines around them do not matter, and must not become
+/// changes when the patch is written again.
+///
+/// e.g., a file of `a`, `b`, a block changing `c` to `C`, `stale` on the template `a`, `b`, `c`, `d`
+/// -> `a`, `b`, `C`, `d`
+///
+/// A block is only placed where the template has what it replaces. If one is not, the lines do not
+/// compare, e.g. the file has the values of a vector one per line, and the template all on one line:
+/// the result is the file as it is, whose form the block fits.
+pub fn apply_to_template(patch: &str, template: &str) -> String {
+    let patch = normalize(patch);
+    let template = normalize(template);
+    let base = resolve(&patch, View::Original);
+    if base == template {
+        return resolve(&patch, View::Mod);
+    }
+    let hunks = line_hunks(&base, &template);
+    let blocks = patch_blocks(&patch);
+    let places: Option<Vec<Range<usize>>> =
+        blocks.iter().map(|block| place_of_lines(&hunks, block.at, block.old)).collect();
+    let Some(places) = places else { return resolve(&patch, View::Mod) };
+
+    let lines: Vec<&str> = template.split_inclusive('\n').collect();
+    let mut out = String::with_capacity(template.len() + patch.len());
+    let mut done = 0; // The lines of the template that were written or replaced.
+    for (block, place) in blocks.iter().zip(places) {
+        lines[done..place.start].iter().for_each(|line| out.push_str(line));
+        for line in &block.new {
+            out.push_str(line);
+            out.push('\n');
+        }
+        done = place.end;
+    }
+    lines[done..].iter().for_each(|line| out.push_str(line));
+    out
+}
+
 /// A template object the edited copy changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedObject {
@@ -735,6 +827,51 @@ mod tests {
     fn a_kept_line_has_no_problems_in_its_fields() {
         let edited = resolve(PUSH, View::Mod);
         assert_eq!(check_fields(&edited), []);
+    }
+
+    fn patch_of(common: &str, block: &str, rest: &str) -> String {
+        format!("{common}<!-- MOD_CODE ~m~ OPEN -->\n{block}<!-- CLOSE -->\n{rest}")
+    }
+
+    /// `Draugr Dagger Animation Fix`: a copy of other data than the template around its one change.
+    #[test]
+    fn only_the_blocks_of_a_patch_change_the_template() {
+        let template = "a\nb\nc\nd\ne\nf\n";
+        let patch = patch_of("a\nb\n", "C\n<!-- ORIGINAL -->\nc\n", "d\nstale\nf\n");
+        assert_eq!(apply_to_template(&patch, template), "a\nb\nC\nd\ne\nf\n");
+    }
+
+    #[test]
+    fn a_block_goes_to_its_place_in_a_template_of_another_length() {
+        // A line is missing before the block, and two more are after it.
+        let template = "a\nnew\nb\nc\nd\ne\nf\n";
+        let patch = patch_of("a\nb\n", "C\n<!-- ORIGINAL -->\nc\n", "d\n");
+        assert_eq!(apply_to_template(&patch, template), "a\nnew\nb\nC\nd\ne\nf\n");
+    }
+
+    /// `Dodge MCO-DXP`: the values of a vector one per line, and all on one line in the template.
+    #[test]
+    fn a_block_that_the_template_has_no_place_for_keeps_the_file() {
+        let template = "a\n(0 1)\nb\n";
+        let patch = patch_of("a\n", "2\n<!-- ORIGINAL -->\n0\n", "1\nb\n");
+        assert_eq!(apply_to_template(&patch, template), "a\n2\n1\nb\n");
+    }
+
+    #[test]
+    fn a_block_that_only_adds_goes_to_its_place() {
+        let template = "a\nb\nc\nd\n";
+        let patch = patch_of("a\nb\n", "new\n", "c\nstale\n");
+        assert_eq!(apply_to_template(&patch, template), "a\nb\nnew\nc\nd\n");
+    }
+
+    /// Writing the patch again gives what the file had.
+    #[test]
+    fn a_patch_on_its_own_template_stays_the_same() {
+        let template = "a\nb\nc\nd\n";
+        let patch = patch_of("a\nb\n", "C\n<!-- ORIGINAL -->\nc\n", "d\n");
+        let edited = apply_to_template(&patch, template);
+        assert_eq!(edited, "a\nb\nC\nd\n");
+        assert_eq!(object_patch("m", template, &edited).as_deref(), Some(patch.as_str()));
     }
 
     #[test]

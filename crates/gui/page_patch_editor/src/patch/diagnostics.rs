@@ -56,7 +56,8 @@ pub(super) struct ParserProblem {
 ///   | ^
 /// expected triggers_len: usize
 /// ```
-/// -> line 1, column 0, `expected triggers_len: usize`. `None`: another kind of error.
+/// -> line 1, column 0, `expected triggers_len: usize`. Its first line is the message when the place
+/// has none (`error: Parse error`). `None`: another kind of error.
 pub(super) fn parser_problem(error: &str) -> Option<ParserProblem> {
     let lines: Vec<&str> = error.lines().collect();
     (0..lines.len().saturating_sub(1)).find_map(|at| {
@@ -70,8 +71,15 @@ pub(super) fn parser_problem(error: &str) -> Option<ParserProblem> {
             None if marker.starts_with('^') => lines[at + 2..].join(" ").trim().to_owned(),
             None => return None,
         };
+        let message = if message.is_empty() { title_of(error).to_owned() } else { message };
         Some(ParserProblem { line, column, message })
     })
+}
+
+/// `error: Parse error` -> `Parse error`
+fn title_of(error: &str) -> &str {
+    let first = error.lines().next().unwrap_or_default();
+    first.split_once(':').map_or(first, |(_, title)| title).trim()
 }
 
 /// `problems` with the parser's `error` added, wherever it says: it goes to the line `to_editor_line`
@@ -127,6 +135,13 @@ mod tests {
         let error = "parse error at line 2, column 1\n  |\n2 | abc\n  | ^\nexpected triggers_len: usize";
         let expected = "expected triggers_len: usize".to_owned();
         assert_eq!(parser_problem(error), Some(ParserProblem { line: 1, column: 0, message: expected }));
+    }
+
+    /// Nothing at the place: the problem must not be listed without a word.
+    #[test]
+    fn an_error_without_a_message_at_its_place_has_its_title() {
+        let problem = parser_problem("error: Parse error\n  |\n1 | attackStat\n  | -").unwrap();
+        assert_eq!(problem, ParserProblem { line: 0, column: 0, message: "Parse error".to_owned() });
     }
 
     #[test]
