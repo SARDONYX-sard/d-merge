@@ -4,10 +4,10 @@
 //! ```text
 //! ▶ mymod  D:/mods/out                                        [Export]
 //! ```
-//! Unfolded (also at the start while something is missing): the output, the mod to read, and the
-//! mod's `info.ini`. The list of behaviors is in [`super::behaviors`].
+//! Unfolded (also at the start while something is missing): the output, the mod to read, the mods
+//! it depends on, and the mod's `info.ini`. The list of behaviors is in [`super::behaviors`].
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use egui_widgets::{
     PathActions, PathRow,
@@ -31,6 +31,14 @@ impl PatchTool {
             let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.export_button(ui, i18n, notify);
+                self.open_recent_menu(ui, i18n);
+                if ui
+                    .add(Button::new(i18n.t(I18nKey::UserPatchTitle)))
+                    .on_hover_text(i18n.t(I18nKey::UserPatchHover))
+                    .clicked()
+                {
+                    self.toggle_user_patch();
+                }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     toggle |= self.project_summary(ui, i18n);
                 });
@@ -41,6 +49,25 @@ impl PatchTool {
         });
         if self.project_open {
             self.project_form(ui, i18n, notify);
+        }
+    }
+
+    /// `Open Recent`, like VS Code's: a work comes back with the tabs it had open.
+    fn open_recent_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        let mut picked = None;
+        ui.menu_button(i18n.t(I18nKey::NemesisOpenRecent), |ui| {
+            if self.recent.is_empty() {
+                ui.weak(i18n.t(I18nKey::NemesisOpenRecentEmpty));
+            }
+            for work in &self.recent {
+                if ui.button(format!("{}  {}", work.mod_code, work.output)).clicked() {
+                    picked = Some(work.clone());
+                    ui.close();
+                }
+            }
+        });
+        if let Some(work) = picked {
+            self.open_recent(&work);
         }
     }
 
@@ -90,6 +117,8 @@ impl PatchTool {
             self.import(&dir, notify, i18n);
         }
 
+        self.ref_mods_row(ui, i18n);
+
         ui.horizontal_wrapped(|ui| {
             ui.label(i18n.t(I18nKey::NemesisModCodeLabel));
             let code = ui.add(
@@ -116,5 +145,37 @@ impl PatchTool {
                 self.mark_dirty();
             }
         });
+    }
+
+    /// `References: [amco ✖] [+]`: the mods this one depends on, see `Workspace::ref_mods`.
+    fn ref_mods_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        let mut remove = None;
+        let mut add = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(i18n.t(I18nKey::NemesisRefMods)).on_hover_text(i18n.t(I18nKey::NemesisRefModsHover));
+            for (at, dir) in self.workspace.ref_mods.iter().enumerate() {
+                let code =
+                    Path::new(dir).file_name().map_or_else(|| dir.as_str().into(), |name| name.to_string_lossy());
+                if ui.add(Button::new(format!("{code} ✖")).small()).on_hover_text(dir).clicked() {
+                    remove = Some(at);
+                }
+            }
+            add = ui
+                .add(Button::new("").icon(Icon::Plus).small())
+                .on_hover_text(i18n.t(I18nKey::NemesisRefModsHover))
+                .clicked();
+        });
+        if let Some(at) = remove {
+            self.workspace.ref_mods.remove(at);
+            self.workspace.reload_refs();
+        } else if add && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder() {
+            let code = self.mod_code.trim().to_owned();
+            self.workspace.add_ref(&dir, &code);
+        } else {
+            return;
+        }
+        self.reset_names();
+        self.editor_for = None;
+        self.mark_dirty();
     }
 }

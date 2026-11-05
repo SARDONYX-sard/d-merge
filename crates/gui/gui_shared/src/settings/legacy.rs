@@ -129,6 +129,7 @@ pub(crate) mod v2 {
                     // added v2
                     parser_mode: ParserMode::Strict,
                     skeleton_arm_fix: false,
+                    apply_user_patch: true,
                 },
                 ui: UiSettings {
                     theme: Theme::Dark,

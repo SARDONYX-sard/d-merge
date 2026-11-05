@@ -20,6 +20,10 @@ pub(super) struct Names {
     pub(super) variables: Vec<String>,
     /// The type of each variable by index, e.g. `REAL`.
     pub(super) variable_types: Vec<Box<str>>,
+    /// `events` and `variables` with those of the referenced mods: what can be used, while only the
+    /// others can be edited.
+    pub(super) usable_events: Vec<String>,
+    pub(super) usable_variables: Vec<String>,
     /// How many of each the template has (the rest are this mod's).
     pub(super) template_events: usize,
     pub(super) template_variables: usize,
@@ -35,6 +39,7 @@ impl Names {
             names.template_variables = vars::names(template, "variableNames").len();
             names.read_names(behavior.text(id).unwrap_or_default());
         }
+        names.read_usable(behavior);
         if let Some(id) = behavior.object_of_class(GRAPH_DATA) {
             names.read_types(behavior.text(id).unwrap_or_default());
         }
@@ -52,7 +57,15 @@ impl Names {
                 _ => {}
             }
         }
+        self.read_usable(behavior);
         self.graph.finish_updates();
+    }
+
+    fn read_usable(&mut self, behavior: &Behavior) {
+        self.usable_events.clone_from(&self.events);
+        self.usable_events.extend_from_slice(&behavior.ref_events);
+        self.usable_variables.clone_from(&self.variables);
+        self.usable_variables.extend_from_slice(&behavior.ref_variables);
     }
 
     fn read_types(&mut self, graph_data: &str) {

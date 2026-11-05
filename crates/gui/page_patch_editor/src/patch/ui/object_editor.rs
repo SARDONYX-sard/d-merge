@@ -45,7 +45,8 @@ impl PatchTool {
         }
 
         // No preview for a new object: it is written as is.
-        let is_new = self.workspace.behaviors[self.active].added.contains_key(&id);
+        let behavior = &self.workspace.behaviors[self.active];
+        let is_new = behavior.added.contains_key(&id) || behavior.is_ref(&id);
         let preview_event = if is_new { None } else { self.preview_panel(ui, i18n) };
         let result = self.editor_panel(ui, i18n, &id);
 
@@ -121,8 +122,8 @@ impl PatchTool {
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
         let language = NemesisXml {
-            events: &names.events,
-            variables: &names.variables,
+            events: &names.usable_events,
+            variables: &names.usable_variables,
             variable_types: &names.variable_types,
             values: &values,
             graph: &names.graph,
@@ -152,6 +153,10 @@ impl PatchTool {
         let mut result = EditorResult::default();
         egui::CentralPanel::default().show(ui, |ui| {
             result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
+            let read_only = self.workspace.behaviors[self.active].is_ref(id);
+            if read_only {
+                ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
+            }
             if self.show_lsp_options {
                 lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
             }
@@ -171,6 +176,7 @@ impl PatchTool {
             egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false).show(ui, |ui| {
                 let output = CodeEditor::new(("nemesis_object", id), &mut self.editor_text)
                     .language(shown_language)
+                    .read_only(read_only)
                     .diagnostics(&self.field_problems)
                     .features(features)
                     .keymap(keymap)

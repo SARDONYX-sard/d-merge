@@ -139,6 +139,7 @@ impl PatchView<'_> {
                 I18nKey::GenerateFnisEspHover,
             ),
             (&mut self.ctx.settings.behavior.skeleton_arm_fix, I18nKey::ArmFixLabel, I18nKey::ArmFixHover),
+            (&mut self.ctx.settings.behavior.apply_user_patch, I18nKey::UserPatchApply, I18nKey::UserPatchApplyHover),
             (&mut self.ctx.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
         ] {
             ui.add(Checkbox::new(value, self.ctx.i18n.t(label))).on_hover_text(self.ctx.i18n.t(hover));

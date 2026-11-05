@@ -65,28 +65,6 @@ pub fn inherit_reorder_cast(old: &[ModItem], new: Vec<ModInfo>) -> Vec<ModItem> 
     with_old
 }
 
-/// Whether `id` (`mymod`, or a path ending with it) is the mod `code`.
-fn is_mod_code(id: &str, code: &str) -> bool {
-    std::path::Path::new(id)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name.eq_ignore_ascii_case(code))
-}
-
-/// A user patch that just appeared is turned on and goes last: it loads last, so it wins. Only when
-/// it is new, so the user can still move it or turn it off.
-///
-/// `old`: the list before. `new`: the list now, in priority order.
-pub fn place_new_user_patch(old: &[ModItem], new: &mut [ModItem], code: &str) {
-    if old.iter().any(|item| is_mod_code(&item.id, code)) {
-        return;
-    }
-    let Some(at) = new.iter().position(|item| is_mod_code(&item.id, code)) else { return };
-    new[at].enabled = true;
-    new[at..].rotate_left(1);
-    new.iter_mut().enumerate().for_each(|(priority, item)| item.priority = priority);
-}
-
 /// Reorder priorities:
 /// 1. Sort mods by type:
 ///    Nemesis -> NemesisExt -> FNIS
@@ -146,22 +124,6 @@ pub fn dedup_mods_by_id(mods: &mut [ModItem]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_new_user_patch_goes_last_only_once() {
-        let item = |id: &str, priority| ModItem { id: id.into(), priority, ..Default::default() };
-        let mut list = vec![item("a", 0), item("D:/mods/upatch", 1), item("b", 2)];
-        place_new_user_patch(&[item("a", 0)], &mut list, "upatch");
-        assert_eq!(list[2].id, "D:/mods/upatch");
-        assert!(list[2].enabled);
-        assert_eq!(list[2].priority, 2);
-
-        // The user moved it first and turned it off: it stays.
-        let mut moved = vec![item("D:/mods/upatch", 0), item("a", 1)];
-        place_new_user_patch(&moved.clone(), &mut moved, "upatch");
-        assert_eq!(moved[0].id, "D:/mods/upatch");
-        assert!(!moved[0].enabled);
-    }
 
     #[test]
     fn normalizes_gaps_and_non_zero_start() {

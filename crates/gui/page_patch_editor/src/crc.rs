@@ -74,7 +74,10 @@ impl CrcTool {
                     crc_cells(ui, crc, i18n);
                 }
                 ui.add(
+                    // A fixed id: the cells before it come and go with the text. An id by position
+                    // would change when the text becomes empty, and with it go the focus.
                     TextEdit::singleline(&mut self.text)
+                        .id_salt("crc_text")
                         .hint_text(i18n.t(I18nKey::CrcTextHint))
                         .desired_width(ui.available_width()),
                 )

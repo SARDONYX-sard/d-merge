@@ -31,6 +31,7 @@ mod search;
 mod template_tree;
 mod tree;
 mod ui;
+mod user_patch;
 mod vars_edit;
 mod workspace;
 
@@ -45,13 +46,26 @@ use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::{
-        pages::{patch::behavior::ParserMode, patch_editor::PatchEditorSettings},
+        pages::{
+            patch::behavior::ParserMode,
+            patch_editor::{PatchEditorSettings, RecentWork},
+        },
         ui::editor::{EditorMode, LspOptions},
     },
 };
 use nemesis_diff::is_valid_mod_code;
 
-use self::workspace::{Behavior, TemplateEntry, Workspace};
+use self::workspace::{Behavior, Session, SessionTab, TemplateEntry, Workspace};
+
+/// How many works the list of recent ones keeps.
+const MAX_RECENT: usize = 12;
+
+/// `work` goes first in the list, once.
+fn remember_recent(recent: &mut Vec<RecentWork>, work: RecentWork) {
+    recent.retain(|other| *other != work);
+    recent.insert(0, work);
+    recent.truncate(MAX_RECENT);
+}
 
 /// How long typing must pause before the patch, its check, the underlines and the diff are computed
 /// again. Together they take over 100 ms on a big object in a debug build: too slow for each key.
@@ -162,8 +176,20 @@ pub(crate) struct PatchTool {
     anim_folders_open: fast_hash::HashSet<String>,
     /// The selection the way to it was last opened for.
     anim_revealed: Option<String>,
-    /// A conflict's value to keep, taken in on the next frame.
+    /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
+    /// The editor goes to the user patch, on the next frame.
+    pending_user_patch: bool,
+    /// And shows this object: `(behavior, id)`.
+    pending_open: Option<(String, String)>,
+    /// The works opened lately, the last one first. From the settings.
+    recent: Vec<RecentWork>,
+    /// The behavior and the object the work last saved had open.
+    session_seen: (usize, Option<String>),
+    /// The window of the user patch, and what it asks for.
+    user_patch: user_patch::UserPatchView,
+    /// Goes up with each edit of the work.
+    edit_revision: u64,
     /// The "new clips" window.
     new_clips: Option<ui::anim_data::NewClipsForm>,
     /// What each line of the open anim data file is. Recomputed with the preview.
@@ -231,26 +257,38 @@ struct ObjectList {
 
 impl PatchTool {
     pub(crate) fn open_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
+        self.pending_user_patch = true;
         self.pending_resolution = Some(request);
     }
 
     /// Before the work is synced: the user patch is a work of its own.
     fn switch_to_user_patch(&mut self) {
-        let Some(request) = &self.pending_resolution else { return };
+        if !std::mem::take(&mut self.pending_user_patch) {
+            return;
+        }
         gui_shared::patch::USER_PATCH_CODE.clone_into(&mut self.mod_code);
-        request.output.clone_into(&mut self.output);
+        gui_shared::patch::USER_PATCH_OUTPUT.clone_into(&mut self.output);
         self.mod_dir.clear();
     }
 
     /// After the work is synced: takes the value in, and shows where it went.
     fn take_in_resolution(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        if let Some((behavior, id)) = self.pending_open.take() {
+            self.active =
+                self.workspace.behaviors.iter().position(|found| found.name == behavior).unwrap_or(self.active);
+            self.editor_for = None;
+            self.selected = Some(id);
+        }
         let Some(request) = self.pending_resolution.take() else { return };
         if self.workspace.info.name.is_empty() {
             i18n.t(I18nKey::NemesisUserPatchName).clone_into(&mut self.workspace.info.name);
         }
+        // What the value points to is that mod's.
+        self.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);
         let root = PathBuf::from(&self.template_dir);
         match resolve::apply(&mut self.workspace, &root, &request) {
             Ok((active, id)) => {
+                self.workspace.reload_refs(); // a behavior may have been opened
                 self.reset_names();
                 self.active = active;
                 self.editor_for = None;
@@ -290,6 +328,7 @@ impl PatchTool {
             self.output.clone_from(&settings.output);
             self.mod_dir.clone_from(&settings.mod_dir);
             self.mod_code.clone_from(&settings.mod_code);
+            self.recent.clone_from(&settings.recent);
             // What is set once stays out of the way, unless it still has to be set.
             self.project_open = settings.output.trim().is_empty() || !is_valid_mod_code(settings.mod_code.trim());
             self.behaviors_open = true;
@@ -312,6 +351,9 @@ impl PatchTool {
         }
         if settings.mod_dir != self.mod_dir {
             settings.mod_dir.clone_from(&self.mod_dir);
+        }
+        if settings.recent != self.recent {
+            settings.recent.clone_from(&self.recent);
         }
         settings.inline_diff = self.show_inline_diff;
         settings.follow_preview = self.follow_preview;
@@ -376,8 +418,18 @@ impl PatchTool {
                 }
                 self.editor_for = None;
                 self.selected = None;
+                self.restore_session();
             }
+            remember_recent(&mut self.recent, RecentWork { output: key.0.clone(), mod_code: key.1.clone() });
             self.loaded_for = Some(key);
+        }
+
+        // What is open is part of the work: back to it when it is opened again.
+        if self.session_seen.0 != self.active || self.session_seen.1 != self.selected {
+            self.session_seen = (self.active, self.selected.clone());
+            if self.loaded_for.is_some() && !self.workspace.behaviors.is_empty() {
+                self.dirty_since.get_or_insert_with(Instant::now);
+            }
         }
 
         if self.dirty_since.is_some_and(|since| since.elapsed() >= SAVE_DELAY) {
@@ -390,9 +442,53 @@ impl PatchTool {
         if self.dirty_since.take().is_none() {
             return;
         }
+        self.workspace.session = self.current_session();
         if let Err(err) = self.workspace.save(Path::new(output), code) {
             notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
         }
+    }
+
+    /// What is open now, to write with the work.
+    fn current_session(&self) -> Session {
+        let behaviors = &self.workspace.behaviors;
+        let name_of = |at: usize| behaviors.get(at).map_or_else(String::new, |behavior| behavior.name.clone());
+        Session {
+            mod_dir: self.mod_dir.clone(),
+            active: name_of(self.active),
+            selected: self.selected.clone(),
+            tabs: self
+                .tabs
+                .all()
+                .map(|tab| SessionTab { behavior: name_of(tab.behavior), id: tab.id.clone(), pinned: tab.pinned })
+                .collect(),
+        }
+    }
+
+    /// Back to what the work just loaded had open. What no longer exists is left out.
+    fn restore_session(&mut self) {
+        let session = std::mem::take(&mut self.workspace.session);
+        let behaviors = &self.workspace.behaviors;
+        let at_of = |name: &str| behaviors.iter().position(|behavior| behavior.name == name);
+        for tab in &session.tabs {
+            if let Some(at) = at_of(&tab.behavior)
+                && behaviors[at].text(&tab.id).is_some()
+            {
+                self.tabs.restore(at, &tab.id, tab.pinned);
+            }
+        }
+        self.active = at_of(&session.active).unwrap_or(0);
+        self.selected = session.selected.filter(|id| behaviors.get(self.active).is_some_and(|b| b.text(id).is_some()));
+        if !session.mod_dir.is_empty() {
+            self.mod_dir = session.mod_dir;
+        }
+        self.session_seen = (self.active, self.selected.clone());
+    }
+
+    /// Opens a work of the list of recent ones: [`Self::sync_workspace`] does the rest.
+    fn open_recent(&mut self, work: &RecentWork) {
+        work.output.clone_into(&mut self.output);
+        work.mod_code.clone_into(&mut self.mod_code);
+        self.mod_dir.clear();
     }
 
     /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object (skips deleted ones).
@@ -495,8 +591,11 @@ impl PatchTool {
         self.field_problems = if behavior.is_anim_data() {
             self.anim_roles = anim_lines::roles(behavior.adsf, id, &self.editor_text);
             Vec::new() // no XML: only the parser's check below
+        } else if behavior.is_ref(id) {
+            Vec::new() // not this mod's to fix
         } else {
-            diagnostics::field_diagnostics(&self.editor_text, behavior, behavior.added.contains_key(id))
+            let is_new = behavior.added.contains_key(id);
+            diagnostics::field_diagnostics(&self.editor_text, behavior, is_new, self.mod_code.trim())
         };
         // Keep the ▲ / ▼ position across edits.
         let current = self.preview_view.as_ref().map_or(0, |view| view.current);
@@ -628,6 +727,7 @@ impl PatchTool {
 
     /// Something to save.
     fn mark_dirty(&mut self) {
+        self.edit_revision += 1;
         self.dirty_since.get_or_insert_with(Instant::now);
     }
 
@@ -639,6 +739,7 @@ impl PatchTool {
                     return;
                 }
                 self.workspace.behaviors.push(behavior);
+                self.workspace.reload_refs();
                 self.active = self.workspace.behaviors.len() - 1;
                 self.selected = None; // an id of the other behavior
                 self.mark_dirty();
@@ -775,6 +876,21 @@ impl PatchTool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_last_opened_work_is_first_and_listed_once() {
+        let work = |code: &str| RecentWork { output: "o".to_owned(), mod_code: code.to_owned() };
+        let mut recent = vec![work("a"), work("b")];
+        remember_recent(&mut recent, work("b"));
+        assert_eq!(recent, [work("b"), work("a")]);
+        remember_recent(&mut recent, work("c"));
+        assert_eq!(recent, [work("c"), work("b"), work("a")]);
+
+        for at in 0..MAX_RECENT * 2 {
+            remember_recent(&mut recent, work(&at.to_string()));
+        }
+        assert_eq!(recent.len(), MAX_RECENT);
+    }
+
     /// What one edit costs on the largest object of the largest template, step by step.
     #[test]
     #[ignore = "needs the template files of the repository; prints timings"]
@@ -801,7 +917,7 @@ mod tests {
         let patch = time!("patch", behavior.patch("m", &id)).unwrap();
         let check = time!("validate", behavior.validate(&id, &patch, ParserMode::Strict));
         println!("  valid: {}", check.is_ok());
-        time!("field_diagnostics", diagnostics::field_diagnostics(&edited, &behavior, false));
+        time!("field_diagnostics", diagnostics::field_diagnostics(&edited, &behavior, false, "m"));
         time!("Preview::new", preview::Preview::new(&patch));
         time!("inline_diff", inline_diff::changes(&text, &edited));
         time!("apply_changes", names.apply_changes(&behavior, std::slice::from_ref(&id)));
@@ -812,7 +928,7 @@ mod tests {
         let bad_patch = time!("broken: patch", behavior.patch("m", &id)).unwrap();
         let bad = time!("broken: validate", behavior.validate(&id, &bad_patch, ParserMode::Strict));
         println!("  valid: {}, error of {} bytes", bad.is_ok(), bad.as_ref().err().map_or(0, String::len));
-        time!("broken: diagnostics", diagnostics::field_diagnostics(&broken, &behavior, false));
+        time!("broken: diagnostics", diagnostics::field_diagnostics(&broken, &behavior, false, "m"));
         time!("broken: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
         behavior.set_text(&id, edited);
         time!("fixed: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));

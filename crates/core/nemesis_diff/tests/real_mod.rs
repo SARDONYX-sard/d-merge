@@ -160,7 +160,7 @@ fn template_pointers_are_valid() {
     let problems: Vec<_> = all
         .iter()
         .flat_map(|o| {
-            nemesis_diff::schema::check_pointers(o.text, &class_of)
+            nemesis_diff::schema::check_pointers(o.text, "", &class_of)
                 .into_iter()
                 .map(|p| format!("{}: {}", o.id, p.message))
         })

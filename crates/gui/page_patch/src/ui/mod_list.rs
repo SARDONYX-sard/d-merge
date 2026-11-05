@@ -22,7 +22,10 @@ impl PatchView<'_> {
     /// The central panel with the toolbar and the table.
     pub(super) fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let rows = self.read_only_rows();
-        self.page.conflicts.refresh_marks(self.ctx.settings.mod_list());
+        let settings = &*self.ctx.settings;
+        let user_patch =
+            crate::run::uses_user_patch(settings).then(|| crate::run::user_patch_priority(settings.mod_list()));
+        self.page.conflicts.refresh_marks(settings.mod_list(), user_patch);
         egui::CentralPanel::default().frame(self.ctx.panel_frame).show(ui, |ui| {
             ui.add_space(10.0);
             self.render_toolbar(ui, rows.is_some());
@@ -98,6 +101,10 @@ impl PatchView<'_> {
         let busy = self.page.conflicts.is_scanning() || self.page.run.is_running();
         if busy && self.page.conflicts.is_scanning() {
             ui.add(egui::Spinner::new());
+        }
+        if ui.add(Button::new(i18n.t(I18nKey::UserPatchTitle))).on_hover_text(i18n.t(I18nKey::UserPatchHover)).clicked()
+        {
+            self.page.user_patch_toggle = true;
         }
         let button = Button::new(i18n.t(I18nKey::ConflictScan)).icon(Icon::Layers);
         if ui.add_enabled(!busy, button).on_hover_text(i18n.t(I18nKey::ConflictScanHover)).clicked() {

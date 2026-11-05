@@ -50,7 +50,47 @@ pub struct PatchEditorPage {
     crc: CrcTool,
 }
 
+/// What the window of the user patch asks of the app.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UserPatchOutcome {
+    /// Show the Patch Editor: an object was opened in it.
+    pub open_editor: bool,
+}
+
 impl PatchEditorPage {
+    /// `Use this` in a conflict: the value goes into the user patch and the mod is written, without
+    /// the editor.
+    ///
+    /// # Errors
+    /// The value could not be taken in; the message says why.
+    pub fn resolve_now(
+        &mut self,
+        request: &gui_shared::patch::ResolveRequest,
+        template_dir: &str,
+        i18n: &I18nMap,
+    ) -> Result<(), String> {
+        self.patch.resolve_now(request, template_dir, i18n.t(I18nKey::NemesisUserPatchName))
+    }
+
+    /// Opens or closes the window of the user patch.
+    pub fn toggle_user_patch(&mut self) {
+        self.patch.toggle_user_patch();
+    }
+
+    /// Draws the window of the user patch, on any page.
+    pub fn user_patch_window(
+        &mut self,
+        ctx: &egui::Context,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+    ) -> UserPatchOutcome {
+        let outcome = self.patch.user_patch_window(ctx, i18n, notify);
+        if outcome.open_editor {
+            self.tool = Tool::Patch;
+        }
+        outcome
+    }
+
     /// Takes a conflict's value into the user patch, and shows it. See [`patch`]'s `resolve`.
     pub fn open_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
         self.tool = Tool::Patch;

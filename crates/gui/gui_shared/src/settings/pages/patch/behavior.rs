@@ -70,6 +70,11 @@ pub struct BehaviorSettings {
     /// - Equivalent to FNIS's `SKELETON arm fix` feature.
     pub skeleton_arm_fix: bool,
 
+    /// Merge the user patch, what the conflict tool decided, after every mod of the list.
+    /// See [`crate::patch::USER_PATCH_OUTPUT`].
+    #[serde(default = "apply_user_patch_default")]
+    pub apply_user_patch: bool,
+
     /// Controls how parser input is validated and whether recoverable
     /// inconsistencies are automatically repaired.
     pub parser_mode: ParserMode,
@@ -79,6 +84,11 @@ pub struct BehaviorSettings {
     /// Typically `./assets/templates`.  The actual merge target is the
     /// `meshes/` subdirectory within this directory.
     pub template_dir: Cow<'static, str>,
+}
+
+/// What was decided should take effect.
+const fn apply_user_patch_default() -> bool {
+    true
 }
 
 impl Default for BehaviorSettings {
@@ -91,6 +101,7 @@ impl Default for BehaviorSettings {
             enable_debug_output: false,
             generate_fnis_esp: false,
             skeleton_arm_fix: false,
+            apply_user_patch: apply_user_patch_default(),
             parser_mode: ParserMode::Strict,
             template_dir: "./assets/templates".into(),
         }

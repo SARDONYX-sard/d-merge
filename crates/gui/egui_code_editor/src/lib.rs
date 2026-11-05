@@ -222,6 +222,7 @@ pub struct CodeEditor<'a> {
     labels: EditorLabels<'a>,
     actions: &'a [EditorAction<'a>],
     inline_diff: Option<&'a InlineDiff>,
+    read_only: bool,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -246,7 +247,16 @@ impl<'a> CodeEditor<'a> {
             labels: EditorLabels::default(),
             actions: &[],
             inline_diff: None,
+            read_only: false,
         }
+    }
+
+    /// Everything but changing the text: the cursor, selecting, copying, hover, go to definition.
+    /// `changed` stays `false`. Keymaps edit the text directly, so what they did is undone at the end
+    /// of the frame.
+    pub const fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
     }
 
     pub const fn language(mut self, language: &'a dyn Language) -> Self {
@@ -322,7 +332,9 @@ impl<'a> CodeEditor<'a> {
             labels,
             actions,
             inline_diff,
+            read_only,
         } = self;
+        let original = read_only.then(|| text.clone());
         let frame = EditorFrame {
             id,
             language,
@@ -408,6 +420,11 @@ impl<'a> CodeEditor<'a> {
             _ => None,
         };
         let navigation = resolve_navigation(response, language, text, pointer, keyboard.or(from_menu));
+
+        if let Some(original) = original {
+            *text = original;
+            changed = false;
+        }
 
         CodeEditorOutput {
             changed,

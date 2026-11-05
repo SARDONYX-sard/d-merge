@@ -30,7 +30,33 @@ impl App {
         self.patch.ui(ui, ctx);
         // A conflict's value to keep: on to the user patch.
         if let Some(request) = self.patch.take_resolve() {
+            self.take_resolution(request);
+        }
+        if self.patch.take_user_patch_toggle() {
+            self.patch_editor.toggle_user_patch();
+        }
+    }
+
+    /// `Use this` decides here and now; `Edit...` goes on in the editor.
+    fn take_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
+        if request.edit {
             self.patch_editor.open_resolution(request);
+            self.pending_page = Some(gui_shared::settings::ui::Page::PatchEditor);
+            return;
+        }
+        let template_dir = &self.settings.pages.patch.behavior.template_dir;
+        match self.patch_editor.resolve_now(&request, template_dir, &self.i18n) {
+            Ok(()) => self.notify.success(self.i18n.t(gui_shared::i18n::I18nKey::ConflictResolved)),
+            Err(err) => {
+                self.notify.error(format!("{}: {err}", self.i18n.t(gui_shared::i18n::I18nKey::NemesisResolveFailed)));
+            }
+        }
+    }
+
+    /// The window of the user patch: it stays when another page is shown.
+    pub(crate) fn ui_user_patch_window(&mut self, ctx: &egui::Context) {
+        let outcome = self.patch_editor.user_patch_window(ctx, &self.i18n, &mut self.notify);
+        if outcome.open_editor {
             self.pending_page = Some(gui_shared::settings::ui::Page::PatchEditor);
         }
     }

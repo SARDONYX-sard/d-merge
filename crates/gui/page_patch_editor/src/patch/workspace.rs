@@ -79,6 +79,21 @@ pub(crate) struct Behavior {
     /// written as they are to `Nemesis_Engine/mod/<code>/animationdatasinglefile/<id>`.
     /// No template is read: new clips do not need one.
     pub(crate) adsf: bool,
+    /// The new objects of the referenced mods, by id. Read only, and not written anywhere.
+    /// See [`Workspace::ref_mods`].
+    pub(crate) refs: BTreeMap<String, RefObject>,
+    /// The events and variables the referenced mods add.
+    pub(crate) ref_events: Vec<String>,
+    pub(crate) ref_variables: Vec<String>,
+}
+
+/// A new object of a referenced mod. See [`Workspace::ref_mods`].
+#[derive(Debug, Clone)]
+pub(crate) struct RefObject {
+    pub(crate) class: String,
+    /// Shown as its name in the lists, e.g. `ref: amco`.
+    pub(crate) label: String,
+    pub(crate) text: String,
 }
 
 /// The patch directory of a mod, given its root (what a mod manager installs).
@@ -147,6 +162,9 @@ impl Behavior {
                 added: BTreeMap::new(),
                 asdsf: false,
                 adsf: true,
+                refs: BTreeMap::new(),
+                ref_events: Vec::new(),
+                ref_variables: Vec::new(),
             });
         }
         let bytes = std::fs::read(template_path).map_err(|e| format!("{}: {e}", template_path.display()))?;
@@ -176,6 +194,9 @@ impl Behavior {
                 added: BTreeMap::new(),
                 asdsf: true,
                 adsf: false,
+                refs: BTreeMap::new(),
+                ref_events: Vec::new(),
+                ref_variables: Vec::new(),
             });
         }
         let xml = if is_bin {
@@ -203,6 +224,9 @@ impl Behavior {
             added: BTreeMap::new(),
             asdsf: false,
             adsf: false,
+            refs: BTreeMap::new(),
+            ref_events: Vec::new(),
+            ref_variables: Vec::new(),
         })
     }
 
@@ -270,7 +294,67 @@ impl Behavior {
         if let Some(text) = self.added.get(id) {
             return Some(class_attribute(text));
         }
-        self.template_object(id).map(|o| o.class.as_str())
+        self.template_object(id)
+            .map(|o| o.class.as_str())
+            .or_else(|| self.refs.get(id).map(|object| object.class.as_str()))
+    }
+
+    /// Is `id` an object of a referenced mod, which can be looked at but not changed?
+    pub(crate) fn is_ref(&self, id: &str) -> bool {
+        self.refs.contains_key(id) && !self.added.contains_key(id)
+    }
+
+    /// The folders of `mod_dir` that could hold patches of this template.
+    ///
+    /// e.g. `<mod_dir>/_1stperson/0_master`, `<mod_dir>/meshes/actors/x/behaviors/x.bin`
+    fn patch_folders_in(&self, mod_dir: &Path) -> Vec<PathBuf> {
+        let mut folders = vec![mod_dir.join(&self.meshes_path)];
+        if let Some((name, first_person)) = &self.nemesis {
+            let folder = if *first_person { mod_dir.join("_1stperson").join(name) } else { mod_dir.join(name) };
+            folders.push(folder);
+        }
+        folders
+    }
+
+    /// Takes in what the referenced mod at `mod_dir` adds to this template: its new objects, and the
+    /// events and variables in its patch of the names object. Its edits of template objects are
+    /// not: those are its own business, and it is merged with this mod anyway.
+    fn read_ref(&mut self, mod_dir: &Path) {
+        if self.is_anim_data() {
+            return;
+        }
+        let code = mod_dir.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+        let files: Vec<PathBuf> = self
+            .patch_folders_in(mod_dir)
+            .iter()
+            .filter_map(|folder| read_dir(folder).ok())
+            .flatten()
+            .filter(|path| file_stem(path).starts_with('#'))
+            .collect();
+        for file in files {
+            let Ok(text) = read_text(&file) else { continue };
+            let id = file_stem(&file);
+            if self.template_object(&id).is_some_and(|object| object.class == STRING_DATA) {
+                self.read_ref_names(&text);
+            } else if self.template_object(&id).is_none() {
+                let (class, label) = (class_attribute(&text).to_owned(), format!("ref: {code}"));
+                self.refs.insert(id, RefObject { class, label, text });
+            }
+        }
+    }
+
+    /// The names in `patch` (of the names object) that the template does not have.
+    fn read_ref_names(&mut self, patch: &str) {
+        let Some(id) = self.object_of_class(STRING_DATA) else { return };
+        let template = self.template_object(id).map(|object| object.text.clone()).unwrap_or_default();
+        let text = resolve(patch, View::Mod);
+        let new_names = |field: &str| {
+            let known = nemesis_diff::vars::names(&template, field);
+            let names = nemesis_diff::vars::names(&text, field);
+            names.into_iter().filter(|name| !known.contains(name)).collect::<Vec<String>>()
+        };
+        self.ref_events.extend(new_names("eventNames"));
+        self.ref_variables.extend(new_names("variableNames"));
     }
 
     /// One object with its current text, if it exists.
@@ -285,7 +369,10 @@ impl Behavior {
                 is_edited: false,
             });
         }
-        let object = self.template_object(id)?;
+        let Some(object) = self.template_object(id) else {
+            let (id, object) = self.refs.get_key_value(id)?;
+            return Some(Self::ref_text(id, object));
+        };
         let edit = self.edits.get(id);
         Some(ObjectText {
             id: &object.id,
@@ -295,6 +382,18 @@ impl Behavior {
             is_new: false,
             is_edited: edit.is_some(),
         })
+    }
+
+    /// `object` of a referenced mod as the lists see it: like an object of the template.
+    fn ref_text<'a>(id: &'a str, object: &'a RefObject) -> ObjectText<'a> {
+        ObjectText {
+            id,
+            class: &object.class,
+            name: &object.label,
+            text: &object.text,
+            is_new: false,
+            is_edited: false,
+        }
     }
 
     /// Every object with its current text: the new ones first, then the template's.
@@ -315,7 +414,8 @@ impl Behavior {
             is_new: false,
             is_edited: self.edits.contains_key(&o.id),
         });
-        new.chain(template)
+        let refs = self.refs.iter().filter(|(id, _)| !self.added.contains_key(*id));
+        new.chain(template).chain(refs.map(|(id, object)| Self::ref_text(id, object)))
     }
 
     pub(crate) fn template_object(&self, id: &str) -> Option<&TemplateObject> {
@@ -329,6 +429,7 @@ impl Behavior {
             .or_else(|| self.added.get(id))
             .map(String::as_str)
             .or_else(|| self.template_object(id).map(|o| o.text.as_str()))
+            .or_else(|| self.refs.get(id).map(|object| object.text.as_str()))
     }
 
     /// Stores `text` as the new text of `id` (an edit back to the template removes the edit).
@@ -410,14 +511,95 @@ fn index(object: XmlObject<'_>) -> TemplateObject {
     TemplateObject { id: object.id.to_string(), class: object.class.to_string(), name, text: object.text.to_string() }
 }
 
+/// See [`WorkspaceFile`].
+const WORKSPACE_FILE: &str = "workspace.json";
+
 /// The whole patch being made.
 #[derive(Debug, Default)]
 pub(crate) struct Workspace {
     pub(crate) info: ModInfo,
     pub(crate) behaviors: Vec<Behavior>,
+    /// The mods this one depends on, by their patch directories, e.g.
+    /// `D:/mods/a/Nemesis_Engine/mod/amco`.
+    ///
+    /// An add-on, or a user patch resolving a conflict, points to their objects (`#amco$17`) and uses
+    /// their events. Those are read as they are, can be looked at and pointed to, and are not edited
+    /// or exported: they come with that mod when merging.
+    pub(crate) ref_mods: Vec<String>,
+    /// What was open when it was saved. See [`Session`].
+    pub(crate) session: Session,
+}
+
+/// What was open in a work, to go back to it when it is opened again.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub(crate) struct Session {
+    /// The mod read into the work.
+    pub(crate) mod_dir: String,
+    /// The behavior shown, by name.
+    pub(crate) active: String,
+    /// The object shown.
+    pub(crate) selected: Option<String>,
+    pub(crate) tabs: Vec<SessionTab>,
+}
+
+/// An open tab of a [`Session`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub(crate) struct SessionTab {
+    pub(crate) behavior: String,
+    pub(crate) id: String,
+    pub(crate) pinned: bool,
+}
+
+/// `workspace.json` in a work's cache: what is not a patch. The patches are files of their own.
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct WorkspaceFile {
+    ref_mods: Vec<String>,
+    session: Session,
+}
+
+/// The patch directories of the mod at `selected`: all its codes, if it is a mod's root, else itself.
+///
+/// e.g. `mods/a` containing `Nemesis_Engine/mod/amco` -> that; `.../mod/amco` -> the same.
+fn patch_dirs_of(selected: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    for engine in ["Nemesis_Engine", "Nemesis_EngineExt"] {
+        if let Ok(codes) = read_dir(&selected.join(engine).join("mod")) {
+            dirs.extend(codes.filter(|path| path.is_dir()));
+        }
+    }
+    if dirs.is_empty() { vec![selected.to_path_buf()] } else { dirs }
 }
 
 impl Workspace {
+    /// Adds the mod at `selected` (its root or a patch directory) to [`Self::ref_mods`], except for
+    /// the code `own_code`, which is this mod.
+    pub(crate) fn add_ref(&mut self, selected: &Path, own_code: &str) {
+        for dir in patch_dirs_of(selected) {
+            let is_own = dir.file_name().is_some_and(|name| name.eq_ignore_ascii_case(own_code));
+            let dir = dir.display().to_string();
+            let is_known = self.ref_mods.iter().any(|known| known.eq_ignore_ascii_case(&dir));
+            if !is_own && !is_known {
+                self.ref_mods.push(dir);
+            }
+        }
+        self.reload_refs();
+    }
+
+    /// Reads the referenced mods into every behavior. Call when they or the behaviors change.
+    pub(crate) fn reload_refs(&mut self) {
+        for behavior in &mut self.behaviors {
+            behavior.refs.clear();
+            behavior.ref_events.clear();
+            behavior.ref_variables.clear();
+            for dir in &self.ref_mods {
+                behavior.read_ref(Path::new(dir));
+            }
+        }
+    }
+
     /// `<output>/.d_merge/caches/patch_editor/nemesis/<code>`
     pub(crate) fn cache_dir(output: &Path, code: &str) -> PathBuf {
         output.join(".d_merge").join("caches").join("patch_editor").join("nemesis").join(code)
@@ -449,6 +631,12 @@ impl Workspace {
             }
             workspace.behaviors.push(behavior);
         }
+        // A work without the file, from before it existed, has nothing to restore.
+        let file = std::fs::read_to_string(dir.join(WORKSPACE_FILE)).unwrap_or_default();
+        let file: WorkspaceFile = sonic_rs::from_str(&file).unwrap_or_default();
+        workspace.ref_mods = file.ref_mods;
+        workspace.session = file.session;
+        workspace.reload_refs();
         Ok(workspace)
     }
 
@@ -459,6 +647,9 @@ impl Workspace {
             std::fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
         write(&dir.join("info.ini"), &info_ini(&self.info))?;
+        let file = WorkspaceFile { ref_mods: self.ref_mods.clone(), session: self.session.clone() };
+        let file = sonic_rs::to_string_pretty(&file).map_err(|e| e.to_string())?;
+        write(&dir.join(WORKSPACE_FILE), &file)?;
         for behavior in &self.behaviors {
             let behavior_dir = dir.join(behavior.cache_name());
             write(&behavior_dir.join("template.path"), &behavior.template_path.display().to_string())?;
@@ -487,6 +678,8 @@ impl Workspace {
         let mut workspace = Self {
             info: std::fs::read_to_string(mod_dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default(),
             behaviors: Vec::new(),
+            ref_mods: Vec::new(),
+            session: Session::default(),
         };
         let mut skipped = Vec::new();
         for folder in patch_folders(mod_dir) {
@@ -819,6 +1012,71 @@ mod tests {
         assert_eq!(bin.objects.len(), txt.objects.len());
         let differ = bin.objects.iter().zip(&txt.objects).filter(|(a, b)| a.id != b.id || a.text != b.text).count();
         assert_eq!(differ, 0);
+    }
+
+    /// A referenced mod's objects can be looked at and pointed to, and are not this mod's.
+    #[test]
+    fn a_referenced_mod_is_read_but_not_written() {
+        let dir = std::env::temp_dir().join(format!("d_merge_ref_mods_{}", std::process::id()));
+        let write_file = |path: &Path, text: &str| {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let template = dir.join("templates/meshes/x.xml");
+        let object = "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"enable\">true</hkparam>\n\t\t</hkobject>\n";
+        write_file(
+            &template,
+            &format!("<hkpackfile>\n\t<hksection name=\"__data__\">\n{object}\t</hksection>\n</hkpackfile>\n"),
+        );
+        let new_object =
+            "\t\t<hkobject name=\"#amco$0\" class=\"hkbClipGenerator\" signature=\"0x333b85b9\">\n\t\t</hkobject>\n";
+        let ref_dir = dir.join("mods/a/Nemesis_Engine/mod/amco");
+        write_file(&ref_dir.join("meshes/x.bin/#amco$0.txt"), new_object);
+
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(Behavior::open(&template).unwrap());
+        workspace.add_ref(&dir.join("mods/a"), "upatch");
+        workspace.add_ref(&dir.join("mods/a"), "upatch"); // once
+
+        let behavior = &workspace.behaviors[0];
+        let shown = behavior.texts().find(|object| object.id == "#amco$0").map(|object| object.name);
+        let (class, is_ref, text, patch, edited) = (
+            behavior.class_of("#amco$0").map(str::to_owned),
+            behavior.is_ref("#amco$0"),
+            behavior.text("#amco$0").map(str::to_owned),
+            behavior.patch("upatch", "#amco$0"),
+            behavior.edits.len() + behavior.added.len(),
+        );
+        let shown = shown.map(str::to_owned);
+
+        // Kept with the work.
+        let output = dir.join("out");
+        let session = Session {
+            mod_dir: "D:/mods/a".to_owned(),
+            active: workspace.behaviors[0].name.clone(),
+            selected: Some("#0106".to_owned()),
+            tabs: vec![SessionTab {
+                behavior: workspace.behaviors[0].name.clone(),
+                id: "#0106".to_owned(),
+                pinned: true,
+            }],
+        };
+        workspace.session = session.clone();
+        workspace.save(&output, "upatch").unwrap();
+        let loaded = Workspace::load(&output, "upatch").unwrap();
+        assert_eq!(loaded.session, session);
+        let reloaded = loaded.behaviors[0].is_ref("#amco$0");
+        let ref_count = loaded.ref_mods.len();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(ref_count, 1);
+        assert_eq!(class.as_deref(), Some("hkbClipGenerator"));
+        assert!(is_ref);
+        assert_eq!(text.as_deref(), Some(new_object));
+        assert_eq!(shown.as_deref(), Some("ref: amco"));
+        assert_eq!(patch, None, "nothing to export");
+        assert_eq!(edited, 0);
+        assert!(reloaded);
     }
 
     /// The export replaces the mod's folder: an anim set file that is no edit of the template must

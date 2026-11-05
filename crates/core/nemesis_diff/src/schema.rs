@@ -21,6 +21,40 @@ pub fn class_of_line(line: &str) -> Option<&str> {
     attribute(line, "class")
 }
 
+/// A field's type for people. e.g. `Real`, `Array<Pointer>`, `Enum(Int8)`
+pub fn type_label(field: &FieldSchema) -> String {
+    match field.kind {
+        TypeKind::Array | TypeKind::SimpleArray => format!("{:?}<{:?}>", field.kind, field.sub_kind),
+        TypeKind::Enum | TypeKind::Flags => format!("{:?}({:?})", field.kind, field.sub_kind),
+        kind => format!("{kind:?}"),
+    }
+}
+
+/// The type at a JSON path of a patch, following nested objects by the types of their fields.
+///
+/// e.g. `#0106/hkbModifierList/enable` -> `Bool`;
+/// `#0106/hkbModifierList/modifiers/[1:3]` -> `Array<Pointer> -> hkbModifier`;
+/// `#m$0/hkbClipGenerator`, a whole object -> its class. `None`: it is not a path of the class table.
+pub fn type_of_path(path: &str) -> Option<String> {
+    let mut parts = path.split('/');
+    parts.next()?; // the object's id
+    let mut class = parts.next()?;
+    find_class_schema(class)?;
+    let mut last = None;
+    for part in parts.filter(|part| !part.starts_with('[')) {
+        let field = field_of(Some(class), part)?;
+        class = field.class.unwrap_or(class);
+        last = Some(field);
+    }
+    Some(match last {
+        None => class.to_owned(),
+        Some(field) => match field.class {
+            Some(target) => format!("{} -> {target}", type_label(field)),
+            None => type_label(field),
+        },
+    })
+}
+
 /// The fields written in XML (not `SERIALIZE_IGNORED`), in order.
 pub fn xml_fields(class: &str) -> impl Iterator<Item = &'static FieldSchema> {
     find_class_schema(class).into_iter().flat_map(|c| c.fields.iter()).filter(|f| !f.serialize_ignored)
@@ -345,11 +379,26 @@ pub struct PointerProblem {
     pub message: String,
 }
 
+/// The mod a pointer's object is from, if it is a new object of a mod and not `own_code`'s.
+///
+/// e.g. `#amco$17` with `upatch` -> `amco`; `#upatch$0` with `upatch`, or `#0106` -> `None`.
+pub fn other_mod_of_pointer<'a>(pointer: &'a str, own_code: &str) -> Option<&'a str> {
+    let (code, _) = pointer.strip_prefix('#')?.split_once('$')?;
+    (!code.eq_ignore_ascii_case(own_code)).then_some(code)
+}
+
 /// Checks every `#pointer` of an object: the target exists and has the field's class.
 ///
 /// `class_of` returns a target's class; it must be the field's pointer class or a subclass, e.g.
 /// `variableBindingSet` -> `hkbVariableBindingSet`. Nemesis variables (`$...$`) are not checked.
-pub fn check_pointers<'c>(object: &str, class_of: &dyn Fn(&str) -> Option<&'c str>) -> Vec<PointerProblem> {
+///
+/// A new object of another mod (`#amco$17`) must be known too, by referencing that mod: `class_of`
+/// answers for those. If it is not, the message says so. `own_code`: this mod's.
+pub fn check_pointers<'c>(
+    object: &str,
+    own_code: &str,
+    class_of: &dyn Fn(&str) -> Option<&'c str>,
+) -> Vec<PointerProblem> {
     let mut problems = Vec::new();
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
@@ -365,7 +414,13 @@ pub fn check_pointers<'c>(object: &str, class_of: &dyn Fn(&str) -> Option<&'c st
             let Some(expected) = field.class else { return };
             match class_of(pointer) {
                 None => {
-                    problems.push(PointerProblem { line: line_no, message: format!("`{pointer}` does not exist.") });
+                    let message = match other_mod_of_pointer(pointer, own_code) {
+                        Some(code) => {
+                            format!("`{pointer}` is an object of the mod `{code}`, which is not referenced.")
+                        }
+                        None => format!("`{pointer}` does not exist."),
+                    };
+                    problems.push(PointerProblem { line: line_no, message });
                 }
                 Some(actual) if !is_subclass(actual, expected) => problems.push(PointerProblem {
                     line: line_no,
@@ -403,6 +458,40 @@ pub fn check_pointers<'c>(object: &str, class_of: &dyn Fn(&str) -> Option<&'c st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_object_of_another_mod_needs_a_reference() {
+        assert_eq!(other_mod_of_pointer("#amco$17", "upatch"), Some("amco"));
+        assert_eq!(other_mod_of_pointer("#upatch$0", "UPatch"), None);
+        assert_eq!(other_mod_of_pointer("#0106", "upatch"), None);
+
+        let object = "<hkobject name=\"#1\" class=\"hkbStateMachineStateInfo\" signature=\"0xed7f9d0\">\n<hkparam name=\"generator\">{}</hkparam>\n</hkobject>\n";
+        let nothing = |_: &str| None;
+        let message =
+            |pointer: &str| check_pointers(&object.replace("{}", pointer), "upatch", &nothing)[0].message.clone();
+        assert!(message("#amco$17").contains("not referenced"), "says what to do");
+        assert!(message("#upatch$0").contains("does not exist"));
+        assert!(message("#0106").contains("does not exist"));
+
+        // Referenced: it is known, and its class is checked like any other's.
+        let referenced = |_: &str| Some("hkbClipGenerator");
+        assert!(check_pointers(&object.replace("{}", "#amco$17"), "upatch", &referenced).is_empty());
+        let wrong = |_: &str| Some("hkbVariableBindingSet");
+        assert_eq!(check_pointers(&object.replace("{}", "#amco$17"), "upatch", &wrong).len(), 1);
+    }
+
+    #[test]
+    fn the_type_of_a_path_follows_the_class_table() {
+        assert_eq!(type_of_path("#0106/hkbModifierList/enable").as_deref(), Some("Bool"));
+        assert_eq!(
+            type_of_path("#0106/hkbModifierList/modifiers/[1:3]").as_deref(),
+            Some("Array<Pointer> -> hkbModifier")
+        );
+        assert_eq!(type_of_path("#m$0/hkbClipGenerator").as_deref(), Some("hkbClipGenerator"));
+        assert_eq!(type_of_path("#0106/hkbModifierList/nothing"), None);
+        // Animation data has no classes.
+        assert_eq!(type_of_path("DefaultMale~1/Idle~348/play_back_speed"), None);
+    }
 
     #[test]
     fn finds_array_elements() {
@@ -460,7 +549,7 @@ mod tests {
             "#0105" => Some("hkbEvaluateExpressionModifier"),
             _ => None,
         };
-        let problems = check_pointers(OBJECT, &class_of);
+        let problems = check_pointers(OBJECT, "m", &class_of);
         let lines: Vec<_> = problems.iter().map(|p| p.line).collect();
         assert_eq!(lines, [1, 3], "{problems:?}"); // wrong class, `#0002` missing
     }

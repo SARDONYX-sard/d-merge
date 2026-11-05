@@ -717,8 +717,44 @@ pub enum I18nKey {
     /// Use this
     ConflictUse,
 
-    /// Puts this value in the user patch in the Patch Editor. It loads last, so it wins.
+    /// Decides on this value: it goes in the user patch, a mod that loads last and so wins, and the mod is written.
     ConflictUseHover,
+
+    /// Edit…
+    ConflictEdit,
+
+    /// Takes this value into the user patch and opens it in the Patch Editor, to change it by hand. Export it there when done.
+    ConflictEditHover,
+
+    /// The value is in the user patch
+    ConflictResolved,
+
+    /// Checked for conflicts
+    ConflictDone,
+
+    /// Apply User Patch
+    UserPatchApply,
+
+    /// Merges what the conflict tool decided, kept in ./.d_merge/user_patch, after every mod. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this profile.
+    UserPatchApplyHover,
+
+    /// User Patch
+    UserPatchTitle,
+
+    /// All that the user patch has: the values chosen in conflicts and what was edited by hand.
+    UserPatchHover,
+
+    /// The user patch has nothing yet.
+    UserPatchEmpty,
+
+    /// Open in Editor
+    UserPatchOpenEditor,
+
+    /// Remove
+    UserPatchRemove,
+
+    /// Takes this object out of the user patch. The other mods' values apply again.
+    UserPatchRemoveHover,
 
     /// FNIS patches are generated: there is no file to take this from.
     ConflictFnisHover,
@@ -743,6 +779,21 @@ pub enum I18nKey {
 
     /// New Anim Sets
     NemesisAnimKindNewSet,
+
+    /// References:
+    NemesisRefMods,
+
+    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from). Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
+    NemesisRefModsHover,
+
+    /// Read only: an object of a referenced mod.
+    NemesisRefReadOnly,
+
+    /// Open Recent
+    NemesisOpenRecent,
+
+    /// Nothing opened yet.
+    NemesisOpenRecentEmpty,
 
     /// Behaviors
     NemesisBehaviorsSection,

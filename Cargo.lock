@@ -4006,6 +4006,7 @@ dependencies = [
  "fast_hash",
  "gui_shared",
  "mod_info",
+ "nemesis_diff",
  "parking_lot 0.13.0",
  "rayon",
  "skyrim_data_dir",
@@ -4029,9 +4030,11 @@ dependencies = [
  "nemesis_diff",
  "phf 0.14.0",
  "rmp-serde",
+ "serde",
  "serde_hkx_for_gui",
  "skyrim_anim_data",
  "skyrim_crc",
+ "sonic-rs",
  "winnow",
 ]
 

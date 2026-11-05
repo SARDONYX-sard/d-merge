@@ -25,8 +25,11 @@ use std::sync::atomic::AtomicBool;
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::{ResolveRequest, USER_PATCH_CODE},
-    settings::{DataMode, LogSettings, pages::patch::PatchSettings},
+    patch::{ResolveRequest, USER_PATCH_MOD_DIR},
+    settings::{
+        DataMode, LogSettings,
+        pages::patch::{PatchSettings, mod_item},
+    },
 };
 
 use self::{
@@ -82,6 +85,8 @@ pub struct PatchPage {
     conflicts: ConflictScan,
     /// A conflict's value to keep, for the Patch Editor. See [`Self::take_resolve`].
     resolve: Option<ResolveRequest>,
+    /// See [`Self::take_user_patch_toggle`].
+    user_patch_toggle: bool,
 }
 
 impl Default for PatchPage {
@@ -97,6 +102,7 @@ impl Default for PatchPage {
             first_frame: true,
             conflicts: ConflictScan::default(),
             resolve: None,
+            user_patch_toggle: false,
         }
     }
 }
@@ -110,7 +116,14 @@ impl PatchPage {
         if self.run.poll(ctx.notify, ctx.i18n) {
             self.conflicts.on_merge_ended();
         }
-        self.conflicts.poll();
+        if let Some(count) = self.conflicts.poll() {
+            ctx.notify.success(format!("{}: {count}", ctx.i18n.t(I18nKey::ConflictDone)));
+        }
+    }
+
+    /// The user asked for the window of the user patch: the app gives that to the Patch Editor.
+    pub fn take_user_patch_toggle(&mut self) -> bool {
+        std::mem::take(&mut self.user_patch_toggle)
     }
 
     /// What the user wants to keep from a conflict: the app gives it to the Patch Editor.
@@ -136,7 +149,16 @@ impl PatchPage {
             priority: item.priority,
             dir: run::dir_of_mod(data_dir, is_vfs, item),
         });
-        self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods.collect());
+        let mut mods: Vec<ScannedMod> = mods.collect();
+        if run::uses_user_patch(settings) {
+            mods.push(ScannedMod {
+                id: USER_PATCH_MOD_DIR.to_owned(),
+                name: "User Patch".to_owned(),
+                priority: run::user_patch_priority(settings.mod_list()),
+                dir: Some(USER_PATCH_MOD_DIR.to_owned()),
+            });
+        }
+        self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods);
         self.run.start_patch_json(egui_ctx, settings, runtime);
     }
 
@@ -158,14 +180,7 @@ impl PatchPage {
         match event {
             FetchEvent::Fetching => self.list_message.info(i18n.t(I18nKey::ModsListFetchStateFetching)),
             FetchEvent::Fetched { mods, elapsed } => {
-                let new_mods =
-                    gui_shared::settings::pages::patch::mod_item::inherit_reorder_cast(settings.mod_list(), mods);
-                let mut new_mods = new_mods;
-                gui_shared::settings::pages::patch::mod_item::place_new_user_patch(
-                    settings.mod_list(),
-                    &mut new_mods,
-                    USER_PATCH_CODE,
-                );
+                let new_mods = mod_item::inherit_reorder_cast(settings.mod_list(), mods);
                 self.check_all = new_mods.iter().all(|m| m.enabled);
                 *settings.mod_list_mut() = new_mods;
                 self.visible.invalidate();

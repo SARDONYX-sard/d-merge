@@ -143,6 +143,8 @@ impl Language for NemesisXml<'_> {
                 if let Some(node) = self.graph.node_of(word) {
                     let (_, class, name, links) = self.graph.label_parts(node);
                     let _ = write!(doc, "**{word}**: ⟦class|{}⟧ ⟦name|{}⟧{links}\n\n", class.trim(), name.trim());
+                } else if let Some((code, _)) = word.trim_start_matches('#').split_once('$') {
+                    let _ = write!(doc, "**{word}**: a new object of the mod `{code}`, which is not referenced.\n\n");
                 }
             }
             Some(Symbol::Name(kind, name)) => {
@@ -241,7 +243,7 @@ impl Language for NemesisXml<'_> {
     fn signature_help(&self, line: &str, _column: usize) -> Option<egui_code_editor::SignatureHelp> {
         let (class, field) = self.field_of_line(line)?;
         Some(egui_code_editor::SignatureHelp {
-            label: format!("{class}.{}: {}", field.name, type_label(field)),
+            label: format!("{class}.{}: {}", field.name, schema::type_label(field)),
             // Enum / flags values, the current one emphasized.
             params: field.values.iter().map(|v| (*v).to_string()).collect(),
             active: field.values.iter().position(|v| line.contains(v)).unwrap_or(usize::MAX),
@@ -516,7 +518,7 @@ fn class_hover(class: &str) -> String {
 ///
 /// e.g., `hkbClipGenerator.flags: Flags(Int8)`, `Now: FLAG_A|FLAG_B`
 fn field_hover(class: &str, field: &FieldSchema, line: &str) -> String {
-    let mut doc = format!("⟦class|{class}⟧.**{}**: `{}`", field.name, type_label(field));
+    let mut doc = format!("⟦class|{class}⟧.**{}**: `{}`", field.name, schema::type_label(field));
     if let Some(target) = field.class {
         doc.push_str(&format!(" → ⟦class|{target}⟧"));
     }
@@ -547,7 +549,7 @@ fn missing_fields_fix(text: &str) -> Option<QuickFix> {
 
 /// `**hkbClipGenerator.mode**: Enum(Int8)` + its values.
 fn field_doc(class: &str, field: &FieldSchema) -> String {
-    let mut doc = format!("**{class}.{}**: `{}`", field.name, type_label(field));
+    let mut doc = format!("**{class}.{}**: `{}`", field.name, schema::type_label(field));
     if let Some(target) = field.class {
         doc.push_str(&format!(" → `{target}`"));
     }
@@ -556,17 +558,6 @@ fn field_doc(class: &str, field: &FieldSchema) -> String {
         doc.push_str(&format!("\n\n{}", field.values.join(sep)));
     }
     doc
-}
-
-/// `Real`, `Array<Pointer>`, `Enum(Int8)`.
-fn type_label(field: &FieldSchema) -> String {
-    match field.kind {
-        TypeKind::Array | TypeKind::SimpleArray => {
-            format!("{:?}<{:?}>", field.kind, field.sub_kind)
-        }
-        TypeKind::Enum | TypeKind::Flags => format!("{:?}({:?})", field.kind, field.sub_kind),
-        kind => format!("{kind:?}"),
-    }
 }
 
 /// The trigger names containing what is typed, up to the `:` before the time (typed by hand).

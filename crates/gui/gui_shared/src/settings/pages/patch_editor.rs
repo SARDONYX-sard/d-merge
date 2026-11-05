@@ -31,6 +31,16 @@ pub struct PatchEditorSettings {
     /// e.g. `meshes/actors/character/behaviors/0_master.bin` -> `#0091` -> `true`.
     /// Nodes not listed have their default state.
     pub tree_open: BTreeMap<String, BTreeMap<String, bool>>,
+    /// The works opened lately, the last one first, like VS Code's "Open Recent".
+    pub recent: Vec<RecentWork>,
+}
+
+/// A work of the Patch Editor. Its patches and what it had open are in its cache: these find it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct RecentWork {
+    pub output: String,
+    pub mod_code: String,
 }
 
 impl PatchEditorSettings {
@@ -44,6 +54,7 @@ impl PatchEditorSettings {
             changed_only: false,
             tree_view: false,
             tree_open: BTreeMap::new(),
+            recent: Vec::new(),
         }
     }
 }

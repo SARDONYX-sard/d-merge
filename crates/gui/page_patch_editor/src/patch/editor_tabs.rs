@@ -18,7 +18,7 @@ use egui_code_editor::CodeEditorState;
 #[derive(Debug)]
 pub(super) struct EditorTab {
     /// Index of its behavior in the workspace.
-    behavior: usize,
+    pub(super) behavior: usize,
     /// e.g. `#0106`
     pub(super) id: String,
     /// `false`: the preview tab, which the next opened object replaces.
@@ -36,6 +36,18 @@ pub(super) struct EditorTabs {
 impl EditorTabs {
     fn position(&self, behavior: usize, id: &str) -> Option<usize> {
         self.tabs.iter().position(|tab| tab.behavior == behavior && tab.id == id)
+    }
+
+    /// Every tab, to write with the work.
+    pub(super) fn all(&self) -> impl Iterator<Item = &EditorTab> {
+        self.tabs.iter()
+    }
+
+    /// A tab from when the work was last open. Its editor state starts anew.
+    pub(super) fn restore(&mut self, behavior: usize, id: &str, pinned: bool) {
+        if self.position(behavior, id).is_none() {
+            self.tabs.push(EditorTab { behavior, id: id.to_owned(), pinned, editor: None });
+        }
     }
 
     /// The tabs of `behavior`, in order.

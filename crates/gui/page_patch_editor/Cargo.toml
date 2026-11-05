@@ -16,6 +16,8 @@ rust-version.workspace = true
 egui = { workspace = true }
 phf = { workspace = true }
 rmp-serde = { workspace = true }
+serde = { workspace = true }
+sonic-rs = { workspace = true }
 
 # workspace members
 fast_hash = { workspace = true }

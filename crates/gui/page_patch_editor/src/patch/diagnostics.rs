@@ -9,12 +9,15 @@ use super::workspace::Behavior;
 ///
 /// `is_new`: also the fields it lacks. A new object is written as is, so it must be complete,
 /// while an edited template object starts complete and its patch only holds the changes.
-pub(super) fn field_diagnostics(text: &str, behavior: &Behavior, is_new: bool) -> Vec<Diagnostic> {
+///
+/// `code`: this work's mod code. Pointers to new objects of other mods are not looked for.
+pub(super) fn field_diagnostics(text: &str, behavior: &Behavior, is_new: bool, code: &str) -> Vec<Diagnostic> {
     let lines: Vec<&str> = text.lines().collect();
     let class_of = |id: &str| behavior.class_of(id);
     let names = nemesis_diff::check_fields(text).into_iter().map(|p| (p.line, p.message, Severity::Warning));
-    let pointers =
-        nemesis_diff::schema::check_pointers(text, &class_of).into_iter().map(|p| (p.line, p.message, Severity::Error));
+    let pointers = nemesis_diff::schema::check_pointers(text, code, &class_of)
+        .into_iter()
+        .map(|p| (p.line, p.message, Severity::Error));
     let missing = if is_new { nemesis_diff::schema::missing_fields(text) } else { Vec::new() };
     let missing = missing.into_iter().map(|field| (0, format!("Missing field `{field}`."), Severity::Warning));
     names

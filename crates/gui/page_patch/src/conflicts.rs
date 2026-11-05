@@ -27,7 +27,7 @@ use std::{
 };
 
 use fast_hash::HashMap;
-use gui_shared::settings::pages::patch::mod_item::ModItem;
+use gui_shared::{patch::USER_PATCH_MOD_DIR, settings::pages::patch::mod_item::ModItem};
 use parking_lot::Mutex;
 use sonic_rs::{JsonContainerTrait as _, JsonValueTrait as _};
 
@@ -274,7 +274,8 @@ fn add_element_writes(entry: &sonic_rs::Value, owners: &Owners, writes: &mut Ele
         let offset = usize::try_from(index - start).ok()?;
         // A replace with fewer values than its range removes the rest.
         let value = if op == Some("replace") { values.and_then(|values| values.get(offset)) } else { None };
-        let text = value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| sonic_rs::to_string(value).unwrap_or_default());
+        let text =
+            value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| sonic_rs::to_string(value).unwrap_or_default());
         writes.entry(index).or_default().push((owner, text));
     }
     Some(())
@@ -306,7 +307,8 @@ fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &O
                 if let Some(done) = group.take() {
                     done.push_to(target, path, points);
                 }
-                group = Some(ElementGroup { start: index, end: index + 1, owners: owners_here, elements: vec![element] });
+                group =
+                    Some(ElementGroup { start: index, end: index + 1, owners: owners_here, elements: vec![element] });
             }
         }
     }
@@ -344,7 +346,11 @@ impl ElementGroup<'_> {
             .map(|&owner| {
                 let texts = self.elements.iter().flat_map(|element| element.iter()).filter(|(at, _)| *at == owner);
                 let joined = texts.map(|(_, text)| text.trim_matches('"')).collect::<Vec<_>>().join("\n");
-                Value { owner, hash: value_hash(&joined), preview: joined.chars().take(PREVIEW_CHARS).collect::<String>().into() }
+                Value {
+                    owner,
+                    hash: value_hash(&joined),
+                    preview: joined.chars().take(PREVIEW_CHARS).collect::<String>().into(),
+                }
             })
             .collect();
         push_if_different(target, &format!("{path}/[{}:{}]", self.start, self.end), values, points);
@@ -449,7 +455,9 @@ pub(crate) struct ConflictScan {
     /// The mod whose window is open, and what it shows.
     pub(crate) inspected: Option<String>,
     pub(crate) filter: String,
-    pub(crate) selected: Option<String>,
+    /// The conflict shown in detail: `(target, path)`. The same path can be in two templates, e.g.
+    /// the 1st and the 3rd person's `0_master`.
+    selected: Option<(Box<str>, Box<str>)>,
 }
 
 impl ConflictScan {
@@ -478,23 +486,27 @@ impl ConflictScan {
         });
     }
 
-    /// Takes in what the worker read.
-    pub(crate) fn poll(&mut self) {
-        if let Some(found) = self.read_result.try_lock().and_then(|mut result| result.take()) {
-            self.current = Some(Arc::new(found));
-            self.is_reading = false;
-            self.marks_for = 0; // computed again
-        }
+    /// Takes in what the worker read. Returns how many conflicts it found, when it did.
+    pub(crate) fn poll(&mut self) -> Option<usize> {
+        let found = self.read_result.try_lock().and_then(|mut result| result.take())?;
+        let count = found.points.len();
+        self.current = Some(Arc::new(found));
+        self.is_reading = false;
+        self.marks_for = 0; // computed again
+        Some(count)
     }
 
     /// Updates the flags if the load order or what is on changed. Runs every frame, and only compares
     /// a hash then: a list has a few hundred mods.
-    pub(crate) fn refresh_marks(&mut self, list: &[ModItem]) {
+    ///
+    /// `user_patch`: its priority, if it is merged: it is not in `list`.
+    pub(crate) fn refresh_marks(&mut self, list: &[ModItem], user_patch: Option<usize>) {
         let Some(found) = &self.current else { return };
         let mut hasher = DefaultHasher::new();
         for item in list.iter().filter(|item| item.enabled) {
             (&item.id, item.priority).hash(&mut hasher);
         }
+        user_patch.hash(&mut hasher);
         let hash = hasher.finish() | 1; // never the 0 of "computed again"
         if hash == self.marks_for {
             return;
@@ -502,8 +514,19 @@ impl ConflictScan {
         self.marks_for = hash;
         self.priorities =
             list.iter().filter(|item| item.enabled).map(|item| (item.id.clone(), item.priority)).collect();
+        if let Some(priority) = user_patch {
+            self.priorities.insert(USER_PATCH_MOD_DIR.to_owned(), priority);
+        }
         self.marks = found.marks(|id| self.priorities.get(id).copied());
         self.stale = self.priorities.keys().any(|id| !found.mods.iter().any(|scanned| scanned.id == *id));
+    }
+
+    pub(crate) fn is_selected(&self, point: &Point) -> bool {
+        self.selected.as_ref().is_some_and(|(target, path)| *target == point.target && *path == point.path)
+    }
+
+    pub(crate) fn select(&mut self, point: &Point) {
+        self.selected = Some((point.target.clone(), point.path.clone()));
     }
 
     pub(crate) fn mark_of(&self, mod_id: &str) -> Mark {

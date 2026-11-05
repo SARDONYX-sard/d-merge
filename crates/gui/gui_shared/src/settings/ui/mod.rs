@@ -61,7 +61,7 @@ pub enum Page {
 
 impl Page {
     /// All pages in navigation order.
-    pub const ALL: [Self; 4] = [Self::Patch, Self::Convert, Self::Hkanno, Self::PatchEditor];
+    pub const ALL: [Self; 4] = [Self::Patch, Self::PatchEditor, Self::Convert, Self::Hkanno];
 
     /// Router path. e.g., `/convert`
     pub const fn path(self) -> &'static str {

@@ -9,7 +9,7 @@ use behavior_merge::PatchMaps;
 use egui_widgets::notify::{Notification, NotificationColor};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::{PatchProgress, phase},
+    patch::{PatchProgress, USER_PATCH_MOD_DIR, phase},
     settings::pages::patch::{
         PatchSettings,
         behavior::{BehaviorSettings, DataMode, ParserMode},
@@ -26,6 +26,8 @@ pub(crate) struct PatchRun {
     /// When the current merge started. `None` when none is running.
     started: Option<std::time::Instant>,
     progress: Arc<PatchProgress>,
+    /// It only writes what each mod changes: its end is no "patched" for the user.
+    is_scan: bool,
 }
 
 impl PatchRun {
@@ -39,6 +41,7 @@ impl PatchRun {
         runtime: &tokio::runtime::Runtime,
     ) {
         self.started = Some(std::time::Instant::now());
+        self.is_scan = false;
         self.progress.clear();
 
         if settings.behavior.auto_remove_meshes {
@@ -67,6 +70,7 @@ impl PatchRun {
         runtime: &tokio::runtime::Runtime,
     ) {
         self.started = Some(std::time::Instant::now());
+        self.is_scan = true;
         self.progress.clear();
         let _no_old_files = std::fs::remove_dir_all(crate::conflicts::debug_patches_dir(settings.current_output_dir()));
         self.spawn(
@@ -98,7 +102,10 @@ impl PatchRun {
             DataMode::Vfs => (&settings.vfs.skyrim_data_dir, true, &settings.vfs.mod_list),
             DataMode::Manual => (&settings.manual.skyrim_data_dir, false, &settings.manual.mod_list),
         };
-        let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
+        let mut patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
+        if uses_user_patch(settings) {
+            patches.nemesis_entries.insert(USER_PATCH_MOD_DIR.to_owned(), user_patch_priority(mod_list));
+        }
 
         let BehaviorSettings { target_runtime, generate_fnis_esp, skeleton_arm_fix, template_dir, parser_mode, .. } =
             &settings.behavior;
@@ -129,11 +136,12 @@ impl PatchRun {
     pub(crate) fn poll(&mut self, notify: &mut Notification, i18n: &I18nMap) -> bool {
         let Some(started) = self.started else { return false };
 
+        let phase_now = self.progress.phase.load(Ordering::Relaxed);
         let text = self.progress.text(i18n, started);
-        if !text.is_empty() {
+        if !text.is_empty() && !(self.is_scan && phase_now == phase::DONE) {
             notify.set(text, self.progress.color());
         }
-        if matches!(self.progress.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
+        if matches!(phase_now, phase::DONE | phase::ERROR) {
             self.progress.phase.store(phase::IDLE, Ordering::Relaxed);
             self.started = None;
             return true;
@@ -241,6 +249,16 @@ const fn to_nemesis_parser_mode(mode: ParserMode) -> behavior_merge::ParserMode 
     }
 }
 
+/// The user patch is merged: it is on, and has been written.
+pub(crate) fn uses_user_patch(settings: &PatchSettings) -> bool {
+    settings.behavior.apply_user_patch && std::path::Path::new(USER_PATCH_MOD_DIR).is_dir()
+}
+
+/// After every mod of the list, on or off: it loads last, so what it says wins.
+pub(crate) fn user_patch_priority(mods: &[ModItem]) -> usize {
+    mods.iter().map(|item| item.priority).max().map_or(0, |last| last + 1)
+}
+
 /// The directory `behavior_merge` reads a mod's patches from. `None`: FNIS, generated from elsewhere.
 pub(crate) fn dir_of_mod(skyrim_data_dir: &str, is_vfs: bool, item: &ModItem) -> Option<String> {
     let id = &item.id;
@@ -284,6 +302,15 @@ mod tests {
 
     fn item(id: &str, mod_type: ModType, enabled: bool) -> ModItem {
         ModItem { enabled, id: id.to_owned(), name: String::new(), mod_type, site: String::new(), priority: 1 }
+    }
+
+    #[test]
+    fn the_user_patch_loads_after_every_mod() {
+        let mut mods = [item("a", ModType::Nemesis, true), item("b", ModType::Nemesis, false)];
+        mods[0].priority = 3;
+        mods[1].priority = 7;
+        assert_eq!(user_patch_priority(&mods), 8);
+        assert_eq!(user_patch_priority(&[]), 0);
     }
 
     #[test]
