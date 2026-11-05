@@ -21,6 +21,7 @@
 //! diffing, so that each pointer is its own patch line (as Nemesis expects).
 
 pub mod asdsf;
+pub mod conflict;
 pub mod schema;
 pub mod vars;
 
@@ -473,6 +474,10 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
             let info = class.and_then(find_class_schema);
             if let Some(class) = class.filter(|_| info.is_none()) {
                 problems.push(FieldProblem { line: line_no, message: format!("Unknown class `{class}`.") });
+            }
+            if let Some(info) = info.filter(|_| schema::line_with_signature(line).is_some()) {
+                let message = format!("The signature of `{}` is `{}`.", info.name, info.signature);
+                problems.push(FieldProblem { line: line_no, message });
             }
             objects.push((class.unwrap_or("?"), info));
             if trimmed.ends_with("/>") {

@@ -1,9 +1,11 @@
 //! The panels above the mod list: execution mode, runtime, parser, options and the directories.
 
 use egui::Label;
-use egui_widgets::shadcn::{Button, Checkbox, ComboBox, Icon, RadioButton, TextEdit};
+use egui_widgets::{
+    PathActions, PathRow,
+    shadcn::{Checkbox, ComboBox, RadioButton},
+};
 use gui_shared::{
-    fs::{find_existing_dir_or_ancestor, open_existing_dir_or_ancestor},
     i18n::I18nKey,
     settings::{DataMode, pages::patch::behavior::ParserMode},
 };
@@ -160,156 +162,59 @@ impl PatchView<'_> {
         });
     }
 
-    /// UI
-    /// ```txt
-    /// |<---label--->|<------ stretch ------>|<-60->|<-60->|
-    /// | Skyrim      | path..................| Auto | ...  |
-    /// ```
+    /// The Skyrim row, with `Auto` in VFS mode (Windows: it is in the registry).
     fn ui_skyrim_dir_row(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            if ui
-                .add_sized([LABEL_WIDTH, BUTTON_HEIGHT], Button::new(self.ctx.i18n.t(I18nKey::SkyrimDataDirLabel)))
-                .on_hover_text(self.ctx.i18n.t(I18nKey::OpenSelectedPathHover))
-                .clicked()
-                && let Err(err) = open_existing_dir_or_ancestor(self.ctx.settings.current_skyrim_data_dir())
-            {
-                self.ctx.notify.error(err);
-            }
+        let i18n = self.ctx.i18n;
+        let settings = &mut *self.ctx.settings;
+        let is_vfs = settings.behavior.mode == DataMode::Vfs;
+        if is_vfs && self.page.first_frame && settings.vfs.skyrim_data_dir.trim().is_empty() {
+            self.page.detect_vfs_data_dir(settings, self.ctx.notify, i18n);
+            return;
+        }
 
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(RIGHT_MARGIN);
-
-                if ui
-                    .add_sized(
-                        [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        Button::new(self.ctx.i18n.t(I18nKey::SelectButton)).icon(Icon::FolderSearch).full_width(),
-                    )
-                    .clicked()
-                {
-                    let dialog = match find_existing_dir_or_ancestor(self.ctx.settings.current_skyrim_data_dir()) {
-                        Ok(abs_path) => gui_shared::rfd::FileDialog::new().set_directory(abs_path),
-                        Err(_) => gui_shared::rfd::FileDialog::new(),
-                    };
-
-                    if let Some(dir) = dialog.pick_folder() {
-                        *self.ctx.settings.current_skyrim_data_dir_mut() = dir.display().to_string();
-                        self.page.fetch_mods(self.ctx.settings);
-                    }
-                }
-
-                #[cfg(target_os = "windows")]
-                {
-                    if self.ctx.settings.behavior.mode == DataMode::Vfs {
-                        if ui
-                            .add_sized(
-                                [BUTTON_WIDTH, BUTTON_HEIGHT],
-                                Button::new(self.ctx.i18n.t(I18nKey::AutoDetectButton))
-                                    .icon(Icon::ScanSearch)
-                                    .full_width(),
-                            )
-                            .on_hover_text(self.ctx.i18n.t(I18nKey::AutoDetectHover))
-                            .clicked()
-                        {
-                            self.page.detect_vfs_data_dir(self.ctx.settings, self.ctx.notify, self.ctx.i18n);
-                        }
-                    } else {
-                        ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
-                    }
-                }
-
-                #[cfg(not(target_os = "windows"))]
-                {
-                    ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
-                }
-
-                let response = match self.ctx.settings.behavior.mode {
-                    DataMode::Vfs => {
-                        if self.page.first_frame && self.ctx.settings.vfs.skyrim_data_dir.trim().is_empty() {
-                            self.page.detect_vfs_data_dir(self.ctx.settings, self.ctx.notify, self.ctx.i18n);
-                            return;
-                        }
-
-                        path_text_edit(ui, &mut self.ctx.settings.vfs.skyrim_data_dir, None)
-                    }
-
-                    DataMode::Manual => path_text_edit(
-                        ui,
-                        &mut self.ctx.settings.manual.skyrim_data_dir,
-                        Some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"),
-                    ),
-                };
-
-                if self.page.first_frame || response.changed() {
-                    self.page.fetch_mods(self.ctx.settings);
-                }
-            });
-        });
+        let mut auto = false;
+        let row = PathRow::new(i18n.t(I18nKey::SkyrimDataDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+            .hover(i18n.t(I18nKey::OpenSelectedPathHover))
+            .hint((!is_vfs).then_some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"))
+            .show_with(ui, settings.current_skyrim_data_dir_mut(), |ui| auto = auto_detect_button(ui, is_vfs, i18n));
+        if let Some(err) = row.open_error {
+            self.ctx.notify.error(err);
+        }
+        if auto {
+            self.page.detect_vfs_data_dir(self.ctx.settings, self.ctx.notify, i18n);
+        }
+        if self.page.first_frame || row.changed {
+            self.page.fetch_mods(self.ctx.settings);
+        }
     }
 
-    /// Renders the output-directory row (label button + text field + folder picker).
-    ///
-    /// UI
-    /// ```txt
-    /// |<---label--->|<------ stretch ------>|<-60->|<-60->|
-    /// | Output      | path..................|      | ...  |
-    /// ```
+    /// The output row. The empty space lines its field up with the Skyrim row's.
     fn ui_output_dir_row(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            if ui
-                .add_sized([LABEL_WIDTH, BUTTON_HEIGHT], Button::new(self.ctx.i18n.t(I18nKey::OutputDirLabel)))
-                .on_hover_text(self.ctx.i18n.t(I18nKey::OpenSelectedPathHover))
-                .clicked()
-                && let Err(err) =
-                    open_existing_dir_or_ancestor(std::path::Path::new(self.ctx.settings.current_output_dir()))
-            {
-                self.ctx.notify.error(err);
-            }
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(RIGHT_MARGIN);
-
-                if ui
-                    .add_sized(
-                        [BUTTON_WIDTH, BUTTON_HEIGHT],
-                        Button::new(self.ctx.i18n.t(I18nKey::SelectButton)).icon(Icon::FolderSearch).full_width(),
-                    )
-                    .clicked()
-                {
-                    let dialog = if self.ctx.settings.current_output_dir().is_empty() {
-                        gui_shared::rfd::FileDialog::new()
-                    } else {
-                        match find_existing_dir_or_ancestor(self.ctx.settings.current_output_dir()) {
-                            Ok(abs_path) => gui_shared::rfd::FileDialog::new().set_directory(abs_path),
-                            Err(err) => {
-                                self.ctx.notify.error(format!("Couldn't find output dir or ancestor: {err}"));
-                                return;
-                            }
-                        }
-                    };
-
-                    if let Some(dir) = dialog.pick_folder() {
-                        *self.ctx.settings.current_output_dir_mut() = dir.display().to_string();
-                    }
-                }
-
-                ui.allocate_ui(egui::vec2(BUTTON_WIDTH, ROW_HEIGHT), |_| {});
-
-                path_text_edit(ui, self.ctx.settings.current_output_dir_mut(), None);
+        let i18n = self.ctx.i18n;
+        let row = PathRow::new(i18n.t(I18nKey::OutputDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+            .hover(i18n.t(I18nKey::OpenSelectedPathHover))
+            .show_with(ui, self.ctx.settings.current_output_dir_mut(), |ui| {
+                ui.allocate_space(egui::Vec2::from(PathRow::BUTTON_SIZE));
             });
-        });
+        if let Some(err) = row.open_error {
+            self.ctx.notify.error(err);
+        }
     }
 }
 
-const LABEL_WIDTH: f32 = 140.0;
-const BUTTON_WIDTH: f32 = 90.0;
-const ROW_HEIGHT: f32 = 40.0;
-const BUTTON_HEIGHT: f32 = 32.0;
-const RIGHT_MARGIN: f32 = 8.0;
+/// See [`PathRow`].
+const PATH_ACTIONS: PathActions =
+    PathActions { open: gui_shared::fs::open_dir_of, pick: gui_shared::fs::pick_folder_from };
 
-fn path_text_edit(ui: &mut egui::Ui, value: &mut String, hint: Option<&str>) -> egui::Response {
-    let mut text_edit = TextEdit::singleline(value).desired_width(ui.available_width());
-    if let Some(hint) = hint {
-        text_edit = text_edit.hint_text(hint);
+/// `Auto`, where it applies; else its space. Returns whether it was clicked.
+fn auto_detect_button(ui: &mut egui::Ui, is_vfs: bool, i18n: &gui_shared::i18n::I18nMap) -> bool {
+    if cfg!(target_os = "windows") && is_vfs {
+        let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::AutoDetectButton))
+            .icon(egui_widgets::shadcn::Icon::ScanSearch)
+            .full_width();
+        ui.add_sized(PathRow::BUTTON_SIZE, button).on_hover_text(i18n.t(I18nKey::AutoDetectHover)).clicked()
+    } else {
+        ui.allocate_space(egui::Vec2::from(PathRow::BUTTON_SIZE));
+        false
     }
-    ui.add(text_edit)
 }

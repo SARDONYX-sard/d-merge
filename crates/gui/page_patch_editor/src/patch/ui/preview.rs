@@ -1,5 +1,7 @@
 //! Draws the patch preview. The data is in [`crate::patch::preview`].
 
+use egui_code_editor::languages::Xml;
+
 use crate::patch::preview::{Kind, Preview};
 
 /// Where the text starts: the `↶` gutter is left of it.
@@ -72,12 +74,18 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
             {
                 event = Some(PreviewEvent::Revert(*block));
             }
-            let color = match kind {
-                Kind::Open(_) | Kind::Marker => ui.visuals().weak_text_color(),
-                _ => ui.visuals().text_color(),
-            };
             let pos = rect.left_center() + egui::vec2(TEXT_LEFT, 0.0);
-            ui.painter().text(pos, egui::Align2::LEFT_CENTER, text, font.clone(), color);
+            if matches!(kind, Kind::Open(_) | Kind::Marker) {
+                // The markers are not XML: they stay out of the way.
+                let color = ui.visuals().weak_text_color();
+                ui.painter().text(pos, egui::Align2::LEFT_CENTER, text, font.clone(), color);
+            } else {
+                // Colored per visible row only, so huge files stay fast.
+                let job = egui_code_editor::line_job(ui, text, &Xml);
+                let galley = ui.painter().layout_job(job);
+                let top = pos - egui::vec2(0.0, galley.size().y / 2.0);
+                ui.painter().galley(top, galley, ui.visuals().text_color());
+            }
         }
     });
     event

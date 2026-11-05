@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use fast_hash as _;
 use imara_diff as _;
+use json_patch as _;
 use nemesis_diff::{View, apply_patches, diff_behavior, normalize, objects, resolve, validate};
 use nemesis_xml as _;
 

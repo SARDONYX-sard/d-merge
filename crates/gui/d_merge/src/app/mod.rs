@@ -82,6 +82,9 @@ pub(crate) struct App {
 
     /// CRC32 page state (inputs, loaded mod tree).
     pub patch_editor: PatchEditorPage,
+
+    /// A page asked for another page to be shown. The router does that, after it drew this frame.
+    pub pending_page: Option<gui_shared::settings::ui::Page>,
 }
 
 impl App {
@@ -124,6 +127,7 @@ impl App {
             convert: ConvertPage::default(),
             hkanno,
             patch_editor: PatchEditorPage::default(),
+            pending_page: None,
         }
     }
 

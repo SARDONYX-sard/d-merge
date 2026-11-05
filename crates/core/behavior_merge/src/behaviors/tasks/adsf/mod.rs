@@ -86,6 +86,10 @@ pub(crate) fn apply_adsf_patches(
         output_debug_patch_json(&borrowed_patches, config);
     }
 
+    if config.debug.patch_json_only {
+        return errors;
+    }
+
     macro_rules! bail {
         ($expr:expr) => {
             match $expr {

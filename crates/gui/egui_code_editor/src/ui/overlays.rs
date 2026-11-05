@@ -5,7 +5,11 @@
 
 use egui::{Color32, Galley, Pos2};
 
-use crate::{inline_diff::InlineDiff, language::Language, text_pos::LinePos};
+use crate::{
+    inline_diff::{CharChange, InlineDiff},
+    language::Language,
+    text_pos::LinePos,
+};
 
 /// Signature help box just above the cursor line.
 ///
@@ -56,8 +60,8 @@ pub(crate) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lang
     let color = ui.visuals().weak_text_color().gamma_multiply(0.8);
 
     // Lines are never wrapped (see `layout`), so row `n` is line `n`.
-    for (row, line) in galley.rows.iter().zip(text.split('\n')) {
-        let hints = language.inlay_hints(line);
+    for (line_no, (row, line)) in galley.rows.iter().zip(text.split('\n')).enumerate() {
+        let hints = language.inlay_hints_at(line_no, line);
         if hints.is_empty() {
             continue;
         }
@@ -103,46 +107,107 @@ pub(crate) fn line_numbers(
     }
 }
 
-/// The inline diff: a green tint on new lines, the old lines in red in their gaps.
+/// The inline diff: a green tint on new lines, the old lines in red in their gaps, what differs
+/// darker, and `↶` at each place. Returns the place whose `↶` was clicked.
 /// See [`crate::inline_diff`].
-pub(crate) fn inline_diff(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, diff: &InlineDiff) {
-    let clip = ui.clip_rect();
-    let painter = ui.painter();
+pub(crate) fn inline_diff(
+    ui: &egui::Ui,
+    galley: &Galley,
+    galley_pos: Pos2,
+    diff: &InlineDiff,
+    id: egui::Id,
+    hover: &str,
+) -> Option<usize> {
     let row_rect = |row: usize| galley.rows.get(row).map(|r| r.rect().translate(galley_pos.to_vec2()));
-    let row_across = |rect: egui::Rect| egui::Rect::from_x_y_ranges(clip.x_range(), rect.y_range());
-
-    let green = Color32::from_rgb(46, 160, 67).gamma_multiply(0.18);
-    for range in &diff.added {
-        for row in range.clone() {
-            if let Some(rect) = row_rect(row).filter(|rect| rect.intersects(clip)) {
-                painter.rect_filled(row_across(rect), 0.0, green);
+    let height = galley.rows.first().map_or(0.0, |row| row.rect().height());
+    let mut clicked = None;
+    for (index, hunk) in diff.hunks.iter().enumerate() {
+        #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
+        let old_height = hunk.old_lines.len() as f32 * height;
+        // In the gap above its first new line, or under the last line.
+        let top = row_rect(hunk.new_lines.start).map_or_else(
+            || galley.rows.last().map_or(galley_pos.y, |r| r.rect().bottom() + galley_pos.y),
+            |rect| rect.top() - old_height,
+        );
+        for (i, line) in hunk.new_lines.clone().enumerate() {
+            if let Some(rect) = row_rect(line) {
+                draw_new_line(ui, rect, galley_pos.x, hunk.changes.get(i), text_at(galley, line));
             }
         }
-    }
-
-    let red = Color32::from_rgb(248, 81, 73).gamma_multiply(0.18);
-    let font = egui::TextStyle::Monospace.resolve(ui.style());
-    let height = galley.rows.first().map_or(0.0, |row| row.rect().height());
-    let text_color = ui.visuals().weak_text_color();
-    for zone in &diff.removed {
-        #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
-        let zone_height = zone.lines.len() as f32 * height;
-        // In the gap above its line, or under the last line.
-        let top = row_rect(zone.before_line).map_or_else(
-            || galley.rows.last().map_or(galley_pos.y, |r| r.rect().bottom() + galley_pos.y),
-            |rect| rect.top() - zone_height,
-        );
-        for (i, line) in zone.lines.iter().enumerate() {
+        for (i, line) in hunk.old_lines.iter().enumerate() {
             #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
             let y = (i as f32).mul_add(height, top);
-            let rect = egui::Rect::from_x_y_ranges(clip.x_range(), y..=y + height);
-            if rect.intersects(clip) {
-                painter.rect_filled(rect, 0.0, red);
-                let pos = egui::pos2(galley_pos.x, y);
-                painter.text(pos, egui::Align2::LEFT_TOP, line.replace('\t', "    "), font.clone(), text_color);
-            }
+            draw_old_line(ui, (galley_pos.x, y, height), line, hunk.changes.get(i));
+        }
+        let button = egui::Rect::from_min_size(egui::pos2(galley_pos.x - height, top), egui::vec2(height, height));
+        if revert_button(ui, button, id.with(("inline_diff_revert", index)), hover) {
+            clicked = Some(index);
         }
     }
+    clicked
+}
+
+/// The text of a row, for finding on-screen columns.
+fn text_at(galley: &Galley, row: usize) -> String {
+    galley.rows.get(row).map_or_else(String::new, |placed| placed.row.glyphs.iter().map(|glyph| glyph.chr).collect())
+}
+
+/// A rect from char `chars.start` to `chars.end` of `line`, by on-screen columns (monospace).
+fn chars_rect(
+    ui: &egui::Ui,
+    line: &str,
+    chars: &std::ops::Range<usize>,
+    left: f32,
+    y: std::ops::RangeInclusive<f32>,
+) -> egui::Rect {
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let width = ui.fonts_mut(|fonts| fonts.glyph_width(&font, '0'));
+    #[expect(clippy::cast_precision_loss, reason = "columns are small")]
+    let x = |char: usize| (crate::status::visual_column(line, char) as f32).mul_add(width, left);
+    egui::Rect::from_x_y_ranges(x(chars.start)..=x(chars.end), y)
+}
+
+fn draw_new_line(ui: &egui::Ui, rect: egui::Rect, left: f32, change: Option<&CharChange>, text: String) {
+    let clip = ui.clip_rect();
+    if !rect.intersects(clip) {
+        return;
+    }
+    let green = Color32::from_rgb(46, 160, 67);
+    let across = egui::Rect::from_x_y_ranges(clip.x_range(), rect.y_range());
+    ui.painter().rect_filled(across, 0.0, green.gamma_multiply(0.18));
+    if let Some(change) = change {
+        let chars = chars_rect(ui, &text, &change.new, left, rect.y_range().into());
+        ui.painter().rect_filled(chars, 0.0, green.gamma_multiply(0.3));
+    }
+}
+
+fn draw_old_line(ui: &egui::Ui, (left, y, height): (f32, f32, f32), line: &str, change: Option<&CharChange>) {
+    let clip = ui.clip_rect();
+    let across = egui::Rect::from_x_y_ranges(clip.x_range(), y..=y + height);
+    if !across.intersects(clip) {
+        return;
+    }
+    let red = Color32::from_rgb(248, 81, 73);
+    let painter = ui.painter();
+    painter.rect_filled(across, 0.0, red.gamma_multiply(0.18));
+    if let Some(change) = change {
+        painter.rect_filled(chars_rect(ui, line, &change.old, left, y..=y + height), 0.0, red.gamma_multiply(0.3));
+    }
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let color = ui.visuals().weak_text_color();
+    painter.text(egui::pos2(left, y), egui::Align2::LEFT_TOP, line.replace('\t', "    "), font, color);
+}
+
+/// `↶` in the gutter. Returns whether it was clicked.
+fn revert_button(ui: &egui::Ui, rect: egui::Rect, id: egui::Id, hover: &str) -> bool {
+    if !rect.intersects(ui.clip_rect()) {
+        return false;
+    }
+    let response = ui.interact(rect, id, egui::Sense::click()).on_hover_text(hover);
+    let color = if response.hovered() { ui.visuals().strong_text_color() } else { ui.visuals().weak_text_color() };
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "↶", font, color);
+    response.clicked()
 }
 
 /// Faint background behind the cursor line.

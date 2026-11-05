@@ -5,8 +5,20 @@
 //! - `- list item`
 //! - fenced code blocks (```` ``` ````)
 //! - inline `` `code` ``, `**bold**` and `[text](url)` links
+//! - `⟦class|hkbClipGenerator⟧` and `⟦name|Idle⟧`: the colors of class and object names, the same
+//!   as in lists, so that a tooltip reads like the list it is about
 //!
 //! Anything else is shown as plain text. A full CommonMark renderer would be overkill here.
+
+/// The color of a class name in lists and tooltips.
+pub const fn class_color(visuals: &egui::Visuals) -> egui::Color32 {
+    if visuals.dark_mode { egui::Color32::from_rgb(86, 182, 194) } else { egui::Color32::from_rgb(0, 110, 130) }
+}
+
+/// The color of an object's name in lists and tooltips.
+pub const fn name_color(visuals: &egui::Visuals) -> egui::Color32 {
+    if visuals.dark_mode { egui::Color32::from_rgb(229, 192, 123) } else { egui::Color32::from_rgb(150, 90, 0) }
+}
 
 /// Renders `markdown` into `ui`.
 ///
@@ -75,7 +87,7 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
     let mut rest = text;
     while !rest.is_empty() {
         // Find the next special span.
-        let next = [rest.find('`'), rest.find('['), rest.find("**")].into_iter().flatten().min();
+        let next = [rest.find('`'), rest.find('['), rest.find("**"), rest.find('⟦')].into_iter().flatten().min();
         let Some(next) = next else {
             ui.label(rest);
             return;
@@ -96,6 +108,10 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
         {
             ui.label(egui::RichText::new(&after[..end]).strong());
             rest = &after[end + 2..];
+        } else if let Some((role, value, after)) = parse_colored(rest) {
+            let color = if role == "class" { class_color(ui.visuals()) } else { name_color(ui.visuals()) };
+            ui.colored_label(color, value);
+            rest = after;
         } else if let Some((label, url, after)) = parse_link(rest) {
             let link = ui.hyperlink_to(label, url);
             if link.has_focus() {
@@ -107,11 +123,18 @@ fn inline(ui: &mut egui::Ui, text: &str, links: &mut Vec<egui::Response>) {
             rest = after;
         } else {
             // A lone `` ` ``, `[` or `*`: print it and move on.
-            let (c, after) = rest.split_at(1);
+            let (c, after) = rest.split_at(rest.chars().next().map_or(0, char::len_utf8));
             ui.label(c);
             rest = after;
         }
     }
+}
+
+/// `⟦class|hkbFoo⟧rest` -> `(class, hkbFoo, rest)`
+fn parse_colored(text: &str) -> Option<(&str, &str, &str)> {
+    let (role, after_role) = text.strip_prefix('⟦')?.split_once('|')?;
+    let (value, rest) = after_role.split_once('⟧')?;
+    Some((role, value, rest))
 }
 
 /// `[label](url)rest` -> `(label, url, rest)`

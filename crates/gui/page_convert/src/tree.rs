@@ -149,6 +149,23 @@ pub(super) fn for_each_dir(entry: &DirEntry, f: &mut impl FnMut(&DirEntry)) {
     }
 }
 
+/// The rows to show: `entry` and, if it is expanded, what is below it, as `(entry, depth)`.
+pub(super) fn visible_rows<'a>(roots: &'a [DirEntry], expanded: &HashSet<String>) -> Vec<(&'a DirEntry, usize)> {
+    fn push<'a>(entry: &'a DirEntry, depth: usize, expanded: &HashSet<String>, rows: &mut Vec<(&'a DirEntry, usize)>) {
+        rows.push((entry, depth));
+        if expanded.contains(&entry.path) {
+            for child in entry.children.iter().flatten() {
+                push(child, depth + 1, expanded, rows);
+            }
+        }
+    }
+    let mut rows = Vec::new();
+    for root in roots {
+        push(root, 0, expanded, &mut rows);
+    }
+    rows
+}
+
 /// Adds `key`, or removes it if it is there. e.g., opening or closing a directory.
 pub(super) fn toggle(set: &mut HashSet<String>, key: &str) {
     if !set.remove(key) {
@@ -201,6 +218,17 @@ mod tests {
         assert_eq!(tree.counts().get("root"), Some(&(3, 1)));
         tree.invalidate_counts();
         assert_eq!(tree.counts().get("root"), Some(&(3, 2)));
+    }
+
+    #[test]
+    fn only_expanded_directories_show_their_rows() {
+        let tree = sample();
+        let names = |expanded: &[&str]| -> Vec<(String, usize)> {
+            let expanded: HashSet<String> = expanded.iter().map(|path| (*path).to_owned()).collect();
+            visible_rows(&tree.roots, &expanded).into_iter().map(|(entry, depth)| (entry.path.clone(), depth)).collect()
+        };
+        assert_eq!(names(&[]), [("root".to_owned(), 0)]);
+        assert_eq!(names(&["root"]), [("root".to_owned(), 0), ("a".to_owned(), 1), ("sub".to_owned(), 1)]);
     }
 
     #[test]

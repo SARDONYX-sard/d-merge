@@ -14,7 +14,6 @@ rust-version.workspace = true
 
 
 [dependencies]
-egui_code_editor = { workspace = true } # The labels of its menus (`i18n::editor_labels`)
 ico = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 open = { workspace = true }

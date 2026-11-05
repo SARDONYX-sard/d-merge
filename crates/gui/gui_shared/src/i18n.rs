@@ -552,9 +552,6 @@ pub enum I18nKey {
     /// Add Behavior…
     NemesisAddBehavior,
 
-    /// Import Mod…
-    NemesisImportMod,
-
     /// Load a Nemesis mod (…/Nemesis_Engine/mod/<code>) to keep working on it.
     NemesisImportModHover,
 
@@ -666,8 +663,164 @@ pub enum I18nKey {
     /// Show the changes inside the editor: new lines in green, the old ones in red between them.
     NemesisInlineDiffHover,
 
-    /// Preview on the side
-    NemesisPreviewSide,
+    /// Close
+    NemesisCloseTab,
+
+    /// Close Others
+    NemesisCloseOtherTabs,
+
+    /// Close to the Right
+    NemesisCloseTabsRight,
+
+    /// Close All
+    NemesisCloseAllTabs,
+
+    /// Keep Open
+    NemesisKeepOpen,
+
+    /// Check Conflicts
+    ConflictScan,
+
+    /// Finds which enabled mods change the same fields. + overrides another mod, - is overridden. Right click a mod for the details. Every patch file of the enabled mods is read, so this takes about as long as patching.
+    ConflictScanHover,
+
+    /// In effect
+    ConflictKept,
+
+    /// Show Conflicts
+    ConflictShow,
+
+    /// Conflicts
+    ConflictTitle,
+
+    /// Checking…
+    ConflictScanning,
+
+    /// No conflicts with the enabled mods.
+    ConflictNone,
+
+    /// A mod was turned on after the last check: check again.
+    ConflictStale,
+
+    /// Filter by path
+    ConflictFilterHint,
+
+    /// Overrides others
+    ConflictWinsHover,
+
+    /// Overridden by others
+    ConflictLosesHover,
+
+    /// The value the merge keeps with the load order now.
+    ConflictKeptHover,
+
+    /// Use this
+    ConflictUse,
+
+    /// Puts this value in the user patch in the Patch Editor. It loads last, so it wins.
+    ConflictUseHover,
+
+    /// FNIS patches are generated: there is no file to take this from.
+    ConflictFnisHover,
+
+    /// Could not take the conflict's value
+    NemesisResolveFailed,
+
+    /// User Patch
+    NemesisUserPatchName,
+
+    /// Header
+    NemesisAnimKindHeader,
+
+    /// Clips
+    NemesisAnimKindClip,
+
+    /// Motions
+    NemesisAnimKindMotion,
+
+    /// Anim Sets
+    NemesisAnimKindSet,
+
+    /// New Anim Sets
+    NemesisAnimKindNewSet,
+
+    /// Behaviors
+    NemesisBehaviorsSection,
+
+    /// Search
+    NemesisSearchTab,
+
+    /// Text of every object, e.g. $eventID[moveStart]$ (Ctrl+Shift+F)
+    NemesisSearchHint,
+
+    /// Go Back
+    NemesisGoBack,
+
+    /// Go Forward
+    NemesisGoForward,
+
+    /// New Clips
+    NemesisNewClips,
+
+    /// New clips with numbered ids: the clip and motion files of each.
+    NemesisNewClipsHover,
+
+    /// Actor
+    NemesisClipActor,
+
+    /// Name
+    NemesisClipName,
+
+    /// Count
+    NemesisClipCount,
+
+    /// Create
+    NemesisCreate,
+
+    /// Follow the cursor: the preview scrolls to the editor's cursor line and highlights it.
+    NemesisFollowCursor,
+
+    /// Animation Data…
+    NemesisAnimData,
+
+    /// Uses the mod's root directory: generates the data of the clips of this work from their hkx (animationdatasinglefile), and adds the hkx you choose to the anim set files you choose (animationsetdatasinglefile).
+    NemesisAnimDataHover,
+
+    /// No clips: this work has no new or edited hkbClipGenerator.
+    NemesisAnimDataNoClips,
+
+    /// Clips (animationdatasinglefile)
+    NemesisAnimDataClips,
+
+    /// Anim sets (animationsetdatasinglefile)
+    NemesisAnimDataSet,
+
+    /// Adds every checked hkx to every checked txt: the hkx the game caches while that anim set is active. Checks in each project are kept.
+    NemesisAnimDataSetHover,
+
+    /// Project:
+    NemesisAnimDataProject,
+
+    /// No hkx in an animations directory under meshes in this mod.
+    NemesisAnimDataNoHkx,
+
+    /// Filter
+    NemesisAnimDataFilter,
+
+    /// All
+    NemesisAnimDataAll,
+
+    /// None
+    NemesisAnimDataNone,
+
+    /// Generate
+    NemesisAnimDataGenerate,
+
+    /// Generated animation data
+    NemesisAnimDataDone,
+
+    /// Mod
+    NemesisModDirLabel,
 
     /// Focus Object Tree
     NemesisFocusTree,
@@ -677,6 +830,27 @@ pub enum I18nKey {
 
     /// Type a command
     EditorPaletteHint,
+
+    /// Cut
+    EditorCut,
+
+    /// Copy
+    EditorCopy,
+
+    /// Paste
+    EditorPaste,
+
+    /// Select All
+    EditorSelectAll,
+
+    /// Command Palette
+    EditorCommandPalette,
+
+    /// Revert this change
+    EditorRevertChange,
+
+    /// Show the selected object in the tree
+    NemesisLocateSelected,
 
     /// Find
     EditorFind,
@@ -1048,16 +1222,25 @@ impl I18nMap {
 }
 
 /// The translated texts of the code editor's menus (right click, `Ctrl+Shift+P`).
-pub fn editor_labels(i18n: &I18nMap) -> egui_code_editor::EditorLabels<'_> {
-    egui_code_editor::EditorLabels {
-        go_to_definition: i18n.t(I18nKey::NemesisGoToDefinition),
-        find_references: i18n.t(I18nKey::NemesisFindReferences),
-        find: i18n.t(I18nKey::EditorFind),
-        go_to_line: i18n.t(I18nKey::EditorGoToLine),
-        quick_fix: i18n.t(I18nKey::EditorQuickFix),
-        format: i18n.t(I18nKey::EditorFormat),
-        show_hover: i18n.t(I18nKey::EditorShowHover),
-        completion: i18n.t(I18nKey::EditorCompletion),
-        palette_hint: i18n.t(I18nKey::EditorPaletteHint),
-    }
+///
+/// In the order `egui_code_editor::EditorLabels::from_texts` takes them: this crate does not know
+/// egui, so it cannot build that struct itself.
+pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 15] {
+    [
+        i18n.t(I18nKey::NemesisGoToDefinition),
+        i18n.t(I18nKey::NemesisFindReferences),
+        i18n.t(I18nKey::EditorFind),
+        i18n.t(I18nKey::EditorGoToLine),
+        i18n.t(I18nKey::EditorQuickFix),
+        i18n.t(I18nKey::EditorFormat),
+        i18n.t(I18nKey::EditorShowHover),
+        i18n.t(I18nKey::EditorCompletion),
+        i18n.t(I18nKey::EditorCut),
+        i18n.t(I18nKey::EditorCopy),
+        i18n.t(I18nKey::EditorPaste),
+        i18n.t(I18nKey::EditorSelectAll),
+        i18n.t(I18nKey::EditorCommandPalette),
+        i18n.t(I18nKey::EditorRevertChange),
+        i18n.t(I18nKey::EditorPaletteHint),
+    ]
 }

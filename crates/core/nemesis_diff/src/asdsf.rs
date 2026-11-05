@@ -86,6 +86,44 @@ pub fn anim_sets(asdsf: &str) -> Result<Vec<AnimSet>, String> {
     Ok(sets)
 }
 
+/// `set` (an [`AnimSet::text`]) with more animations at the end of its anim infos, which come last in
+/// it: a count line, then 3 lines each. Those already there are not added twice.
+///
+/// The count line stays as it is, on purpose. That makes the patch one `MOD_CODE` block at the end,
+/// the push real mods write; mergers count the elements themselves, and a second block on the
+/// count line would be one more place for two mods to conflict.
+///
+/// `infos`: `[crc of the directory, crc of the file name, crc of the extension]`.
+/// e.g., count `1` + `1 2 3`, adding `4 5 6`: count `1` + `1 2 3` + `4 5 6`.
+///
+/// # Errors
+/// The set does not have the layout in the module docs.
+pub fn add_anim_infos(set: &str, infos: &[[String; 3]]) -> Result<String, String> {
+    let mut lines = Lines { lines: set.lines().collect(), at: 0 };
+    lines.skip(1)?; // `V3`
+    let triggers = lines.number()?;
+    lines.skip(triggers)?;
+    let conditions = lines.number()?;
+    lines.skip(conditions * 3)?;
+    for _ in 0..lines.number()? {
+        lines.skip(2)?; // trigger, 0|1
+        let clips = lines.number()?;
+        lines.skip(clips)?;
+    }
+    lines.number()?; // the count: not trusted, as earlier pushes did not change it either
+    let old: Vec<&[&str]> = lines.lines[lines.at..].chunks(3).collect();
+    let is_there = |info: &[String; 3]| old.iter().any(|existing| existing.iter().eq(info.iter()));
+    let new: Vec<&[String; 3]> = infos.iter().filter(|info| !is_there(info)).collect();
+
+    let mut out = lines.lines.join("\n");
+    out.push('\n');
+    for line in new.into_iter().flatten() {
+        out.push_str(line);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
 /// Line cursor with errors that tell the line number.
 struct Lines<'a> {
     lines: Vec<&'a str>,
@@ -118,6 +156,17 @@ impl<'a> Lines<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adds_anim_infos_once() {
+        let set = "V3\n1\ntrig\n1\nvar\n0\n1\n1\natk\n0\n1\nclip\n1\n1\n2\n3\n";
+        let infos = [["4", "5", "6"].map(str::to_owned), ["1", "2", "3"].map(str::to_owned)];
+        let added = add_anim_infos(set, &infos).unwrap();
+        assert_eq!(added, "V3\n1\ntrig\n1\nvar\n0\n1\n1\natk\n0\n1\nclip\n1\n1\n2\n3\n4\n5\n6\n");
+        // Again: what the earlier push added is seen though the count did not change.
+        assert_eq!(add_anim_infos(&added, &infos).unwrap(), added);
+        assert!(add_anim_infos("V3\nx\n", &infos).is_err());
+    }
 
     #[test]
     fn splits_sets() {

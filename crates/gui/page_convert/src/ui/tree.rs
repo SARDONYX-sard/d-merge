@@ -4,7 +4,7 @@ use egui_widgets::shadcn::Checkbox;
 use fast_hash::{HashMap, HashSet};
 use serde_hkx_for_gui::{DirEntry, status::Status};
 
-use crate::tree::{TreeView, for_each_dir, for_each_file, toggle};
+use crate::tree::{TreeView, for_each_dir, for_each_file, toggle, visible_rows};
 
 impl TreeView {
     /// Draws the tree. `status_of` returns the conversion status for a file path.
@@ -13,9 +13,14 @@ impl TreeView {
         let Self { roots, checked, expanded, counts, .. } = self;
         let Some(counts) = counts.as_ref() else { return };
         let mut state = NodeState { checked, expanded, status_of, counts, checks_changed: false };
-        for root in roots.iter() {
-            node_ui(ui, root, 0, &mut state);
-        }
+        // Only the rows on screen are laid out: a tree may have thousands of files.
+        let rows = visible_rows(roots, state.expanded);
+        let row_height = ui.spacing().interact_size.y + 2.0;
+        egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
+            for (entry, depth) in &rows[range] {
+                row_ui(ui, entry, *depth, row_height, &mut state);
+            }
+        });
         if state.checks_changed {
             self.invalidate_counts();
         }
@@ -33,24 +38,20 @@ struct NodeState<'a> {
     checks_changed: bool,
 }
 
-/// One row (+ its children when expanded).
-fn node_ui(ui: &mut egui::Ui, entry: &DirEntry, depth: usize, state: &mut NodeState) {
+/// One row.
+fn row_ui(ui: &mut egui::Ui, entry: &DirEntry, depth: usize, height: f32, state: &mut NodeState) {
     const INDENT: f32 = 18.0;
 
     ui.horizontal(|ui| {
+        ui.set_height(height);
+        #[expect(clippy::cast_precision_loss, reason = "a small depth")]
         ui.add_space(depth as f32 * INDENT);
-
         if entry.children.is_some() {
             directory_row(ui, entry, state);
         } else {
             file_row(ui, entry, state);
         }
     });
-    if state.expanded.contains(&entry.path) {
-        for child in entry.children.iter().flatten() {
-            node_ui(ui, child, depth + 1, state);
-        }
-    }
 }
 
 /// `[▼] [✔/-/ ] name`: expand button + tri-state checkbox.

@@ -113,6 +113,12 @@ impl Preview {
         self.scroll_to_followed = row.is_some();
     }
 
+    /// The user turned following off: no highlight, and the view stays where it is.
+    pub(super) const fn stop_following(&mut self) {
+        self.followed = None;
+        self.scroll_to_followed = false;
+    }
+
     /// The highlighted row. See [`Self::follow_editor_line`].
     pub(super) fn followed_row(&self) -> Option<usize> {
         self.followed.and_then(|(_, row)| row)
@@ -224,6 +230,13 @@ mod tests {
 
         preview.follow_editor_line(99, editor); // no such line
         assert_eq!(preview.followed_row(), None);
+
+        preview.follow_editor_line(3, editor);
+        preview.stop_following();
+        assert_eq!(preview.followed_row(), None);
+        assert_eq!(preview.take_followed_scroll(), None);
+        preview.follow_editor_line(3, editor); // on again: it goes back to the line
+        assert_eq!(preview.take_followed_scroll(), Some(4));
     }
 
     #[test]

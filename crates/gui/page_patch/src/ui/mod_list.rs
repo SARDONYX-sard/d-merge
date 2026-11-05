@@ -14,7 +14,7 @@ use mod_info::ModType;
 
 use super::{
     PatchView,
-    dnd_table::{check_only_table_body, dnd_table_body},
+    dnd_table::{RowConflicts, check_only_table_body, dnd_table_body},
 };
 use crate::visible_mods::{self, is_dnd_allowed};
 
@@ -22,6 +22,7 @@ impl PatchView<'_> {
     /// The central panel with the toolbar and the table.
     pub(super) fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let rows = self.read_only_rows();
+        self.page.conflicts.refresh_marks(self.ctx.settings.mod_list());
         egui::CentralPanel::default().frame(self.ctx.panel_frame).show(ui, |ui| {
             ui.add_space(10.0);
             self.render_toolbar(ui, rows.is_some());
@@ -87,7 +88,24 @@ impl PatchView<'_> {
                 ui.add(egui::Spinner::new());
             }
             ui.colored_label(self.page.list_message.color.resolve(ui.visuals()), &self.page.list_message.message);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| self.conflict_button(ui));
         });
+    }
+
+    /// `Check conflicts`, which runs the merge up to what each mod changes.
+    fn conflict_button(&mut self, ui: &mut egui::Ui) {
+        let i18n = self.ctx.i18n;
+        let busy = self.page.conflicts.is_scanning() || self.page.run.is_running();
+        if busy && self.page.conflicts.is_scanning() {
+            ui.add(egui::Spinner::new());
+        }
+        let button = Button::new(i18n.t(I18nKey::ConflictScan)).icon(Icon::Layers);
+        if ui.add_enabled(!busy, button).on_hover_text(i18n.t(I18nKey::ConflictScanHover)).clicked() {
+            self.page.scan_conflicts(ui.ctx(), self.ctx.settings, self.ctx.runtime);
+        }
+        if self.page.conflicts.is_stale() {
+            ui.colored_label(ui.visuals().warn_fg_color, "⚠").on_hover_text(i18n.t(I18nKey::ConflictStale));
+        }
     }
 
     /// Shows `<selected> / <total> selected`, and `<hits> hits` while searching.
@@ -192,41 +210,61 @@ impl PatchView<'_> {
                 let priority_width =
                     text_width(ui, &format!("{} ▲", self.ctx.i18n.t(I18nKey::ColumnPriority))) + padding;
                 const CHECKBOX_WIDTH: f32 = 24.0;
+                const FLAG_WIDTH: f32 = 18.0;
                 let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
 
                 // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
                 // remainder column's width in sync with the window only when it is the last one.
-                let gaps = spacing.item_spacing.x * 6.0;
-                let site_width =
-                    (table_width - (CHECKBOX_WIDTH + id_width + name_width + mod_type_width + priority_width) - gaps)
-                        .max(80.0);
+                let gaps = spacing.item_spacing.x * 7.0;
+                let fixed = CHECKBOX_WIDTH + FLAG_WIDTH + id_width + name_width + mod_type_width + priority_width;
+                let site_width = (table_width - fixed - gaps).max(80.0);
 
-                // | checkbox | id | name | mod type | site (fills the rest) | priority |
-                // NOTE: The column border is the resize handle: keep every column resizable.
+                // | checkbox | + - | id | name | mod type | site (fills the rest) | priority |
+                // NOTE: The column border is the resize handle: keep the columns resizable. Not the last
+                // one: its handle would be on the scroll bar, and take its drags.
+                let mut asked = None;
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     egui_extras::TableBuilder::new(ui)
                         .striped(true)
+                        .sense(egui::Sense::click()) // the rows' right-click menu
                         .auto_shrink([false, true])
                         .column(egui_extras::Column::exact(CHECKBOX_WIDTH)) // checkbox
+                        .column(egui_extras::Column::exact(FLAG_WIDTH)) // `+`, `-`
                         .column(Self::resizable_column(id_width, changed_width)) // id
                         .column(Self::resizable_column(name_width, changed_width)) // name
                         .column(Self::resizable_column(mod_type_width, changed_width)) // mod type
                         .column(Self::resizable_column(site_width, changed_width).clip(true)) // site
-                        .column(Self::resizable_column(priority_width, changed_width)) // priority
+                        .column(egui_extras::Column::exact(priority_width)) // priority
                         .header(20.0, |mut header| self.render_table_header(&mut header, rows))
                         .body(|mut body| {
-                            let mut widths = [0.0_f32; 6];
+                            let mut widths = [0.0_f32; 7];
                             widths.clone_from_slice(body.widths());
 
+                            let i18n = self.ctx.i18n;
                             let mod_list: &mut [_] =
                                 if self.page.fetch.last_was_empty { &mut [] } else { self.ctx.settings.mod_list_mut() };
                             let anchor = &mut self.page.selection_anchor;
+                            let mut conflicts = RowConflicts {
+                                scan: &self.page.conflicts,
+                                label: i18n.t(I18nKey::ConflictShow),
+                                hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
+                                asked: None,
+                            };
                             match rows {
-                                None => dnd_table_body(&mut body, mod_list, widths, anchor),
-                                Some(rows) => check_only_table_body(body, rows, mod_list, widths, anchor),
+                                None => dnd_table_body(&mut body, mod_list, widths, anchor, &mut conflicts),
+                                Some(rows) => {
+                                    check_only_table_body(body, rows, mod_list, widths, anchor, &mut conflicts);
+                                }
                             }
+                            asked = conflicts.asked;
                         });
                 });
+                if let Some(id) = asked {
+                    self.page.conflicts.inspected = Some(id);
+                    if self.page.conflicts.current.is_none() {
+                        self.page.scan_conflicts(ui.ctx(), self.ctx.settings, self.ctx.runtime);
+                    }
+                }
             });
     }
 
@@ -246,6 +284,11 @@ impl PatchView<'_> {
     fn render_table_header(&mut self, header: &mut egui_extras::TableRow<'_, '_>, rows: Option<&[u32]>) {
         let i18n = self.ctx.i18n;
         self.checkbox_header_button(header, rows);
+        header.col(|ui| {
+            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+                ui.label("±").on_hover_text(i18n.t(I18nKey::ConflictScanHover));
+            });
+        });
         self.header_button(header, i18n.t(I18nKey::ColumnId), SortColumn::Id);
         self.header_button(header, i18n.t(I18nKey::ColumnName), SortColumn::Name);
         self.header_button(header, i18n.t(I18nKey::ColumnModType), SortColumn::ModType);

@@ -18,7 +18,7 @@
 use std::{borrow::Cow, fmt::Write as _, ops::Range};
 
 use egui::Color32;
-use egui_code_editor::{CompletionItem, CompletionList, Language, Location, References, languages::Xml};
+use egui_code_editor::{CompletionItem, CompletionList, Language, Location, QuickFix, References, languages::Xml};
 use fast_hash::HashMap;
 use nemesis_diff::{
     schema::{self, FieldSchema, TypeKind},
@@ -141,7 +141,8 @@ impl Language for NemesisXml<'_> {
         match symbol_at(line, column) {
             Some(Symbol::Pointer(word)) => {
                 if let Some(node) = self.graph.node_of(word) {
-                    let _ = write!(doc, "**{word}**: {}\n\n", self.graph.doc(node));
+                    let (_, class, name, links) = self.graph.label_parts(node);
+                    let _ = write!(doc, "**{word}**: ⟦class|{}⟧ ⟦name|{}⟧{links}\n\n", class.trim(), name.trim());
                 }
             }
             Some(Symbol::Name(kind, name)) => {
@@ -157,12 +158,18 @@ impl Language for NemesisXml<'_> {
             }
             None => {}
         }
+        // `<hkobject>`, whose class may only be known from the field it is in.
+        if line.trim_start().starts_with("<hkobject")
+            && let Some((class, _)) = schema::field_context(text, line_no + 1)
+        {
+            doc.push_str(&class_hover(&class));
+        }
         // The class around the hovered line (`self.fields` is the one around the cursor).
         if let Some((class, fields)) = schema::field_context(text, line_no)
             && let Some(name) = field_name_of(line)
             && let Some(field) = fields.iter().find(|field| field.name == name)
         {
-            doc.push_str(&field_doc(&class, field));
+            doc.push_str(&field_hover(&class, field, line));
         }
         let doc = doc.trim_end();
         (!doc.is_empty()).then(|| doc.to_owned())
@@ -215,6 +222,19 @@ impl Language for NemesisXml<'_> {
                 }
             };
         Some(References { symbol, locations })
+    }
+
+    /// At the `<hkobject>` line: its signature. Anywhere: the fields the object lacks.
+    fn quick_fixes(&self, text: &str, line: usize, _column: usize) -> Vec<QuickFix> {
+        let mut fixes = Vec::new();
+        if let Some(source) = text.split('\n').nth(line)
+            && let Some(new_text) = schema::line_with_signature(source)
+        {
+            let columns = 0..source.chars().count();
+            fixes.push(QuickFix { title: "Fix the class signature".to_owned(), line, columns, new_text });
+        }
+        fixes.extend(missing_fields_fix(text));
+        fixes
     }
 
     /// `hkbClipGenerator.mode: String` for the field of the cursor line.
@@ -447,10 +467,9 @@ impl NemesisXml<'_> {
             return None;
         }
         // The schema's enum / flags values; else what the template uses for this field name.
-        let schema_values = self
-            .fields
-            .and_then(|(_, fields)| fields.iter().find(|f| f.name == field))
-            .map(|f| f.values)
+        let schema_field = self.fields.and_then(|(_, fields)| fields.iter().find(|f| f.name == field));
+        let schema_values = schema_field
+            .map(|f| if f.kind == TypeKind::Bool { BOOL_VALUES } else { f.values })
             .filter(|values| !values.is_empty());
         let (values, doc): (Vec<&str>, &str) = match schema_values {
             Some(values) => (values.to_vec(), "class schema"),
@@ -471,6 +490,59 @@ impl NemesisXml<'_> {
 /// `<hkparam name="mode">X</hkparam>` -> `mode`
 fn field_name_of(line: &str) -> Option<&str> {
     line.split_once("<hkparam name=\"")?.1.split('"').next()
+}
+
+/// What a field of the type `Bool` can be.
+const BOOL_VALUES: &[&str] = &["true", "false"];
+
+/// Hovering `<hkobject>`: the class, what it inherits and its signature.
+///
+/// e.g., `hkbModifierList : hkbModifier : hkbBindable`, `signature 0xa4180ca1`
+fn class_hover(class: &str) -> String {
+    use std::fmt::Write as _;
+    let mut doc = format!("⟦class|{class}⟧");
+    for parent in schema::class_parents(class) {
+        let _ = write!(doc, " : ⟦class|{parent}⟧");
+    }
+    if let Some(signature) = schema::class_signature(class) {
+        let _ = write!(doc, "\n\n`signature` `{signature}`");
+    }
+    doc.push_str("\n\n");
+    doc
+}
+
+/// Hovering a field: what it is and what it holds now. The values it could hold are for the
+/// completion: a hover tells what is there.
+///
+/// e.g., `hkbClipGenerator.flags: Flags(Int8)`, `Now: FLAG_A|FLAG_B`
+fn field_hover(class: &str, field: &FieldSchema, line: &str) -> String {
+    let mut doc = format!("⟦class|{class}⟧.**{}**: `{}`", field.name, type_label(field));
+    if let Some(target) = field.class {
+        doc.push_str(&format!(" → ⟦class|{target}⟧"));
+    }
+    let value = line.split_once('>').and_then(|(_, rest)| rest.split_once("</hkparam>")).map(|(value, _)| value.trim());
+    if let Some(value) = value.filter(|value| !value.is_empty())
+        && !field.values.is_empty()
+    {
+        doc.push_str(&format!("\n\nNow: `{value}`"));
+    }
+    doc
+}
+
+/// Adds the fields the object lacks before its closing tag, at their defaults.
+fn missing_fields_fix(text: &str) -> Option<QuickFix> {
+    let missing = schema::missing_fields(text);
+    if missing.is_empty() {
+        return None;
+    }
+    let class = text.lines().next().and_then(schema::class_of_line)?;
+    let lines = text.lines().enumerate().filter(|(_, line)| line.trim_start().starts_with("</hkobject>"));
+    let line = lines.last()?.0;
+    let mut new_text = String::new();
+    for field in schema::xml_fields(class).filter(|field| missing.contains(&field.name)) {
+        let _ = writeln!(new_text, "\t\t\t{}", schema::field_snippet(field, 3));
+    }
+    Some(QuickFix { title: format!("Add the missing fields: {}", missing.join(", ")), line, columns: 0..0, new_text })
 }
 
 /// `**hkbClipGenerator.mode**: Enum(Int8)` + its values.
@@ -497,13 +569,31 @@ fn type_label(field: &FieldSchema) -> String {
     }
 }
 
+/// The trigger names containing what is typed, up to the `:` before the time (typed by hand).
+///
+/// e.g., `sound|` -> `SoundPlay.Foo:`; after `SoundPlay.Foo:0` there is nothing to offer.
+pub(super) fn trigger_completion(names: &[String], before: &str, column: usize) -> CompletionList {
+    let typed = before.trim_start();
+    if typed.contains(':') {
+        return CompletionList::default();
+    }
+    let lower = typed.to_lowercase();
+    let items = names
+        .iter()
+        .filter(|name| name.to_lowercase().contains(&lower))
+        .take(200)
+        .map(|name| item(name, "⚡", format!("{name}:"), String::new()))
+        .collect();
+    CompletionList { replace: column - typed.chars().count()..column, items }
+}
+
 /// A `#id` candidate, described by its class and name.
 fn pointer_item(graph: &Graph, node: super::tree::Node) -> CompletionItem {
     let id = graph.id(node);
     item(id, "→", id.to_owned(), graph.doc(node).to_owned())
 }
 
-fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
+pub(super) fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
     CompletionItem { label: label.to_string(), icon, insert, select: None, documentation }
 }
 

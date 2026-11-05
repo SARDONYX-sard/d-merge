@@ -148,7 +148,8 @@ impl egui::Widget for Button {
             egui::Color32::PLACEHOLDER,
         );
 
-        let icon_size = height * 0.5;
+        // Lucide's strokes are thin: much smaller than the text's height and they get hard to read.
+        let icon_size = height * 0.72;
         let icon_gap = 6.0;
 
         let content_width = match (self.icon.is_some(), has_text) {

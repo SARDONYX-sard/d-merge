@@ -15,7 +15,7 @@ use crate::{
         asdsf::apply_asdsf_patches,
         hkx::generate::generate_hkx_files,
         patches::{
-            apply::apply_patches,
+            apply::{apply_patches, write_all_debug_json_patches},
             collect::{collect_borrowed_patches, collect_owned_patches},
             types::{OwnedPatchMap, OwnedPatches, PatchCollection},
         },
@@ -75,7 +75,10 @@ pub async fn behavior_gen(patches: PatchMaps, config: Config) -> Result<()> {
     let mut fnis_convert_errors = vec![];
 
     rayon::scope(|s| {
-        s.spawn(|_| fnis_convert_errors = io_job_runner.convert());
+        // What FNIS converts is for the game: not needed if nothing is generated.
+        if !config.debug.patch_json_only {
+            s.spawn(|_| fnis_convert_errors = io_job_runner.convert());
+        }
         s.spawn(|_| {
             adsf_errors = apply_adsf_patches(owned_adsf_patches, &patches, &config, fnis_adsf_patches);
         });
@@ -155,6 +158,11 @@ fn apply_and_gen_patched_hkx<'a>(
 
         (borrowed_patches, patch_errors_len)
     };
+
+    if config.debug.patch_json_only {
+        write_all_debug_json_patches(&borrowed_patches, config);
+        return Errors { patch_errors_len, hkx_errors: all_errors, ..Errors::default() };
+    }
 
     let mut template_error_len;
     let owned_templates = {

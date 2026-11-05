@@ -194,12 +194,14 @@ impl ThemeManager {
     pub(crate) fn show(&mut self, ctx: &egui::Context, open: &mut bool) -> Option<SettingsUpdate> {
         let mut update: Option<SettingsUpdate> = None;
 
-        egui::Window::new("Theme Editor").open(open).default_width(380.0).min_width(300.0).resizable(true).show(
-            ctx,
-            |ui| {
+        egui_widgets::window_near_pointer(ctx, "Theme Editor")
+            .open(open)
+            .default_width(380.0)
+            .min_width(300.0)
+            .resizable(true)
+            .show(ctx, |ui| {
                 update = self.ui_contents(ui);
-            },
-        );
+            });
 
         update
     }

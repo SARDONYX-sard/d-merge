@@ -513,6 +513,28 @@ pub fn parse_as_hkanno<'a>(bytes: &'a [u8], input: &Path) -> Result<Hkanno<'a>, 
     hkanno.ok_or(HkannoError::MissingHkaAnimationClass)
 }
 
+/// The root motion of an animation: how the whole character moves over time.
+///
+/// One `[x, y, z, w]` per sample of `hkaDefaultAnimatedReferenceFrame`, evenly spaced over the
+/// animation: `x y z` is the position, `w` the turn around the up axis in radians.
+/// Empty: the file has none, so the character stays in place.
+///
+/// # Errors
+/// If the file cannot be parsed.
+pub fn parse_root_motion(bytes: &[u8], input: &Path) -> Result<Vec<[f32; 4]>, HkannoError> {
+    let mut samples = Vec::new();
+    hkx_io::with_class_map(bytes, input, &mut |classes| {
+        for class in classes.values() {
+            if let Classes::hkaDefaultAnimatedReferenceFrame(frame) = class {
+                samples = frame.m_referenceFrameSamples.iter().map(|v| [v.x, v.y, v.z, v.w]).collect();
+            }
+        }
+        Ok(())
+    })
+    .context(SerdeHkxFeatureSnafu)?;
+    Ok(samples)
+}
+
 /// Custom error type for hkanno parsing operations.
 #[derive(Debug, snafu::Snafu)]
 pub enum HkannoError {

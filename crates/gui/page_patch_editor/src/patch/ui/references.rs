@@ -11,7 +11,7 @@ pub(in crate::patch) fn references_window<'a>(
     let references = list.as_ref()?;
     let mut open = true;
     let mut picked = None;
-    egui::Window::new(references.title()).open(&mut open).default_height(300.0).show(ctx, |ui| {
+    egui_widgets::window_near_pointer(ctx, references.title()).open(&mut open).default_height(300.0).show(ctx, |ui| {
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
         egui::ScrollArea::vertical().show_rows(ui, row_height, references.len(), |ui, range| {
             for index in range {

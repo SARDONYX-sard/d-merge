@@ -75,6 +75,13 @@ pub trait Language {
         Vec::new()
     }
 
+    /// Like [`Self::inlay_hints`], for languages whose lines mean what their position says.
+    /// `line_no` is 0-based.
+    fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<String> {
+        let _ = line_no;
+        self.inlay_hints(line)
+    }
+
     /// Formats the **whole document**. `None` = this language has no formatter.
     fn format(&self, text: &str) -> Option<String> {
         let _ = text;

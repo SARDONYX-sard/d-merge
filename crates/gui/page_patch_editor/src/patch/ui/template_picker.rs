@@ -11,7 +11,7 @@ use crate::patch::{
     workspace::TemplateEntry,
 };
 
-const MAX_HEIGHT: f32 = 220.0;
+const MAX_HEIGHT: f32 = 420.0;
 /// Pixels of indent per directory level.
 const INDENT: f32 = 12.0;
 

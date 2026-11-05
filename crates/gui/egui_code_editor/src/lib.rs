@@ -29,6 +29,7 @@
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
 mod completion;
+mod edit_ops;
 mod find;
 mod hover;
 mod inline_diff;
@@ -53,10 +54,14 @@ use self::{
     palette::{Palette, PaletteContext},
     quick_fix::QuickFixMenu,
     text_pos::LinePos,
-    ui::{overlays, palette::PaletteInput},
+    ui::{
+        context_menu::{self, MenuAction, MenuContext},
+        overlays,
+        palette::PaletteInput,
+    },
 };
 pub use self::{
-    inline_diff::{InlineDiff, RemovedLines},
+    inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
         CompletionItem, CompletionList, Diagnostic, Language, Location, QuickFix, References, Severity, SignatureHelp,
@@ -132,8 +137,15 @@ pub struct CodeEditorState {
     /// The editor had the keyboard focus last frame.
     had_focus: bool,
     layout: layout::LayoutCache,
-    /// Where the right-click menu was opened (the pointer moves while it is open).
+    /// The symbol the right-click menu was opened on (the pointer moves while it is open).
     menu_target: Option<LinePos>,
+    /// `(errors, warnings)` for the status bar.
+    status_problems: (usize, usize),
+    /// The cursor and how many chars are selected, for the status bar (drawn before the editor).
+    status_cursor: Option<(LinePos, usize)>,
+    /// The menu's Paste asked the OS for the clipboard, at this time (seconds). The text arrives as
+    /// an event in a later frame.
+    pending_paste: Option<f64>,
 }
 
 impl CodeEditorState {
@@ -187,6 +199,8 @@ pub struct CodeEditorOutput<'a> {
     pub navigation: Option<Navigation<'a>>,
     /// The id of the [`EditorAction`] run from the command palette.
     pub action: Option<&'a str>,
+    /// The `↶` of this [`InlineDiff::hunks`] entry was clicked: the host puts it back.
+    pub inline_revert: Option<usize>,
 }
 
 /// Language used when none is given: no colors, no completion, ...
@@ -319,7 +333,7 @@ impl<'a> CodeEditor<'a> {
         };
 
         let input = read_input(frame, ui, state, text, &labels, actions);
-        let mut changed = input.keys.changed | apply_format(frame, text, input.triggers);
+        let mut changed = input.keys.changed | input.pasted | apply_format(frame, text, input.triggers);
         let navigate_keys = match input.keys.command {
             Some(EditorCommand::GoToDefinition) => Some(false),
             Some(EditorCommand::FindReferences) => Some(true),
@@ -347,9 +361,8 @@ impl<'a> CodeEditor<'a> {
         update_completion_popup(frame, ui, state, text, cursor, inserting, completion_request);
         changed |= accept_completion(ui, id, state, text, anchor, input.accept_key, &mut cursor, response);
 
-        if let Some(diff) = inline_diff {
-            overlays::inline_diff(ui, placed.0, placed.1, diff);
-        }
+        let inline_revert =
+            inline_diff.and_then(|diff| overlays::inline_diff(ui, placed.0, placed.1, diff, id, labels.revert_change));
         draw_text_background(ui, placed, cursor.map(|cursor| cursor.line), whitespace);
         changed |= run_quick_fix(ui.ctx(), id, state, text, anchor, input.fix);
         draw_line_decorations(
@@ -383,10 +396,18 @@ impl<'a> CodeEditor<'a> {
             let index = placed.0.cursor_from_pos(pos - placed.1).index.0;
             LinePos::from_char_index(text, index)
         });
+        let selection = cursor_range.map_or(0..0, |range| sorted_chars(&range));
+        state.status_cursor = cursor.map(|cursor| (cursor, selection.len()));
+        let errors = frame.underlines.iter().filter(|problem| problem.severity == Severity::Error).count();
+        state.status_problems = (errors, frame.underlines.len() - errors);
+        let menu_action = context_menu(response, language, text, pointer, &mut state.menu_target, &labels, &selection);
+        changed |= run_menu_action(menu_action, ui, id, state, text, &selection, response);
         let keyboard = navigate_keys.and_then(|references| Some((cursor?, references)));
-        let menu_labels = (labels.go_to_definition, labels.find_references);
-        let navigation =
-            resolve_navigation(response, language, text, pointer, keyboard, &mut state.menu_target, menu_labels);
+        let from_menu = match menu_action {
+            Some(MenuAction::Navigate { pos, references }) => Some((pos, references)),
+            _ => None,
+        };
+        let navigation = resolve_navigation(response, language, text, pointer, keyboard.or(from_menu));
 
         CodeEditorOutput {
             changed,
@@ -396,6 +417,7 @@ impl<'a> CodeEditor<'a> {
             pointer,
             navigation,
             action: input.picked.and_then(palette::Picked::host_action),
+            inline_revert,
         }
     }
 }
@@ -420,6 +442,8 @@ struct FrameInput<'a> {
     fix: Option<QuickFix>,
     /// `Enter` / `Tab` in the completion popup.
     accept_key: bool,
+    /// The text changed by the menu's Paste.
+    pasted: bool,
     keys: KeymapOutput,
 }
 
@@ -445,12 +469,13 @@ fn read_input<'a>(
     let fix = state.quick_fix.handle_keys(ui);
     state.find.handle_keys(keymap, ui, id, text, has_focus);
     let accept_key = state.completion.handle_keys(ui);
+    let pasted = take_requested_paste(ui, id, state, text);
     let keys = if has_focus && !state.quick_fix.is_open() {
         state.keymap.handle(keymap, ui, id, text, state.view)
     } else {
         KeymapOutput::default()
     };
-    FrameInput { picked, triggers, fix, accept_key, keys }
+    FrameInput { picked, triggers, fix, accept_key, pasted, keys }
 }
 
 /// `Shift+Alt+F`. Returns whether the text changed.
@@ -743,24 +768,17 @@ fn apply_quick_fix(text: &mut String, fix: &QuickFix) -> usize {
 
 /// Asks the language about what the keyboard, `Ctrl+click` or the right-click menu requested.
 ///
-/// `keyboard`: `(cursor, references)` from `F12` / Vim `gd` and friends.
+/// `requested`: `(position, references)` from `F12`, Vim `gd`, the menu and the like.
 fn resolve_navigation<'a>(
     response: &egui::Response,
     language: &'a dyn Language,
     text: &str,
     pointer: Option<LinePos>,
-    keyboard: Option<(LinePos, bool)>,
-    menu_target: &mut Option<LinePos>,
-    labels: (&str, &str),
+    requested: Option<(LinePos, bool)>,
 ) -> Option<Navigation<'a>> {
     let ctrl_click = response.clicked() && response.ctx.input(|i| i.modifiers.command);
     let at_pointer = pointer.filter(|_| ctrl_click).map(|pos| (pos, false));
-    if response.secondary_clicked() {
-        // Only over a symbol: elsewhere there is nothing to offer.
-        *menu_target = pointer.filter(|pos| language.definition(text, pos.line, pos.column).is_some());
-    }
-    let from_menu = menu_target.and_then(|pos| navigation_menu(response, language, text, pos, labels));
-    let (pos, references) = keyboard.or(at_pointer).or(from_menu)?;
+    let (pos, references) = requested.or(at_pointer)?;
     if references {
         language.references(text, pos.line, pos.column).map(Navigation::References)
     } else {
@@ -768,29 +786,104 @@ fn resolve_navigation<'a>(
     }
 }
 
-/// The right-click menu for the symbol at `pos`. Returns `(pos, references)` if an item was clicked.
-fn navigation_menu(
+/// The char range of a selection, start first.
+const fn sorted_chars(range: &CCursorRange) -> std::ops::Range<usize> {
+    let (a, b) = (range.primary.index.0, range.secondary.index.0);
+    if a <= b { a..b } else { b..a }
+}
+
+/// The right-click menu. `menu_target` remembers the symbol under the pointer when it opened.
+fn context_menu(
     response: &egui::Response,
     language: &dyn Language,
     text: &str,
-    pos: LinePos,
-    labels: (&str, &str),
-) -> Option<(LinePos, bool)> {
-    let mut request = None;
+    pointer: Option<LinePos>,
+    menu_target: &mut Option<LinePos>,
+    labels: &EditorLabels<'_>,
+    selection: &std::ops::Range<usize>,
+) -> Option<MenuAction> {
+    if response.secondary_clicked() {
+        *menu_target = pointer.filter(|pos| language.definition(text, pos.line, pos.column).is_some());
+    }
+    let mut action = None;
     response.context_menu(|ui| {
-        if let Some(definition) = language.definition(text, pos.line, pos.column) {
-            ui.weak(&*definition.document);
+        let definition = menu_target.and_then(|pos| Some((pos, language.definition(text, pos.line, pos.column)?)));
+        let symbol = definition.as_ref().map(|(pos, definition)| (*pos, &*definition.document));
+        let menu = MenuContext { symbol, has_selection: !selection.is_empty() };
+        action = context_menu::contents(ui, labels, menu);
+    });
+    action
+}
+
+/// Carries out the editing items of the menu. Returns whether the text changed.
+fn run_menu_action(
+    action: Option<MenuAction>,
+    ui: &egui::Ui,
+    id: egui::Id,
+    state: &mut CodeEditorState,
+    text: &mut String,
+    selection: &std::ops::Range<usize>,
+    response: &egui::Response,
+) -> bool {
+    let Some(action) = action else { return false };
+    let ctx = ui.ctx();
+    let mut changed = false;
+    match action {
+        MenuAction::Copy | MenuAction::Cut => {
+            if let Some(selected) = edit_ops::selected_text(text, selection) {
+                ctx.copy_text(selected.to_owned());
+            }
+            if action == MenuAction::Cut {
+                let at = edit_ops::replace_chars(text, selection, "");
+                set_selection(ctx, id, at..at);
+                changed = true;
+            }
         }
-        if ui.button(format!("{}  (F12)", labels.0)).clicked() {
-            request = Some((pos, false));
-            ui.close();
+        MenuAction::Paste => {
+            // Reading the clipboard is asynchronous: see `take_requested_paste`.
+            state.pending_paste = Some(ui.input(|i| i.time));
+            ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
         }
-        if ui.button(format!("{}  (Shift+F12)", labels.1)).clicked() {
-            request = Some((pos, true));
-            ui.close();
+        MenuAction::SelectAll => set_selection(ctx, id, 0..text.chars().count()),
+        MenuAction::CommandPalette => {
+            ui::palette::open(&mut state.palette, ui, id);
+            return false;
+        }
+        MenuAction::Navigate { .. } => return false,
+    }
+    response.request_focus();
+    changed
+}
+
+/// The clipboard text the menu's Paste asked for, put in at the selection. Returns whether it came.
+///
+/// It is taken before the keymap: Vim's Normal mode reads a paste event as `Ctrl+V`.
+fn take_requested_paste(ui: &egui::Ui, id: egui::Id, state: &mut CodeEditorState, text: &mut String) -> bool {
+    /// Seconds until the request is forgotten, so that a later `Ctrl+V` means what it should.
+    const WAIT: f64 = 0.5;
+    let Some(asked_at) = state.pending_paste else { return false };
+    let pasted = ui.input_mut(|i| {
+        let at = i.events.iter().position(|event| matches!(event, egui::Event::Paste(_)))?;
+        match i.events.remove(at) {
+            egui::Event::Paste(pasted) => Some(pasted),
+            _ => None,
         }
     });
-    request
+    let Some(pasted) = pasted else {
+        if ui.input(|i| i.time) - asked_at > WAIT {
+            state.pending_paste = None;
+        } else {
+            ui.ctx().request_repaint();
+        }
+        return false;
+    };
+    state.pending_paste = None;
+    let selection = egui::TextEdit::load_state(ui.ctx(), id)
+        .and_then(|state| state.cursor.char_range())
+        .map_or(0..0, |range| sorted_chars(&range));
+    let at = edit_ops::replace_chars(text, &selection, &pasted);
+    set_selection(ui.ctx(), id, at..at);
+    true
 }
 
 /// The lines of `galley` **fully** inside the visible area (lines are never wrapped: row = line).

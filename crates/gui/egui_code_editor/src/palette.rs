@@ -34,8 +34,55 @@ pub struct EditorLabels<'a> {
     pub format: &'a str,
     pub show_hover: &'a str,
     pub completion: &'a str,
+    pub cut: &'a str,
+    pub copy: &'a str,
+    pub paste: &'a str,
+    pub select_all: &'a str,
+    pub command_palette: &'a str,
+    /// The `↶` of an inline diff, on hover.
+    pub revert_change: &'a str,
     /// The palette's input field, when empty.
     pub palette_hint: &'a str,
+}
+
+impl<'a> EditorLabels<'a> {
+    /// The texts in the order of the fields, for a host that keeps them in a list.
+    pub const fn from_texts(texts: [&'a str; 15]) -> Self {
+        let [
+            go_to_definition,
+            find_references,
+            find,
+            go_to_line,
+            quick_fix,
+            format,
+            show_hover,
+            completion,
+            cut,
+            copy,
+            paste,
+            select_all,
+            command_palette,
+            revert_change,
+            palette_hint,
+        ] = texts;
+        Self {
+            go_to_definition,
+            find_references,
+            find,
+            go_to_line,
+            quick_fix,
+            format,
+            show_hover,
+            completion,
+            cut,
+            copy,
+            paste,
+            select_all,
+            command_palette,
+            revert_change,
+            palette_hint,
+        }
+    }
 }
 
 impl Default for EditorLabels<'_> {
@@ -49,6 +96,12 @@ impl Default for EditorLabels<'_> {
             format: "Format Document",
             show_hover: "Show Hover",
             completion: "Trigger Suggest",
+            cut: "Cut",
+            copy: "Copy",
+            paste: "Paste",
+            select_all: "Select All",
+            command_palette: "Command Palette",
+            revert_change: "Revert this change",
             palette_hint: "Type a command",
         }
     }

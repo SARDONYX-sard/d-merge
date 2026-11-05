@@ -126,11 +126,9 @@ impl HkannoPage {
         }
 
         // Status line first (bottom of the area), so it stays visible while the text scrolls.
-        if tab.editor.keymap.status(keymap).is_some() {
-            egui::Panel::bottom("hkanno_keymap_status").show(ui, |ui| {
-                egui_code_editor::status_line(ui, &tab.editor, keymap);
-            });
-        }
+        egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
+            egui_code_editor::status_line(ui, &tab.editor, keymap, &tab.text);
+        });
 
         let CodeEditorOutput { changed, cursor, command, .. } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
@@ -141,7 +139,7 @@ impl HkannoPage {
                     .diagnostics(&tab.editor_diagnostics)
                     .features(features)
                     .keymap(keymap)
-                    .labels(gui_shared::i18n::editor_labels(ctx.i18n))
+                    .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)))
                     .show(ui, &mut tab.editor)
             })
             .inner;

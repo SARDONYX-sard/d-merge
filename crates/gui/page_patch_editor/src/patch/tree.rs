@@ -161,7 +161,12 @@ impl Graph {
         }
         self.walk_from_root();
         self.compute_relevant();
-        self.unlinked = self.new_nodes.values().copied().filter(|&node| !self.entry(node).reachable).collect();
+        self.unlinked = self
+            .new_nodes
+            .values()
+            .copied()
+            .filter(|&node| !self.entry(node).reachable && self.entry(node).id.starts_with('#'))
+            .collect();
         self.tree_generation = next_generation();
     }
 
@@ -269,7 +274,8 @@ impl Graph {
     /// The end of a new object's label: where it is linked, e.g. ` ← #0106, #0107`.
     fn refresh_links_text(&mut self, node: Node) {
         let entry = self.entry(node);
-        if !entry.exists || !entry.is_new {
+        // (Clip data files are "new" too, but nothing points to them: they have no `#` id.)
+        if !entry.exists || !entry.is_new || !entry.id.starts_with('#') {
             return;
         }
         let mut links = String::new();
@@ -339,6 +345,14 @@ impl Graph {
 
     pub(super) fn label(&self, node: Node) -> &str {
         &self.entry(node).label
+    }
+
+    /// A short name for the way to an object: its `name` field, or else its class.
+    ///
+    /// e.g. `GetUpModList`, `hkbVariableBindingSet`
+    pub(super) fn short_name(&self, node: Node) -> &str {
+        let (_, class, name, _) = self.label_parts(node);
+        if name.trim().is_empty() { class.trim() } else { name.trim() }
     }
 
     /// e.g. `hkbModifierList  GetUpModList`: the object in hovers and completion.
@@ -417,6 +431,8 @@ pub(super) struct Row {
     pub(super) dimmed: bool,
     /// The last child of its parent: its connecting line ends here (`└`, not `├`).
     pub(super) last_child: bool,
+    /// The row of its parent. `None`: the root.
+    pub(super) parent_row: Option<u32>,
     /// Bit `n`: the line of tree level `n` continues past this row, as that ancestor has more
     /// children below. e.g., `│   └ row` has bit 0.
     pub(super) guides: u64,
@@ -425,6 +441,7 @@ pub(super) struct Row {
 /// How a row connects to the rows around it. See [`Row`].
 #[derive(Debug, Clone, Copy)]
 struct RowLines {
+    parent_row: Option<u32>,
     last_child: bool,
     guides: u64,
 }
@@ -509,9 +526,10 @@ fn apply_input(input: TreeInput, rows: &[Row], cursor: usize) -> Effect {
 /// Tree state kept between frames.
 #[derive(Debug, Default)]
 pub(super) struct TreeState {
-    /// Nodes the user opened / closed, by id so it survives switching behaviors.
-    /// Others: [`Self::default_open`].
+    /// Nodes the user opened / closed, by id so it survives edits. Others: [`Self::default_open`].
     open: HashMap<Rc<str>, bool>,
+    /// `open` changed since the settings last took it. See [`Self::take_open_changes`].
+    open_changed: bool,
     rows: Vec<Row>,
     /// What `rows` was built from: [`Graph::tree_generation`] and "changed only".
     built_for: Option<(u64, bool)>,
@@ -523,11 +541,25 @@ pub(super) struct TreeState {
     pub(super) scroll_to: Option<usize>,
     pub(super) scroll_offset: f32,
     pub(super) view_height: f32,
+    pub(super) scroll_x: f32,
+    pub(super) view_width: f32,
     /// `Space` was pressed: the next `e` leaves the tree (same keys as entering it).
     pub(super) leader: bool,
 }
 
 impl TreeState {
+    /// A tree with the open / closed nodes saved in the settings.
+    pub(super) fn restored(open: &BTreeMap<String, bool>) -> Self {
+        let open = open.iter().map(|(id, open)| (Rc::from(id.as_str()), *open)).collect();
+        Self { open, ..Self::default() }
+    }
+
+    /// The open / closed nodes to save, if they changed since the last call.
+    pub(super) fn take_open_changes(&mut self) -> Option<BTreeMap<String, bool>> {
+        std::mem::take(&mut self.open_changed)
+            .then(|| self.open.iter().map(|(id, open)| (id.to_string(), *open)).collect())
+    }
+
     pub(super) fn rows(&self) -> &[Row] {
         &self.rows
     }
@@ -542,6 +574,7 @@ impl TreeState {
 
     pub(super) fn set_open(&mut self, graph: &Graph, node: Node, open: bool) {
         self.open.insert(Rc::clone(&graph.entry(node).id), open);
+        self.open_changed = true;
         self.built_for = None;
     }
 
@@ -587,7 +620,8 @@ impl TreeState {
         let mut rows = std::mem::take(&mut self.rows);
         rows.clear();
         if let Some(root) = graph.root {
-            self.push_rows(graph, root, 0, RowLines { last_child: true, guides: 0 }, changed_only, &mut rows);
+            let lines = RowLines { parent_row: None, last_child: true, guides: 0 };
+            self.push_rows(graph, root, 0, lines, changed_only, &mut rows);
         }
         self.rows = rows;
         self.built_for = Some((graph.tree_generation(), changed_only));
@@ -604,8 +638,10 @@ impl TreeState {
     ) {
         let expandable = graph.shown_children(node, changed_only).next().is_some();
         let open = expandable && self.is_open(graph, node, changed_only);
-        let RowLines { last_child, guides } = lines;
-        rows.push(Row { node, depth, expandable, open, dimmed: false, last_child, guides });
+        let RowLines { parent_row, last_child, guides } = lines;
+        #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion rows")]
+        let this_row = Some(rows.len() as u32);
+        rows.push(Row { node, depth, expandable, open, dimmed: false, last_child, parent_row, guides });
         if !open {
             return;
         }
@@ -615,11 +651,12 @@ impl TreeState {
             // This node's children hang from a line at this depth: more of them keep it going.
             let guides = if last_child { guides } else { guides | guide_bit(depth) };
             if graph.entry(child).first_parent == Some(node) {
-                let lines = RowLines { last_child, guides };
+                let lines = RowLines { parent_row: this_row, last_child, guides };
                 self.push_rows(graph, child, depth + 1, lines, changed_only, rows);
             } else {
                 let (expandable, open, dimmed) = (false, false, true);
-                rows.push(Row { node: child, depth: depth + 1, expandable, open, dimmed, last_child, guides });
+                let (depth, parent_row) = (depth + 1, this_row);
+                rows.push(Row { node: child, depth, expandable, open, dimmed, last_child, parent_row, guides });
             }
         }
     }
@@ -673,6 +710,56 @@ impl TreeState {
         }
     }
 
+    /// The rows of `row`'s ancestors, root first: the way from the root to it.
+    ///
+    /// e.g., for `#c` in `#root > #b > #c`: the rows of `#root` and `#b`.
+    pub(super) fn ancestors(&self, row: usize) -> Vec<usize> {
+        let mut chain = Vec::new();
+        let mut current = self.rows.get(row).and_then(|r| r.parent_row);
+        while let Some(parent) = current {
+            chain.push(parent as usize);
+            current = self.rows[parent as usize].parent_row;
+        }
+        chain.reverse();
+        chain
+    }
+
+    /// The rows to pin at the top of the view (like VS Code's sticky scroll): the ancestors of what
+    /// is shown under them, or at most the `max` nearest, so you see which branch you are in after
+    /// scrolling far from its parents. `step`: a row's height with its spacing.
+    pub(super) fn sticky_rows(&self, step: f32, max: usize) -> Vec<usize> {
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a positive row number")]
+        let top = (self.scroll_offset / step).max(0.0) as usize;
+        // The pinned rows cover as many rows as they are: go by the first row still seen.
+        let covered = self.ancestors(top).len().min(max);
+        let chain = self.ancestors((top + covered).min(self.rows.len().saturating_sub(1)));
+        chain[chain.len().saturating_sub(max)..].to_vec()
+    }
+
+    /// The way to the selected row on the connecting lines: per tree level, the rows whose line at
+    /// that level is part of it. e.g., `[Some(0..=3), Some(1..=2)]`.
+    pub(super) fn active_guides(&self) -> Vec<Option<std::ops::RangeInclusive<usize>>> {
+        let mut levels = Vec::new();
+        let mut child = self.cursor;
+        for parent in self.ancestors(self.cursor).into_iter().rev() {
+            let level = usize::from(self.rows[parent].depth);
+            if levels.len() <= level {
+                levels.resize(level + 1, None);
+            }
+            levels[level] = Some(parent + 1..=child);
+            child = parent;
+        }
+        levels
+    }
+
+    /// The horizontal offset that shows the start of a row indented by `indent` pixels (`None`: it
+    /// is on screen). Deep rows would otherwise be out of view to the right.
+    pub(super) fn offset_x_for(&self, indent: f32) -> Option<f32> {
+        const MARGIN: f32 = 24.0;
+        let visible = self.scroll_x..=self.scroll_x + self.view_width / 2.0;
+        (!visible.contains(&indent)).then_some((indent - MARGIN).max(0.0))
+    }
+
     /// The scroll offset that brings row `row` into view (`None`: it already is).
     pub(super) fn offset_for(&self, row: usize, row_height: f32) -> Option<f32> {
         #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
@@ -718,6 +805,27 @@ fn pointers<'a>(text: &'a str, own: &str) -> Vec<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// How long the walk over all the nodes takes on the largest template: what a pointer edit costs.
+    #[test]
+    #[ignore = "needs the template files of the repository; prints timings"]
+    fn time_the_walk_on_the_largest_template() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../resource/assets/templates/meshes/actors/character/behaviors/0_master.bin");
+        let behavior = Behavior::open(&path).unwrap();
+
+        let start = std::time::Instant::now();
+        let mut graph = Graph::new(&behavior);
+        println!("{} nodes, whole build: {:?}", graph.entries.len(), start.elapsed());
+
+        const RUNS: u32 = 100;
+        let start = std::time::Instant::now();
+        for _ in 0..RUNS {
+            graph.links_dirty = true;
+            graph.finish_updates();
+        }
+        println!("walk: {:?} each", start.elapsed() / RUNS);
+    }
 
     fn template<'a>(id: &'a str, text: &'a str) -> ObjectText<'a> {
         ObjectText { id, class: "c", name: "", text, is_new: false, is_edited: false }
@@ -876,6 +984,53 @@ mod tests {
     ///   └ #new0
     /// ```
     #[test]
+    fn open_nodes_can_be_saved_and_restored() {
+        let graph = sample();
+        let mut state = TreeState::default();
+        assert_eq!(state.take_open_changes(), None);
+        state.set_open(&graph, graph.node_of("#b").unwrap(), true);
+
+        let saved = state.take_open_changes().unwrap();
+        assert_eq!(state.take_open_changes(), None); // reported once
+
+        let mut restored = TreeState::restored(&saved);
+        restored.prepare(&graph, None, false);
+        assert_eq!(ids(&graph, &restored), ["#root", "#a", "#b", "#c", "#new0"]);
+    }
+
+    #[test]
+    fn knows_the_way_to_a_row() {
+        let graph = sample();
+        let mut state = TreeState::default();
+        state.prepare(&graph, None, false);
+        state.set_open_below(&graph, graph.node_of("#root").unwrap(), true);
+        state.prepare(&graph, None, false);
+        // 0 #root, 1 #a, 2 #c, 3 #b, 4 #c (dimmed), 5 #new0
+        assert_eq!(state.ancestors(5), [0, 3]);
+        assert_eq!(state.ancestors(4), [0, 3]);
+        assert!(state.ancestors(0).is_empty());
+        assert!(state.ancestors(99).is_empty());
+
+        state.cursor = 5;
+        assert_eq!(state.active_guides(), [Some(1..=3), Some(4..=5)]);
+
+        // Scrolled so that `#new0` is the top row: its parents get pinned.
+        state.scroll_offset = 50.0;
+        assert_eq!(state.sticky_rows(10.0, 5), [0, 3]);
+        assert_eq!(state.sticky_rows(10.0, 1), [3]); // only the nearest fit
+        state.scroll_offset = 0.0;
+        assert_eq!(state.sticky_rows(10.0, 5), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn horizontal_scroll_only_when_the_indent_is_out_of_view() {
+        let state = TreeState { scroll_x: 100.0, view_width: 200.0, ..TreeState::default() };
+        assert_eq!(state.offset_x_for(150.0), None);
+        assert_eq!(state.offset_x_for(500.0), Some(476.0));
+        assert_eq!(state.offset_x_for(10.0), Some(0.0));
+    }
+
+    #[test]
     fn rows_know_their_connecting_lines() {
         let graph = sample();
         let mut state = TreeState::default();
@@ -922,6 +1077,7 @@ mod tests {
             open,
             dimmed: false,
             last_child: false,
+            parent_row: None,
             guides: 0,
         };
         // 0 (open) > 1 (closed, has children), 2 (leaf)

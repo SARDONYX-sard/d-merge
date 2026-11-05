@@ -21,8 +21,7 @@ pub(crate) struct PaletteInput<'a, 'b> {
 /// (Vim uses `Ctrl+P` itself) and the `TextEdit`. Returns the command that was run.
 pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>) -> Option<Picked<'a>> {
     if input.has_focus && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::P)) {
-        palette.reopen();
-        ui.memory_mut(|m| m.request_focus(field_id(input.id)));
+        open(palette, ui, input.id);
     }
     if !palette.open {
         return None;
@@ -34,6 +33,12 @@ pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput
     let picked = from_keys.or(clicked);
     close_if_done(palette, ui, input.id, picked.is_some() || keys.escape);
     picked
+}
+
+/// Opens the palette with the keyboard in its field. `editor`: the editor it belongs to.
+pub(crate) fn open(palette: &mut Palette, ui: &egui::Ui, editor: egui::Id) {
+    palette.reopen();
+    ui.memory_mut(|m| m.request_focus(field_id(editor)));
 }
 
 /// The keys the editor takes in any keymap, whether or not the palette is open.

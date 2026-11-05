@@ -2303,7 +2303,6 @@ dependencies = [
 name = "gui_shared"
 version = "0.0.0"
 dependencies = [
- "egui_code_editor",
  "fast_hash",
  "gh_issue_link",
  "gui_shared_derive",
@@ -3390,6 +3389,7 @@ version = "0.0.0"
 dependencies = [
  "fast_hash",
  "imara-diff",
+ "json_patch",
  "nemesis_xml",
 ]
 
@@ -4003,11 +4003,13 @@ dependencies = [
  "egui_dnd",
  "egui_extras",
  "egui_widgets",
+ "fast_hash",
  "gui_shared",
  "mod_info",
  "parking_lot 0.13.0",
  "rayon",
  "skyrim_data_dir",
+ "sonic-rs",
  "tokio",
  "tracing",
  "tracing_rotation",
@@ -4027,8 +4029,10 @@ dependencies = [
  "nemesis_diff",
  "phf 0.14.0",
  "rmp-serde",
+ "serde_hkx_for_gui",
  "skyrim_anim_data",
  "skyrim_crc",
+ "winnow",
 ]
 
 [[package]]

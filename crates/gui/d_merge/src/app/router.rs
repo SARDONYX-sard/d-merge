@@ -119,6 +119,9 @@ impl eframe::App for Root {
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
             self.router.ui(ui, &mut self.app);
         });
+        if let Some(page) = self.app.pending_page.take() {
+            self.go(page);
+        }
 
         self.app.frame_end(&ctx);
     }

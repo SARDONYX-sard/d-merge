@@ -25,7 +25,10 @@ use self::{
 };
 use crate::{
     error::{Error, Result},
-    hack::{HackOptions, do_hack_cast_ragdoll_event},
+    hack::{
+        HackOptions, do_hack_cast_ragdoll_event,
+        empty_array::{closed_then_mod_code, original_is_empty_array},
+    },
     helpers::{
         comment::{CommentKind, close_comment, comment_kind, take_till_close},
         delimited_multispace0,
@@ -168,7 +171,7 @@ impl<'de> PatchDeserializer<'de> {
         let mut obj = Object::new();
         obj.insert("__ptr".into(), ptr_index.into());
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
-            if self.hack_options.bone_weight_outside_hkparam && self.try_hack_bone_weight_seq_push()? {
+            if self.try_push_after_empty_array()? {
                 continue;
             }
 
@@ -207,6 +210,9 @@ impl<'de> PatchDeserializer<'de> {
 
         let mut obj = Object::new();
         while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
+            if self.try_push_after_empty_array()? {
+                continue;
+            }
             let (field_name, value) = self.field()?;
             obj.insert(field_name.into(), value);
         }
@@ -243,6 +249,15 @@ impl<'de> PatchDeserializer<'de> {
 
         let value = {
             let value = self.parse_value(field_type)?;
+
+            if should_take_in_this && self.parse_peek(original_is_empty_array(field_name)).is_ok() {
+                self.parse_next(original_is_empty_array(field_name))?;
+                let path = self.current.path.clone();
+                self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
+                self.current.clear_flags();
+                self.current.path.pop();
+                return Ok((field_name, Default::default()));
+            }
 
             if should_take_in_this {
                 self.current.push_current_patch(value);
@@ -483,6 +498,10 @@ impl<'de> PatchDeserializer<'de> {
         let mut index = 0;
         let mut should_take_in_this = false;
         while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+            // An element that takes no input would go on forever, filling the memory: e.g., what is
+            // no element here at all. Such a patch is an error, like any other that does not fit.
+            let before = self.input.len();
+
             // seq start
             let is_start = self.parse_start_maybe_comment()?;
             if is_start {
@@ -530,6 +549,9 @@ impl<'de> PatchDeserializer<'de> {
             if self.parse_maybe_close_comment()? {
                 should_take_in_this = false;
             };
+            if self.input.len() == before {
+                return Err(Error::ContextError { err: ErrMode::Backtrack(ContextError::new()) });
+            }
         }
 
         self.current.seq_range = None;
@@ -538,34 +560,26 @@ impl<'de> PatchDeserializer<'de> {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// Peeks for the pattern:
-    /// ```xml
-    /// <hkparam name="boneWeights" numelements="0"></hkparam>
-    /// <!-- MOD_CODE ~id~ OPEN -->
-    /// <float list>
-    /// </hkparam>
-    /// <!-- CLOSE -->
-    /// ```
-    ///
-    /// If the pattern matches, consumes all of it and inserts a SeqPush patch.
-    /// Returns `true` if the pattern was handled.
-    fn try_hack_bone_weight_seq_push(&mut self) -> Result<bool> {
-        use super::hack::bone_weight::{bone_weight_then_mod_code, parse_floats_till_end_hkparam};
-
-        // Peek: does `<hkparam name="boneWeights" numelements="0"></hkparam>` follow?
-        if self.parse_peek(bone_weight_then_mod_code).is_err() {
+    /// A push written after the kept line of an empty array, if that comes next (the second form in
+    /// [`empty_array`]). Returns `true` if it was handled.
+    fn try_push_after_empty_array(&mut self) -> Result<bool> {
+        if !self.hack_options.empty_array_outside_hkparam {
             return Ok(false);
         }
+        let field_info = self.current.field_info.ok_or(Error::MissingFieldInfo)?;
+        let mut head = (field_start_tag(field_info).verify(|(_, _, len)| *len == Some(0)), closed_then_mod_code);
+        if self.parse_peek(head.by_ref()).is_err() {
+            return Ok(false);
+        }
+        let ((field_name, field_type, _), ()) = self.parse_next(head)?;
 
-        self.parse_next(bone_weight_then_mod_code)?;
-        let floats = self.parse_next(parse_floats_till_end_hkparam)?;
-
-        let mut patch_path = self.current.path.clone();
-        patch_path.push("boneWeights".into());
-
-        self.output_patches
-            .insert(patch_path, JsonPatch { action: Action::SeqPush, value: BorrowedValue::Array(Box::new(floats)) });
-
+        self.current.path.push(field_name.into());
+        let value = self.parse_value(field_type)?;
+        self.parse_next(end_tag("hkparam"))?;
+        self.parse_next(close_comment)?;
+        let path = self.current.path.clone();
+        self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
+        self.current.path.pop();
         Ok(true)
     }
 
@@ -929,14 +943,14 @@ mod tests {
     }
 
     #[test]
-    fn hack_bone_weight_outside_hkparam() {
+    fn push_after_the_line_of_an_empty_array() {
         let nemesis_xml = r###"
     <hkobject name="#0119" class="hkbBoneWeightArray" signature="0xcd902b77">
         <hkparam name="variableBindingSet">null</hkparam>
         <hkparam name="boneWeights" numelements="0"></hkparam>
 <!-- MOD_CODE ~colisc~ OPEN -->
-        0.000000 0.100000 0.200000
-        0.300000 0.400000 0.500000
+        0.000000 0.250000 0.500000
+        0.750000 1.000000 1.500000
         </hkparam>
 <!-- CLOSE -->
     </hkobject>
@@ -944,16 +958,135 @@ mod tests {
 
         let (actual, _) = parse_nemesis_patch(
             nemesis_xml,
-            Some(HackOptions { bone_weight_outside_hkparam: true, ..Default::default() }),
+            Some(HackOptions { empty_array_outside_hkparam: true, ..Default::default() }),
         )
         .unwrap_or_else(|e| panic!("{e}"));
 
         let mut expected = HashMap::default();
         expected.insert(
             json_path!["#0119", "hkbBoneWeightArray", "boneWeights"],
-            JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]) },
+            JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, [0.0, 0.25, 0.5, 0.75, 1.0, 1.5]) },
         );
         assert_eq!(actual, expected);
+    }
+
+    /// A real one (`ADXP MCO`): the block after the empty array changes the next field. This was once
+    /// taken for a push, and the parser never came back.
+    #[test]
+    fn a_block_after_an_empty_array_can_be_the_next_field() {
+        let nemesis_xml = r###"
+    <hkobject name="#2980" class="hkbStateMachineStateInfo" signature="0xed7f9d0">
+        <hkparam name="variableBindingSet">null</hkparam>
+        <hkparam name="listeners" numelements="0"></hkparam>
+<!-- MOD_CODE ~amco~ OPEN -->
+        <hkparam name="enterNotifyEvents">#amco$17</hkparam>
+<!-- ORIGINAL -->
+        <hkparam name="enterNotifyEvents">null</hkparam>
+<!-- CLOSE -->
+        <hkparam name="exitNotifyEvents">null</hkparam>
+        <hkparam name="transitions">null</hkparam>
+        <hkparam name="generator">#2967</hkparam>
+        <hkparam name="name">a</hkparam>
+        <hkparam name="stateId">1</hkparam>
+        <hkparam name="probability">1.000000</hkparam>
+        <hkparam name="enable">true</hkparam>
+    </hkobject>
+    "###;
+        let options = Some(HackOptions { empty_array_outside_hkparam: true, ..Default::default() });
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, options).unwrap_or_else(|e| panic!("{e}"));
+
+        let mut expected = HashMap::default();
+        expected.insert(
+            json_path!["#2980", "hkbStateMachineStateInfo", "enterNotifyEvents"],
+            JsonPatch { action: Action::Pure { op: Op::Replace }, value: "#amco$17".into() },
+        );
+        assert_eq!(actual, expected);
+    }
+
+    /// What is no element of the array ends the parse with an error, however the patch got here.
+    #[test]
+    fn an_array_that_takes_no_input_is_an_error() {
+        let nemesis_xml = r###"
+    <hkobject name="#1" class="hkbStateMachineStateInfo" signature="0xed7f9d0">
+        <hkparam name="listeners" numelements="1">
+            <hkparam name="enterNotifyEvents">null</hkparam>
+        </hkparam>
+    </hkobject>
+    "###;
+        assert!(parse_nemesis_patch(nemesis_xml, None).is_err());
+    }
+
+    /// Any field and any mod code: the `</hkparam>` nothing opened is what tells.
+    #[test]
+    fn push_after_the_line_of_any_empty_array() {
+        let nemesis_xml = r###"
+    <hkobject name="#0091" class="hkbBehaviorGraphStringData" signature="0xc713064e">
+        <hkparam name="eventNames" numelements="0"></hkparam>
+<!-- MOD_CODE ~mymod~ OPEN -->
+        <hkcstring>first</hkcstring>
+        <hkcstring>second</hkcstring>
+        </hkparam>
+<!-- CLOSE -->
+    </hkobject>
+    "###;
+        let options = Some(HackOptions { empty_array_outside_hkparam: true, ..Default::default() });
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, options).unwrap_or_else(|e| panic!("{e}"));
+
+        let mut expected = HashMap::default();
+        expected.insert(
+            json_path!["#0091", "hkbBehaviorGraphStringData", "eventNames"],
+            JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, ["first", "second"]) },
+        );
+        assert_eq!(actual, expected);
+
+        // Not valid XML: without the option it is an error.
+        assert!(parse_nemesis_patch(nemesis_xml, None).is_err());
+    }
+
+    /// The usual form needs no option: `ORIGINAL` says that the array was empty, so it is a push.
+    #[test]
+    fn replacing_the_line_of_an_empty_array_is_a_push() {
+        let nemesis_xml = r###"
+    <hkobject name="#0119" class="hkbBoneWeightArray" signature="0xcd902b77">
+        <hkparam name="variableBindingSet">null</hkparam>
+<!-- MOD_CODE ~mymod~ OPEN -->
+        <hkparam name="boneWeights" numelements="2">
+            0.500000 1.000000
+        </hkparam>
+<!-- ORIGINAL -->
+        <hkparam name="boneWeights" numelements="0"></hkparam>
+<!-- CLOSE -->
+    </hkobject>
+    "###;
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
+
+        let mut expected = HashMap::default();
+        expected.insert(
+            json_path!["#0119", "hkbBoneWeightArray", "boneWeights"],
+            JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, [0.5, 1.0]) },
+        );
+        assert_eq!(actual, expected);
+    }
+
+    /// With elements in `ORIGINAL`, replacing the field stays a replacement.
+    #[test]
+    fn replacing_a_filled_array_is_not_a_push() {
+        let nemesis_xml = r###"
+    <hkobject name="#0119" class="hkbBoneWeightArray" signature="0xcd902b77">
+<!-- MOD_CODE ~mymod~ OPEN -->
+        <hkparam name="boneWeights" numelements="1">
+            0.500000
+        </hkparam>
+<!-- ORIGINAL -->
+        <hkparam name="boneWeights" numelements="1">
+            1.000000
+        </hkparam>
+<!-- CLOSE -->
+    </hkobject>
+    "###;
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
+        let path = json_path!["#0119", "hkbBoneWeightArray", "boneWeights"];
+        assert_eq!(actual[&path].action, Action::Pure { op: Op::Replace });
     }
 
     // #[quick_tracing::init(file = "./parse.log", stdio = false)]

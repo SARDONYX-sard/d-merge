@@ -54,11 +54,13 @@ pub(crate) fn label_with_hover(ui: &mut Ui, text: &str, width: f32, align: CellA
 
 /// Add a hyperlink truncated to fit within `width`; the full URL is a tooltip only when truncated.
 /// Always left-aligned (URLs are not centered or right-aligned).
-pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
+///
+/// Returns its response: it takes the clicks there, so the row's right-click menu goes on it too.
+pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::click() | egui::Sense::hover());
     if url.trim().is_empty() || !ui.is_rect_visible(rect) {
-        return;
+        return response;
     }
 
     let hovered = response.hovered();
@@ -91,9 +93,7 @@ pub(crate) fn hyperlink_with_hover(ui: &mut Ui, url: &str, width: f32) {
     if response.clicked() {
         ui.ctx().open_url(egui::OpenUrl::new_tab(url));
     }
-    if is_truncated {
-        response.on_hover_text(url);
-    }
+    if is_truncated { response.on_hover_text(url) } else { response }
 }
 
 /// `text` as is when it fits in `width` (no allocation), else cut with `...` (`Cow::Owned`).

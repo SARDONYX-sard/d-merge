@@ -188,9 +188,11 @@ fn editor_mode_select(ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
 
 /// Window with one checkbox per language feature.
 fn lsp_options_window(egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>, open: &mut bool) {
-    egui::Window::new(ctx.i18n.t(I18nKey::HkannoLspOptionsTitle)).open(open).resizable(false).collapsible(false).show(
-        egui_ctx,
-        |ui| {
+    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::HkannoLspOptionsTitle))
+        .open(open)
+        .resizable(false)
+        .collapsible(false)
+        .show(egui_ctx, |ui| {
             let options = [
                 (&mut ctx.lsp_settings.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
                 (&mut ctx.lsp_settings.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
@@ -204,6 +206,5 @@ fn lsp_options_window(egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>, ope
             for (value, label, hover) in options {
                 ui.add(Checkbox::new(value, ctx.i18n.t(label))).on_hover_text(ctx.i18n.t(hover));
             }
-        },
-    );
+        });
 }

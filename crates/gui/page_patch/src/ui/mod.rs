@@ -1,6 +1,7 @@
 //! Drawing of the patch page. The logic is in the modules next to this directory.
 
 mod bottom_panel;
+mod conflicts;
 mod dnd_table;
 mod label_ext;
 mod mod_list;
@@ -30,6 +31,7 @@ impl PatchPage {
         view.ui_paths(ui);
         view.ui_bottom_panel(ui);
         view.ui_mod_list(ui); // the central panel must be the last one
+        view.ui_conflict_window(ui.ctx());
         view.page.first_frame = false;
     }
 }

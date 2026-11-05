@@ -16,6 +16,11 @@ pub fn class_names() -> Vec<&'static str> {
     names
 }
 
+/// The class of an `<hkobject .. class="x" ..>` line.
+pub fn class_of_line(line: &str) -> Option<&str> {
+    attribute(line, "class")
+}
+
 /// The fields written in XML (not `SERIALIZE_IGNORED`), in order.
 pub fn xml_fields(class: &str) -> impl Iterator<Item = &'static FieldSchema> {
     find_class_schema(class).into_iter().flat_map(|c| c.fields.iter()).filter(|f| !f.serialize_ignored)
@@ -169,6 +174,50 @@ pub fn missing_fields(object: &str) -> Vec<&'static str> {
         }
     }
     xml_fields(class).map(|field| field.name).filter(|name| !written.contains(name)).collect()
+}
+
+/// `<signature of the class>`, e.g. `hkbModifierList` -> `0xa4180ca1`.
+pub fn class_signature(class: &str) -> Option<&'static str> {
+    find_class_schema(class).map(|schema| schema.signature)
+}
+
+/// The parents of `class`, nearest first. e.g., `hkbModifierList` -> `hkbModifier`, ...
+pub fn class_parents(class: &str) -> Vec<&'static str> {
+    let mut parents = Vec::new();
+    let mut current = find_class_schema(class).and_then(|schema| schema.parent);
+    while let Some(name) = current {
+        parents.push(name);
+        current = find_class_schema(name).and_then(|schema| schema.parent);
+    }
+    parents
+}
+
+/// `line` (an `<hkobject .. class="x" ..>` tag) with the signature its class has. `None`: it has it
+/// already, or the line has no known class.
+///
+/// e.g., `<hkobject name="#a" class="hkbModifierList" signature="0x0">`
+/// -> `<hkobject name="#a" class="hkbModifierList" signature="0xa4180ca1">`
+pub fn line_with_signature(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix("<hkobject")?;
+    let signature = class_signature(attribute(rest, "class")?)?;
+    match attribute(rest, "signature") {
+        Some(current) if same_signature(current, signature) => None,
+        Some(current) => {
+            Some(line.replacen(&format!("signature=\"{current}\""), &format!("signature=\"{signature}\""), 1))
+        }
+        None => {
+            let at = line.rfind('>')?;
+            let before = line[..at].trim_end_matches('/').trim_end();
+            Some(format!("{before} signature=\"{signature}\"{}", &line[before.len()..]))
+        }
+    }
+}
+
+/// Numbers, not text: `0x95aca5d` is `0x095ACA5D`.
+fn same_signature(a: &str, b: &str) -> bool {
+    let value = |s: &str| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok();
+    value(a).is_some() && value(a) == value(b)
 }
 
 /// Is `class` `base` or one of its subclasses?

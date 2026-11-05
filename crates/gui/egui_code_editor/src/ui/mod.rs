@@ -2,6 +2,7 @@
 //! can be unit tested.
 
 pub(crate) mod completion;
+pub(crate) mod context_menu;
 pub(crate) mod find;
 pub(crate) mod hover;
 pub(crate) mod overlays;

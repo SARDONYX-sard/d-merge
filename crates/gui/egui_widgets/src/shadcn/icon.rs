@@ -13,13 +13,19 @@ use egui::{Pos2, pos2};
 pub enum Icon {
     Check,
     ChevronDown,
+    ChevronRight,
+    Copy,
+    Crosshair,
+    Diff,
     FilePlus,
     FolderOpen,
     FolderPlus,
     FolderSearch,
     Layers,
+    ListTree,
     Lock,
     Logs,
+    Plus,
     RefreshCcw,
     RefreshCwOff,
     ScanSearch,
@@ -27,6 +33,7 @@ pub enum Icon {
     TextAlignJustify,
     Toolbox,
     Trash,
+    Undo2,
 }
 
 impl Icon {
@@ -35,6 +42,14 @@ impl Icon {
         match self {
             Self::Check => r#"<path d="M20 6 9 17l-5-5" />"#,
             Self::ChevronDown => r#"<path d="m6 9 6 6 6-6" />"#,
+            Self::ChevronRight => r#"<path d="m9 18 6-6-6-6" />"#,
+            Self::Copy => {
+                r#"<rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />"#
+            }
+            Self::Crosshair => {
+                r#"<circle cx="12" cy="12" r="10" /> <path d="M22 12h-4" /> <path d="M6 12H2" /> <path d="M12 6V2" /> <path d="M12 22v-4" />"#
+            }
+            Self::Diff => r#"<path d="M12 3v14" /> <path d="M5 10h14" /> <path d="M5 21h14" />"#,
             Self::FilePlus => {
                 r#"<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /> <path d="M14 2v4a2 2 0 0 0 2 2h4" /> <path d="M9 15h6" /> <path d="M12 18v-6" />"#
             }
@@ -50,12 +65,16 @@ impl Icon {
             Self::Layers => {
                 r#"<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />"#
             }
+            Self::ListTree => {
+                r#"<path d="M21 12h-8" /> <path d="M21 6H8" /> <path d="M21 18h-8" /> <path d="M3 6v4c0 1.1.9 2 2 2h3" /> <path d="M3 10v6c0 1.1.9 2 2 2h3" />"#
+            }
             Self::Lock => {
                 r#"<rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" />"#
             }
             Self::Logs => {
                 r#"<path d="M3 5h1" /> <path d="M3 12h1" /> <path d="M3 19h1" /> <path d="M8 5h1" /> <path d="M8 12h1" /> <path d="M8 19h1" /> <path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" />"#
             }
+            Self::Plus => r#"<path d="M5 12h14" /> <path d="M12 5v14" />"#,
             Self::RefreshCcw => {
                 r#"<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /> <path d="M16 16h5v5" />"#
             }
@@ -69,6 +88,9 @@ impl Icon {
             Self::TextAlignJustify => r#"<path d="M3 5h18" /> <path d="M3 12h18" /> <path d="M3 19h18" />"#,
             Self::Trash => {
                 r#"<path d="M3 6h18" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />"#
+            }
+            Self::Undo2 => {
+                r#"<path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />"#
             }
             Self::Toolbox => {
                 r#"<path d="M16 12v4" /> <path d="M16 6a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 22 12v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 .586-1.414l4-4A2 2 0 0 1 8 6z" /> <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /> <path d="M2 14h20" /> <path d="M8 12v4" />"#

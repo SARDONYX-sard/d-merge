@@ -32,6 +32,9 @@ mod span;
 
 pub use self::span::{LineSpan, Span};
 
+/// How a null `hkStringPtr` is written. An empty string is not this: it is nothing written.
+const NULL_STR: &str = "\u{2400}";
+
 /// Splits a document into lines the same way every feature does.
 ///
 /// `\r` is stripped so that CRLF documents produce the same columns as LF ones.

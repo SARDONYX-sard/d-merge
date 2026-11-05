@@ -1,38 +1,63 @@
-//! The left panel: the object list (a tree or a flat list), its buttons and the class picker.
+//! The side bar below the behaviors: the objects of the active one.
+//!
+//! ```text
+//! [Objects] [Events / Variables] [Search]  [+] [⧉] [↶]    <- new, duplicate, revert or delete
+//! [filter......................]     [Δ] [≡]        <- only changed, tree or flat list
+//! (the tree or the list)
+//! ```
+//! A window has the class list: nothing moves in the side bar when it is opened.
 
-use egui_widgets::shadcn::{Button, Checkbox, TextEdit};
+use egui_widgets::shadcn::{Button, Icon, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
 
-use crate::patch::{PatchTool, tree::Graph};
+use super::{
+    anim_data::NewClipsForm,
+    anim_tree::{self, AnimFile, AnimRow, FileKind},
+    behaviors::quick_pick_window,
+};
+use crate::patch::{
+    PatchTool,
+    tree::{Graph, Node, TreeState},
+};
 
 impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let asdsf = self.workspace.behaviors[self.active].asdsf;
-        if !asdsf {
-            self.list_tabs(ui, i18n);
+        let asdsf = self.workspace.behaviors[self.active].is_anim_data();
+        // `Ctrl+Shift+F`, as in VS Code.
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::F)) {
+            self.show_search = true;
+            self.focus_search = true;
         }
-        ui.add(
-            TextEdit::singleline(&mut self.filter)
-                .hint_text(i18n.t(I18nKey::NemesisFilterHint))
-                .desired_width(ui.available_width()),
-        );
+        ui.horizontal(|ui| {
+            self.list_tabs(ui, i18n, asdsf);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if (!self.show_vars || asdsf) && !self.show_search {
+                    self.object_buttons(ui, i18n, asdsf);
+                }
+            });
+        });
+        if self.show_search {
+            self.search_panel(ui, i18n);
+            return;
+        }
+        ui.horizontal(|ui| {
+            // Right to left: the toggles take their width first, the filter gets the rest.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if !self.show_vars || asdsf {
+                    self.list_toggles(ui, i18n, asdsf);
+                }
+                ui.add(
+                    TextEdit::singleline(&mut self.filter)
+                        .hint_text(i18n.t(I18nKey::NemesisFilterHint))
+                        .desired_width(ui.available_width()),
+                );
+            });
+        });
         if self.show_vars && !asdsf {
             self.vars_panel(ui, i18n);
             return;
         }
-        ui.horizontal(|ui| {
-            ui.add(Checkbox::new(&mut self.changed_only, i18n.t(I18nKey::NemesisChangedOnly)));
-            if !asdsf {
-                ui.add(Checkbox::new(&mut self.tree_view, i18n.t(I18nKey::NemesisTreeView)))
-                    .on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover));
-            }
-        });
-        self.object_buttons(ui, i18n, asdsf);
-        if self.class_picker {
-            self.class_picker_ui(ui, i18n);
-        }
-        ui.separator();
 
         // Clicking any text field takes the keyboard out of the tree.
         if ui.memory(|m| m.focused().is_some()) {
@@ -40,72 +65,191 @@ impl PatchTool {
         }
         let names = self.names();
         // A tree from the root container, unless filtering: a filter wants the flat list.
-        if self.tree_view && self.filter.is_empty() && !asdsf {
+        if asdsf {
+            self.anim_tree_panel(ui, i18n, &names.graph);
+        } else if self.tree_view && self.filter.is_empty() {
             self.tree_panel(ui, i18n, &names.graph);
         } else {
             self.flat_list(ui, i18n, &names.graph);
         }
     }
 
-    /// `[Objects] [Events / Variables]`
-    fn list_tabs(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        ui.horizontal(|ui| {
-            for (vars, label) in [(false, I18nKey::NemesisObjectsTab), (true, I18nKey::NemesisVarsTab)] {
-                if ui.add(Button::selectable(self.show_vars == vars, i18n.t(label))).clicked() {
-                    self.show_vars = vars;
-                }
-            }
-        });
+    /// `[Objects] [Events / Variables] [Search]`. Anim data has no events or variables.
+    fn list_tabs(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
+        let objects = !self.show_vars && !self.show_search;
+        if ui.add(Button::selectable(objects, i18n.t(I18nKey::NemesisObjectsTab)).small()).clicked() {
+            self.show_vars = false;
+            self.show_search = false;
+        }
+        if !asdsf
+            && ui
+                .add(Button::selectable(self.show_vars && !self.show_search, i18n.t(I18nKey::NemesisVarsTab)).small())
+                .clicked()
+        {
+            self.show_vars = true;
+            self.show_search = false;
+        }
+        if ui.add(Button::selectable(self.show_search, i18n.t(I18nKey::NemesisSearchTab)).small()).clicked() {
+            self.show_search = true;
+            self.focus_search = true;
+        }
     }
 
-    /// `[New] [Duplicate] [Revert]`. A new object is deleted, a template object goes back to the
-    /// template. Anim sets (`asdsf`) can only be edited, not added.
+    /// `[Δ] [≡]`: only what changed, a tree or a flat list.
+    fn list_toggles(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
+        if !asdsf {
+            let tree = Button::selectable(self.tree_view, "").icon(Icon::ListTree).small();
+            if ui.add(tree).on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover)).clicked() {
+                self.tree_view = !self.tree_view;
+            }
+        }
+        let changed = Button::selectable(self.changed_only, "").icon(Icon::Diff).small();
+        if ui.add(changed).on_hover_text(i18n.t(I18nKey::NemesisChangedOnly)).clicked() {
+            self.changed_only = !self.changed_only;
+        }
+    }
+
+    /// `[+] [⧉] [↶]`, drawn right to left. A new object is deleted, a template object goes back to
+    /// the template. Anim sets can only be edited, not added; clip data adds clips ([`NewClipsForm`]).
     fn object_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
-        ui.horizontal(|ui| {
-            let code_ok = is_valid_mod_code(self.mod_code.trim()) && !asdsf;
-            if ui
-                .add_enabled(code_ok, Button::new(i18n.t(I18nKey::NemesisNewObject)).small())
-                .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
-                .clicked()
-            {
-                self.class_picker = !self.class_picker; // pick the class below
-            }
-            let selected = self.selected.clone();
-            if ui
-                .add_enabled(code_ok && selected.is_some(), Button::new(i18n.t(I18nKey::NemesisDuplicate)).small())
-                .clicked()
-            {
-                self.new_object(selected.as_deref());
-            }
-            let is_new =
-                selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(id));
-            let (label, hover) = if is_new {
-                (I18nKey::NemesisDeleteObject, I18nKey::NemesisDeleteObjectHover)
+        let code_ok = is_valid_mod_code(self.mod_code.trim()) && !asdsf;
+        let selected = self.selected.clone();
+        let is_new = selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(id));
+        let (icon, hover) = if is_new {
+            (Icon::Trash, I18nKey::NemesisDeleteObjectHover)
+        } else {
+            (Icon::Undo2, I18nKey::NemesisRevertHover)
+        };
+        if ui
+            .add_enabled(selected.is_some(), Button::new("").icon(icon).small().destructive())
+            .on_hover_text(i18n.t(hover))
+            .clicked()
+            && let Some(id) = &selected
+        {
+            self.revert_or_delete(id);
+        }
+        if ui
+            .add_enabled(code_ok && selected.is_some(), Button::new("").icon(Icon::Copy).small())
+            .on_hover_text(i18n.t(I18nKey::NemesisDuplicate))
+            .clicked()
+        {
+            self.new_object(selected.as_deref());
+        }
+        let adsf = self.workspace.behaviors[self.active].adsf;
+        let hover = if adsf { I18nKey::NemesisNewClipsHover } else { I18nKey::NemesisNewObject };
+        if ui
+            .add_enabled(
+                code_ok || (adsf && is_valid_mod_code(self.mod_code.trim())),
+                Button::new("").icon(Icon::Plus).small(),
+            )
+            .on_hover_text(i18n.t(hover))
+            .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
+            .clicked()
+        {
+            if adsf {
+                self.new_clips = Some(NewClipsForm::new(selected.as_deref()));
             } else {
-                (I18nKey::NemesisRevert, I18nKey::NemesisRevertHover)
-            };
-            if ui
-                .add_enabled(selected.is_some(), Button::new(i18n.t(label)).small().destructive())
-                .on_hover_text(i18n.t(hover))
-                .clicked()
-                && let Some(id) = selected
-            {
-                self.revert_or_delete(&id);
+                self.class_picker = true;
+                self.focus_quick_pick = true;
             }
-        });
+        }
     }
 
     /// The tree, and its keys while it has the keyboard.
     fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
+        let path = &self.workspace.behaviors[self.active].meshes_path;
+        if !self.trees.contains_key(path) {
+            self.trees.insert(path.clone(), TreeState::default());
+        }
+        let Some(tree) = self.trees.get_mut(path) else { return };
         if self.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = super::tree::read_keys(ui, &mut self.tree.leader);
-            if self.tree.apply_inputs(&inputs, graph, &mut self.selected, self.changed_only) {
+            let inputs = super::tree::read_keys(ui, &mut tree.leader);
+            if tree.apply_inputs(&inputs, graph, &mut self.selected, self.changed_only) {
                 self.leave_tree();
+                return;
             }
         }
         let flags = (self.changed_only, self.tree_focus);
-        super::tree::tree_ui(ui, graph, &mut self.selected, &mut self.tree, flags, i18n);
+        if let Some(id) = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n) {
+            self.keep_open(id);
+        }
+    }
+
+    /// The anim data files after the filter: the rows of [`anim_tree::rows`].
+    fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
+        self.refresh_list(graph);
+        if self.tree_focus {
+            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            self.list_keys(ui, graph);
+        }
+        let is_adsf = self.workspace.behaviors[self.active].adsf;
+        // Only when the selection changes: after that, what is open is the user's.
+        if self.anim_revealed != self.selected {
+            self.anim_revealed.clone_from(&self.selected);
+            if let Some(id) = &self.selected {
+                anim_tree::reveal(&mut self.anim_folders_open, is_adsf, id);
+            }
+        }
+        let nodes = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+        let files: Vec<AnimFile<'_>> =
+            nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect();
+        let rows = anim_tree::rows(&files, &self.anim_folders_open, is_adsf, !self.filter.is_empty());
+
+        let (mut toggled, mut menu_action) = (None, None);
+        let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
+        egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
+            for row in &rows[range] {
+                match row {
+                    AnimRow::Folder { name, files, changed, open } => {
+                        if anim_group_row(ui, name, (*files, *changed, *open), 0).clicked() {
+                            toggled = Some((*name).to_owned());
+                        }
+                    }
+                    AnimRow::Group { kind, key, files, changed, open } => {
+                        let label = i18n.t(anim_kind_label(*kind));
+                        if anim_group_row(ui, label, (*files, *changed, *open), 1).clicked() {
+                            toggled = Some(key.clone());
+                        }
+                    }
+                    AnimRow::File { node, name } => {
+                        menu_action = self.anim_file_row(ui, i18n, graph, *node, name).or(menu_action);
+                    }
+                }
+            }
+        });
+        if let Some(key) = toggled {
+            anim_tree::toggle(&mut self.anim_folders_open, &key);
+        }
+        self.apply_row_action(ui, graph, menu_action);
+    }
+
+    /// `    ● Idle~mymod$0.txt`
+    fn anim_file_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        graph: &Graph,
+        node: Node,
+        name: &str,
+    ) -> Option<(Node, RowAction)> {
+        let mut action = None;
+        let is_selected = self.selected.as_deref() == Some(graph.id(node));
+        let marker = if graph.is_changed(node) { "● " } else { "" };
+        let text = egui::RichText::new(format!("    {marker}{name}")).monospace();
+        let response = ui.add(egui::Button::selectable(is_selected, text));
+        if response.clicked() {
+            graph.id(node).clone_into(self.selected.get_or_insert_default());
+        }
+        if response.double_clicked() {
+            action = Some((node, RowAction::KeepOpen));
+        }
+        response.context_menu(|ui| {
+            if let Some(picked) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
+                action = Some((node, picked));
+            }
+        });
+        action
     }
 
     /// The flat list after the filter (only the rows on screen are laid out).
@@ -127,6 +271,9 @@ impl PatchTool {
                 if response.clicked() {
                     id.clone_into(self.selected.get_or_insert_default());
                 }
+                if response.double_clicked() {
+                    menu_action = Some((node, RowAction::KeepOpen));
+                }
                 response.context_menu(|ui| {
                     if let Some(action) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
                         menu_action = Some((node, action));
@@ -134,24 +281,43 @@ impl PatchTool {
                 });
             }
         });
-        if let Some((node, action)) = menu_action {
-            let id = graph.id(node);
-            match action {
-                RowAction::Duplicate => self.new_object(Some(id)),
-                RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
-                RowAction::RevertOrDelete => self.revert_or_delete(id),
-            }
+        self.apply_row_action(ui, graph, menu_action);
+    }
+
+    fn apply_row_action(&mut self, ui: &egui::Ui, graph: &Graph, action: Option<(Node, RowAction)>) {
+        let Some((node, action)) = action else { return };
+        let id = graph.id(node);
+        match action {
+            RowAction::KeepOpen => self.keep_open(id),
+            RowAction::Duplicate => self.new_object(Some(id)),
+            RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
+            RowAction::RevertOrDelete => self.revert_or_delete(id),
         }
+    }
+
+    /// The window of [`Self::class_picker_ui`].
+    pub(in crate::patch) fn class_picker_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
+        if !self.class_picker {
+            return;
+        }
+        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject))
+            .open(&mut open)
+            .show(ctx, |ui| self.class_picker_ui(ui, i18n));
+        self.class_picker &= open; // a picked class has turned it off already
     }
 
     /// `[class filter]` + the class table's classes (the template's own first); a click adds a
     /// new object of that class with every field at its default.
     fn class_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        ui.add(
+        let field = ui.add(
             TextEdit::singleline(&mut self.class_filter)
                 .hint_text(i18n.t(I18nKey::NemesisClassFilterHint))
                 .desired_width(ui.available_width()),
         );
+        if std::mem::take(&mut self.focus_quick_pick) {
+            field.request_focus();
+        }
         let behavior = &self.workspace.behaviors[self.active];
         let filter = self.class_filter.to_lowercase();
         let used = |class: &str| behavior.object_of_class(class).is_some();
@@ -161,7 +327,7 @@ impl PatchTool {
 
         let mut picked = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
-        egui::ScrollArea::vertical().id_salt("nemesis_class_picker").max_height(200.0).show_rows(
+        egui::ScrollArea::vertical().id_salt("nemesis_class_picker").max_height(420.0).show_rows(
             ui,
             row_height,
             classes.len(),
@@ -186,16 +352,44 @@ impl PatchTool {
     }
 }
 
+/// A folder or a group of the anim data list: `▼ Clips (3) ●`. `(files, changed, open)`.
+fn anim_group_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    (files, changed, open): (usize, bool, bool),
+    depth: usize,
+) -> egui::Response {
+    let glyph = if open { "▼" } else { "▶" };
+    let marker = if changed { " ●" } else { "" };
+    let indent = "  ".repeat(depth);
+    ui.add(egui::Button::selectable(
+        false,
+        egui::RichText::new(format!("{indent}{glyph} {label} ({files}){marker}")).monospace(),
+    ))
+}
+
+const fn anim_kind_label(kind: FileKind) -> I18nKey {
+    match kind {
+        FileKind::Header => I18nKey::NemesisAnimKindHeader,
+        FileKind::Clip => I18nKey::NemesisAnimKindClip,
+        FileKind::Motion => I18nKey::NemesisAnimKindMotion,
+        FileKind::Set => I18nKey::NemesisAnimKindSet,
+        FileKind::NewSet => I18nKey::NemesisAnimKindNewSet,
+    }
+}
+
 /// What a row's right-click menu asked for.
 #[derive(Debug, Clone, Copy)]
 enum RowAction {
+    KeepOpen,
     Duplicate,
     CopyId,
     RevertOrDelete,
 }
 
-/// `Duplicate / Copy id / Revert (or Delete for a new object)`.
+/// `Keep Open / Duplicate / Copy id / Revert (or Delete for a new object)`.
 fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
+    let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
     let duplicate = ui.button(i18n.t(I18nKey::NemesisDuplicate)).clicked();
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
     let revert = changed && {
@@ -203,7 +397,12 @@ fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> O
         let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::NemesisRevert };
         ui.add(Button::new(i18n.t(label)).destructive()).clicked()
     };
-    [(duplicate, RowAction::Duplicate), (copy, RowAction::CopyId), (revert, RowAction::RevertOrDelete)]
-        .into_iter()
-        .find_map(|(clicked, action)| clicked.then_some(action))
+    [
+        (keep_open, RowAction::KeepOpen),
+        (duplicate, RowAction::Duplicate),
+        (copy, RowAction::CopyId),
+        (revert, RowAction::RevertOrDelete),
+    ]
+    .into_iter()
+    .find_map(|(clicked, action)| clicked.then_some(action))
 }

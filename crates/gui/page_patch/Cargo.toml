@@ -18,10 +18,12 @@ egui_dnd = { workspace = true }
 egui_extras = { workspace = true }
 parking_lot = { workspace = true }
 rayon = { workspace = true }
+sonic-rs = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
 # workspace members
+fast_hash = { workspace = true }
 behavior_merge = { workspace = true, features = ["tracing"] }
 egui_widgets = { workspace = true }
 gui_shared = { workspace = true }

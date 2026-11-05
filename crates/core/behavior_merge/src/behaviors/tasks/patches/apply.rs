@@ -113,6 +113,25 @@ fn apply_to_one_template<'a, 'b: 'a>(
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Writes the patches of every template, without applying any. See `DebugOptions::patch_json_only`.
+pub(crate) fn write_all_debug_json_patches(patches: &BehaviorPatchesMap<'_>, config: &Config) {
+    patches.0.par_iter().for_each(|entry| {
+        if let Err(_err) = write_debug_json_patch(&config.output_dir, entry.key(), entry.value()) {
+            #[cfg(feature = "tracing")]
+            tracing::error!("{_err}");
+        }
+    });
+}
+
+/// What `<template>.patch.json` holds. `overridden`: what lost at each path of `one`, which the merge
+/// does not use, and a conflict check does.
+#[derive(serde::Serialize)]
+struct DebugPatchJson<'p, 'a> {
+    one: &'p behavior_merge_types::patches::OnePatchMap<'a>,
+    seq: &'p behavior_merge_types::patches::SeqPatchMap<'a>,
+    overridden: &'p behavior_merge_types::patches::SeqPatchMap<'a>,
+}
+
 fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPatchMaps) -> Result<(), Error> {
     use snafu::ResultExt as _;
 
@@ -125,8 +144,9 @@ fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPat
         std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
     }
 
-    let json =
-        sonic_rs::to_string_pretty(patches).with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
+    let patches = DebugPatchJson { one: &patches.one, seq: &patches.seq, overridden: &patches.one.overridden };
+    let json = sonic_rs::to_string_pretty(&patches)
+        .with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
 
     Ok(())

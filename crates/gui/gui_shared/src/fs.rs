@@ -58,3 +58,21 @@ where
     let abs_dir = find_existing_dir_or_ancestor(dir)?;
     open::that_detached(abs_dir).map_err(|e| format!("Failed to open directory ({}): {e}", dir.display()))
 }
+
+/// [`open_existing_dir_or_ancestor`] for a path as text.
+///
+/// # Errors
+/// Neither the directory nor an ancestor could be opened.
+pub fn open_dir_of(path: &str) -> Result<(), String> {
+    open_existing_dir_or_ancestor(path)
+}
+
+/// The folder dialog, starting from `current` or else what exists of it. `None`: cancelled.
+pub fn pick_folder_from(current: &str) -> Option<std::path::PathBuf> {
+    let dialog = crate::rfd::FileDialog::new();
+    let dialog = match find_existing_dir_or_ancestor(current) {
+        Ok(start) => dialog.set_directory(start),
+        Err(_) => dialog,
+    };
+    dialog.pick_folder()
+}

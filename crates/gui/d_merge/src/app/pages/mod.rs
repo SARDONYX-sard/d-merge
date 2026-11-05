@@ -28,6 +28,11 @@ impl App {
             show_log_window: &self.show_log_window,
         };
         self.patch.ui(ui, ctx);
+        // A conflict's value to keep: on to the user patch.
+        if let Some(request) = self.patch.take_resolve() {
+            self.patch_editor.open_resolution(request);
+            self.pending_page = Some(gui_shared::settings::ui::Page::PatchEditor);
+        }
     }
 
     pub(crate) fn ui_convert_page(&mut self, ui: &mut egui::Ui) {
@@ -58,6 +63,7 @@ impl App {
             i18n: &self.i18n,
             notify: &mut self.notify,
             template_dir: &self.settings.pages.patch.behavior.template_dir,
+            parser_mode: self.settings.pages.patch.behavior.parser_mode,
             settings: &mut self.settings.pages.patch_editor,
             editor: &mut self.settings.ui.lsp,
         };

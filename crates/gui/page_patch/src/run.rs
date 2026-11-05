@@ -44,23 +44,64 @@ impl PatchRun {
         if settings.behavior.auto_remove_meshes {
             remove_meshes_dir_all(settings, notify, i18n);
         }
+        let enable_debug_output = settings.behavior.enable_debug_output;
+        self.spawn(
+            ctx,
+            settings,
+            runtime,
+            behavior_merge::DebugOptions {
+                output_patch_json: enable_debug_output,
+                output_merged_json: enable_debug_output,
+                output_merged_xml: enable_debug_output,
+                patch_json_only: false,
+            },
+        );
+    }
 
+    /// Runs the merge only up to writing what each mod changes, for the conflict check.
+    /// The old files go first: a mod that is off now must not be read from them.
+    pub(crate) fn start_patch_json(
+        &mut self,
+        ctx: &egui::Context,
+        settings: &PatchSettings,
+        runtime: &tokio::runtime::Runtime,
+    ) {
+        self.started = Some(std::time::Instant::now());
+        self.progress.clear();
+        let _no_old_files = std::fs::remove_dir_all(crate::conflicts::debug_patches_dir(settings.current_output_dir()));
+        self.spawn(
+            ctx,
+            settings,
+            runtime,
+            behavior_merge::DebugOptions {
+                output_patch_json: true,
+                output_merged_json: false,
+                output_merged_xml: false,
+                patch_json_only: true,
+            },
+        );
+    }
+
+    /// Whether a merge is running.
+    pub(crate) const fn is_running(&self) -> bool {
+        self.started.is_some()
+    }
+
+    fn spawn(
+        &self,
+        ctx: &egui::Context,
+        settings: &PatchSettings,
+        runtime: &tokio::runtime::Runtime,
+        debug: behavior_merge::DebugOptions,
+    ) {
         let (skyrim_data_dir, is_vfs, mod_list) = match settings.behavior.mode {
             DataMode::Vfs => (&settings.vfs.skyrim_data_dir, true, &settings.vfs.mod_list),
             DataMode::Manual => (&settings.manual.skyrim_data_dir, false, &settings.manual.mod_list),
         };
         let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
 
-        let BehaviorSettings {
-            target_runtime,
-            enable_debug_output,
-            generate_fnis_esp,
-            skeleton_arm_fix,
-            template_dir,
-            parser_mode,
-            ..
-        } = &settings.behavior;
-        let enable_debug_output = *enable_debug_output;
+        let BehaviorSettings { target_runtime, generate_fnis_esp, skeleton_arm_fix, template_dir, parser_mode, .. } =
+            &settings.behavior;
         let output_target = match target_runtime {
             Runtime::Le | Runtime::Enderal => behavior_merge::OutPutTarget::SkyrimLe,
             Runtime::Se | Runtime::EnderalSe | Runtime::Vr => behavior_merge::OutPutTarget::SkyrimSe,
@@ -74,11 +115,7 @@ impl PatchRun {
             status_report: Some(Box::new(move |status| progress.apply(status, &ctx))),
             parser_mode: to_nemesis_parser_mode(*parser_mode),
             hack_options: Some(behavior_merge::HackOptions::enable_all()),
-            debug: behavior_merge::DebugOptions {
-                output_patch_json: enable_debug_output,
-                output_merged_json: enable_debug_output,
-                output_merged_xml: enable_debug_output,
-            },
+            debug,
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
             skeleton_arm_fix: *skeleton_arm_fix,
@@ -88,9 +125,9 @@ impl PatchRun {
     }
 
     /// Shows the progress in the notification bar. Call once per frame.
-    /// With no merge running, it only checks an `Option`.
-    pub(crate) fn poll(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(started) = self.started else { return };
+    /// With no merge running, it only checks an `Option`. Returns whether a merge just ended.
+    pub(crate) fn poll(&mut self, notify: &mut Notification, i18n: &I18nMap) -> bool {
+        let Some(started) = self.started else { return false };
 
         let text = self.progress.text(i18n, started);
         if !text.is_empty() {
@@ -99,7 +136,9 @@ impl PatchRun {
         if matches!(self.progress.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
             self.progress.phase.store(phase::IDLE, Ordering::Relaxed);
             self.started = None;
+            return true;
         }
+        false
     }
 }
 
@@ -199,6 +238,17 @@ const fn to_nemesis_parser_mode(mode: ParserMode) -> behavior_merge::ParserMode 
     match mode {
         ParserMode::Strict => behavior_merge::ParserMode::Strict,
         ParserMode::Lenient => behavior_merge::ParserMode::Lenient,
+    }
+}
+
+/// The directory `behavior_merge` reads a mod's patches from. `None`: FNIS, generated from elsewhere.
+pub(crate) fn dir_of_mod(skyrim_data_dir: &str, is_vfs: bool, item: &ModItem) -> Option<String> {
+    let id = &item.id;
+    match item.mod_type {
+        ModType::Nemesis if is_vfs => Some(format!("{skyrim_data_dir}/Nemesis_Engine/mod/{id}")),
+        ModType::NemesisExt if is_vfs => Some(format!("{skyrim_data_dir}/Nemesis_EngineExt/mod/{id}")),
+        ModType::Nemesis | ModType::NemesisExt => Some(id.clone()),
+        ModType::Fnis => None,
     }
 }
 

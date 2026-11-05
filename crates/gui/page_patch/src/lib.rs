@@ -11,9 +11,10 @@
 //!
 //! # Layout of this crate
 //! - logic, testable without egui: [`fetch`] (read the mod list in the background), [`run`] (run
-//!   the merge), [`visible_mods`] (filter, sort, range selection)
+//!   the merge), [`visible_mods`] (filter, sort, range selection), [`conflicts`] (`+` and `-`)
 //! - drawing: [`ui`]
 
+mod conflicts;
 mod fetch;
 mod run;
 mod ui;
@@ -24,10 +25,12 @@ use std::sync::atomic::AtomicBool;
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
+    patch::{ResolveRequest, USER_PATCH_CODE},
     settings::{DataMode, LogSettings, pages::patch::PatchSettings},
 };
 
 use self::{
+    conflicts::{ConflictScan, ScannedMod},
     fetch::{FetchEvent, ModListFetch},
     run::PatchRun,
     visible_mods::VisibleMods,
@@ -76,6 +79,9 @@ pub struct PatchPage {
     list_message: Notification,
     /// The page was not drawn yet: reads the mod list and finds the Skyrim directory.
     first_frame: bool,
+    conflicts: ConflictScan,
+    /// A conflict's value to keep, for the Patch Editor. See [`Self::take_resolve`].
+    resolve: Option<ResolveRequest>,
 }
 
 impl Default for PatchPage {
@@ -89,6 +95,8 @@ impl Default for PatchPage {
             prev_table_width: 0.0,
             list_message: Notification::default(),
             first_frame: true,
+            conflicts: ConflictScan::default(),
+            resolve: None,
         }
     }
 }
@@ -99,7 +107,37 @@ impl PatchPage {
         if let Some(event) = self.fetch.poll() {
             self.on_fetch_event(event, egui_ctx, ctx.settings, ctx.i18n, ctx.notify, ctx.runtime);
         }
-        self.run.poll(ctx.notify, ctx.i18n);
+        if self.run.poll(ctx.notify, ctx.i18n) {
+            self.conflicts.on_merge_ended();
+        }
+        self.conflicts.poll();
+    }
+
+    /// What the user wants to keep from a conflict: the app gives it to the Patch Editor.
+    pub const fn take_resolve(&mut self) -> Option<ResolveRequest> {
+        self.resolve.take()
+    }
+
+    /// Lets the merge write what each mod changes, then reads that. See [`conflicts`].
+    fn scan_conflicts(
+        &mut self,
+        egui_ctx: &egui::Context,
+        settings: &PatchSettings,
+        runtime: &tokio::runtime::Runtime,
+    ) {
+        if self.run.is_running() || self.conflicts.is_scanning() {
+            return;
+        }
+        let is_vfs = settings.behavior.mode == DataMode::Vfs;
+        let data_dir = settings.current_skyrim_data_dir();
+        let mods = settings.mod_list().iter().filter(|item| item.enabled).map(|item| ScannedMod {
+            id: item.id.clone(),
+            name: item.name.clone(),
+            priority: item.priority,
+            dir: run::dir_of_mod(data_dir, is_vfs, item),
+        });
+        self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods.collect());
+        self.run.start_patch_json(egui_ctx, settings, runtime);
     }
 
     /// Reads the mod list of the current mode in the background.
@@ -122,6 +160,12 @@ impl PatchPage {
             FetchEvent::Fetched { mods, elapsed } => {
                 let new_mods =
                     gui_shared::settings::pages::patch::mod_item::inherit_reorder_cast(settings.mod_list(), mods);
+                let mut new_mods = new_mods;
+                gui_shared::settings::pages::patch::mod_item::place_new_user_patch(
+                    settings.mod_list(),
+                    &mut new_mods,
+                    USER_PATCH_CODE,
+                );
                 self.check_all = new_mods.iter().all(|m| m.enabled);
                 *settings.mod_list_mut() = new_mods;
                 self.visible.invalidate();

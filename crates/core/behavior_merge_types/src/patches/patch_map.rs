@@ -62,6 +62,9 @@ pub struct OnePatchMap<'a> {
     /// If multiple patches target the same path, only the patch with the
     /// highest priority is retained.
     patches: DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState>,
+
+    /// The patches that lost at each JSON path. Not applied: they tell which mods conflict.
+    pub overridden: SeqPatchMap<'a>,
 }
 
 impl<'a> OnePatchMap<'a> {
@@ -78,16 +81,19 @@ impl<'a> OnePatchMap<'a> {
     pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         // Same-path conflict.
         if let Some(mut existing) = self.patches.get_mut(&key) {
-            if new_value.priority > existing.priority {
+            let loser = if new_value.priority > existing.priority {
                 tracing::info!(
                     "Conflict Path {key:?}: priority {} -> {} (overwritten)",
                     new_value.priority,
                     existing.priority,
                 );
 
-                *existing = new_value;
-            }
-
+                std::mem::replace(&mut *existing, new_value)
+            } else {
+                new_value
+            };
+            drop(existing);
+            self.overridden.insert(key, loser);
             return;
         }
         self.patches.insert(key, new_value);
@@ -99,16 +105,22 @@ impl<'a> OnePatchMap<'a> {
         for (path, new_val) in other.patches {
             match self.patches.entry(path) {
                 dashmap::Entry::Occupied(mut occ) => {
+                    let path = occ.key().clone();
                     let existing = occ.get_mut();
-                    if new_val.priority > existing.priority {
-                        *existing = new_val;
-                    }
+                    let loser = if new_val.priority > existing.priority {
+                        std::mem::replace(existing, new_val)
+                    } else {
+                        new_val
+                    };
+                    drop(occ);
+                    self.overridden.insert(path, loser);
                 }
                 dashmap::Entry::Vacant(v) => {
                     v.insert(new_val);
                 }
             }
         }
+        self.overridden.merge(other.overridden);
     }
 
     /// Inserts patches in parallel without conflict resolution.
@@ -240,7 +252,7 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
                     let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     patches.insert(json_path, value);
                 }
-                Ok(OnePatchMap { patches })
+                Ok(OnePatchMap { patches, overridden: SeqPatchMap::default() })
             }
         }
 
@@ -311,6 +323,25 @@ mod tests {
             },
             priority,
         }
+    }
+
+    #[test]
+    fn the_highest_priority_is_kept_and_the_losers_are_remembered() {
+        let map = OnePatchMap::default();
+        let path = json_patch::json_path!["#1", "C", "a"];
+        map.insert(path.clone(), value(5));
+        map.insert(path.clone(), value(9)); // takes over
+        map.insert(path.clone(), value(1)); // too low
+
+        assert_eq!(map.patches.get(&path).unwrap().priority, 9);
+        let losers: Vec<usize> = map.overridden.0.get(&path).unwrap().iter().map(|v| v.priority).collect();
+        assert_eq!(losers, [5, 1]);
+
+        let other = OnePatchMap::default();
+        other.insert(path.clone(), value(20));
+        map.merge(other);
+        assert_eq!(map.patches.get(&path).unwrap().priority, 20);
+        assert!(map.overridden.0.get(&path).unwrap().iter().any(|v| v.priority == 9));
     }
 
     #[test]

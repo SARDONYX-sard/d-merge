@@ -123,21 +123,18 @@ pub struct HackOptions {
     /// - Substitutes `event` with `contactEvent`
     /// - Substitutes `anotherBoneIndex` with `bones`
     pub cast_ragdoll_event: bool,
-    /// Handle `hkbBoneWeightArray.boneWeights` patches where the MOD_CODE comment
-    /// appears *outside* the closing `</hkparam>` tag instead of inside it.
+    /// Handle pushes to an empty array where the `MOD_CODE` comment appears *after* its one-line
+    /// `<hkparam name=".." numelements="0"></hkparam>`, closed again by a `</hkparam>` nothing opened.
     ///
-    /// Such patches contain a raw space-separated float list between MOD_CODE and CLOSE
-    /// at the class field level, which is structurally invalid in normal Nemesis XML.
-    ///
-    /// For `Precision Creatures` patch.
-    pub bone_weight_outside_hkparam: bool,
+    /// e.g. `hkbBoneWeightArray.boneWeights` of `Precision Creatures`.
+    pub empty_array_outside_hkparam: bool,
 }
 
 impl HackOptions {
     /// Enable all hack options.
     #[inline]
     pub const fn enable_all() -> Self {
-        Self { cast_ragdoll_event: true, bone_weight_outside_hkparam: true }
+        Self { cast_ragdoll_event: true, empty_array_outside_hkparam: true }
     }
 }
 
@@ -146,7 +143,7 @@ impl From<HackOptions> for nemesis_xml::hack::HackOptions {
     fn from(value: HackOptions) -> Self {
         Self {
             cast_ragdoll_event: value.cast_ragdoll_event,
-            bone_weight_outside_hkparam: value.bone_weight_outside_hkparam,
+            empty_array_outside_hkparam: value.empty_array_outside_hkparam,
         }
     }
 }
@@ -174,12 +171,17 @@ pub struct DebugOptions {
     /// This is the final XML representation of the patched and merged data,
     /// just before conversion to the binary `.hkx` format.
     pub output_merged_xml: bool,
+
+    /// Stop after writing the patches of [`Self::output_patch_json`]: nothing is merged or generated.
+    ///
+    /// Those files say what every mod changes, which is all a conflict check needs.
+    pub patch_json_only: bool,
 }
 
 impl Default for DebugOptions {
     #[inline]
     fn default() -> Self {
-        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: false }
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: false, patch_json_only: false }
     }
 }
 
@@ -187,7 +189,7 @@ impl DebugOptions {
     /// Enable all debug options.
     #[inline]
     pub const fn enable_all() -> Self {
-        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: true }
+        Self { output_patch_json: true, output_merged_json: true, output_merged_xml: true, patch_json_only: false }
     }
 }
 

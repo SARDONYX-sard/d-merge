@@ -17,6 +17,7 @@ imara-diff = { workspace = true }
 
 # workspace members
 fast_hash = { workspace = true }
+json_patch = { workspace = true }
 nemesis_xml = { workspace = true }
 
 [lints]

@@ -10,6 +10,7 @@
 //! "0.1 "             context = "0.1 "       -> event names (animmotion, SCAR_ActionData, ...)
 //! "0.1 SCAR_ActionData{\"Mi"                -> JSON keys (MinDistance, ...); after `:` values
 //! ""                 context = ""           -> <time>, trackName:, # numAnnotations:
+//! "trackName: "      context = "trackName: " -> <name>, ␀ (the null pointer)
 //! ```
 
 use std::borrow::Cow;
@@ -17,7 +18,7 @@ use std::borrow::Cow;
 use super::byte_offset;
 use crate::{
     Span,
-    parser::{LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, parse_line},
+    parser::{LineNode, MotionNode, PieNode, RotationNode, Syntax, TextNode, TrackNameNode, parse_line},
     pie, scar,
 };
 
@@ -78,7 +79,8 @@ pub fn complete(line: &str, cursor: usize) -> CompletionList {
         LineNode::Rotation(node) => rotation(&node),
         LineNode::Text(node) => text(&node, word_start),
         LineNode::Pie(node) => pie_items(&node, word_start),
-        LineNode::Comment(_) | LineNode::TrackName(_) | LineNode::IFrame(_) => Vec::new(),
+        LineNode::TrackName(node) => track_name(&node),
+        LineNode::Comment(_) | LineNode::IFrame(_) => Vec::new(),
     };
 
     let typed = typed.to_lowercase();
@@ -110,6 +112,22 @@ const fn item(
 }
 
 // ── Line kinds ───────────────────────────────────────────────────────────────
+
+/// `trackName: `: a name, or `␀`. An empty string needs no candidate: it is nothing written.
+fn track_name(node: &TrackNameNode) -> Vec<CompletionItem> {
+    if node.literal.is_none() || node.name.is_some() {
+        return Vec::new();
+    }
+    vec![
+        item("<name>", CompletionKind::Snippet, "${1:Name}", "```hkanno\ntrackName: <name>\n```\nThe track's name."),
+        item(
+            "␀ null",
+            CompletionKind::EnumMember,
+            crate::NULL_STR,
+            "```hkanno\ntrackName: ␀\n```\nThe **null pointer** of `hkStringPtr`: `<hkparam name=\"trackName\">␀</hkparam>`.\n\nNot the empty string, which is `trackName:` with nothing after it: `<hkparam name=\"trackName\"></hkparam>`.",
+        ),
+    ]
+}
 
 /// `<time> <event>` lines (the most common case).
 fn text(node: &TextNode, cursor: usize) -> Vec<CompletionItem> {
@@ -327,6 +345,13 @@ mod tests {
     fn empty_line() {
         assert_eq!(labels(""), ["<time>", "# numAnnotations:", "trackName:"]);
         assert_eq!(labels("tr"), ["trackName:"]);
+    }
+
+    #[test]
+    fn track_name_offers_the_null_pointer() {
+        assert_eq!(labels("trackName: "), ["<name>", "␀ null"]);
+        assert_eq!(labels("trackName: nu"), ["␀ null"]);
+        assert!(labels("trackName: Root ").is_empty());
     }
 
     #[test]

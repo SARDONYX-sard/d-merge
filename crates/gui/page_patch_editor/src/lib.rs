@@ -25,6 +25,8 @@ pub struct PatchEditorPageCtx<'a> {
     pub notify: &'a mut Notification,
     /// `settings.behavior.template_dir`: the templates the patch tool lists.
     pub template_dir: &'a str,
+    /// `settings.behavior.parser_mode`: patches are checked as d-merge will read them.
+    pub parser_mode: pages::patch::behavior::ParserMode,
     /// Persisted page state (`settings.patch_editor`).
     pub settings: &'a mut pages::patch_editor::PatchEditorSettings,
     /// Editor settings shared with the hkanno editor: Normal / Vim keys, language features.
@@ -49,9 +51,16 @@ pub struct PatchEditorPage {
 }
 
 impl PatchEditorPage {
+    /// Takes a conflict's value into the user patch, and shows it. See [`patch`]'s `resolve`.
+    pub fn open_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
+        self.tool = Tool::Patch;
+        self.patch.open_resolution(request);
+    }
+
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, ctx: PatchEditorPageCtx<'_>) {
-        let PatchEditorPageCtx { i18n, notify, template_dir, settings, editor, panel_frame } = ctx;
+        let PatchEditorPageCtx { i18n, notify, template_dir, parser_mode, settings, editor, panel_frame } = ctx;
+        self.patch.set_parser_mode(parser_mode);
         egui::CentralPanel::default().frame(panel_frame).show(ui, |ui| {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
             ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();

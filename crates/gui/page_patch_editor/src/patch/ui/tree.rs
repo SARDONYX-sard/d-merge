@@ -58,42 +58,64 @@ enum RowEvent {
     Select(usize),
     SetOpen(Node, bool),
     SetOpenBelow(Node, bool),
+    /// Bring the selected row into view.
+    Locate,
+    /// Double click or menu: the row's object stays in a tab.
+    KeepOpen(usize),
 }
 
 /// Draws the tree; a click selects an object (`selected`).
 ///
 /// `changed_only`: only the branches leading to edited / new objects.
 /// `focused`: the keyboard is in the tree: the selected row gets a frame.
-pub(in crate::patch) fn tree_ui(
+///
+/// Returns the object to keep open in a tab (double click, menu).
+pub(in crate::patch) fn tree_ui<'g>(
     ui: &mut egui::Ui,
-    graph: &Graph,
+    graph: &'g Graph,
     selected: &mut Option<String>,
     state: &mut TreeState,
     (changed_only, focused): (bool, bool),
     i18n: &I18nMap,
-) {
+) -> Option<&'g str> {
     state.prepare(graph, selected.as_deref(), changed_only);
     unlinked_section(ui, graph, selected, i18n);
+    let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
 
     let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 4.0);
     let mut scroll = egui::ScrollArea::both().id_salt("nemesis_tree").auto_shrink(false);
     let row_with_spacing = row_height + ui.spacing().item_spacing.y;
-    if let Some(offset) = state.scroll_to.take().and_then(|row| state.offset_for(row, row_with_spacing)) {
-        scroll = scroll.vertical_scroll_offset(offset);
+    if let Some(row) = state.scroll_to.take() {
+        if let Some(offset) = state.offset_for(row, row_with_spacing) {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
+        let indent = state.rows().get(row).map_or(0.0, |row| f32::from(row.depth) * INDENT);
+        if let Some(offset) = state.offset_x_for(indent) {
+            scroll = scroll.horizontal_scroll_offset(offset);
+        }
     }
 
-    let mut event = None;
+    let guides = state.active_guides();
     let output = scroll.show_rows(ui, row_height, state.rows().len(), |ui, range| {
         for (i, row) in state.rows()[range.clone()].iter().enumerate() {
             let is_selected = selected.as_deref() == Some(graph.id(row.node));
+            draw_connecting_lines(ui, *row, range.start + i, row_height, &guides);
             let row_event = row_ui(ui, graph, *row, row_height, (is_selected, focused), range.start + i, i18n);
             event = row_event.or(event);
         }
     });
     state.scroll_offset = output.state.clamped_offset().y;
     state.view_height = output.inner_rect.height();
+    state.scroll_x = output.state.clamped_offset().x;
+    state.view_width = output.inner_rect.width();
+    event = sticky_rows_ui(ui, graph, state, output.inner_rect, row_with_spacing).or(event);
 
+    let mut keep_open = None;
     match event {
+        Some(RowEvent::KeepOpen(row)) => {
+            state.cursor = row;
+            keep_open = state.rows().get(row).map(|row| graph.id(row.node));
+        }
         Some(RowEvent::Select(row)) => {
             state.cursor = row;
             let id = graph.id(state.rows()[row].node);
@@ -101,8 +123,10 @@ pub(in crate::patch) fn tree_ui(
         }
         Some(RowEvent::SetOpen(node, open)) => state.set_open(graph, node, open),
         Some(RowEvent::SetOpenBelow(node, open)) => state.set_open_below(graph, node, open),
+        Some(RowEvent::Locate) => state.scroll_to = Some(state.cursor),
         None => {}
     }
+    keep_open
 }
 
 /// `⚠ Not linked (2)` and the new objects nothing points to. Above the tree: always in view,
@@ -139,7 +163,6 @@ fn row_ui(
     let mut event = None;
     ui.horizontal(|ui| {
         ui.set_height(height);
-        draw_connecting_lines(ui, row, height);
         ui.add_space(f32::from(row.depth) * INDENT);
         let glyph = if row.expandable && row.open {
             "▼"
@@ -156,12 +179,20 @@ fn row_ui(
         if response.clicked() {
             event = Some(RowEvent::Select(index));
         }
+        if response.double_clicked() {
+            event = Some(RowEvent::KeepOpen(index));
+        }
         if focused && is_selected {
             let stroke = ui.visuals().selection.stroke;
             ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
         }
-        if row.expandable {
-            response.context_menu(|ui| {
+        response.context_menu(|ui| {
+            if ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked() {
+                event = Some(RowEvent::KeepOpen(index));
+                ui.close();
+            }
+            if row.expandable {
+                ui.separator();
                 if ui.button(i18n.t(I18nKey::NemesisExpandAllBelow)).clicked() {
                     event = Some(RowEvent::SetOpenBelow(row.node, true));
                     ui.close();
@@ -170,8 +201,8 @@ fn row_ui(
                     event = Some(RowEvent::SetOpenBelow(row.node, false));
                     ui.close();
                 }
-            });
-        }
+            }
+        });
     });
     event
 }
@@ -183,11 +214,22 @@ fn row_ui(
 /// │ └ #0094     `│` is level 0 going on past this row, `└` the row's own line at level 1
 /// └ #0095
 /// ```
-fn draw_connecting_lines(ui: &egui::Ui, row: Row, height: f32) {
+/// `guides`: what is on the way to the selected row is drawn in the selection's color, so its
+/// branch stands out in a big tree. See [`TreeState::active_guides`].
+fn draw_connecting_lines(
+    ui: &egui::Ui,
+    row: Row,
+    index: usize,
+    height: f32,
+    guides: &[Option<std::ops::RangeInclusive<usize>>],
+) {
     let Some(own_level) = row.depth.checked_sub(1) else { return };
-    let stroke = egui::Stroke::new(1.0, ui.visuals().weak_text_color().gamma_multiply(0.5));
-    let left = ui.cursor().left();
-    let top = ui.cursor().top();
+    let normal = egui::Stroke::new(1.0, ui.visuals().weak_text_color().gamma_multiply(0.5));
+    let active = egui::Stroke::new(2.0, ui.visuals().selection.bg_fill);
+    let is_active =
+        |level: u16| guides.get(usize::from(level)).and_then(Option::as_ref).is_some_and(|r| r.contains(&index));
+
+    let (left, top) = (ui.cursor().left(), ui.cursor().top());
     // Up to the next row, over the gap between the rows.
     let bottom = top + height + ui.spacing().item_spacing.y;
     let center = top + height / 2.0;
@@ -196,12 +238,102 @@ fn draw_connecting_lines(ui: &egui::Ui, row: Row, height: f32) {
 
     for level in 0..own_level {
         if has_guide(row.guides, level) {
-            painter.vline(x_of(level), top..=bottom, stroke);
+            painter.vline(x_of(level), top..=bottom, if is_active(level) { active } else { normal });
         }
     }
     let own_x = x_of(own_level);
-    painter.vline(own_x, top..=if row.last_child { center } else { bottom }, stroke);
-    painter.hline(own_x..=own_x + INDENT / 2.0, center, stroke);
+    painter.vline(own_x, top..=if row.last_child { center } else { bottom }, normal);
+    painter.hline(own_x..=own_x + INDENT / 2.0, center, normal);
+    if is_active(own_level) {
+        // The way ends at this row if it is the one on the way: only down to its own branch.
+        let on_the_way_here = guides[usize::from(own_level)].as_ref().is_some_and(|r| *r.end() == index);
+        painter.vline(own_x, top..=if on_the_way_here { center } else { bottom }, active);
+        if on_the_way_here {
+            painter.hline(own_x..=own_x + INDENT / 2.0, center, active);
+        }
+    }
+}
+
+/// How many crumbs of the way to the selected row are shown at most; the rest are on hover.
+const MAX_CRUMBS: usize = 6;
+
+/// `◎ … › BehaviorGraph › Root › GetUpModList`: where the selected object is. `◎` scrolls to it, a
+/// name selects that object.
+fn breadcrumb(
+    ui: &mut egui::Ui,
+    graph: &Graph,
+    state: &TreeState,
+    selected: Option<&str>,
+    i18n: &I18nMap,
+) -> Option<RowEvent> {
+    let row = *state.rows().get(state.cursor)?;
+    if selected != Some(graph.id(row.node)) {
+        return None; // not in the tree as it is expanded now
+    }
+    let mut chain = state.ancestors(state.cursor);
+    chain.push(state.cursor);
+    let hidden = chain.len().saturating_sub(MAX_CRUMBS);
+
+    let mut event = None;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        if ui.small_button("◎").on_hover_text(i18n.t(I18nKey::NemesisLocateSelected)).clicked() {
+            event = Some(RowEvent::Locate);
+        }
+        if hidden > 0 {
+            let names: Vec<&str> = chain[..hidden].iter().map(|&r| graph.short_name(state.rows()[r].node)).collect();
+            ui.weak("…").on_hover_text(names.join(" › "));
+        }
+        for (i, &crumb) in chain[hidden..].iter().enumerate() {
+            if i > 0 || hidden > 0 {
+                ui.weak("›");
+            }
+            let node = state.rows()[crumb].node;
+            let text = egui::RichText::new(graph.short_name(node)).small();
+            if ui.add(egui::Button::new(text).frame(false)).on_hover_text(graph.label(node)).clicked() {
+                event = Some(RowEvent::Select(crumb));
+            }
+        }
+    });
+    ui.separator();
+    event
+}
+
+/// How many ancestors are pinned over the tree at most.
+const MAX_STICKY: usize = 5;
+
+/// The ancestors of the rows on screen, pinned over the top of the tree. Without them, a long list
+/// of children shows nothing of what they belong to. A click selects one.
+fn sticky_rows_ui(
+    ui: &mut egui::Ui,
+    graph: &Graph,
+    state: &TreeState,
+    view: egui::Rect,
+    step: f32,
+) -> Option<RowEvent> {
+    let rows = state.sticky_rows(step, MAX_STICKY);
+    if rows.is_empty() {
+        return None;
+    }
+    #[expect(clippy::cast_precision_loss, reason = "a few rows")]
+    let height = rows.len() as f32 * step;
+    let area = egui::Rect::from_min_size(view.min, egui::vec2(view.width(), height));
+    ui.painter().rect_filled(area, 0.0, ui.visuals().window_fill);
+    ui.painter().hline(area.x_range(), area.bottom(), ui.visuals().widgets.noninteractive.bg_stroke);
+
+    let mut event = None;
+    let mut sticky = ui.new_child(egui::UiBuilder::new().max_rect(area));
+    sticky.set_clip_rect(area);
+    for row in rows {
+        let line = state.rows()[row];
+        sticky.horizontal(|ui| {
+            ui.add_space(f32::from(line.depth).mul_add(INDENT, -state.scroll_x).max(0.0));
+            if ui.add(egui::Button::selectable(false, object_label(ui, graph, line.node, false))).clicked() {
+                event = Some(RowEvent::Select(row));
+            }
+        });
+    }
+    event
 }
 
 /// A row's text: the class and the name each have their color, to find them in a long list.
@@ -210,11 +342,8 @@ pub(in crate::patch) fn object_label(ui: &egui::Ui, graph: &Graph, node: Node, d
     let (head, class, name, links) = graph.label_parts(node);
     let visuals = ui.visuals();
     let font = egui::TextStyle::Monospace.resolve(ui.style());
-    let (class_color, name_color) = if visuals.dark_mode {
-        (egui::Color32::from_rgb(86, 182, 194), egui::Color32::from_rgb(229, 192, 123))
-    } else {
-        (egui::Color32::from_rgb(0, 110, 130), egui::Color32::from_rgb(150, 90, 0))
-    };
+    let (class_color, name_color) =
+        (egui_widgets::markdown::class_color(visuals), egui_widgets::markdown::name_color(visuals));
     let tone = |color: egui::Color32| if dimmed { color.gamma_multiply(0.5) } else { color };
 
     let mut job = egui::text::LayoutJob::default();

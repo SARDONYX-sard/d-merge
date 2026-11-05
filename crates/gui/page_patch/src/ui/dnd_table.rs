@@ -4,7 +4,47 @@ use egui_extras::TableBody;
 use gui_shared::settings::pages::patch::mod_item::ModItem;
 
 use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
-use crate::visible_mods::{apply_range, apply_visible_range};
+use crate::{
+    conflicts::{ConflictScan, Mark},
+    visible_mods::{apply_range, apply_visible_range},
+};
+
+/// What the rows need for their conflict flag and right-click menu.
+pub(super) struct RowConflicts<'a> {
+    pub(super) scan: &'a ConflictScan,
+    /// The menu's "show conflicts".
+    pub(super) label: &'a str,
+    /// The flag's hover: wins, loses.
+    pub(super) hovers: (&'a str, &'a str),
+    /// The mod whose conflicts were asked for.
+    pub(super) asked: Option<String>,
+}
+
+impl RowConflicts<'_> {
+    /// `+`, `-` or `±`. Green: it overrides others, orange: others override it.
+    fn flag(&self, ui: &mut egui::Ui, id: &str, width: f32) {
+        let mark = self.scan.mark_of(id);
+        if mark == Mark::default() {
+            ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::hover());
+            return;
+        }
+        let color = if mark.loses > 0 { ui.visuals().warn_fg_color } else { egui::Color32::from_rgb(100, 200, 120) };
+        let (wins, loses) = self.hovers;
+        let hover = format!("{wins}: {}\n{loses}: {}", mark.wins, mark.loses);
+        // Not selectable: it would take the clicks, and with them the row's right-click menu.
+        let glyph = egui::Label::new(egui::RichText::new(mark.glyph()).color(color).strong()).selectable(false);
+        ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_text(hover);
+    }
+
+    fn menu(&mut self, response: &egui::Response, id: &str) {
+        response.context_menu(|ui| {
+            if ui.button(self.label).clicked() {
+                self.asked = Some(id.to_owned());
+                ui.close();
+            }
+        });
+    }
+}
 
 /// A clicked checkbox: `(Shift held, mod id, its new state)`.
 type CheckClick = (bool, String, bool);
@@ -13,16 +53,18 @@ type CheckClick = (bool, String, bool);
 pub(super) fn dnd_table_body(
     body: &mut TableBody,
     items: &mut [ModItem],
-    widths: [f32; 6],
+    widths: [f32; 7],
     selection_anchor: &mut Option<String>,
+    conflicts: &mut RowConflicts<'_>,
 ) {
     let ui = body.ui_mut();
     let checkbox_rect = [widths[0], ROW_HEIGHT];
-    let w_path = widths[1];
-    let w_name = widths[2];
-    let w_mod_type = widths[3];
-    let w_site = widths[4];
-    let priority_size = [widths[5], ROW_HEIGHT];
+    let w_flag = widths[1];
+    let w_path = widths[2];
+    let w_name = widths[3];
+    let w_mod_type = widths[4];
+    let w_site = widths[5];
+    let priority_size = [widths[6], ROW_HEIGHT];
 
     let row_width = widths.iter().sum::<f32>() + 38.0;
     let mut click: Option<CheckClick> = None;
@@ -47,6 +89,9 @@ pub(super) fn dnd_table_body(
             };
 
             ui.painter().rect_filled(row_rect, egui::CornerRadius::ZERO, bg_color);
+            // Under the row's widgets: a right click anywhere on the row.
+            let row = ui.interact(row_rect, ui.scope_id().with("mod_row_menu"), egui::Sense::click());
+            conflicts.menu(&row, &item.id);
 
             ui.scope_builder(egui::UiBuilder::new().max_rect(row_rect), |ui| {
                 ui.horizontal(|ui| {
@@ -55,12 +100,16 @@ pub(super) fn dnd_table_body(
                     if response.clicked() {
                         click = Some((ui.input(|input| input.modifiers.shift), item.id.clone(), item.enabled));
                     }
+                    conflicts.menu(&response, &item.id);
 
+                    conflicts.flag(ui, &item.id, w_flag);
                     label_with_hover(ui, &item.id, w_path, CellAlign::Left);
                     draggable_handle.ui(ui, |ui| label_with_hover(ui, &item.name, w_name, CellAlign::Center));
                     label_with_hover(ui, item.mod_type.as_str(), w_mod_type, CellAlign::Center);
-                    hyperlink_with_hover(ui, &item.site, w_site);
-                    centered_ui(ui, |ui| ui.add_sized(priority_size, egui::Label::new(item.priority.to_string())));
+                    let site = hyperlink_with_hover(ui, &item.site, w_site);
+                    conflicts.menu(&site, &item.id);
+                    let priority = egui::Label::new(item.priority.to_string()).selectable(false);
+                    centered_ui(ui, |ui| ui.add_sized(priority_size, priority));
                 });
             });
         });
@@ -87,15 +136,17 @@ pub(super) fn check_only_table_body(
     body: TableBody,
     rows: &[u32],
     items: &mut [ModItem],
-    widths: [f32; 6],
+    widths: [f32; 7],
     selection_anchor: &mut Option<String>,
+    conflicts: &mut RowConflicts<'_>,
 ) {
     // The last fetch found nothing: `items` is empty, while `rows` may still be the old list's.
     if items.is_empty() {
         return;
     }
     let checkbox_size = [widths[0], ROW_HEIGHT];
-    let (w_path, w_name, w_mod_type, w_site) = (widths[1], widths[2], widths[3], widths[4]);
+    let w_flag = widths[1];
+    let (w_path, w_name, w_mod_type, w_site) = (widths[2], widths[3], widths[4], widths[5]);
     let mut click: Option<CheckClick> = None;
 
     body.rows(ROW_HEIGHT, rows.len(), |mut row| {
@@ -105,12 +156,21 @@ pub(super) fn check_only_table_body(
             if response.clicked() {
                 click = Some((ui.input(|input| input.modifiers.shift), item.id.clone(), item.enabled));
             }
+            conflicts.menu(&response, &item.id);
         });
+        row.col(|ui| conflicts.flag(ui, &item.id, w_flag));
         row.col(|ui| label_with_hover(ui, &item.id, w_path, CellAlign::Left));
         row.col(|ui| label_with_hover(ui, &item.name, w_name, CellAlign::Center));
         row.col(|ui| label_with_hover(ui, item.mod_type.as_str(), w_mod_type, CellAlign::Center));
-        row.col(|ui| hyperlink_with_hover(ui, &item.site, w_site));
-        row.col(|ui| centered_ui(ui, |ui| ui.label(item.priority.to_string())));
+        row.col(|ui| {
+            let site = hyperlink_with_hover(ui, &item.site, w_site);
+            conflicts.menu(&site, &item.id);
+        });
+        row.col(|ui| {
+            centered_ui(ui, |ui| ui.add(egui::Label::new(item.priority.to_string()).selectable(false)));
+        });
+        let response = row.response();
+        conflicts.menu(&response, &item.id);
     });
 
     if let Some((shift, clicked_id, enabled)) = click {

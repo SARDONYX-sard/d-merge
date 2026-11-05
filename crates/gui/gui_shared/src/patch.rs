@@ -130,3 +130,19 @@ pub struct PatchProgressSnapshot {
     pub index: usize,
     pub total: usize,
 }
+
+/// The mod code of the user patch: what the conflict tool writes, and what loads last.
+pub const USER_PATCH_CODE: &str = "upatch";
+
+/// A conflict's value to keep, from the patch page to the Patch Editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolveRequest {
+    /// What is patched, e.g. `meshes/actors/character/behaviors/0_master.bin`
+    pub target: String,
+    /// The change, e.g. `#0106/hkbModifierList/enable`
+    pub path: String,
+    /// The directory of the mod whose value is kept, e.g. `D:/mods/a/Nemesis_Engine/mod/a`
+    pub mod_dir: String,
+    /// Where the user patch is written.
+    pub output: String,
+}

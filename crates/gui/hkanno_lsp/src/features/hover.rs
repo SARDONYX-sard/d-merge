@@ -42,11 +42,24 @@ fn on(span: Option<Span>, cursor: usize) -> bool {
     span.is_some_and(|span| span.touches(cursor))
 }
 
+/// A null `hkStringPtr` is not an empty one, and the file keeps them apart:
+///
+/// | hkanno         | XML                                      | `hkStringPtr`     |
+/// | -------------- | ---------------------------------------- | ----------------- |
+/// | `trackName: ␀` | `<hkparam name="trackName">&#9216;</hkparam>`  | null pointer      |
+/// | `trackName: `  | `<hkparam name="trackName"></hkparam>`   | empty string `""` |
 fn track_name(node: &TrackNameNode) -> String {
-    let name = node.name.as_ref().map_or("<unnamed>", |n| n.value);
-    format!(
-        "# Annotation Track\nThis defines a named annotation track. All following annotations belong to this track until the next trackName or end of file.\n\n- Track name: `{name}`"
-    )
+    const HEAD: &str = "# Annotation Track\nThis defines a named annotation track. All following annotations belong to this track until the next trackName or end of file.";
+    let name = node.name.as_ref().map_or("", |n| n.value);
+    match name {
+        crate::NULL_STR => format!(
+            "{HEAD}\n\n- Track name: `␀`, the **null pointer** of `hkStringPtr` (it points to no string).\n- XML: `<hkparam name=\"trackName\">&#9216;</hkparam>`\n- This is not the empty string: that is `trackName:` with nothing after it."
+        ),
+        "" => format!(
+            "{HEAD}\n\n- Track name: the **empty string** `\"\"`.\n- XML: `<hkparam name=\"trackName\"></hkparam>`\n- This is not null: the null pointer of `hkStringPtr` is written `␀`."
+        ),
+        name => format!("{HEAD}\n\n- Track name: `{name}`"),
+    }
 }
 
 fn motion(node: &MotionNode, cursor: usize) -> String {

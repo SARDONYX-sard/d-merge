@@ -65,12 +65,12 @@ pub(super) fn cached(
 
 /// Moves rows down to leave gaps for the old lines; see [`crate::inline_diff`].
 fn make_room_for_removed_lines(galley: &mut Arc<egui::Galley>, diff: &InlineDiff) {
-    if diff.removed.is_empty() {
+    if diff.hunks.iter().all(|hunk| hunk.old_lines.is_empty()) {
         return;
     }
     let galley = Arc::make_mut(galley);
     let line_height = galley.rows.first().map_or(0.0, |row| row.rect().height());
-    let (shifts, total) = row_shifts(galley.rows.len(), &diff.removed);
+    let (shifts, total) = row_shifts(galley.rows.len(), &diff.hunks);
     #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
     let pixels = |lines: usize| lines as f32 * line_height;
     for (row, shift) in galley.rows.iter_mut().zip(shifts) {
@@ -217,7 +217,7 @@ mod tests {
     use egui::text::CCursor;
 
     use super::*;
-    use crate::inline_diff::RemovedLines;
+    use crate::inline_diff::DiffHunk;
 
     struct Plain;
     impl Language for Plain {}
@@ -227,8 +227,8 @@ mod tests {
     fn the_gap_for_old_lines_keeps_cursor_positions_right() {
         egui::__run_test_ui(|ui| {
             let text = "aa\nbb\ncc";
-            let removed = vec![RemovedLines { before_line: 1, lines: vec![String::new(), String::new()] }];
-            let diff = InlineDiff { added: Vec::new(), removed };
+            let hunk = DiffHunk { new_lines: 1..1, old_lines: vec![String::new(), String::new()], changes: Vec::new() };
+            let diff = InlineDiff { hunks: vec![hunk] };
 
             let plain = cached(&mut LayoutCache::default(), ui, text, &Plain, &[], None, None);
             let shifted = cached(&mut LayoutCache::default(), ui, text, &Plain, &[], None, Some(&diff));

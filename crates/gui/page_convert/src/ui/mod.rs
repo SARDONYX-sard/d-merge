@@ -137,26 +137,26 @@ impl ConvertPage {
         egui::Frame::group(ui.style()).show(ui, |ui| {
             ui.set_min_size(ui.available_size());
             let task = &self.task;
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-                match ctx.settings.selection_type {
-                    SelectionType::Tree => {
-                        // `✖` per root, then the tree.
-                        ctx.settings.tree_roots.retain(|root| {
-                            ui.horizontal(|ui| {
-                                ui.add(Icon::FolderOpen);
-                                ui.strong(root);
-                                !remove_button(ui)
-                            })
-                            .inner
-                        });
-                        ui.separator();
-                        self.tree.ui(ui, &|path| task.status_of(path));
-                    }
-                    SelectionType::Files | SelectionType::Dir => {
-                        ctx.settings.selected_files.retain(|path| path_row(ui, path, task));
-                    }
+            match ctx.settings.selection_type {
+                SelectionType::Tree => {
+                    // `✖` per root, then the tree, which scrolls by itself.
+                    ctx.settings.tree_roots.retain(|root| {
+                        ui.horizontal(|ui| {
+                            ui.add(Icon::FolderOpen);
+                            ui.strong(root);
+                            !remove_button(ui)
+                        })
+                        .inner
+                    });
+                    ui.separator();
+                    self.tree.ui(ui, &|path| task.status_of(path));
                 }
-            });
+                SelectionType::Files | SelectionType::Dir => {
+                    egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+                        ctx.settings.selected_files.retain(|path| path_row(ui, path, task));
+                    });
+                }
+            }
         });
     }
 

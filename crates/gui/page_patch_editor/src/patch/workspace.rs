@@ -21,6 +21,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use gui_shared::settings::pages::patch::behavior::ParserMode;
 use nemesis_diff::{View, XmlObject, normalize, object_patch, objects, resolve};
 
 /// Mod metadata (`info.ini`).
@@ -74,6 +75,10 @@ pub(crate) struct Behavior {
     /// `animationsetdatasinglefile`: the "objects" are anim sets (`Project~Data/file.txt`), patched
     /// as `Nemesis_Engine/mod/<code>/animationsetdatasinglefile/<id>`. No new objects.
     pub(crate) asdsf: bool,
+    /// `animationdatasinglefile`: the "objects" are clip data files (`DefaultMale~1/Idle~mod$0.txt`),
+    /// written as they are to `Nemesis_Engine/mod/<code>/animationdatasinglefile/<id>`.
+    /// No template is read: new clips do not need one.
+    pub(crate) adsf: bool,
 }
 
 /// The patch directory of a mod, given its root (what a mod manager installs).
@@ -122,10 +127,28 @@ fn class_attribute(text: &str) -> &str {
 /// File stem of the anim set data template (`meshes/animationsetdatasinglefile.bin|txt`).
 pub(crate) const ASDSF: &str = "animationsetdatasinglefile";
 
+/// File stem of the clip data template (`meshes/animationdatasinglefile.bin|txt`).
+pub(crate) const ADSF: &str = "animationdatasinglefile";
+
 impl Behavior {
     /// Reads and indexes the template (behavior xml, or the anim set data txt).
     /// A `.bin` (d-merge's shipped template) is converted to text first; ids are the template's.
     pub(crate) fn open(template_path: &Path) -> Result<Self, String> {
+        if template_path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(ADSF)) {
+            return Ok(Self {
+                name: ADSF.to_string(),
+                template_path: template_path.to_path_buf(),
+                meshes_path: format!("meshes/{ADSF}.bin"),
+                nemesis: Some((ADSF.to_string(), false)),
+                force_ext: false,
+                object_index: fast_hash::HashMap::default(),
+                objects: Vec::new(),
+                edits: BTreeMap::new(),
+                added: BTreeMap::new(),
+                asdsf: false,
+                adsf: true,
+            });
+        }
         let bytes = std::fs::read(template_path).map_err(|e| format!("{}: {e}", template_path.display()))?;
         let is_bin = template_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("bin"));
         let asdsf = template_path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(ASDSF));
@@ -152,6 +175,7 @@ impl Behavior {
                 edits: BTreeMap::new(),
                 added: BTreeMap::new(),
                 asdsf: true,
+                adsf: false,
             });
         }
         let xml = if is_bin {
@@ -178,17 +202,29 @@ impl Behavior {
             edits: BTreeMap::new(),
             added: BTreeMap::new(),
             asdsf: false,
+            adsf: false,
         })
     }
 
-    /// Patch file name of `id` (in [`Self::patch_dir`]): `#0106.txt`, or the anim set path as is.
-    pub(crate) fn patch_file(&self, id: &str) -> String {
-        if self.asdsf { id.to_string() } else { format!("{id}.txt") }
+    /// Not a behavior but animation data: plain text, no objects with pointers, no new objects.
+    pub(crate) const fn is_anim_data(&self) -> bool {
+        self.asdsf || self.adsf
     }
 
-    /// d-merge's parser check of a patch (behaviors only: anim set patches are plain text).
-    pub(crate) fn validate(&self, patch: &str) -> Result<(), String> {
-        if self.asdsf { Ok(()) } else { nemesis_diff::validate(patch) }
+    /// Patch file name of `id` (in [`Self::patch_dir`]): `#0106.txt`, or an anim data path as is.
+    pub(crate) fn patch_file(&self, id: &str) -> String {
+        if self.is_anim_data() { id.to_string() } else { format!("{id}.txt") }
+    }
+
+    /// d-merge's parser check of a patch, in the mode of the patch page.
+    pub(crate) fn validate(&self, id: &str, patch: &str, mode: ParserMode) -> Result<(), String> {
+        if self.adsf {
+            super::anim_patch::validate_adsf(id, patch, mode)
+        } else if self.asdsf {
+            super::anim_patch::validate_asdsf(id, patch)
+        } else {
+            nemesis_diff::validate(patch)
+        }
     }
 
     pub(crate) fn target(&self) -> Target {
@@ -207,6 +243,9 @@ impl Behavior {
     pub(crate) fn patch_dir(&self, code: &str) -> PathBuf {
         if self.asdsf {
             return Path::new("Nemesis_Engine").join("mod").join(code).join(ASDSF);
+        }
+        if self.adsf {
+            return Path::new("Nemesis_Engine").join("mod").join(code).join(ADSF);
         }
         match self.target() {
             Target::Nemesis { name, first_person } => {
@@ -306,7 +345,8 @@ impl Behavior {
     /// The `#XXXX.txt` contents of an edited object, or the new object's text.
     pub(crate) fn patch(&self, code: &str, id: &str) -> Option<String> {
         if let Some(text) = self.added.get(id) {
-            return Some(normalize(text));
+            // Animation data has lines, not XML: nothing to normalize.
+            return Some(if self.is_anim_data() { text.clone() } else { normalize(text) });
         }
         object_patch(code, &self.template_object(id)?.text, self.edits.get(id)?)
     }
@@ -481,14 +521,57 @@ impl Workspace {
         if let Some(asdsf) = import_asdsf(mod_dir, template_root, &mut skipped)? {
             workspace.behaviors.push(asdsf);
         }
+        if let Some(adsf) = import_adsf(mod_dir, template_root)? {
+            workspace.behaviors.push(adsf);
+        }
         Ok((workspace, code, skipped))
+    }
+
+    /// The anim set files per project of the template: the keys of its json, `txt_projects`.
+    /// e.g. (`DefaultMaleData~DefaultMale`, [`_MTSolo.txt`, `1HMSolo.txt`, ...]), and a creature's
+    /// (`BearProjectData~BearProject`, [`FullBody.txt`]).
+    ///
+    /// Does not add the anim set behavior to the work: that happens when one is changed.
+    pub(crate) fn anim_set_projects(&self, template_root: &Path) -> Vec<(String, Vec<String>)> {
+        // The template lists the sets of a project together, in the file's order.
+        let group = |behavior: &Behavior| -> Vec<(String, Vec<String>)> {
+            let projects = behavior.objects.chunk_by(|a, b| a.class == b.class);
+            projects.map(|sets| (sets[0].class.clone(), sets.iter().map(|set| set.name.clone()).collect())).collect()
+        };
+        match self.behaviors.iter().find(|behavior| behavior.asdsf) {
+            Some(asdsf) => group(asdsf),
+            None => Behavior::open(&anim_template_path(template_root, ASDSF))
+                .map_or_else(|_| Vec::new(), |asdsf| group(&asdsf)),
+        }
+    }
+
+    /// The position of the behavior of `template`, opened if not yet there. `meshes_path`: its id.
+    pub(crate) fn open_behavior(&mut self, template: &Path, meshes_path: &str) -> Result<usize, String> {
+        if let Some(at) =
+            self.behaviors.iter().position(|behavior| behavior.meshes_path.eq_ignore_ascii_case(meshes_path))
+        {
+            return Ok(at);
+        }
+        self.behaviors.push(Behavior::open(template)?);
+        Ok(self.behaviors.len() - 1)
+    }
+
+    /// The animation data behavior with this file stem ([`ADSF`], [`ASDSF`]), opened if not yet there.
+    pub(crate) fn anim_behavior(&mut self, stem: &str, template_root: &Path) -> Result<&mut Behavior, String> {
+        let is_it = |behavior: &Behavior| if stem == ADSF { behavior.adsf } else { behavior.asdsf };
+        let existing = self.behaviors.iter().position(is_it);
+        if existing.is_none() {
+            self.behaviors.push(Behavior::open(&anim_template_path(template_root, stem))?);
+        }
+        let at = existing.unwrap_or(self.behaviors.len() - 1);
+        Ok(&mut self.behaviors[at])
     }
 
     /// Writes the mod under `<output>` (replacing `Nemesis_Engine/mod/<code>` and
     /// `Nemesis_EngineExt/mod/<code>`): each behavior to its [`Behavior::patch_dir`], `info.ini`
     /// to each mod root used. Returns the files written and the patches d-merge's Nemesis parser
     /// rejects (`behavior/#id: error`).
-    pub(crate) fn export(&self, output: &Path, code: &str) -> Result<(usize, Vec<String>), String> {
+    pub(crate) fn export(&self, output: &Path, code: &str, mode: ParserMode) -> Result<(usize, Vec<String>), String> {
         let roots = [
             output.join("Nemesis_Engine").join("mod").join(code),
             output.join("Nemesis_EngineExt").join("mod").join(code),
@@ -504,7 +587,7 @@ impl Workspace {
             let dir = output.join(behavior.patch_dir(code));
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };
-                if let Err(err) = behavior.validate(&patch) {
+                if let Err(err) = behavior.validate(id, &patch, mode) {
                     invalid.push(format!("{}/{id}: {err}", behavior.name));
                 }
                 write(&dir.join(behavior.patch_file(id)), &patch)?;
@@ -518,8 +601,36 @@ impl Workspace {
     }
 }
 
-/// `<mod>/animationsetdatasinglefile/<project>/<set>.txt` -> an anim set "behavior" (or `None`).
-/// Sets the template does not have are added to `skipped`.
+/// The template of animation data, `.bin` or `.txt`. (`.bin` if neither exists: clip data needs none.)
+fn anim_template_path(template_root: &Path, stem: &str) -> PathBuf {
+    let meshes = template_root.join("meshes");
+    let path = |ext: &str| meshes.join(format!("{stem}.{ext}"));
+    if path("bin").is_file() || !path("txt").is_file() { path("bin") } else { path("txt") }
+}
+
+/// `<mod>/animationdatasinglefile/<project>/<file>.txt` -> the clip data "behavior" (or `None`).
+/// Files are kept as they are; see [`Behavior::adsf`].
+fn import_adsf(mod_dir: &Path, template_root: &Path) -> Result<Option<Behavior>, String> {
+    let dir = mod_dir.join(ADSF);
+    if !dir.is_dir() {
+        return Ok(None);
+    }
+    let mut behavior = Behavior::open(&anim_template_path(template_root, ADSF))?;
+    for project in read_dir(&dir)?.filter(|p| p.is_dir()) {
+        let project_name = project.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        for file in read_dir(&project)?.filter(|p| p.is_file()) {
+            let file_name = file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            behavior.added.insert(format!("{project_name}/{file_name}"), read_text(&file)?);
+        }
+    }
+    Ok(Some(behavior))
+}
+
+/// `<mod>/animationsetdatasinglefile/<project>/<file>.txt` -> an anim set "behavior" (or `None`).
+///
+/// An edit of a set of the template is read as the edited set. Every other file (`tkuc$New.txt`,
+/// `$header$.txt`, a project the template does not have) is kept as it is: the export replaces the
+/// mod's folder, so what is not kept would be lost.
 fn import_asdsf(mod_dir: &Path, template_root: &Path, skipped: &mut Vec<String>) -> Result<Option<Behavior>, String> {
     let dir = mod_dir.join(ASDSF);
     if !dir.is_dir() {
@@ -540,12 +651,14 @@ fn import_asdsf(mod_dir: &Path, template_root: &Path, skipped: &mut Vec<String>)
             let file_name = file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             let wanted = format!("{project_name}/{file_name}");
             // Folder / file names are case-insensitive.
-            let Some(id) = behavior.objects.iter().find(|o| o.id.eq_ignore_ascii_case(&wanted)).map(|o| o.id.clone())
-            else {
-                skipped.push(format!("{ASDSF}/{wanted}"));
-                continue;
-            };
-            behavior.set_text(&id, resolve(&read_text(&file)?, View::Mod));
+            let template_id =
+                behavior.objects.iter().find(|o| o.id.eq_ignore_ascii_case(&wanted)).map(|o| o.id.clone());
+            match template_id {
+                Some(id) => behavior.set_text(&id, resolve(&read_text(&file)?, View::Mod)),
+                None => {
+                    behavior.added.insert(wanted, read_text(&file)?);
+                }
+            }
         }
     }
     Ok(Some(behavior))
@@ -603,7 +716,7 @@ fn meshes_path(template: &Path) -> String {
 }
 
 /// The Nemesis folder `(name, 1st person)` of a template, if Nemesis supports it.
-fn nemesis_folder(meshes_path: &str) -> Option<(String, bool)> {
+pub(super) fn nemesis_folder(meshes_path: &str) -> Option<(String, bool)> {
     use behavior_merge_types::template_key::{NEMESIS_1ST_PERSON_MAP, NEMESIS_3RD_PERSON_MAP};
     let find = |map: &phf::Map<&'static str, &'static str>| {
         map.entries().find(|(_, path)| path.eq_ignore_ascii_case(meshes_path)).map(|(name, _)| (*name).to_string())
@@ -680,7 +793,7 @@ fn read_dir(dir: &Path) -> Result<impl Iterator<Item = PathBuf>, String> {
 }
 
 /// UTF-8 (lossy) without `\r`.
-fn read_text(path: &Path) -> Result<String, String> {
+pub(super) fn read_text(path: &Path) -> Result<String, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(String::from_utf8_lossy(&bytes).replace("\r\n", "\n"))
 }
@@ -706,6 +819,33 @@ mod tests {
         assert_eq!(bin.objects.len(), txt.objects.len());
         let differ = bin.objects.iter().zip(&txt.objects).filter(|(a, b)| a.id != b.id || a.text != b.text).count();
         assert_eq!(differ, 0);
+    }
+
+    /// The export replaces the mod's folder: an anim set file that is no edit of the template must
+    /// come out as it went in. Real mods have `tkuc$New.txt` and `$header$.txt`.
+    #[test]
+    fn anim_set_files_that_are_no_edits_are_kept() {
+        let dir = std::env::temp_dir().join(format!("d_merge_import_asdsf_{}", std::process::id()));
+        let set = "V3\n0\n0\n0\n1\n1\n2\n7891816\n";
+        let write = |path: &str, text: &str| {
+            let path = dir.join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("templates/meshes/animationsetdatasinglefile.txt", &format!("1\nAData\\A.txt\n1\nx.txt\n{set}"));
+        write(&format!("mod/{ASDSF}/AData~A/m$New.txt"), set);
+        write(&format!("mod/{ASDSF}/AData~A/$header$.txt"), "1\nNew.txt\n");
+        let mut skipped = Vec::new();
+
+        let behavior = import_asdsf(&dir.join("mod"), &dir.join("templates"), &mut skipped).unwrap().unwrap();
+        let patch = |id: &str| behavior.patch("m", id).unwrap();
+        let (new_set, header) = (patch("AData~A/m$New.txt"), patch("AData~A/$header$.txt"));
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(skipped.is_empty());
+        assert_eq!(new_set, set);
+        assert_eq!(header, "1\nNew.txt\n");
+        behavior.validate("AData~A/m$New.txt", &new_set, ParserMode::Strict).unwrap();
     }
 
     #[test]

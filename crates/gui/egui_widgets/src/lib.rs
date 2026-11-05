@@ -9,3 +9,11 @@
 pub mod markdown;
 pub mod notify;
 pub mod shadcn;
+
+mod path_row;
+mod window;
+
+pub use self::{
+    path_row::{PathActions, PathRow, PathRowOutput},
+    window::window_near_pointer,
+};

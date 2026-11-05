@@ -25,7 +25,9 @@ egui_widgets = { workspace = true }
 gui_shared = { workspace = true }
 hkx_io = { workspace = true }
 nemesis_diff = { workspace = true }
+serde_hkx_for_gui = { workspace = true }
 skyrim_anim_data = { workspace = true }
+winnow = { workspace = true }
 skyrim_crc = { workspace = true }
 
 [lints]
