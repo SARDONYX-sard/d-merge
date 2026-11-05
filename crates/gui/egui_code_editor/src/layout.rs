@@ -13,6 +13,7 @@ use std::sync::Arc;
 use egui::{Color32, Stroke, text::LayoutJob};
 
 use super::{
+    inline_diff::{InlineDiff, row_shifts},
     language::{Diagnostic, Language},
     search::Matcher,
 };
@@ -36,6 +37,7 @@ pub(super) fn cached(
     language: &dyn Language,
     diagnostics: &[Diagnostic],
     search: Option<&Matcher>,
+    inline_diff: Option<&InlineDiff>,
 ) -> Arc<egui::Galley> {
     use std::hash::{Hash, Hasher};
 
@@ -43,7 +45,7 @@ pub(super) fn cached(
     // The glyph width changes with the fonts (a galley does not get invalidated by `set_fonts`).
     let glyph_width = ui.fonts_mut(|fonts| fonts.glyph_width(&font_id, '0'));
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (text, diagnostics, search).hash(&mut hasher);
+    (text, diagnostics, search, inline_diff).hash(&mut hasher);
     (font_id.size.to_bits(), glyph_width.to_bits(), ui.pixels_per_point().to_bits()).hash(&mut hasher);
     (ui.visuals().dark_mode, ui.visuals().text_color()).hash(&mut hasher);
     let key = hasher.finish();
@@ -53,9 +55,29 @@ pub(super) fn cached(
     {
         return Arc::clone(galley);
     }
-    let galley = layout(ui, text, language, diagnostics, search);
+    let mut galley = layout(ui, text, language, diagnostics, search);
+    if let Some(diff) = inline_diff {
+        make_room_for_removed_lines(&mut galley, diff);
+    }
     *cache = LayoutCache { key, galley: Some(Arc::clone(&galley)) };
     galley
+}
+
+/// Moves rows down to leave gaps for the old lines; see [`crate::inline_diff`].
+fn make_room_for_removed_lines(galley: &mut Arc<egui::Galley>, diff: &InlineDiff) {
+    if diff.removed.is_empty() {
+        return;
+    }
+    let galley = Arc::make_mut(galley);
+    let line_height = galley.rows.first().map_or(0.0, |row| row.rect().height());
+    let (shifts, total) = row_shifts(galley.rows.len(), &diff.removed);
+    #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
+    let pixels = |lines: usize| lines as f32 * line_height;
+    for (row, shift) in galley.rows.iter_mut().zip(shifts) {
+        row.pos.y += pixels(shift);
+    }
+    galley.rect.max.y += pixels(total);
+    galley.mesh_bounds.max.y += pixels(total);
 }
 
 /// Builds the galley for `text`.
@@ -187,5 +209,43 @@ fn format(font_id: &egui::FontId, color: Color32, underline: Option<Color32>) ->
         color,
         underline: underline.map_or(Stroke::NONE, |c| Stroke::new(1.5_f32, c)),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use egui::text::CCursor;
+
+    use super::*;
+    use crate::inline_diff::RemovedLines;
+
+    struct Plain;
+    impl Language for Plain {}
+
+    /// Two old lines above line 1: lines 1 and 2 move down, and positions still map to chars.
+    #[test]
+    fn the_gap_for_old_lines_keeps_cursor_positions_right() {
+        egui::__run_test_ui(|ui| {
+            let text = "aa\nbb\ncc";
+            let removed = vec![RemovedLines { before_line: 1, lines: vec![String::new(), String::new()] }];
+            let diff = InlineDiff { added: Vec::new(), removed };
+
+            let plain = cached(&mut LayoutCache::default(), ui, text, &Plain, &[], None, None);
+            let shifted = cached(&mut LayoutCache::default(), ui, text, &Plain, &[], None, Some(&diff));
+            let height = plain.rows[0].rect().height();
+            let top = |galley: &egui::Galley, row: usize| galley.rows[row].rect().top();
+
+            assert!((top(&shifted, 0) - top(&plain, 0)).abs() < 0.01);
+            assert!((top(&shifted, 1) - 2.0_f32.mul_add(height, top(&plain, 1))).abs() < 0.01);
+            assert!((shifted.rect.height() - 2.0_f32.mul_add(height, plain.rect.height())).abs() < 0.01);
+
+            // `b` of line 1 is char 3: the cursor is drawn at the moved row, and a click there finds it.
+            let rect = shifted.pos_from_cursor(CCursor::new(3));
+            assert!((rect.top() - top(&shifted, 1)).abs() < 0.01);
+            assert_eq!(shifted.cursor_from_pos(rect.center().to_vec2()).index.0, 3);
+            // A click in the gap goes to a neighbor line, not a wrong place far away.
+            let in_gap = egui::vec2(0.0, top(&shifted, 1) - height);
+            assert!(shifted.cursor_from_pos(in_gap).index.0 <= 3);
+        });
     }
 }

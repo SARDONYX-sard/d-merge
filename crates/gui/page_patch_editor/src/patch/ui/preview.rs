@@ -36,13 +36,18 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
     #[expect(clippy::cast_precision_loss, reason = "line lengths are small")]
     let content_width = (preview.longest_line() as f32).mul_add(char_width, TEXT_LEFT + 8.0);
 
+    // `show_rows` puts `item_spacing` between rows.
+    #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
+    let row_top = |row: usize| row as f32 * (row_height + ui.spacing().item_spacing.y);
     let mut scroll = egui::ScrollArea::both().auto_shrink(false);
-    if let Some(row) = preview.take_scroll_row() {
-        // `show_rows` puts `item_spacing` between rows: the `OPEN` line lands at the very top.
-        #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
-        let offset = row as f32 * (row_height + ui.spacing().item_spacing.y);
-        scroll = scroll.vertical_scroll_offset(offset);
+    if let Some(row) = preview.take_followed_scroll() {
+        scroll = scroll.vertical_scroll_offset((row_top(row) - ui.available_height() / 2.0).max(0.0));
     }
+    // After the line above: ▲ / ▼ was asked for last, so it wins. The `OPEN` line lands at the top.
+    if let Some(row) = preview.take_scroll_row() {
+        scroll = scroll.vertical_scroll_offset(row_top(row));
+    }
+    let followed = preview.followed_row();
 
     let current = preview.current;
     let mut event = None;
@@ -56,6 +61,9 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
             }
             if let Some(fill) = line_fill(ui, *kind, current) {
                 ui.painter().rect_filled(rect, 0.0, fill);
+            }
+            if followed == Some(first_row + i) {
+                ui.painter().rect_filled(rect, 0.0, ui.visuals().selection.bg_fill.gamma_multiply(0.3));
             }
             // `↶` at the start of each block, like git's conflict buttons.
             let gutter = egui::Rect::from_min_size(rect.min, egui::vec2(20.0, row_height));

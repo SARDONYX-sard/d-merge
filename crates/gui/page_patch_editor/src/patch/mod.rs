@@ -16,6 +16,7 @@
 //! Work is cached under the output dir and saved a moment after each edit (see [`workspace`]).
 
 mod diagnostics;
+mod inline_diff;
 mod language;
 mod names;
 mod navigate;
@@ -28,7 +29,7 @@ mod workspace;
 
 use std::{path::Path, rc::Rc, time::Instant};
 
-use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand};
+use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -76,6 +77,11 @@ pub(crate) struct PatchTool {
     preview: Option<(Option<String>, Result<(), String>)>,
     /// Unknown class / field names in the editor text (underlined).
     field_problems: Vec<Diagnostic>,
+    /// The changes shown inside the editor, compared to the template.
+    inline_diff: InlineDiff,
+    /// Show `inline_diff`, and put the preview on the right. From the settings.
+    show_inline_diff: bool,
+    preview_side: bool,
     /// One label per changed block of the selected object (its `↶` revert buttons).
     preview_view: Option<preview::Preview>,
     /// `Shift+F12`: who uses a symbol.
@@ -173,6 +179,8 @@ impl PatchTool {
             self.output.clone_from(&settings.output);
             self.mod_code.clone_from(&settings.mod_code);
         }
+        self.show_inline_diff = settings.inline_diff;
+        self.preview_side = settings.preview_side;
         self.sync_workspace(notify, i18n);
         self.draw(ui, i18n, notify);
 
@@ -181,6 +189,8 @@ impl PatchTool {
         if *editor != self.lsp {
             editor.clone_from(&self.lsp);
         }
+        settings.inline_diff = self.show_inline_diff;
+        settings.preview_side = self.preview_side;
         if settings.output != self.output || settings.mod_code != self.mod_code {
             settings.output.clone_from(&self.output);
             settings.mod_code.clone_from(&self.mod_code);
@@ -317,6 +327,9 @@ impl PatchTool {
             view.keep_current(current);
         }
         self.preview = Some((patch, check));
+        self.inline_diff = behavior
+            .template_object(id)
+            .map_or_else(InlineDiff::default, |template| inline_diff::changes(&template.text, &self.editor_text));
     }
 
     /// Enum / flag values only depend on the template: computed once per behavior.

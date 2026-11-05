@@ -1,18 +1,23 @@
 //! Draws the checkbox tree. The check state model is in [`crate::tree`].
 
 use egui_widgets::shadcn::Checkbox;
-use fast_hash::HashSet;
+use fast_hash::{HashMap, HashSet};
 use serde_hkx_for_gui::{DirEntry, status::Status};
 
-use crate::tree::{TreeView, count_files, for_each_dir, for_each_file, toggle};
+use crate::tree::{TreeView, for_each_dir, for_each_file, toggle};
 
 impl TreeView {
     /// Draws the tree. `status_of` returns the conversion status for a file path.
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui, status_of: &dyn Fn(&str) -> Option<Status>) {
-        let Self { roots, checked, expanded, .. } = self;
-        let mut state = NodeState { checked, expanded, status_of };
+        self.counts(); // computed now, so that the rows can read them while editing `checked`
+        let Self { roots, checked, expanded, counts, .. } = self;
+        let Some(counts) = counts.as_ref() else { return };
+        let mut state = NodeState { checked, expanded, status_of, counts, checks_changed: false };
         for root in roots.iter() {
             node_ui(ui, root, 0, &mut state);
+        }
+        if state.checks_changed {
+            self.invalidate_counts();
         }
     }
 }
@@ -22,6 +27,10 @@ struct NodeState<'a> {
     checked: &'a mut HashSet<String>,
     expanded: &'a mut HashSet<String>,
     status_of: &'a dyn Fn(&str) -> Option<Status>,
+    /// See `TreeView::counts`.
+    counts: &'a HashMap<String, (u32, u32)>,
+    /// A box was clicked: the counts must be recomputed.
+    checks_changed: bool,
 }
 
 /// One row (+ its children when expanded).
@@ -51,12 +60,13 @@ fn directory_row(ui: &mut egui::Ui, entry: &DirEntry, state: &mut NodeState) {
         toggle(state.expanded, &entry.path);
     }
 
-    let (total, checked) = count_files(entry, state.checked);
+    let (total, checked) = state.counts.get(&entry.path).copied().unwrap_or_default();
     let mut all = total > 0 && checked == total;
     let partial = checked > 0 && checked < total;
     if ui.add(Checkbox::without_text(&mut all).indeterminate(partial)).clicked() {
         // Clicking a full/partial directory clears it; an empty one checks everything.
         let check = checked == 0;
+        state.checks_changed = true;
         for_each_file(entry, &mut |file| {
             if check {
                 state.checked.insert(file.path.clone());
@@ -89,6 +99,7 @@ fn file_row(ui: &mut egui::Ui, entry: &DirEntry, state: &mut NodeState) {
     let mut is_checked = state.checked.contains(&entry.path);
     if ui.add(Checkbox::without_text(&mut is_checked)).changed() {
         toggle(state.checked, &entry.path);
+        state.checks_changed = true;
     }
     super::status_icon(ui, (state.status_of)(&entry.path));
     ui.label(&entry.name);

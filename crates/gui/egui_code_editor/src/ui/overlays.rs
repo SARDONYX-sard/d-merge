@@ -5,7 +5,7 @@
 
 use egui::{Color32, Galley, Pos2};
 
-use crate::{language::Language, text_pos::LinePos};
+use crate::{inline_diff::InlineDiff, language::Language, text_pos::LinePos};
 
 /// Signature help box just above the cursor line.
 ///
@@ -100,6 +100,48 @@ pub(crate) fn line_numbers(
         let color = if current_line == Some(line) { strong } else { weak };
         let pos = egui::pos2(x_range.end - 8.0, rect.center().y);
         painter.text(pos, egui::Align2::RIGHT_CENTER, (line + 1).to_string(), font.clone(), color);
+    }
+}
+
+/// The inline diff: a green tint on new lines, the old lines in red in their gaps.
+/// See [`crate::inline_diff`].
+pub(crate) fn inline_diff(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, diff: &InlineDiff) {
+    let clip = ui.clip_rect();
+    let painter = ui.painter();
+    let row_rect = |row: usize| galley.rows.get(row).map(|r| r.rect().translate(galley_pos.to_vec2()));
+    let row_across = |rect: egui::Rect| egui::Rect::from_x_y_ranges(clip.x_range(), rect.y_range());
+
+    let green = Color32::from_rgb(46, 160, 67).gamma_multiply(0.18);
+    for range in &diff.added {
+        for row in range.clone() {
+            if let Some(rect) = row_rect(row).filter(|rect| rect.intersects(clip)) {
+                painter.rect_filled(row_across(rect), 0.0, green);
+            }
+        }
+    }
+
+    let red = Color32::from_rgb(248, 81, 73).gamma_multiply(0.18);
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let height = galley.rows.first().map_or(0.0, |row| row.rect().height());
+    let text_color = ui.visuals().weak_text_color();
+    for zone in &diff.removed {
+        #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
+        let zone_height = zone.lines.len() as f32 * height;
+        // In the gap above its line, or under the last line.
+        let top = row_rect(zone.before_line).map_or_else(
+            || galley.rows.last().map_or(galley_pos.y, |r| r.rect().bottom() + galley_pos.y),
+            |rect| rect.top() - zone_height,
+        );
+        for (i, line) in zone.lines.iter().enumerate() {
+            #[expect(clippy::cast_precision_loss, reason = "line counts are small")]
+            let y = (i as f32).mul_add(height, top);
+            let rect = egui::Rect::from_x_y_ranges(clip.x_range(), y..=y + height);
+            if rect.intersects(clip) {
+                painter.rect_filled(rect, 0.0, red);
+                let pos = egui::pos2(galley_pos.x, y);
+                painter.text(pos, egui::Align2::LEFT_TOP, line.replace('\t', "    "), font.clone(), text_color);
+            }
+        }
     }
 }
 

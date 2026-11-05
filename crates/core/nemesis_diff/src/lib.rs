@@ -176,6 +176,14 @@ fn line_hunks(before: &str, after: &str) -> Vec<Hunk> {
         .collect()
 }
 
+/// The changed lines between two texts as they are written (not [`normalize`]d), for showing the
+/// changes on the text being edited: the line numbers are those of `new`.
+///
+/// e.g., `a\nb\n` -> `a\nc\nd\n`: one hunk, `old` = `1..2` (`b`), `new` = `1..3` (`c`, `d`).
+pub fn line_changes(old: &str, new: &str) -> Vec<Hunk> {
+    line_hunks(old, new)
+}
+
 /// The changed blocks of an edited object (the `OPEN` blocks of its patch, in order).
 pub fn hunks(template: &str, edited: &str) -> Vec<Hunk> {
     let before = normalize(template);

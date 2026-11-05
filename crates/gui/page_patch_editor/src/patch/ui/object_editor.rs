@@ -29,6 +29,9 @@ impl PatchTool {
         let preview_event = if is_new { None } else { self.preview_panel(ui, i18n) };
         let result = self.editor_panel(ui, i18n, &id, is_new);
 
+        if let Some(view) = &mut self.preview_view {
+            view.follow_editor_line(self.cursor_line, &self.editor_text);
+        }
         if self.apply_editor_result(result, &id) {
             self.enter_tree(ui, editor_id);
         }
@@ -52,7 +55,12 @@ impl PatchTool {
     /// `Patch preview ▲ ▼ 2/5 ✔` and its lines.
     fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
         let mut event = None;
-        egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(ui, |ui| {
+        let panel = if self.preview_side {
+            egui::Panel::right("nemesis_preview_side").default_size(520.0)
+        } else {
+            egui::Panel::bottom("nemesis_preview").default_size(260.0)
+        };
+        panel.resizable(true).show(ui, |ui| {
             let Some((patch, check)) = &self.preview else { return };
             ui.horizontal(|ui| {
                 ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
@@ -108,6 +116,7 @@ impl PatchTool {
             // A new object has no preview panel: the parser's verdict goes here.
             let error = self.preview.as_ref().and_then(|(_, check)| check.as_ref().err()).filter(|_| is_new);
             toolbar(ui, i18n, &mut self.editor_mode, &mut self.show_lsp_options, error.map(String::as_str));
+            ui.horizontal(|ui| diff_view_options(ui, i18n, &mut self.show_inline_diff, &mut self.preview_side));
             if self.show_lsp_options {
                 lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
             }
@@ -123,6 +132,7 @@ impl PatchTool {
                     .keymap(keymap)
                     .labels(labels)
                     .actions(&actions)
+                    .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
                     .show(ui, &mut self.editor);
                 if let Some(cursor) = output.cursor {
                     self.cursor_line = cursor.line;
@@ -142,6 +152,13 @@ impl PatchTool {
         });
         result
     }
+}
+
+/// `☑ Inline diff  ☑ Preview on the side`
+fn diff_view_options(ui: &mut egui::Ui, i18n: &I18nMap, inline_diff: &mut bool, preview_side: &mut bool) {
+    ui.add(Checkbox::new(inline_diff, i18n.t(I18nKey::NemesisInlineDiff)))
+        .on_hover_text(i18n.t(I18nKey::NemesisInlineDiffHover));
+    ui.add(Checkbox::new(preview_side, i18n.t(I18nKey::NemesisPreviewSide)));
 }
 
 /// The language features the settings turn on, and what XML has no use for.

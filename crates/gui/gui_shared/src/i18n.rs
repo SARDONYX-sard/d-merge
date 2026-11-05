@@ -660,6 +660,15 @@ pub enum I18nKey {
     /// j / k: move, h / l: fold, Enter: back to the editor
     NemesisTreeKeysHint,
 
+    /// Inline diff
+    NemesisInlineDiff,
+
+    /// Show the changes inside the editor: new lines in green, the old ones in red between them.
+    NemesisInlineDiffHover,
+
+    /// Preview on the side
+    NemesisPreviewSide,
+
     /// Focus Object Tree
     NemesisFocusTree,
 

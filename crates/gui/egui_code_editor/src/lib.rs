@@ -31,6 +31,7 @@
 mod completion;
 mod find;
 mod hover;
+mod inline_diff;
 pub mod keymap;
 pub mod language;
 pub mod languages;
@@ -55,6 +56,7 @@ use self::{
     ui::{overlays, palette::PaletteInput},
 };
 pub use self::{
+    inline_diff::{InlineDiff, RemovedLines},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
         CompletionItem, CompletionList, Diagnostic, Language, Location, QuickFix, References, Severity, SignatureHelp,
@@ -205,6 +207,7 @@ pub struct CodeEditor<'a> {
     whitespace: bool,
     labels: EditorLabels<'a>,
     actions: &'a [EditorAction<'a>],
+    inline_diff: Option<&'a InlineDiff>,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -228,6 +231,7 @@ impl<'a> CodeEditor<'a> {
             whitespace: true,
             labels: EditorLabels::default(),
             actions: &[],
+            inline_diff: None,
         }
     }
 
@@ -250,6 +254,12 @@ impl<'a> CodeEditor<'a> {
     /// Key binding style. Default: [`Keymap::Normal`].
     pub const fn keymap(mut self, keymap: Keymap) -> Self {
         self.keymap = keymap;
+        self
+    }
+
+    /// Shows the changes inside the text, like Monaco's inline diff. See [`InlineDiff`].
+    pub const fn inline_diff(mut self, diff: Option<&'a InlineDiff>) -> Self {
+        self.inline_diff = diff;
         self
     }
 
@@ -297,6 +307,7 @@ impl<'a> CodeEditor<'a> {
             whitespace,
             labels,
             actions,
+            inline_diff,
         } = self;
         let frame = EditorFrame {
             id,
@@ -304,6 +315,7 @@ impl<'a> CodeEditor<'a> {
             underlines: if features.diagnostics { diagnostics } else { &[] },
             features,
             keymap,
+            inline_diff,
         };
 
         let input = read_input(frame, ui, state, text, &labels, actions);
@@ -335,6 +347,9 @@ impl<'a> CodeEditor<'a> {
         update_completion_popup(frame, ui, state, text, cursor, inserting, completion_request);
         changed |= accept_completion(ui, id, state, text, anchor, input.accept_key, &mut cursor, response);
 
+        if let Some(diff) = inline_diff {
+            overlays::inline_diff(ui, placed.0, placed.1, diff);
+        }
         draw_text_background(ui, placed, cursor.map(|cursor| cursor.line), whitespace);
         changed |= run_quick_fix(ui.ctx(), id, state, text, anchor, input.fix);
         draw_line_decorations(
@@ -394,6 +409,7 @@ struct EditorFrame<'a> {
     underlines: &'a [Diagnostic],
     features: EditorFeatures,
     keymap: Keymap,
+    inline_diff: Option<&'a InlineDiff>,
 }
 
 /// What the keys of this frame asked for. See [`read_input`].
@@ -465,7 +481,15 @@ fn show_text(
     let hide_text_cursor = state.keymap.hides_text_cursor(frame.keymap);
     let look = TextLook { desired_rows, dim_selection: frame.keymap == Keymap::Vim, hide_text_cursor, gutter };
     let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
-        layout::cached(&mut state.layout, ui, buf.as_str(), frame.language, frame.underlines, search.as_ref())
+        layout::cached(
+            &mut state.layout,
+            ui,
+            buf.as_str(),
+            frame.language,
+            frame.underlines,
+            search.as_ref(),
+            frame.inline_diff,
+        )
     };
     show_text_edit(ui, frame.id, text, look, &mut layouter)
 }

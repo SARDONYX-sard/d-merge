@@ -10,7 +10,7 @@
 //! Clicking a directory checks/unchecks every file below it.
 //! This avoids keeping directory flags in sync with their children.
 
-use fast_hash::HashSet;
+use fast_hash::{HashMap, HashSet};
 use serde_hkx_for_gui::DirEntry;
 
 /// Loaded tree + user selection. Not persisted (a tree may contain thousands of files).
@@ -27,6 +27,10 @@ pub(crate) struct TreeView {
 
     /// Expanded directory paths.
     pub(super) expanded: HashSet<String>,
+
+    /// Directory path -> `(files below, of which checked)`, for its checkbox. Counting walks all
+    /// the files below, too slow for every row of every frame, so this only runs after a change.
+    pub(super) counts: Option<HashMap<String, (u32, u32)>>,
 }
 
 impl TreeView {
@@ -47,8 +51,26 @@ impl TreeView {
 
         self.roots = entries;
         self.checked.clear();
+        self.counts = None;
         self.expanded = self.roots.iter().map(|root| root.path.clone()).collect();
         Ok(())
+    }
+
+    /// The checks changed: the directory counts are out of date.
+    pub(super) fn invalidate_counts(&mut self) {
+        self.counts = None;
+    }
+
+    /// See [`Self::counts`].
+    pub(super) fn counts(&mut self) -> &HashMap<String, (u32, u32)> {
+        let Self { roots, checked, counts, .. } = self;
+        counts.get_or_insert_with(|| {
+            let mut counts = HashMap::default();
+            for root in roots.iter() {
+                add_dir_counts(root, checked, &mut counts);
+            }
+            counts
+        })
     }
 
     /// Drops the tree (e.g., "All Clear").
@@ -83,6 +105,7 @@ impl TreeView {
 
     /// Checks every file, or unchecks all when something is already checked.
     pub(crate) fn toggle_select_all(&mut self) {
+        self.counts = None;
         if self.checked.is_empty() {
             for root in &self.roots {
                 for_each_file(root, &mut |file| {
@@ -133,12 +156,59 @@ pub(super) fn toggle(set: &mut HashSet<String>, key: &str) {
     }
 }
 
-/// `(files below entry, of which checked)`. A directory's checkbox is derived from these.
-pub(super) fn count_files(entry: &DirEntry, checked: &HashSet<String>) -> (usize, usize) {
+/// Records `(files, checked)` of `entry` and every directory below it, and returns those of `entry`:
+/// each directory adds up its children, so the whole tree is one pass.
+fn add_dir_counts(entry: &DirEntry, checked: &HashSet<String>, counts: &mut HashMap<String, (u32, u32)>) -> (u32, u32) {
+    let Some(children) = &entry.children else {
+        return (1, u32::from(checked.contains(&entry.path)));
+    };
     let (mut total, mut on) = (0, 0);
-    for_each_file(entry, &mut |file| {
-        total += 1;
-        on += usize::from(checked.contains(&file.path));
-    });
+    for child in children {
+        let (child_total, child_on) = add_dir_counts(child, checked, counts);
+        total += child_total;
+        on += child_on;
+    }
+    counts.insert(entry.path.clone(), (total, on));
     (total, on)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(path: &str) -> DirEntry {
+        DirEntry { name: path.to_owned(), path: path.to_owned(), children: None }
+    }
+
+    fn dir(path: &str, children: Vec<DirEntry>) -> DirEntry {
+        DirEntry { name: path.to_owned(), path: path.to_owned(), children: Some(children) }
+    }
+
+    fn sample() -> TreeView {
+        let roots = vec![dir("root", vec![file("a"), dir("sub", vec![file("b"), file("c")])])];
+        TreeView { roots, ..TreeView::default() }
+    }
+
+    #[test]
+    fn directories_add_up_their_files() {
+        let mut tree = sample();
+        tree.checked.insert("b".to_owned());
+        assert_eq!(tree.counts().get("root"), Some(&(3, 1)));
+        assert_eq!(tree.counts().get("sub"), Some(&(2, 1)));
+
+        // Checking a file is seen after the invalidation.
+        tree.checked.insert("a".to_owned());
+        assert_eq!(tree.counts().get("root"), Some(&(3, 1)));
+        tree.invalidate_counts();
+        assert_eq!(tree.counts().get("root"), Some(&(3, 2)));
+    }
+
+    #[test]
+    fn select_all_toggles_and_lists_in_tree_order() {
+        let mut tree = sample();
+        tree.toggle_select_all();
+        assert_eq!(tree.checked_files(), ["a", "b", "c"]);
+        tree.toggle_select_all();
+        assert!(tree.checked_files().is_empty());
+    }
 }

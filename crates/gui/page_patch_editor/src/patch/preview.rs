@@ -33,6 +33,10 @@ pub(super) struct Preview {
     pub(super) current: usize,
     /// A pending scroll to `current`.
     scroll_to_current: bool,
+    /// The editor line the preview follows, and its row (highlighted so you see where you are).
+    followed: Option<(usize, Option<usize>)>,
+    /// A pending scroll to the followed row.
+    scroll_to_followed: bool,
 }
 
 impl Preview {
@@ -60,7 +64,15 @@ impl Preview {
             longest_line = longest_line.max(line.chars().count());
             lines.push((line_kind, line));
         }
-        Self { lines, longest_line, blocks, current: 0, scroll_to_current: false }
+        Self {
+            lines,
+            longest_line,
+            blocks,
+            current: 0,
+            scroll_to_current: false,
+            followed: None,
+            scroll_to_followed: false,
+        }
     }
 
     pub(super) fn lines(&self) -> &[(Kind, String)] {
@@ -88,6 +100,38 @@ impl Preview {
         self.current =
             if forward { (self.current + 1) % self.blocks } else { (self.current + self.blocks - 1) % self.blocks };
         self.scroll_to_current = true;
+    }
+
+    /// The editor's cursor is on `line`: highlights the row showing it and scrolls there.
+    /// Does nothing while the line stays the same, so you can scroll the preview freely.
+    pub(super) fn follow_editor_line(&mut self, line: usize, editor_text: &str) {
+        if self.followed.is_some_and(|(followed, _)| followed == line) {
+            return;
+        }
+        let row = self.row_of_editor_line(line, editor_text);
+        self.followed = Some((line, row));
+        self.scroll_to_followed = row.is_some();
+    }
+
+    /// The highlighted row. See [`Self::follow_editor_line`].
+    pub(super) fn followed_row(&self) -> Option<usize> {
+        self.followed.and_then(|(_, row)| row)
+    }
+
+    /// The pending scroll: the followed row, which goes to the middle of the view.
+    pub(super) fn take_followed_scroll(&mut self) -> Option<usize> {
+        std::mem::take(&mut self.scroll_to_followed).then(|| self.followed_row()).flatten()
+    }
+
+    /// The preview row showing editor line `line`. The reverse of [`Self::editor_line_of`]: the n-th
+    /// line with this text in the editor is the n-th one in the preview.
+    fn row_of_editor_line(&self, line: usize, editor_text: &str) -> Option<usize> {
+        let target = editor_text.lines().nth(line)?.trim();
+        let occurrence = editor_text.lines().take(line).filter(|other| other.trim() == target).count();
+        let is_mod_line = |kind: Kind| matches!(kind, Kind::Common | Kind::New);
+        let rows = self.lines.iter().enumerate();
+        let mut same = rows.filter(|(_, (kind, text))| is_mod_line(*kind) && text.trim() == target);
+        same.nth(occurrence).map(|(row, _)| row)
     }
 
     /// The line of the editor text that preview row `row` shows, to jump there.
@@ -162,6 +206,24 @@ mod tests {
         assert_eq!(preview.current, 0);
         preview.step(false);
         assert_eq!(preview.current, 1);
+    }
+
+    #[test]
+    fn follows_the_editor_line() {
+        let patch = "a\nx\n<!-- MOD_CODE ~m~ OPEN -->\nnew\nx\n<!-- ORIGINAL -->\nold\n<!-- CLOSE -->\nb\n";
+        let mut preview = Preview::new(patch);
+        let editor = "a\nx\nnew\n\t\tx\nb\n";
+
+        preview.follow_editor_line(3, editor); // the 2nd `x`
+        assert_eq!(preview.followed_row(), Some(4));
+        assert_eq!(preview.take_followed_scroll(), Some(4));
+        assert_eq!(preview.take_followed_scroll(), None);
+
+        preview.follow_editor_line(3, editor); // same line: the view stays where you scrolled it
+        assert_eq!(preview.take_followed_scroll(), None);
+
+        preview.follow_editor_line(99, editor); // no such line
+        assert_eq!(preview.followed_row(), None);
     }
 
     #[test]
