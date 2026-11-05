@@ -1,6 +1,6 @@
 [package]
 name = "gui_shared_derive"
-version.workspace = true
+version = "0.0.0"
 description = "egui ver. derive attr"
 
 authors.workspace = true
@@ -18,8 +18,8 @@ proc-macro = true
 
 
 [dependencies]
-syn = { version = "3.0.0", features = [] }
-quote = "1.0.45"
+syn = { workspace = true }
+quote = { workspace = true }
 
 
 [lints]

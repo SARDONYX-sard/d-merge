@@ -1,6 +1,6 @@
 [package]
 name = "egui_widgets"
-version.workspace = true
+version = "0.0.0"
 description = "Reusable egui widgets: shadcn-styled controls, mini Markdown, notifications"
 
 authors.workspace = true

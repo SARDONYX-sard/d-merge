@@ -1,6 +1,6 @@
 [package]
 name = "skyrim_anim_data"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core"
 
 authors.workspace = true
@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bitvec = "1.0.1"
+bitvec = { workspace = true }
 indexmap = { workspace = true }
 fast_hash = { workspace = true }
 rayon = { workspace = true }

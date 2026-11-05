@@ -14,7 +14,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use egui_code_editor::languages::Xml;
 use fast_hash::HashMap;
 use parking_lot::Mutex;
 use serde_hkx_for_gui::hkanno::{Format, Hkanno};
@@ -27,7 +26,7 @@ type Outcome = Result<String, String>;
 #[derive(Default)]
 pub(crate) struct Preview {
     /// Preview XML split into lines (for fast, virtualized drawing).
-    lines: Vec<String>,
+    pub(crate) lines: Vec<String>,
 
     /// Error of the last build (shown instead of the title).
     pub(crate) error: Option<String>,
@@ -42,10 +41,10 @@ pub(crate) struct Preview {
     jump_map: HashMap<usize, usize>,
 
     /// Preview line to scroll to on the next draw.
-    scroll_to: Option<usize>,
+    pub(crate) scroll_to: Option<usize>,
 
     /// Preview line highlighted as the jump target.
-    highlighted: Option<usize>,
+    pub(crate) highlighted: Option<usize>,
 }
 
 impl Preview {
@@ -117,34 +116,6 @@ impl Preview {
             self.scroll_to = Some(target);
         }
     }
-
-    /// Draws the XML (only the visible rows are laid out, so huge files stay fast).
-    pub(crate) fn ui(&mut self, ui: &mut egui::Ui) {
-        let font = egui::TextStyle::Monospace.resolve(ui.style());
-        let row_height = ui.fonts_mut(|f| f.row_height(&font));
-        let row_step = row_height + ui.spacing().item_spacing.y;
-
-        let mut area = egui::ScrollArea::both().id_salt("hkanno_preview").auto_shrink(false);
-        if let Some(target) = self.scroll_to.take() {
-            // Put the target line in the middle of the view.
-            let offset = (target as f32).mul_add(row_step, -ui.available_height() / 2.0);
-            area = area.vertical_scroll_offset(offset.max(0.0));
-        }
-
-        let highlight = ui.visuals().selection.bg_fill.gamma_multiply(0.5);
-        area.show_rows(ui, row_height, self.lines.len(), |ui, rows| {
-            for i in rows {
-                // Colored per visible row only, so huge files stay fast.
-                let mut job = egui_code_editor::line_job(ui, &self.lines[i], &Xml);
-                if self.highlighted == Some(i) {
-                    for section in &mut job.sections {
-                        section.format.background = highlight;
-                    }
-                }
-                ui.add(egui::Label::new(job).extend());
-            }
-        });
-    }
 }
 
 /// editor line -> XML line, matched by order of appearance (see the module docs).
@@ -169,4 +140,30 @@ fn build_jump_map(editor_text: &str, xml_lines: &[String]) -> HashMap<usize, usi
     }
 
     editor_tracks.into_iter().zip(xml_tracks).chain(editor_times.into_iter().zip(xml_times)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jump_map_pairs_lines_by_order() {
+        let editor = "# numOriginalFrames: 38\ntrackName: Root\n0.1 event\ntrackName: Other\n0.2 event\n";
+        let xml: Vec<String> = [
+            "<hkobject>",
+            r#"<hkparam name="trackName">Root</hkparam>"#,
+            r#"<hkparam name="time">0.1</hkparam>"#,
+            r#"<hkparam name="trackName">Other</hkparam>"#,
+            r#"<hkparam name="time">0.2</hkparam>"#,
+        ]
+        .map(str::to_owned)
+        .to_vec();
+
+        let map = build_jump_map(editor, &xml);
+        assert_eq!(map.get(&1), Some(&1));
+        assert_eq!(map.get(&2), Some(&2));
+        assert_eq!(map.get(&3), Some(&3));
+        assert_eq!(map.get(&4), Some(&4));
+        assert_eq!(map.get(&0), None); // a comment has no XML line
+    }
 }

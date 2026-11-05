@@ -1,6 +1,5 @@
-//! App-owned UI panels.
+//! App-owned UI: what is shown on every page.
 
-pub(crate) mod bottom_panel;
-pub(crate) mod mod_list;
-pub(crate) mod top_panels;
+pub(crate) mod notification;
+pub(crate) mod theme_box;
 pub(crate) mod window;

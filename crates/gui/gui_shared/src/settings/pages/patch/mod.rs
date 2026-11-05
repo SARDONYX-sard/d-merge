@@ -84,7 +84,10 @@ impl PatchSettings {
     /// Constructs a GitHub issue URL pre-filled with system information.
     ///
     /// Included in the help window's bug-report section.
-    pub fn create_issue_link(&self) -> String {
+    ///
+    /// `app_version`: e.g. `2.8.0`. From the app, so that this crate does not depend on the version
+    /// and a release does not rebuild everything that uses it.
+    pub fn create_issue_link(&self, app_version: &str) -> String {
         use std::{borrow::Cow, path::Path};
 
         let runtime = self.behavior.target_runtime;
@@ -97,6 +100,6 @@ impl PatchSettings {
         let skyrim_version =
             skyrim_data_dir.and_then(|skyrim_data_dir| runtime.get_version(skyrim_data_dir).map(|ver| ver.to_string()));
 
-        gh_issue_link::new_gh_issue_link(env!("CARGO_PKG_VERSION"), runtime, skyrim_version.as_deref())
+        gh_issue_link::new_gh_issue_link(app_version, runtime, skyrim_version.as_deref())
     }
 }

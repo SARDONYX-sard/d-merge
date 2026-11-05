@@ -237,3 +237,25 @@ mod tests {
         assert_eq!(txt_to_text(b"\xEF\xBB\xBF0.1 a\r\n0.2 b"), "0.1 a\n0.2 b");
     }
 }
+
+/// Replaces the chars `columns` of line `line` (a quick fix).
+///
+/// e.g., line 1, columns `0..3`, `new`: `a\nold b` -> `a\nnew b`
+pub(crate) fn replace_columns(text: &mut String, line: usize, columns: std::ops::Range<usize>, new_text: &str) {
+    use egui_code_editor::text_pos::{LinePos, char_to_byte};
+    let at = |column| LinePos { line, column }.to_char_index(text);
+    let (start, end) = (char_to_byte(text, at(columns.start)), char_to_byte(text, at(columns.end)));
+    text.replace_range(start..end, new_text);
+}
+
+#[cfg(test)]
+mod replace_tests {
+    use super::*;
+
+    #[test]
+    fn replaces_columns_of_a_line() {
+        let mut text = "first\nold b".to_owned();
+        replace_columns(&mut text, 1, 0..3, "new");
+        assert_eq!(text, "first\nnew b");
+    }
+}

@@ -7,7 +7,7 @@ use gui_shared::{
     settings::ui::editor::{EditorMode, LspOptions},
 };
 
-use super::references::references_window;
+use super::{preview::PreviewEvent, references::references_window};
 use crate::patch::{EditorResult, FocusAt, PatchTool, language::NemesisXml};
 
 /// The id of the palette's "focus the object tree" command.
@@ -26,7 +26,7 @@ impl PatchTool {
 
         // No preview for a new object: it is written as is.
         let is_new = self.workspace.behaviors[self.active].added.contains_key(&id);
-        let revert = if is_new { None } else { self.preview_panel(ui, i18n) };
+        let preview_event = if is_new { None } else { self.preview_panel(ui, i18n) };
         let result = self.editor_panel(ui, i18n, &id, is_new);
 
         if self.apply_editor_result(result, &id) {
@@ -39,14 +39,19 @@ impl PatchTool {
             }
             self.focus_editor = Some(FocusAt::Line(line));
         }
-        if let Some(block) = revert {
-            self.revert_block(&id, block);
+        match preview_event {
+            Some(PreviewEvent::Revert(block)) => self.revert_block(&id, block),
+            Some(PreviewEvent::JumpToEditor(row)) => {
+                let line = self.preview_view.as_ref().and_then(|view| view.editor_line_of(row, &self.editor_text));
+                self.focus_editor = line.map(FocusAt::Line);
+            }
+            None => {}
         }
     }
 
-    /// `Patch preview ▲ ▼ 2/5 ✔` and its lines. Returns the block whose `↶` was clicked.
-    fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<usize> {
-        let mut revert = None;
+    /// `Patch preview ▲ ▼ 2/5 ✔` and its lines.
+    fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
+        let mut event = None;
         egui::Panel::bottom("nemesis_preview").resizable(true).default_size(260.0).show(ui, |ui| {
             let Some((patch, check)) = &self.preview else { return };
             ui.horizontal(|ui| {
@@ -68,10 +73,10 @@ impl PatchTool {
                 }
             });
             if let Some(view) = &mut self.preview_view {
-                revert = super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover));
+                event = super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover));
             }
         });
-        revert
+        event
     }
 
     /// The toolbar, the editor and the Vim status line. Returns what the editor asked for: it is
@@ -84,6 +89,7 @@ impl PatchTool {
         let language = NemesisXml {
             events: &names.events,
             variables: &names.variables,
+            variable_types: &names.variable_types,
             values: &values,
             graph: &names.graph,
             fields: context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice())),

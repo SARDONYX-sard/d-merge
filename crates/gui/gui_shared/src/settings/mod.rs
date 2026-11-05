@@ -20,6 +20,10 @@ pub use self::{
 };
 use crate::error::{Error, *};
 
+/// The layout of `settings.json` written by this code. It only has to change with the layout:
+/// [`Settings::load`] picks the migration by its major version.
+const LAYOUT_VERSION: Version = Version::new(3, 0, 0);
+
 /// Top-level settings written to and read from `settings.json`.
 ///
 /// Each field group is a dedicated struct so that a call-site only borrows
@@ -27,7 +31,7 @@ use crate::error::{Error, *};
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// Schema version written by the last save.
+    /// [`LAYOUT_VERSION`] of the last save. The key keeps its name for older `settings.json`.
     ///
     /// Since this option was not available until version 1.8.0.
     pub app_version: Version,
@@ -45,7 +49,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            app_version: crate::CURRENT_VERSION,
+            app_version: LAYOUT_VERSION,
             ui: UiSettings::default(),
             log: LogSettings::default(),
             pages: PagesSettings::default(),
@@ -103,7 +107,7 @@ impl Settings {
             Some(_) => sonic_rs::from_str(text).context(SerializeJsonSnafu { path: Self::PATH })?, // v3
         };
 
-        settings.app_version = semver::Version::new(3, 0, 0); // FIXME: after release, remove it!
+        settings.app_version = LAYOUT_VERSION;
         Ok(settings)
     }
 

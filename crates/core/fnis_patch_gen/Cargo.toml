@@ -1,6 +1,6 @@
 [package]
 name = "fnis_patch_gen"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core: generates behavior patches from FNIS mods (FNIS_*_List.txt)"
 
 authors.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "hkanno_lsp"
-version = "0.1.0"
+version = "0.0.0"
 description = "Language features (diagnostics, completion, hover, ...) for the hkanno text format"
 
 authors.workspace = true

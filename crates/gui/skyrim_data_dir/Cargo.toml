@@ -1,6 +1,6 @@
 [package]
 name = "skyrim_data_dir"
-version = "0.1.0"
+version = "0.0.0"
 description = "Get Skyrim data directory(For windows)"
 
 authors.workspace = true

@@ -283,6 +283,7 @@ impl<'a> CodeEditor<'a> {
         self
     }
 
+    /// One frame; see the crate docs for the order of the steps and why.
     pub fn show(self, ui: &mut egui::Ui, state: &mut CodeEditorState) -> CodeEditorOutput<'a> {
         let Self {
             id,
@@ -297,57 +298,30 @@ impl<'a> CodeEditor<'a> {
             labels,
             actions,
         } = self;
-        let has_focus = current_focus(ui, id, keymap, state.had_focus);
-
-        // ── 1. Keys owned by the popups / keymap (must run before the TextEdit) ──
-        state.hover.handle_input(ui, id); // before the keymap swallows the key events
-        let context = PaletteContext { keymap, features, inserting: state.keymap.is_inserting(keymap) };
-        let palette_input = PaletteInput { id, has_focus, context, labels: &labels, actions };
-        let picked = ui::palette::show(&mut state.palette, ui, palette_input);
-        let triggers = ui::palette::read_triggers(ui, has_focus).with_picked(picked);
-        state.open_requested_menus(ui.ctx(), id, text, language, triggers);
-        // While the quick fix menu is open it owns the arrow keys.
-        let mut fix = state.quick_fix.handle_keys(ui);
-        state.find.handle_keys(keymap, ui, id, text, has_focus);
-        let accept_key = state.completion.handle_keys(ui);
-        let keys = if has_focus && !state.quick_fix.is_open() {
-            state.keymap.handle(keymap, ui, id, text, state.view)
-        } else {
-            KeymapOutput::default()
+        let frame = EditorFrame {
+            id,
+            language,
+            underlines: if features.diagnostics { diagnostics } else { &[] },
+            features,
+            keymap,
         };
-        let mut changed = keys.changed;
-        let navigate_keys = match keys.command {
+
+        let input = read_input(frame, ui, state, text, &labels, actions);
+        let mut changed = input.keys.changed | apply_format(frame, text, input.triggers);
+        let navigate_keys = match input.keys.command {
             Some(EditorCommand::GoToDefinition) => Some(false),
             Some(EditorCommand::FindReferences) => Some(true),
-            _ => triggers.navigate, // (Vim's `gd` / `gD` arrive as commands, the rest as keys.)
+            _ => input.triggers.navigate, // (Vim's `gd` / `gD` arrive as commands, the rest as keys.)
         };
         let inserting = state.keymap.is_inserting(keymap);
 
-        let ctrl_space = features.completion && inserting && triggers.completion;
-        if features.format
-            && triggers.format
-            && let Some(formatted) = language.format(text)
-            && formatted != *text
-        {
-            *text = formatted;
-            changed = true;
-        }
-
-        // ── 2. The TextEdit ───────────────────────────────────────────────────
-        let underlines = if features.diagnostics { diagnostics } else { &[] };
-        let search = state.search_highlight(keymap);
-        let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
-            layout::cached(&mut state.layout, ui, buf.as_str(), language, underlines, search.as_ref())
-        };
-        // e.g., Vim Normal mode draws a block cursor: no blinking I-beam then.
-        let hide_text_cursor = state.keymap.hides_text_cursor(keymap);
         // Gutter for the line numbers on the left (drawn after the text is laid out, below).
         let gutter = line_numbers.then(|| overlays::gutter_width(ui, text));
-        let look = TextLook { desired_rows, dim_selection: keymap == Keymap::Vim, hide_text_cursor, gutter };
-        let (gutter_left, output) = show_text_edit(ui, id, text, look, &mut layouter);
-
+        let (gutter_left, output) = show_text(frame, ui, state, text, desired_rows, gutter);
         let response = &output.response.response;
+        let placed = (&*output.galley, output.galley_pos);
         changed |= response.changed();
+
         // egui reports the cursor only while the editor has the focus; a jump from outside (e.g., a
         // problems list, `set_cursor`) arrives one frame before the focus does, so read the state.
         let cursor_range = output
@@ -355,103 +329,264 @@ impl<'a> CodeEditor<'a> {
             .or_else(|| egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range()));
         let cursor_index = cursor_range.map(|range| range.primary.index.0);
         let mut cursor = cursor_index.map(|i| LinePos::from_char_index(text, i));
+        let anchor = cursor_index.map(|i| placed.0.pos_from_cursor(CCursor::new(i)).translate(placed.1.to_vec2()));
 
-        // ── 3. Completion ────────────────────────────────────────────────────────
-        if features.completion && inserting {
-            update_completion(&mut state.completion, ui, language, text, cursor, (ctrl_space, response.changed()));
-        } else {
-            state.completion.close();
-        }
+        let completion_request = (input.triggers.completion, response.changed());
+        update_completion_popup(frame, ui, state, text, cursor, inserting, completion_request);
+        changed |= accept_completion(ui, id, state, text, anchor, input.accept_key, &mut cursor, response);
 
-        let anchor =
-            cursor_index.map(|i| output.galley.pos_from_cursor(CCursor::new(i)).translate(output.galley_pos.to_vec2()));
-        let clicked = anchor.is_some_and(|anchor| state.completion.ui(ui.ctx(), id, anchor));
-        if (clicked || accept_key)
-            && let Some(accepted) = state.completion.accept(text)
-        {
-            *text = accepted.text;
-            set_selection(ui.ctx(), id, accepted.select.clone());
-            cursor = Some(LinePos::from_char_index(text, accepted.select.end));
-            changed = true;
-            response.request_focus();
-        }
-
-        // ── 4. Overlays ──────────────────────────────────────────────────────────
-        let (galley, galley_pos) = (&output.galley, output.galley_pos);
-        draw_text_background(ui, (galley, galley_pos), cursor.map(|cursor| cursor.line), whitespace);
-        if let Some(anchor) = anchor
-            && let Some(clicked) = state.quick_fix.ui(ui.ctx(), id, anchor)
-        {
-            fix = Some(clicked);
-        }
-        if let Some(fix) = fix.take() {
-            let at = apply_quick_fix(text, &fix);
-            set_cursor(ui.ctx(), id, at);
-            changed = true;
-        }
-        if let Some(width) = gutter {
-            let current = cursor.map(|c| c.line);
-            overlays::line_numbers(ui, galley, galley_pos, gutter_left..gutter_left + width, current);
-        }
-        if let Some(ranges) = state.keymap.block_selection(keymap, text) {
-            overlays::block_selection(ui, galley, galley_pos, &ranges);
-        }
+        draw_text_background(ui, placed, cursor.map(|cursor| cursor.line), whitespace);
+        changed |= run_quick_fix(ui.ctx(), id, state, text, anchor, input.fix);
+        draw_line_decorations(
+            ui,
+            state,
+            keymap,
+            text,
+            placed,
+            gutter.map(|width| gutter_left..gutter_left + width),
+            cursor,
+        );
         if let Some(cursor) = anchor {
-            scroll_to_cursor(ui, id, cursor, galley, keys.scroll);
+            scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
-        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text, (galley, galley_pos));
-        state.view = visible_lines(ui, galley, galley_pos);
+        state.find.ui(ui, id, response.rect.intersect(ui.clip_rect()), text, placed);
+        state.view = visible_lines(ui, placed.0, placed.1);
         state.had_focus = response.has_focus();
         if let Some(index) = state.keymap.block_cursor(keymap, cursor_index, text) {
-            overlays::block_cursor(ui, galley, galley_pos, index);
+            overlays::block_cursor(ui, placed.0, placed.1, index);
         }
         if features.inlay_hints {
-            overlays::inlay_hints(ui, galley, galley_pos, language, text);
+            overlays::inlay_hints(ui, placed.0, placed.1, language, text);
         }
-        if features.hover || features.diagnostics {
-            let hover = HoverCtx {
-                id,
-                response,
-                galley,
-                galley_pos,
-                text,
-                language,
-                diagnostics: underlines,
-                with_docs: features.hover,
-            };
-            let open_at = cursor_index.filter(|_| keys.show_hover || triggers.hover); // e.g., Vim `K`
-            state.hover.show(ui, &hover, open_at);
-        }
-        if features.signature_help
-            && response.has_focus()
-            && inserting
-            && !state.completion.is_open()
-            && let (Some(cursor), Some(anchor)) = (cursor, anchor)
-        {
-            overlays::signature_box(ui.ctx(), id, anchor, language, text, cursor);
+        let open_hover = cursor_index.filter(|_| input.keys.show_hover || input.triggers.hover); // e.g., Vim `K`
+        show_hover(frame, ui, state, text, response, placed, open_hover);
+        if inserting && !state.completion.is_open() && response.has_focus() {
+            show_signature(frame, ui, text, cursor, anchor);
         }
 
         let pointer = response.hover_pos().map(|pos| {
-            let index = galley.cursor_from_pos(pos - galley_pos).index.0;
+            let index = placed.0.cursor_from_pos(pos - placed.1).index.0;
             LinePos::from_char_index(text, index)
         });
-
-        // ── 5. Go to definition / find references ────────────────────────────────
         let keyboard = navigate_keys.and_then(|references| Some((cursor?, references)));
         let menu_labels = (labels.go_to_definition, labels.find_references);
         let navigation =
             resolve_navigation(response, language, text, pointer, keyboard, &mut state.menu_target, menu_labels);
-        let action = picked.and_then(palette::Picked::host_action);
 
         CodeEditorOutput {
             changed,
             cursor,
-            command: keys.command,
+            command: input.keys.command,
             response: response.clone(),
             pointer,
             navigation,
-            action,
+            action: input.picked.and_then(palette::Picked::host_action),
         }
+    }
+}
+
+/// What every step of a frame needs. Does not change during the frame.
+#[derive(Clone, Copy)]
+struct EditorFrame<'a> {
+    id: egui::Id,
+    language: &'a dyn Language,
+    /// The problems to underline (none with [`EditorFeatures::diagnostics`] off).
+    underlines: &'a [Diagnostic],
+    features: EditorFeatures,
+    keymap: Keymap,
+}
+
+/// What the keys of this frame asked for. See [`read_input`].
+struct FrameInput<'a> {
+    picked: Option<palette::Picked<'a>>,
+    triggers: palette::Triggers,
+    /// `Enter` / `Tab` in the quick fix menu.
+    fix: Option<QuickFix>,
+    /// `Enter` / `Tab` in the completion popup.
+    accept_key: bool,
+    keys: KeymapOutput,
+}
+
+/// Step 1: the keys owned by the popups and the keymap. Must run before the `TextEdit`.
+fn read_input<'a>(
+    frame: EditorFrame<'a>,
+    ui: &egui::Ui,
+    state: &mut CodeEditorState,
+    text: &mut String,
+    labels: &EditorLabels<'a>,
+    actions: &'a [EditorAction<'a>],
+) -> FrameInput<'a> {
+    let EditorFrame { id, language, features, keymap, .. } = frame;
+    let has_focus = current_focus(ui, id, keymap, state.had_focus);
+
+    state.hover.handle_input(ui, id); // before the keymap swallows the key events
+    let context = PaletteContext { keymap, features, inserting: state.keymap.is_inserting(keymap) };
+    let palette_input = PaletteInput { id, has_focus, context, labels, actions };
+    let picked = ui::palette::show(&mut state.palette, ui, palette_input);
+    let triggers = ui::palette::read_triggers(ui, has_focus).with_picked(picked);
+    state.open_requested_menus(ui.ctx(), id, text, language, triggers);
+    // While the quick fix menu is open it owns the arrow keys.
+    let fix = state.quick_fix.handle_keys(ui);
+    state.find.handle_keys(keymap, ui, id, text, has_focus);
+    let accept_key = state.completion.handle_keys(ui);
+    let keys = if has_focus && !state.quick_fix.is_open() {
+        state.keymap.handle(keymap, ui, id, text, state.view)
+    } else {
+        KeymapOutput::default()
+    };
+    FrameInput { picked, triggers, fix, accept_key, keys }
+}
+
+/// `Shift+Alt+F`. Returns whether the text changed.
+fn apply_format(frame: EditorFrame<'_>, text: &mut String, triggers: palette::Triggers) -> bool {
+    if !(frame.features.format && triggers.format) {
+        return false;
+    }
+    match frame.language.format(text) {
+        Some(formatted) if formatted != *text => {
+            *text = formatted;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Step 2: the `TextEdit`, with the syntax colors, underlines and search matches.
+fn show_text(
+    frame: EditorFrame<'_>,
+    ui: &mut egui::Ui,
+    state: &mut CodeEditorState,
+    text: &mut String,
+    desired_rows: usize,
+    gutter: Option<f32>,
+) -> (f32, egui::text_edit::TextEditOutput) {
+    let search = state.search_highlight(frame.keymap);
+    // e.g., Vim Normal mode draws a block cursor: no blinking I-beam then.
+    let hide_text_cursor = state.keymap.hides_text_cursor(frame.keymap);
+    let look = TextLook { desired_rows, dim_selection: frame.keymap == Keymap::Vim, hide_text_cursor, gutter };
+    let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
+        layout::cached(&mut state.layout, ui, buf.as_str(), frame.language, frame.underlines, search.as_ref())
+    };
+    show_text_edit(ui, frame.id, text, look, &mut layouter)
+}
+
+/// Step 3: opens, updates or closes the completion list.
+///
+/// `(requested, typed)`: `Ctrl+Space` was pressed, the text changed.
+fn update_completion_popup(
+    frame: EditorFrame<'_>,
+    ui: &egui::Ui,
+    state: &mut CodeEditorState,
+    text: &str,
+    cursor: Option<LinePos>,
+    inserting: bool,
+    request: (bool, bool),
+) {
+    if frame.features.completion && inserting {
+        update_completion(&mut state.completion, ui, frame.language, text, cursor, request);
+    } else {
+        state.completion.close();
+    }
+}
+
+/// Draws the popup and puts in the item picked by a click or `accept_key`.
+/// Returns whether the text changed.
+#[expect(clippy::too_many_arguments, reason = "each is one piece of this step's data, no natural group")]
+fn accept_completion(
+    ui: &egui::Ui,
+    id: egui::Id,
+    state: &mut CodeEditorState,
+    text: &mut String,
+    anchor: Option<egui::Rect>,
+    accept_key: bool,
+    cursor: &mut Option<LinePos>,
+    response: &egui::Response,
+) -> bool {
+    let clicked = anchor.is_some_and(|anchor| state.completion.ui(ui.ctx(), id, anchor));
+    if !(clicked || accept_key) {
+        return false;
+    }
+    let Some(accepted) = state.completion.accept(text) else { return false };
+    *text = accepted.text;
+    set_selection(ui.ctx(), id, accepted.select.clone());
+    *cursor = Some(LinePos::from_char_index(text, accepted.select.end));
+    response.request_focus();
+    true
+}
+
+/// Draws the quick fix menu and applies the fix picked by a click or `key_fix`.
+/// Returns whether the text changed.
+fn run_quick_fix(
+    ctx: &egui::Context,
+    id: egui::Id,
+    state: &mut CodeEditorState,
+    text: &mut String,
+    anchor: Option<egui::Rect>,
+    key_fix: Option<QuickFix>,
+) -> bool {
+    let clicked = anchor.and_then(|anchor| state.quick_fix.ui(ctx, id, anchor));
+    let Some(fix) = clicked.or(key_fix) else { return false };
+    let at = apply_quick_fix(text, &fix);
+    set_cursor(ctx, id, at);
+    true
+}
+
+/// The line numbers, and the rectangle of Vim's Visual block.
+fn draw_line_decorations(
+    ui: &egui::Ui,
+    state: &CodeEditorState,
+    keymap: Keymap,
+    text: &str,
+    (galley, galley_pos): (&egui::Galley, egui::Pos2),
+    gutter: Option<std::ops::Range<f32>>,
+    cursor: Option<LinePos>,
+) {
+    if let Some(x_range) = gutter {
+        overlays::line_numbers(ui, galley, galley_pos, x_range, cursor.map(|cursor| cursor.line));
+    }
+    if let Some(ranges) = state.keymap.block_selection(keymap, text) {
+        overlays::block_selection(ui, galley, galley_pos, &ranges);
+    }
+}
+
+/// The hover popup (diagnostics and docs). `open_at`: opens it there, not at the pointer.
+fn show_hover(
+    frame: EditorFrame<'_>,
+    ui: &egui::Ui,
+    state: &mut CodeEditorState,
+    text: &str,
+    response: &egui::Response,
+    (galley, galley_pos): (&egui::Galley, egui::Pos2),
+    open_at: Option<usize>,
+) {
+    if !(frame.features.hover || frame.features.diagnostics) {
+        return;
+    }
+    let hover = HoverCtx {
+        id: frame.id,
+        response,
+        galley,
+        galley_pos,
+        text,
+        language: frame.language,
+        diagnostics: frame.underlines,
+        with_docs: frame.features.hover,
+    };
+    state.hover.show(ui, &hover, open_at);
+}
+
+/// The signature help above the cursor.
+fn show_signature(
+    frame: EditorFrame<'_>,
+    ui: &egui::Ui,
+    text: &str,
+    cursor: Option<LinePos>,
+    anchor: Option<egui::Rect>,
+) {
+    if frame.features.signature_help
+        && let (Some(cursor), Some(anchor)) = (cursor, anchor)
+    {
+        overlays::signature_box(ui.ctx(), frame.id, anchor, frame.language, text, cursor);
     }
 }
 

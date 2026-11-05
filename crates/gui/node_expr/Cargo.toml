@@ -1,6 +1,6 @@
 [package]
 name = "node_expr"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core"
 
 authors.workspace = true

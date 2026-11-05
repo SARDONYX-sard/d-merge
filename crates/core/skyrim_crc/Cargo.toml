@@ -1,6 +1,6 @@
 [package]
 name = "skyrim_crc"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core"
 
 authors.workspace = true
@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-crc = "3.4.0"
+crc = { workspace = true }
 rayon = { workspace = true }
 
 [lints]

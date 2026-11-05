@@ -56,17 +56,6 @@ pub(crate) fn themed_top_bottom_panel(panel: egui::Panel, theme: Theme, bg_color
     panel.frame(frame_from_theme(theme, bg_color))
 }
 
-/// Applies theme-dependent styling to a central panel.
-///
-/// The panel background is determined by `bg_color`.
-pub(crate) fn themed_central_panel(
-    panel: egui::CentralPanel,
-    theme: Theme,
-    bg_color: Option<&Rgba>,
-) -> egui::CentralPanel {
-    panel.frame(frame_from_theme(theme, bg_color))
-}
-
 /// Panel background for the current theme.
 pub(crate) fn frame_from_theme(theme: Theme, bg_color: Option<&Rgba>) -> egui::Frame {
     let effective_theme = match theme {

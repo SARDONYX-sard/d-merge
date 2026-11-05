@@ -1,12 +1,17 @@
-//! Behavior-generation (patch) runner.
+//! Runs the merge (`behavior_merge::behavior_gen`) on the async runtime and reports its progress.
+//!
+//! The merge calls `status_report` from its own threads. That writes into [`PatchProgress`]
+//! (atomics, so the UI never waits for a lock), and [`PatchRun::poll`] shows it every frame.
 
 use std::sync::{Arc, atomic::Ordering};
 
 use behavior_merge::PatchMaps;
+use egui_widgets::notify::{Notification, NotificationColor};
 use gui_shared::{
-    i18n::I18nKey,
-    patch::phase,
+    i18n::{I18nKey, I18nMap},
+    patch::{PatchProgress, phase},
     settings::pages::patch::{
+        PatchSettings,
         behavior::{BehaviorSettings, DataMode, ParserMode},
         mod_item::ModItem,
     },
@@ -15,24 +20,34 @@ use mod_info::ModType;
 use rayon::{iter::Either, prelude::*};
 use skyrim_data_dir::Runtime;
 
-use crate::{app::App, ui::notify::NotificationColor};
+/// One merge at a time; see the module docs.
+#[derive(Debug, Default)]
+pub(crate) struct PatchRun {
+    /// When the current merge started. `None` when none is running.
+    started: Option<std::time::Instant>,
+    progress: Arc<PatchProgress>,
+}
 
-impl App {
-    pub(crate) fn patch(&mut self, ctx: &egui::Context) {
-        self.patch_start_time = Some(std::time::Instant::now());
-        self.patch_status.clear();
+impl PatchRun {
+    /// Starts a merge of the enabled mods of the current mode.
+    pub(crate) fn start(
+        &mut self,
+        ctx: &egui::Context,
+        settings: &PatchSettings,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+        runtime: &tokio::runtime::Runtime,
+    ) {
+        self.started = Some(std::time::Instant::now());
+        self.progress.clear();
 
-        if self.settings.pages.patch.behavior.auto_remove_meshes {
-            self.remove_meshes_dir_all();
+        if settings.behavior.auto_remove_meshes {
+            remove_meshes_dir_all(settings, notify, i18n);
         }
 
-        let (skyrim_data_dir, is_vfs, mod_list) = match self.settings.pages.patch.behavior.mode {
-            DataMode::Vfs => {
-                (&self.settings.pages.patch.vfs.skyrim_data_dir, true, &self.settings.pages.patch.vfs.mod_list)
-            }
-            DataMode::Manual => {
-                (&self.settings.pages.patch.manual.skyrim_data_dir, false, &self.settings.pages.patch.manual.mod_list)
-            }
+        let (skyrim_data_dir, is_vfs, mod_list) = match settings.behavior.mode {
+            DataMode::Vfs => (&settings.vfs.skyrim_data_dir, true, &settings.vfs.mod_list),
+            DataMode::Manual => (&settings.manual.skyrim_data_dir, false, &settings.manual.mod_list),
         };
         let patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
 
@@ -42,79 +57,66 @@ impl App {
             generate_fnis_esp,
             skeleton_arm_fix,
             template_dir,
+            parser_mode,
             ..
-        } = &self.settings.pages.patch.behavior;
+        } = &settings.behavior;
         let enable_debug_output = *enable_debug_output;
         let output_target = match target_runtime {
             Runtime::Le | Runtime::Enderal => behavior_merge::OutPutTarget::SkyrimLe,
             Runtime::Se | Runtime::EnderalSe | Runtime::Vr => behavior_merge::OutPutTarget::SkyrimSe,
         };
-
-        let patch_status = Arc::clone(&self.patch_status);
-
-        let debug = behavior_merge::DebugOptions {
-            output_patch_json: enable_debug_output,
-            output_merged_json: enable_debug_output,
-            output_merged_xml: enable_debug_output,
-        };
-
+        let progress = Arc::clone(&self.progress);
         let ctx = ctx.clone();
         let config = behavior_merge::Config {
             resource_dir: template_dir.to_string().into(),
-            output_dir: self.settings.pages.patch.current_output_dir().to_owned().into(),
+            output_dir: settings.current_output_dir().to_owned().into(),
             output_target,
-            status_report: Some(Box::new(move |status| patch_status.apply(status, &ctx))),
-            parser_mode: to_nemesis_parser_mode(self.settings.pages.patch.behavior.parser_mode),
+            status_report: Some(Box::new(move |status| progress.apply(status, &ctx))),
+            parser_mode: to_nemesis_parser_mode(*parser_mode),
             hack_options: Some(behavior_merge::HackOptions::enable_all()),
-            debug,
+            debug: behavior_merge::DebugOptions {
+                output_patch_json: enable_debug_output,
+                output_merged_json: enable_debug_output,
+                output_merged_xml: enable_debug_output,
+            },
             skyrim_data_dir_glob: Some(skyrim_data_dir.clone()),
             generate_fnis_esp: *generate_fnis_esp,
             skeleton_arm_fix: *skeleton_arm_fix,
         };
 
-        self.async_rt.spawn(behavior_merge::behavior_gen(patches, config));
+        runtime.spawn(behavior_merge::behavior_gen(patches, config));
     }
 
-    /// Polls the patch status written by the `status_report` callback and
-    /// forwards it to the notification bar.
-    ///
-    /// # Notes
-    /// Must be called once per frame from [`eframe::App::update`].
-    /// Short-circuits immediately when no patch is in progress
-    /// (`patch_start_time` is `None`), keeping the happy-path cost to a
-    /// single `Option` check.
-    pub(crate) fn poll_patch_result(&mut self) {
-        // Check start_time first to avoid an unnecessary RwLock read every frame.
-        let Some(start_time) = self.patch_start_time else {
-            return;
-        };
+    /// Shows the progress in the notification bar. Call once per frame.
+    /// With no merge running, it only checks an `Option`.
+    pub(crate) fn poll(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(started) = self.started else { return };
 
-        let text = self.patch_status.text(&self.i18n, start_time);
+        let text = self.progress.text(i18n, started);
         if !text.is_empty() {
-            self.notify.set(text, self.patch_status.color());
+            notify.set(text, self.progress.color());
         }
-
-        if matches!(self.patch_status.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
-            self.patch_status.phase.store(phase::IDLE, Ordering::Relaxed);
-            self.patch_start_time = None;
+        if matches!(self.progress.phase.load(Ordering::Relaxed), phase::DONE | phase::ERROR) {
+            self.progress.phase.store(phase::IDLE, Ordering::Relaxed);
+            self.started = None;
         }
     }
+}
 
-    fn remove_meshes_dir_all(&mut self) {
-        let output_dir = self.settings.pages.patch.current_output_dir().to_owned();
-        let skyrim_data_dir = self.settings.pages.patch.current_skyrim_data_dir();
+/// `auto_remove_meshes`: deletes the old output, unless it is the game's own data directory.
+fn remove_meshes_dir_all(settings: &PatchSettings, notify: &mut Notification, i18n: &I18nMap) {
+    let output_dir = settings.current_output_dir();
 
-        if behavior_merge::cache_remover::is_dangerous_remove(&output_dir, skyrim_data_dir) {
-            tracing::warn!(
-                "0/6: `auto remove meshes` is enabled but output dir equals the Skyrim data \
-                 directory — skipping to avoid destroying installed mods."
-            );
-            return;
-        }
-
-        self.notify.info(format!("0/6: {} `{output_dir}/meshes`", self.i18n.t(I18nKey::RemovingMeshesMessage)));
-        behavior_merge::cache_remover::remove_meshes_dir_all(output_dir);
+    if behavior_merge::cache_remover::is_dangerous_remove(output_dir, settings.current_skyrim_data_dir()) {
+        tracing::warn!(
+            "0/6: `auto remove meshes` is enabled but output dir equals the Skyrim data \
+             directory — skipping to avoid destroying installed mods."
+        );
+        return;
     }
+
+    notify.info(format!("0/6: {} `{output_dir}/meshes`", i18n.t(I18nKey::RemovingMeshesMessage)));
+    behavior_merge::cache_remover::remove_meshes_dir_all(output_dir);
 }
 
 trait EguiDisplay {
@@ -224,4 +226,32 @@ fn to_patches(skyrim_data_dir: &str, is_vfs: bool, mod_infos: &[ModItem]) -> Pat
         }
     });
     PatchMaps { nemesis_entries, fnis_entries }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(id: &str, mod_type: ModType, enabled: bool) -> ModItem {
+        ModItem { enabled, id: id.to_owned(), name: String::new(), mod_type, site: String::new(), priority: 1 }
+    }
+
+    #[test]
+    fn only_enabled_mods_are_merged_with_the_ids_the_merger_expects() {
+        let mods = [
+            item("aaaa", ModType::Nemesis, true),
+            item("bbbb", ModType::NemesisExt, true),
+            item("cccc", ModType::Fnis, true),
+            item("off", ModType::Nemesis, false),
+        ];
+
+        let vfs = format!("{:?}", to_patches("D:/Data", true, &mods));
+        assert!(vfs.contains("D:/Data/Nemesis_Engine/mod/aaaa"), "{vfs}");
+        assert!(vfs.contains("D:/Data/Nemesis_EngineExt/mod/bbbb"), "{vfs}");
+        assert!(!vfs.contains("off"), "{vfs}");
+        assert!(!vfs.contains("Data/Nemesis_Engine/mod/cccc"), "{vfs}"); // FNIS: the bare id
+
+        let manual = format!("{:?}", to_patches("D:/Data", false, &mods));
+        assert!(!manual.contains("D:/Data"), "{manual}");
+    }
 }

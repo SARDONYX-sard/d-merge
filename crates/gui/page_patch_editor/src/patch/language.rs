@@ -106,6 +106,8 @@ pub(crate) type FieldValues = HashMap<String, Vec<String>>;
 pub(crate) struct NemesisXml<'a> {
     pub(crate) events: &'a [String],
     pub(crate) variables: &'a [String],
+    /// The type of each variable by index, e.g. `REAL`.
+    pub(crate) variable_types: &'a [Box<str>],
     pub(crate) values: &'a FieldValues,
     /// Every object's id and description, for `#` completion and hovers.
     pub(crate) graph: &'a Graph,
@@ -146,11 +148,7 @@ impl Language for NemesisXml<'_> {
                 let prefix = kind.prefix();
                 match self.names_of(kind).iter().position(|n| n.eq_ignore_ascii_case(name)) {
                     Some(index) => {
-                        let label = match kind {
-                            Kind::Event => "Event",
-                            Kind::Variable => "Variable",
-                        };
-                        let _ = write!(doc, "**{prefix}{name}]$**: {label} #{index}\n\n");
+                        let _ = write!(doc, "**{prefix}{name}]$**: {}\n\n", self.name_doc(kind, index));
                     }
                     None => {
                         let _ = write!(doc, "**{prefix}{name}]$**: not found\n\n");
@@ -248,6 +246,17 @@ impl Language for NemesisXml<'_> {
 }
 
 impl NemesisXml<'_> {
+    /// e.g., `Event #12`, `Variable #3: REAL`
+    fn name_doc(&self, kind: Kind, index: usize) -> String {
+        match kind {
+            Kind::Event => format!("Event #{index}"),
+            Kind::Variable => match self.variable_types.get(index) {
+                Some(kind) => format!("Variable #{index}: {kind}"),
+                None => format!("Variable #{index}"),
+            },
+        }
+    }
+
     const fn names_of(&self, kind: Kind) -> &[String] {
         match kind {
             Kind::Event => self.events,
@@ -279,14 +288,14 @@ impl NemesisXml<'_> {
         }
         let typed = value.trim_start();
         let lower = typed.trim_start_matches('$').to_lowercase();
-        let items = [(Kind::Event, "⚡", "Event"), (Kind::Variable, "𝑥", "Variable")]
+        let items = [(Kind::Event, "⚡"), (Kind::Variable, "𝑥")]
             .into_iter()
-            .flat_map(|(kind, icon, label)| {
+            .flat_map(|(kind, icon)| {
                 let lower = &lower;
                 self.names_of(kind).iter().enumerate().filter(move |(_, name)| name.to_lowercase().contains(lower)).map(
                     move |(index, name)| {
                         let insert = format!("{}{name}]$", kind.prefix());
-                        item(&insert, icon, insert.clone(), format!("{label} #{index}"))
+                        item(&insert, icon, insert.clone(), self.name_doc(kind, index))
                     },
                 )
             })
@@ -360,16 +369,16 @@ impl NemesisXml<'_> {
         let after: String = line.chars().skip(column).take(2).collect();
         let end = if after == "]$" { column + 2 } else { column };
 
-        let (names, doc, icon) = match kind {
-            Kind::Event => (self.events, "Event", "⚡"),
-            Kind::Variable => (self.variables, "Variable", "𝑥"),
+        let (names, icon) = match kind {
+            Kind::Event => (self.events, "⚡"),
+            Kind::Variable => (self.variables, "𝑥"),
         };
         let typed = typed.to_lowercase();
         let items = names
             .iter()
             .enumerate()
             .filter(|(_, name)| name.to_lowercase().contains(&typed))
-            .map(|(index, name)| item(name, icon, format!("{name}]$"), format!("{doc} #{index}")))
+            .map(|(index, name)| item(name, icon, format!("{name}]$"), self.name_doc(kind, index)))
             .collect();
         Some(CompletionList { replace: start..end, items })
     }

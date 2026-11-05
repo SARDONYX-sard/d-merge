@@ -20,12 +20,31 @@ pub(super) struct NewNames {
     pub(super) variable: String,
     pub(super) kind: VariableType,
     pub(super) value: String,
+    /// The name being renamed in the list.
+    pub(super) renaming: Option<Renaming>,
 }
 
 impl Default for NewNames {
     fn default() -> Self {
-        Self { event: String::new(), variable: String::new(), kind: VariableType::Int32, value: String::new() }
+        Self {
+            event: String::new(),
+            variable: String::new(),
+            kind: VariableType::Int32,
+            value: String::new(),
+            renaming: None,
+        }
     }
+}
+
+/// A row of the list being renamed.
+#[derive(Debug)]
+pub(super) struct Renaming {
+    pub(super) is_variable: bool,
+    pub(super) index: usize,
+    /// The field's text.
+    pub(super) text: String,
+    /// Give the field the keyboard on the next draw.
+    pub(super) focus: bool,
 }
 
 impl PatchTool {
@@ -83,6 +102,26 @@ impl PatchTool {
                 new.variable.clear();
                 new.value.clear();
             }
+            Action::Rename { is_variable, index } => {
+                let text = new.renaming.take().map(|renaming| renaming.text).unwrap_or_default();
+                let (param, prefix, existing) = if is_variable {
+                    ("variableNames", vars::VARIABLE_ID_PREFIX, variables)
+                } else {
+                    ("eventNames", vars::EVENT_ID_PREFIX, events)
+                };
+                let old = existing.get(index).ok_or(param)?;
+                let new_name = valid_rename(&text, existing, index)?;
+                if new_name == old {
+                    return Ok(Vec::new());
+                }
+                let renamed = vars::rename(&behavior_text(behavior, &ids.string_data), param, index, new_name);
+                edits.push((ids.string_data.clone(), renamed.ok_or(param)?));
+                // Patches name it: those texts change too, or they would point to nothing.
+                edits.extend(behavior.texts().filter_map(|object| {
+                    let edited = vars::rename_uses(object.text, prefix, old, new_name)?;
+                    Some((object.id.to_owned(), edited))
+                }));
+            }
             Action::RemoveEvent(i) => {
                 for (id, param) in [(&ids.string_data, "eventNames"), (&ids.graph_data, "eventInfos")] {
                     edits.push((id.clone(), vars::remove(&text(id), param, i).ok_or(param)?));
@@ -110,6 +149,11 @@ impl PatchTool {
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Action {
     AddEvent,
+    /// Takes the new name from [`NewNames::renaming`].
+    Rename {
+        is_variable: bool,
+        index: usize,
+    },
     AddVariable,
     RemoveEvent(usize),
     RemoveVariable(usize),
@@ -119,6 +163,19 @@ pub(super) struct Ids {
     pub(super) string_data: String,
     pub(super) graph_data: String,
     pub(super) value_set: Option<String>,
+}
+
+/// The text of object `id`.
+fn behavior_text(behavior: &super::Behavior, id: &str) -> String {
+    behavior.text(id).unwrap_or_default().to_owned()
+}
+
+/// A new name for entry `index`: as [`valid_name`], but its own old name does not count, so that
+/// only the case can be changed.
+fn valid_rename<'a>(name: &'a str, existing: &[String], index: usize) -> Result<&'a str, String> {
+    let name = valid_name(name, &[])?;
+    let taken = existing.iter().enumerate().any(|(i, other)| i != index && other.eq_ignore_ascii_case(name));
+    if taken { Err(format!("Already exists: `{name}`")) } else { Ok(name) }
 }
 
 /// A name to add, trimmed: no whitespace, not there yet. Nemesis ignores ASCII case in names.
@@ -146,5 +203,13 @@ mod tests {
         assert!(valid_name("", &existing).is_err());
         assert!(valid_name("my var", &existing).is_err());
         assert!(valid_name("MOVESTART", &existing).is_err());
+    }
+
+    #[test]
+    fn a_rename_may_change_the_case_of_its_own_name() {
+        let existing = ["moveStart".to_owned(), "moveStop".to_owned()];
+        assert_eq!(valid_rename("MOVESTART", &existing, 0), Ok("MOVESTART"));
+        assert!(valid_rename("moveStop", &existing, 0).is_err());
+        assert!(valid_rename("my var", &existing, 0).is_err());
     }
 }

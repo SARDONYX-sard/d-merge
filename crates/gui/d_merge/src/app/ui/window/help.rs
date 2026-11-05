@@ -138,7 +138,10 @@ impl App {
                 .on_hover_text(self.i18n.t(I18nKey::IssueReportHover))
                 .clicked()
             {
-                ui.ctx().open_url(egui::OpenUrl { url: self.settings.pages.patch.create_issue_link(), new_tab: true });
+                ui.ctx().open_url(egui::OpenUrl {
+                    url: self.settings.pages.patch.create_issue_link(env!("CARGO_PKG_VERSION")),
+                    new_tab: true,
+                });
             }
 
             const ISSUE_URL: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues");
@@ -344,7 +347,7 @@ impl App {
     fn write_new_i18n(&mut self) {
         let dir = start_dir(&self.settings.ui.i18n_path, ".", false);
 
-        let path = rfd::FileDialog::new()
+        let path = gui_shared::rfd::FileDialog::new()
             .set_directory(dir)
             .set_title("Save translation.json")
             .set_file_name("translation.json")
@@ -421,11 +424,13 @@ const BACKGROUND_ROW: PathRow = PathRow {
 fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow) -> bool {
     fn pick(picker: &Picker, current: &str) -> Option<String> {
         let picked = match picker {
-            Picker::File { filter, exts, fallback_dir } => rfd::FileDialog::new()
+            Picker::File { filter, exts, fallback_dir } => gui_shared::rfd::FileDialog::new()
                 .set_directory(start_dir(current, fallback_dir, false))
                 .add_filter(*filter, exts)
                 .pick_file(),
-            Picker::Folder => rfd::FileDialog::new().set_directory(start_dir(current, ".", true)).pick_folder(),
+            Picker::Folder => {
+                gui_shared::rfd::FileDialog::new().set_directory(start_dir(current, ".", true)).pick_folder()
+            }
         };
         picked.map(|p| p.display().to_string())
     }

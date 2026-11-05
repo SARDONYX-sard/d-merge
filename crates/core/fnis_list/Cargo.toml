@@ -1,6 +1,6 @@
 [package]
 name = "fnis_list"
-version.workspace = true
+version = "0.0.0"
 description = "Parser for FNIS's List.txt"
 
 authors.workspace = true

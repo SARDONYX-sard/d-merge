@@ -1,6 +1,6 @@
 [package]
 name = "serde_hkx_for_gui"
-version = "0.1.0"
+version = "0.0.0"
 description = "hkx conversion / annotation helpers used by the GUI"
 
 authors.workspace = true

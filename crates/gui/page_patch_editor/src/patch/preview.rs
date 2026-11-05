@@ -90,6 +90,27 @@ impl Preview {
         self.scroll_to_current = true;
     }
 
+    /// The line of the editor text that preview row `row` shows, to jump there.
+    ///
+    /// The preview is normalized, so its line numbers can differ from the editor's: the n-th line
+    /// with this text in the preview is looked up as the n-th one in the editor. A row that is not
+    /// in the editor text (the template's lines, the markers) goes to the next line that is.
+    ///
+    /// e.g., the row of the 2nd `<hkparam name="enable">false</hkparam>` -> that line's number.
+    pub(super) fn editor_line_of(&self, row: usize, editor_text: &str) -> Option<usize> {
+        let is_mod_line = |kind: Kind| matches!(kind, Kind::Common | Kind::New);
+        let next = self.lines.get(row..)?.iter().position(|(kind, _)| is_mod_line(*kind)).map(|at| row + at);
+        let target_row = next.or_else(|| self.lines.iter().rposition(|(kind, _)| is_mod_line(*kind)))?;
+        let target = self.lines[target_row].1.trim();
+
+        let mod_lines_before = || self.lines[..target_row].iter().filter(|(kind, _)| is_mod_line(*kind));
+        let occurrence = mod_lines_before().filter(|(_, line)| line.trim() == target).count();
+        let found = editor_text.lines().enumerate().filter(|(_, line)| line.trim() == target).nth(occurrence);
+        // Not found (e.g., pointers joined on a line there): about the same place.
+        let last_line = editor_text.lines().count().saturating_sub(1);
+        Some(found.map_or_else(|| mod_lines_before().count().min(last_line), |(line, _)| line))
+    }
+
     /// The pending scroll: the row of the current block's `OPEN` line, which goes to the top.
     pub(super) fn take_scroll_row(&mut self) -> Option<usize> {
         if !std::mem::take(&mut self.scroll_to_current) {
@@ -141,6 +162,21 @@ mod tests {
         assert_eq!(preview.current, 0);
         preview.step(false);
         assert_eq!(preview.current, 1);
+    }
+
+    #[test]
+    fn rows_map_to_editor_lines() {
+        let patch = "a\nx\n<!-- MOD_CODE ~m~ OPEN -->\nnew\nx\n<!-- ORIGINAL -->\nold\n<!-- CLOSE -->\nb\n";
+        let preview = Preview::new(patch);
+        let editor = "a\nx\nnew\n\t\tx\nb\n"; // indented differently, on purpose
+        let line = |row| preview.editor_line_of(row, editor);
+
+        assert_eq!(line(0), Some(0)); // a
+        assert_eq!(line(1), Some(1)); // x
+        assert_eq!(line(2), Some(2)); // OPEN: the next line of the mod, `new`
+        assert_eq!(line(4), Some(3)); // the 2nd `x`
+        assert_eq!(line(6), Some(4)); // the template's `old`: not in the editor, goes on to `b`
+        assert_eq!(line(99), None);
     }
 
     #[test]

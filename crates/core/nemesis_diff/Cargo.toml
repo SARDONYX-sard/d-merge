@@ -1,6 +1,6 @@
 [package]
 name = "nemesis_diff"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core: Nemesis behavior patch (`#XXXX.txt`) generation from a template xml and an edited copy"
 
 authors.workspace = true
@@ -13,7 +13,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-imara-diff = "0.2.0"
+imara-diff = { workspace = true }
 
 # workspace members
 fast_hash = { workspace = true }

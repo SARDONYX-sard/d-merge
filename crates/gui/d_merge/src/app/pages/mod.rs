@@ -1,22 +1,33 @@
 //! Top-level pages, shown one at a time by the router (see [`super::router`]).
 //!
-//! - Patch: in this crate ([`patch`]), it needs most of [`App`].
-//! - Convert / hkanno / Patch Editor: separate crates (`page_convert`, `page_hkanno`, `page_patch_editor`) that only
-//!   see what they are given in a `*PageCtx`. Their state lives in [`App`], because the router
-//!   recreates the route object on every navigation.
-
-mod patch;
+//! Each page is a separate crate (`page_patch`, `page_convert`, `page_hkanno`, `page_patch_editor`)
+//! that only sees what it is given in a `*PageCtx`. Their state lives in [`App`], because the
+//! router recreates the route object on every navigation.
 
 use page_convert::ConvertPageCtx;
 use page_hkanno::HkannoPageCtx;
+use page_patch::PatchPageCtx;
 use page_patch_editor::PatchEditorPageCtx;
 
 use crate::{app::App, theme::frame_from_theme};
 
 impl App {
     /// Background of page panels for the current theme.
-    fn panel_frame(&self) -> egui::Frame {
+    pub(super) fn panel_frame(&self) -> egui::Frame {
         frame_from_theme(self.settings.ui.theme, self.theme_manager.current_bg_color())
+    }
+
+    pub(crate) fn ui_patch_page(&mut self, ui: &mut egui::Ui) {
+        let ctx = PatchPageCtx {
+            panel_frame: self.panel_frame(),
+            settings: &mut self.settings.pages.patch,
+            log: &mut self.settings.log,
+            i18n: &self.i18n,
+            notify: &mut self.notify,
+            runtime: &self.async_rt,
+            show_log_window: &self.show_log_window,
+        };
+        self.patch.ui(ui, ctx);
     }
 
     pub(crate) fn ui_convert_page(&mut self, ui: &mut egui::Ui) {

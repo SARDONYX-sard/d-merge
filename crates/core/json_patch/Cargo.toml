@@ -1,6 +1,6 @@
 [package]
 name = "json_patch"
-version = "0.1.0"
+version = "0.0.0"
 description = "Json patch by simd_json::BorrowedValue"
 
 authors.workspace = true

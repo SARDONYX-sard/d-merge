@@ -663,6 +663,9 @@ pub enum I18nKey {
     /// Focus Object Tree
     NemesisFocusTree,
 
+    /// Rename (the patches using it are updated too)
+    NemesisRename,
+
     /// Type a command
     EditorPaletteHint,
 

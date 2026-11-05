@@ -94,7 +94,7 @@ impl CrcTool {
                         .desired_width(160.0),
                 );
                 if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
-                    && let Some(dir) = rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()
+                    && let Some(dir) = gui_shared::rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()
                 {
                     self.mod_dir = dir.display().to_string();
                 }

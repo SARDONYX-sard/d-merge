@@ -180,7 +180,7 @@ pub(crate) mod v2 {
 impl From<v2::Settings> for Settings {
     fn from(old: v2::Settings) -> Self {
         Self {
-            app_version: crate::CURRENT_VERSION,
+            app_version: super::LAYOUT_VERSION,
             ui: ui::UiSettings {
                 theme: old.ui.theme,
                 custom_theme: old.ui.custom_theme,

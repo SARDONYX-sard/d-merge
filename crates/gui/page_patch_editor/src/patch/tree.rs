@@ -64,6 +64,8 @@ struct Entry {
     label: String,
     /// Where the text after the id starts in `label` (`hkbModifierList  GetUpModList`).
     doc_start: u32,
+    /// Where the object's name starts in `label`.
+    name_start: u32,
     /// Where the `← #0106` part of a new object starts in `label`.
     links_start: u32,
     /// The nodes this object's text mentions, first occurrence order.
@@ -87,6 +89,7 @@ impl Entry {
             is_edited: false,
             label: String::new(),
             doc_start: 0,
+            name_start: 0,
             links_start: 0,
             children: Vec::new(),
             parents: Vec::new(),
@@ -257,6 +260,7 @@ impl Graph {
         entry.doc_start = text_offset(entry.label.len());
         entry.label.push_str(object.class);
         entry.label.push_str("  ");
+        entry.name_start = text_offset(entry.label.len());
         entry.label.push_str(name);
         entry.links_start = text_offset(entry.label.len());
         self.refresh_links_text(node);
@@ -343,6 +347,14 @@ impl Graph {
         &entry.label[entry.doc_start as usize..]
     }
 
+    /// The label split for coloring: `(marker and id, class, name, where it is linked)`.
+    pub(super) fn label_parts(&self, node: Node) -> (&str, &str, &str, &str) {
+        let entry = self.entry(node);
+        let label = entry.label.as_str();
+        let (doc, name, links) = (entry.doc_start as usize, entry.name_start as usize, entry.links_start as usize);
+        (&label[..doc], &label[doc..name], &label[name..links], &label[links..])
+    }
+
     /// The node of an **existing** object.
     pub(super) fn node_of(&self, id: &str) -> Option<Node> {
         self.index.get(id).copied().filter(|&node| self.entry(node).exists)
@@ -403,6 +415,28 @@ pub(super) struct Row {
     pub(super) open: bool,
     /// Expanded at another place.
     pub(super) dimmed: bool,
+    /// The last child of its parent: its connecting line ends here (`└`, not `├`).
+    pub(super) last_child: bool,
+    /// Bit `n`: the line of tree level `n` continues past this row, as that ancestor has more
+    /// children below. e.g., `│   └ row` has bit 0.
+    pub(super) guides: u64,
+}
+
+/// How a row connects to the rows around it. See [`Row`].
+#[derive(Debug, Clone, Copy)]
+struct RowLines {
+    last_child: bool,
+    guides: u64,
+}
+
+/// The bit of tree level `depth` in [`Row::guides`]. Deeper than 64 levels has no lines.
+const fn guide_bit(depth: u16) -> u64 {
+    if depth < u64::BITS as u16 { 1 << depth } else { 0 }
+}
+
+/// Does the line of tree level `level` continue past the row with these `guides`?
+pub(super) const fn has_guide(guides: u64, level: u16) -> bool {
+    guides & guide_bit(level) != 0
 }
 
 /// A tree command, whichever key asked for it. The keys are in [`super::ui::tree::read_keys`].
@@ -553,24 +587,39 @@ impl TreeState {
         let mut rows = std::mem::take(&mut self.rows);
         rows.clear();
         if let Some(root) = graph.root {
-            self.push_rows(graph, root, 0, changed_only, &mut rows);
+            self.push_rows(graph, root, 0, RowLines { last_child: true, guides: 0 }, changed_only, &mut rows);
         }
         self.rows = rows;
         self.built_for = Some((graph.tree_generation(), changed_only));
     }
 
-    fn push_rows(&self, graph: &Graph, node: Node, depth: u16, changed_only: bool, rows: &mut Vec<Row>) {
+    fn push_rows(
+        &self,
+        graph: &Graph,
+        node: Node,
+        depth: u16,
+        lines: RowLines,
+        changed_only: bool,
+        rows: &mut Vec<Row>,
+    ) {
         let expandable = graph.shown_children(node, changed_only).next().is_some();
         let open = expandable && self.is_open(graph, node, changed_only);
-        rows.push(Row { node, depth, expandable, open, dimmed: false });
+        let RowLines { last_child, guides } = lines;
+        rows.push(Row { node, depth, expandable, open, dimmed: false, last_child, guides });
         if !open {
             return;
         }
-        for child in graph.shown_children(node, changed_only) {
+        let children: Vec<Node> = graph.shown_children(node, changed_only).collect();
+        for (i, &child) in children.iter().enumerate() {
+            let last_child = i + 1 == children.len();
+            // This node's children hang from a line at this depth: more of them keep it going.
+            let guides = if last_child { guides } else { guides | guide_bit(depth) };
             if graph.entry(child).first_parent == Some(node) {
-                self.push_rows(graph, child, depth + 1, changed_only, rows);
+                let lines = RowLines { last_child, guides };
+                self.push_rows(graph, child, depth + 1, lines, changed_only, rows);
             } else {
-                rows.push(Row { node: child, depth: depth + 1, expandable: false, open: false, dimmed: true });
+                let (expandable, open, dimmed) = (false, false, true);
+                rows.push(Row { node: child, depth: depth + 1, expandable, open, dimmed, last_child, guides });
             }
         }
     }
@@ -818,6 +867,31 @@ mod tests {
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#c", "#b", "#c", "#new0"]);
     }
 
+    /// ```text
+    /// #root
+    /// ├ #a
+    /// │ └ #c
+    /// └ #b
+    ///   ├ #c (dimmed)
+    ///   └ #new0
+    /// ```
+    #[test]
+    fn rows_know_their_connecting_lines() {
+        let graph = sample();
+        let mut state = TreeState::default();
+        state.prepare(&graph, None, false);
+        state.set_open_below(&graph, graph.node_of("#root").unwrap(), true);
+        state.prepare(&graph, None, false);
+        let rows = state.rows();
+
+        assert_eq!(rows.iter().map(|row| row.last_child).collect::<Vec<_>>(), [true, false, true, true, false, true]);
+        // `#c` under `#a`: the line of level 0 goes on to `#b`.
+        assert!(has_guide(rows[2].guides, 0));
+        // `#c` under `#b`: `#b` is the last child, so level 0 has ended; level 1 goes on to `#new0`.
+        assert!(!has_guide(rows[4].guides, 0));
+        assert!(has_guide(rows[4].guides, 1));
+    }
+
     #[test]
     fn selecting_opens_the_parents() {
         let graph = sample();
@@ -841,7 +915,15 @@ mod tests {
 
     #[test]
     fn input_effects() {
-        let row = |node, depth, open, expandable| Row { node, depth, expandable, open, dimmed: false };
+        let row = |node, depth, open, expandable| Row {
+            node,
+            depth,
+            expandable,
+            open,
+            dimmed: false,
+            last_child: false,
+            guides: 0,
+        };
         // 0 (open) > 1 (closed, has children), 2 (leaf)
         let rows = [row(0, 0, true, true), row(1, 1, false, true), row(2, 1, false, false)];
 

@@ -94,19 +94,3 @@ pub(crate) const fn to_format(format: OutputFormat) -> Format {
         OutputFormat::Json => Format::Json,
     }
 }
-
-/// Small icon for a file's progress (nothing while pending).
-pub(crate) fn status_icon(ui: &mut egui::Ui, status: Option<Status>) {
-    match status {
-        Some(Status::Processing) => {
-            ui.add(egui::Spinner::new().size(14.0));
-        }
-        Some(Status::Done) => {
-            ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔");
-        }
-        Some(Status::Error) => {
-            ui.colored_label(ui.visuals().error_fg_color, "✖");
-        }
-        Some(Status::Pending) | None => {}
-    }
-}

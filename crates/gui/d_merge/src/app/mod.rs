@@ -1,10 +1,8 @@
 //! Root of the application module.
 
 mod background_image;
-mod fetch;
 mod log;
 mod pages;
-mod patch;
 pub(crate) mod router;
 mod ui;
 
@@ -12,13 +10,12 @@ use std::sync::{Arc, atomic::AtomicBool};
 
 use eframe::egui;
 use gui_shared::{
-    fetch::FetchState,
     i18n::I18nMap,
-    patch::PatchProgress,
     settings::{Settings, ui::WindowGeometry},
 };
 use page_convert::ConvertPage;
 use page_hkanno::HkannoPage;
+use page_patch::{PatchPage, PatchPollCtx};
 use page_patch_editor::PatchEditorPage;
 use parking_lot::RwLock;
 
@@ -38,31 +35,12 @@ pub(crate) struct App {
     i18n: I18nMap,
 
     // ── Async / threading ─────────────────────────────────────────────────────
-    /// Tokio runtime for `behavior_merge::behavior_gen`.
+    /// Tokio runtime for the merge and conversions.
     pub async_rt: tokio::runtime::Runtime,
 
     // ── UI state (not persisted) ──────────────────────────────────────────────
-    /// `true` only during the very first call to [`eframe::App::update`].
-    /// Used to trigger auto-detection of the Skyrim data directory.
-    pub is_first_render: bool,
-
     /// Controls visibility of the help / about window.
     pub show_help: bool,
-
-    /// `true` when DnD reordering is disabled (filter active or non-priority sort).
-    /// Drives the lock button in the search panel.
-    pub is_locked: bool,
-
-    /// Mirrors the enabled state of all *visible* mods.
-    /// Drives the "check all" header checkbox.
-    pub check_all: bool,
-
-    /// ID of the mod used as the anchor for Shift-click range selection.
-    pub mod_selection_anchor: Option<String>,
-
-    /// Last observed table width; used to detect window resize and reset
-    /// column widths for one frame.
-    pub prev_table_available_width: f32,
 
     // ── Custom theme panel  ──────────────────────────────────────────────────────
     /// Custom theme editor window state.
@@ -74,9 +52,6 @@ pub(crate) struct App {
     pub bg_img_handle: Option<egui::TextureHandle>,
 
     // ── Notification bar ──────────────────────────────────────────────────────
-    /// shown in the mod-list status line.
-    pub mod_list_msg: Notification,
-
     ///  shown in the notification bar at the bottom.
     pub notify: Notification,
 
@@ -95,28 +70,10 @@ pub(crate) struct App {
     /// Shared with the deferred log-viewer viewport; toggled by the log button.
     pub show_log_window: Arc<AtomicBool>,
 
-    // ── Fetch state ───────────────────────────────────────────────────────────
-    /// Current phase of the background mod-list fetch.
-    /// Written by the worker thread, read by the UI thread every frame.
-    pub fetch_state: Arc<RwLock<FetchState>>,
+    // ── Pages ─────────────────────────────────────────────────────────────────
+    /// Patch page state that is not persisted (mod list fetch, merge progress, ...).
+    pub patch: PatchPage,
 
-    /// Staging buffer: the worker writes here before transitioning to `Done`.
-    pub fetched_mod_info: Arc<RwLock<Vec<mod_info::ModInfo>>>,
-
-    /// `true` when the last completed fetch returned zero items.
-    /// Causes the table to render against an empty list while preserving
-    /// the stored check-state.
-    pub last_fetch_was_empty: bool,
-
-    // ── Patch state ───────────────────────────────────────────────────────────
-    /// Wall-clock instant at which the current patch run started.
-    /// `None` when no patch is in progress.
-    pub patch_start_time: Option<std::time::Instant>,
-
-    /// Latest status written by the `behavior_merge` status-report callback.
-    pub patch_status: Arc<PatchProgress>,
-
-    // ── Other pages ───────────────────────────────────────────────────────────
     /// Convert page state that is not persisted (loaded tree, progress, ...).
     pub convert: ConvertPage,
 
@@ -148,19 +105,13 @@ impl App {
             #[expect(clippy::unwrap_used)]
             async_rt: tokio::runtime::Runtime::new().unwrap(),
 
-            is_first_render: true,
             show_help: false,
-            is_locked: false,
-            check_all: false,
-            mod_selection_anchor: None,
-            prev_table_available_width: 0.0,
 
             theme_manager,
             show_theme_editor: false,
 
             bg_img_handle: None,
 
-            mod_list_msg: Notification::default(),
             notify,
 
             current_log_dir: None,
@@ -169,13 +120,7 @@ impl App {
             log_watcher_started: false,
             show_log_window: Arc::new(AtomicBool::new(false)),
 
-            fetch_state: Arc::new(RwLock::new(FetchState::Idle)),
-            fetched_mod_info: Arc::new(RwLock::new(Vec::new())),
-            last_fetch_was_empty: false,
-
-            patch_status: Arc::new(PatchProgress::default()),
-            patch_start_time: None,
-
+            patch: PatchPage::default(),
             convert: ConvertPage::default(),
             hkanno,
             patch_editor: PatchEditorPage::default(),
@@ -199,15 +144,15 @@ impl App {
     pub(crate) fn frame_begin(&mut self, ctx: &egui::Context) {
         // ── Background task polling ───────────────────────────────────────────
         self.paint_background(ctx);
-        self.poll_fetch_result(ctx);
-        self.poll_patch_result();
+        let patch_ctx = PatchPollCtx {
+            settings: &mut self.settings.pages.patch,
+            i18n: &self.i18n,
+            notify: &mut self.notify,
+            runtime: &self.async_rt,
+        };
+        self.patch.poll(ctx, patch_ctx);
         self.convert.poll(&mut self.notify, &self.i18n);
         self.update_window_info(ctx);
-
-        // Patch-page shortcuts (e.g., Ctrl+R = reload mod list) must not fire while typing elsewhere.
-        if self.settings.ui.page == gui_shared::settings::ui::Page::Patch {
-            self.handle_shortcuts(ctx);
-        }
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
         self.start_log_watcher();
@@ -217,8 +162,6 @@ impl App {
     pub(crate) fn frame_end(&mut self, ctx: &egui::Context) {
         self.ui_log_window(ctx);
         self.ui_help_window(ctx);
-
-        self.is_first_render = false;
     }
 
     /// Persists everything on shutdown.

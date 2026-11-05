@@ -2,12 +2,14 @@
 //! the pointers between its objects. Kept up to date object by object.
 //!
 //! e.g., typing in `#0106` re-reads that one object; `hkbBehaviorGraphStringData`, which holds the
-//! event and variable names, is only parsed again when it is the object that changed.
+//! event and variable names, and `hkbBehaviorGraphData`, which holds the variable types, are only
+//! parsed again when they are the object that changed.
 
 use nemesis_diff::vars;
 
 use super::{
     tree::Graph,
+    vars_edit::GRAPH_DATA,
     workspace::{Behavior, STRING_DATA},
 };
 
@@ -16,6 +18,8 @@ use super::{
 pub(super) struct Names {
     pub(super) events: Vec<String>,
     pub(super) variables: Vec<String>,
+    /// The type of each variable by index, e.g. `REAL`.
+    pub(super) variable_types: Vec<Box<str>>,
     /// How many of each the template has (the rest are this mod's).
     pub(super) template_events: usize,
     pub(super) template_variables: usize,
@@ -31,6 +35,9 @@ impl Names {
             names.template_variables = vars::names(template, "variableNames").len();
             names.read_names(behavior.text(id).unwrap_or_default());
         }
+        if let Some(id) = behavior.object_of_class(GRAPH_DATA) {
+            names.read_types(behavior.text(id).unwrap_or_default());
+        }
         names
     }
 
@@ -39,11 +46,17 @@ impl Names {
         for id in changed {
             let object = behavior.object_text(id);
             self.graph.update(id, object);
-            if let Some(object) = object.filter(|object| object.class == STRING_DATA) {
-                self.read_names(object.text);
+            match object {
+                Some(object) if object.class == STRING_DATA => self.read_names(object.text),
+                Some(object) if object.class == GRAPH_DATA => self.read_types(object.text),
+                _ => {}
             }
         }
         self.graph.finish_updates();
+    }
+
+    fn read_types(&mut self, graph_data: &str) {
+        self.variable_types = vars::variable_types(graph_data).into_iter().map(Box::from).collect();
     }
 
     fn read_names(&mut self, string_data: &str) {

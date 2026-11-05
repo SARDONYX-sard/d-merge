@@ -1,6 +1,6 @@
 [package]
 name = "fast_hash"
-version = "0.1.0"
+version = "0.0.0"
 description = "Workspace-wide hash collection aliases. Change the hasher here only."
 
 authors.workspace = true

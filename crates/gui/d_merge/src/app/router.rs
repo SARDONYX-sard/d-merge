@@ -18,7 +18,11 @@
 use egui_router::{EguiRouter, Route, TransitionConfig};
 use gui_shared::{i18n::I18nKey, settings::ui::Page};
 
-use crate::{app::App, theme::themed_top_bottom_panel, ui::shadcn::Button};
+use crate::{
+    app::App,
+    theme::themed_top_bottom_panel,
+    ui::shadcn::{Button, Icon},
+};
 
 /// The `eframe::App` given to eframe: the [`App`] state + the router showing its pages.
 pub(crate) struct Root {
@@ -66,7 +70,7 @@ impl Root {
         );
 
         let mut clicked = None;
-        // `[Patch] [Convert] [hkanno]  <- grow ->  Theme: [Dark ▼]`
+        // `[Patch] [Convert] [hkanno]  <- grow ->  Theme: [Dark ▼] [Help]`
         panel.show(ui, |ui| {
             let flex = egui_flex::Flex::horizontal().w_full().align_items(egui_flex::FlexAlign::Center);
             flex.show(ui, |flex| {
@@ -85,7 +89,13 @@ impl Root {
                 }
                 flex.grow();
                 flex.add_ui(egui_flex::item(), |ui| {
-                    ui.horizontal(|ui| self.app.ui_theme_box(ui));
+                    ui.horizontal(|ui| {
+                        self.app.ui_theme_box(ui);
+                        let help = Button::new(self.app.i18n.t(I18nKey::HelpButton)).icon(Icon::Toolbox);
+                        if ui.add(help).clicked() {
+                            self.app.show_help ^= true;
+                        }
+                    });
                 });
             });
         });

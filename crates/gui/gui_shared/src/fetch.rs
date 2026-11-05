@@ -16,9 +16,10 @@
 /// [`Empty`]: FetchState::Empty
 /// [`Error`]: FetchState::Error
 /// [`Idle`]: FetchState::Idle
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum FetchState {
     /// No fetch is in progress; the mod list is up-to-date (or never loaded).
+    #[default]
     Idle,
 
     /// A background worker thread is currently fetching mod info.

@@ -1,6 +1,6 @@
 [package]
 name = "behavior_merge_types"
-version = "0.1.0"
+version = "0.0.0"
 description = "D merge core: data exchanged between behavior_merge and fnis_patch_gen (config, template keys, patches)"
 
 authors.workspace = true

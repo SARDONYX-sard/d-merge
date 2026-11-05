@@ -1,6 +1,6 @@
 [package]
 name = "gui_shared"
-version.workspace = true
+version = "0.0.0"
 description = "Diff & Merge hkx patcher gui shared code"
 
 authors.workspace = true
@@ -15,13 +15,13 @@ rust-version.workspace = true
 
 [dependencies]
 egui_code_editor = { workspace = true } # The labels of its menus (`i18n::editor_labels`)
-ico = "0.5.0"
+ico = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
-open = { version = "5.4.4" }
+open = { workspace = true }
 parking_lot = { workspace = true }
 fast_hash = { workspace = true }
 rayon = { workspace = true }
-semver = { version = "1.0.28", features = ["serde"] }
+semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 snafu = { workspace = true }
 sonic-rs = { workspace = true }
@@ -33,6 +33,12 @@ mod_info = { workspace = true }
 skyrim_data_dir = { workspace = true, features = ["serde"] }
 gui_shared_derive = { path = "../gui_shared_derive" }
 
+# File dialogs. Differs per OS, so the page crates use it through `gui_shared::rfd`.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd-linux = { workspace = true }
 
 [features]
 tracing = ["dep:tracing"]

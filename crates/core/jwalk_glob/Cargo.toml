@@ -1,6 +1,6 @@
 [package]
 name = "jwalk_glob"
-version.workspace = true
+version = "0.0.0"
 description = "Parallel glob & dir walker. To avoid MO2 vfs error when using glob crate."
 
 authors.workspace = true

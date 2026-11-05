@@ -2,7 +2,7 @@
 
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState};
+use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState, has_guide};
 
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
@@ -117,7 +117,7 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Stri
     egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
         for &node in unlinked {
             let id = graph.id(node);
-            let text = egui::RichText::new(graph.label(node)).monospace();
+            let text = object_label(ui, graph, node, false);
             if ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text)).clicked() {
                 id.clone_into(selected.get_or_insert_default());
             }
@@ -139,6 +139,7 @@ fn row_ui(
     let mut event = None;
     ui.horizontal(|ui| {
         ui.set_height(height);
+        draw_connecting_lines(ui, row, height);
         ui.add_space(f32::from(row.depth) * INDENT);
         let glyph = if row.expandable && row.open {
             "▼"
@@ -151,9 +152,7 @@ fn row_ui(
             event = Some(RowEvent::SetOpen(row.node, !row.open));
         }
 
-        let text = egui::RichText::new(graph.label(row.node)).monospace();
-        let text = if row.dimmed { text.weak() } else { text };
-        let response = ui.add(egui::Button::selectable(is_selected, text));
+        let response = ui.add(egui::Button::selectable(is_selected, object_label(ui, graph, row.node, row.dimmed)));
         if response.clicked() {
             event = Some(RowEvent::Select(index));
         }
@@ -175,4 +174,54 @@ fn row_ui(
         }
     });
     event
+}
+
+/// The lines joining a row to its parent and to the rows below:
+/// ```text
+/// #0090
+/// ├ #0091
+/// │ └ #0094     `│` is level 0 going on past this row, `└` the row's own line at level 1
+/// └ #0095
+/// ```
+fn draw_connecting_lines(ui: &egui::Ui, row: Row, height: f32) {
+    let Some(own_level) = row.depth.checked_sub(1) else { return };
+    let stroke = egui::Stroke::new(1.0, ui.visuals().weak_text_color().gamma_multiply(0.5));
+    let left = ui.cursor().left();
+    let top = ui.cursor().top();
+    // Up to the next row, over the gap between the rows.
+    let bottom = top + height + ui.spacing().item_spacing.y;
+    let center = top + height / 2.0;
+    let x_of = |level: u16| f32::from(level).mul_add(INDENT, left + INDENT / 2.0);
+    let painter = ui.painter();
+
+    for level in 0..own_level {
+        if has_guide(row.guides, level) {
+            painter.vline(x_of(level), top..=bottom, stroke);
+        }
+    }
+    let own_x = x_of(own_level);
+    painter.vline(own_x, top..=if row.last_child { center } else { bottom }, stroke);
+    painter.hline(own_x..=own_x + INDENT / 2.0, center, stroke);
+}
+
+/// A row's text: the class and the name each have their color, to find them in a long list.
+/// `dimmed`: the object is expanded at another place.
+pub(in crate::patch) fn object_label(ui: &egui::Ui, graph: &Graph, node: Node, dimmed: bool) -> egui::text::LayoutJob {
+    let (head, class, name, links) = graph.label_parts(node);
+    let visuals = ui.visuals();
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let (class_color, name_color) = if visuals.dark_mode {
+        (egui::Color32::from_rgb(86, 182, 194), egui::Color32::from_rgb(229, 192, 123))
+    } else {
+        (egui::Color32::from_rgb(0, 110, 130), egui::Color32::from_rgb(150, 90, 0))
+    };
+    let tone = |color: egui::Color32| if dimmed { color.gamma_multiply(0.5) } else { color };
+
+    let mut job = egui::text::LayoutJob::default();
+    let parts =
+        [(head, visuals.text_color()), (class, class_color), (name, name_color), (links, visuals.weak_text_color())];
+    for (text, color) in parts {
+        job.append(text, 0.0, egui::TextFormat::simple(font.clone(), tone(color)));
+    }
+    job
 }

@@ -13,6 +13,11 @@
 //! `numelements` is left as is: Nemesis / d-merge count the elements themselves, and leaving it
 //! keeps patches of different mods from conflicting on that line.
 
+/// How patches refer to an event: `$eventID[name]$`.
+pub const EVENT_ID_PREFIX: &str = "$eventID[";
+/// How patches refer to a variable: `$variableID[name]$`.
+pub const VARIABLE_ID_PREFIX: &str = "$variableID[";
+
 /// Variable types that keep their initial value in `wordVariableValues`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VariableType {
@@ -86,6 +91,69 @@ pub fn name_line(object: &str, param: &str, name: &str) -> Option<usize> {
         value.is_some_and(|value| value.eq_ignore_ascii_case(name))
     })?;
     Some(line)
+}
+
+/// The type of each entry of `variableInfos` of a `hkbBehaviorGraphData`, by index, without the
+/// `VARIABLE_TYPE_` prefix.
+///
+/// e.g., `<hkparam name="type">VARIABLE_TYPE_REAL</hkparam>` -> `REAL`
+pub fn variable_types(graph_data: &str) -> Vec<&str> {
+    const OPEN: &str = "<hkparam name=\"type\">";
+    let mut lines = graph_data.lines();
+    if !lines.any(|line| line.trim_start().starts_with("<hkparam name=\"variableInfos\"")) {
+        return Vec::new();
+    }
+    // The array ends at a `</hkparam>` with its own indent, or a field on one line when it is empty.
+    lines
+        .take_while(|line| !line.trim_start().starts_with("<hkparam name=\"") || line.contains(OPEN) || is_nested(line))
+        .filter_map(|line| line.trim().strip_prefix(OPEN)?.strip_suffix("</hkparam>"))
+        .map(|kind| kind.strip_prefix("VARIABLE_TYPE_").unwrap_or(kind))
+        .collect()
+}
+
+/// A field inside a `variableInfos` element, not the next field of the object.
+fn is_nested(line: &str) -> bool {
+    ["\"role\"", "\"flags\""].iter().any(|name| line.contains(name))
+}
+
+/// Element `index` of the name array `param` with a new name.
+///
+/// e.g., `eventNames`, 1, `run` turns `<hkcstring>moveStop</hkcstring>` into `<hkcstring>run</hkcstring>`
+pub fn rename(object: &str, param: &str, index: usize, new_name: &str) -> Option<String> {
+    let mut array = Array::find(object, param)?;
+    let line = array.elements.get_mut(index)?.first_mut()?;
+    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+    *line = format!("{indent}<hkcstring>{new_name}</hkcstring>");
+    Some(array.join())
+}
+
+/// `text` with every use of a name changed, or `None` if it has none. Case is ignored, as Nemesis
+/// and d-merge do.
+///
+/// e.g., `$eventID[`, `old`, `new`: `<hkparam name="id">$EVENTID[OLD]$</hkparam>` ->
+/// `<hkparam name="id">$EVENTID[new]$</hkparam>`
+pub fn rename_uses(text: &str, prefix: &str, old: &str, new: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut copied = 0;
+    for (at, _) in text.match_indices('$') {
+        let rest = &text[at..];
+        let after_prefix = rest
+            .get(prefix.len()..)
+            .filter(|_| rest.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix)));
+        let name = after_prefix.and_then(|after| after.get(..old.len())).filter(|name| name.eq_ignore_ascii_case(old));
+        let closed = after_prefix.and_then(|after| after.get(old.len()..)).is_some_and(|tail| tail.starts_with("]$"));
+        if name.is_some() && closed {
+            let name_start = at + prefix.len();
+            out.push_str(&text[copied..name_start]);
+            out.push_str(new);
+            copied = name_start + old.len();
+        }
+    }
+    if copied == 0 {
+        return None;
+    }
+    out.push_str(&text[copied..]);
+    Some(out)
 }
 
 /// Appends an element (lines relative to the element indent) to array `param` of `object`.
@@ -237,6 +305,27 @@ mod tests {
 \t\t\t<hkparam name=\"wordVariableValues\" numelements=\"0\"></hkparam>
 \t\t</hkobject>
 ";
+
+    #[test]
+    fn reads_variable_types() {
+        let (_, graph_data, _) = add_variable(STRING_DATA, GRAPH_DATA, VALUE_SET, "a", VariableType::Real, 0).unwrap();
+        let (string_data, graph_data, value_set) = (STRING_DATA, graph_data, VALUE_SET);
+        let (_, graph_data, _) = add_variable(string_data, &graph_data, value_set, "b", VariableType::Bool, 0).unwrap();
+        assert_eq!(variable_types(&graph_data), ["REAL", "BOOL"]);
+        assert!(variable_types(GRAPH_DATA).is_empty());
+    }
+
+    #[test]
+    fn renames_names_and_their_uses() {
+        let renamed = rename(STRING_DATA, "eventNames", 1, "run").unwrap();
+        assert_eq!(names(&renamed, "eventNames"), ["moveStart", "run"]);
+        assert!(rename(STRING_DATA, "eventNames", 9, "run").is_none());
+
+        let text = "a $eventID[moveStop]$ b $EVENTID[MOVESTOP]$ $eventID[moveStopped]$ $variableID[moveStop]$";
+        let expected = "a $eventID[run]$ b $EVENTID[run]$ $eventID[moveStopped]$ $variableID[moveStop]$";
+        assert_eq!(rename_uses(text, "$eventID[", "moveStop", "run").as_deref(), Some(expected));
+        assert_eq!(rename_uses("nothing", "$eventID[", "moveStop", "run"), None);
+    }
 
     #[test]
     fn add_and_remove() {

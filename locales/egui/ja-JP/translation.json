@@ -206,6 +206,7 @@
   "nemesis_collapse_all_below": "以下をすべて折りたたむ",
   "nemesis_expand_all_below": "以下をすべて展開",
   "nemesis_not_linked": "未リンク",
+  "nemesis_rename": "名前を変更(使用しているパッチも更新します)",
   "nemesis_not_linked_hover": "ツリーのどのオブジェクトからも参照されていない新規オブジェクトです。Nemesis には無視されます。どこかのポインタフィールドに #id を追加してください。",
   "nemesis_focus_tree": "オブジェクトツリーへフォーカス",
   "nemesis_tree_keys_hint": "j / k: 移動、h / l: 開閉、Enter: エディタへ戻る",

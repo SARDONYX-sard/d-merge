@@ -18,7 +18,7 @@ impl PatchTool {
             ui.label(i18n.t(I18nKey::NemesisOutputLabel)).on_hover_text(i18n.t(I18nKey::NemesisOutputHover));
             ui.add(TextEdit::singleline(&mut self.output).desired_width(260.0));
             if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
-                && let Some(dir) = rfd::FileDialog::new().set_directory(&self.output).pick_folder()
+                && let Some(dir) = gui_shared::rfd::FileDialog::new().set_directory(&self.output).pick_folder()
             {
                 self.output = dir.display().to_string();
             }
@@ -63,7 +63,7 @@ impl PatchTool {
                 .add(Button::new(i18n.t(I18nKey::NemesisCustomXml)))
                 .on_hover_text(i18n.t(I18nKey::NemesisCustomXmlHover))
                 .clicked()
-                && let Some(path) = rfd::FileDialog::new()
+                && let Some(path) = gui_shared::rfd::FileDialog::new()
                     .add_filter("Template", &["xml", "bin"])
                     .set_directory(&self.template_dir)
                     .pick_file()
@@ -74,7 +74,7 @@ impl PatchTool {
                 .add(Button::new(i18n.t(I18nKey::NemesisImportMod)))
                 .on_hover_text(i18n.t(I18nKey::NemesisImportModHover))
                 .clicked()
-                && let Some(dir) = rfd::FileDialog::new().pick_folder()
+                && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder()
             {
                 self.import(&dir, notify, i18n);
             }

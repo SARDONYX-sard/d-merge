@@ -18,8 +18,17 @@ pub(in crate::patch) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: 
     ui.label(format!("{}/{}", preview.current + 1, preview.blocks()));
 }
 
-/// The lines (only the visible ones are laid out). Returns the block whose `↶` was clicked.
-pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &str) -> Option<usize> {
+/// What a click in the preview asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::patch) enum PreviewEvent {
+    /// `↶`: put this changed block back to the template.
+    Revert(usize),
+    /// A double click: show this preview row in the editor.
+    JumpToEditor(usize),
+}
+
+/// The lines (only the visible ones are laid out).
+pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &str) -> Option<PreviewEvent> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     // The painter below does not grow the rows, so the horizontal scroll needs the real width.
@@ -36,11 +45,15 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
     }
 
     let current = preview.current;
-    let mut revert = None;
+    let mut event = None;
     scroll.show_rows(ui, row_height, preview.lines().len(), |ui, range| {
-        for (kind, text) in &preview.lines()[range] {
+        let first_row = range.start;
+        for (i, (kind, text)) in preview.lines()[range].iter().enumerate() {
             let size = egui::vec2(ui.available_width().max(content_width), row_height);
-            let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+            if response.double_clicked() {
+                event = Some(PreviewEvent::JumpToEditor(first_row + i));
+            }
             if let Some(fill) = line_fill(ui, *kind, current) {
                 ui.painter().rect_filled(rect, 0.0, fill);
             }
@@ -49,7 +62,7 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
             if let Kind::Open(block) = kind
                 && ui.put(gutter, egui::Button::new("↶").small()).on_hover_text(revert_hover).clicked()
             {
-                revert = Some(*block);
+                event = Some(PreviewEvent::Revert(*block));
             }
             let color = match kind {
                 Kind::Open(_) | Kind::Marker => ui.visuals().weak_text_color(),
@@ -59,7 +72,7 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
             ui.painter().text(pos, egui::Align2::LEFT_CENTER, text, font.clone(), color);
         }
     });
-    revert
+    event
 }
 
 /// The background of a line: git's green / red, and a tint on the current block's `OPEN` line.

@@ -1,6 +1,6 @@
 [package]
 name = "tracing_rotation"
-version = "0.1.0"
+version = "0.0.0"
 description = "Rotation file tracing global subscriber"
 
 authors.workspace = true
@@ -13,14 +13,14 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-chrono = "0.4.44"
+chrono = { workspace = true }
 parking_lot = { workspace = true }
 snafu = { workspace = true } # Implement error types
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-temp-dir = "0.2.0"
+temp-dir = { workspace = true }
 pretty_assertions = { workspace = true }
 
 [lints]
