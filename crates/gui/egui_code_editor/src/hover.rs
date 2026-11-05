@@ -5,9 +5,10 @@
 //! - opens after the pointer rests on a char for [`HOVER_DELAY`]
 //! - stays open while the pointer is on the text or inside the popup (links are clickable)
 //! - closes when the pointer leaves both, on any key press, or on a click outside it
+//! - scrolls when its text is taller than [`MAX_HEIGHT`]
 //! - Vim `K` opens it at the text cursor (see [`HoverPopup::open_at`]); `K` again moves the
-//!   keyboard into it: `Tab` / `j` / `k` go through the links, `Enter` opens one,
-//!   `Esc` / `q` close it and return to the editor
+//!   keyboard into it if there is anything to do there: `j` / `k` scroll, `Tab` / `Shift+Tab` go
+//!   through the links, `Enter` opens one, `Esc` / `q` close it and return to the editor
 
 use egui::{Galley, Pos2, Rect};
 
@@ -22,6 +23,12 @@ pub(crate) const HOVER_DELAY: f64 = 0.3;
 /// Slack (in points) around the popup, so a small gap between the text and the popup
 /// does not close it while the pointer travels into it.
 pub(crate) const POPUP_MARGIN: f32 = 8.0;
+
+/// The popup scrolls above this height, so that a long text does not cover the editor.
+pub(crate) const MAX_HEIGHT: f32 = 320.0;
+
+/// How far `j` / `k` scroll the popup: about three lines.
+pub(crate) const SCROLL_STEP: f32 = 48.0;
 
 /// Per-editor hover state (part of [`crate::CodeEditorState`]).
 #[derive(Debug, Default)]
@@ -46,10 +53,73 @@ pub(crate) struct Open {
     pub(crate) rect: Option<Rect>,
     /// Opened by keyboard (Vim `K`): the pointer does not move or close it.
     pub(crate) pinned: bool,
-    /// The keyboard is in the popup (Vim `K` twice): keys go to its links, not to the editor.
+    /// The keyboard is in the popup (Vim `K` twice): keys scroll it and go to its links, not to the
+    /// editor.
     pub(crate) focused: bool,
-    /// Focus the first link on the next draw.
-    pub(crate) focus_first_link: bool,
+    /// How many links the last draw had.
+    pub(crate) links: usize,
+    /// The link the keyboard is on. `None`: on the popup itself.
+    pub(crate) link: Option<usize>,
+    /// [`Self::link`] changed: bring it into view on the next draw.
+    pub(crate) follow_link: bool,
+    /// The last draw had more text than fits.
+    pub(crate) can_scroll: bool,
+    /// How far it was scrolled at the last draw.
+    pub(crate) scroll_offset: f32,
+    /// Scroll here on the next draw. Otherwise the mouse wheel decides.
+    pub(crate) scroll_to: Option<f32>,
+}
+
+impl Open {
+    pub(crate) const fn new(index: usize, anchor: Rect, content: Content, pinned: bool) -> Self {
+        Self {
+            index,
+            anchor,
+            content,
+            rect: None,
+            pinned,
+            focused: false,
+            links: 0,
+            link: None,
+            follow_link: false,
+            can_scroll: false,
+            scroll_offset: 0.0,
+            // A popup that was open at the same place before must not start where that one ended.
+            scroll_to: Some(0.0),
+        }
+    }
+
+    /// Is there anything for the keyboard to do in the popup? If not, it stays in the editor.
+    pub(crate) const fn takes_keyboard(&self) -> bool {
+        self.links > 0 || self.can_scroll
+    }
+
+    /// `Tab` (`forward`) / `Shift+Tab`.
+    pub(crate) const fn step_link(&mut self, forward: bool) {
+        self.link = next_link(self.link, self.links, forward);
+        self.follow_link = true;
+    }
+
+    /// `j` (positive) / `k` (negative). The scroll area keeps it within the text.
+    pub(crate) const fn scroll_by(&mut self, delta: f32) {
+        self.scroll_to = Some(self.scroll_offset + delta);
+    }
+}
+
+/// The link after `current` of `links`, around the ends. From no link: the first, or the last going
+/// backward.
+///
+/// e.g., of 3 links: `None` -> `Some(0)`, `Some(2)` -> `Some(0)`; backward, `Some(0)` -> `Some(2)`
+pub(crate) const fn next_link(current: Option<usize>, links: usize, forward: bool) -> Option<usize> {
+    if links == 0 {
+        return None;
+    }
+    Some(match (current, forward) {
+        (None, true) => 0,
+        (None, false) => links - 1,
+        (Some(at), true) => (at + 1) % links,
+        (Some(at), false) => (at + links - 1) % links,
+    })
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,6 +168,16 @@ fn content_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn links_go_around() {
+        assert_eq!(next_link(None, 3, true), Some(0));
+        assert_eq!(next_link(None, 3, false), Some(2));
+        assert_eq!(next_link(Some(0), 3, true), Some(1));
+        assert_eq!(next_link(Some(2), 3, true), Some(0));
+        assert_eq!(next_link(Some(0), 3, false), Some(2));
+        assert_eq!(next_link(None, 0, true), None);
+    }
 
     struct Docs;
     impl Language for Docs {

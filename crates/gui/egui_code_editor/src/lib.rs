@@ -64,7 +64,8 @@ pub use self::{
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
-        CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References, Severity, SignatureHelp,
+        CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References, Severity,
+        SignatureHelp,
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},
@@ -1210,6 +1211,102 @@ mod tests {
         frames.button(egui::PointerButton::Secondary, elsewhere, true);
         let selection = frames.selection();
         assert!(selection.is_empty() && selection.start > 12, "{selection:?}");
+    }
+
+    /// A language with the same hover over all of its text.
+    struct Hovered(&'static str);
+    impl Language for Hovered {
+        fn hover_at(&self, _text: &str, _line: usize, _column: usize) -> Option<String> {
+            Some(self.0.to_owned())
+        }
+    }
+
+    /// Presses a key the way a window system reports it: the key, then the text it typed.
+    fn press(frames: &mut Frames, key: egui::Key, modifiers: egui::Modifiers, typed: &str) {
+        let mut events = vec![egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }];
+        if !typed.is_empty() {
+            events.push(egui::Event::Text(typed.to_owned()));
+        }
+        frames.frame(events);
+    }
+
+    fn press_shift_k(frames: &mut Frames) {
+        press(frames, egui::Key::K, egui::Modifiers::SHIFT, "K");
+    }
+
+    fn press_j(frames: &mut Frames) {
+        press(frames, egui::Key::J, egui::Modifiers::NONE, "j");
+    }
+
+    /// `K` twice, in Vim.
+    fn in_hover_of(doc: &'static str) -> Frames {
+        // (A leak is fine in a test: a language has to live as long as the frames.)
+        let language: &'static Hovered = Box::leak(Box::new(Hovered(doc)));
+        let mut frames = Frames::new("first\nsecond");
+        frames.language = language;
+        frames.keymap = Keymap::Vim;
+        frames.frame(Vec::new());
+        press_shift_k(&mut frames);
+        press_shift_k(&mut frames);
+        frames
+    }
+
+    fn open_hover(frames: &Frames) -> &crate::hover::Open {
+        frames.state.hover.open.as_ref().expect("the popup is open")
+    }
+
+    #[test]
+    fn k_twice_with_nothing_to_do_in_the_hover_leaves_the_keyboard_in_the_editor() {
+        let mut frames = in_hover_of("plain text");
+        assert!(!open_hover(&frames).focused);
+
+        press_j(&mut frames);
+        assert!(frames.state.hover.open.is_none(), "the next key closes it");
+    }
+
+    #[test]
+    fn j_and_k_scroll_a_long_hover() {
+        let doc: &'static str = "a line\n\n".repeat(100).leak();
+        let mut frames = in_hover_of(doc);
+        assert!(open_hover(&frames).focused, "there is more text to see");
+        assert_eq!(open_hover(&frames).scroll_offset, 0.0);
+
+        press_j(&mut frames);
+        press_j(&mut frames);
+        frames.frame(Vec::new());
+        let scrolled = open_hover(&frames).scroll_offset;
+        assert!(scrolled > 0.0, "{scrolled}");
+
+        press(&mut frames, egui::Key::K, egui::Modifiers::NONE, "k");
+        frames.frame(Vec::new());
+        assert!(open_hover(&frames).scroll_offset < scrolled);
+        assert!(frames.state.hover.open.is_some(), "not closed by them");
+        assert_eq!(frames.text, "first\nsecond", "nor do they reach the editor");
+    }
+
+    #[test]
+    fn tab_goes_through_the_links_of_a_hover() {
+        let mut frames = in_hover_of("[one](https://example.com/1) and [two](https://example.com/2)");
+        assert!(open_hover(&frames).focused);
+        assert_eq!(open_hover(&frames).link, None, "on the popup, until asked");
+
+        press_tab(&mut frames);
+        assert_eq!(open_hover(&frames).link, Some(0));
+        press_tab(&mut frames);
+        assert_eq!(open_hover(&frames).link, Some(1));
+        press(&mut frames, egui::Key::Tab, egui::Modifiers::SHIFT, "");
+        assert_eq!(open_hover(&frames).link, Some(0));
+        assert!(!frames.ctx.memory(|memory| memory.has_focus(frames.id)), "the keyboard is not in the editor");
+    }
+
+    #[test]
+    fn q_leaves_the_hover_for_the_editor() {
+        let mut frames = in_hover_of("[one](https://example.com/1)");
+        press(&mut frames, egui::Key::Q, egui::Modifiers::NONE, "q");
+        assert!(frames.state.hover.open.is_none());
+        assert!(frames.ctx.memory(|memory| memory.has_focus(frames.id)));
+        let status = frames.state.keymap.status(Keymap::Vim).unwrap();
+        assert!(!status.text.contains("recording"), "the `q` is not Vim's: {}", status.text);
     }
 
     fn press_tab(frames: &mut Frames) {

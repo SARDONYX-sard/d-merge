@@ -230,19 +230,19 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 
 ### Other
 
-| Key             | Action                                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `K`             | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
-| `gx`            | Open the URL under the cursor                                                                                                    |
-| `gd`            | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
-| `gD`            | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
-| `<Space>e`      | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                       |
-| `<Space>l` `gt` | Next tab (`EditorCommand::NextTab` for the host)                                                                                 |
-| `<Space>h` `gT` | Previous tab (`EditorCommand::PreviousTab` for the host)                                                                         |
-| `<Space>f`      | Format the document                                                                                                              |
-| `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                              |
-| `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                 |
-| `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                 |
+| Key             | Action                                                                                                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `K`             | Hover at the cursor; `K` again moves the keyboard into it if it can scroll or has links (`j` / `k` scroll, `Tab` / `Shift+Tab` choose a link, `Enter` opens it, `Esc` / `q` close) |
+| `gx`            | Open the URL under the cursor                                                                                                                                                      |
+| `gd`            | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                                                                    |
+| `gD`            | Find references (`EditorCommand::FindReferences` for the host)                                                                                                                     |
+| `<Space>e`      | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                                                                         |
+| `<Space>l` `gt` | Next tab (`EditorCommand::NextTab` for the host)                                                                                                                                   |
+| `<Space>h` `gT` | Previous tab (`EditorCommand::PreviousTab` for the host)                                                                                                                           |
+| `<Space>f`      | Format the document                                                                                                                                                                |
+| `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                                                                                |
+| `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                                                                   |
+| `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                                                                   |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 

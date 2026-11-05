@@ -2,7 +2,7 @@
 
 use egui::{Galley, Pos2, Rect, text::CCursor};
 
-use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, Open, POPUP_MARGIN, content};
+use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, MAX_HEIGHT, Open, POPUP_MARGIN, SCROLL_STEP, content};
 
 impl HoverPopup {
     /// Handles the keys meant for the popup, and closes it on other keys or a click outside it.
@@ -30,10 +30,11 @@ impl HoverPopup {
             return;
         }
 
-        // Vim `K` on an open `K` popup: move the keyboard into it (like Neovim's hover window).
+        // Vim `K` on an open `K` popup: move the keyboard into it (like Neovim's hover window). With
+        // nothing to scroll or follow it stays in the editor, so the next key closes the popup as
+        // usual.
         if open.pinned && take_shift_k(ui) {
-            open.focused = true;
-            open.focus_first_link = true;
+            open.focused = open.takes_keyboard();
             return;
         }
 
@@ -59,15 +60,7 @@ impl HoverPopup {
     /// Opens the popup for the char at `index` right away (e.g., Vim `K` at the cursor).
     pub(crate) fn open_at(&mut self, index: usize, ctx: &HoverCtx<'_>) {
         let anchor = char_rect(ctx.galley, ctx.galley_pos, index);
-        self.open = content(index, ctx).map(|content| Open {
-            index,
-            anchor,
-            content,
-            rect: None,
-            pinned: true,
-            focused: false,
-            focus_first_link: false,
-        });
+        self.open = content(index, ctx).map(|content| Open::new(index, anchor, content, true));
     }
 
     /// Tracks the pointer and draws the popup.
@@ -105,7 +98,6 @@ impl HoverPopup {
             // Re-anchor every frame so the popup follows its char when the text scrolls.
             open.anchor = char_rect(ctx.galley, ctx.galley_pos, open.index);
             open.rect = Some(show(ui.ctx(), ctx.id, open));
-            open.focus_first_link = false;
         }
     }
 
@@ -139,15 +131,7 @@ impl HoverPopup {
             Some(new) if self.open.as_ref().is_some_and(|o| o.content == new) => {}
             Some(content) => {
                 let anchor = char_rect(ctx.galley, ctx.galley_pos, index);
-                self.open = Some(Open {
-                    index,
-                    anchor,
-                    content,
-                    rect: None,
-                    pinned: false,
-                    focused: false,
-                    focus_first_link: false,
-                });
+                self.open = Some(Open::new(index, anchor, content, false));
             }
             None => self.open = None,
         }
@@ -158,22 +142,31 @@ impl HoverPopup {
 fn focused_keys(ui: &egui::Ui, open: &mut Open, editor_id: egui::Id) {
     use egui::{Key, Modifiers};
 
-    let (close, next, prev, clicked_outside) = ui.input_mut(|i| {
+    let keys = ui.input_mut(|i| {
         let close = i.consume_key(Modifiers::NONE, Key::Escape) || i.consume_key(Modifiers::NONE, Key::Q);
-        let next = i.consume_key(Modifiers::NONE, Key::J) || i.consume_key(Modifiers::NONE, Key::ArrowDown);
-        let prev = i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+        let down = i.consume_key(Modifiers::NONE, Key::J) || i.consume_key(Modifiers::NONE, Key::ArrowDown);
+        let up = i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+        let next = i.consume_key(Modifiers::NONE, Key::Tab);
+        let previous = i.consume_key(Modifiers::SHIFT, Key::Tab);
         let click = i.pointer.any_pressed().then(|| i.pointer.interact_pos()).flatten();
         let outside = click.is_some_and(|pos| !open.rect.is_some_and(|rect| rect.contains(pos)));
-        (close, next, prev, outside)
+        // What these keys typed must not reach the editor, which gets the keyboard back on `q`.
+        i.events.retain(|event| !matches!(event, egui::Event::Text(_)));
+        (close || outside, down, up, next, previous)
     });
+    let (close, down, up, next, previous) = keys;
 
-    if close || clicked_outside {
+    if close {
         open.focused = false;
         ui.memory_mut(|m| m.request_focus(editor_id));
+    } else if down {
+        open.scroll_by(SCROLL_STEP);
+    } else if up {
+        open.scroll_by(-SCROLL_STEP);
     } else if next {
-        ui.memory_mut(|m| m.move_focus(egui::FocusDirection::Next));
-    } else if prev {
-        ui.memory_mut(|m| m.move_focus(egui::FocusDirection::Previous));
+        open.step_link(true);
+    } else if previous {
+        open.step_link(false);
     }
 }
 
@@ -189,33 +182,65 @@ fn take_shift_k(ui: &egui::Ui) -> bool {
 }
 
 /// Draws the popup below its anchor and returns its rect.
-fn show(ctx: &egui::Context, id: egui::Id, open: &Open) -> Rect {
+fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open) -> Rect {
     egui::Area::new(id.with("hover_popup"))
         .order(egui::Order::Tooltip)
         .fixed_pos(open.anchor.left_bottom())
         .constrain(true)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.set_max_width(480.0);
-                let Content { problems, docs } = &open.content;
-                for (severity, message) in problems {
-                    ui.colored_label(severity.color(ui.visuals()), message);
+                // Has the keyboard while no link does, so that it leaves the editor.
+                let popup = ui.allocate_response(egui::Vec2::ZERO, egui::Sense::focusable_noninteractive());
+                let mut area = egui::ScrollArea::vertical().id_salt("hover_scroll").max_height(MAX_HEIGHT);
+                if let Some(offset) = open.scroll_to.take() {
+                    area = area.vertical_scroll_offset(offset);
                 }
-                if let Some(docs) = docs {
-                    if !problems.is_empty() {
-                        ui.separator();
+                let scrolled = area.show(ui, |ui| {
+                    ui.set_max_width(480.0);
+                    let links = popup_text(ui, &open.content);
+                    if open.focused {
+                        let link = open.link.and_then(|link| links.get(link));
+                        hold_keyboard(ui, link.unwrap_or(&popup));
+                        if open.follow_link
+                            && let Some(link) = link
+                        {
+                            link.scroll_to_me(None);
+                        }
                     }
-                    let links = egui_widgets::markdown::markdown(ui, docs);
-                    if open.focus_first_link
-                        && let Some(first) = links.first()
-                    {
-                        first.request_focus();
-                    }
-                }
+                    open.follow_link = false;
+                    links.len()
+                });
+                open.links = scrolled.inner;
+                open.can_scroll = scrolled.content_size.y > scrolled.inner_rect.height();
+                open.scroll_offset = scrolled.state.clamped_offset().y;
             });
         })
         .response
         .rect
+}
+
+/// The problems, then the docs. Returns the links in the docs.
+fn popup_text(ui: &mut egui::Ui, content: &Content) -> Vec<egui::Response> {
+    let Content { problems, docs } = content;
+    for (severity, message) in problems {
+        ui.colored_label(severity.color(ui.visuals()), message);
+    }
+    let Some(docs) = docs else { return Vec::new() };
+    if !problems.is_empty() {
+        ui.separator();
+    }
+    egui_widgets::markdown::markdown(ui, docs)
+}
+
+/// Keeps the keyboard on `widget`, with egui leaving `Tab` and the arrows to [`focused_keys`]: on its
+/// own, it would move them to any widget of the window.
+fn hold_keyboard(ui: &egui::Ui, widget: &egui::Response) {
+    // (Asking again would reset the filter below.)
+    if !widget.has_focus() {
+        widget.request_focus();
+    }
+    let filter = egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true };
+    ui.memory_mut(|m| m.set_focus_lock_filter(widget.id, filter));
 }
 
 /// Char index under `pointer`, or `None` in the empty area right of a line.

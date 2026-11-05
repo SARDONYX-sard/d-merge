@@ -14,8 +14,8 @@
 pub(crate) mod normal;
 pub(crate) mod vim;
 
-pub(crate) use self::vim::which_key::Prefix;
 pub use self::vim::VimOptions;
+pub(crate) use self::vim::which_key::Prefix;
 use crate::{EditorCommand, search::Matcher};
 
 /// Key binding style of the editor.

@@ -91,7 +91,11 @@ pub struct VimOptions {
 
 impl Default for VimOptions {
     fn default() -> Self {
-        Self { insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']], escape_timeout: 0.5, indent: crate::Indent::default() }
+        Self {
+            insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']],
+            escape_timeout: 0.5,
+            indent: crate::Indent::default(),
+        }
     }
 }
 

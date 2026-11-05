@@ -130,9 +130,8 @@ mod tests {
 
     /// Every printable key the parser knows after the prefix.
     fn parsed_keys(prefix: char) -> Vec<char> {
-        let mut keys: Vec<char> = (' '..='~')
-            .filter(|&key| parse(&[VimKey::Char(prefix), VimKey::Char(key)]) != Parse::Invalid)
-            .collect();
+        let mut keys: Vec<char> =
+            (' '..='~').filter(|&key| parse(&[VimKey::Char(prefix), VimKey::Char(key)]) != Parse::Invalid).collect();
         keys.sort_unstable();
         keys
     }
