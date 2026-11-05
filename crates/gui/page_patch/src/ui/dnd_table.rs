@@ -16,12 +16,15 @@ pub(super) struct RowConflicts<'a> {
     pub(super) label: &'a str,
     /// The flag's hover: wins, loses.
     pub(super) hovers: (&'a str, &'a str),
+    /// The hover of a mod whose patch does nothing in the end.
+    pub(super) dead_hover: &'a str,
     /// The mod whose conflicts were asked for.
     pub(super) asked: Option<String>,
 }
 
 impl RowConflicts<'_> {
-    /// `+`, `-` or `±`. Green: it overrides others, orange: others override it.
+    /// `+`, `-` or `±`. Green: it overrides others, orange: others override it. `⚡`, like MO2: all it
+    /// does loses, so its patch does nothing.
     fn flag(&self, ui: &mut egui::Ui, id: &str, width: f32) {
         let mark = self.scan.mark_of(id);
         if mark == Mark::default() {
@@ -36,9 +39,12 @@ impl RowConflicts<'_> {
             egui::Color32::from_rgb(100, 200, 120)
         };
         let (wins, loses) = self.hovers;
-        let hover = format!("{wins}: {}\n{loses}: {}", mark.wins, mark.loses);
+        let counts = format!("{wins}: {}\n{loses}: {}", mark.wins, mark.loses);
+        let is_dead = self.scan.is_dead(id);
+        let hover = if is_dead { format!("{}\n\n{counts}", self.dead_hover) } else { counts };
         // Not selectable: it would take the clicks, and with them the row's right-click menu.
-        let glyph = egui::Label::new(egui::RichText::new(mark.glyph()).color(color).strong()).selectable(false);
+        let text = if is_dead { "⚡" } else { mark.glyph() };
+        let glyph = egui::Label::new(egui::RichText::new(text).color(color).strong()).selectable(false);
         ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_text(hover);
     }
 

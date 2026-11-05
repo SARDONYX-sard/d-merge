@@ -83,7 +83,7 @@ impl AdsfFile {
 }
 
 /// An `Indexed*` file is an edit if it has `MOD_CODE`, else it is whole.
-fn is_edit(patch: &str) -> bool {
+pub(super) fn is_edit(patch: &str) -> bool {
     patch.contains("<!-- MOD_CODE")
 }
 

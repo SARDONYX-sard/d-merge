@@ -60,6 +60,14 @@ impl EditorTabs {
         self.of(behavior).last().map(|tab| tab.id.as_str())
     }
 
+    /// The tab next to `id` of `behavior`, around the ends. `None`: there is no other.
+    pub(super) fn neighbor(&self, behavior: usize, id: &str, forward: bool) -> Option<&str> {
+        let tabs: Vec<&str> = self.of(behavior).map(|tab| tab.id.as_str()).collect();
+        let at = tabs.iter().position(|tab| *tab == id)?;
+        let next = if forward { (at + 1) % tabs.len() } else { (at + tabs.len() - 1) % tabs.len() };
+        (next != at).then(|| tabs[next])
+    }
+
     /// Shows `id` in a tab: its own if it has one, else the preview tab, else a new one right after
     /// `current` (the tab being left), or at the end.
     pub(super) fn open(&mut self, behavior: usize, id: &str, current: Option<&str>) {
@@ -134,6 +142,22 @@ impl EditorTabs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_next_tab_goes_around_within_its_behavior() {
+        let mut tabs = EditorTabs::default();
+        for id in ["#a", "#b", "#c"] {
+            tabs.restore(0, id, true);
+        }
+        tabs.restore(1, "#x", true);
+
+        assert_eq!(tabs.neighbor(0, "#a", true), Some("#b"));
+        assert_eq!(tabs.neighbor(0, "#c", true), Some("#a"), "around the end");
+        assert_eq!(tabs.neighbor(0, "#a", false), Some("#c"), "around the start");
+        assert_eq!(tabs.neighbor(0, "#b", false), Some("#a"));
+        assert_eq!(tabs.neighbor(1, "#x", true), None, "the only one of its behavior");
+        assert_eq!(tabs.neighbor(0, "#none", true), None);
+    }
 
     fn ids(tabs: &EditorTabs, behavior: usize) -> Vec<&str> {
         tabs.of(behavior).map(|tab| tab.id.as_str()).collect()

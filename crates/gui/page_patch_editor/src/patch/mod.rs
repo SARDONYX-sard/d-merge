@@ -13,7 +13,7 @@
 //! └ [New][Dup][Rev] ┘└───────────────────────────────────────────────────────────────────┘
 //! ```
 //!
-//! Work is cached under the output dir and saved a moment after each edit (see [`workspace`]).
+//! Work is cached under the patch page's output dir and saved a moment after each edit (see [`workspace`]).
 
 mod anim_data;
 mod anim_lines;
@@ -56,7 +56,7 @@ use gui_shared::{
 };
 use nemesis_diff::is_valid_mod_code;
 
-use self::workspace::{Behavior, CACHE_ROOT, Session, SessionTab, TemplateEntry, Workspace};
+use self::workspace::{Behavior, Session, SessionTab, TemplateEntry, Workspace};
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
@@ -75,8 +75,33 @@ const REFRESH_DELAY: std::time::Duration = std::time::Duration::from_millis(150)
 /// How long after an edit the workspace is written to its cache.
 const SAVE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
+/// What the tool needs of the patch page's settings.
+#[derive(Debug, Clone, Copy)]
+pub struct PatchPaths<'a> {
+    /// The patch page's output directory: the works and the user patch are kept in it. It belongs to
+    /// the profile, as its conflicts do. Empty: not set yet, and nothing can be kept.
+    pub patch_output_dir: &'a str,
+    /// `settings.behavior.template_dir` (absolute or relative).
+    pub template_dir: &'a str,
+    /// `settings.behavior.parser_mode`: patches are checked as d-merge will read them.
+    pub parser_mode: ParserMode,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
+    /// The patch page's output directory, see [`PatchPaths`].
+    patch_output: String,
+    /// Where the works are: see [`workspace::cache_root_of`].
+    cache_root: PathBuf,
+    /// This tool is the user patch's, in its window: see [`user_patch`].
+    is_user_patch: bool,
+    /// What the mods have at the conflict being edited, shown beside the editor.
+    merge_values: Option<resolve::MergeValues>,
+    /// What `Edit...` proposed, until it is edited.
+    draft: Option<user_patch::Draft>,
+    /// Its bulk delete asks once more.
+    confirm_clear: bool,
+    /// Where this work is exported to.
     output: String,
     /// The root of the mod the work was read from. Empty: it was made here.
     mod_dir: String,
@@ -101,7 +126,7 @@ pub(crate) struct PatchTool {
     /// `output` / `code` were taken from the settings.
     restored: bool,
     workspace: Workspace,
-    /// `(output, code)` the workspace belongs to (`None` = not on disk yet).
+    /// The code of the work the workspace belongs to (`None` = no work is open).
     loaded_for: Option<String>,
     /// Unsaved edits since this time.
     dirty_since: Option<Instant>,
@@ -181,22 +206,26 @@ pub(crate) struct PatchTool {
     focus_search: bool,
     /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
     anim_folders_open: fast_hash::HashSet<String>,
+    /// The button above the list was clicked: done where the list has its files.
+    anim_expand_all: bool,
     /// The selection the way to it was last opened for.
     anim_revealed: Option<String>,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
-    /// The editor goes to the user patch, on the next frame.
-    pending_user_patch: bool,
-    /// And shows this object: `(behavior, id)`.
-    pending_open: Option<(String, String)>,
     /// The works opened lately, the last one first. From the settings.
     recent: Vec<RecentWork>,
     /// The behavior and the object the work last saved had open.
     session_seen: (usize, Option<String>),
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
-    /// Goes up with each edit of the work.
-    edit_revision: u64,
+    /// The projects of the clip data template, read once. See [`anim_data::template_projects`].
+    template_projects: Option<Vec<String>>,
+    /// The window of what was checked on request.
+    work_check: Option<ui::work_check::WorkCheck>,
+    /// The "duplicate to" window.
+    duplicate_form: Option<ui::anim_data::DuplicateForm>,
+    /// What a row's menu asked to duplicate: `(files, to the project)`.
+    pending_duplicate: Option<(Vec<String>, String)>,
     /// The "new clips" window.
     new_clips: Option<ui::anim_data::NewClipsForm>,
     /// What each line of the open anim data file is. Recomputed with the preview.
@@ -263,20 +292,6 @@ struct ObjectList {
 }
 
 impl PatchTool {
-    pub(crate) fn open_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
-        self.pending_user_patch = true;
-        self.pending_resolution = Some(request);
-    }
-
-    /// Before the work is synced: the user patch is a work of its own.
-    fn switch_to_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if !std::mem::take(&mut self.pending_user_patch) {
-            return;
-        }
-        let (code, output) = (gui_shared::patch::USER_PATCH_CODE, gui_shared::patch::USER_PATCH_OUTPUT);
-        self.switch_work(code, output, "", notify, i18n);
-    }
-
     /// Goes to the work of `code`: [`Self::sync_workspace`] loads it, and what it saved of the output
     /// and the source wins over these. The current work is saved first, while these are still its own.
     fn switch_work(&mut self, code: &str, output: &str, source: &str, notify: &mut Notification, i18n: &I18nMap) {
@@ -286,20 +301,22 @@ impl PatchTool {
         source.clone_into(&mut self.mod_dir);
     }
 
-    /// After the work is synced: takes the value in, and shows where it went.
+    /// After the work is synced: takes the value in, and shows where it went. It is a proposal for now:
+    /// see [`user_patch::Draft`]. So nothing of it is saved until there is an edit.
     fn take_in_resolution(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if let Some((behavior, id)) = self.pending_open.take() {
-            self.active =
-                self.workspace.behaviors.iter().position(|found| found.name == behavior).unwrap_or(self.active);
-            self.editor_for = None;
-            self.selected = Some(id);
-        }
         let Some(request) = self.pending_resolution.take() else { return };
+        self.undo_unedited_draft();
+        let before = user_patch::Draft::before(&self.workspace);
+        let dirty_since = self.dirty_since;
         if self.workspace.info.name.is_empty() {
             i18n.t(I18nKey::NemesisUserPatchName).clone_into(&mut self.workspace.info.name);
         }
         // What the value points to is that mod's.
         self.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);
+        // And what is taken from the others is theirs.
+        for side in &request.sides {
+            self.workspace.add_ref(Path::new(&side.mod_dir), gui_shared::patch::USER_PATCH_CODE);
+        }
         let root = PathBuf::from(&self.template_dir);
         let shown = resolve::apply(&mut self.workspace, &root, &request).map_or_else(
             |err| {
@@ -314,8 +331,12 @@ impl PatchTool {
         self.reset_names();
         self.active = behavior;
         self.editor_for = None;
-        self.object_changed(&id);
+        self.draft = Some(before.with_proposal(&self.workspace, behavior, &id));
+        self.merge_values = resolve::merge_values(&request, &id);
         self.selected = Some(id);
+        // What is shown is no change of the work yet.
+        self.dirty_since = dirty_since;
+        self.session_seen = (self.active, self.selected.clone());
         // Picking another value of the object shown has no other sign of having gone anywhere.
         self.focus_editor = line.map(FocusAt::Line);
     }
@@ -333,21 +354,64 @@ impl PatchTool {
         }
     }
 
-    /// `template_dir`: `settings.behavior.template_dir` (absolute or relative).
+    /// The patch page's output directory may have changed: the works are others then. What is open is
+    /// saved where it belongs first.
+    fn set_patch_output(&mut self, output: &str, notify: &mut Notification, i18n: &I18nMap) {
+        let output = output.trim();
+        if self.patch_output == output {
+            return;
+        }
+        if self.restored {
+            self.close_work(notify, i18n);
+        }
+        output.clone_into(&mut self.patch_output);
+        self.cache_root = workspace::cache_root_of(output);
+    }
+
+    /// The editor's settings, shared with the hkanno editor.
+    fn read_editor_options(&mut self, editor: &LspOptions) {
+        self.editor_mode = editor.editor_mode;
+        self.lsp.clone_from(editor);
+    }
+
+    /// Back to the settings: changed by the keymap box and the options window.
+    fn write_editor_options(&mut self, editor: &mut LspOptions) {
+        // Both hold the keymap: the box only changes `editor_mode`.
+        self.lsp.editor_mode = self.editor_mode;
+        if *editor != self.lsp {
+            editor.clone_from(&self.lsp);
+        }
+    }
+
+    /// What is shown of the editor, kept in the settings.
+    const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
+        self.show_inline_diff = settings.inline_diff;
+        self.follow_preview = settings.follow_preview;
+        self.show_preview = settings.show_preview;
+        self.tree_view = settings.tree_view;
+    }
+
+    const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
+        settings.inline_diff = self.show_inline_diff;
+        settings.show_preview = self.show_preview;
+        settings.follow_preview = self.follow_preview;
+        settings.tree_view = self.tree_view;
+    }
+
     pub(crate) fn ui(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         notify: &mut Notification,
-        template_dir: &str,
+        paths: PatchPaths<'_>,
         settings: &mut PatchEditorSettings,
         editor: &mut LspOptions,
     ) {
-        self.editor_mode = editor.editor_mode;
-        self.lsp.clone_from(editor);
-        if self.template_dir != template_dir {
-            template_dir.clone_into(&mut self.template_dir);
+        self.read_editor_options(editor);
+        if self.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut self.template_dir);
         }
+        self.set_patch_output(paths.patch_output_dir, notify, i18n);
         // The first frame reopens the last work (its cache is found from these two).
         if !self.restored {
             self.restored = true;
@@ -355,8 +419,14 @@ impl PatchTool {
             self.mod_dir.clone_from(&settings.mod_dir);
             self.mod_code.clone_from(&settings.mod_code);
             self.recent.clone_from(&settings.recent);
+            // It has a window of its own.
+            self.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
             // A work that is gone: the start screen rather than an empty work.
-            if !Workspace::exists(Path::new(CACHE_ROOT), self.mod_code.trim()) {
+            let code_is_free = self.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
+            if self.patch_output.is_empty()
+                || code_is_free
+                || !Workspace::exists(&self.cache_root, self.mod_code.trim())
+            {
                 self.close_work(notify, i18n);
             }
             // What is set once stays out of the way, unless it still has to be set.
@@ -365,32 +435,20 @@ impl PatchTool {
             self.trees =
                 settings.tree_open.iter().map(|(path, open)| (path.clone(), tree::TreeState::restored(open))).collect();
         }
-        self.show_inline_diff = settings.inline_diff;
-        self.follow_preview = settings.follow_preview;
-        self.show_preview = settings.show_preview;
+        self.read_view_settings(settings);
         self.changed_only = settings.changed_only;
-        self.tree_view = settings.tree_view;
-        self.switch_to_user_patch(notify, i18n);
         self.sync_workspace(notify, i18n);
-        self.take_in_resolution(notify, i18n);
         self.draw(ui, i18n, notify);
 
-        // Changed by the editor's keymap box / options window.
-        editor.editor_mode = self.editor_mode;
-        if *editor != self.lsp {
-            editor.clone_from(&self.lsp);
-        }
+        self.write_editor_options(editor);
         if settings.mod_dir != self.mod_dir {
             settings.mod_dir.clone_from(&self.mod_dir);
         }
         if settings.recent != self.recent {
             settings.recent.clone_from(&self.recent);
         }
-        settings.inline_diff = self.show_inline_diff;
-        settings.show_preview = self.show_preview;
-        settings.follow_preview = self.follow_preview;
+        self.write_view_settings(settings);
         settings.changed_only = self.changed_only;
-        settings.tree_view = self.tree_view;
         for (path, tree) in &mut self.trees {
             if let Some(open) = tree.take_open_changes() {
                 settings.tree_open.insert(path.clone(), open);
@@ -403,19 +461,25 @@ impl PatchTool {
     }
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        if self.loaded_for.is_none() {
+        if self.is_user_patch {
+            self.user_patch_bar(ui, i18n, notify);
+        } else if self.loaded_for.is_none() {
             self.start_screen(ui, i18n, notify);
             return;
+        } else {
+            self.project_bar(ui, i18n, notify);
         }
-        self.project_bar(ui, i18n, notify);
         ui.separator();
         self.template_picker_window(ui.ctx(), i18n, notify);
         self.anim_data_window(ui.ctx(), i18n, notify);
         self.new_clips_window(ui.ctx(), i18n);
+        self.duplicate_window(ui.ctx(), i18n);
+        self.work_check_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the side bar, and the editor with what belongs to it on the right of it.
-        egui::Panel::left("nemesis_objects").resizable(true).default_size(320.0).show(ui, |ui| {
+        let objects_id = if self.is_user_patch { "user_patch_objects" } else { "nemesis_objects" };
+        egui::Panel::left(objects_id).resizable(true).default_size(320.0).show(ui, |ui| {
             self.behaviors_section(ui, i18n, notify);
             if !self.workspace.behaviors.is_empty() {
                 self.object_list(ui, i18n);
@@ -437,7 +501,7 @@ impl PatchTool {
         if is_valid_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
             let code = code.to_owned();
             self.save_now(notify, i18n); // the previous workspace
-            match Workspace::load(Path::new(CACHE_ROOT), &code) {
+            match Workspace::load(&self.cache_root, &code) {
                 Ok(workspace) => {
                     self.workspace = workspace;
                     self.reset_names();
@@ -476,7 +540,21 @@ impl PatchTool {
             return;
         }
         self.workspace.session = self.current_session();
-        if let Err(err) = self.workspace.save(Path::new(CACHE_ROOT), &code) {
+        // It has no `Export`: what is edited is what the next merge gets.
+        if self.is_user_patch {
+            match self.workspace.export(Path::new(&self.output), &code, self.parser_mode) {
+                Ok((_, invalid)) if invalid.is_empty() => {}
+                Ok((_, invalid)) => notify.warn(format!(
+                    "{} ({}):\n{}",
+                    i18n.t(I18nKey::NemesisRejected),
+                    invalid.len(),
+                    invalid.join("\n")
+                )),
+                Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+            }
+            self.mod_written = true;
+        }
+        if let Err(err) = self.workspace.save(&self.cache_root, &code) {
             notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
         }
         // The output may have changed.
@@ -517,7 +595,8 @@ impl PatchTool {
         if !session.mod_dir.is_empty() {
             self.mod_dir = session.mod_dir;
         }
-        if !session.output.is_empty() {
+        // The user patch's is decided by the patch page's.
+        if !session.output.is_empty() && !self.is_user_patch {
             self.output = session.output;
         }
         self.session_seen = (self.active, self.selected.clone());
@@ -526,7 +605,7 @@ impl PatchTool {
     /// Opens a work of the list of recent ones. If its cache is gone, the mod it was exported to is
     /// read instead; if that is gone too, it leaves the list.
     fn open_recent(&mut self, work: &RecentWork, notify: &mut Notification, i18n: &I18nMap) {
-        if Workspace::exists(Path::new(CACHE_ROOT), &work.mod_code) {
+        if Workspace::exists(&self.cache_root, &work.mod_code) {
             self.switch_work(&work.mod_code, &work.output, "", notify, i18n);
         } else if let Some(dir) = workspace::patch_dir_of_code(Path::new(&work.output), &work.mod_code) {
             self.open_mod(&dir, notify, i18n);
@@ -580,9 +659,13 @@ impl PatchTool {
         if !is_valid_mod_code(&code) {
             return not_a_mod(notify);
         }
+        if code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) {
+            notify.warn(i18n.t(I18nKey::NemesisUserPatchReserved));
+            return;
+        }
         let source = root.display().to_string();
         let is_source = |path: &str| path.eq_ignore_ascii_case(&source);
-        match Workspace::cached_session(Path::new(CACHE_ROOT), &code) {
+        match Workspace::cached_session(&self.cache_root, &code) {
             Some(session) if is_source(&session.mod_dir) || is_source(&session.output) => {
                 self.switch_work(&code, &source, &source, notify, i18n);
                 return;
@@ -639,6 +722,14 @@ impl PatchTool {
             self.workspace.ref_mods = refs;
             self.workspace.reload_refs();
             self.reset_names();
+        }
+    }
+
+    /// The next or previous tab, with the keyboard staying in the editor.
+    fn step_tab(&mut self, current: &str, forward: bool) {
+        if let Some(next) = self.tabs.neighbor(self.active, current, forward) {
+            next.clone_into(self.selected.get_or_insert_default());
+            self.focus_editor = Some(FocusAt::Keep);
         }
     }
 
@@ -741,7 +832,7 @@ impl PatchTool {
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
         self.field_problems = if behavior.is_anim_data() {
             self.anim_roles = anim_lines::roles(behavior.adsf, id, &self.editor_text);
-            Vec::new() // no XML: only the parser's check below
+            anim_lines::diagnostics(behavior.adsf, id, &self.editor_text)
         } else if behavior.is_ref(id) {
             Vec::new() // not this mod's to fix
         } else {
@@ -766,6 +857,7 @@ impl PatchTool {
         self.inline_diff = behavior
             .template_object(id)
             .map_or_else(InlineDiff::default, |template| inline_diff::changes(&template.text, &self.editor_text));
+        self.refresh_work_check(id);
     }
 
     /// Enum / flag values only depend on the template: computed once per behavior.
@@ -830,7 +922,20 @@ impl PatchTool {
             Some(EditorCommand::Save) => self.dirty_since = Instant::now().checked_sub(SAVE_DELAY),
             Some(EditorCommand::JumpBack) => self.walk_history(true, id),
             Some(EditorCommand::JumpForward) => self.walk_history(false, id),
-            Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
+            Some(EditorCommand::NextTab) => self.step_tab(id, true),
+            Some(EditorCommand::PreviousTab) => self.step_tab(id, false),
+            Some(EditorCommand::CloseTab) => {
+                self.apply_tab_event(Some(TabEvent::Close(id.to_owned())), id);
+                self.focus_editor = Some(FocusAt::Keep);
+            }
+            Some(EditorCommand::TogglePreview) => self.show_preview = !self.show_preview,
+            Some(EditorCommand::ToggleInlineDiff) => self.show_inline_diff = !self.show_inline_diff,
+            Some(
+                EditorCommand::ToggleExplorer
+                | EditorCommand::GoToDefinition
+                | EditorCommand::FindReferences
+                | EditorCommand::Format,
+            )
             | None => {}
         }
         if let Some(older) = result.walk_history {
@@ -878,7 +983,6 @@ impl PatchTool {
 
     /// Something to save.
     fn mark_dirty(&mut self) {
-        self.edit_revision += 1;
         self.dirty_since.get_or_insert_with(Instant::now);
     }
 
@@ -995,6 +1099,7 @@ impl PatchTool {
             }
         }
         self.editor_for = None;
+        self.refresh_work_check(id);
         self.object_changed(id);
     }
 
@@ -1107,5 +1212,85 @@ mod tests {
                 assert!(!tool.editor_text.is_empty(), "`{id}` opened empty");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod work_tests {
+    use super::*;
+
+    fn tool_in(dir: &Path) -> PatchTool {
+        let mut tool = PatchTool { restored: true, ..PatchTool::default() };
+        tool.set_patch_output(&dir.display().to_string(), &mut Notification::default(), &I18nMap::new());
+        tool
+    }
+
+    /// A work is kept in the patch page's output, and another one can be made next to it.
+    #[test]
+    fn a_new_work_can_be_made_beside_another() {
+        let dir = std::env::temp_dir().join(format!("d_merge_new_work_{}", std::process::id()));
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut tool = tool_in(&dir);
+
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.sync_workspace(&mut notify, &i18n);
+        assert_eq!(tool.loaded_for.as_deref(), Some("aaaa"));
+        tool.workspace.info.name = "first".to_owned();
+        tool.mark_dirty();
+        tool.save_now(&mut notify, &i18n);
+
+        // `File > New`: the first one goes away, and the second one starts empty.
+        tool.close_work(&mut notify, &i18n);
+        assert_eq!(tool.loaded_for, None);
+        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned());
+        tool.sync_workspace(&mut notify, &i18n);
+        assert_eq!(tool.loaded_for.as_deref(), Some("bbbb"));
+        assert_eq!(tool.workspace.info.name, "");
+        tool.save_now(&mut notify, &i18n);
+
+        let root = workspace::cache_root_of(&dir.display().to_string());
+        let both = (Workspace::exists(&root, "aaaa"), Workspace::exists(&root, "bbbb"));
+
+        // Back to the first one.
+        tool.switch_work("aaaa", "D:/mods/a", "", &mut notify, &i18n);
+        tool.sync_workspace(&mut notify, &i18n);
+        let name = tool.workspace.info.name.clone();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(both, (true, true));
+        assert_eq!(name, "first");
+    }
+
+    /// What is open is saved where it belongs when the output directory changes.
+    #[test]
+    fn another_output_directory_has_other_works() {
+        let dir = std::env::temp_dir().join(format!("d_merge_other_output_{}", std::process::id()));
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut tool = tool_in(&dir.join("one"));
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.sync_workspace(&mut notify, &i18n);
+
+        tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
+        assert_eq!(tool.loaded_for, None);
+        let in_one = Workspace::exists(&workspace::cache_root_of(&dir.join("one").display().to_string()), "aaaa");
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(in_one);
+    }
+
+    /// `LspOptions` holds the keymap too: it must not put back the one it was given.
+    #[test]
+    fn the_keymap_box_changes_the_keymap() {
+        let mut tool = PatchTool::default();
+        let mut editor = LspOptions { editor_mode: EditorMode::Normal, ..LspOptions::default() };
+        tool.read_editor_options(&editor);
+        tool.editor_mode = EditorMode::Vim;
+        tool.write_editor_options(&mut editor);
+        assert_eq!(editor.editor_mode, EditorMode::Vim);
+
+        tool.read_editor_options(&editor);
+        tool.lsp.hover = !tool.lsp.hover;
+        tool.write_editor_options(&mut editor);
+        assert_eq!(editor.hover, tool.lsp.hover);
+        assert_eq!(editor.editor_mode, EditorMode::Vim);
     }
 }

@@ -257,6 +257,87 @@ pub(super) fn template_trigger_names(template_root: &Path) -> BTreeSet<String> {
     blocks.flat_map(|block| &block.trigger_names).map(|trigger| trigger_name(trigger).to_owned()).collect()
 }
 
+/// The projects of the clip data template. e.g. `DefaultMale~1`. Only `.bin` templates; else none.
+pub(super) fn template_projects(template_root: &Path) -> Vec<String> {
+    let path = template_root.join("meshes").join(format!("{ADSF}.bin"));
+    let Ok(bytes) = std::fs::read(path) else { return Vec::new() };
+    let Ok(adsf) = rmp_serde::from_slice::<AltAdsf<'_>>(&bytes) else { return Vec::new() };
+    adsf.0.keys().map(|project| project.as_ref().to_owned()).collect()
+}
+
+/// Where a file of animation data can go, sorted: `template`, and the folders of the files there are.
+///
+/// e.g. `DefaultMale~1`, or for anim sets `DefaultMaleData~DefaultMale`
+pub(super) fn project_folders(behavior: &Behavior, template: &[String]) -> Vec<String> {
+    let folders = behavior.texts().filter_map(|object| object.id.split_once('/')).map(|(folder, _)| folder);
+    let all: BTreeSet<&str> = folders.chain(template.iter().map(String::as_str)).filter(|f| *f != "$header$").collect();
+    all.into_iter().map(str::to_owned).collect()
+}
+
+/// The project that usually has the same patches as `project` comes first in `projects`.
+///
+/// e.g. `DefaultFemale~1` for `DefaultMale~1`
+pub(super) fn partner_first(projects: &mut [String], project: &str) {
+    let partner = partner_of(project);
+    projects.sort_by_key(|other| *other != partner);
+}
+
+/// The project that usually has the same patches. e.g. `DefaultFemale~1` for `DefaultMale~1`;
+/// a project without one has itself.
+pub(super) fn partner_of(project: &str) -> String {
+    if project.contains("Male") && !project.contains("Female") {
+        project.replacen("Male", "Female", 1)
+    } else {
+        project.replacen("Female", "Male", 1)
+    }
+}
+
+/// `id`, and if it is a clip, its motion if the work has one: one is of no use without the other.
+///
+/// e.g. `D~1/Idle~m$0.txt` -> that, `D~1/m$0.txt`
+pub(super) fn with_motion(behavior: &Behavior, id: &str) -> Vec<String> {
+    let mut files = vec![id.to_owned()];
+    if matches!(AdsfFile::of(id), AdsfFile::AddAnim | AdsfFile::IndexedAnim)
+        && let Some((folder, file)) = id.split_once('/')
+        && let Some((_, clip)) = file.split_once('~')
+    {
+        let motion = format!("{folder}/{clip}");
+        if behavior.text(&motion).is_some() {
+            files.push(motion);
+        }
+    }
+    files
+}
+
+/// The changed files of a project, to duplicate them all.
+pub(super) fn changed_files(behavior: &Behavior, folder: &str) -> Vec<String> {
+    let prefix = format!("{folder}/");
+    let changed = behavior.edits.keys().chain(behavior.added.keys());
+    changed.filter(|id| id.starts_with(&prefix)).cloned().collect()
+}
+
+/// Copies `files` to the project `to`. Returns the ids of the files it made or changed.
+///
+/// e.g. `DefaultMale~1/Idle~m$0.txt` to `DefaultFemale~1` -> `DefaultFemale~1/Idle~m$0.txt`
+pub(super) fn duplicate_to(behavior: &mut Behavior, files: &[String], to: &str) -> Vec<String> {
+    let mut made = Vec::new();
+    for id in files {
+        let Some((_, file)) = id.split_once('/') else { continue };
+        let copy = format!("{to}/{file}");
+        let Some(text) = behavior.text(id).map(str::to_owned) else { continue };
+        if copy == *id {
+            continue;
+        }
+        if behavior.template_object(&copy).is_some() {
+            behavior.set_text(&copy, text);
+        } else {
+            behavior.added.insert(copy.clone(), text);
+        }
+        made.push(copy);
+    }
+    made
+}
+
 /// The names of [`template_trigger_names`] and of the clip files of the work, sorted.
 pub(super) fn trigger_names(template: &BTreeSet<String>, adsf: &Behavior) -> Vec<String> {
     // After name, id, speed, crop start, crop end and the count.
@@ -389,6 +470,44 @@ pub(super) fn generate(workspace: &mut Workspace, template_root: &Path, request:
 #[cfg(test)]
 mod tests {
     use gui_shared::settings::pages::patch::behavior::ParserMode;
+
+    #[test]
+    fn a_patch_goes_to_another_project_with_its_motion() {
+        let mut adsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        adsf.added.insert("DefaultMale~1/Idle~m$0.txt".to_owned(), "Idle\nm$0\n".to_owned());
+        adsf.added.insert("DefaultMale~1/m$0.txt".to_owned(), "m$0\n".to_owned());
+        adsf.added.insert("DefaultMale~1/Run~m$1.txt".to_owned(), "Run\nm$1\n".to_owned());
+
+        let files = with_motion(&adsf, "DefaultMale~1/Idle~m$0.txt");
+        assert_eq!(files, ["DefaultMale~1/Idle~m$0.txt", "DefaultMale~1/m$0.txt"]);
+        assert_eq!(with_motion(&adsf, "DefaultMale~1/Run~m$1.txt").len(), 1, "it has no motion");
+        assert_eq!(with_motion(&adsf, "DefaultMale~1/m$0.txt").len(), 1, "a motion");
+
+        let made = duplicate_to(&mut adsf, &files, "DefaultFemale~1");
+        assert_eq!(made, ["DefaultFemale~1/Idle~m$0.txt", "DefaultFemale~1/m$0.txt"]);
+        assert_eq!(adsf.added["DefaultFemale~1/m$0.txt"], "m$0\n");
+
+        // To where it is: nothing.
+        assert!(duplicate_to(&mut adsf, &files, "DefaultMale~1").is_empty());
+
+        assert_eq!(changed_files(&adsf, "DefaultMale~1").len(), 3);
+        assert_eq!(changed_files(&adsf, "DefaultFemale~1").len(), 2);
+    }
+
+    #[test]
+    fn the_projects_are_listed_with_the_usual_partner_first() {
+        let mut adsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        adsf.added.insert("Mine~1/Idle~m$0.txt".to_owned(), String::new());
+        adsf.added.insert("$header$/$header$.txt".to_owned(), String::new());
+        let template = ["DefaultFemale~1".to_owned(), "BearProject~1".to_owned(), "DefaultMale~1".to_owned()];
+        let mut projects = project_folders(&adsf, &template);
+        assert_eq!(projects, ["BearProject~1", "DefaultFemale~1", "DefaultMale~1", "Mine~1"]);
+
+        partner_first(&mut projects, "DefaultMale~1");
+        assert_eq!(projects[0], "DefaultFemale~1");
+        partner_first(&mut projects, "DefaultFemale~1");
+        assert_eq!(projects[0], "DefaultMale~1");
+    }
 
     use super::{super::anim_patch::validate_asdsf, *};
 

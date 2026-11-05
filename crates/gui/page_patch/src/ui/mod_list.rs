@@ -255,6 +255,7 @@ impl PatchView<'_> {
                                 scan: &self.page.conflicts,
                                 label: i18n.t(I18nKey::ConflictShow),
                                 hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
+                                dead_hover: i18n.t(I18nKey::ConflictDeadHover),
                                 asked: None,
                             };
                             match rows {

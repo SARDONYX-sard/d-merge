@@ -177,6 +177,18 @@ pub struct ModInfo {
     #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub auto: String,
 
+    /// The mod's version now. `Nemesis_EngineExt` only: Nemesis' own mods have none, and so are empty.
+    ///
+    /// e.g. `version=1.2.0`
+    #[serde(default, deserialize_with = "deserialize_remove_null")]
+    pub version: String,
+
+    /// The mod codes this mod depends on. `Nemesis_EngineExt` only, as [`Self::version`].
+    ///
+    /// e.g. `deps=amco, bfco` -> `amco`, `bfco`
+    #[serde(default, deserialize_with = "deserialize_mod_codes")]
+    pub deps: Vec<String>,
+
     /// Mod type. Nemesis, FNIS
     #[serde(default)]
     pub mod_type: ModType,
@@ -249,6 +261,18 @@ where
     })
 }
 
+/// `amco, bfco` -> `amco`, `bfco`. `null`, or nothing: none.
+fn deserialize_mod_codes<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: std::borrow::Cow<'de, str> = serde::Deserialize::deserialize(deserializer)?;
+    if s.eq_ignore_ascii_case("null") {
+        return Ok(Vec::new());
+    }
+    Ok(s.split(',').map(str::trim).filter(|code| !code.is_empty()).map(str::to_owned).collect())
+}
+
 /// Remove "null" and prepend "https://" if starts with "www."
 fn deserialize_site<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -281,6 +305,21 @@ mod tests {
         dbg!(info.len());
         std::fs::create_dir_all("../../../dummy").unwrap();
         std::fs::write("../../../dummy/debug/get_all_mods_info.log", format!("{info:#?}")).unwrap();
+    }
+
+    #[test]
+    fn version_and_deps_are_optional() {
+        let info: ModInfo = serde_ini::from_str("name=a\nauthor=b\nsite=null\nauto=null\n").unwrap();
+        assert_eq!(info.version, "");
+        assert!(info.deps.is_empty());
+
+        let info: ModInfo = serde_ini::from_str("name=a\nversion=1.2.0\ndeps=amco, bfco\n").unwrap();
+        assert_eq!(info.version, "1.2.0");
+        assert_eq!(info.deps, ["amco", "bfco"]);
+
+        let info: ModInfo = serde_ini::from_str("version=null\ndeps=null\n").unwrap();
+        assert_eq!(info.version, "");
+        assert!(info.deps.is_empty());
     }
 
     #[test]

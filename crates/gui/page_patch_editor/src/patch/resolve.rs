@@ -12,12 +12,14 @@
 //!
 //! Clip data has one file per clip, and an anim set's lines are positions, so these are copied as they are.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use gui_shared::patch::ResolveRequest;
+#[cfg(test)]
+use gui_shared::patch::ResolveSide;
 use nemesis_diff::{
     View,
-    conflict::{apply_block_over, block_of_change, replacing_blocks},
+    conflict::{apply_block_over, block_of_change, blocks_of_change, replacing_blocks},
     resolve,
 };
 
@@ -99,6 +101,87 @@ fn apply_anim_data(
     Ok(Resolved { behavior, id, line: None })
 }
 
+/// The patch file of object `id` of a behavior in the mod at `mod_dir`.
+///
+/// e.g. `D:/mods/a/Nemesis_Engine/mod/a/0_master/#2489.txt`
+fn patch_file(mod_dir: &str, target: &str, id: &str) -> PathBuf {
+    let folder = match nemesis_folder(target) {
+        Some((name, true)) => Path::new("_1stperson").join(name),
+        Some((name, false)) => Path::new(&name).to_path_buf(),
+        None => Path::new(target).to_path_buf(),
+    };
+    Path::new(mod_dir).join(folder).join(format!("{id}.txt"))
+}
+
+/// What a mod has at a conflict. See [`MergeValues`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MergeSide {
+    /// e.g. `Paraglider`
+    pub(super) name: String,
+    /// Its lines there. e.g. `\t\t\t\t#para$3`. Empty: it removes them.
+    pub(super) lines: Vec<String>,
+}
+
+/// What the mods have at a conflict, to make the result from in the editor: with an array, the elements
+/// of several mods are often wanted, which no one of them has.
+///
+/// ```text
+/// #2489/hkbManualSelectorGenerator/generators/[0:1]
+/// Original   #0338
+/// Flinching  #flinch$2     [Insert]
+/// Impact     #neymar$1019  [Insert]
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MergeValues {
+    /// The object: it is shown with this one.
+    pub(super) id: String,
+    /// e.g. `#2489/hkbManualSelectorGenerator/generators/[0:1]`
+    pub(super) path: String,
+    /// What the template has there, as the mods say.
+    pub(super) original: Vec<String>,
+    pub(super) sides: Vec<MergeSide>,
+}
+
+/// What the mods of `request` have at its conflict. `None`: there is nothing to choose from, as with
+/// less than two mods, or animation data, whose files are whole.
+pub(super) fn merge_values(request: &ResolveRequest, id: &str) -> Option<MergeValues> {
+    if anim_stem(&request.target).is_some() || request.sides.len() < 2 {
+        return None;
+    }
+    let mut original = Vec::new();
+    let lines_of = |text: &str| text.lines().map(str::to_owned).collect::<Vec<String>>();
+    let sides: Vec<MergeSide> = request
+        .sides
+        .iter()
+        .filter_map(|side| {
+            // A mod whose file cannot be read has nothing to offer: the others still do.
+            let patch = read_text(&patch_file(&side.mod_dir, &request.target, id)).ok()?;
+            let blocks = blocks_of_change(&patch, &request.path);
+            if blocks.is_empty() {
+                return None;
+            }
+            if original.is_empty() {
+                original = blocks.iter().flat_map(|block| lines_of(&block.original)).collect();
+            }
+            let lines = blocks.iter().flat_map(|block| lines_of(&block.text)).collect();
+            Some(MergeSide { name: side.name.clone(), lines })
+        })
+        .collect();
+    (!sides.is_empty()).then(|| MergeValues { id: id.to_owned(), path: request.path.clone(), original, sides })
+}
+
+/// `text` with `lines` after line `after`. Returns it, and the last line put in.
+///
+/// e.g. `a\nb\n`, after line 0, `x`: `a\nx\nb\n`, 1
+pub(super) fn insert_lines(text: &str, after: usize, lines: &[String]) -> (String, usize) {
+    let mut all: Vec<&str> = text.lines().collect();
+    let at = (after + 1).min(all.len());
+    all.splice(at..at, lines.iter().map(String::as_str));
+    let mut out = all.join("\n");
+    out.push('\n');
+    (out, at + lines.len().saturating_sub(1))
+}
+
 fn apply_behavior(
     workspace: &mut Workspace,
     template_root: &Path,
@@ -108,13 +191,7 @@ fn apply_behavior(
     let behavior = &mut workspace.behaviors[at];
     let id = request.path.split('/').next().unwrap_or_default();
 
-    let file = format!("{id}.txt");
-    let folder = match nemesis_folder(&request.target) {
-        Some((name, true)) => Path::new("_1stperson").join(name),
-        Some((name, false)) => Path::new(&name).to_path_buf(),
-        None => Path::new(&request.target).to_path_buf(),
-    };
-    let patch = read_text(&Path::new(&request.mod_dir).join(folder).join(file))?;
+    let patch = read_text(&patch_file(&request.mod_dir, &request.target, id))?;
 
     if replacing_blocks(&patch).is_none() {
         // A new object: the file is the object.
@@ -134,6 +211,56 @@ fn apply_behavior(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lines_go_below_the_cursor() {
+        let lines = ["x".to_owned(), "y".to_owned()];
+        assert_eq!(insert_lines("a\nb\n", 0, &lines), ("a\nx\ny\nb\n".to_owned(), 2));
+        assert_eq!(insert_lines("a\nb\n", 1, &lines), ("a\nb\nx\ny\n".to_owned(), 3));
+        // Beyond the end, and a last line without its end.
+        assert_eq!(insert_lines("a\nb", 9, &lines), ("a\nb\nx\ny\n".to_owned(), 3));
+        assert_eq!(insert_lines("a\nb", 1, &lines[..1]), ("a\nb\nx\n".to_owned(), 2));
+    }
+
+    /// As in `0_master`'s `#2489`, which three mods change.
+    #[test]
+    fn each_mod_has_its_lines_at_the_conflict() {
+        const PATH: &str = "#2489/hkbManualSelectorGenerator/generators/[0:1]";
+        let dir = std::env::temp_dir().join(format!("d_merge_merge_values_{}", std::process::id()));
+        let patch = |code: &str, value: &str| {
+            format!(
+                "\t\t<hkobject name=\"#2489\" class=\"hkbManualSelectorGenerator\" signature=\"0xd932fab8\">\n\t\t\t<hkparam name=\"generators\" numelements=\"2\">\n<!-- MOD_CODE ~{code}~ OPEN -->\n\t\t\t\t{value}\n<!-- ORIGINAL -->\n\t\t\t\t#0338\n<!-- CLOSE -->\n\t\t\t\t#0340\n\t\t\t</hkparam>\n\t\t</hkobject>\n"
+            )
+        };
+        let side = |code: &str, value: &str| {
+            let mod_dir = dir.join(code);
+            let file = mod_dir.join("0_master").join("#2489.txt");
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, patch(code, value)).unwrap();
+            ResolveSide { name: code.to_owned(), mod_dir: mod_dir.display().to_string() }
+        };
+        let flinch = side("flinch", "#flinch$2");
+        let impact = side("neymar", "#neymar$1019");
+        let gone = ResolveSide { name: "gone".to_owned(), mod_dir: dir.join("gone").display().to_string() };
+        let request = |sides| ResolveRequest {
+            target: "meshes/actors/character/behaviors/0_master.bin".to_owned(),
+            path: PATH.to_owned(),
+            mod_dir: String::new(),
+            edit: true,
+            sides,
+        };
+
+        let values = merge_values(&request(vec![flinch.clone(), gone, impact]), "#2489").unwrap();
+        let alone = merge_values(&request(vec![flinch]), "#2489");
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(values.original, ["\t\t\t\t#0338"]);
+        assert_eq!(values.sides.len(), 2, "the one that cannot be read is left out");
+        assert_eq!(values.sides[0].name, "flinch");
+        assert_eq!(values.sides[0].lines, ["\t\t\t\t#flinch$2"]);
+        assert_eq!(values.sides[1].lines, ["\t\t\t\t#neymar$1019"]);
+        assert_eq!(alone, None, "one mod: nothing to choose from");
+    }
 
     #[test]
     fn finds_the_file_of_an_anim_data_change() {

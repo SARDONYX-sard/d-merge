@@ -12,12 +12,13 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
 
 use super::{
-    anim_data::NewClipsForm,
+    anim_data::{DuplicateForm, NewClipsForm},
     anim_tree::{self, AnimFile, AnimRow, FileKind},
     behaviors::quick_pick_window,
+    work_check::{CheckScope, check_items},
 };
 use crate::patch::{
-    PatchTool,
+    PatchTool, anim_data,
     tree::{Graph, Node, TreeState},
 };
 
@@ -97,6 +98,14 @@ impl PatchTool {
 
     /// `[Δ] [≡]`: only what changed, a tree or a flat list.
     fn list_toggles(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
+        if asdsf {
+            let collapse = Button::new("").icon(Icon::ChevronRight).small();
+            if ui.add(collapse).on_hover_text(i18n.t(I18nKey::NemesisCollapseAll)).clicked() {
+                self.anim_folders_open.clear();
+            }
+            let expand = Button::new("").icon(Icon::ChevronDown).small();
+            self.anim_expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::NemesisExpandAll)).clicked();
+        }
         if !asdsf {
             let tree = Button::selectable(self.tree_view, "").icon(Icon::ListTree).small();
             if ui.add(tree).on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover)).clicked() {
@@ -147,7 +156,8 @@ impl PatchTool {
             .clicked()
         {
             if adsf {
-                self.new_clips = Some(NewClipsForm::new(selected.as_deref()));
+                let projects = self.anim_projects();
+                self.new_clips = Some(NewClipsForm::new(selected.as_deref(), projects));
             } else {
                 self.class_picker = true;
                 self.focus_quick_pick = true;
@@ -194,6 +204,9 @@ impl PatchTool {
         let nodes = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let files: Vec<AnimFile<'_>> =
             nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect();
+        if std::mem::take(&mut self.anim_expand_all) {
+            anim_tree::expand_all(&mut self.anim_folders_open, &files);
+        }
         let rows = anim_tree::rows(&files, &self.anim_folders_open, is_adsf, !self.filter.is_empty());
 
         let (mut toggled, mut menu_action) = (None, None);
@@ -202,15 +215,45 @@ impl PatchTool {
             for row in &rows[range] {
                 match row {
                     AnimRow::Folder { name, files, changed, open } => {
-                        if anim_group_row(ui, name, (*files, *changed, *open), 0).clicked() {
+                        let response = anim_group_row(ui, name, (*files, *changed, *open), 0);
+                        if response.clicked() {
                             toggled = Some((*name).to_owned());
                         }
+                        response.context_menu(|ui| {
+                            if ui.button(i18n.t(I18nKey::NemesisExpandAllBelow)).clicked() {
+                                anim_tree::expand(&mut self.anim_folders_open, name);
+                                ui.close();
+                            }
+                            if ui.button(i18n.t(I18nKey::NemesisCollapseAllBelow)).clicked() {
+                                anim_tree::collapse(&mut self.anim_folders_open, name);
+                                ui.close();
+                            }
+                            ui.separator();
+                            let projects = self.anim_projects();
+                            if let Some(pick) = duplicate_items(ui, i18n, &projects, name) {
+                                let files = anim_data::changed_files(&self.workspace.behaviors[self.active], name);
+                                self.ask_duplicate(pick, files, &projects, name);
+                            }
+                            if let Some(is_row) = check_items(ui, i18n) {
+                                let folder = is_row.then(|| CheckScope::Folder((*name).to_owned()));
+                                self.start_work_check(folder.unwrap_or(CheckScope::All));
+                            }
+                        });
                     }
                     AnimRow::Group { kind, key, files, changed, open } => {
                         let label = i18n.t(anim_kind_label(*kind));
-                        if anim_group_row(ui, label, (*files, *changed, *open), 1).clicked() {
+                        let response = anim_group_row(ui, label, (*files, *changed, *open), 1);
+                        if response.clicked() {
                             toggled = Some(key.clone());
                         }
+                        // `DefaultMale~1/Clip`
+                        let folder = key.rsplit_once('/').map_or(key.as_str(), |(folder, _)| folder);
+                        response.context_menu(|ui| {
+                            if let Some(is_row) = check_items(ui, i18n) {
+                                let of_kind = CheckScope::Kind { folder: folder.to_owned(), kind: *kind };
+                                self.start_work_check(if is_row { of_kind } else { CheckScope::All });
+                            }
+                        });
                     }
                     AnimRow::File { node, name } => {
                         menu_action = self.anim_file_row(ui, i18n, graph, *node, name).or(menu_action);
@@ -222,6 +265,25 @@ impl PatchTool {
             anim_tree::toggle(&mut self.anim_folders_open, &key);
         }
         self.apply_row_action(ui, graph, menu_action);
+        self.duplicate_anim_files();
+    }
+
+    /// What a row's menu asked for: at once, or after asking where. `current`: the project they are in.
+    fn ask_duplicate(&mut self, pick: DuplicatePick, files: Vec<String>, projects: &[String], current: &str) {
+        match pick {
+            DuplicatePick::To(to) => self.pending_duplicate = Some((files, to)),
+            DuplicatePick::Choose => self.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), current)),
+        }
+    }
+
+    /// The files go to the other project, which opens to show them.
+    fn duplicate_anim_files(&mut self) {
+        let Some((files, to)) = self.pending_duplicate.take() else { return };
+        let made = anim_data::duplicate_to(&mut self.workspace.behaviors[self.active], &files, &to);
+        for id in &made {
+            self.object_changed(id);
+        }
+        self.anim_folders_open.insert(to);
     }
 
     /// `    ● Idle~mymod$0.txt`
@@ -247,6 +309,13 @@ impl PatchTool {
         response.context_menu(|ui| {
             if let Some(picked) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
                 action = Some((node, picked));
+            }
+            let id = graph.id(node);
+            let folder = id.split_once('/').map_or(id, |(folder, _)| folder);
+            let projects = self.anim_projects();
+            if let Some(pick) = duplicate_items(ui, i18n, &projects, folder) {
+                let files = anim_data::with_motion(&self.workspace.behaviors[self.active], id);
+                self.ask_duplicate(pick, files, &projects, folder);
             }
         });
         action
@@ -350,6 +419,34 @@ impl PatchTool {
             }
         }
     }
+}
+
+/// What a row's menu asked to do with its files.
+#[derive(Debug)]
+enum DuplicatePick {
+    To(String),
+    /// Ask which project, see [`DuplicateForm`].
+    Choose,
+}
+
+/// `Duplicate to DefaultFemale~1`, the project that usually has the same patches, if there is one, and
+/// `Duplicate to...`, which asks. `current`: the project it is in.
+fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], current: &str) -> Option<DuplicatePick> {
+    let mut picked = None;
+    let hover = i18n.t(I18nKey::NemesisDuplicateToHover);
+    let partner = anim_data::partner_of(current);
+    if partner != current && projects.contains(&partner) {
+        let label = format!("{} {partner}", i18n.t(I18nKey::NemesisDuplicateTo));
+        if ui.button(label).on_hover_text(hover).clicked() {
+            picked = Some(DuplicatePick::To(partner));
+            ui.close();
+        }
+    }
+    if ui.button(i18n.t(I18nKey::NemesisDuplicateToOther)).on_hover_text(hover).clicked() {
+        picked = Some(DuplicatePick::Choose);
+        ui.close();
+    }
+    picked
 }
 
 /// A folder or a group of the anim data list: `▼ Clips (3) ●`. `(files, changed, open)`.

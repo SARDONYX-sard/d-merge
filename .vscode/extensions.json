@@ -1,11 +1,7 @@
 {
   "recommendations": [
     "editorconfig.editorconfig",
-    "jayfong.generate-index",
-    "lokalise.i18n-ally",
     "rust-lang.rust-analyzer",
-    "tamasfe.even-better-toml",
-    "vitest.explorer",
-    "VoidZero.vite-plus-extension-pack"
+    "Dylan23691.toml-analyzer"
   ]
 }

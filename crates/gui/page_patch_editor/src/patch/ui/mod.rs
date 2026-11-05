@@ -16,3 +16,4 @@ mod top_bar;
 pub(super) mod tree;
 mod user_patch;
 mod vars_panel;
+pub(super) mod work_check;

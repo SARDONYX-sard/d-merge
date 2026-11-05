@@ -24,7 +24,7 @@
 use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::ResolveRequest,
+    patch::{ResolveRequest, ResolveSide},
 };
 
 use super::PatchView;
@@ -112,6 +112,14 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
         ui.colored_label(WINNER_COLOR, format!("+ {}", mark.wins)).on_hover_text(i18n.t(I18nKey::ConflictWinsHover));
         ui.colored_label(ui.visuals().error_fg_color, format!("- {}", mark.loses))
             .on_hover_text(i18n.t(I18nKey::ConflictLosesHover));
+        if scan.has_hidden()
+            && ui
+                .add(Button::new(i18n.t(I18nKey::ConflictUnhideAll)).small())
+                .on_hover_text(i18n.t(I18nKey::ConflictUnhideAllHover))
+                .clicked()
+        {
+            scan.show_all_hidden();
+        }
         // The list stays while it follows what changed.
         if scan.is_scanning() {
             ui.add(egui::Spinner::new()).on_hover_text(i18n.t(I18nKey::ConflictScanning));
@@ -238,6 +246,16 @@ fn template_name(target: &str) -> String {
     if target.contains("/_1stperson/") { format!("_1stperson/{name}") } else { name.to_owned() }
 }
 
+/// The mods with a value at `point`, to make the result from. The user patch's is what is being edited,
+/// and FNIS has no patch file.
+fn resolve_sides(found: &crate::conflicts::Conflicts, point: &Point) -> Vec<ResolveSide> {
+    let owners = point.values.iter().map(|value| &found.mods[value.owner as usize]);
+    owners
+        .filter(|owner| owner.id != gui_shared::patch::USER_PATCH_ID)
+        .filter_map(|owner| Some(ResolveSide { name: owner.name.clone(), mod_dir: owner.dir.clone()? }))
+        .collect()
+}
+
 /// Each mod's value, the one the merge keeps first.
 fn point_ui(
     ui: &mut egui::Ui,
@@ -277,6 +295,7 @@ fn point_ui(
                         path: point.path.to_string(),
                         mod_dir: dir.clone(),
                         edit,
+                        sides: if edit { resolve_sides(found, point) } else { Vec::new() },
                     });
                 };
                 if ui
@@ -349,7 +368,11 @@ mod tests {
         if pick {
             scan.select(&points[0]);
         }
-        scan.current = Some(std::sync::Arc::new(Conflicts { mods: vec![scanned("a", 0), scanned("b", 1)], points }));
+        scan.current = Some(std::sync::Arc::new(Conflicts {
+            mods: vec![scanned("a", 0), scanned("b", 1)],
+            points,
+            useful: Vec::new(),
+        }));
         let item = |id: &str, priority| ModItem { id: id.into(), enabled: true, priority, ..Default::default() };
         scan.refresh_marks(&[item("a", 0), item("b", 1)], None, true);
         let i18n = I18nMap::new();

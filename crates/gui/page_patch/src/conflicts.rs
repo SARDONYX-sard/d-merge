@@ -31,7 +31,7 @@ use std::{
 
 use behavior_merge::HiddenPatches;
 use fast_hash::HashMap;
-use gui_shared::{patch::USER_PATCH_MOD_DIR, settings::pages::patch::mod_item::ModItem};
+use gui_shared::{patch::USER_PATCH_ID, settings::pages::patch::mod_item::ModItem};
 use parking_lot::Mutex;
 use sonic_rs::{JsonContainerTrait as _, JsonValueTrait as _};
 
@@ -106,6 +106,9 @@ impl Mark {
 pub(crate) struct Conflicts {
     pub(crate) mods: Vec<ScannedMod>,
     pub(crate) points: Vec<Point>,
+    /// Per mod of [`Self::mods`]: how many of its operations conflict with nothing, so that they are
+    /// kept whatever the load order. See [`Self::dead_mods`].
+    pub(crate) useful: Vec<u32>,
 }
 
 /// The directory the merge writes the JSON to.
@@ -134,7 +137,8 @@ impl Conflicts {
             }
         }
         points.sort_unstable_by(|a, b| (&a.target, &a.path).cmp(&(&b.target, &b.path)));
-        Self { mods, points }
+        let useful = names.useful.into_inner();
+        Self { mods, points, useful }
     }
 
     /// The flags of the mods, by `ModItem::id`, for the load order now: `priority_of` gives a mod's
@@ -169,6 +173,41 @@ impl Conflicts {
         marks
     }
 
+    /// The mods whose patch does nothing in the end, like MO2's lightning: they lose every conflict
+    /// they are in, no value of theirs is the one kept, and all else they do is such a conflict.
+    ///
+    /// `marks`: what [`Self::marks`] gave for the same load order and `hidden`.
+    pub(crate) fn dead_mods(
+        &self,
+        marks: &HashMap<String, Mark>,
+        priority_of: impl Fn(&str) -> Option<usize>,
+        hidden: Option<&HiddenPatches>,
+    ) -> fast_hash::HashSet<String> {
+        let mut keeps_a_value: fast_hash::HashSet<&str> = fast_hash::HashSet::default();
+        for point in &self.points {
+            let enabled = point.values.iter().filter_map(|value| {
+                let owner = &self.mods[value.owner as usize];
+                if owner.hides(point, hidden) {
+                    return None;
+                }
+                priority_of(&owner.id).map(|priority| (priority, owner, value.hash))
+            });
+            let Some((.., kept)) = enabled.clone().max_by_key(|(priority, ..)| *priority) else { continue };
+            keeps_a_value.extend(enabled.filter(|(.., hash)| *hash == kept).map(|(_, owner, _)| owner.id.as_str()));
+        }
+        let useful_of = |id: &str| {
+            let at = self.mods.iter().position(|scanned| scanned.id == id);
+            at.and_then(|at| self.useful.get(at)).copied().unwrap_or(0)
+        };
+        marks
+            .iter()
+            .filter(|(id, mark)| {
+                mark.wins == 0 && mark.loses > 0 && !keeps_a_value.contains(id.as_str()) && useful_of(id) == 0
+            })
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
     /// The points `mod_id` is part of.
     pub(crate) fn of_mod(&self, mod_id: &str) -> Vec<&Point> {
         let Some(at) = self.mods.iter().position(|scanned| scanned.id == mod_id) else { return Vec::new() };
@@ -189,6 +228,8 @@ struct Owners {
     by_priority: HashMap<usize, u32>,
     /// By its directory in one form.
     by_dir: HashMap<String, u32>,
+    /// See [`Conflicts::useful`]. A cell, as a file is read with this borrowed.
+    useful: std::cell::RefCell<Vec<u32>>,
 }
 
 impl Owners {
@@ -201,7 +242,20 @@ impl Owners {
                 by_dir.insert(dir_key(dir), at as u32);
             }
         }
-        Self { by_priority, by_dir }
+        Self { by_priority, by_dir, useful: std::cell::RefCell::new(vec![0; mods.len()]) }
+    }
+
+    /// One more operation of this mod conflicts with nothing.
+    fn note_useful(&self, owner: u32) {
+        if let Some(count) = self.useful.borrow_mut().get_mut(owner as usize) {
+            *count += 1;
+        }
+    }
+
+    /// The owner of `{ "patch": .., "priority": 3 }`.
+    fn of_entry(&self, entry: &sonic_rs::Value) -> Option<u32> {
+        let priority = usize::try_from(entry.get("priority")?.as_u64()?).ok()?;
+        self.by_priority.get(&priority).copied()
     }
 }
 
@@ -258,13 +312,17 @@ fn read_behavior(target: &str, json: &sonic_rs::Value, owners: &Owners, points: 
     {
         // `Object::get` walks the object: too slow with a `one` of many thousand entries.
         let one: HashMap<&str, &sonic_rs::Value> = one.iter().collect();
+        let mut contested: fast_hash::HashSet<&str> = fast_hash::HashSet::default();
         for (path, losers) in overridden.iter() {
+            contested.insert(path);
             let Some(losers) = losers.as_array() else { continue };
             let winner = one.get(path).and_then(|entry| entry_value(entry, owners));
             let values: Vec<Value> =
                 winner.into_iter().chain(losers.iter().filter_map(|entry| entry_value(entry, owners))).collect();
-            push_if_different(target, path, values, points);
+            push_if_different(target, path, values, owners, points);
         }
+        let only_one = one.iter().filter(|(path, _)| !contested.contains(*path));
+        only_one.filter_map(|(_, entry)| owners.of_entry(entry)).for_each(|owner| owners.note_useful(owner));
     }
     let Some(seq) = json.get("seq").and_then(|v| v.as_object()) else { return };
     for (path, entries) in seq.iter() {
@@ -317,8 +375,15 @@ fn add_element_writes(entry: &sonic_rs::Value, owners: &Owners, writes: &mut Ele
 fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &Owners, points: &mut Vec<Point>) {
     let mut writes = ElementWrites::new();
     for entry in entries {
-        let _not_a_replace_or_remove = add_element_writes(entry, owners, &mut writes);
+        // What adds is kept from all mods.
+        if add_element_writes(entry, owners, &mut writes).is_none()
+            && let Some(owner) = owners.of_entry(entry)
+        {
+            owners.note_useful(owner);
+        }
     }
+    let agreed = writes.values().filter(|element| !element_differs(element));
+    agreed.flatten().for_each(|(owner, _)| owners.note_useful(*owner));
     let mut group: Option<ElementGroup<'_>> = None;
     for (&index, element) in writes.iter().filter(|(_, element)| element_differs(element)) {
         let owners_here = element_owners(element);
@@ -329,7 +394,7 @@ fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &O
             }
             _ => {
                 if let Some(done) = group.take() {
-                    done.push_to(target, path, points);
+                    done.push_to(target, path, owners, points);
                 }
                 group =
                     Some(ElementGroup { start: index, end: index + 1, owners: owners_here, elements: vec![element] });
@@ -337,7 +402,7 @@ fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &O
         }
     }
     if let Some(done) = group {
-        done.push_to(target, path, points);
+        done.push_to(target, path, owners, points);
     }
 }
 
@@ -363,7 +428,7 @@ struct ElementGroup<'a> {
 }
 
 impl ElementGroup<'_> {
-    fn push_to(self, target: &str, path: &str, points: &mut Vec<Point>) {
+    fn push_to(self, target: &str, path: &str, owners: &Owners, points: &mut Vec<Point>) {
         let values = self
             .owners
             .iter()
@@ -377,11 +442,12 @@ impl ElementGroup<'_> {
                 }
             })
             .collect();
-        push_if_different(target, &format!("{path}/[{}:{}]", self.start, self.end), values, points);
+        push_if_different(target, &format!("{path}/[{}:{}]", self.start, self.end), values, owners, points);
     }
 }
 
-fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, points: &mut Vec<Point>) {
+/// What does not differ conflicts with nothing: that is useful of each mod there.
+fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, owners: &Owners, points: &mut Vec<Point>) {
     // Several places of one mod are one value here: the others say the same about that mod.
     values.sort_unstable_by_key(|value| value.owner);
     values.dedup_by_key(|value| (value.owner, value.hash));
@@ -389,6 +455,10 @@ fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, points: &
     let values_differ = values.windows(2).any(|pair| pair[0].hash != pair[1].hash);
     if owners_differ && values_differ {
         points.push(Point { target: target.into(), path: path.into(), values });
+    } else {
+        for value in &values {
+            owners.note_useful(value.owner);
+        }
     }
 }
 
@@ -416,7 +486,10 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
             let name = ["name_clip", "clip_id", "index", "file_name"]
                 .iter()
                 .find_map(|key| body.get(key).and_then(|v| v.as_str()));
-            let Some(name) = name else { continue };
+            let Some(name) = name else {
+                owners.note_useful(owner); // a header: a list merged by the merge
+                continue;
+            };
             let place = format!("{project}/{name}");
             match kind {
                 "SpecifiedAnim" | "SpecifiedMotion" | "AddAnimSet" => {
@@ -429,12 +502,12 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
                         flatten(&place, fields, owner, &mut places);
                     }
                 }
-                _ => {}
+                _ => owners.note_useful(owner), // what adds
             }
         }
     }
     for (path, values) in places {
-        push_if_different(target, &path, values, points);
+        push_if_different(target, &path, values, owners, points);
     }
 }
 
@@ -467,10 +540,14 @@ pub(crate) struct ConflictScan {
     /// Filled by the worker that reads the files.
     read_result: Arc<Mutex<Option<Conflicts>>>,
     is_reading: bool,
+    /// When the check that is running started.
+    started: Option<std::time::Instant>,
     /// The last result.
     pub(crate) current: Option<Arc<Conflicts>>,
     /// See [`Conflicts::marks`], for the load order `marks_for` tells.
     marks: HashMap<String, Mark>,
+    /// See [`Conflicts::dead_mods`], for the same.
+    dead: fast_hash::HashSet<String>,
     marks_for: u64,
     /// Priorities of the mods that are on now.
     priorities: HashMap<String, usize>,
@@ -484,6 +561,8 @@ pub(crate) struct ConflictScan {
     selected: Option<(Box<str>, Box<str>)>,
     /// How much of the window the list takes, once the bar below it was dragged.
     pub(crate) list_share: Option<f32>,
+    /// The patch page's output directory, where [`Self::hidden`] is kept.
+    hidden_output: Option<String>,
     /// All that is hidden, see [`crate::hidden`].
     hidden: HiddenPatches,
     /// `apply_user_patch` is on: what is hidden counts.
@@ -497,6 +576,36 @@ pub(crate) struct ConflictScan {
 impl ConflictScan {
     pub(crate) fn with_hidden(hidden: HiddenPatches) -> Self {
         Self { hidden, hidden_applies: true, ..Self::default() }
+    }
+
+    /// The output directory may have changed: its own hidden operations count then.
+    pub(crate) fn follow_output(&mut self, output: &str) {
+        if self.hidden_output.as_deref() != Some(output) {
+            self.hidden_output = Some(output.to_owned());
+            self.hidden = crate::hidden::load(output);
+            self.hidden_revision += 1;
+        }
+    }
+
+    fn save_hidden(&mut self) {
+        self.hidden_revision += 1;
+        self.hidden_error = crate::hidden::save(self.hidden_output.as_deref().unwrap_or_default(), &self.hidden).err();
+    }
+
+    /// Is anything hidden?
+    pub(crate) fn has_hidden(&self) -> bool {
+        !self.hidden.is_empty()
+    }
+
+    /// Shows all the hidden operations again.
+    pub(crate) fn show_all_hidden(&mut self) {
+        self.hidden = HiddenPatches::default();
+        self.save_hidden();
+    }
+
+    /// Does this mod's patch do nothing in the end? See [`Conflicts::dead_mods`].
+    pub(crate) fn is_dead(&self, mod_id: &str) -> bool {
+        self.dead.contains(mod_id)
     }
 
     /// What is hidden, if it counts.
@@ -513,8 +622,7 @@ impl ConflictScan {
     /// for what is generated at the next merge.
     pub(crate) fn toggle_hidden(&mut self, mod_code: &str, point: &Point) {
         self.hidden.toggle(mod_code, &point.target, &point.path);
-        self.hidden_revision += 1;
-        self.hidden_error = crate::hidden::save(&self.hidden).err();
+        self.save_hidden();
     }
 
     pub(crate) const fn is_scanning(&self) -> bool {
@@ -534,6 +642,7 @@ impl ConflictScan {
     /// The merge is told to write the files: after it ends, [`Self::on_merge_ended`] reads them.
     pub(crate) fn wait_for(&mut self, dir: PathBuf, mods: Vec<ScannedMod>) {
         self.waiting = Some((dir, mods));
+        self.started = Some(std::time::Instant::now());
     }
 
     /// Reads the files on a worker thread, if this merge was for them. Errors of the merge do not
@@ -548,14 +657,15 @@ impl ConflictScan {
         });
     }
 
-    /// Takes in what the worker read. Returns how many conflicts it found, when it did.
-    pub(crate) fn poll(&mut self) -> Option<usize> {
+    /// Takes in what the worker read. Returns how many conflicts it found and how long the check took,
+    /// when it is done.
+    pub(crate) fn poll(&mut self) -> Option<(usize, std::time::Duration)> {
         let found = self.read_result.try_lock().and_then(|mut result| result.take())?;
         let count = found.points.len();
         self.current = Some(Arc::new(found));
         self.is_reading = false;
         self.marks_for = 0; // computed again
-        Some(count)
+        Some((count, self.started.take().map_or_else(Default::default, |started| started.elapsed())))
     }
 
     /// Updates the flags if the load order or what is on changed. Runs every frame, and only compares
@@ -579,10 +689,11 @@ impl ConflictScan {
         self.priorities =
             list.iter().filter(|item| item.enabled).map(|item| (item.id.clone(), item.priority)).collect();
         if let Some(priority) = user_patch {
-            self.priorities.insert(USER_PATCH_MOD_DIR.to_owned(), priority);
+            self.priorities.insert(USER_PATCH_ID.to_owned(), priority);
         }
         let hidden = self.hidden_applies.then_some(&self.hidden);
         self.marks = found.marks(|id| self.priorities.get(id).copied(), hidden);
+        self.dead = found.dead_mods(&self.marks, |id| self.priorities.get(id).copied(), hidden);
         self.stale = self.priorities.keys().any(|id| !found.mods.iter().any(|scanned| scanned.id == *id));
     }
 
@@ -640,6 +751,48 @@ mod tests {
             .collect()
     }
 
+    /// MO2's lightning: all it does loses, and nothing of it is kept.
+    #[test]
+    fn a_mod_that_only_loses_does_nothing() {
+        let priority = |id: &str| match id {
+            "low" => Some(1),
+            "high" => Some(2),
+            _ => None,
+        };
+        let dead = |found: &Conflicts| {
+            let marks = found.marks(priority, None);
+            let mut dead: Vec<String> = found.dead_mods(&marks, priority, None).into_iter().collect();
+            dead.sort();
+            dead
+        };
+        let found = read(&behavior("false", "true"), "meshes/m.bin");
+        assert_eq!(dead(&found), ["low"]);
+
+        // The load order changes who does nothing.
+        let swapped = |id: &str| priority(if id == "low" { "high" } else { "low" });
+        let marks = found.marks(swapped, None);
+        assert_eq!(found.dead_mods(&marks, swapped, None).into_iter().collect::<Vec<_>>(), ["high"]);
+
+        // It also changes a field nobody else does: it is of use.
+        let more = format!(
+            r##"{{"one":{{"#1/C/a":{},"#1/C/b":{}}},"overridden":{{"#1/C/a":[{}]}},"seq":{{}}}}"##,
+            entry("false", 4, PURE),
+            entry("7", 3, PURE),
+            entry("true", 3, PURE)
+        );
+        assert!(dead(&read(&more, "meshes/m.bin")).is_empty());
+
+        // It pushes to an array: a merge keeps that.
+        let push = r#"{"kind":"seq_push"}"#;
+        let pushes = format!(
+            r##"{{"one":{{"#1/C/a":{}}},"overridden":{{"#1/C/a":[{}]}},"seq":{{"#1/C/items":[{}]}}}}"##,
+            entry("false", 4, PURE),
+            entry("true", 3, PURE),
+            entry("[]", 3, push)
+        );
+        assert!(dead(&read(&pushes, "meshes/m.bin")).is_empty());
+    }
+
     /// Hiding the winner's operation: the conflict is gone from the flags, and the mod that lost keeps
     /// the place, with no new scan. Only that mod's only there.
     #[test]
@@ -694,8 +847,10 @@ mod tests {
     fn read(json: &str, target: &str) -> Conflicts {
         let mods = mods();
         let mut points = Vec::new();
-        read_file(target, json, &Owners::new(&mods), &mut points);
-        Conflicts { mods, points }
+        let owners = Owners::new(&mods);
+        read_file(target, json, &owners, &mut points);
+        let useful = owners.useful.into_inner();
+        Conflicts { mods, points, useful }
     }
 
     fn entry(value: &str, priority: usize, action: &str) -> String {

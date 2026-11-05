@@ -12,6 +12,19 @@ use super::{
     theme::{ShadcnTheme, interpolate_color, paint_focus_ring, popup_shadow, with_alpha},
 };
 
+/// What the button has beside its text: the padding, the chevron.
+const TRIGGER_CHROME: f32 = 36.0;
+/// What a menu row has beside its text: the padding, the check mark, a scroll bar.
+const ITEM_CHROME: f32 = 40.0;
+/// The button is at least this wide, however short its text.
+const MIN_TRIGGER_WIDTH: f32 = 72.0;
+/// The button is at most this wide unless [`ComboBox::width`] says otherwise: longer text is clipped.
+const MAX_TRIGGER_WIDTH: f32 = 320.0;
+/// The menu shows long items whole up to this width, however narrow the button.
+const MAX_MENU_WIDTH: f32 = 480.0;
+/// The height of the button.
+const TRIGGER_HEIGHT: f32 = 32.0;
+
 /// [`egui::UiStackInfo`] tag telling [`Button::selectable`] to render as a menu item.
 const ITEM_STYLE_TAG: &str = "shadcn::combo_item";
 
@@ -43,7 +56,7 @@ impl ItemStyle {
 /// (the egui 0.33 replacement of `selectable_label`); it renders as a menu item there.
 ///
 /// Extensions (not in egui): [`Self::placeholder`], [`Self::search_hint`],
-/// [`Self::no_results_text`].
+/// [`Self::no_results_text`], [`Self::show_creatable`].
 #[derive(Debug)]
 #[must_use = "You should call .show*"]
 pub struct ComboBox {
@@ -57,6 +70,8 @@ pub struct ComboBox {
     placeholder: egui::WidgetText,
     search_hint: Option<egui::WidgetText>,
     no_results_text: egui::WidgetText,
+    /// The width of the text of the widest item, if the items are known. See [`Self::show_index`].
+    widest_item: Option<f32>,
 }
 
 impl ComboBox {
@@ -83,10 +98,11 @@ impl ComboBox {
             placeholder: "Select...".into(),
             search_hint: None,
             no_results_text: "No results found".into(),
+            widest_item: None,
         }
     }
 
-    /// Set the outer width of the button and menu.
+    /// Set the outer width of the button and menu. Without it, they are as wide as what they show.
     pub const fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self
@@ -132,6 +148,21 @@ impl ComboBox {
         self
     }
 
+    /// The outer width of the button: [`Self::width`], or what it shows.
+    fn trigger_width(&self, ui: &egui::Ui, theme: &ShadcnTheme) -> f32 {
+        let text = self
+            .widest_item
+            .unwrap_or_else(|| selected_galley(ui, theme, &self.selected_text, &self.placeholder).size().x);
+        let fitting = (text + TRIGGER_CHROME).clamp(MIN_TRIGGER_WIDTH, MAX_TRIGGER_WIDTH);
+        self.width.unwrap_or(fitting).min(ui.available_width())
+    }
+
+    /// The inner width of the menu: at least the button's and `min`, and what its items need.
+    fn menu_width(&self, trigger: f32, min: f32) -> f32 {
+        let items = self.widest_item.map_or(0.0, |text| (text + ITEM_CHROME).min(MAX_MENU_WIDTH));
+        trigger.max(min).max(items)
+    }
+
     // ── Show ────────────────────────────────────────────────────
 
     /// Show the combo box, with the given ui code for the menu contents.
@@ -160,11 +191,12 @@ impl ComboBox {
         if *selected < len {
             self = self.selected_text(get(*selected));
         }
+        self.widest_item = Some(widest_item(ui, ui.make_persistent_id(self.id_salt), len, &get));
 
         let label = self.label.clone();
         if self.search_hint.is_some() {
             return with_label(ui, label, |ui| {
-                let response = self.show_searchable_index(ui, selected, len, get);
+                let response = self.show_searchable_index(ui, selected, len, get, None);
                 egui::InnerResponse::new((), response)
             })
             .response;
@@ -188,6 +220,34 @@ impl ComboBox {
         response
     }
 
+    /// [`Self::show_index`] with a search, where what is searched for can also be taken as it is: for a
+    /// value that need not be in the list. While the search is no item, the first row of the menu is
+    /// `create_label: <the search>`, which a click or `Enter` puts in `created`.
+    ///
+    /// e.g. `DefaultMale~1`, `DefaultFemale~1` are listed, and `Mine~1` is typed.
+    pub fn show_creatable<Text: Into<egui::WidgetText>>(
+        mut self,
+        ui: &mut egui::Ui,
+        selected: &mut usize,
+        len: usize,
+        get: impl Fn(usize) -> Text,
+        (create_label, created): (&str, &mut Option<String>),
+    ) -> egui::Response {
+        if *selected < len {
+            self = self.selected_text(get(*selected));
+        }
+        self.widest_item = Some(widest_item(ui, ui.make_persistent_id(self.id_salt), len, &get));
+        if self.search_hint.is_none() {
+            self.search_hint = Some(egui::WidgetText::default());
+        }
+        let label = self.label.clone();
+        with_label(ui, label, |ui| {
+            let response = self.show_searchable_index(ui, selected, len, get, Some((create_label, created)));
+            egui::InnerResponse::new((), response)
+        })
+        .response
+    }
+
     fn show_ui_impl<R>(
         self,
         ui: &mut egui::Ui,
@@ -195,12 +255,11 @@ impl ComboBox {
     ) -> egui::InnerResponse<Option<R>> {
         let theme = ShadcnTheme::get(ui.ctx());
 
-        let height: f32 = 32.0;
         let h_padding: f32 = 10.0;
         let chevron_width: f32 = 20.0;
-        let width = self.width.unwrap_or_else(|| ui.available_width().min(200.0));
+        let width = self.trigger_width(ui, &theme);
 
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(width, TRIGGER_HEIGHT), egui::Sense::hover());
         let response = ui.interact(rect, ui.make_persistent_id(self.id_salt), egui::Sense::click());
 
         if ui.is_rect_visible(rect) {
@@ -221,7 +280,12 @@ impl ComboBox {
 
             let galley = selected_galley(ui, &theme, &self.selected_text, &self.placeholder);
             let text_pos = egui::pos2(rect.min.x + h_padding, rect.center().y - galley.size().y / 2.0);
-            painter.galley(text_pos, galley, theme.foreground);
+            // Not over the chevron and out of the button.
+            painter.with_clip_rect(rect.with_max_x(rect.max.x - chevron_width - 4.0)).galley(
+                text_pos,
+                galley,
+                theme.foreground,
+            );
 
             let icon_size: f32 = 14.0;
             let chevron_rect = egui::Rect::from_center_size(
@@ -252,7 +316,7 @@ impl ComboBox {
                     .shadow(popup_shadow()),
             )
             .show(|ui: &mut egui::Ui| {
-                let popup_width = width.max(144.0);
+                let popup_width = self.menu_width(width, 144.0);
                 ui.set_min_width(popup_width);
                 ui.set_max_width(popup_width);
                 ItemStyle::Select.scope(ui, |ui| match self.height {
@@ -271,17 +335,17 @@ impl ComboBox {
         selected: &mut usize,
         len: usize,
         get: impl Fn(usize) -> Text,
+        mut creatable: Option<(&str, &mut Option<String>)>,
     ) -> egui::Response {
         let theme = ShadcnTheme::get(ui.ctx());
 
         let icon_size = 12.0;
         let h_padding = 10.0;
-        let trigger_height = 36.0;
-        let width = self.width.unwrap_or(220.0).min(ui.available_width());
+        let width = self.trigger_width(ui, &theme);
         let menu_height = self.height.unwrap_or(250.0);
 
         let id = ui.make_persistent_id(self.id_salt);
-        let (trigger_rect, _) = ui.allocate_exact_size(egui::vec2(width, trigger_height), egui::Sense::hover());
+        let (trigger_rect, _) = ui.allocate_exact_size(egui::vec2(width, TRIGGER_HEIGHT), egui::Sense::hover());
         let mut trigger = ui.interact(trigger_rect, id, egui::Sense::click());
 
         if ui.is_rect_visible(trigger_rect) {
@@ -304,7 +368,9 @@ impl ComboBox {
 
             let galley = selected_galley(ui, &theme, &self.selected_text, &self.placeholder);
             let text_pos = egui::pos2(trigger_rect.min.x + h_padding, trigger_rect.center().y - galley.size().y / 2.0);
-            ui.painter().galley(text_pos, galley, theme.foreground);
+            // Not over the chevron and out of the button.
+            let text_clip = trigger_rect.with_max_x(trigger_rect.max.x - h_padding - icon_size - 4.0);
+            ui.painter().with_clip_rect(text_clip).galley(text_pos, galley, theme.foreground);
 
             let icon_rect = egui::Rect::from_min_size(
                 egui::pos2(trigger_rect.max.x - h_padding - icon_size, trigger_rect.center().y - icon_size / 2.0),
@@ -340,10 +406,9 @@ impl ComboBox {
         let mut search_text = ui.memory_mut(|mem| mem.data.get_temp::<String>(search_id).unwrap_or_default());
 
         popup.show(|ui| {
-            let popup_width = trigger_rect.width().max(200.0);
+            let popup_width = self.menu_width(trigger_rect.width(), 180.0);
             ui.set_min_width(popup_width);
             ui.set_max_width(popup_width);
-            ui.set_min_height(menu_height);
 
             let input_width = ui.available_width();
             let mut input = TextEdit::singleline(&mut search_text).desired_width(input_width);
@@ -363,7 +428,20 @@ impl ComboBox {
                 .filter(|(_, text)| query.is_empty() || text.text().to_lowercase().contains(&query))
                 .collect();
 
-            if filtered.is_empty() {
+            let typed = search_text.trim().to_owned();
+            let can_create =
+                !typed.is_empty() && !filtered.iter().any(|(_, text)| text.text().eq_ignore_ascii_case(&typed));
+            if let Some((create_label, created)) = creatable.as_mut().filter(|_| can_create) {
+                let row = ItemStyle::Search
+                    .scope(ui, |ui| ui.add(Button::selectable(false, format!("{create_label}: {typed}"))).clicked());
+                if row || (input_resp.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter))) {
+                    **created = Some(typed);
+                    search_text.clear();
+                    close = true;
+                    changed = true;
+                    return;
+                }
+            } else if filtered.is_empty() {
                 let text = egui::RichText::new(self.no_results_text.text()).color(theme.muted_foreground).size(13.0);
                 ui.label(text);
                 return;
@@ -401,6 +479,30 @@ impl ComboBox {
         }
         trigger
     }
+}
+
+/// The width of the text of the widest of the items. Measured when their number changes, not on each
+/// frame: a list of fonts has hundreds.
+fn widest_item<Text: Into<egui::WidgetText>>(
+    ui: &egui::Ui,
+    id: egui::Id,
+    len: usize,
+    get: &impl Fn(usize) -> Text,
+) -> f32 {
+    let key = id.with("widest_item");
+    if let Some((for_len, widest)) = ui.data(|data| data.get_temp::<(usize, f32)>(key))
+        && for_len == len
+    {
+        return widest;
+    }
+    let width_of = |i: usize| {
+        let text: egui::WidgetText = get(i).into();
+        let font = egui::FontId::proportional(14.0);
+        ui.painter().layout_no_wrap(text.text().to_owned(), font, egui::Color32::PLACEHOLDER).size().x
+    };
+    let widest = (0..len).map(width_of).fold(0.0, f32::max);
+    ui.data_mut(|data| data.insert_temp(key, (len, widest)));
+    widest
 }
 
 /// Lays the combo box out horizontally with its label, like egui does (only when labelled).
@@ -486,4 +588,136 @@ pub(super) fn paint_item(
     }
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Opens the real combo box in a window. Returns the button and the menu.
+    fn open(search: bool, width: Option<f32>, items: &[&str]) -> (egui::Rect, egui::Rect) {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 900.0));
+        let mut selected = 0;
+        let (mut trigger, mut menu) = (egui::Rect::NOTHING, None);
+        for frame in 0..7 {
+            let mut input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
+            if frame == 2 {
+                input.events.push(egui::Event::PointerMoved(trigger.center()));
+            }
+            if frame == 3 || frame == 4 {
+                input.events.push(egui::Event::PointerButton {
+                    pos: trigger.center(),
+                    button: egui::PointerButton::Primary,
+                    pressed: frame == 3,
+                    modifiers: egui::Modifiers::NONE,
+                });
+            }
+            let mut output = ctx.run_ui(input, |ui| {
+                let ctx = ui.ctx().clone();
+                egui::Window::new("window").show(&ctx, |ui| {
+                    let mut combo = ComboBox::from_id_salt("combo");
+                    if let Some(width) = width {
+                        combo = combo.width(width);
+                    }
+                    if search {
+                        combo = combo.search_hint("search");
+                    }
+                    let response = combo.show_index(ui, &mut selected, items.len(), |i| items[i]);
+                    trigger = response.rect;
+                    menu = ctx.memory(|memory| memory.area_rect(response.id.with("popup")));
+                });
+            });
+            output.textures_delta.clear();
+        }
+        (trigger, menu.expect("the menu is open"))
+    }
+
+    const SHORT: [&str; 3] = ["a", "b", "c"];
+    const LONG: [&str; 2] = ["DraugrSkeletonProjectData~DraugrSkeletonProject", "DefaultMale~1"];
+
+    #[test]
+    fn it_is_as_wide_as_what_it_shows() {
+        for search in [false, true] {
+            let (short, _) = open(search, None, &SHORT);
+            assert!(short.width() <= MIN_TRIGGER_WIDTH + 1.0, "search: {search}: {short:?}");
+
+            let (long, menu) = open(search, None, &LONG);
+            assert!(long.width() > 200.0, "search: {search}: fits its text: {long:?}");
+            assert!(long.width() <= MAX_TRIGGER_WIDTH + 1.0, "search: {search}: {long:?}");
+            assert!(menu.width() >= long.width(), "search: {search}: {menu:?}");
+            assert!((long.height() - TRIGGER_HEIGHT).abs() < 0.5, "both kinds look the same: {long:?}");
+        }
+    }
+
+    #[test]
+    fn a_width_is_kept_and_the_menu_still_shows_its_items() {
+        for search in [false, true] {
+            let (trigger, menu) = open(search, Some(90.0), &LONG);
+            assert!((trigger.width() - 90.0).abs() < 0.5, "search: {search}: {trigger:?}");
+            assert!(menu.width() > 250.0, "search: {search}: the items are whole: {menu:?}");
+            assert!(menu.width() <= MAX_MENU_WIDTH + 24.0, "search: {search}: {menu:?}");
+        }
+    }
+
+    /// Opens a creatable combo box, types `typed` and presses `Enter`. Returns what it created.
+    fn type_and_enter(typed: &str) -> Option<String> {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 900.0));
+        let (mut selected, mut created, mut trigger) = (usize::MAX, None, egui::Rect::NOTHING);
+        let press = |pos, pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let enter = egui::Event::Key {
+            key: egui::Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        for frame in 0..9 {
+            let events = match frame {
+                2 => vec![egui::Event::PointerMoved(trigger.center())],
+                3 => vec![press(trigger.center(), true)],
+                4 => vec![press(trigger.center(), false)],
+                6 => vec![egui::Event::Text(typed.to_owned())],
+                7 => vec![enter.clone()],
+                _ => Vec::new(),
+            };
+            let input = egui::RawInput { screen_rect: Some(screen), events, ..Default::default() };
+            let mut output = ctx.run_ui(input, |ui| {
+                let ctx = ui.ctx().clone();
+                egui::Window::new("window").show(&ctx, |ui| {
+                    let response = ComboBox::from_id_salt("combo").show_creatable(
+                        ui,
+                        &mut selected,
+                        LONG.len(),
+                        |i| LONG[i],
+                        ("New", &mut created),
+                    );
+                    trigger = response.rect;
+                });
+            });
+            output.textures_delta.clear();
+        }
+        created
+    }
+
+    #[test]
+    fn what_is_searched_for_can_be_taken_as_it_is() {
+        assert_eq!(type_and_enter("Mine~1").as_deref(), Some("Mine~1"));
+        assert_eq!(type_and_enter(" Mine~1 ").as_deref(), Some("Mine~1"));
+        // It is in the list: that is no new value, whatever its case.
+        assert_eq!(type_and_enter("defaultmale~1"), None);
+        assert_eq!(type_and_enter("   "), None);
+    }
+
+    #[test]
+    fn a_search_menu_is_as_tall_as_its_results() {
+        let (_, menu) = open(true, None, &SHORT);
+        assert!(menu.height() < 200.0, "three items: {menu:?}");
+    }
 }

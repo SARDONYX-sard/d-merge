@@ -30,6 +30,8 @@ const LIST_HEIGHT: f32 = 130.0;
 enum RowEvent {
     SetExt(usize, bool),
     Remove(usize),
+    /// Check what it changes, see [`super::work_check`].
+    Check(usize),
 }
 
 /// What the `+` menu asked for.
@@ -123,6 +125,13 @@ impl PatchTool {
             Some(RowEvent::SetExt(i, ext)) => {
                 self.workspace.behaviors[i].force_ext = ext;
                 self.mark_dirty();
+            }
+            Some(RowEvent::Check(i)) => {
+                if i != self.active {
+                    self.active = i;
+                    self.selected = self.tabs.last_of(i).map(str::to_owned);
+                }
+                self.start_work_check(super::work_check::CheckScope::All);
             }
             Some(RowEvent::Remove(i)) => {
                 self.workspace.behaviors.remove(i);
@@ -233,6 +242,11 @@ fn row_hover(behavior: &Behavior, code: &str, i18n: &I18nMap) -> String {
 /// `☐ NemesisExt`, `Remove`.
 fn row_menu(ui: &mut egui::Ui, behavior: &Behavior, index: usize, i18n: &I18nMap) -> Option<RowEvent> {
     let mut event = None;
+    if ui.button(i18n.t(I18nKey::NemesisCheck)).on_hover_text(i18n.t(I18nKey::NemesisCheckHover)).clicked() {
+        event = Some(RowEvent::Check(index));
+        ui.close();
+    }
+    ui.separator();
     if !behavior.is_anim_data() {
         let supported = behavior.nemesis.is_some();
         let mut ext = behavior.force_ext || !supported;

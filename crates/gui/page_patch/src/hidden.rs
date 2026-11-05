@@ -1,4 +1,5 @@
-//! Where the hidden operations of the mods are kept: with the user patch, for each profile.
+//! Where the hidden operations of the mods are kept: with the user patch, in the patch page's output
+//! directory, so for each profile: `<output>/.d_merge/user_patch/hidden_patches.json`.
 //! What they are is in [`HiddenPatches`].
 //!
 //! ```json
@@ -6,21 +7,31 @@
 //!     "path": "#0106/hkbModifierList/enable" } ]
 //! ```
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use behavior_merge::{HiddenPatch, HiddenPatches};
+use gui_shared::patch::user_patch_output;
 
-const HIDDEN_FILE: &str = "./.d_merge/user_patch/hidden_patches.json";
+fn hidden_file(output: &str) -> PathBuf {
+    user_patch_output(output).join("hidden_patches.json")
+}
 
-/// What is hidden now. A file that cannot be read is logged, and nothing is hidden.
-pub(crate) fn load() -> HiddenPatches {
-    load_from(Path::new(HIDDEN_FILE))
+/// What is hidden with this output directory. A file that cannot be read is logged, and nothing is
+/// hidden. No output directory: nothing either.
+pub(crate) fn load(output: &str) -> HiddenPatches {
+    if output.trim().is_empty() {
+        return HiddenPatches::default();
+    }
+    load_from(&hidden_file(output))
 }
 
 /// # Errors
-/// The file could not be written.
-pub(crate) fn save(hidden: &HiddenPatches) -> Result<(), String> {
-    save_to(Path::new(HIDDEN_FILE), hidden)
+/// There is no output directory to keep it in, or the file could not be written.
+pub(crate) fn save(output: &str, hidden: &HiddenPatches) -> Result<(), String> {
+    if output.trim().is_empty() {
+        return Err("Set the output directory first: what is hidden is kept in it.".to_owned());
+    }
+    save_to(&hidden_file(output), hidden)
 }
 
 fn load_from(path: &Path) -> HiddenPatches {

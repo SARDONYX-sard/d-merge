@@ -71,7 +71,7 @@ pub struct BehaviorSettings {
     pub skeleton_arm_fix: bool,
 
     /// Merge the user patch, what the conflict tool decided, after every mod of the list.
-    /// See [`crate::patch::USER_PATCH_OUTPUT`].
+    /// See [`crate::patch::user_patch_output`].
     #[serde(default = "apply_user_patch_default")]
     pub apply_user_patch: bool,
 

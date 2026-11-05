@@ -48,6 +48,7 @@ impl VariableType {
     pub fn word_value(self, input: &str) -> Option<i64> {
         let input = input.trim();
         match self {
+            Self::Real if input.is_empty() => Some(0), // the bits of `0.0`
             Self::Real => input.parse::<f32>().ok().map(|f| i64::from(f.to_bits())),
             Self::Bool => match input.to_ascii_lowercase().as_str() {
                 "" | "0" | "false" => Some(0),
@@ -282,6 +283,16 @@ impl Array {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn no_initial_value_is_zero_of_any_type() {
+        for kind in VariableType::ALL {
+            assert_eq!(kind.word_value(""), Some(0), "{kind:?}");
+            assert_eq!(kind.word_value("  "), Some(0), "{kind:?}");
+        }
+        assert_eq!(VariableType::Real.word_value("0.2"), Some(1_045_220_557));
+        assert_eq!(VariableType::Real.word_value("x"), None);
+    }
 
     const STRING_DATA: &str =
         "\t\t<hkobject name=\"#0092\" class=\"hkbBehaviorGraphStringData\" signature=\"0xc713064e\">

@@ -114,6 +114,18 @@ pub fn block_of_change(patch: &str, path: &str) -> Option<Replaced> {
     })
 }
 
+/// Every block of `patch` that has part in the change at `path`. A conflict over several elements can be
+/// in several blocks of a mod. e.g., `#0106/hkbX/items/[0:2]`, with a block for each element.
+pub fn blocks_of_change(patch: &str, path: &str) -> Vec<Replaced> {
+    let Some(blocks) = replacing_blocks(patch) else { return Vec::new() };
+    let hacks = Some(nemesis_xml::hack::HackOptions::enable_all());
+    let makes_it = |at: &usize| {
+        let only_this = with_only_block(patch, *at);
+        parse_nemesis_patch(&only_this, hacks).is_ok_and(|(patches, _)| makes_change(&patches, path))
+    };
+    (0..blocks.len()).filter(makes_it).map(|at| blocks[at].clone()).collect()
+}
+
 /// `patch` with its replacing block number `keep` only: the others are undone.
 fn with_only_block(patch: &str, keep: usize) -> String {
     let mut out = String::with_capacity(patch.len());
@@ -166,21 +178,29 @@ pub fn apply_block(text: &str, block: &Replaced) -> Option<(String, usize)> {
     let original = crate::normalize(&block.original);
     let lines: Vec<&str> = text.split('\n').collect();
     let original: Vec<&str> = original.lines().collect();
+    let at = find_lines(&lines, &original, block.lines.start as usize)?;
+    Some((splice(&lines, at, original.len(), &block.text), at))
+}
+
+/// Where `wanted` are in `lines`, as near as possible to line `near`.
+fn find_lines(lines: &[&str], wanted: &[&str], near: usize) -> Option<usize> {
     let fits = |at: usize| {
         lines
-            .get(at..at + original.len())
-            .is_some_and(|part| part.iter().map(|l| line_key(l)).eq(original.iter().map(|l| line_key(l))))
+            .get(at..at + wanted.len())
+            .is_some_and(|part| part.iter().map(|l| line_key(l)).eq(wanted.iter().map(|l| line_key(l))))
     };
-    let near = block.lines.start as usize;
-    let at = (near..=lines.len()).chain((0..near).rev()).find(|&at| fits(at))?;
+    (near..=lines.len()).chain((0..near).rev()).find(|&at| fits(at))
+}
 
+/// `lines` with the `len` lines at `at` replaced by `new_text`, which ends its lines itself.
+fn splice(lines: &[&str], at: usize, len: usize, new_text: &str) -> String {
     let mut out = lines[..at].join("\n");
     if at > 0 {
         out.push('\n');
     }
-    out.push_str(&block.text);
-    out.push_str(&lines[at + original.len()..].join("\n"));
-    Some((out, at))
+    out.push_str(new_text);
+    out.push_str(&lines[at + len..].join("\n"));
+    out
 }
 
 /// [`apply_block`] on an object that may already be changed there: the value picked before is what
@@ -188,10 +208,34 @@ pub fn apply_block(text: &str, block: &Replaced) -> Option<(String, usize)> {
 ///
 /// e.g. `#0338` was replaced by `#flinch$2`, and now `#zcbe$107` is picked for that place.
 pub fn apply_block_over(template: &str, text: &str, block: &Replaced) -> Option<(String, usize)> {
-    apply_block(text, block).or_else(|| {
+    apply_block(text, block).or_else(|| replace_in_hunk(template, text, block)).or_else(|| {
         (0..crate::hunks(template, text).len())
             .find_map(|index| apply_block(&crate::revert_hunk(template, text, index), block))
     })
+}
+
+/// The block's lines in a changed place that has as many lines as the template there: each line is
+/// the change of the same line of the template, so the others stay, though they are one change for a
+/// line diff.
+///
+/// e.g. `#a`, `#b` became `#x`, `#y`, and now `#p` is picked for `#a`: `#p`, `#y`.
+fn replace_in_hunk(template: &str, text: &str, block: &Replaced) -> Option<(String, usize)> {
+    let before = crate::normalize(template);
+    let after = crate::align_numelements(&before, &crate::normalize(text));
+    let original = crate::normalize(&block.original);
+    let original: Vec<&str> = original.lines().collect();
+    let before_lines: Vec<&str> = before.split('\n').collect();
+    let in_template = find_lines(&before_lines, &original, block.lines.start as usize)?;
+
+    let hunks = crate::hunks(template, text);
+    let hunk = hunks.iter().find(|hunk| {
+        hunk.old.len() == hunk.new.len()
+            && hunk.old.start <= in_template
+            && in_template + original.len() <= hunk.old.end
+    })?;
+    let at = hunk.new.start + (in_template - hunk.old.start);
+    let lines: Vec<&str> = after.split('\n').collect();
+    Some((splice(&lines, at, original.len(), &block.text), at))
 }
 
 #[cfg(test)]
@@ -246,6 +290,19 @@ mod tests {
     }
 
     #[test]
+    fn a_change_over_several_elements_has_all_its_blocks() {
+        let patch = object(&format!(
+            "\t\t\t<hkparam name=\"modifiers\" numelements=\"3\">\n{OPEN}\t\t\t\t#x\n{ORIGINAL}\t\t\t\t#a\n{CLOSE}\t\t\t\t#b\n{OPEN}\t\t\t\t#y\n{ORIGINAL}\t\t\t\t#c\n{CLOSE}\t\t\t</hkparam>\n"
+        ));
+        let texts = |path: &str| -> Vec<String> {
+            blocks_of_change(&patch, path).iter().map(|block| block.text.trim().to_owned()).collect()
+        };
+        assert_eq!(texts("#0106/hkbModifierList/modifiers/[0:3]"), ["#x", "#y"]);
+        assert_eq!(texts("#0106/hkbModifierList/modifiers/[2:3]"), ["#y"]);
+        assert!(texts("#0106/hkbModifierList/modifiers/[1:2]").is_empty());
+    }
+
+    #[test]
     fn applies_a_block_where_its_field_is_now() {
         let block = Replaced {
             lines: 1..2,
@@ -295,6 +352,31 @@ mod tests {
         let written = crate::object_patch("upatch", &template, &taken).unwrap();
         assert!(written.contains("#flinch$2\n"), "{written}");
         assert!(written.contains("<!-- ORIGINAL -->\n\t\t\t\t#0338\n"), "{written}");
+    }
+
+    /// Elements next to each other are one change for a line diff, and each mod's value is its own.
+    #[test]
+    fn the_element_beside_a_picked_one_stays() {
+        let array = |values: &str| {
+            object(&format!("\t\t\t<hkparam name=\"modifiers\" numelements=\"3\">\n{values}\t\t\t</hkparam>\n"))
+        };
+        let template = array("\t\t\t\t#a\n\t\t\t\t#b\n\t\t\t\t#c\n");
+        let picked = array("\t\t\t\t#x\n\t\t\t\t#y\n\t\t\t\t#c\n");
+        let block = Replaced { lines: 2..3, original: "\t\t\t\t#a\n".into(), text: "\t\t\t\t#p\n".into() };
+        let (taken, line) = apply_block_over(&template, &picked, &block).unwrap();
+        assert_eq!(taken, array("\t\t\t\t#p\n\t\t\t\t#y\n\t\t\t\t#c\n"));
+        assert_eq!(line, 2);
+
+        let block = Replaced { lines: 3..4, original: "\t\t\t\t#b\n".into(), text: "\t\t\t\t#q\n".into() };
+        let (taken, line) = apply_block_over(&template, &picked, &block).unwrap();
+        assert_eq!(taken, array("\t\t\t\t#x\n\t\t\t\t#q\n\t\t\t\t#c\n"));
+        assert_eq!(line, 3);
+
+        // Lines added or removed there: a line is no other line's change, so all of it gives way.
+        let more = array("\t\t\t\t#x\n\t\t\t\t#y\n\t\t\t\t#z\n\t\t\t\t#c\n");
+        let block = Replaced { lines: 2..3, original: "\t\t\t\t#a\n".into(), text: "\t\t\t\t#p\n".into() };
+        let (taken, _) = apply_block_over(&template, &more, &block).unwrap();
+        assert_eq!(taken, array("\t\t\t\t#p\n\t\t\t\t#b\n\t\t\t\t#c\n"));
     }
 
     #[test]

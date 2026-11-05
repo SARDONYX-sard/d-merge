@@ -110,6 +110,18 @@ pub enum EditorCommand {
     JumpForward,
     /// Vim `<Space>e`: move the keyboard to the host's file / object tree.
     ToggleExplorer,
+    /// Vim `<Space>l`, `gt`, `:tabn`: the host's next tab.
+    NextTab,
+    /// Vim `<Space>h`, `gT`, `:tabp`: the host's previous tab.
+    PreviousTab,
+    /// Vim `:tabc`, `:q`: close the host's tab.
+    CloseTab,
+    /// Vim `<Space>f`, `:fmt`: format the document. The editor does this itself.
+    Format,
+    /// Vim `<Space>p`, `:preview`: show or hide what the host shows beside the editor.
+    TogglePreview,
+    /// Vim `<Space>d`, `:diff`: show or hide the changes inside the editor.
+    ToggleInlineDiff,
 }
 
 /// A resolved `F12` / `Shift+F12` / Vim `gd` / `gD` / `Ctrl+click` / right-click request:
@@ -139,6 +151,8 @@ pub struct CodeEditorState {
     layout: layout::LayoutCache,
     /// The symbol the right-click menu was opened on (the pointer moves while it is open).
     menu_target: Option<LinePos>,
+    /// The selection the right button was pressed on, while that button is down.
+    held_selection: Option<CCursorRange>,
     /// `(errors, warnings)` for the status bar.
     status_problems: (usize, usize),
     /// The cursor and how many chars are selected, for the status bar (drawn before the editor).
@@ -345,7 +359,10 @@ impl<'a> CodeEditor<'a> {
         };
 
         let input = read_input(frame, ui, state, text, &labels, actions);
-        let mut changed = input.keys.changed | input.pasted | apply_format(frame, text, input.triggers);
+        let mut changed = input.keys.changed | input.pasted | {
+            let asked = input.triggers.format || input.keys.command == Some(EditorCommand::Format);
+            apply_format(frame, ui, text, asked)
+        };
         let navigate_keys = match input.keys.command {
             Some(EditorCommand::GoToDefinition) => Some(false),
             Some(EditorCommand::FindReferences) => Some(true),
@@ -496,17 +513,32 @@ fn read_input<'a>(
 }
 
 /// `Shift+Alt+F`. Returns whether the text changed.
-fn apply_format(frame: EditorFrame<'_>, text: &mut String, triggers: palette::Triggers) -> bool {
-    if !(frame.features.format && triggers.format) {
+fn apply_format(frame: EditorFrame<'_>, ui: &egui::Ui, text: &mut String, asked: bool) -> bool {
+    if !(frame.features.format && asked) {
         return false;
     }
     match frame.language.format(text) {
         Some(formatted) if formatted != *text => {
+            let cursor = egui::TextEdit::load_state(ui.ctx(), frame.id)
+                .and_then(|edit| edit.cursor.char_range())
+                .map(|range| LinePos::from_char_index(text, range.primary.index.0));
             *text = formatted;
+            if let Some(cursor) = cursor {
+                keep_cursor_line(ui.ctx(), frame.id, text, cursor);
+            }
             true
         }
         _ => false,
     }
+}
+
+/// Puts the cursor on its line after the formatter changed the text. The char index would be on
+/// another line by then: every line before it may have changed its indentation.
+fn keep_cursor_line(ctx: &egui::Context, id: egui::Id, text: &str, cursor: LinePos) {
+    let mut edit = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+    let index = cursor.to_char_index(text);
+    edit.cursor.set_char_range(Some(CCursorRange::one(CCursor::new(index))));
+    edit.store(ctx, id);
 }
 
 /// Step 2: the `TextEdit`, with the syntax colors, underlines and search matches.
@@ -533,7 +565,51 @@ fn show_text(
             frame.inline_diff,
         )
     };
-    show_text_edit(ui, frame.id, text, look, &mut layouter)
+    let before = ui
+        .input(|input| input.pointer.secondary_pressed())
+        .then(|| egui::TextEdit::load_state(ui.ctx(), frame.id)?.cursor.char_range())
+        .flatten();
+    let (gutter_left, mut output) = show_text_edit(ui, frame.id, text, look, &mut layouter);
+    keep_selection_for_menu(ui, frame.id, &mut state.held_selection, before, &mut output);
+    (gutter_left, output)
+}
+
+/// Pressing the right button on the selection keeps it, for the menu's Copy and Cut. egui's
+/// `TextEdit` moves the cursor on the press of any button, so it is put back. A press elsewhere moves
+/// the cursor there, as in VS Code.
+///
+/// `before`: the selection before this frame's press of the right button, if it was pressed.
+fn keep_selection_for_menu(
+    ui: &egui::Ui,
+    id: egui::Id,
+    held: &mut Option<CCursorRange>,
+    before: Option<CCursorRange>,
+    output: &mut egui::text_edit::TextEditOutput,
+) {
+    // The press has just moved the cursor to where it happened.
+    let pressed_at = output.state.cursor.char_range().map(|range| range.primary.index.0);
+    if let Some(before) = before
+        && pressed_at.is_some_and(|at| selection_covers(&before, at))
+    {
+        *held = Some(before);
+    }
+    let Some(selection) = *held else { return };
+
+    output.state.cursor.set_char_range(Some(selection));
+    output.state.clone().store(ui.ctx(), id);
+    output.cursor_range = Some(selection);
+    // This frame has painted what egui moved: without the next one, it stays until the release.
+    ui.ctx().request_repaint();
+    if !ui.input(|input| input.pointer.secondary_down()) {
+        *held = None;
+    }
+}
+
+/// Is the char index `at` on a selection? Its end counts: the pointer on the right half of the last
+/// char is there. An empty selection has nothing to keep.
+const fn selection_covers(selection: &CCursorRange, at: usize) -> bool {
+    let range = sorted_chars(selection);
+    range.start < range.end && range.start <= at && at <= range.end
 }
 
 /// Step 3: opens, updates or closes the completion list.
@@ -962,5 +1038,120 @@ mod tests {
         // `first\n` is 6 chars, then `abc ` is 4.
         assert_eq!(apply_quick_fix(&mut text, &fix), 10);
         assert_eq!(text, "first\nabc XY");
+    }
+
+    /// Shows an editor for pointer events, one frame at a time.
+    struct Frames {
+        ctx: egui::Context,
+        text: String,
+        state: CodeEditorState,
+        id: egui::Id,
+        rect: egui::Rect,
+    }
+
+    impl Frames {
+        fn new(text: &str) -> Self {
+            let mut frames = Self {
+                ctx: egui::Context::default(),
+                text: text.to_owned(),
+                state: CodeEditorState::default(),
+                id: egui::Id::NULL,
+                rect: egui::Rect::NOTHING,
+            };
+            frames.frame(Vec::new());
+            frames.ctx.memory_mut(|memory| memory.request_focus(frames.id));
+            frames.frame(Vec::new());
+            frames
+        }
+
+        fn frame(&mut self, events: Vec<egui::Event>) {
+            let raw = egui::RawInput { events, ..Default::default() };
+            let (text, state, id, rect) = (&mut self.text, &mut self.state, &mut self.id, &mut self.rect);
+            let mut output = self.ctx.run_ui(raw, |ui| {
+                let response = CodeEditor::new("editor", text).show(ui, state).response;
+                *id = response.id;
+                *rect = response.rect;
+            });
+            output.textures_delta.clear();
+        }
+
+        fn select(&self, from: usize, to: usize) {
+            let mut edit = egui::TextEdit::load_state(&self.ctx, self.id).unwrap_or_default();
+            edit.cursor.set_char_range(Some(CCursorRange::two(CCursor::new(from), CCursor::new(to))));
+            edit.store(&self.ctx, self.id);
+        }
+
+        fn selection(&self) -> std::ops::Range<usize> {
+            let edit = egui::TextEdit::load_state(&self.ctx, self.id).unwrap();
+            sorted_chars(&edit.cursor.char_range().unwrap())
+        }
+
+        fn move_to(&mut self, pos: egui::Pos2) {
+            self.frame(vec![egui::Event::PointerMoved(pos)]);
+        }
+
+        fn button(&mut self, button: egui::PointerButton, pos: egui::Pos2, pressed: bool) {
+            let modifiers = egui::Modifiers::NONE;
+            self.frame(vec![egui::Event::PointerButton { pos, button, pressed, modifiers }]);
+        }
+
+        /// A point on the 0-based `line`, a little in from the start of the text.
+        fn on_line(&self, line: usize) -> egui::Pos2 {
+            let font = egui::TextStyle::Monospace.resolve(&self.ctx.global_style());
+            let row = self.ctx.fonts_mut(|fonts| fonts.row_height(&font));
+            self.rect.left_top() + egui::vec2(20.0, row.mul_add(line as f32, row / 2.0) + 2.0)
+        }
+    }
+
+    #[test]
+    fn the_right_button_on_the_selection_keeps_it() {
+        let mut frames = Frames::new("abcdefghijkl\nsecond line");
+        frames.select(0, 12);
+        let on_it = frames.on_line(0);
+        frames.move_to(on_it);
+
+        frames.button(egui::PointerButton::Secondary, on_it, true);
+        assert_eq!(frames.selection(), 0..12, "on the press");
+        frames.frame(Vec::new());
+        assert_eq!(frames.selection(), 0..12, "while it is down");
+        frames.button(egui::PointerButton::Secondary, on_it, false);
+        assert_eq!(frames.selection(), 0..12, "on the release");
+        frames.frame(Vec::new());
+        assert_eq!(frames.selection(), 0..12, "after it");
+        assert_eq!(frames.state.held_selection, None);
+    }
+
+    #[test]
+    fn the_right_button_elsewhere_moves_the_cursor() {
+        let mut frames = Frames::new("abcdefghijkl\nsecond line");
+        frames.select(0, 12);
+        let elsewhere = frames.on_line(1);
+        frames.move_to(elsewhere);
+
+        frames.button(egui::PointerButton::Secondary, elsewhere, true);
+        let selection = frames.selection();
+        assert!(selection.is_empty() && selection.start > 12, "{selection:?}");
+    }
+
+    #[test]
+    fn selecting_with_the_mouse_asks_for_no_hover() {
+        let mut frames = Frames::new("abcdefghijkl");
+        let start = frames.on_line(0);
+        frames.move_to(start);
+        frames.frame(Vec::new());
+        assert!(frames.state.hover.resting.is_some(), "resting on a char waits for the hover");
+
+        frames.button(egui::PointerButton::Primary, start, true);
+        let dragged = start + egui::vec2(30.0, 0.0);
+        frames.move_to(dragged);
+        frames.frame(Vec::new());
+        assert_eq!(frames.state.hover.resting, None, "dragging");
+
+        frames.button(egui::PointerButton::Primary, dragged, false);
+        frames.frame(Vec::new());
+        assert_eq!(frames.state.hover.resting, None, "where the drag ended");
+
+        frames.move_to(dragged + egui::vec2(10.0, 0.0));
+        assert!(frames.state.hover.resting.is_some(), "moved on");
     }
 }

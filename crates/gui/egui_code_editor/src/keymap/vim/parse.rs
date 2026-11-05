@@ -7,6 +7,7 @@ use super::{
     command::{Command, Motion, ObjectKind, Operator, ScrollTo, Simple, Target},
     keys::VimKey,
 };
+use crate::EditorCommand;
 
 /// Result of parsing the pending keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +58,21 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
     match after_count {
         [VimKey::Char(' ')] => return Parse::Incomplete,
         [VimKey::Char(' '), VimKey::Char('e'), ..] => return done(Command::Simple(Simple::ToggleExplorer), None),
+        [VimKey::Char(' '), VimKey::Char('l'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::NextTab)), None);
+        }
+        [VimKey::Char(' '), VimKey::Char('h'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::PreviousTab)), None);
+        }
+        [VimKey::Char(' '), VimKey::Char('f'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::Format)), None);
+        }
+        [VimKey::Char(' '), VimKey::Char('p'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::TogglePreview)), None);
+        }
+        [VimKey::Char(' '), VimKey::Char('d'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)), None);
+        }
         [VimKey::Char(' '), ..] => return Parse::Invalid,
         _ => {}
     }
@@ -271,6 +287,8 @@ const fn simple(keys: &[VimKey]) -> Step<Command> {
         [Char('g'), Char('x'), ..] => Simple::OpenUrl,
         [Char('g'), Char('d'), ..] => Simple::GoTo { references: false },
         [Char('g'), Char('D'), ..] => Simple::GoTo { references: true },
+        [Char('g'), Char('t'), ..] => Simple::Ask(EditorCommand::NextTab),
+        [Char('g'), Char('T'), ..] => Simple::Ask(EditorCommand::PreviousTab),
         [Char('g'), Char('*'), ..] => Simple::SearchWord { forward: true, whole: false },
         [Char('g'), Char('#'), ..] => Simple::SearchWord { forward: false, whole: false },
         [Char('z'), key, ..] => {
@@ -349,6 +367,19 @@ mod tests {
         assert_eq!(command("gx"), Command::Simple(Simple::OpenUrl));
         assert_eq!(command("gg"), Command::Move(Motion::FileStart));
         assert_eq!(command("zt"), Command::Simple(Simple::ScrollCursor { to: ScrollTo::Top, first_non_blank: false }));
+    }
+
+    #[test]
+    fn what_the_host_is_asked_for() {
+        assert_eq!(command("gt"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
+        assert_eq!(command("gT"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
+        assert_eq!(command(" f"), Command::Simple(Simple::Ask(EditorCommand::Format)));
+        assert_eq!(command(" l"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
+        assert_eq!(command(" h"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
+        assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));
+        assert_eq!(command(" d"), Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)));
+        assert_eq!(parse(&keys(" ")), Parse::Incomplete);
+        assert_eq!(parse(&keys(" z")), Parse::Invalid);
     }
 
     #[test]

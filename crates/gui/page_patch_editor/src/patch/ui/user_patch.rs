@@ -1,34 +1,23 @@
-//! The window of the whole user patch. What it is is in [`crate::patch::user_patch`].
+//! The window of the user patch: its own editor. What it is is in [`crate::patch::user_patch`].
 //!
 //! ```text
-//! ┌ User Patch ───────────────────────────────────────────────┐
-//! │ 0_master                                                  │
-//! │   #0106 hkbModifierList GetUpModList                      │  <- a click shows it below
-//! │   #0241 hkbClipGenerator                                  │
-//! │ ───────────────────────────────────────────────────────── │
-//! │ [Open in Editor] [Remove]                                 │
-//! │ ↶ <!-- MOD_CODE ~upatch~ OPEN -->                         │  <- `↶`: that change goes
-//! │   <hkparam name="enable">false</hkparam>                  │
-//! └───────────────────────────────────────────────────────────┘
+//! ┌ User Patch ─────────────────────────────────────────────────────┐
+//! │ D:/out/.d_merge/user_patch       [Open work data] [Delete all]  │
+//! │ (the side bar and the editor, as in the Patch Editor)           │
+//! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
-use egui_widgets::{notify::Notification, shadcn::Button};
-use gui_shared::i18n::{I18nKey, I18nMap};
+use egui_widgets::{
+    Modal,
+    notify::Notification,
+    shadcn::{Button, Icon},
+};
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::{pages::patch_editor::PatchEditorSettings, ui::editor::LspOptions},
+};
 
-use super::preview::{PreviewEvent, lines_ui};
-use crate::{UserPatchOutcome, patch::PatchTool};
-
-/// How far an object is to the right of its behavior.
-const INDENT: f32 = 12.0;
-
-/// What a click in the window asked for.
-#[derive(Debug)]
-enum Event {
-    Show(String, String),
-    Open(String, String),
-    Remove(String, String),
-    Revert(String, String, usize),
-}
+use crate::patch::{PatchPaths, PatchTool};
 
 impl PatchTool {
     /// Draws the window if it is open. It belongs to no page: it stays when another is shown.
@@ -37,87 +26,75 @@ impl PatchTool {
         ctx: &egui::Context,
         i18n: &I18nMap,
         notify: &mut Notification,
-    ) -> UserPatchOutcome {
+        paths: PatchPaths<'_>,
+        settings: &mut PatchEditorSettings,
+        editor: &mut LspOptions,
+    ) {
         if !self.user_patch.open {
-            return UserPatchOutcome::default();
+            return;
         }
-        if self.user_patch.seen_revision != self.edit_revision {
-            self.refresh_user_patch();
-        }
+        let to_top = std::mem::take(&mut self.user_patch.to_top);
+        let has_output = !paths.patch_output_dir.trim().is_empty();
+        let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
         let mut open = true;
-        let mut event = None;
-        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::UserPatchTitle)).open(&mut open);
-        window.default_size([640.0, 420.0]).resizable(true).show(ctx, |ui| event = self.user_patch_ui(ui, i18n));
+        Modal::new(i18n.t(I18nKey::UserPatchTitle)).to_top(to_top).show(ctx, &mut open, |ui| match &mut tool {
+            Some(tool) => tool.user_patch_ui(ui, i18n, notify, settings, editor),
+            None => {
+                ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
+            }
+        });
         self.user_patch.open = open;
-        self.apply_user_patch_event(event, notify)
+        if !open {
+            self.close_user_patch(notify, i18n);
+        }
     }
 
-    fn apply_user_patch_event(&mut self, event: Option<Event>, notify: &mut Notification) -> UserPatchOutcome {
-        let result = match event {
-            None => return UserPatchOutcome::default(),
-            Some(Event::Show(behavior, id)) => {
-                self.show_user_patch_object(Some((behavior, id)));
-                return UserPatchOutcome::default();
-            }
-            Some(Event::Open(behavior, id)) => {
-                self.open_user_patch_object(behavior, id);
-                return UserPatchOutcome { open_editor: true };
-            }
-            Some(Event::Remove(behavior, id)) => self.remove_user_patch_object(&behavior, &id),
-            Some(Event::Revert(behavior, id, block)) => self.revert_user_patch_block(&behavior, &id, block),
-        };
-        if let Err(err) = result {
-            notify.error(err);
-        }
-        UserPatchOutcome { open_editor: false }
+    /// One frame of the user patch's own tool, which keeps nothing of its work in the settings.
+    fn user_patch_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+        settings: &mut PatchEditorSettings,
+        editor: &mut LspOptions,
+    ) {
+        self.read_editor_options(editor);
+        self.read_view_settings(settings);
+        self.sync_workspace(notify, i18n);
+        self.take_in_resolution(notify, i18n);
+        self.draw(ui, i18n, notify);
+        self.write_editor_options(editor);
+        self.write_view_settings(settings);
     }
 
-    fn user_patch_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<Event> {
-        let view = &mut self.user_patch;
-        if view.rows.is_empty() {
-            ui.weak(i18n.t(I18nKey::UserPatchEmpty));
-            return None;
-        }
-        let mut event = None;
-        let available = if view.preview.is_some() { ui.available_height() / 2.0 } else { ui.available_height() };
-        // Filling the window, as a window shrinks to its contents and then resists a drag.
-        let scroll = egui::ScrollArea::both().id_salt("user_patch_rows").max_height(available).auto_shrink(false);
-        scroll.show(ui, |ui| {
-            for group in view.rows.chunk_by(|a, b| a.behavior == b.behavior) {
-                ui.add(
-                    egui::Label::new(egui::RichText::new(&group[0].behavior).monospace().strong()).selectable(false),
-                );
-                for row in group {
-                    ui.horizontal(|ui| {
-                        ui.add_space(INDENT);
-                        let is_selected = view
-                            .selected
-                            .as_ref()
-                            .is_some_and(|(behavior, id)| *behavior == row.behavior && *id == row.id);
-                        let text = egui::RichText::new(&row.label).monospace();
-                        if ui.add(egui::Button::selectable(is_selected, text)).clicked() {
-                            event = Some(Event::Show(row.behavior.clone(), row.id.clone()));
-                        }
-                    });
-                }
-            }
-        });
-        // Last: nothing is drawn below a list that took all the height.
-        let (Some((behavior, id)), Some(preview)) = (&view.selected, &mut view.preview) else { return event };
-        ui.separator();
+    /// Where it goes, which is not for the user to change, and deleting all of it.
+    pub(in crate::patch) fn user_patch_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         ui.horizontal(|ui| {
-            if ui.add(Button::new(i18n.t(I18nKey::UserPatchOpenEditor)).small()).clicked() {
-                event = Some(Event::Open(behavior.clone(), id.clone()));
-            }
-            let remove = Button::new(i18n.t(I18nKey::UserPatchRemove)).small().destructive();
-            if ui.add(remove).on_hover_text(i18n.t(I18nKey::UserPatchRemoveHover)).clicked() {
-                event = Some(Event::Remove(behavior.clone(), id.clone()));
-            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                self.clear_button(ui, i18n, notify);
+                self.open_cache_button(ui, i18n, notify);
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    let output = egui::RichText::new(self.output.trim()).weak();
+                    ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
+                });
+            });
         });
-        match lines_ui(preview, ui, i18n.t(I18nKey::NemesisRevertHunkHover)) {
-            Some(PreviewEvent::Revert(block)) => Some(Event::Revert(behavior.clone(), id.clone(), block)),
-            Some(PreviewEvent::JumpToEditor(_)) => Some(Event::Open(behavior.clone(), id.clone())),
-            None => event,
+    }
+
+    /// `[Delete all]`, then `[Delete everything?] [Cancel]`: nothing of it can be undone.
+    fn clear_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        if !self.confirm_clear {
+            let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
+            self.confirm_clear = ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked();
+            return;
+        }
+        if ui.add(Button::new(i18n.t(I18nKey::NemesisCancel))).clicked() {
+            self.confirm_clear = false;
+        }
+        let sure = Button::new(i18n.t(I18nKey::UserPatchClearConfirm)).icon(Icon::Trash).destructive();
+        if ui.add(sure).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
+            self.confirm_clear = false;
+            self.clear_user_patch(notify, i18n);
         }
     }
 }

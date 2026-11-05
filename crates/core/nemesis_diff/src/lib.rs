@@ -22,12 +22,15 @@
 
 pub mod asdsf;
 pub mod conflict;
+mod format;
 pub mod schema;
 pub mod vars;
 
 use std::{fmt::Write as _, ops::Range};
 
 use fast_hash::{HashMap, HashSet};
+
+pub use self::format::format_object;
 
 /// One top-level `<hkobject name="#0106" class="..">` of a behavior xml.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -509,12 +512,6 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
         }
     }
     problems
-}
-
-/// `info.ini` of a Nemesis mod.
-pub fn info_ini(name: &str, author: &str, site: &str, auto: bool) -> String {
-    let auto = if auto { "true" } else { "null" };
-    format!("name={name}\nauthor={author}\nsite={site}\nauto={auto}\n")
 }
 
 /// Is `code` a valid Nemesis mod code? (4-6 ASCII letters/digits, not `vanilla`)

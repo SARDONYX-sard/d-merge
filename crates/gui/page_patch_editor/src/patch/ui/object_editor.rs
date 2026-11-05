@@ -1,6 +1,9 @@
 //! The right side: the XML editor of the open object, and its patch preview below.
 
-use egui_code_editor::{CodeEditor, EditorAction, EditorFeatures, EditorLabels, Keymap, Navigation};
+use egui_code_editor::{
+    CodeEditor, EditorAction, EditorCommand, EditorFeatures, EditorLabels, InlineDiff, Keymap, Navigation,
+    languages::Xml,
+};
 use egui_widgets::shadcn::{Button, Checkbox, Icon};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -9,8 +12,8 @@ use gui_shared::{
 
 use super::{preview::PreviewEvent, references::references_window};
 use crate::patch::{
-    EditorResult, FocusAt, PatchTool, TabEvent, anim_lines::AnimDataLanguage, editor_tabs::EditorTabs,
-    language::NemesisXml, tree::Graph,
+    EditorResult, FocusAt, PatchTool, TabEvent, anim_lines::AnimDataLanguage, editor_tabs::EditorTabs, inline_diff,
+    language::NemesisXml, resolve, tree::Graph,
 };
 
 /// The id of the palette's "focus the object tree" command.
@@ -18,6 +21,24 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 /// The ids of the palette's "go back" and "go forward".
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
+/// The palette's commands that Vim has keys for: see [`action_command`].
+const ACTION_NEXT_TAB: &str = "next_tab";
+const ACTION_PREVIOUS_TAB: &str = "previous_tab";
+const ACTION_CLOSE_TAB: &str = "close_tab";
+const ACTION_PREVIEW: &str = "toggle_preview";
+const ACTION_INLINE_DIFF: &str = "toggle_inline_diff";
+
+/// What a command of the palette asks for.
+fn action_command(action: Option<&str>) -> Option<EditorCommand> {
+    Some(match action? {
+        ACTION_NEXT_TAB => EditorCommand::NextTab,
+        ACTION_PREVIOUS_TAB => EditorCommand::PreviousTab,
+        ACTION_CLOSE_TAB => EditorCommand::CloseTab,
+        ACTION_PREVIEW => EditorCommand::TogglePreview,
+        ACTION_INLINE_DIFF => EditorCommand::ToggleInlineDiff,
+        _ => return None,
+    })
+}
 
 impl PatchTool {
     pub(in crate::patch) fn object_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
@@ -26,7 +47,7 @@ impl PatchTool {
             return;
         };
         self.open_in_editor(&id);
-        let editor_id = egui_code_editor::editor_id(("nemesis_object", &id));
+        let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, &id));
         self.apply_focus_request(ui.ctx(), editor_id);
         // `Ctrl+W` closes the tab, as in VS Code. (Vim uses that key itself.)
         if self.editor_mode == EditorMode::Normal
@@ -43,11 +64,26 @@ impl PatchTool {
             ui.ctx().request_repaint();
             return;
         }
+        // `Ctrl+PageDown` / `Ctrl+PageUp`, as in VS Code, in every keymap.
+        if let Some(forward) = tab_keys(ui) {
+            self.step_tab(&id, forward);
+            ui.ctx().request_repaint();
+            return;
+        }
 
         // No preview for a new object: it is written as is.
         let behavior = &self.workspace.behaviors[self.active];
         let is_new = behavior.added.contains_key(&id) || behavior.is_ref(&id);
-        let preview_event = if is_new || !self.show_preview { None } else { self.preview_panel(ui, i18n) };
+        // What the mods have at the conflict being edited: the preview comes back when it is closed.
+        let is_merging = self.merge_values.as_ref().is_some_and(|values| values.id == id);
+        let preview_event = if is_merging {
+            self.merge_panel(ui, i18n, &id);
+            None
+        } else if is_new || !self.show_preview {
+            None
+        } else {
+            self.preview_panel(ui, i18n)
+        };
         let result = self.editor_panel(ui, i18n, &id);
 
         if let Some(view) = &mut self.preview_view {
@@ -77,10 +113,42 @@ impl PatchTool {
         }
     }
 
+    /// See [`resolve::MergeValues`]. What is picked goes below the cursor in the editor.
+    fn merge_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) {
+        let Some(values) = self.merge_values.take() else { return };
+        let (mut picked, mut close) = (None, false);
+        let panel_id = if self.is_user_patch { "user_patch_merge" } else { "nemesis_merge" };
+        egui::Panel::right(panel_id).default_size(520.0).resizable(true).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.strong(i18n.t(I18nKey::NemesisMergeTitle)).on_hover_text(i18n.t(I18nKey::NemesisMergeHover));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.small_button("✖").clicked();
+                });
+            });
+            ui.add(egui::Label::new(egui::RichText::new(&values.path).monospace().weak()).truncate());
+            ui.separator();
+            egui::ScrollArea::both().id_salt(("nemesis_merge_values", id)).auto_shrink(false).show(ui, |ui| {
+                picked = merge_values_ui(ui, i18n, &values);
+            });
+        });
+        if let Some(lines) = picked {
+            let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
+            self.editor_text = text;
+            self.workspace.behaviors[self.active].set_text(id, self.editor_text.clone());
+            self.preview = None;
+            self.object_changed(id);
+            self.focus_editor = Some(FocusAt::Line(last));
+        }
+        if !close {
+            self.merge_values = Some(values);
+        }
+    }
+
     /// `Patch preview ▲ ▼ 2/5 ✔ ... [follow]` and its lines.
     fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
         let mut event = None;
-        egui::Panel::right("nemesis_preview").default_size(520.0).resizable(true).show(ui, |ui| {
+        let panel_id = if self.is_user_patch { "user_patch_preview" } else { "nemesis_preview" };
+        egui::Panel::right(panel_id).default_size(520.0).resizable(true).show(ui, |ui| {
             let Some((patch, check)) = &self.preview else { return };
             ui.horizontal(|ui| {
                 ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
@@ -121,24 +189,30 @@ impl PatchTool {
         let values = self.field_values();
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
+        let pointer_field = nemesis_diff::schema::open_pointer_field(&self.editor_text, self.cursor_line);
         let language = NemesisXml {
+            code_action: self.lsp.code_action,
             events: &names.usable_events,
             variables: &names.usable_variables,
             variable_types: &names.variable_types,
             values: &values,
             graph: &names.graph,
             fields: context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice())),
+            pointer_field,
             // After name, id, speed, crop start, crop end and the count.
             behavior: &self.workspace.behaviors[self.active],
         };
         let anim_data = self.workspace.behaviors[self.active].is_anim_data();
         let anim_language = AnimDataLanguage {
+            is_adsf: self.workspace.behaviors[self.active].adsf,
+            id,
+            code_action: self.lsp.code_action,
             roles: &self.anim_roles,
             cursor_line: self.cursor_line,
             trigger_names: &self.trigger_names,
         };
         let shown_language: &dyn egui_code_editor::Language = if anim_data { &anim_language } else { &language };
-        let features = EditorFeatures { inlay_hints: anim_data, ..editor_features(&self.lsp) };
+        let features = editor_features(&self.lsp, anim_data);
         let keymap = match self.editor_mode {
             EditorMode::Normal => Keymap::Normal,
             EditorMode::Vim => Keymap::Vim,
@@ -148,11 +222,38 @@ impl PatchTool {
             EditorAction { id: ACTION_FOCUS_TREE, label: i18n.t(I18nKey::NemesisFocusTree) },
             EditorAction { id: ACTION_BACK, label: i18n.t(I18nKey::NemesisGoBack) },
             EditorAction { id: ACTION_FORWARD, label: i18n.t(I18nKey::NemesisGoForward) },
+            EditorAction { id: ACTION_NEXT_TAB, label: i18n.t(I18nKey::NemesisNextTab) },
+            EditorAction { id: ACTION_PREVIOUS_TAB, label: i18n.t(I18nKey::NemesisPreviousTab) },
+            EditorAction { id: ACTION_CLOSE_TAB, label: i18n.t(I18nKey::NemesisCloseCurrentTab) },
+            EditorAction { id: ACTION_PREVIEW, label: i18n.t(I18nKey::NemesisTogglePreview) },
+            EditorAction { id: ACTION_INLINE_DIFF, label: i18n.t(I18nKey::NemesisToggleInlineDiff) },
         ];
 
         let mut result = EditorResult::default();
         egui::CentralPanel::default().show(ui, |ui| {
-            result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
+            // Like VS Code's: the tabs, and at the far right what splits the editor. A new object has no
+            // preview: it is written as is.
+            let behavior = &self.workspace.behaviors[self.active];
+            let can_split = !behavior.added.contains_key(id) && !behavior.is_ref(id);
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if can_split {
+                        split_preview_button(ui, i18n, &mut self.show_preview);
+                    }
+                    let inline = Button::selectable(self.show_inline_diff, "").icon(Icon::Diff).small();
+                    if ui.add(inline).on_hover_text(i18n.t(I18nKey::NemesisInlineDiffHover)).clicked() {
+                        self.show_inline_diff = !self.show_inline_diff;
+                    }
+                    if self.show_inline_diff
+                        && let Some(line) = inline_diff_nav(ui, i18n, &self.inline_diff, self.cursor_line)
+                    {
+                        self.focus_editor = Some(FocusAt::Line(line));
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
+                    });
+                });
+            });
             let read_only = self.workspace.behaviors[self.active].is_ref(id);
             if read_only {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
@@ -161,34 +262,17 @@ impl PatchTool {
                 lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
             }
             // The editor's settings are in its status bar, as in VS Code.
-            egui::Panel::bottom("nemesis_status_bar").show(ui, |ui| {
+            let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
+            egui::Panel::bottom(status_id).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     toolbar(ui, i18n, &mut self.editor_mode, &mut self.show_lsp_options);
-                    let diff = Button::selectable(self.show_inline_diff, "").icon(Icon::Diff).small();
-                    if ui.add(diff).on_hover_text(i18n.t(I18nKey::NemesisInlineDiffHover)).clicked() {
-                        self.show_inline_diff = !self.show_inline_diff;
-                    }
-                    let diff_split = Button::selectable(self.show_preview, "").icon(Icon::Diff).small();
-                    if ui
-                        .add(diff_split)
-                        .on_hover_text({
-                            if self.show_preview {
-                                i18n.t(I18nKey::EditorHidePreview)
-                            } else {
-                                i18n.t(I18nKey::EditorShowPreview)
-                            }
-                        })
-                        .clicked()
-                    {
-                        self.show_preview = !self.show_preview;
-                    }
                     egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
                 });
             });
             result.jump_to_line = super::problems::problems_panel(ui, i18n, &self.field_problems);
             // Per object: each tab keeps where it was scrolled to.
             egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false).show(ui, |ui| {
-                let output = CodeEditor::new(("nemesis_object", id), &mut self.editor_text)
+                let output = CodeEditor::new(("nemesis_object", self.is_user_patch, id), &mut self.editor_text)
                     .language(shown_language)
                     .read_only(read_only)
                     .diagnostics(&self.field_problems)
@@ -203,7 +287,7 @@ impl PatchTool {
                 }
                 result.changed = output.changed;
                 result.inline_revert = output.inline_revert;
-                result.command = output.command;
+                result.command = output.command.or_else(|| action_command(output.action));
                 result.focus_tree = output.action == Some(ACTION_FOCUS_TREE);
                 result.walk_history = match output.action {
                     Some(ACTION_BACK) => Some(true),
@@ -222,6 +306,80 @@ impl PatchTool {
         });
         result
     }
+}
+
+/// The original lines, then each mod's with `Insert`, for all of them and for each line. Returns the
+/// lines picked.
+fn merge_values_ui(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<Vec<String>> {
+    let line_of = |ui: &egui::Ui, line: &str| egui_code_editor::line_job(ui, line.trim_start(), &Xml);
+    ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
+    for line in &values.original {
+        ui.add(egui::Label::new(line_of(ui, line)));
+    }
+    let mut picked = None;
+    for side in &values.sides {
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.strong(&side.name);
+            let insert =
+                ui.add_enabled(!side.lines.is_empty(), Button::new(i18n.t(I18nKey::NemesisMergeInsert)).small());
+            if insert.on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
+                picked = Some(side.lines.clone());
+            }
+        });
+        if side.lines.is_empty() {
+            ui.weak(i18n.t(I18nKey::NemesisMergeRemoves));
+        }
+        // Several lines: one of them may be all that is wanted.
+        for line in side.lines.iter().filter(|_| side.lines.len() > 1) {
+            ui.horizontal(|ui| {
+                if ui.small_button("+").on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
+                    picked = Some(vec![line.clone()]);
+                }
+                ui.add(egui::Label::new(line_of(ui, line)));
+            });
+        }
+        if let [line] = side.lines.as_slice() {
+            ui.add(egui::Label::new(line_of(ui, line)));
+        }
+    }
+    picked
+}
+
+/// `▲ ▼ 2/5` of the changes shown in the editor, drawn right to left. Returns the line to go to.
+fn inline_diff_nav(ui: &mut egui::Ui, i18n: &I18nMap, diff: &InlineDiff, cursor_line: usize) -> Option<usize> {
+    let (at, count) = inline_diff::position(diff, cursor_line)?;
+    ui.label(format!("{}/{count}", at + 1));
+    let mut line = None;
+    for (forward, glyph) in [(true, "▼"), (false, "▲")] {
+        if ui.small_button(glyph).on_hover_text(i18n.t(I18nKey::NemesisJumpDiffHover)).clicked() {
+            line = inline_diff::step(diff, cursor_line, forward);
+        }
+    }
+    line
+}
+
+/// Shows or hides the patch preview beside the editor.
+fn split_preview_button(ui: &mut egui::Ui, i18n: &I18nMap, show_preview: &mut bool) {
+    let hover = if *show_preview { I18nKey::EditorHidePreview } else { I18nKey::EditorShowPreview };
+    let button = Button::selectable(*show_preview, "").icon(Icon::Columns2).small();
+    if ui.add(button).on_hover_text(i18n.t(hover)).clicked() {
+        *show_preview = !*show_preview;
+    }
+}
+
+/// `Ctrl+PageDown`: `Some(true)`. `Ctrl+PageUp`: `Some(false)`.
+fn tab_keys(ui: &egui::Ui) -> Option<bool> {
+    use egui::{Key, Modifiers};
+    ui.input_mut(|input| {
+        if input.consume_key(Modifiers::COMMAND, Key::PageDown) {
+            Some(true)
+        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) {
+            Some(false)
+        } else {
+            None
+        }
+    })
 }
 
 /// `Alt+←` or the mouse's back button: `Some(true)`. `Alt+→` or its forward button: `Some(false)`.
@@ -311,14 +469,15 @@ fn graph_label(graph: &Graph, node: Option<crate::patch::tree::Node>) -> String 
     node.map_or_else(String::new, |node| graph.label(node).to_owned())
 }
 
-/// The language features the settings turn on, and what XML has no use for.
-const fn editor_features(lsp: &LspOptions) -> EditorFeatures {
+/// The language features the settings turn on. The lines of the animation data have no form to
+/// format them to.
+const fn editor_features(lsp: &LspOptions, anim_data: bool) -> EditorFeatures {
     EditorFeatures {
         completion: lsp.completion,
         hover: lsp.hover,
         diagnostics: lsp.diagnostics,
-        format: false,
-        inlay_hints: false,
+        format: lsp.formatter && !anim_data,
+        inlay_hints: lsp.inlay_hints,
         signature_help: lsp.signature_help,
     }
 }
@@ -353,8 +512,11 @@ fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions,
         .show(ctx, |ui| {
             let options = [
                 (&mut lsp.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
+                (&mut lsp.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
                 (&mut lsp.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
+                (&mut lsp.formatter, I18nKey::LspFormatter, I18nKey::LspFormatterHover),
                 (&mut lsp.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
+                (&mut lsp.inlay_hints, I18nKey::LspInlayHints, I18nKey::LspInlayHintsHover),
                 (&mut lsp.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
             ];
             for (value, label, hover) in options {

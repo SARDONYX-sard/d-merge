@@ -21,16 +21,16 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 
 ## Editor keys (all keymaps)
 
-| Key                  | Action                                   |
-| -------------------- | ---------------------------------------- |
-| `Ctrl+Space`         | Open completion                          |
-| `Tab` / `Enter`      | Accept completion                        |
-| `Shift+Alt+F`        | Format document                          |
-| `Ctrl+.`             | Quick fix menu (`↑`/`↓`, `Enter`, `Esc`) |
-| `Ctrl+Shift+P`       | Command palette (see below)              |
+| Key                  | Action                                    |
+| -------------------- | ----------------------------------------- |
+| `Ctrl+Space`         | Open completion                           |
+| `Tab` / `Enter`      | Accept completion                         |
+| `Shift+Alt+F`        | Format document                           |
+| `Ctrl+.`             | Quick fix menu (`↑`/`↓`, `Enter`, `Esc`)  |
+| `Ctrl+Shift+P`       | Command palette (see below)               |
 | `F12` / `Ctrl+click` | Go to definition (`Language::definition`) |
-| `Shift+F12`          | Find references (`Language::references`) |
-| Mouse rest on a word | Hover (diagnostics + docs)               |
+| `Shift+F12`          | Find references (`Language::references`)  |
+| Mouse rest on a word | Hover (diagnostics + docs)                |
 
 ## Command palette and host API
 
@@ -230,13 +230,18 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 
 ### Other
 
-| Key        | Action                                                                                                                           |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `K`        | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
-| `gx`       | Open the URL under the cursor                                                                                                    |
-| `gd`       | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
-| `gD`       | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
-| `<Space>e` | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                       |
+| Key             | Action                                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `K`             | Hover at the cursor; `K` again moves the keyboard into it (`Tab` / `j` / `k` choose a link, `Enter` opens it, `Esc` / `q` close) |
+| `gx`            | Open the URL under the cursor                                                                                                    |
+| `gd`            | Go to definition (`EditorCommand::GoToDefinition` for the host)                                                                  |
+| `gD`            | Find references (`EditorCommand::FindReferences` for the host)                                                                   |
+| `<Space>e`      | Move the keyboard to the host's tree (`EditorCommand::ToggleExplorer`). `<Space>` is a leader key, not `l`                       |
+| `<Space>l` `gt` | Next tab (`EditorCommand::NextTab` for the host)                                                                                 |
+| `<Space>h` `gT` | Previous tab (`EditorCommand::PreviousTab` for the host)                                                                         |
+| `<Space>f`      | Format the document                                                                                                              |
+| `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                 |
+| `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                 |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 
@@ -255,6 +260,12 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | `:reg`                    | Show the registers                          |
 | `:delm {a-z}`             | Delete marks                                |
 | `:noh`                    | Hide the search highlight                   |
+| `:tabn` `:bn`             | Next tab                                    |
+| `:tabp` `:bp`             | Previous tab                                |
+| `:tabc` `:bd` `:q`        | Close the tab                               |
+| `:fmt` `:format`          | Format the document                         |
+| `:preview` `:pre`         | Show or hide the host's preview             |
+| `:diff`                   | Show or hide the inline diff                |
 
 The prompt line accepts `Backspace`, `Ctrl+U` (clear) and `Ctrl+W` (delete a word).
 

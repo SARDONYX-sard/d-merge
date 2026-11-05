@@ -4,8 +4,8 @@
 //! ```text
 //! [File v] > mymod  D:/mods/out                [Open work data] [User Patch] [Export]
 //! ```
-//! Unfolded: where it is exported to, the mod it was read from, where the work is kept, the mods it
-//! depends on, and the mod's `info.ini`. The list of behaviors is in [`super::behaviors`].
+//! Unfolded: where it is exported to, the mod it was read from, the mods it depends on, and the mod's
+//! `info.ini`. The list of behaviors is in [`super::behaviors`].
 
 use std::path::Path;
 
@@ -19,11 +19,7 @@ use gui_shared::{
     settings::pages::patch_editor::RecentWork,
 };
 
-use crate::patch::{
-    PatchTool,
-    new_work::NewWork,
-    workspace::{CACHE_ROOT, Workspace},
-};
+use crate::patch::{PatchTool, new_work::NewWork, workspace::Workspace};
 
 /// See [`PathRow`].
 pub(super) const PATH_ACTIONS: PathActions =
@@ -71,7 +67,9 @@ impl PatchTool {
     /// `New`, `Open`, `Open Recent`, `Close`, like VS Code's.
     fn file_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut action = None;
-        ui.menu_button(i18n.t(I18nKey::NemesisFileMenu), |ui| {
+        // With a frame and an arrow: it should be seen to be a menu.
+        let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::NemesisFileMenu)));
+        egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
             let mut item = |ui: &mut egui::Ui, label, hover, picked| {
                 if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
                     action = Some(picked);
@@ -98,8 +96,10 @@ impl PatchTool {
         });
         match action {
             Some(FileAction::New) => {
+                // Usually next to the one that was open.
+                let output = self.output.clone();
                 self.close_work(notify, i18n);
-                self.new_work = Some(NewWork::default());
+                self.new_work = Some(NewWork { code: String::new(), output });
             }
             Some(FileAction::Open) => self.pick_mod(notify, i18n),
             Some(FileAction::Recent(work)) => self.open_recent(&work, notify, i18n),
@@ -140,7 +140,6 @@ impl PatchTool {
             self.mark_dirty();
         }
         self.source_row(ui, i18n, notify);
-        self.cache_row(ui, i18n, notify);
         self.ref_mods_row(ui, i18n);
 
         ui.horizontal_wrapped(|ui| {
@@ -155,6 +154,7 @@ impl PatchTool {
                 (I18nKey::NemesisNameLabel, I18nKey::NemesisNameHover, &mut info.name, 260.0),
                 (I18nKey::NemesisAuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
                 (I18nKey::NemesisSiteLabel, I18nKey::NemesisSiteHover, &mut info.site, 320.0),
+                (I18nKey::NemesisVersionLabel, I18nKey::NemesisVersionHover, &mut info.version, 70.0),
             ] {
                 ui.label(i18n.t(label)).on_hover_text(i18n.t(hover));
                 let field = ui.add(TextEdit::singleline(value).desired_width(width));
@@ -186,16 +186,6 @@ impl PatchTool {
         }
     }
 
-    /// `[Work data] D:/d_merge/.d_merge/caches/patch_editor/nemesis/mymod`: decided by the code.
-    fn cache_row(&self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let error = PathRow::new(i18n.t(I18nKey::NemesisCacheDirLabel), "", PATH_ACTIONS)
-            .hover(i18n.t(I18nKey::NemesisCacheDirHover))
-            .show_read_only(ui, &self.cache_dir().to_string_lossy(), |_| {});
-        if let Some(err) = error {
-            notify.error(err);
-        }
-    }
-
     /// `Open work data`, always in reach. Its hover says where that is.
     pub(super) fn open_cache_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let button = Button::new(i18n.t(I18nKey::NemesisOpenCacheDir)).icon(Icon::FolderOpen);
@@ -214,9 +204,8 @@ impl PatchTool {
 
     /// The directory of the open work, or of all the works if none is open.
     fn cache_dir(&self) -> std::path::PathBuf {
-        let root = Path::new(CACHE_ROOT);
-        let dir =
-            self.loaded_for.as_deref().map_or_else(|| root.to_path_buf(), |code| Workspace::cache_dir(root, code));
+        let root = &self.cache_root;
+        let dir = self.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
         std::path::absolute(&dir).unwrap_or(dir)
     }
 

@@ -38,11 +38,16 @@
 //!
 //! An anim set's anim infos go to the end of the file whatever its count says: a pushing patch does
 //! not change the count (see [`nemesis_diff::asdsf::add_anim_infos`]).
+//!
+//! [`problems`] checks what can be wrong in a way the positions hide: a count that says something else
+//! than what is there, and a clip id that is not the one in the file's name. Only a file that is a
+//! whole thing: a patch that edits one pushes elements without changing the counts, which the merge
+//! counts itself. e.g., `tkuc`'s `FirstPerson~1/346.txt` keeps `1` with 9 translations.
 
-use egui_code_editor::{CompletionList, Language, languages::Xml};
+use egui_code_editor::{CompletionList, Diagnostic, Language, QuickFix, Severity, languages::Xml};
 
 use super::{
-    anim_patch::{AdsfFile, AsdsfFile},
+    anim_patch::{AdsfFile, AsdsfFile, is_edit},
     language::{item, trigger_completion},
 };
 
@@ -291,9 +296,227 @@ pub(super) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRole> {
     walk.roles
 }
 
+/// What [`problems`] found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct LineProblem {
+    /// 0-based line.
+    pub(super) line: usize,
+    pub(super) message: String,
+    pub(super) severity: Severity,
+    /// What the line should say. e.g., `3`
+    pub(super) fixed: String,
+}
+
+/// Is this no name? e.g., `1`, `0.5`, `$crc32[name]$`
+fn is_value(line: &str) -> bool {
+    let line = line.trim();
+    line.parse::<f64>().is_ok() || line.starts_with("$crc32")
+}
+
+/// The lines of the layout, which [`problems`] goes through by what they are: where a count is wrong,
+/// it cannot go by the counts.
+struct Reader<'a> {
+    /// `(line number, text)`
+    lines: Vec<(usize, &'a str)>,
+    at: usize,
+    problems: Vec<LineProblem>,
+}
+
+impl<'a> Reader<'a> {
+    fn new(text: &'a str) -> Self {
+        let mut lines = Walk::new(text).lines;
+        lines.retain(|(_, line)| !line.trim().is_empty());
+        Self { lines, at: 0, problems: Vec::new() }
+    }
+
+    fn next(&mut self) -> Option<(usize, &'a str)> {
+        let line = *self.lines.get(self.at)?;
+        self.at += 1;
+        Some(line)
+    }
+
+    fn peek(&self) -> Option<&'a str> {
+        self.lines.get(self.at).map(|(_, line)| *line)
+    }
+
+    /// The names from here on, which are passed. Returns how many.
+    fn skip_names(&mut self) -> u32 {
+        let mut names = 0;
+        while self.peek().is_some_and(|line| !is_value(line)) {
+            self.at += 1;
+            names += 1;
+        }
+        names
+    }
+
+    /// The lines with several values from here on, which are passed: what is next after them is a count,
+    /// one value. Returns how many. How many values is the parser's to check, not a miscount.
+    fn skip_keys(&mut self) -> u32 {
+        let mut keys = 0;
+        while self.peek().is_some_and(|line| line.split_whitespace().nth(1).is_some()) {
+            self.at += 1;
+            keys += 1;
+        }
+        keys
+    }
+
+    /// The count of anim infos is next: it and then three lines per anim info, all values.
+    fn is_at_anim_infos(&self) -> bool {
+        let rest = &self.lines[self.at.min(self.lines.len())..];
+        rest.len() % 3 == 1 && rest.iter().all(|(_, line)| is_value(line))
+    }
+
+    /// `(line, text)` is a count of `what`, and there are `actual`.
+    fn check_count(&mut self, (line, text): (usize, &str), what: &str, actual: u32) {
+        if text.trim().parse::<u32>().is_ok_and(|declared| declared != actual) {
+            self.problems.push(LineProblem {
+                line,
+                message: format!("The count of {what} is {}, but there are {actual}.", text.trim()),
+                severity: Severity::Error,
+                fixed: actual.to_string(),
+            });
+        }
+    }
+
+    /// `id` is the clip id in the file's name.
+    fn check_clip_id(&mut self, (line, text): (usize, &str), id: &str) {
+        if text.trim() != id {
+            self.problems.push(LineProblem {
+                line,
+                message: format!("The clip id is `{}`, but the file's name says `{id}`.", text.trim()),
+                severity: Severity::Warning,
+                fixed: id.to_owned(),
+            });
+        }
+    }
+
+    /// See [`walk_set`].
+    fn read_set(&mut self) -> Option<()> {
+        self.next()?; // the version
+        let count = self.next()?;
+        let triggers = self.skip_names();
+        self.check_count(count, "triggers", triggers);
+
+        let count = self.next()?;
+        let mut conditions = 0;
+        while self.peek().is_some_and(|line| !is_value(line)) {
+            self.at += 3;
+            conditions += 1;
+        }
+        self.check_count(count, "conditions", conditions);
+
+        let count = self.next()?;
+        let attacks = self.read_attacks()?;
+        self.check_count(count, "attacks", attacks);
+
+        let count = self.next()?;
+        let anim_infos = u32::try_from(self.lines.len().saturating_sub(self.at) / 3).ok()?;
+        self.check_count(count, "anim infos", anim_infos);
+        Some(())
+    }
+
+    /// Returns how many attacks there are. What ends an attack's clips is not known by the line, as the
+    /// next attack starts with a name too: it is the last name before the next attack's values, unless
+    /// the anim infos are next.
+    fn read_attacks(&mut self) -> Option<u32> {
+        let mut attacks = 0;
+        while !self.is_at_anim_infos() && self.peek().is_some_and(|line| !is_value(line)) {
+            self.next()?; // its trigger
+            self.next()?; // is it contextual?
+            let count = self.next()?;
+            let names = self.skip_names();
+            let clips = if names > 0 && self.peek().is_some() && !self.is_at_anim_infos() {
+                self.at -= 1;
+                names - 1
+            } else {
+                names
+            };
+            self.check_count(count, "this attack's clips", clips);
+            attacks += 1;
+        }
+        Some(attacks)
+    }
+
+    /// See [`walk_clip`]. `id`: the clip id in the file's name.
+    fn read_clip(&mut self, id: &str) -> Option<()> {
+        self.next()?; // the name
+        let clip_id = self.next()?;
+        self.check_clip_id(clip_id, id);
+        self.at += 3; // the speed and the crops
+        let count = self.next()?;
+        let triggers = u32::try_from(self.lines.len().saturating_sub(self.at)).ok()?;
+        self.check_count(count, "triggers", triggers);
+        Some(())
+    }
+
+    /// See [`walk_motion`]. `id`: the clip id in the file's name.
+    fn read_motion(&mut self, id: &str) -> Option<()> {
+        let clip_id = self.next()?;
+        self.check_clip_id(clip_id, id);
+        self.next()?; // the duration
+        let count = self.next()?;
+        let translations = self.skip_keys();
+        self.check_count(count, "translations", translations);
+        let count = self.next()?;
+        let rotations = self.skip_keys();
+        self.check_count(count, "rotations", rotations);
+        Some(())
+    }
+}
+
+/// `DefaultMale~1/Idle~mod$0.txt` -> `mod$0`, `DefaultMale~1/mod$0.txt` -> `mod$0`
+fn clip_id_of_file(id: &str) -> &str {
+    let file = id.rsplit_once('/').map_or(id, |(_, file)| file);
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
+    stem.rsplit_once('~').map_or(stem, |(_, clip_id)| clip_id)
+}
+
+/// The counts that are wrong, and a clip id that is not the file's. See the module docs.
+pub(super) fn problems(is_adsf: bool, id: &str, text: &str) -> Vec<LineProblem> {
+    let mut reader = Reader::new(text);
+    let _partial = if is_adsf {
+        match AdsfFile::of(id) {
+            _ if is_edit(text) => None,
+            AdsfFile::AddAnim | AdsfFile::IndexedAnim => reader.read_clip(clip_id_of_file(id)),
+            AdsfFile::AddMotion | AdsfFile::IndexedMotion => reader.read_motion(clip_id_of_file(id)),
+            AdsfFile::ProjectNamesHeader | AdsfFile::AnimHeader => None,
+        }
+    } else {
+        match AsdsfFile::of(id) {
+            AsdsfFile::AddSet => reader.read_set(),
+            AsdsfFile::EditSet | AsdsfFile::ProjectsHeader | AsdsfFile::SetsHeader => None,
+        }
+    };
+    reader.problems
+}
+
+/// [`problems`] as editor underlines (the trimmed line).
+pub(super) fn diagnostics(is_adsf: bool, id: &str, text: &str) -> Vec<Diagnostic> {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let columns = |line: usize| {
+        let source = lines.get(line).copied().unwrap_or_default();
+        let start = source.chars().take_while(|c| c.is_whitespace()).count();
+        start..start + source.trim().chars().count()
+    };
+    problems(is_adsf, id, text)
+        .into_iter()
+        .map(|problem| Diagnostic {
+            line: problem.line,
+            columns: columns(problem.line),
+            severity: problem.severity,
+            message: problem.message,
+        })
+        .collect()
+}
+
 /// The editor's language for these files.
 #[derive(Debug)]
 pub(super) struct AnimDataLanguage<'a> {
+    /// Which of the two templates, and the file: see [`problems`].
+    pub(super) is_adsf: bool,
+    pub(super) id: &'a str,
+    /// `LspOptions::code_action`
+    pub(super) code_action: bool,
     /// See [`roles`], per line of the open file.
     pub(super) roles: &'a [LineRole],
     /// The cursor line last frame: [`Language::complete`] only gets the text of a line.
@@ -322,6 +545,25 @@ impl Language for AnimDataLanguage<'_> {
 
     fn completion_triggers(&self) -> &[char] {
         &['$']
+    }
+
+    fn quick_fixes(&self, text: &str, line: usize, _column: usize) -> Vec<QuickFix> {
+        if !self.code_action {
+            return Vec::new();
+        }
+        let source = text.split('\n').nth(line).unwrap_or_default();
+        let start = source.chars().take_while(|c| c.is_whitespace()).count();
+        let columns = start..start + source.trim().chars().count();
+        problems(self.is_adsf, self.id, text)
+            .into_iter()
+            .filter(|problem| problem.line == line)
+            .map(|problem| QuickFix {
+                title: format!("Change it to `{}`", problem.fixed),
+                line,
+                columns: columns.clone(),
+                new_text: problem.fixed,
+            })
+            .collect()
     }
 
     fn complete(&self, line: &str, column: usize) -> CompletionList {
@@ -392,6 +634,101 @@ mod tests {
         assert_eq!(roles[5], LineRole::Rotation(0));
     }
 
+    /// `(line, what it should say)`
+    fn found(is_adsf: bool, id: &str, text: &str) -> Vec<(usize, String)> {
+        problems(is_adsf, id, text).into_iter().map(|problem| (problem.line, problem.fixed)).collect()
+    }
+
+    const CLIP: &str = "D~1/Idle~m$0.txt";
+    const SET: &str = "A~A/m$New.txt";
+
+    #[test]
+    fn a_clip_has_the_triggers_its_count_says() {
+        assert!(found(true, CLIP, "Idle\nm$0\n1\n0\n0\n1\nDraw:0.5\n").is_empty());
+        // 7 triggers, and none.
+        assert_eq!(found(true, CLIP, "Idle\nm$0\n1\n0\n0\n7\n"), [(5, "0".to_owned())]);
+        assert_eq!(found(true, CLIP, "Idle\nm$0\n1\n0\n0\n0\nDraw:0.5\nHit:0.6\n"), [(5, "2".to_owned())]);
+    }
+
+    #[test]
+    fn a_clip_id_is_the_one_of_the_file_name() {
+        let problems = problems(true, CLIP, "Idle\nother$3\n1\n0\n0\n0\n");
+        assert_eq!(problems.len(), 1);
+        assert_eq!((problems[0].line, problems[0].fixed.as_str()), (1, "m$0"));
+        assert_eq!(problems[0].severity, Severity::Warning, "it merges, but the motion is not found by it");
+
+        assert_eq!(found(true, "D~1/Idle~348.txt", "Idle\n349\n1\n0\n0\n0\n"), [(1, "348".to_owned())]);
+        assert_eq!(found(true, "D~1/m$0.txt", "m$1\n1\n0\n0\n"), [(0, "m$0".to_owned())]);
+    }
+
+    #[test]
+    fn a_motion_has_the_keys_its_counts_say() {
+        let motion = "D~1/m$0.txt";
+        assert!(found(true, motion, "m$0\n1\n1\n1 0 0 0\n1\n1 0 0 0 1\n").is_empty());
+        assert_eq!(found(true, motion, "m$0\n1\n2\n1 0 0 0\n1\n1 0 0 0 1\n"), [(2, "1".to_owned())]);
+        assert_eq!(found(true, motion, "m$0\n1\n1\n1 0 0 0\n0\n1 0 0 0 1\n"), [(4, "1".to_owned())]);
+        // Keys that are not what they should be are not a wrong count: real mods have such ones.
+        assert!(found(true, motion, "m$0\n1\n1\n1 animmotion 0 0 0\n0\n").is_empty());
+    }
+
+    #[test]
+    fn an_anim_set_has_what_its_counts_say() {
+        let good = "V3\n1\ntrig\n1\nvar\n0\n1\n2\natk\n0\n1\nclip\natk2\n0\n2\nclip1\nclip2\n1\n1\n2\n3\n";
+        assert!(found(false, SET, good).is_empty(), "{:?}", found(false, SET, good));
+
+        // The triggers are gone: it stays readable, for the rest to be checked.
+        let no_triggers = good.replace("V3\n1\ntrig\n", "V3\n1\n");
+        assert_eq!(found(false, SET, &no_triggers), [(1, "0".to_owned())]);
+
+        let conditions = good.replace("1\nvar\n0\n1\n", "3\nvar\n0\n1\n");
+        assert_eq!(found(false, SET, &conditions), [(3, "1".to_owned())]);
+
+        let attacks = good.replace("\n2\natk\n", "\n5\natk\n");
+        assert_eq!(found(false, SET, &attacks), [(7, "2".to_owned())]);
+
+        // The first attack's clips: its one, then the next attack's trigger.
+        let clips = good.replace("atk\n0\n1\nclip\n", "atk\n0\n4\nclip\n");
+        assert_eq!(found(false, SET, &clips), [(10, "1".to_owned())]);
+        // The last attack's: up to the anim infos.
+        let clips = good.replace("atk2\n0\n2\n", "atk2\n0\n9\n");
+        assert_eq!(found(false, SET, &clips), [(14, "2".to_owned())]);
+
+        let infos = good.replace("clip2\n1\n1\n2\n3\n", "clip2\n4\n1\n2\n3\n");
+        assert_eq!(found(false, SET, &infos), [(17, "1".to_owned())]);
+    }
+
+    /// A push does not change the counts in a patch that edits, so that is no mistake there.
+    #[test]
+    fn an_edit_may_push_without_changing_the_counts() {
+        let text = "V3\n0\n0\n0\n1\n1\n2\n3\n4\n5\n6\n";
+        assert!(found(false, "A~A/_MTSolo.txt", text).is_empty());
+        assert_eq!(found(false, SET, text), [(4, "2".to_owned())]);
+
+        let motion = "346\n1\n1\n<!-- MOD_CODE ~m~ OPEN -->\n1 0 0 0\n2 0 0 0\n<!-- CLOSE -->\n1\n1 0 0 0 1\n";
+        assert!(found(true, "D~1/346.txt", motion).is_empty());
+    }
+
+    #[test]
+    fn a_quick_fix_changes_the_count_to_what_is_there() {
+        let text = "Idle\nm$0\n1\n0\n0\n\t7\n";
+        let language = AnimDataLanguage {
+            is_adsf: true,
+            id: CLIP,
+            code_action: true,
+            roles: &[],
+            cursor_line: 0,
+            trigger_names: &[],
+        };
+        let fixes = language.quick_fixes(text, 5, 0);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].new_text, "0");
+        assert_eq!(fixes[0].columns, 1..2);
+        assert!(language.quick_fixes(text, 4, 0).is_empty(), "another line");
+
+        let off = AnimDataLanguage { code_action: false, ..language };
+        assert!(off.quick_fixes(text, 5, 0).is_empty());
+    }
+
     #[test]
     fn what_does_not_fit_has_no_role() {
         assert!(roles(false, "A~A/x.txt", "V3\nnot a count\nx\n")[2..].iter().all(|role| *role == LineRole::Other));
@@ -401,7 +738,14 @@ mod tests {
     #[test]
     fn completes_by_the_role_of_the_cursor_line() {
         let roles = roles(false, "A~A/x.txt", "V3\n0\n0\n0\n1\n1\n2\n");
-        let language = AnimDataLanguage { roles: &roles, cursor_line: 7, trigger_names: &[] };
+        let language = AnimDataLanguage {
+            is_adsf: false,
+            id: "A~A/x.txt",
+            code_action: true,
+            roles: &roles,
+            cursor_line: 7,
+            trigger_names: &[],
+        };
         let list = language.complete("", 0);
         assert_eq!(list.items[0].insert, "7891816");
         assert_eq!(language.inlay_hints_at(5, "1"), ["animInfos[0].dir"]);

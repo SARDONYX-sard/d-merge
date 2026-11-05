@@ -158,7 +158,6 @@ impl App {
                     let name = &mut self.settings.ui.font.name;
                     let mut index = fonts.iter().position(|f| f == name).unwrap_or(usize::MAX);
                     let name_changed = ComboBox::from_id_salt("font_family")
-                        .width(ui.available_width())
                         .search_hint(format!("{}...", self.i18n.t(I18nKey::SearchLabel)))
                         .show_index(ui, &mut index, fonts.len(), |i| fonts.get(i).map_or("", String::as_str))
                         .changed();

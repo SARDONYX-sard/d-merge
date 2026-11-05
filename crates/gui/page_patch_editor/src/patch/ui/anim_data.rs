@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 use egui_widgets::{
     notify::Notification,
-    shadcn::{Button, TextEdit},
+    shadcn::{Button, ComboBox, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
@@ -235,12 +235,11 @@ fn project_combo(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog)
     };
     ui.horizontal(|ui| {
         ui.label(i18n.t(I18nKey::NemesisAnimDataProject));
-        let shown = dialog.projects.get(dialog.project).map(title).unwrap_or_default();
-        egui::ComboBox::from_id_salt("nemesis_anim_project").selected_text(shown).height(320.0).show_ui(ui, |ui| {
-            for (index, project) in dialog.projects.iter().enumerate() {
-                ui.selectable_value(&mut dialog.project, index, title(project));
-            }
-        });
+        let projects = &dialog.projects;
+        ComboBox::from_id_salt("nemesis_anim_project")
+            .search_hint(i18n.t(I18nKey::SearchLabel))
+            .height(320.0)
+            .show_index(ui, &mut dialog.project, projects.len(), |i| title(&projects[i]));
     });
 }
 
@@ -329,13 +328,15 @@ pub(in crate::patch) struct NewClipsForm {
     folder: String,
     name: String,
     count: usize,
+    /// What `folder` can be: its candidates. See [`anim_data::project_folders`].
+    projects: Vec<String>,
 }
 
 impl NewClipsForm {
     /// `selected`: the open file, whose actor is the likely one.
-    pub(in crate::patch) fn new(selected: Option<&str>) -> Self {
+    pub(in crate::patch) fn new(selected: Option<&str>, projects: Vec<String>) -> Self {
         let folder = selected.and_then(|id| id.split_once('/')).map_or("DefaultMale~1", |(folder, _)| folder);
-        Self { folder: folder.to_owned(), name: String::new(), count: 1 }
+        Self { folder: folder.to_owned(), name: String::new(), count: 1, projects }
     }
 
     /// `<actor>~<index>`, and a name.
@@ -344,7 +345,99 @@ impl NewClipsForm {
     }
 }
 
+/// A project that was typed, as a folder of clip data: `<name>~<number>`.
+///
+/// e.g. `Mine` -> `Mine~1`, `Mine~2` -> as it is
+fn project_folder_of(typed: &str) -> String {
+    if typed.contains('~') { typed.to_owned() } else { format!("{typed}~1") }
+}
+
+/// The project of the new clips: searched among those there are, or a new one by what is searched for.
+/// With no list (a template that is not a `.bin`), it is typed.
+fn actor_field(ui: &mut egui::Ui, i18n: &I18nMap, folder: &mut String, projects: &[String], hover: &str) {
+    if projects.is_empty() {
+        ui.add(TextEdit::singleline(folder).desired_width(220.0)).on_hover_text(hover);
+        return;
+    }
+    let mut index = projects.iter().position(|project| project == folder).unwrap_or(usize::MAX);
+    let mut created = None;
+    let new_label = i18n.t(I18nKey::NemesisNewProject);
+    let picked = ComboBox::from_id_salt("nemesis_clip_actor")
+        .selected_text(folder.as_str())
+        .search_hint(i18n.t(I18nKey::SearchLabel))
+        .show_creatable(ui, &mut index, projects.len(), |i| projects[i].as_str(), (new_label, &mut created))
+        .on_hover_text(hover);
+    if let Some(typed) = created {
+        *folder = project_folder_of(&typed);
+    } else if picked.changed() {
+        projects[index].clone_into(folder);
+    }
+}
+
+/// `Duplicate to...`: which project, searched among the others.
+#[derive(Debug)]
+pub(in crate::patch) struct DuplicateForm {
+    /// What goes there. e.g. `DefaultMale~1/Idle~mod$0.txt`
+    files: Vec<String>,
+    /// The project that usually has the same patches first.
+    projects: Vec<String>,
+    /// In `projects`.
+    picked: usize,
+}
+
+impl DuplicateForm {
+    /// `current`: the project the files are in.
+    pub(in crate::patch) fn new(files: Vec<String>, mut projects: Vec<String>, current: &str) -> Self {
+        projects.retain(|project| project != current);
+        anim_data::partner_first(&mut projects, current);
+        Self { files, projects, picked: 0 }
+    }
+}
+
 impl PatchTool {
+    /// The window of [`DuplicateForm`]: what it asks for goes on as a row's menu's does.
+    pub(in crate::patch) fn duplicate_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
+        let Some(form) = &mut self.duplicate_form else { return };
+        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        let mut go = false;
+        egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label(format!("{}: {}", i18n.t(I18nKey::NemesisDuplicateFiles), form.files.len()))
+                    .on_hover_text(form.files.join("\n"));
+                ui.horizontal(|ui| {
+                    let projects = &form.projects;
+                    ComboBox::from_id_salt("nemesis_duplicate_to")
+                        .search_hint(i18n.t(I18nKey::SearchLabel))
+                        .show_index(ui, &mut form.picked, projects.len(), |i| projects[i].as_str());
+                    go = ui
+                        .add_enabled(!projects.is_empty(), Button::new(i18n.t(I18nKey::NemesisDuplicate)).primary())
+                        .clicked();
+                });
+            });
+        if go && let Some(form) = self.duplicate_form.take() {
+            if let Some(to) = form.projects.into_iter().nth(form.picked) {
+                self.pending_duplicate = Some((form.files, to));
+            }
+            return;
+        }
+        if !open {
+            self.duplicate_form = None;
+        }
+    }
+
+    /// Where a file of the open animation data can go. The template's are read once.
+    pub(in crate::patch) fn anim_projects(&mut self) -> Vec<String> {
+        let is_adsf = self.workspace.behaviors[self.active].adsf;
+        if is_adsf && self.template_projects.is_none() {
+            self.template_projects = Some(anim_data::template_projects(Path::new(&self.template_dir)));
+        }
+        let template = if is_adsf { self.template_projects.as_deref().unwrap_or_default() } else { &[] };
+        anim_data::project_folders(&self.workspace.behaviors[self.active], template)
+    }
+
     pub(in crate::patch) fn new_clips_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         let Some(form) = &mut self.new_clips else { return };
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
@@ -356,7 +449,7 @@ impl PatchTool {
                 egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
                     let hover = i18n.t(I18nKey::NemesisClipActorHover);
                     ui.label(i18n.t(I18nKey::NemesisClipActor)).on_hover_text(hover);
-                    ui.add(TextEdit::singleline(&mut form.folder).desired_width(220.0)).on_hover_text(hover);
+                    actor_field(ui, i18n, &mut form.folder, &form.projects, hover);
                     ui.end_row();
                     let hover = i18n.t(I18nKey::NemesisClipNameHover);
                     ui.label(i18n.t(I18nKey::NemesisClipName)).on_hover_text(hover);
@@ -390,5 +483,16 @@ impl PatchTool {
         for id in &added {
             self.object_changed(id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_typed_project_is_a_folder_of_clip_data() {
+        assert_eq!(project_folder_of("Mine"), "Mine~1");
+        assert_eq!(project_folder_of("Mine~2"), "Mine~2");
     }
 }

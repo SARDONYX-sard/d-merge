@@ -77,3 +77,39 @@ impl Names {
         self.variables = vars::names(string_data, "variableNames");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    /// Added with the panel or typed into the object: the list has it.
+    #[test]
+    #[ignore = "needs the template of the repository's resource"]
+    fn an_added_event_is_listed() {
+        let path = Path::new("../../../resource/assets/templates/meshes/actors/character/behaviors/0_master.bin");
+        let mut behavior = Behavior::open(path).unwrap();
+        let mut names = Names::new(&behavior);
+        let before = names.events.len();
+        let string_data = behavior.object_of_class(STRING_DATA).unwrap().to_owned();
+        let graph_data = behavior.object_of_class(GRAPH_DATA).unwrap().to_owned();
+
+        let (string_text, graph_text) =
+            vars::add_event(behavior.text(&string_data).unwrap(), behavior.text(&graph_data).unwrap(), "myEvent")
+                .unwrap();
+        behavior.set_text(&string_data, string_text.clone());
+        behavior.set_text(&graph_data, graph_text);
+        names.apply_changes(&behavior, &[string_data.clone(), graph_data]);
+        assert_eq!(names.events.len(), before + 1);
+        assert_eq!(names.events.last().map(String::as_str), Some("myEvent"));
+
+        let typed = string_text.replace(
+            "<hkcstring>myEvent</hkcstring>",
+            "<hkcstring>myEvent</hkcstring>\n\t\t\t\t<hkcstring>typed</hkcstring>",
+        );
+        behavior.set_text(&string_data, typed);
+        names.apply_changes(&behavior, &[string_data]);
+        assert_eq!(names.events.last().map(String::as_str), Some("typed"));
+    }
+}

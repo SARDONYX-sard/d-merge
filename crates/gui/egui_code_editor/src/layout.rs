@@ -96,6 +96,12 @@ fn layout(
     let mut job = LayoutJob::default();
     job.wrap.max_width = f32::INFINITY;
 
+    // Once per line of each edit: the same three buffers, and the problems found by their line instead
+    // of going through all of them for each.
+    let (mut colors, mut underlines, mut backgrounds) = (Vec::new(), Vec::new(), Vec::new());
+    let mut by_line: Vec<&Diagnostic> = diagnostics.iter().collect();
+    by_line.sort_by_key(|diagnostic| diagnostic.line);
+
     for (line_no, line) in text.split('\n').enumerate() {
         if line_no > 0 {
             job.append("\n", 0.0, format(&font_id, default_color, None));
@@ -104,14 +110,18 @@ fn layout(
         // Per-char style; lines are short so this is simpler than merging ranges.
         // e.g., `0.5 animmotion` -> [orange x3, default, blue x10]
         let len = line.chars().count();
-        let mut colors = vec![default_color; len];
-        let mut underlines: Vec<Option<Color32>> = vec![None; len];
-        let mut backgrounds = vec![Color32::TRANSPARENT; len];
+        colors.clear();
+        colors.resize(len, default_color);
+        underlines.clear();
+        underlines.resize(len, None);
+        backgrounds.clear();
+        backgrounds.resize(len, Color32::TRANSPARENT);
 
         for (columns, color) in language.highlight(line, visuals) {
             fill(&mut colors, columns, color);
         }
-        for diagnostic in diagnostics.iter().filter(|d| d.line == line_no) {
+        let first = by_line.partition_point(|diagnostic| diagnostic.line < line_no);
+        for diagnostic in by_line[first..].iter().take_while(|diagnostic| diagnostic.line == line_no) {
             // An empty range (e.g., a missing value at the line end) still gets one visible char.
             let start = diagnostic.columns.start;
             let end = diagnostic.columns.end.max(start + 1);

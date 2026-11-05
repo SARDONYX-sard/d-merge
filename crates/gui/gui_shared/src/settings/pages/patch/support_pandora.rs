@@ -92,17 +92,21 @@ pub struct Pandora {
 impl Pandora {
     /// Imports Pandora configuration into d-merge VFS settings.
     ///
+    /// Only the mods in the list now get their state. The data directory may have changed, so what is
+    /// returned is to be [applied](Self::apply_to) again once the list is read from it.
+    ///
     /// # Errors
     ///
     /// Returns an error if Pandora files cannot be read or parsed, if the
     /// selected Pandora version is unsupported, or if duplicate Pandora mod
     /// codes are found.
-    pub fn import_to<P>(root: P, settings: &mut PatchSettings, version: PandoraVersion) -> Result<(), String>
+    pub fn import_to<P>(root: P, settings: &mut PatchSettings, version: PandoraVersion) -> Result<Self, String>
     where
         P: AsRef<Path>,
     {
         let pandora = Self::load(root, version)?;
-        pandora.apply_to(settings)
+        pandora.apply_to(settings)?;
+        Ok(pandora)
     }
 
     /// Exports the d-merge VFS settings as Pandora configuration.
@@ -211,7 +215,11 @@ impl Pandora {
         Ok(Self { settings: pandora_settings, active_mods })
     }
 
-    fn apply_to(&self, settings: &mut PatchSettings) -> Result<(), String> {
+    /// Gives the VFS settings the directories, and the Nemesis mods of the list their state and order.
+    ///
+    /// # Errors
+    /// Pandora's list has a mod code twice.
+    pub fn apply_to(&self, settings: &mut PatchSettings) -> Result<(), String> {
         settings.vfs.skyrim_data_dir = self.settings.games.skyrim_se.game_data_path.clone();
         settings.vfs.output_dir = self.settings.games.skyrim_se.output_path.clone();
 
@@ -263,5 +271,47 @@ impl Pandora {
         });
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::pages::patch::mod_item::ModItem;
+
+    fn item(id: &str) -> ModItem {
+        ModItem { id: id.to_owned(), enabled: true, mod_type: ModType::Nemesis, ..Default::default() }
+    }
+
+    fn state(settings: &PatchSettings) -> Vec<(&str, bool, usize)> {
+        settings.vfs.mod_list.iter().map(|item| (item.id.as_str(), item.enabled, item.priority)).collect()
+    }
+
+    /// The list may be of another data directory at first: applied again, the mods that were not in it
+    /// get their state too.
+    #[test]
+    fn applying_again_reaches_the_mods_of_the_new_list() {
+        let game = PandoraGameSettings { game_data_path: "D:/Data".to_owned(), output_path: "D:/out".to_owned() };
+        let active = |code: &str, active, priority| PandoraActiveMod { code: code.to_owned(), active, priority };
+        let pandora = Pandora {
+            settings: PandoraSettings {
+                app: PandoraAppSettings { theme: 0 },
+                games: PandoraGamesSettings { skyrim_se: game },
+            },
+            active_mods: vec![active("new1", true, 1), active("old1", true, 2), active("new2", false, 3)],
+        };
+        let mut settings = PatchSettings::default();
+        settings.vfs.mod_list = vec![item("old1")];
+        pandora.apply_to(&mut settings).unwrap();
+        assert_eq!(state(&settings), [("old1", true, 0)]);
+        assert_eq!(settings.vfs.skyrim_data_dir, "D:/Data");
+
+        settings.vfs.mod_list = vec![item("old1"), item("new2"), item("new1"), item("other")];
+        pandora.apply_to(&mut settings).unwrap();
+        assert_eq!(
+            state(&settings),
+            [("new1", true, 0), ("old1", true, 1), ("new2", false, 2), ("other", false, 3)],
+            "what Pandora does not know is off and last"
+        );
     }
 }

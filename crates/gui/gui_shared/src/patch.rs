@@ -134,13 +134,22 @@ pub struct PatchProgressSnapshot {
 /// The mod code of the user patch: what the conflict tool writes, and what loads last.
 pub const USER_PATCH_CODE: &str = "upatch";
 
-/// Where the user patch is written: next to the settings, so each profile of a mod manager has its
-/// own, as the app runs from the profile's directory. Not among the mods, like MO2's overwrite.
-pub const USER_PATCH_OUTPUT: &str = "./.d_merge/user_patch";
+/// What the conflict check names the user patch by. It is not in the mod list, which can be reordered
+/// and is saved: a switch turns it on, and it always loads last. See `apply_user_patch` of the settings.
+pub const USER_PATCH_ID: &str = "user_patch";
 
-/// The user patch's patch directory. It is not in the mod list, which can be reordered and is
-/// saved: a switch turns it on, and it always loads last. See `apply_user_patch` of the settings.
-pub const USER_PATCH_MOD_DIR: &str = "./.d_merge/user_patch/Nemesis_Engine/mod/upatch";
+/// Where the user patch is written, in the patch page's output directory: each profile has its own
+/// output, and its own conflicts. Not among the mods, like MO2's overwrite.
+///
+/// e.g. `D:/out` -> `D:/out/.d_merge/user_patch`
+pub fn user_patch_output(output_dir: &str) -> std::path::PathBuf {
+    std::path::Path::new(output_dir).join(".d_merge").join("user_patch")
+}
+
+/// The user patch's patch directory. e.g. `D:/out/.d_merge/user_patch/Nemesis_Engine/mod/upatch`
+pub fn user_patch_mod_dir(output_dir: &str) -> std::path::PathBuf {
+    user_patch_output(output_dir).join("Nemesis_Engine").join("mod").join(USER_PATCH_CODE)
+}
 
 /// A conflict's value to keep, from the patch page to the Patch Editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,4 +162,16 @@ pub struct ResolveRequest {
     pub mod_dir: String,
     /// `false`: the value goes in at once (`Use this`). `true`: to the editor as well, to change it.
     pub edit: bool,
+    /// When editing: every mod with a value there, to make the result from. e.g., of an array, where the
+    /// elements of several mods are wanted.
+    pub sides: Vec<ResolveSide>,
+}
+
+/// A mod with a value at a conflict. See [`ResolveRequest::sides`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolveSide {
+    /// What it is shown as, e.g. `Paraglider`
+    pub name: String,
+    /// e.g. `D:/mods/a/Nemesis_Engine/mod/a`
+    pub mod_dir: String,
 }

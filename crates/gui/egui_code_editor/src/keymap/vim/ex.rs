@@ -2,6 +2,12 @@
 //!
 //! ```text
 //! :w  :write  :wq  :x        save (the host decides what that means)
+//! :tabn  :tabnext  :bn  :bnext        the next tab
+//! :tabp  :tabprevious  :bp  :bprevious  the previous tab
+//! :tabc  :tabclose  :bd  :q  :quit    close the tab
+//! :fmt  :format                format the document
+//! :preview  :pre              show or hide the preview beside the editor
+//! :diff                       show or hide the changes inside the editor
 //! :<n>                       go to line n
 //! :[range]s/pat/rep/[g]      substitute (plain text, smartcase; `g`: every match in a line)
 //! :[range]sort[!] [u]        sort lines (`!`: reverse, `u`: drop duplicates)
@@ -11,7 +17,8 @@
 //! :reg  :registers           show the registers
 //! :delm[arks] {a-z}          delete marks
 //! ```
-//! `range`: `%` (all lines), `'<,'>` (the last Visual selection), `n`, `n,m`, `.`, `$`
+//! `range`: `%` (all lines), `'<,'>` (the last Visual selection), `n`, `n,m`, `.`, `$`, `+n`, `-n`
+//! (lines from the cursor, stopping at the first and the last)
 //! e.g., `:%s/old/new/g`, `:'<,'>sort`, `:3,5d`
 
 use super::{Mode, VimState, buffer::Buffer, command::Operator, exec::Exec, prompt::LastSearch};
@@ -39,6 +46,7 @@ impl VimState {
                 exec.output.command = Some(EditorCommand::Save);
             }
             "noh" | "nohl" | "nohlsearch" => self.hlsearch = false,
+            _ if host_command(command).is_some() => exec.output.command = host_command(command),
             "u" | "undo" => self.undo_redo(true, exec),
             "red" | "redo" => self.undo_redo(false, exec),
             "reg" | "registers" | "di" | "display" => self.message = Some(self.registers.list()),
@@ -175,8 +183,27 @@ impl VimState {
     }
 }
 
-/// `5`, `.`, `$` at the start of `s` -> (0-based line, rest).
+/// What an Ex command asks of the host, if it does.
+fn host_command(command: &str) -> Option<EditorCommand> {
+    Some(match command {
+        "tabn" | "tabnext" | "bn" | "bnext" => EditorCommand::NextTab,
+        "tabp" | "tabprevious" | "tabN" | "tabNext" | "bp" | "bprevious" => EditorCommand::PreviousTab,
+        "tabc" | "tabclose" | "bd" | "bdelete" | "q" | "quit" => EditorCommand::CloseTab,
+        "fmt" | "format" => EditorCommand::Format,
+        "preview" | "pre" => EditorCommand::TogglePreview,
+        "diff" => EditorCommand::ToggleInlineDiff,
+        _ => return None,
+    })
+}
+
+/// `5`, `.`, `$`, `+5`, `-5` at the start of `s` -> (0-based line, rest). `+` and `-` alone: one line.
 fn parse_address(s: &str, current: usize, last: usize) -> (Option<usize>, &str) {
+    if let Some(rest) = s.strip_prefix(['+', '-']) {
+        let digits = rest.chars().take_while(char::is_ascii_digit).count();
+        let count = rest[..digits].parse().unwrap_or(1);
+        let line = if s.starts_with('+') { current.saturating_add(count) } else { current.saturating_sub(count) };
+        return (Some(line.min(last)), &rest[digits..]);
+    }
     if let Some(rest) = s.strip_prefix('.') {
         return (Some(current), rest);
     }
@@ -218,9 +245,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn what_the_host_is_asked_for() {
+        assert_eq!(host_command("tabn"), Some(EditorCommand::NextTab));
+        assert_eq!(host_command("bprevious"), Some(EditorCommand::PreviousTab));
+        assert_eq!(host_command("q"), Some(EditorCommand::CloseTab));
+        assert_eq!(host_command("fmt"), Some(EditorCommand::Format));
+        assert_eq!(host_command("preview"), Some(EditorCommand::TogglePreview));
+        assert_eq!(host_command("diff"), Some(EditorCommand::ToggleInlineDiff));
+        assert_eq!(host_command("d"), None, "delete a line");
+    }
+
+    #[test]
     fn addresses_and_commands() {
         assert_eq!(parse_address("3,5d", 0, 9), (Some(2), ",5d"));
         assert_eq!(parse_address("$", 0, 9), (Some(9), ""));
+        // From the cursor, and no further than there are lines.
+        assert_eq!(parse_address("+3", 2, 9), (Some(5), ""));
+        assert_eq!(parse_address("-1", 2, 9), (Some(1), ""));
+        assert_eq!(parse_address("+1200", 2, 9), (Some(9), ""));
+        assert_eq!(parse_address("-1200", 2, 9), (Some(0), ""));
+        assert_eq!(parse_address("+", 2, 9), (Some(3), ""));
+        assert_eq!(parse_address("-2d", 2, 9), (Some(0), "d"));
         assert_eq!(strip_command("s/a/b/g", &["substitute", "s"]), Some("/a/b/g"));
         assert_eq!(strip_command("sort u", &["substitute", "s"]), None);
         assert_eq!(strip_command("sort u", &["sort"]), Some("u"));

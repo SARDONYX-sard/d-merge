@@ -37,15 +37,14 @@ impl App {
         }
     }
 
-    /// `Use this` decides here and now; `Edit...` goes on in the editor.
+    /// `Use this` decides here and now; `Edit...` goes on in the window of the user patch.
     fn take_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
+        let paths = patch_paths(&self.settings.pages.patch);
         if request.edit {
-            self.patch_editor.open_resolution(request);
-            self.pending_page = Some(gui_shared::settings::ui::Page::PatchEditor);
+            self.patch_editor.open_resolution(request, paths, &mut self.notify, &self.i18n);
             return;
         }
-        let template_dir = &self.settings.pages.patch.behavior.template_dir;
-        match self.patch_editor.resolve_now(&request, template_dir, &self.i18n) {
+        match self.patch_editor.resolve_now(&request, paths, &mut self.notify, &self.i18n) {
             Ok(()) => self.notify.success(self.i18n.t(gui_shared::i18n::I18nKey::ConflictResolved)),
             Err(err) => {
                 self.notify.error(format!("{}: {err}", self.i18n.t(gui_shared::i18n::I18nKey::NemesisResolveFailed)));
@@ -55,10 +54,14 @@ impl App {
 
     /// The window of the user patch: it stays when another page is shown.
     pub(crate) fn ui_user_patch_window(&mut self, ctx: &egui::Context) {
-        let outcome = self.patch_editor.user_patch_window(ctx, &self.i18n, &mut self.notify);
-        if outcome.open_editor {
-            self.pending_page = Some(gui_shared::settings::ui::Page::PatchEditor);
-        }
+        self.patch_editor.user_patch_window(
+            ctx,
+            &self.i18n,
+            &mut self.notify,
+            patch_paths(&self.settings.pages.patch),
+            &mut self.settings.pages.patch_editor,
+            &mut self.settings.ui.lsp,
+        );
     }
 
     pub(crate) fn ui_convert_page(&mut self, ui: &mut egui::Ui) {
@@ -88,11 +91,19 @@ impl App {
             panel_frame: self.panel_frame(),
             i18n: &self.i18n,
             notify: &mut self.notify,
-            template_dir: &self.settings.pages.patch.behavior.template_dir,
-            parser_mode: self.settings.pages.patch.behavior.parser_mode,
+            paths: patch_paths(&self.settings.pages.patch),
             settings: &mut self.settings.pages.patch_editor,
             editor: &mut self.settings.ui.lsp,
         };
         self.patch_editor.ui(ui, ctx);
+    }
+}
+
+/// What the Patch Editor needs of the patch page's settings.
+fn patch_paths(patch: &gui_shared::settings::pages::patch::PatchSettings) -> page_patch_editor::PatchPaths<'_> {
+    page_patch_editor::PatchPaths {
+        patch_output_dir: patch.current_output_dir(),
+        template_dir: &patch.behavior.template_dir,
+        parser_mode: patch.behavior.parser_mode,
     }
 }

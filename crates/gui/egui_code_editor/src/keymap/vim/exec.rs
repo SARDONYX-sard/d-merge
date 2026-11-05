@@ -211,6 +211,7 @@ impl VimState {
             Simple::Hover => exec.output.show_hover = true,
             Simple::OpenUrl => self.open_url(exec),
             Simple::ToggleExplorer => exec.output.command = Some(EditorCommand::ToggleExplorer),
+            Simple::Ask(command) => exec.output.command = Some(command),
             Simple::GoTo { references } => {
                 exec.output.command =
                     Some(if references { EditorCommand::FindReferences } else { EditorCommand::GoToDefinition });

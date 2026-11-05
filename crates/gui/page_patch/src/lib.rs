@@ -26,10 +26,10 @@ use std::sync::atomic::AtomicBool;
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::{ResolveRequest, USER_PATCH_MOD_DIR},
+    patch::{ResolveRequest, USER_PATCH_ID, user_patch_mod_dir},
     settings::{
         DataMode, LogSettings,
-        pages::patch::{PatchSettings, mod_item},
+        pages::patch::{PatchSettings, mod_item, support_pandora::Pandora},
     },
 };
 
@@ -98,6 +98,8 @@ pub struct PatchPage {
     user_patch_toggle: bool,
     /// The window of `ui::pandora` is open.
     pandora_open: bool,
+    /// Imported, and to be applied again once the VFS mod list is read: see [`Pandora::import_to`].
+    pandora_import: Option<Pandora>,
 }
 
 impl Default for PatchPage {
@@ -111,12 +113,13 @@ impl Default for PatchPage {
             prev_table_width: 0.0,
             list_message: Notification::default(),
             first_frame: true,
-            conflicts: ConflictScan::with_hidden(hidden::load()),
+            conflicts: ConflictScan::with_hidden(behavior_merge::HiddenPatches::default()),
             rescan_wanted: false,
             is_background_scan: false,
             resolve: None,
             user_patch_toggle: false,
             pandora_open: false,
+            pandora_import: None,
         }
     }
 }
@@ -130,10 +133,12 @@ impl PatchPage {
         if self.run.poll(ctx.notify, ctx.i18n) {
             self.conflicts.on_merge_ended();
         }
-        if let Some(count) = self.conflicts.poll()
+        self.conflicts.follow_output(ctx.settings.current_output_dir());
+        if let Some((count, elapsed)) = self.conflicts.poll()
             && !std::mem::take(&mut self.is_background_scan)
         {
-            ctx.notify.success(format!("{}: {count}", ctx.i18n.t(I18nKey::ConflictDone)));
+            let seconds = elapsed.as_secs_f32();
+            ctx.notify.success(format!("{}: {count} ({seconds:.2}s)", ctx.i18n.t(I18nKey::ConflictDone)));
         }
         if self.conflicts.is_scanning() {
             // The worker that reads the files has no way to wake the app.
@@ -199,10 +204,10 @@ impl PatchPage {
         let mut mods: Vec<ScannedMod> = mods.collect();
         if run::uses_user_patch(settings) {
             mods.push(ScannedMod {
-                id: USER_PATCH_MOD_DIR.to_owned(),
+                id: USER_PATCH_ID.to_owned(),
                 name: "User Patch".to_owned(),
                 priority: run::user_patch_priority(settings.mod_list()),
-                dir: Some(USER_PATCH_MOD_DIR.to_owned()),
+                dir: Some(user_patch_mod_dir(settings.current_output_dir()).display().to_string()),
             });
         }
         self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods);
@@ -230,6 +235,8 @@ impl PatchPage {
                 let new_mods = mod_item::inherit_reorder_cast(settings.mod_list(), mods);
                 self.check_all = new_mods.iter().all(|m| m.enabled);
                 *settings.mod_list_mut() = new_mods;
+                self.apply_pandora_import(settings, notify);
+                self.check_all = settings.mod_list().iter().all(|m| m.enabled);
                 self.visible.invalidate();
                 self.list_message.success(timed(I18nKey::ModsListFetchStateDone, elapsed));
 
@@ -238,8 +245,32 @@ impl PatchPage {
                     self.run.start(egui_ctx, settings, notify, i18n, runtime);
                 }
             }
-            FetchEvent::Empty { elapsed } => self.list_message.info(timed(I18nKey::ModsListFetchStateEmpty, elapsed)),
-            FetchEvent::Failed { elapsed } => self.list_message.error(timed(I18nKey::ModsListFetchStateError, elapsed)),
+            FetchEvent::Empty { elapsed } => {
+                self.forget_pandora_import(settings);
+                self.list_message.info(timed(I18nKey::ModsListFetchStateEmpty, elapsed));
+            }
+            FetchEvent::Failed { elapsed } => {
+                self.forget_pandora_import(settings);
+                self.list_message.error(timed(I18nKey::ModsListFetchStateError, elapsed));
+            }
+        }
+    }
+
+    /// The VFS mod list was just read: the mods of the import that were not in it get their state.
+    /// Only once: after this the order is the user's. A list of the other mode leaves it waiting.
+    fn apply_pandora_import(&mut self, settings: &mut PatchSettings, notify: &mut Notification) {
+        if settings.behavior.mode != DataMode::Vfs {
+            return;
+        }
+        if let Some(Err(err)) = self.pandora_import.take().map(|pandora| pandora.apply_to(settings)) {
+            notify.error(err);
+        }
+    }
+
+    /// There is no VFS list to apply it to: a later reading must not undo what the user did until then.
+    fn forget_pandora_import(&mut self, settings: &PatchSettings) {
+        if settings.behavior.mode == DataMode::Vfs {
+            self.pandora_import = None;
         }
     }
 

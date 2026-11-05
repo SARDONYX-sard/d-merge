@@ -9,7 +9,7 @@ use behavior_merge::PatchMaps;
 use egui_widgets::notify::{Notification, NotificationColor};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::{PatchProgress, USER_PATCH_MOD_DIR, phase},
+    patch::{PatchProgress, phase, user_patch_mod_dir},
     settings::pages::patch::{
         PatchSettings,
         behavior::{BehaviorSettings, DataMode, ParserMode},
@@ -109,7 +109,8 @@ impl PatchRun {
         };
         let mut patches = to_patches(skyrim_data_dir, is_vfs, mod_list);
         if uses_user_patch(settings) {
-            patches.nemesis_entries.insert(USER_PATCH_MOD_DIR.to_owned(), user_patch_priority(mod_list));
+            let dir = user_patch_mod_dir(settings.current_output_dir()).display().to_string();
+            patches.nemesis_entries.insert(dir, user_patch_priority(mod_list));
         }
 
         let BehaviorSettings { target_runtime, generate_fnis_esp, skeleton_arm_fix, template_dir, parser_mode, .. } =
@@ -134,7 +135,7 @@ impl PatchRun {
             skeleton_arm_fix: *skeleton_arm_fix,
             // A conflict check sees them, to tell what is hidden.
             hidden_patches: if settings.behavior.apply_user_patch && !debug_only {
-                crate::hidden::load()
+                crate::hidden::load(settings.current_output_dir())
             } else {
                 behavior_merge::HiddenPatches::default()
             },
@@ -263,7 +264,8 @@ const fn to_nemesis_parser_mode(mode: ParserMode) -> behavior_merge::ParserMode 
 
 /// The user patch is merged: it is on, and has been written.
 pub(crate) fn uses_user_patch(settings: &PatchSettings) -> bool {
-    settings.behavior.apply_user_patch && std::path::Path::new(USER_PATCH_MOD_DIR).is_dir()
+    let output = settings.current_output_dir();
+    settings.behavior.apply_user_patch && !output.trim().is_empty() && user_patch_mod_dir(output).is_dir()
 }
 
 /// After every mod of the list, on or off: it loads last, so what it says wins.

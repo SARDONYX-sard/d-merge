@@ -9,8 +9,6 @@
 //! para   D:/mods/Paraglider
 //! ```
 
-use std::path::Path;
-
 use egui_widgets::{
     PathRow,
     notify::Notification,
@@ -19,10 +17,7 @@ use egui_widgets::{
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::top_bar::{PATH_ACTIONS, recent_list};
-use crate::patch::{
-    PatchTool,
-    workspace::{CACHE_ROOT, Workspace},
-};
+use crate::patch::{PatchTool, workspace::Workspace};
 
 impl PatchTool {
     pub(in crate::patch) fn start_screen(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
@@ -30,11 +25,20 @@ impl PatchTool {
         ui.heading(i18n.t(I18nKey::PagePatchEditor));
         ui.weak(i18n.t(I18nKey::NemesisStartHint));
         ui.add_space(8.0);
-        self.start_buttons(ui, i18n, notify);
-        self.new_work_form(ui, i18n, notify);
+        let has_output = !self.patch_output.is_empty();
+        if !has_output {
+            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
+            ui.add_space(8.0);
+        }
+        // A work is kept in that directory.
+        ui.add_enabled_ui(has_output, |ui| {
+            self.start_buttons(ui, i18n, notify);
+            self.new_work_form(ui, i18n, notify);
+        });
         ui.add_space(12.0);
         ui.strong(i18n.t(I18nKey::NemesisOpenRecent));
-        if let Some(work) = recent_list(ui, &self.recent, i18n) {
+        let picked = ui.add_enabled_ui(has_output, |ui| recent_list(ui, &self.recent, i18n)).inner;
+        if let Some(work) = picked {
             self.open_recent(&work, notify, i18n);
         }
     }
@@ -74,7 +78,7 @@ impl PatchTool {
             notify.error(err);
         }
 
-        let problem = form.problem(|code| Workspace::exists(Path::new(CACHE_ROOT), code));
+        let problem = form.problem(|code| Workspace::exists(&self.cache_root, code));
         let (mut create, mut cancel) = (false, false);
         ui.horizontal(|ui| {
             create = ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();

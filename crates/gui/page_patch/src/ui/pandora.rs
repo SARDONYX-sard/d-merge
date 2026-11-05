@@ -75,9 +75,10 @@ impl PatchView<'_> {
         let settings = &mut *self.ctx.settings;
         let dir = settings.pandora.output_dir.clone();
         match Pandora::import_to(&dir, settings, settings.pandora.version) {
-            Ok(()) => {
+            Ok(pandora) => {
                 self.ctx.notify.success(format!("Imported Pandora settings from {dir}"));
-                // The data directory may be another one now.
+                // The data directory may be another one now, with mods the list did not have yet.
+                self.page.pandora_import = Some(pandora);
                 self.page.fetch_mods(self.ctx.settings);
             }
             Err(err) => self.ctx.notify.error(err),

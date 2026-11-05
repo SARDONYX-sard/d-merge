@@ -33,36 +33,68 @@ const MODAL_SHARE: Vec2 = Vec2::new(0.8, 0.85);
 const MODAL_OVERLAY_ALPHA: u8 = 160;
 
 /// A window that takes most of the app's, in its center, with the rest dimmed: for what is read at
-/// length. It closes with its `x`, `Esc`, or a click beside it, which all set `open` to `false`.
+/// length.
 ///
-/// Returns what `content` returned, unless it is closed.
+/// It closes with its `x`, a click beside it, or `Esc` unless a widget has the keyboard: that key is
+/// the widget's, e.g. Vim's in an editor.
+#[derive(Debug)]
+#[must_use = "Call `show` to draw it"]
+pub struct Modal {
+    title: egui::WidgetText,
+    to_top: bool,
+}
+
+impl Modal {
+    pub fn new(title: impl Into<egui::WidgetText>) -> Self {
+        Self { title: title.into(), to_top: false }
+    }
+
+    /// Comes above the other windows on this frame, e.g. another modal it was opened from.
+    pub const fn to_top(mut self, to_top: bool) -> Self {
+        self.to_top = to_top;
+        self
+    }
+
+    /// Returns what `content` returned, unless it is closed.
+    pub fn show<R>(self, ctx: &egui::Context, open: &mut bool, content: impl FnOnce(&mut egui::Ui) -> R) -> Option<R> {
+        if !*open {
+            return None;
+        }
+        let esc = ctx.input(|input| input.key_pressed(egui::Key::Escape));
+        if modal_overlay(ctx).clicked() || (esc && ctx.memory(|memory| memory.focused().is_none())) {
+            *open = false;
+            return None;
+        }
+        let id = egui::Id::NULL.with(("modal", self.title.text()));
+        if self.to_top {
+            ctx.move_to_top(egui::LayerId::new(egui::Order::Middle, id));
+        }
+        let size = ctx.content_rect().size() * MODAL_SHARE;
+        egui::Window::new(self.title)
+            .id(id)
+            .open(open)
+            .collapsible(false)
+            .fixed_size(size)
+            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+            .show(ctx, |ui| {
+                let inner = content(ui);
+                // A window takes the size of its contents, and is centered with that: however little
+                // they are, it stays large and in the center.
+                ui.allocate_space(ui.available_size());
+                inner
+            })
+            .and_then(|response| response.inner)
+    }
+}
+
+/// A [`Modal`] with nothing more to it.
 pub fn show_modal<R>(
     ctx: &egui::Context,
     title: impl Into<egui::WidgetText>,
     open: &mut bool,
     content: impl FnOnce(&mut egui::Ui) -> R,
 ) -> Option<R> {
-    if !*open {
-        return None;
-    }
-    if modal_overlay(ctx).clicked() || ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
-        *open = false;
-        return None;
-    }
-    let size = ctx.content_rect().size() * MODAL_SHARE;
-    egui::Window::new(title)
-        .open(open)
-        .collapsible(false)
-        .fixed_size(size)
-        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-        .show(ctx, |ui| {
-            let inner = content(ui);
-            // A window takes the size of its contents, and is centered with that: however little
-            // they are, it stays large and in the center.
-            ui.allocate_space(ui.available_size());
-            inner
-        })
-        .and_then(|response| response.inner)
+    Modal::new(title).show(ctx, open, content)
 }
 
 /// Draws the dimmed backdrop. The response tells whether it was clicked.

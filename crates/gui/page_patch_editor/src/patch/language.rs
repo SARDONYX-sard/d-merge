@@ -104,6 +104,8 @@ pub(crate) type FieldValues = HashMap<String, Vec<String>>;
 /// The names and values to complete with.
 #[derive(Debug)]
 pub(crate) struct NemesisXml<'a> {
+    /// `LspOptions::code_action`
+    pub(super) code_action: bool,
     pub(crate) events: &'a [String],
     pub(crate) variables: &'a [String],
     /// The type of each variable by index, e.g. `REAL`.
@@ -113,6 +115,8 @@ pub(crate) struct NemesisXml<'a> {
     pub(crate) graph: &'a Graph,
     /// The class around the cursor and its XML fields (class schema).
     pub(crate) fields: Option<(&'a str, &'a [&'static FieldSchema])>,
+    /// The array of pointers the cursor line is an element of: what its objects have to be.
+    pub(crate) pointer_field: Option<&'static FieldSchema>,
     /// Every object, for go-to-definition and find-references.
     pub(crate) behavior: &'a Behavior,
 }
@@ -171,10 +175,15 @@ impl Language for NemesisXml<'_> {
             && let Some(name) = field_name_of(line)
             && let Some(field) = fields.iter().find(|field| field.name == name)
         {
-            doc.push_str(&field_hover(&class, field, line));
+            doc.push_str(&field_hover(&class, field));
         }
         let doc = doc.trim_end();
         (!doc.is_empty()).then(|| doc.to_owned())
+    }
+
+    /// Indents as the templates do, so that it adds nothing to the patch.
+    fn format(&self, text: &str) -> Option<String> {
+        nemesis_diff::format_object(text)
     }
 
     /// `#0106`: that object. `$eventID[x]$`: the line of `x` in the names object.
@@ -229,6 +238,9 @@ impl Language for NemesisXml<'_> {
     /// At the `<hkobject>` line: its signature. Anywhere: the fields the object lacks.
     fn quick_fixes(&self, text: &str, line: usize, _column: usize) -> Vec<QuickFix> {
         let mut fixes = Vec::new();
+        if !self.code_action {
+            return fixes;
+        }
         if let Some(source) = text.split('\n').nth(line)
             && let Some(new_text) = schema::line_with_signature(source)
         {
@@ -407,7 +419,6 @@ impl NemesisXml<'_> {
 
     /// In the value of a pointer field: `null` and the objects of the field's class (or a subclass).
     fn pointer_value(&self, before: &str, column: usize) -> Option<CompletionList> {
-        use nemesis_diff::schema::is_subclass;
         let open = before.rfind("<hkparam name=\"")?;
         let rest = &before[open + "<hkparam name=\"".len()..];
         let (name, value) = rest.split_once('"')?;
@@ -418,10 +429,7 @@ impl NemesisXml<'_> {
         }
         let typed = value.rsplit(char::is_whitespace).next().unwrap_or_default();
         let typed_lower = typed.to_lowercase();
-        let fits = |doc: &str| {
-            let class = doc.split_whitespace().next().unwrap_or_default();
-            field.class.is_none_or(|expected| is_subclass(class, expected))
-        };
+        let fits = |doc: &str| schema::pointer_accepts(field, class_of_doc(doc));
         let null = (field.kind == TypeKind::Pointer && "null".starts_with(&typed_lower))
             .then(|| item("null", "∅", "null".to_string(), "No object".to_string()));
         let graph = self.graph;
@@ -438,7 +446,7 @@ impl NemesisXml<'_> {
         Some(CompletionList { replace: column - typed.chars().count()..column, items })
     }
 
-    /// A `#...` token being typed.
+    /// A `#...` token being typed. On a line of an array of pointers, only what the array can hold.
     fn pointer(&self, before: &str, column: usize) -> Option<CompletionList> {
         let token_start = before.rfind('#')?;
         let typed = &before[token_start..];
@@ -447,8 +455,10 @@ impl NemesisXml<'_> {
         }
         let typed_lower = typed.to_lowercase();
         let graph = self.graph;
+        let fits = |doc: &str| self.pointer_field.is_none_or(|field| schema::pointer_accepts(field, class_of_doc(doc)));
         let items = graph
             .nodes()
+            .filter(|&node| fits(graph.doc(node)))
             .filter(|&node| {
                 graph.id(node).to_lowercase().starts_with(&typed_lower)
                     || (typed.len() > 1 && graph.doc(node).to_lowercase().contains(&typed_lower[1..]))
@@ -513,20 +523,14 @@ fn class_hover(class: &str) -> String {
     doc
 }
 
-/// Hovering a field: what it is and what it holds now. The values it could hold are for the
-/// completion: a hover tells what is there.
+/// Hovering a field: what it is. What it holds is on the line, and the values it could hold are for
+/// the completion.
 ///
-/// e.g., `hkbClipGenerator.flags: Flags(Int8)`, `Now: FLAG_A|FLAG_B`
-fn field_hover(class: &str, field: &FieldSchema, line: &str) -> String {
+/// e.g., `hkbClipGenerator.flags: Flags(Int8)`
+fn field_hover(class: &str, field: &FieldSchema) -> String {
     let mut doc = format!("⟦class|{class}⟧.**{}**: `{}`", field.name, schema::type_label(field));
     if let Some(target) = field.class {
         doc.push_str(&format!(" → ⟦class|{target}⟧"));
-    }
-    let value = line.split_once('>').and_then(|(_, rest)| rest.split_once("</hkparam>")).map(|(value, _)| value.trim());
-    if let Some(value) = value.filter(|value| !value.is_empty())
-        && !field.values.is_empty()
-    {
-        doc.push_str(&format!("\n\nNow: `{value}`"));
     }
     doc
 }
@@ -579,6 +583,11 @@ pub(super) fn trigger_completion(names: &[String], before: &str, column: usize) 
 }
 
 /// A `#id` candidate, described by its class and name.
+/// The class in an object's text for completion. e.g. `hkbModifierList  GetUpModList` -> `hkbModifierList`
+fn class_of_doc(doc: &str) -> &str {
+    doc.split_whitespace().next().unwrap_or_default()
+}
+
 fn pointer_item(graph: &Graph, node: super::tree::Node) -> CompletionItem {
     let id = graph.id(node);
     item(id, "→", id.to_owned(), graph.doc(node).to_owned())

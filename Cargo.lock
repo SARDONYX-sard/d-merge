@@ -4029,6 +4029,7 @@ dependencies = [
  "hkx_io",
  "nemesis_diff",
  "phf 0.14.0",
+ "rayon",
  "rmp-serde",
  "serde",
  "serde_hkx_for_gui",

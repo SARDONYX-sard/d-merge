@@ -23,7 +23,7 @@ use crate::patch::{
 
 /// A kind of file, in the order they are shown. See [`AdsfFile`], [`AsdsfFile`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum FileKind {
+pub(in crate::patch) enum FileKind {
     Header,
     Clip,
     Motion,
@@ -37,7 +37,7 @@ impl FileKind {
     const ALL: [Self; 5] = [Self::Header, Self::Clip, Self::Motion, Self::Set, Self::NewSet];
 
     /// `is_adsf`: which of the two templates the file `id` is of.
-    fn of(is_adsf: bool, id: &str) -> Self {
+    pub(super) fn of(is_adsf: bool, id: &str) -> Self {
         if is_adsf {
             match AdsfFile::of(id) {
                 AdsfFile::ProjectNamesHeader | AdsfFile::AnimHeader => Self::Header,
@@ -156,6 +156,27 @@ pub(super) fn reveal(open: &mut HashSet<String>, is_adsf: bool, id: &str) {
     open.insert(folder.to_owned());
 }
 
+/// Opens a folder and each kind of file in it.
+pub(super) fn expand(open: &mut HashSet<String>, folder: &str) {
+    open.insert(folder.to_owned());
+    open.extend(FileKind::ALL.map(|kind| kind.key(folder)));
+}
+
+/// Closes a folder and each kind of file in it, so that it opens as it starts.
+pub(super) fn collapse(open: &mut HashSet<String>, folder: &str) {
+    open.remove(folder);
+    for kind in FileKind::ALL {
+        open.remove(&kind.key(folder));
+    }
+}
+
+/// `Expand all` above the list: opens every folder there is.
+pub(super) fn expand_all(open: &mut HashSet<String>, files: &[AnimFile<'_>]) {
+    for group in files.chunk_by(|a, b| split_id(a.id).0 == split_id(b.id).0) {
+        expand(open, split_id(group[0].id).0);
+    }
+}
+
 /// A click on a folder or a group.
 pub(super) fn toggle(open: &mut HashSet<String>, key: &str) {
     if !open.remove(key) {
@@ -221,6 +242,29 @@ mod tests {
         assert_eq!(count_files(&rows(&FILES, &open, true, false)), 0);
         toggle(&mut open, "A~1");
         assert_eq!(count_files(&rows(&FILES, &open, true, false)), 1);
+    }
+
+    #[test]
+    fn a_folder_opens_and_closes_with_all_in_it() {
+        let mut open = HashSet::default();
+        expand(&mut open, "A~1");
+        assert_eq!(count_files(&rows(&FILES, &open, true, false)), 3);
+        assert!(
+            !rows(&FILES, &open, true, false).iter().any(|row| matches!(row, AnimRow::File { name: "z~348.txt", .. }))
+        );
+
+        expand_all(&mut open, &FILES);
+        assert_eq!(count_files(&rows(&FILES, &open, true, false)), 4);
+
+        // Opened again, it is not as it was left: all of it was closed.
+        collapse(&mut open, "A~1");
+        assert_eq!(count_files(&rows(&FILES, &open, true, false)), 1);
+        toggle(&mut open, "A~1");
+        assert_eq!(count_files(&rows(&FILES, &open, true, false)), 1, "its kinds are closed");
+
+        // `Collapse all`.
+        open.clear();
+        assert_eq!(rows(&FILES, &open, true, false).len(), 2);
     }
 
     #[test]

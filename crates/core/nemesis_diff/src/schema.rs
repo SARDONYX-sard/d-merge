@@ -279,6 +279,35 @@ pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static 
     Some((class.to_string(), xml_fields(class).collect()))
 }
 
+/// The array of pointers that 0-based `line` of an object text is an element of, if any. A line of it
+/// only has the pointers, so the line alone does not tell what they should be.
+///
+/// e.g. the line of `#0107` in `<hkparam name="modifiers" numelements="2">\n#0107\n#0108\n</hkparam>`
+pub fn open_pointer_field(object: &str, line: usize) -> Option<&'static FieldSchema> {
+    let mut objects: Vec<Option<&str>> = Vec::new();
+    let mut fields: Vec<Option<&'static str>> = Vec::new();
+    let mut open: Vec<Option<&'static FieldSchema>> = Vec::new();
+    for text in object.lines().take(line) {
+        let trimmed = text.trim();
+        if let Some(rest) = trimmed.strip_prefix("<hkparam") {
+            if !trimmed.contains("</hkparam>") && !trimmed.ends_with("/>") {
+                let name = attribute(rest, "name").unwrap_or_default();
+                let field = field_of(objects.last().copied().flatten(), name);
+                open.push(field.filter(|field| field.kind == TypeKind::Pointer || field.sub_kind == TypeKind::Pointer));
+            }
+        } else if trimmed.starts_with("</hkparam>") {
+            open.pop();
+        }
+        walk_line(text, &mut objects, &mut fields);
+    }
+    open.last().copied().flatten()
+}
+
+/// Can a pointer of `field` point to an object of `class`? Any object, if it does not say.
+pub fn pointer_accepts(field: &FieldSchema, class: &str) -> bool {
+    field.class.is_none_or(|expected| is_subclass(class, expected))
+}
+
 /// Tracks the open objects (their classes) and fields (the class their nested objects have).
 fn walk_line<'a>(text: &'a str, objects: &mut Vec<Option<&'a str>>, fields: &mut Vec<Option<&'static str>>) {
     let trimmed = text.trim();
@@ -458,6 +487,24 @@ pub fn check_pointers<'c>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The completion of a line of an array has to know the array.
+    #[test]
+    fn a_line_of_an_array_of_pointers_knows_what_it_points_to() {
+        let object = "\t\t<hkobject name=\"#0106\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"variableBindingSet\">null</hkparam>\n\t\t\t<hkparam name=\"modifiers\" numelements=\"2\">\n\t\t\t\t#0107\n\t\t\t\t#0108\n\t\t\t</hkparam>\n\t\t\t<hkparam name=\"enable\">true</hkparam>\n\t\t</hkobject>\n";
+        let at = |line| open_pointer_field(object, line).map(|field| field.name);
+        assert_eq!(at(1), None, "no field is open");
+        assert_eq!(at(2), None, "a field on one line");
+        assert_eq!(at(3), Some("modifiers"));
+        assert_eq!(at(4), Some("modifiers"));
+        assert_eq!(at(5), Some("modifiers"), "the line that closes it");
+        assert_eq!(at(6), None);
+
+        let field = open_pointer_field(object, 3).unwrap();
+        assert!(pointer_accepts(field, "hkbModifierList"), "a modifier itself");
+        assert!(pointer_accepts(field, "hkbModifier"));
+        assert!(!pointer_accepts(field, "hkbClipGenerator"), "out of the inheritance");
+    }
 
     #[test]
     fn a_new_object_of_another_mod_needs_a_reference() {

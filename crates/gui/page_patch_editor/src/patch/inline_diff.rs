@@ -29,6 +29,31 @@ pub(super) fn changes(template: &str, text: &str) -> InlineDiff {
     InlineDiff { hunks: hunks.collect() }
 }
 
+/// The changed place the cursor is at, or else the next one, as `(index, count)`: what `2/5` shows.
+pub(super) fn position(diff: &InlineDiff, cursor_line: usize) -> Option<(usize, usize)> {
+    let count = diff.hunks.len();
+    let at = diff.hunks.iter().position(|hunk| cursor_line <= last_line(hunk));
+    (count > 0).then(|| (at.unwrap_or(count - 1), count))
+}
+
+/// The line to go to for the previous or next changed place from the cursor, around the ends.
+///
+/// e.g., changes at lines 3 and 9: from line 5, next is 9 and previous is 3; from line 9, next is 3.
+pub(super) fn step(diff: &InlineDiff, cursor_line: usize, forward: bool) -> Option<usize> {
+    let hunks = &diff.hunks;
+    let found = if forward {
+        hunks.iter().find(|hunk| hunk.new_lines.start > cursor_line).or_else(|| hunks.first())
+    } else {
+        hunks.iter().rfind(|hunk| last_line(hunk) < cursor_line).or_else(|| hunks.last())
+    };
+    found.map(|hunk| hunk.new_lines.start)
+}
+
+/// The last line of a changed place. Only a removal has none: it goes above its start.
+fn last_line(hunk: &DiffHunk) -> usize {
+    hunk.new_lines.end.saturating_sub(1).max(hunk.new_lines.start)
+}
+
 /// `text` with changed place `index` of [`changes`] put back as in `template`.
 pub(super) fn revert(template: &str, text: &str, index: usize) -> String {
     let Some(hunk) = nemesis_diff::line_changes(template, text).into_iter().nth(index) else {
@@ -45,6 +70,30 @@ pub(super) fn revert(template: &str, text: &str, index: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn it_goes_from_one_change_to_the_next() {
+        let hunk = |new_lines| DiffHunk { new_lines, ..DiffHunk::default() };
+        let diff = InlineDiff { hunks: vec![hunk(3..5), hunk(9..9), hunk(12..13)] };
+
+        assert_eq!(step(&diff, 0, true), Some(3));
+        assert_eq!(step(&diff, 3, true), Some(9), "from inside one, to the next one");
+        assert_eq!(step(&diff, 9, true), Some(12));
+        assert_eq!(step(&diff, 12, true), Some(3), "around the end");
+
+        assert_eq!(step(&diff, 12, false), Some(9));
+        assert_eq!(step(&diff, 9, false), Some(3));
+        assert_eq!(step(&diff, 4, false), Some(12), "inside the first one: around the start");
+
+        assert_eq!(position(&diff, 0), Some((0, 3)));
+        assert_eq!(position(&diff, 4), Some((0, 3)));
+        assert_eq!(position(&diff, 5), Some((1, 3)));
+        assert_eq!(position(&diff, 99), Some((2, 3)));
+
+        let none = InlineDiff::default();
+        assert_eq!(step(&none, 0, true), None);
+        assert_eq!(position(&none, 0), None);
+    }
 
     #[test]
     fn a_changed_line_is_both_old_and_new() {

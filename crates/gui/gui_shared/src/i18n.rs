@@ -753,7 +753,7 @@ pub enum I18nKey {
     /// Apply User Patch
     UserPatchApply,
 
-    /// Merges what the conflict tool decided, kept in ./.d_merge/user_patch, after every mod, and leaves out the operations hidden there. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this profile.
+    /// Merges what the conflict tool decided, kept in <output>/.d_merge/user_patch, after every mod, and leaves out the operations hidden there. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this output directory.
     UserPatchApplyHover,
 
     /// User Patch
@@ -761,18 +761,6 @@ pub enum I18nKey {
 
     /// All that the user patch has: the values chosen in conflicts and what was edited by hand.
     UserPatchHover,
-
-    /// The user patch has nothing yet.
-    UserPatchEmpty,
-
-    /// Open in Editor
-    UserPatchOpenEditor,
-
-    /// Remove
-    UserPatchRemove,
-
-    /// Takes this object out of the user patch. The other mods' values apply again.
-    UserPatchRemoveHover,
 
     /// FNIS patches are generated: there is no file to take this from.
     ConflictFnisHover,
@@ -918,7 +906,7 @@ pub enum I18nKey {
     /// The new event's name, e.g. myEvent: no spaces, and not one that exists, whatever its case. Patches refer to it as $eventID[myEvent]$.
     NemesisNewEventHover,
 
-    /// The project the clips go to, as <name>~<number>, e.g. DefaultMale~1.
+    /// The project the clips go to: search among those there are, or type a new one, as <name>~<number>, e.g. DefaultMale~1. A new project also needs its place in the list of projects, $header$/$header$.txt.
     NemesisClipActorHover,
 
     /// The clip's name, e.g. Attack, without / \ ~ $. With a count of 2 or more: Attack_0, Attack_1, ...
@@ -972,11 +960,116 @@ pub enum I18nKey {
     /// Neither its work nor its mod is there any more, so it left the list
     NemesisRecentMissing,
 
-    /// Work data
-    NemesisCacheDirLabel,
-
-    /// Where the work in progress is saved automatically, for each mod code. Decided by the app.
+    /// Where the work in progress is saved automatically, for each mod code: in the output directory of the Patch page. Decided by the app.
     NemesisCacheDirHover,
+
+    /// Set the output directory on the Patch page first: the works and the User Patch are kept in it. The Skyrim Data directory can be used too, but something may be overwritten unintentionally.
+    NemesisNeedPatchOutput,
+
+    /// The User Patch is edited in its own window: the User Patch button.
+    NemesisUserPatchReserved,
+
+    /// Version:
+    NemesisVersionLabel,
+
+    /// The mod's version now, e.g. 1.2.0. Written to the info.ini of Nemesis_EngineExt only, with the mod codes of the references as deps.
+    NemesisVersionHover,
+
+    /// Decided by the output directory of the Patch page, as each profile has its own conflicts. It cannot be changed here. Edits are written a moment later.
+    UserPatchOutputHover,
+
+    /// Delete all
+    UserPatchClear,
+
+    /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
+    UserPatchClearHover,
+
+    /// Really delete all
+    UserPatchClearConfirm,
+
+    /// All this mod's patch does loses to other mods, so it does nothing in the end. Its files are not changed: it still takes part in other mods' merges by the load order.
+    ConflictDeadHover,
+
+    /// Show all hidden
+    ConflictUnhideAll,
+
+    /// Every hidden operation, of all the mods, counts again.
+    ConflictUnhideAllHover,
+
+    /// Values of the mods
+    NemesisMergeTitle,
+
+    /// What each mod has at this conflict. Put together in the editor what is wanted: with an array, the elements of several mods are often wanted. Closed with its x, the patch preview comes back.
+    NemesisMergeHover,
+
+    /// Original
+    NemesisMergeOriginal,
+
+    /// Insert
+    NemesisMergeInsert,
+
+    /// Puts it below the line of the cursor in the editor. What it replaces stays: delete it there if it is not wanted.
+    NemesisMergeInsertHover,
+
+    /// It removes these lines.
+    NemesisMergeRemoves,
+
+    /// Next tab (Vim: Space l, gt, :tabn)
+    NemesisNextTab,
+
+    /// Previous tab (Vim: Space h, gT, :tabp)
+    NemesisPreviousTab,
+
+    /// Close tab (Vim: :tabc, :q)
+    NemesisCloseCurrentTab,
+
+    /// Show or hide the patch preview (Vim: Space p, :preview)
+    NemesisTogglePreview,
+
+    /// Show or hide the inline diff (Vim: Space d, :diff)
+    NemesisToggleInlineDiff,
+
+    /// Check
+    NemesisCheck,
+
+    /// Check all
+    NemesisCheckAll,
+
+    /// Expand all
+    NemesisExpandAll,
+
+    /// Collapse all
+    NemesisCollapseAll,
+
+    /// Checks without opening them. Animation data: counts that say something else than what is there, and clip ids that are not the ones in the file names; patches that edit are left out, as the merge counts for them. Behaviors: the fields and pointers of what the mod changes, and d-merge's parser on its patches.
+    NemesisCheckHover,
+
+    /// Check results
+    NemesisCheckTitle,
+
+    /// No problems found.
+    NemesisCheckNone,
+
+    /// Errors
+    NemesisCheckErrors,
+
+    /// Warnings
+    NemesisCheckWarnings,
+
+    /// Duplicate to
+    NemesisDuplicateTo,
+
+    /// Duplicate to...
+    NemesisDuplicateToOther,
+
+    /// New project
+    NemesisNewProject,
+
+    /// Files
+    NemesisDuplicateFiles,
+
+    /// Copies this patch to another project. DefaultMale~1 and DefaultFemale~1 usually have the same patches. A clip goes with its motion.
+    NemesisDuplicateToHover,
 
     /// Open work data
     NemesisOpenCacheDir,
@@ -1290,7 +1383,7 @@ pub enum I18nKey {
     /// Formatter
     LspFormatter,
 
-    /// Normalize spaces and number formats (Shift+Alt+F).
+    /// Format the document (Shift+Alt+F. Vim: Space f, :fmt).
     LspFormatterHover,
 
     /// Semantic highlighting

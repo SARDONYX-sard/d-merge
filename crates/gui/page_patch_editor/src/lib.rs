@@ -15,6 +15,7 @@ use gui_shared::{
     settings::{pages, ui},
 };
 
+pub use self::patch::PatchPaths;
 use self::{crc::CrcTool, patch::PatchTool};
 
 /// What the page borrows from the app for one frame.
@@ -23,10 +24,8 @@ pub struct PatchEditorPageCtx<'a> {
     pub i18n: &'a I18nMap,
     /// The app's notification bar.
     pub notify: &'a mut Notification,
-    /// `settings.behavior.template_dir`: the templates the patch tool lists.
-    pub template_dir: &'a str,
-    /// `settings.behavior.parser_mode`: patches are checked as d-merge will read them.
-    pub parser_mode: pages::patch::behavior::ParserMode,
+    /// What the patch tool needs of the patch page's settings.
+    pub paths: PatchPaths<'a>,
     /// Persisted page state (`settings.patch_editor`).
     pub settings: &'a mut pages::patch_editor::PatchEditorSettings,
     /// Editor settings shared with the hkanno editor: Normal / Vim keys, language features.
@@ -50,26 +49,19 @@ pub struct PatchEditorPage {
     crc: CrcTool,
 }
 
-/// What the window of the user patch asks of the app.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct UserPatchOutcome {
-    /// Show the Patch Editor: an object was opened in it.
-    pub open_editor: bool,
-}
-
 impl PatchEditorPage {
-    /// `Use this` in a conflict: the value goes into the user patch and the mod is written, without
-    /// the editor.
+    /// `Use this` in a conflict: the value goes into the user patch and the mod is written.
     ///
     /// # Errors
     /// The value could not be taken in; the message says why.
     pub fn resolve_now(
         &mut self,
         request: &gui_shared::patch::ResolveRequest,
-        template_dir: &str,
+        paths: PatchPaths<'_>,
+        notify: &mut Notification,
         i18n: &I18nMap,
     ) -> Result<(), String> {
-        self.patch.resolve_now(request, template_dir, i18n.t(I18nKey::NemesisUserPatchName))
+        self.patch.resolve_now(request, paths, notify, i18n)
     }
 
     /// A mod was written since the last call, so that the conflict check can follow.
@@ -78,7 +70,7 @@ impl PatchEditorPage {
     }
 
     /// Opens or closes the window of the user patch.
-    pub fn toggle_user_patch(&mut self) {
+    pub const fn toggle_user_patch(&mut self) {
         self.patch.toggle_user_patch();
     }
 
@@ -88,24 +80,28 @@ impl PatchEditorPage {
         ctx: &egui::Context,
         i18n: &I18nMap,
         notify: &mut Notification,
-    ) -> UserPatchOutcome {
-        let outcome = self.patch.user_patch_window(ctx, i18n, notify);
-        if outcome.open_editor {
-            self.tool = Tool::Patch;
-        }
-        outcome
+        paths: PatchPaths<'_>,
+        settings: &mut pages::patch_editor::PatchEditorSettings,
+        editor: &mut ui::editor::LspOptions,
+    ) {
+        self.patch.user_patch_window(ctx, i18n, notify, paths, settings, editor);
     }
 
-    /// Takes a conflict's value into the user patch, and shows it. See [`patch`]'s `resolve`.
-    pub fn open_resolution(&mut self, request: gui_shared::patch::ResolveRequest) {
-        self.tool = Tool::Patch;
-        self.patch.open_resolution(request);
+    /// `Edit...` in a conflict: the value goes into the user patch, and its window shows it.
+    pub fn open_resolution(
+        &mut self,
+        request: gui_shared::patch::ResolveRequest,
+        paths: PatchPaths<'_>,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+    ) {
+        self.patch.open_resolution(request, paths, notify, i18n);
     }
 
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, ctx: PatchEditorPageCtx<'_>) {
-        let PatchEditorPageCtx { i18n, notify, template_dir, parser_mode, settings, editor, panel_frame } = ctx;
-        self.patch.set_parser_mode(parser_mode);
+        let PatchEditorPageCtx { i18n, notify, paths, settings, editor, panel_frame } = ctx;
+        self.patch.set_parser_mode(paths.parser_mode);
         egui::CentralPanel::default().frame(panel_frame).show(ui, |ui| {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
             ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
@@ -118,7 +114,7 @@ impl PatchEditorPage {
             });
             ui.separator();
             match self.tool {
-                Tool::Patch => self.patch.ui(ui, i18n, notify, template_dir, settings, editor),
+                Tool::Patch => self.patch.ui(ui, i18n, notify, paths, settings, editor),
                 Tool::Crc => self.crc.ui(ui, i18n),
             }
         });

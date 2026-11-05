@@ -4,7 +4,7 @@
 //! Nemesis matches patches by object id, and ids stay valid when the template text changes
 //! (positions would not). Only the changed objects are stored, so a 1.5 MB template costs nothing.
 //!
-//! # On disk (`./.d_merge/caches/patch_editor/nemesis/<code>/`, see [`CACHE_ROOT`])
+//! # On disk (`<patch page's output>/.d_merge/caches/patch_editor/nemesis/<code>/`, see [`cache_root_of`])
 //! ```text
 //! info.ini                      name / author / site
 //! meshes~actors~draugr~behaviors~draugrbehavior.bin/
@@ -17,12 +17,14 @@
 //! Nemesis supports, `<output>/Nemesis_EngineExt/mod/<code>/meshes/...` for the others.
 
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
 use gui_shared::settings::pages::patch::behavior::ParserMode;
 use nemesis_diff::{View, XmlObject, normalize, object_patch, objects, resolve};
+use rayon::prelude::*;
 
 /// Mod metadata (`info.ini`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -30,6 +32,30 @@ pub(crate) struct ModInfo {
     pub(crate) name: String,
     pub(crate) author: String,
     pub(crate) site: String,
+    /// The mod's version now, written for `Nemesis_EngineExt` only. e.g. `1.2.0`
+    pub(crate) version: String,
+    /// Mod codes it says it depends on, as it was read. See [`Workspace::deps`].
+    pub(crate) deps: Vec<String>,
+    /// The lines the editor has no field for, as they were read: the mod's, so they stay.
+    ///
+    /// e.g. `auto=true`
+    pub(crate) other: Vec<String>,
+}
+
+impl ModInfo {
+    /// `info.ini` of the mod, without a line end at the end. Nemesis wants `auto`, so a mod has it.
+    fn exported(&self) -> String {
+        let mut out = format!("name={}\nauthor={}\nsite={}", self.name, self.author, self.site);
+        for line in &self.other {
+            out.push('\n');
+            out.push_str(line);
+        }
+        let is_auto = |line: &String| line.split_once('=').is_some_and(|(key, _)| key.trim() == "auto");
+        if !self.other.iter().any(is_auto) {
+            out.push_str("\nauto=null");
+        }
+        out
+    }
 }
 
 /// One template object, indexed once when the template is loaded.
@@ -96,8 +122,12 @@ pub(crate) struct RefObject {
     pub(crate) text: String,
 }
 
-/// Where the works are kept: for each profile of the app, not in the mods.
-pub(crate) const CACHE_ROOT: &str = "./.d_merge/caches/patch_editor/nemesis";
+/// Where the works are kept: in the patch page's output directory, so for each profile, not in the mods.
+///
+/// e.g. `D:/out` -> `D:/out/.d_merge/caches/patch_editor/nemesis`
+pub(crate) fn cache_root_of(output_dir: &str) -> PathBuf {
+    Path::new(output_dir).join(".d_merge").join("caches").join("patch_editor").join("nemesis")
+}
 
 /// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
 const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
@@ -554,9 +584,60 @@ fn index(object: XmlObject<'_>) -> TemplateObject {
 /// See [`WorkspaceFile`].
 const WORKSPACE_FILE: &str = "workspace.json";
 
+/// What a cache dir holds, as of the last save or load. See [`Workspace::save`].
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SavedFiles {
+    dir: PathBuf,
+    /// File (relative to `dir`) -> a hash of its contents.
+    hashes: BTreeMap<PathBuf, u64>,
+}
+
+/// A hash of what a file holds, to tell whether it changed.
+fn text_hash(text: &str) -> u64 {
+    use std::hash::{Hash as _, Hasher as _};
+    let mut hasher = std::hash::DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Removes a file of the cache dir, and the directory of a behavior this leaves empty.
+fn remove_saved(dir: &Path, path: &Path) -> Result<(), String> {
+    let file = dir.join(path);
+    match std::fs::remove_file(&file) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("{}: {err}", file.display())),
+    }
+    if let Some(parent) = file.parent().filter(|parent| *parent != dir) {
+        let _not_empty = std::fs::remove_dir(parent);
+    }
+    Ok(())
+}
+
+/// A behavior of a cache dir: `<dir>/<behavior>/template.path` and its objects. `None`: no behavior.
+fn read_cached_behavior(entry: &Path) -> Result<Option<Behavior>, String> {
+    let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
+        return Ok(None);
+    };
+    let mut behavior = Behavior::open(Path::new(template.trim()))?;
+    behavior.force_ext = entry.join("force_ext").exists();
+    for file in read_dir(entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
+        let id = file_stem(&file).replace("%2F", "/");
+        let text = read_text(&file)?;
+        if behavior.template_object(&id).is_some() {
+            behavior.edits.insert(id, text);
+        } else {
+            behavior.added.insert(id, text);
+        }
+    }
+    Ok(Some(behavior))
+}
+
 /// The whole patch being made.
 #[derive(Debug, Default)]
 pub(crate) struct Workspace {
+    /// See [`Workspace::save`].
+    saved: Option<SavedFiles>,
     pub(crate) info: ModInfo,
     pub(crate) behaviors: Vec<Behavior>,
     /// The mods this one depends on, by their patch directories, e.g.
@@ -646,7 +727,7 @@ impl Workspace {
         }
     }
 
-    /// `<root>/<code>`. `root`: [`CACHE_ROOT`], except in tests.
+    /// `<root>/<code>`. `root`: see [`cache_root_of`].
     pub(crate) fn cache_dir(root: &Path, code: &str) -> PathBuf {
         root.join(code)
     }
@@ -675,23 +756,11 @@ impl Workspace {
         }
         workspace.info = std::fs::read_to_string(dir.join("info.ini")).map(|s| parse_info(&s)).unwrap_or_default();
 
-        for entry in read_dir(&dir)?.filter(|p| p.is_dir()) {
-            let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
-                continue;
-            };
-            let mut behavior = Behavior::open(Path::new(template.trim()))?;
-            behavior.force_ext = entry.join("force_ext").exists();
-            for file in read_dir(&entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
-                let id = file_stem(&file).replace("%2F", "/");
-                let text = read_text(&file)?;
-                if behavior.template_object(&id).is_some() {
-                    behavior.edits.insert(id, text);
-                } else {
-                    behavior.added.insert(id, text);
-                }
-            }
-            workspace.behaviors.push(behavior);
-        }
+        // Each one reads and indexes a whole template: at the same time, in the order of the directory.
+        let entries: Vec<PathBuf> = read_dir(&dir)?.filter(|p| p.is_dir()).collect();
+        let behaviors: Vec<Option<Behavior>> =
+            entries.par_iter().map(|entry| read_cached_behavior(entry)).collect::<Result<_, String>>()?;
+        workspace.behaviors = behaviors.into_iter().flatten().collect();
         // A work without the file, from before it existed, has nothing to restore.
         let file = std::fs::read_to_string(dir.join(WORKSPACE_FILE)).unwrap_or_default();
         let file: WorkspaceFile = sonic_rs::from_str(&file).unwrap_or_default();
@@ -699,30 +768,61 @@ impl Workspace {
         workspace.session = file.session;
         workspace.owned = file.owned;
         workspace.reload_refs();
+        let hashes = workspace.files_to_save()?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
+        workspace.saved = Some(SavedFiles { dir, hashes });
         Ok(workspace)
     }
 
-    /// Writes the whole workspace to its cache dir (replacing what was there).
-    pub(crate) fn save(&self, root: &Path, code: &str) -> Result<(), String> {
-        let dir = Self::cache_dir(root, code);
-        if dir.is_dir() {
-            std::fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        }
-        write(&dir.join("info.ini"), &info_ini(&self.info))?;
+    /// What the cache dir holds: file (relative to it) -> contents. See [`Self::save`].
+    fn files_to_save(&self) -> Result<BTreeMap<PathBuf, Cow<'_, str>>, String> {
+        let mut files = BTreeMap::new();
+        files.insert(PathBuf::from("info.ini"), Cow::Owned(info_ini(&self.info)));
         let file =
             WorkspaceFile { ref_mods: self.ref_mods.clone(), session: self.session.clone(), owned: self.owned.clone() };
         let file = sonic_rs::to_string_pretty(&file).map_err(|e| e.to_string())?;
-        write(&dir.join(WORKSPACE_FILE), &file)?;
+        files.insert(PathBuf::from(WORKSPACE_FILE), Cow::Owned(file));
         for behavior in &self.behaviors {
-            let behavior_dir = dir.join(behavior.cache_name());
-            write(&behavior_dir.join("template.path"), &behavior.template_path.display().to_string())?;
+            let behavior_dir = PathBuf::from(behavior.cache_name());
+            let template = behavior.template_path.display().to_string();
+            files.insert(behavior_dir.join("template.path"), Cow::Owned(template));
             if behavior.force_ext {
-                write(&behavior_dir.join("force_ext"), "")?;
+                files.insert(behavior_dir.join("force_ext"), Cow::Borrowed(""));
             }
             for (id, text) in behavior.edits.iter().chain(&behavior.added) {
-                write(&behavior_dir.join(cache_file(id)), text)?;
+                files.insert(behavior_dir.join(cache_file(id)), Cow::Borrowed(text.as_str()));
             }
         }
+        Ok(files)
+    }
+
+    /// Writes the workspace to its cache dir.
+    ///
+    /// This runs on the UI thread a moment after each edit, and after opening a file, as what is open
+    /// is part of the work. Writing all the files takes over a second with a few hundred of them
+    /// (e.g., BFCO), which froze the app each time. So only what changed since the last save is
+    /// written, and what is gone removed. [`Self::saved`] knows that without reading the disk. If it
+    /// does not know (the first save, another place), the directory is written anew.
+    pub(crate) fn save(&mut self, root: &Path, code: &str) -> Result<(), String> {
+        let dir = Self::cache_dir(root, code);
+        // Not known until this has succeeded: a failure leaves the disk in between.
+        let known = self.saved.take().filter(|saved| saved.dir == dir && dir.is_dir());
+        let files = self.files_to_save()?;
+        let hashes: BTreeMap<PathBuf, u64> = files.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
+
+        if known.is_none() && dir.is_dir() {
+            std::fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        }
+        let was = known.map(|saved| saved.hashes).unwrap_or_default();
+        for (path, text) in &files {
+            if was.get(path) != hashes.get(path) {
+                write(&dir.join(path), text)?;
+            }
+        }
+        for path in was.keys().filter(|path| !hashes.contains_key(*path)) {
+            remove_saved(&dir, path)?;
+        }
+        drop(files);
+        self.saved = Some(SavedFiles { dir, hashes });
         Ok(())
     }
 
@@ -854,6 +954,30 @@ impl Workspace {
         Ok(&mut self.behaviors[at])
     }
 
+    /// The mod codes this mod depends on: what it said when it was read, and the mods it refers to.
+    ///
+    /// e.g. a reference `D:/mods/a/Nemesis_Engine/mod/amco` -> `amco`
+    fn deps(&self, own_code: &str) -> Vec<String> {
+        let refs = self.ref_mods.iter().filter_map(|dir| Path::new(dir).file_name()?.to_str());
+        let all: std::collections::BTreeSet<&str> =
+            self.info.deps.iter().map(String::as_str).chain(refs).filter(|code| *code != own_code).collect();
+        all.into_iter().map(str::to_owned).collect()
+    }
+
+    /// `info.ini` of `Nemesis_EngineExt`: `info`, with what only that one has. What is not known is left
+    /// out, so that a mod without any of it reads like Nemesis'.
+    fn ext_info(&self, info: &str, own_code: &str) -> String {
+        let mut out = info.to_owned();
+        if !self.info.version.trim().is_empty() {
+            out.push_str(&format!("\nversion={}", self.info.version.trim()));
+        }
+        let deps = self.deps(own_code);
+        if !deps.is_empty() {
+            out.push_str(&format!("\ndeps={}", deps.join(",")));
+        }
+        out
+    }
+
     /// Writes the mod under `<output>`: each behavior to its [`Behavior::patch_dir`], `info.ini` to
     /// each mod root used. Returns the files written and the patches d-merge's Nemesis parser rejects
     /// (`behavior/#id: error`).
@@ -870,8 +994,7 @@ impl Workspace {
             remove_owned(output, file)?;
         }
         self.owned.clear();
-        let mut info = nemesis_diff::info_ini(&self.info.name, &self.info.author, &self.info.site, false);
-        info.truncate(info.trim_end().len());
+        let info = self.info.exported();
 
         let (mut written, mut invalid) = (0, Vec::new());
         for behavior in &self.behaviors {
@@ -888,8 +1011,12 @@ impl Workspace {
             }
         }
         let roots = ENGINES.map(|engine| output.join(engine).join("mod").join(code));
-        for root in roots.iter().filter(|r| r.is_dir()) {
-            write(&root.join("info.ini"), &info)?;
+        let [nemesis, ext] = roots;
+        if nemesis.is_dir() {
+            write(&nemesis.join("info.ini"), &info)?;
+        }
+        if ext.is_dir() {
+            write(&ext.join("info.ini"), &self.ext_info(&info, code))?;
         }
         Ok((written, invalid))
     }
@@ -1086,19 +1213,37 @@ fn file_stem(path: &Path) -> String {
     path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
 }
 fn info_ini(info: &ModInfo) -> String {
-    format!("name={}\nauthor={}\nsite={}\n", info.name, info.author, info.site)
+    let deps = info.deps.join(",");
+    let mut out = format!(
+        "name={}\nauthor={}\nsite={}\nversion={}\ndeps={deps}\n",
+        info.name, info.author, info.site, info.version
+    );
+    for line in &info.other {
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
 }
 
 fn parse_info(ini: &str) -> ModInfo {
     let mut info = ModInfo::default();
-    for line in ini.lines() {
-        let Some((key, value)) = line.split_once('=') else { continue };
+    for line in ini.lines().filter(|line| !line.trim().is_empty()) {
+        let Some((key, value)) = line.split_once('=') else {
+            info.other.push(line.to_owned());
+            continue;
+        };
         let value = value.trim().to_string();
         match key.trim() {
             "name" => info.name = value,
             "author" => info.author = value,
             "site" => info.site = value,
-            _ => {}
+            "version" | "deps" if value.eq_ignore_ascii_case("null") => {}
+            "version" => info.version = value,
+            "deps" => {
+                let codes = value.split(',').map(str::trim).filter(|code| !code.is_empty());
+                info.deps = codes.map(str::to_owned).collect();
+            }
+            _ => info.other.push(line.to_owned()),
         }
     }
     info
@@ -1305,9 +1450,104 @@ mod tests {
         assert_eq!(codes.1, "para");
     }
 
+    /// By default a mod is exported over itself: what the editor has no field for must stay.
+    /// Saving runs after each edit and each file opened: it must not write what did not change.
+    #[test]
+    fn a_save_only_writes_what_changed() {
+        let dir = std::env::temp_dir().join(format!("d_merge_save_changes_{}", std::process::id()));
+        let root = dir.join("caches");
+        let template = dir.join("meshes").join(format!("{ADSF}.bin"));
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(Behavior::open(&template).unwrap());
+        let behavior = &mut workspace.behaviors[0];
+        behavior.added.insert("D~1/a.txt".to_owned(), "a\n".to_owned());
+        behavior.added.insert("D~1/b.txt".to_owned(), "b\n".to_owned());
+        workspace.save(&root, "mine").unwrap();
+
+        let folder = Workspace::cache_dir(&root, "mine").join(workspace.behaviors[0].cache_name());
+        let (a, b) = (folder.join("D~1%2Fa.txt.xml"), folder.join("D~1%2Fb.txt.xml"));
+        let read = |path: &Path| std::fs::read_to_string(path).unwrap();
+        assert_eq!(read(&a), "a\n");
+
+        // What is written on the disk marks it: a file written again loses the mark.
+        std::fs::write(&a, "mark").unwrap();
+        workspace.behaviors[0].added.insert("D~1/b.txt".to_owned(), "changed\n".to_owned());
+        workspace.save(&root, "mine").unwrap();
+        assert_eq!(read(&a), "mark", "it did not change");
+        assert_eq!(read(&b), "changed\n");
+
+        // Only what is open changed: no patch is written.
+        workspace.session.active = ADSF.to_owned();
+        workspace.save(&root, "mine").unwrap();
+        assert_eq!(read(&a), "mark");
+        assert!(read(&Workspace::cache_dir(&root, "mine").join(WORKSPACE_FILE)).contains(ADSF));
+
+        // What is gone goes, and with its last file the directory of the behavior.
+        workspace.behaviors[0].added.remove("D~1/b.txt");
+        workspace.save(&root, "mine").unwrap();
+        assert!(!b.exists());
+        workspace.behaviors.clear();
+        workspace.save(&root, "mine").unwrap();
+        assert!(!folder.exists());
+
+        // Loaded, it knows what is there: nothing is written.
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(Behavior::open(&template).unwrap());
+        workspace.behaviors[0].added.insert("D~1/a.txt".to_owned(), "a\n".to_owned());
+        workspace.save(&root, "mine").unwrap();
+        std::fs::write(&a, "a\n").unwrap();
+        let mut loaded = Workspace::load(&root, "mine").unwrap();
+        std::fs::write(&a, "mark").unwrap();
+        loaded.save(&root, "mine").unwrap();
+        assert_eq!(read(&a), "mark");
+
+        // Somewhere else, it knows nothing: all of it is written.
+        loaded.save(&dir.join("other"), "mine").unwrap();
+        let elsewhere = Workspace::cache_dir(&dir.join("other"), "mine").join(loaded.behaviors[0].cache_name());
+        assert_eq!(read(&elsewhere.join("D~1%2Fa.txt.xml")), "a\n");
+
+        // The directory was deleted by hand: the same.
+        std::fs::remove_dir_all(Workspace::cache_dir(&dir.join("other"), "mine")).unwrap();
+        loaded.save(&dir.join("other"), "mine").unwrap();
+        assert_eq!(read(&elsewhere.join("D~1%2Fa.txt.xml")), "a\n");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_export_keeps_what_the_mod_had() {
+        let info = parse_info("name=a\nauthor=b\nsite=c\nauto=true\nmine=1\n\n; note\n");
+        assert_eq!(info.other, ["auto=true", "mine=1", "; note"]);
+        assert_eq!(info.exported(), "name=a\nauthor=b\nsite=c\nauto=true\nmine=1\n; note");
+
+        // Nemesis wants it.
+        assert_eq!(parse_info("name=a\n").exported(), "name=a\nauthor=\nsite=\nauto=null");
+        // `null` is no value of these, and no line to keep.
+        let info = parse_info("version=null\ndeps=null\n");
+        assert_eq!((info.version.as_str(), info.deps.len(), info.other.len()), ("", 0, 0));
+    }
+
+    #[test]
+    fn an_ext_mod_says_its_version_and_deps() {
+        let mut workspace = Workspace::default();
+        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a", "nothing known: as Nemesis'");
+
+        workspace.info.version = " 1.2.0 ".into();
+        workspace.info.deps = vec!["bfco".into(), "mine".into()];
+        workspace.ref_mods =
+            vec!["D:/mods/a/Nemesis_Engine/mod/amco".into(), "D:/mods/b/Nemesis_Engine/mod/bfco".into()];
+        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a\nversion=1.2.0\ndeps=amco,bfco");
+    }
+
     #[test]
     fn info_round_trip() {
-        let info = ModInfo { name: "My Mod".into(), author: "me".into(), site: "https://x".into() };
+        let info = ModInfo {
+            name: "My Mod".into(),
+            author: "me".into(),
+            site: "https://x".into(),
+            version: "1.2.0".into(),
+            deps: vec!["amco".into(), "bfco".into()],
+            other: vec!["auto=true".into(), "; a comment".into()],
+        };
         assert_eq!(parse_info(&info_ini(&info)), info);
     }
 }

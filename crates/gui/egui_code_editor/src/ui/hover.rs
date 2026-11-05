@@ -74,6 +74,12 @@ impl HoverPopup {
     pub(crate) fn ui(&mut self, ui: &egui::Ui, ctx: &HoverCtx<'_>) {
         let now = ui.input(|i| i.time);
         let pointer = ui.input(|i| i.pointer.hover_pos());
+        // A button is down: the pointer is selecting, not asking. Where it stops is not a question
+        // either, until it moves on.
+        if ui.input(|i| i.pointer.any_down()) {
+            self.resting = None;
+            self.suppressed_at = pointer;
+        }
         let over_popup = self
             .open
             .as_ref()
