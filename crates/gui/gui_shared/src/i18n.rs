@@ -996,7 +996,7 @@ pub enum I18nKey {
     /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
     UserPatchClearHover,
 
-    /// Really delete all
+    /// Delete all of the User Patch?
     UserPatchClearConfirm,
 
     /// All this mod's patch does loses to other mods, so it does nothing in the end. Its files are not changed: it still takes part in other mods' merges by the load order.

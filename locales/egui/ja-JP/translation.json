@@ -208,7 +208,7 @@
   "user_patch_output_hover": "Patch ページの出力ディレクトリで決まります。プロファイルごとに競合が異なるためで、ここでは変更できません。編集は少し後に自動で書き出します。",
   "user_patch_clear": "すべて削除",
   "user_patch_clear_hover": "User Patch の内容をすべて削除して書き出します。競合はロード順で勝つ mod の値に戻ります。隠した操作はそのままです。元に戻せません。",
-  "user_patch_clear_confirm": "本当にすべて削除",
+  "user_patch_clear_confirm": "User Patch をすべて削除しますか？",
   "conflict_dead_hover": "この mod のパッチはすべて他の mod に負けており、結果として何も効いていません。",
   "conflict_unhide_all": "隠した操作をすべて戻す",
   "conflict_unhide_all_hover": "全 mod の隠した操作を元どおりマージに含めます。",
