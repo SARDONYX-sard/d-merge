@@ -268,6 +268,24 @@ impl Workspace {
 mod tests {
     use super::*;
 
+    /// A work kept when this still counted as an edit: nothing is left of it in the changed objects.
+    #[test]
+    fn replacing_by_the_same_is_not_changed_also_from_an_old_work() {
+        let dir = std::env::temp_dir().join(format!("d_merge_pandora_same_{}", std::process::id()));
+        let mut master = behavior(&dir);
+        let doc = "<patch>\n\t<Replace path=\"#0001/enable\">\n\t\t<hkparam name=\"enable\">true</hkparam>\n\t</Replace>\n</patch>\n";
+        master.pandora_doc = Some(doc.to_owned());
+        master.pandora_doc_ids = pandora_patch::doc::doc_object_ids(doc);
+        master.edits.insert("#0001".to_owned(), "kept in the cache".to_owned());
+
+        let (changed, failed) = master.apply_pandora_doc();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(master.edits.is_empty());
+        assert_eq!(changed, ["#0001"], "the list takes it out");
+        assert!(failed.is_empty());
+    }
+
     /// A template of one object, in a place that has a project.
     fn behavior(dir: &Path) -> Behavior {
         let meshes = dir.join("meshes/actors/character/behaviors");

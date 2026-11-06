@@ -718,15 +718,17 @@ mod work_tests {
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.
     #[test]
     fn the_change_keys_go_to_what_shows_the_changes() {
-        let mut tool = PatchTool::default();
-        tool.inline_diff = editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n");
-        tool.preview_view = Some(editor::preview::Preview::new(
-            "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
-        ));
+        let mut tool = PatchTool {
+            inline_diff: editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
+            preview_view: Some(editor::preview::Preview::new(
+                "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
+            )),
+            show_inline_diff: true,
+            show_preview: true,
+            ..PatchTool::default()
+        };
         let current = |tool: &PatchTool| tool.preview_view.as_ref().map(|view| view.current);
 
-        tool.show_inline_diff = true;
-        tool.show_preview = true;
         tool.step_change(true);
         assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
         tool.cursor_line = 1;
