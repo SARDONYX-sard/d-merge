@@ -37,21 +37,19 @@
 //! <!-- CLOSE -->
 //! ```
 
+use nemesis_patch_syntax::comment::{CommentKind, mod_code_or_other_comment, original_or_close_comment};
 use winnow::{ModalResult, Parser, combinator::peek, token::take_until};
 
-use crate::helpers::{
-    comment::{CommentKind, close_comment, comment_kind},
-    tag::{any_field_start_tag, end_tag},
-};
+use crate::helpers::tag::{any_field_start_tag, end_tag};
 
 /// After the elements of the usual form: `</hkparam>`, `ORIGINAL`, the empty field, `CLOSE`.
 pub(crate) fn original_is_empty_array(field: &str) -> impl FnMut(&mut &str) -> ModalResult<()> {
     move |input: &mut &str| {
         end_tag("hkparam").parse_next(input)?;
-        close_comment.verify(|kind| matches!(kind, CommentKind::Original)).parse_next(input)?;
+        original_or_close_comment.verify(|kind| matches!(kind, CommentKind::Original)).parse_next(input)?;
         any_field_start_tag.verify(|(name, len)| *name == field && *len == Some(0)).parse_next(input)?;
         end_tag("hkparam").parse_next(input)?;
-        close_comment.verify(|kind| matches!(kind, CommentKind::Close)).void().parse_next(input)
+        original_or_close_comment.verify(|kind| matches!(kind, CommentKind::Close)).void().parse_next(input)
     }
 }
 
@@ -59,12 +57,12 @@ pub(crate) fn original_is_empty_array(field: &str) -> impl FnMut(&mut &str) -> M
 /// next. Those are only looked at: up to a `</hkparam>` that nothing opened, then `CLOSE`.
 pub(crate) fn closed_then_mod_code(input: &mut &str) -> ModalResult<()> {
     end_tag("hkparam").parse_next(input)?;
-    comment_kind.verify(|kind| matches!(kind, CommentKind::ModCode(_))).void().parse_next(input)?;
+    mod_code_or_other_comment.verify(|kind| matches!(kind, CommentKind::ModCode(_))).void().parse_next(input)?;
     peek((
         take_until(0.., "</hkparam>")
             .verify(|elements: &str| !elements.contains("<hkparam") && !elements.contains("<!--")),
         end_tag("hkparam"),
-        close_comment.verify(|kind| matches!(kind, CommentKind::Close)),
+        original_or_close_comment.verify(|kind| matches!(kind, CommentKind::Close)),
     ))
     .void()
     .parse_next(input)

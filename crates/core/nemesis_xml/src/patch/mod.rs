@@ -8,6 +8,10 @@ use std::mem;
 
 use fast_hash::HashMap;
 use json_patch::{Action, JsonPatch, JsonPath, Op};
+use nemesis_patch_syntax::{
+    comment::{CommentKind, mod_code_or_other_comment, original_or_close_comment, take_till_exact_close},
+    cursor::Cursor,
+};
 use rayon::prelude::*;
 use serde_hkx::xml::de::parser::type_kind::{boolean, real, string};
 use simd_json::{BorrowedValue, StaticNode, ValueBuilder, borrowed::Object};
@@ -17,7 +21,6 @@ use winnow::{
     combinator::{alt, opt},
     error::{ContextError, ErrMode},
 };
-use winnow_ext::ReadableError;
 
 use self::{
     class_schema::{ClassSchema, TypeKind, find_class_schema},
@@ -30,7 +33,6 @@ use crate::{
         empty_array::{closed_then_mod_code, original_is_empty_array},
     },
     helpers::{
-        comment::{CommentKind, close_comment, comment_kind, take_till_close},
         delimited_multispace0,
         ptr::pointer,
         tag::{PointerType, class_start_tag, end_tag, field_start_tag, start_tag},
@@ -52,17 +54,15 @@ pub fn parse_nemesis_patch(
     hack_options: Option<HackOptions>,
 ) -> Result<(PatchesMap<'_>, Option<&str>)> {
     let mut patcher_de = PatchDeserializer::new(nemesis_xml, hack_options.unwrap_or_default());
-    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
+    patcher_de.root_class().map_err(|err| patcher_de.cursor.to_readable(err))?;
     Ok((patcher_de.output_patches, patcher_de.id_index))
 }
 
 /// Nemesis patch deserializer
 #[derive(Debug, Clone, Default)]
 struct PatchDeserializer<'a> {
-    /// mutable pointer to str
-    input: &'a str,
-    /// This is readonly for error report. Not move position.
-    original: &'a str,
+    /// Where the parsing is.
+    cursor: Cursor<'a, Error>,
 
     /// Output
     // output_patches: Vec<JsonPatch<'a>>,
@@ -93,8 +93,7 @@ struct PatchDeserializer<'a> {
 impl<'de> PatchDeserializer<'de> {
     fn new(input: &'de str, hack_options: HackOptions) -> Self {
         Self {
-            input,
-            original: input,
+            cursor: Cursor::new(input),
             output_patches: HashMap::default(),
             hack_options,
             field_infos: Vec::new(),
@@ -105,35 +104,6 @@ impl<'de> PatchDeserializer<'de> {
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
-
-    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
-        parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
-    }
-
-    /// Parse by argument parser no consume.
-    ///
-    /// If an error occurs, it is converted to [`ReadableError`] and returned.
-    fn parse_peek<O>(&self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
-        let (_, res) = parser.parse_peek(self.input).map_err(|err| Error::ContextError { err })?;
-        Ok(res)
-    }
-
-    /// Convert Visitor errors to position-assigned errors.
-    ///
-    /// # Why is this necessary?
-    /// Because Visitor errors that occur within each `Deserialize` implementation cannot indicate the error location in XML.
-    #[cold]
-    fn to_readable_err(&self, err: Error) -> Error {
-        let readable = match err {
-            Error::ContextError { err } => {
-                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
-            }
-            Error::ReadableError { source } => source,
-            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
-        };
-
-        Error::ReadableError { source: readable }
-    }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,7 +119,7 @@ impl<'de> PatchDeserializer<'de> {
 
     /// Parse root C++ class(as XML)
     fn root_class(&mut self) -> Result<()> {
-        let (ptr_index, class_name) = self.parse_next(class_start_tag)?;
+        let (ptr_index, class_name) = self.cursor.parse_next(class_start_tag)?;
 
         let (should_take_in_this, ptr_index) = match ptr_index {
             PointerType::Index(index) => (false, index),
@@ -170,7 +140,7 @@ impl<'de> PatchDeserializer<'de> {
 
         let mut obj = Object::new();
         obj.insert("__ptr".into(), ptr_index.into());
-        while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
+        while self.cursor.parse_next(opt(end_tag("hkobject")))?.is_none() {
             if self.try_push_after_empty_array()? {
                 continue;
             }
@@ -200,7 +170,7 @@ impl<'de> PatchDeserializer<'de> {
     /// # Errors
     /// Parse failed.
     fn class_in_field(&mut self, class_name: &'static str) -> Result<BorrowedValue<'de>> {
-        self.parse_next(start_tag("hkobject"))?;
+        self.cursor.parse_next(start_tag("hkobject"))?;
 
         {
             let field_info = find_class_schema(class_name)
@@ -209,7 +179,7 @@ impl<'de> PatchDeserializer<'de> {
         }
 
         let mut obj = Object::new();
-        while self.parse_next(opt(end_tag("hkobject")))?.is_none() {
+        while self.cursor.parse_next(opt(end_tag("hkobject")))?.is_none() {
             if self.try_push_after_empty_array()? {
                 continue;
             }
@@ -228,7 +198,7 @@ impl<'de> PatchDeserializer<'de> {
 
         let field_info = self.current.field_info.ok_or(Error::MissingFieldInfo)?;
 
-        let (field_name, field_type, _) = match self.parse_next(field_start_tag(field_info)) {
+        let (field_name, field_type, _) = match self.cursor.parse_next(field_start_tag(field_info)) {
             Ok(ret) => ret,
             Err(err) => {
                 if self.hack_options.cast_ragdoll_event
@@ -238,7 +208,7 @@ impl<'de> PatchDeserializer<'de> {
                         .last()
                         .is_some_and(|s| s.eq_ignore_ascii_case("BSRagdollContactListenerModifier"))
                 {
-                    self.parse_next(do_hack_cast_ragdoll_event)?
+                    self.cursor.parse_next(do_hack_cast_ragdoll_event)?
                 } else {
                     return Err(err);
                 }
@@ -250,8 +220,8 @@ impl<'de> PatchDeserializer<'de> {
         let value = {
             let value = self.parse_value(field_type)?;
 
-            if should_take_in_this && self.parse_peek(original_is_empty_array(field_name)).is_ok() {
-                self.parse_next(original_is_empty_array(field_name))?;
+            if should_take_in_this && self.cursor.parse_peek(original_is_empty_array(field_name)).is_ok() {
+                self.cursor.parse_next(original_is_empty_array(field_name))?;
                 let path = self.current.path.clone();
                 self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
                 self.current.clear_flags();
@@ -267,7 +237,7 @@ impl<'de> PatchDeserializer<'de> {
             }
         };
 
-        self.parse_next(end_tag("hkparam"))?;
+        self.cursor.parse_next(end_tag("hkparam"))?;
         self.parse_maybe_close_comment()?;
         self.current.path.pop();
 
@@ -281,7 +251,7 @@ impl<'de> PatchDeserializer<'de> {
         let event_parser = event_id.map(|s| s.into());
         let var_parser = variable_id.map(|s| s.into());
         let int_parser = dec_int.map(|int: i64| int.into());
-        let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        let value = self.cursor.parse_next(alt((int_parser, event_parser, var_parser)))?;
         Ok(value)
     }
 
@@ -289,33 +259,33 @@ impl<'de> PatchDeserializer<'de> {
         let event_parser = event_id.map(|s| s.into());
         let var_parser = variable_id.map(|s| s.into());
         let int_parser = dec_uint.map(|int: u64| int.into());
-        let value = self.parse_next(alt((int_parser, event_parser, var_parser)))?;
+        let value = self.cursor.parse_next(alt((int_parser, event_parser, var_parser)))?;
         Ok(value)
     }
 
     /// Parse `CString` | `StringPtr`
     fn parse_string_ptr(&mut self) -> Result<BorrowedValue<'de>> {
-        self.parse_next(alt((
+        self.cursor.parse_next(alt((
             "\u{2400}".value(BorrowedValue::Static(StaticNode::Null)), // StringPtr | CString
             string.map(BorrowedValue::String),
         )))
     }
 
     fn parse_real(&mut self) -> Result<BorrowedValue<'de>> {
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
         let should_take_in_this = self.parse_start_maybe_comment()?;
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
 
-        let value = self.parse_next(real)?;
+        let value = self.cursor.parse_next(real)?;
         #[cfg(feature = "tracing")]
         tracing::debug!(should_take_in_this, ?value);
         if should_take_in_this {
             self.current.push_current_patch(value.into());
         };
 
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
         self.parse_maybe_close_comment()?;
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
         Ok(value.into())
     }
 
@@ -379,7 +349,7 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_quaternion(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-        self.parse_next(opt(delimited_multispace0("(")))?;
+        self.cursor.parse_next(opt(delimited_multispace0("(")))?;
 
         self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_real()?);
@@ -397,7 +367,7 @@ impl<'de> PatchDeserializer<'de> {
         obj.insert("scaler".into(), self.parse_real()?);
         self.current.path.pop();
 
-        self.parse_next(opt(delimited_multispace0(")")))?;
+        self.cursor.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
@@ -417,7 +387,7 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_vector4(&mut self) -> Result<BorrowedValue<'de>> {
         let mut obj = Object::new();
-        self.parse_next(opt(delimited_multispace0("(")))?;
+        self.cursor.parse_next(opt(delimited_multispace0("(")))?;
 
         self.current.path.push("x".into());
         obj.insert("x".into(), self.parse_real()?);
@@ -435,7 +405,7 @@ impl<'de> PatchDeserializer<'de> {
         obj.insert("w".into(), self.parse_real()?);
         self.current.path.pop();
 
-        self.parse_next(opt(delimited_multispace0(")")))?;
+        self.cursor.parse_next(opt(delimited_multispace0(")")))?;
 
         Ok(BorrowedValue::Object(Box::new(obj)))
     }
@@ -453,7 +423,7 @@ impl<'de> PatchDeserializer<'de> {
     /// - Array|<TypeName>
     /// - Array|Object|<ClassName>
     fn parse_value(&mut self, field_type: FieldType) -> Result<BorrowedValue<'de>> {
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
         // NOTE: Is there any possibility of a comment indicating field change intent coming here?
         // If there is a comment directly below `<hkparam>` indicating a differential change, it is a change in value alone,
         // such as a part of Vector4.
@@ -477,10 +447,10 @@ impl<'de> PatchDeserializer<'de> {
             K::Void => BorrowedValue::Static(StaticNode::Null),
             K::Int8 | K::Int16 | K::Int32 | K::Int64 => self.parse_i64()?,
             K::Uint8 | K::Uint16 | K::Uint32 | K::Uint64 | K::Ulong => self.parse_u64()?,
-            K::Real | K::Half => self.parse_next(real.map(|real| real.into()))?,
+            K::Real | K::Half => self.cursor.parse_next(real.map(|real| real.into()))?,
             _ if field_type.is_string() => self.parse_string_ptr()?, // StringPtr | CString | enum
-            K::Pointer => self.parse_next(pointer)?,
-            K::Bool => self.parse_next(boolean.map(|boolean| boolean.into()))?,
+            K::Pointer => self.cursor.parse_next(pointer)?,
+            K::Bool => self.cursor.parse_next(boolean.map(|boolean| boolean.into()))?,
             unknown => return Err(Error::UnknownFieldType { field_type: format!("{unknown:?}") }),
         };
 
@@ -497,10 +467,10 @@ impl<'de> PatchDeserializer<'de> {
 
         let mut index = 0;
         let mut should_take_in_this = false;
-        while self.parse_peek(opt(end_tag("hkparam")))?.is_none() {
+        while self.cursor.parse_peek(opt(end_tag("hkparam")))?.is_none() {
             // An element that takes no input would go on forever, filling the memory: e.g., what is
             // no element here at all. Such a patch is an error, like any other that does not fit.
-            let before = self.input.len();
+            let before = self.cursor.input.len();
 
             // seq start
             let is_start = self.parse_start_maybe_comment()?;
@@ -512,9 +482,9 @@ impl<'de> PatchDeserializer<'de> {
             // seq inner
             let value = if element.is_string() {
                 // <hkcstring>String</hkcstring>
-                self.parse_next(start_tag("hkcstring"))?;
+                self.cursor.parse_next(start_tag("hkcstring"))?;
                 let value = self.parse_string_ptr()?;
-                self.parse_next(end_tag("hkcstring"))?;
+                self.cursor.parse_next(end_tag("hkcstring"))?;
                 value
             } else {
                 // NOTE: In the case of nested seq patterns, intermediate indexes
@@ -549,7 +519,7 @@ impl<'de> PatchDeserializer<'de> {
             if self.parse_maybe_close_comment()? {
                 should_take_in_this = false;
             };
-            if self.input.len() == before {
+            if self.cursor.input.len() == before {
                 return Err(Error::ContextError { err: ErrMode::Backtrack(ContextError::new()) });
             }
         }
@@ -568,15 +538,15 @@ impl<'de> PatchDeserializer<'de> {
         }
         let field_info = self.current.field_info.ok_or(Error::MissingFieldInfo)?;
         let mut head = (field_start_tag(field_info).verify(|(_, _, len)| *len == Some(0)), closed_then_mod_code);
-        if self.parse_peek(head.by_ref()).is_err() {
+        if self.cursor.parse_peek(head.by_ref()).is_err() {
             return Ok(false);
         }
-        let ((field_name, field_type, _), ()) = self.parse_next(head)?;
+        let ((field_name, field_type, _), ()) = self.cursor.parse_next(head)?;
 
         self.current.path.push(field_name.into());
         let value = self.parse_value(field_type)?;
-        self.parse_next(end_tag("hkparam"))?;
-        self.parse_next(close_comment)?;
+        self.cursor.parse_next(end_tag("hkparam"))?;
+        self.cursor.parse_next(original_or_close_comment)?;
         let path = self.current.path.clone();
         self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
         self.current.path.pop();
@@ -588,7 +558,7 @@ impl<'de> PatchDeserializer<'de> {
     /// # Return
     /// Is the mode code comment?
     fn parse_start_maybe_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(comment_kind))? {
+        if let Some(comment_ty) = self.cursor.parse_next(opt(mod_code_or_other_comment))? {
             #[cfg(feature = "tracing")]
             tracing::debug!(?comment_ty);
             match comment_ty {
@@ -606,7 +576,7 @@ impl<'de> PatchDeserializer<'de> {
     /// Processes the close comment (`ORIGINAL` or `CLOSE`) depending on whether it was encountered,
     /// and returns whether it was encountered or not.
     fn parse_maybe_close_comment(&mut self) -> Result<bool> {
-        if let Some(comment_ty) = self.parse_next(opt(close_comment))? {
+        if let Some(comment_ty) = self.cursor.parse_next(opt(original_or_close_comment))? {
             #[cfg(feature = "tracing")]
             tracing::debug!(?comment_ty);
             match comment_ty {
@@ -620,7 +590,7 @@ impl<'de> PatchDeserializer<'de> {
                             tracing::debug!(?op);
                             tracing::trace!("{:#?}", self.current);
                         }
-                        self.parse_next(take_till_close)?;
+                        self.cursor.parse_next(take_till_exact_close)?;
                         self.extend_output_patches()?;
                     }
                     return Ok(true);
@@ -665,7 +635,7 @@ impl<'de> PatchDeserializer<'de> {
             // <!-- CLOSE -->
             //         </hkparam>
             // ```
-            if matches!(op, Op::Add) && self.parse_peek(opt(end_tag("hkparam")))?.is_some() {
+            if matches!(op, Op::Add) && self.cursor.parse_peek(opt(end_tag("hkparam")))?.is_some() {
                 self.output_patches.insert(path, JsonPatch { action: Action::SeqPush, value });
             } else {
                 self.output_patches.insert(path, JsonPatch { action: Action::Seq { op, range: new_range }, value });

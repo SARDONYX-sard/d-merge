@@ -26,6 +26,7 @@ winnow_ext = { workspace = true }
 
 # workspace members
 json_patch = { workspace = true, features = ["rayon"] }
+nemesis_patch_syntax = { workspace = true }
 skyrim_crc = { workspace = true }
 
 [dev-dependencies]

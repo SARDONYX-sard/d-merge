@@ -1,8 +1,9 @@
 use std::{borrow::Cow, slice::Iter};
 
-use json_patch::Op;
-
-use crate::adsf::patch::de::{anim_header::LineKind, error::Error};
+use crate::{
+    adsf::patch::de::{anim_header::LineKind, error::Error},
+    common_parser::line_diff::DiffFlags,
+};
 
 #[derive(Debug)]
 pub(super) struct CurrentState<'input> {
@@ -10,19 +11,14 @@ pub(super) struct CurrentState<'input> {
     line_kinds: Iter<'static, LineKind>,
     current_kind: Option<LineKind>,
 
-    /// When present, this signals the start of a differential change
-    pub mode_code: Option<&'input str>,
-
-    /// Is passed `<!-- ORIGINAL --!>` xml comment?
-    is_passed_original: bool,
+    /// Where the parser is in a block.
+    pub flags: DiffFlags<'input>,
 
     /// If the addition or deletion is `<! -- CLOSE --!>` since it is impossible to determine whether something
     /// is added or deleted until a comment comes in, this is a place to temporarily save them.
     ///
     /// None is nothing diff.
     pub patch: Option<PartialAdsfPatch<'input>>,
-
-    pub force_removed: bool,
 }
 
 const LINE_KINDS: [LineKind; 4] =
@@ -44,14 +40,7 @@ pub(super) struct PartialProjectAssets<'input> {
 impl<'de> CurrentState<'de> {
     #[inline]
     pub(super) fn new() -> Self {
-        Self {
-            line_kinds: LINE_KINDS.iter(),
-            current_kind: None,
-            mode_code: None,
-            is_passed_original: false,
-            patch: None,
-            force_removed: false,
-        }
+        Self { line_kinds: LINE_KINDS.iter(), current_kind: None, flags: DiffFlags::new(), patch: None }
     }
 
     pub(super) fn next(&mut self) -> Option<LineKind> {
@@ -70,7 +59,7 @@ impl<'de> CurrentState<'de> {
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
     pub(super) fn replace_lead_int(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
-        if self.mode_code.is_none() {
+        if self.flags.mode_code.is_none() {
             return Err(Error::NeedInModDiff);
         }
 
@@ -86,7 +75,7 @@ impl<'de> CurrentState<'de> {
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
     pub(super) fn push_as_project_assets(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
-        let is_in_diff = self.mode_code.is_some();
+        let is_in_diff = self.flags.mode_code.is_some();
         #[cfg(feature = "tracing")]
         tracing::trace!("{self:#?}");
         if !is_in_diff {
@@ -116,7 +105,7 @@ impl<'de> CurrentState<'de> {
 
     /// Sets the range start index for either transitions or rotations.
     pub(super) fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
-        let is_in_diff = self.mode_code.is_some();
+        let is_in_diff = self.flags.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
@@ -131,28 +120,5 @@ impl<'de> CurrentState<'de> {
         }
 
         Ok(())
-    }
-
-    /// - `<!-- ORIGINAL --!> is found.
-    #[inline]
-    pub(super) const fn set_is_passed_original(&mut self) {
-        self.is_passed_original = true;
-    }
-
-    #[inline]
-    pub(super) fn judge_operation(&self) -> Op {
-        self.mode_code.map_or(Op::Remove, |_| {
-            if self.force_removed {
-                return Op::Remove;
-            }
-
-            if self.is_passed_original { if self.patch.is_some() { Op::Replace } else { Op::Remove } } else { Op::Add }
-        })
-    }
-
-    #[inline]
-    pub(super) const fn clear_flags(&mut self) {
-        self.mode_code = None;
-        self.is_passed_original = false;
     }
 }

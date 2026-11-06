@@ -3394,11 +3394,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nemesis_patch_syntax"
+version = "0.0.0"
+dependencies = [
+ "winnow",
+ "winnow_ext",
+]
+
+[[package]]
 name = "nemesis_xml"
 version = "0.0.0"
 dependencies = [
  "fast_hash",
  "json_patch",
+ "nemesis_patch_syntax",
  "phf 0.14.0",
  "rayon",
  "serde_hkx",
@@ -5299,6 +5308,7 @@ dependencies = [
  "fast_hash",
  "indexmap 2.14.2",
  "json_patch",
+ "nemesis_patch_syntax",
  "pretty_assertions",
  "rayon",
  "rmp-serde",

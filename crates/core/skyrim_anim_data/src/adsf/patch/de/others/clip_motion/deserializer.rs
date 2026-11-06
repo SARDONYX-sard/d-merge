@@ -1,22 +1,19 @@
 use json_patch::JsonPath;
+use nemesis_patch_syntax::cursor::Cursor;
 use winnow::{
     Parser,
     ascii::{multispace0, space1},
     combinator::opt,
-    error::{ContextError, ErrMode, StrContext, StrContextValue},
+    error::{StrContext, StrContextValue},
 };
-use winnow_ext::ReadableError;
 
-use super::{
-    ClipMotionDiffPatch,
-    raw_diff::{Op, RawDiff},
-};
+use super::{ClipMotionDiffPatch, raw_diff::RawDiff};
 use crate::{
-    adsf::patch::de::error::{Error, Result},
-    common_parser::{
-        comment::close_comment_line,
-        lines::{one_line, parse_one_line},
+    adsf::patch::de::{
+        error::{Error, Result},
+        others::raw_block::{Op, RawBlock, next_block},
     },
+    common_parser::lines::{one_line, parse_one_line},
 };
 
 /// Parse `animationdatasinglefile.txt` clip motion patch.
@@ -25,7 +22,7 @@ use crate::{
 /// Parse failed.
 pub fn parse_clip_motion_diff_patch(adsf_patch: &str, priority: usize) -> Result<ClipMotionDiffPatch<'_>> {
     let mut patcher_de = PatchDeserializer::new(adsf_patch);
-    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
+    patcher_de.root_class().map_err(|err| patcher_de.cursor.to_readable(err))?;
 
     super::raw_diff::into_patch_map(patcher_de.raw_diffs, priority)
 }
@@ -33,10 +30,8 @@ pub fn parse_clip_motion_diff_patch(adsf_patch: &str, priority: usize) -> Result
 /// Nemesis patch deserializer
 #[derive(Debug, Clone)]
 struct PatchDeserializer<'a> {
-    /// mutable pointer to str
-    input: &'a str,
-    /// This is readonly for error report. Not move position.
-    original: &'a str,
+    /// Where the parsing is.
+    cursor: Cursor<'a, Error>,
 
     /// Raw diff blocks captured during parsing.
     raw_diffs: Vec<RawDiff<'a>>,
@@ -77,8 +72,7 @@ pub(crate) enum ArrayType {
 impl<'de> PatchDeserializer<'de> {
     const fn new(input: &'de str) -> Self {
         Self {
-            input,
-            original: input,
+            cursor: Cursor::new(input),
             raw_diffs: Vec::new(),
             path: JsonPath::new(),
             op: Op::Add,
@@ -91,34 +85,6 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
-        parser.parse_next(&mut self.input).map_err(|err| Error::Context { err })
-    }
-
-    /// Convert Visitor errors to position-assigned errors.
-    ///
-    /// # Why is this necessary?
-    /// Because Visitor errors that occur within each `Deserialize` implementation cannot indicate the error location in XML.
-    #[cold]
-    fn to_readable_err(&self, err: Error) -> Error {
-        let readable = match err {
-            Error::Context { err } => {
-                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
-            }
-            Error::Readable { source } => source,
-            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
-        };
-
-        Error::Readable { source: readable }
-    }
-
-    #[cold]
-    fn message_to_readable_err(&self, err: impl core::fmt::Display) -> Error {
-        Error::Readable {
-            source: ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
-        }
-    }
-
     /// Capture a raw diff block if present at the current position.
     ///
     /// The diff block is associated with the current JsonPath.
@@ -126,30 +92,14 @@ impl<'de> PatchDeserializer<'de> {
     /// # Return
     /// Got diff?
     fn maybe_capture_diff(&mut self) -> Result<bool> {
-        if self.ignore_close && self.parse_next(opt(close_comment_line))?.is_some() {
-            self.ignore_close = false;
-        };
-
-        let Some((raw, has_original, original_len)) = self.parse_next(take_raw_diff)? else {
+        let Some(RawBlock { text, op, original_len }) = next_block(&mut self.cursor, &mut self.ignore_close, self.op)?
+        else {
             return Ok(false);
         };
-
         let path = self.path.clone();
-
-        let op = match (has_original, raw.is_empty()) {
-            (true, true) => Op::Remove,
-            (true, false) => Op::Replace,
-            (false, true) => Op::Add,
-            (false, false) => self.op,
-        };
-
-        if has_original {
-            self.ignore_close = true;
-        }
-
         self.raw_diffs.push(RawDiff {
             path,
-            text: raw,
+            text,
             op,
             seq_index: self.seq_index,
             seq_type: self.category,
@@ -180,7 +130,7 @@ impl<'de> PatchDeserializer<'de> {
                     ArrayType::Translation => "Translations",
                     ArrayType::Rotation => "Rotations",
                 };
-                return Err(self.message_to_readable_err(format!(
+                return Err(self.cursor.message_to_readable(format!(
                     "Invalid {array_target}.\n\nExpected {len} vanilla entries, but found only {index}."
                 )));
             }
@@ -203,7 +153,8 @@ impl<'de> PatchDeserializer<'de> {
         use winnow::error::{StrContext::Expected, StrContextValue::Description};
 
         self.maybe_capture_diff()?;
-        let len = self.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
+        let len =
+            self.cursor.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
         #[cfg(feature = "tracing")]
         tracing::trace!("{:?}, line Length = {len}", self.path);
         Ok(len)
@@ -212,7 +163,7 @@ impl<'de> PatchDeserializer<'de> {
     /// Parse 1 line(but ignore new line)
     fn parse_str_line(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        let _s = self.parse_next(one_line)?;
+        let _s = self.cursor.parse_next(one_line)?;
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_s);
 
@@ -221,10 +172,11 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_line_f32(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        let _value = self.parse_next(
-            parse_one_line::<f32>
-                .context(winnow::error::StrContext::Expected(winnow::error::StrContextValue::Description("f32"))),
-        )?;
+        let _value =
+            self.cursor
+                .parse_next(parse_one_line::<f32>.context(winnow::error::StrContext::Expected(
+                    winnow::error::StrContextValue::Description("f32"),
+                )))?;
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_value);
 
@@ -233,16 +185,16 @@ impl<'de> PatchDeserializer<'de> {
 
     /// parse `<time: f32> <text: str>\n`
     fn parse_annotation(&mut self) -> Result<()> {
-        self.parse_next(
+        self.cursor.parse_next(
             winnow::ascii::float::<_, f32, _>.context(StrContext::Expected(StrContextValue::Description("f32"))),
         )?;
-        self.parse_next(
+        self.cursor.parse_next(
             space1.context(StrContext::Expected(StrContextValue::Description("space between time & text"))),
         )?;
 
-        let _s = self.parse_next(winnow::ascii::till_line_ending)?;
+        let _s = self.cursor.parse_next(winnow::ascii::till_line_ending)?;
         // In the case of patches, this may not be present, so `opt`
-        self.parse_next(opt(winnow::ascii::line_ending))?; // skip line end
+        self.cursor.parse_next(opt(winnow::ascii::line_ending))?; // skip line end
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_s);
 
@@ -253,7 +205,7 @@ impl<'de> PatchDeserializer<'de> {
 
     /// Parse 1 asdsf patch
     fn root_class(&mut self) -> Result<()> {
-        self.parse_next(multispace0)?;
+        self.cursor.parse_next(multispace0)?;
         self.parse_clip_id()?;
         self.parse_duration()?;
 
@@ -280,49 +232,6 @@ impl<'de> PatchDeserializer<'de> {
 
         Ok(())
     }
-}
-
-/// Returns
-/// (diff, has_original, original_len)
-pub(crate) fn take_raw_diff<'a>(input: &mut &'a str) -> winnow::ModalResult<Option<(&'a str, bool, Option<usize>)>> {
-    use crate::common_parser::comment::{open_comment, take_till_close, take_till_original};
-
-    // Fast path: no OPEN comment ahead
-    if opt(open_comment).parse_next(input)?.is_none() {
-        return Ok(None);
-    }
-    #[cfg(feature = "tracing")]
-    tracing::debug!("Open diff");
-
-    // take_till_original may overshoot into the *next* diff's ORIGINAL
-    // when this diff has no ORIGINAL of its own
-    // (pattern: OPEN -> CLOSE -> OPEN -> ORIGINAL).
-    // Comparing remaining lengths tells us which marker truly comes first.
-    let (original_remain, original_found) = opt(take_till_original).parse_peek(input)?;
-    let (close_remain, close_found) = opt(take_till_close).parse_peek(input)?;
-
-    let has_original = match (original_found, close_found) {
-        // ORIGINAL belongs to this diff only if reaching it consumed
-        // *less* input than reaching CLOSE did, i.e. it comes first.
-        (Some(_), Some(_)) => original_remain.len() > close_remain.len(),
-        (Some(_), None) => true,
-        _ => false,
-    };
-
-    let (diff, has_original, original_len) = if has_original {
-        let diff = take_till_original.parse_next(input)?;
-        let (_, original) = take_till_close.parse_peek(input)?;
-        let original_len = original.lines().filter(|l| !l.trim().is_empty()).count();
-        (diff, true, Some(original_len))
-    } else {
-        let diff = take_till_close.parse_next(input)?;
-        (diff, false, None)
-    };
-
-    #[cfg(feature = "tracing")]
-    tracing::debug!(?diff, has_original, original_len);
-
-    Ok(Some((diff, has_original, original_len)))
 }
 
 #[cfg(test)]

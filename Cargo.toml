@@ -98,6 +98,7 @@ mod_info             = { path = "./crates/gui/mod_info" }
 behavior_merge       = { path = "./crates/core/behavior_merge" }
 behavior_merge_types = { path = "./crates/core/behavior_merge_types" }
 nemesis_diff         = { path = "./crates/core/nemesis_diff" }
+nemesis_patch_syntax = { path = "./crates/core/nemesis_patch_syntax" }
 nemesis_xml          = { path = "./crates/core/nemesis_xml" }
 node_expr            = { path = "./crates/gui/node_expr" }
 serde_hkx_for_gui    = { path = "./crates/gui/serde_hkx_for_gui" }

@@ -26,5 +26,7 @@ pub enum Error {
     JsonPatch { source: json_patch::JsonPatchError },
 }
 
+nemesis_patch_syntax::impl_parse_failure!(Error, ContextError, ReadableError);
+
 /// `Result` for this crate.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

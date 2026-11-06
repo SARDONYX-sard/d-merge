@@ -1,25 +1,20 @@
 use json_patch::{JsonPath, ValueWithPriority};
-use winnow::{
-    Parser,
-    ascii::multispace0,
-    combinator::opt,
-    error::{ContextError, ErrMode},
+use nemesis_patch_syntax::{
+    comment::{close_comment_line, take_raw_block},
+    cursor::Cursor,
 };
-use winnow_ext::ReadableError;
+use winnow::{Parser, ascii::multispace0, combinator::opt};
 
 use super::{
     error::{Error, Result},
-    line_parsers::{take_raw_diff, version_v3},
+    line_parsers::version_v3,
 };
 use crate::{
     asdsf::patch::de::{
         DiffPatchAnimSetData,
         raw_diff::{Op, RawDiff},
     },
-    common_parser::{
-        comment::close_comment_line,
-        lines::{num_bool_line, one_line, parse_one_line},
-    },
+    common_parser::lines::{num_bool_line, one_line, parse_one_line},
 };
 
 pub type PatchesMap<'a> = fast_hash::HashMap<JsonPath<'a>, ValueWithPriority<'a>>;
@@ -30,7 +25,7 @@ pub type PatchesMap<'a> = fast_hash::HashMap<JsonPath<'a>, ValueWithPriority<'a>
 /// Parse failed.
 pub fn parse_anim_set_diff_patch(asdsf_patch: &str, priority: usize) -> Result<DiffPatchAnimSetData<'_>> {
     let mut patcher_de = PatchDeserializer::new(asdsf_patch);
-    patcher_de.root_class().map_err(|err| patcher_de.to_readable_err(err))?;
+    patcher_de.root_class().map_err(|err| patcher_de.cursor.to_readable(err))?;
 
     super::raw_diff::into_patch_map(asdsf_patch, patcher_de.raw_diffs, priority)
 }
@@ -38,10 +33,8 @@ pub fn parse_anim_set_diff_patch(asdsf_patch: &str, priority: usize) -> Result<D
 /// Nemesis patch deserializer
 #[derive(Debug, Clone)]
 struct PatchDeserializer<'a> {
-    /// mutable pointer to str
-    input: &'a str,
-    /// This is readonly for error report. Not move position.
-    original: &'a str,
+    /// Where the parsing is.
+    cursor: Cursor<'a, Error>,
 
     /// Raw diff blocks captured during parsing.
     raw_diffs: Vec<RawDiff<'a>>,
@@ -91,8 +84,7 @@ pub(crate) enum ArrayType {
 impl<'de> PatchDeserializer<'de> {
     const fn new(input: &'de str) -> Self {
         Self {
-            input,
-            original: input,
+            cursor: Cursor::new(input),
             raw_diffs: Vec::new(),
             path: JsonPath::new(),
             op: Op::Add,
@@ -105,36 +97,16 @@ impl<'de> PatchDeserializer<'de> {
     // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser methods
 
-    fn parse_next<O>(&mut self, mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>) -> Result<O> {
-        parser.parse_next(&mut self.input).map_err(|err| Error::ContextError { err })
-    }
-
-    /// Convert Visitor errors to position-assigned errors.
-    ///
-    /// # Why is this necessary?
-    /// Because Visitor errors that occur within each `Deserialize` implementation cannot indicate the error location in XML.
-    #[cold]
-    fn to_readable_err(&self, err: Error) -> Error {
-        let readable = match err {
-            Error::ContextError { err } => {
-                ReadableError::from_context(err, self.original, self.original.len() - self.input.len())
-            }
-            Error::ReadableError { source } => source,
-            err => ReadableError::from_display(err, self.original, self.original.len() - self.input.len()),
-        };
-
-        Error::ReadableError { source: readable }
-    }
-
     /// Capture a raw diff block if present at the current position.
     ///
     /// The diff block is associated with the current JsonPath.
     fn maybe_capture_diff(&mut self) -> Result<()> {
-        if self.ignore_close && self.parse_next(opt(close_comment_line))?.is_some() {
+        if self.ignore_close && self.cursor.parse_next(opt(close_comment_line))?.is_some() {
             self.ignore_close = false;
         };
 
-        if let Some((raw, has_original)) = self.parse_next(take_raw_diff)? {
+        if let Some((raw, original_len)) = self.cursor.parse_next(take_raw_block)? {
+            let has_original = original_len.is_some();
             let path = self.path.clone();
 
             let op = match (has_original, raw.is_empty()) {
@@ -192,7 +164,8 @@ impl<'de> PatchDeserializer<'de> {
         use winnow::error::{StrContext::Expected, StrContextValue::Description};
 
         self.maybe_capture_diff()?;
-        let len = self.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
+        let len =
+            self.cursor.parse_next(parse_one_line::<usize>.context(Expected(Description("length_line: usize"))))?;
         #[cfg(feature = "tracing")]
         tracing::trace!("{:?}, line Length = {len}", self.path);
         Ok(len)
@@ -200,14 +173,14 @@ impl<'de> PatchDeserializer<'de> {
 
     fn parse_num_bool(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        self.parse_next(num_bool_line)?;
+        self.cursor.parse_next(num_bool_line)?;
         Ok(())
     }
 
     /// Parse 1 line(but ignore new line)
     fn parse_str_line(&mut self) -> Result<()> {
         self.maybe_capture_diff()?;
-        let _s = self.parse_next(one_line)?;
+        let _s = self.cursor.parse_next(one_line)?;
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_s);
 
@@ -219,7 +192,7 @@ impl<'de> PatchDeserializer<'de> {
         T: core::str::FromStr + core::fmt::Debug + Copy,
     {
         self.maybe_capture_diff()?;
-        let _value = self.parse_next(parse_one_line::<T>)?;
+        let _value = self.cursor.parse_next(parse_one_line::<T>)?;
         #[cfg(feature = "tracing")]
         tracing::debug!(?self.path, ?_value);
 
@@ -230,8 +203,8 @@ impl<'de> PatchDeserializer<'de> {
 
     /// Parse 1 asdsf patch
     fn root_class(&mut self) -> Result<()> {
-        self.parse_next(multispace0)?;
-        self.parse_next(version_v3)?;
+        self.cursor.parse_next(multispace0)?;
+        self.cursor.parse_next(version_v3)?;
 
         self.parse_array(ArrayType::Trigger)?; // triggers
         self.parse_array(ArrayType::Condition)?;
@@ -455,6 +428,41 @@ $crc32[ground_bite]$
             },
         };
         pretty_assertions::assert_eq!(patches, expected);
+    }
+
+    /// `OPEN` -> `CLOSE` -> `OPEN` -> `ORIGINAL`: that `ORIGINAL` is of the second block. Read as the
+    /// first one's, the first block would swallow the data and the second block up to there.
+    #[test]
+    fn the_original_of_the_next_block_is_not_this_ones() {
+        let input = "\
+V3
+0
+<!-- MOD_CODE ~test~ OPEN -->
+pushedTrigger
+<!-- CLOSE -->
+0
+0
+1
+<!-- MOD_CODE ~test~ OPEN -->
+4000000000
+<!-- ORIGINAL -->
+3995179646
+<!-- CLOSE -->
+1440038008
+7891816
+";
+        let patches = parse_anim_set_diff_patch(input, 0).unwrap_or_else(|e| panic!("{e}"));
+
+        let trigger = ValueWithPriority {
+            patch: JsonPatch { action: Action::SeqPush, value: simd_json::json_typed!(borrowed, ["pushedTrigger"]) },
+            priority: 0,
+        };
+        pretty_assertions::assert_eq!(patches.triggers_patches, vec![trigger]);
+        let replaced = patches.anim_infos_patches.one.0.get(&json_patch::json_path!["[0]", "hashed_path"]);
+        pretty_assertions::assert_eq!(
+            replaced.map(|value| &value.patch.value),
+            Some(&simd_json::json_typed!(borrowed, "4000000000"))
+        );
     }
 
     #[cfg_attr(feature = "tracing", quick_tracing::init)]

@@ -1,16 +1,14 @@
 use std::{borrow::Cow, ops::Range};
 
-use json_patch::Op;
-
-use crate::{common_parser::lines::Str, diff_line::error::Error};
+use crate::{
+    common_parser::{line_diff::DiffFlags, lines::Str},
+    diff_line::error::Error,
+};
 
 #[derive(Debug)]
 pub(super) struct CurrentState<'input> {
-    /// When present, this signals the start of a differential change
-    pub mode_code: Option<&'input str>,
-
-    /// Is passed `<!-- ORIGINAL --!>` xml comment?
-    is_passed_original: bool,
+    /// Where the parser is in a block.
+    pub flags: DiffFlags<'input>,
 
     /// If the addition or deletion is `<! -- CLOSE --!>` since it is impossible to determine whether something
     /// is added or deleted until a comment comes in, this is a place to temporarily save them.
@@ -23,8 +21,6 @@ pub(super) struct CurrentState<'input> {
     /// # NOTE
     /// This represents only the continuous partial patches where changes have been made.
     pub range: Option<Range<usize>>,
-
-    pub force_removed: bool,
 }
 
 impl<'de> Default for CurrentState<'de> {
@@ -36,14 +32,14 @@ impl<'de> Default for CurrentState<'de> {
 impl<'de> CurrentState<'de> {
     #[inline]
     pub(super) const fn new() -> Self {
-        Self { mode_code: None, is_passed_original: false, patch: None, force_removed: false, range: None }
+        Self { flags: DiffFlags::new(), patch: None, range: None }
     }
 
     /// The following is an additional element, so push.
     /// - `<!-- MOD_CODE ~<id>~ --!>` after it is found.
     /// - `<!-- ORIGINAL --!> is not found yet.
     pub(super) fn push_one_line(&mut self, value: Cow<'de, str>) -> Result<(), Error> {
-        let is_in_diff = self.mode_code.is_some();
+        let is_in_diff = self.flags.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
@@ -59,7 +55,7 @@ impl<'de> CurrentState<'de> {
     /// - If it is not included in diff (if it does not pass `MOD_CODE`).
     /// - If it is called with a type that is not an array.
     pub(super) const fn set_range_start(&mut self, start: usize) -> Result<(), Error> {
-        let is_in_diff = self.mode_code.is_some();
+        let is_in_diff = self.flags.mode_code.is_some();
         if !is_in_diff {
             return Err(Error::NeedInModDiff);
         }
@@ -80,28 +76,5 @@ impl<'de> CurrentState<'de> {
     /// If `Option::is_none`
     pub(super) fn take_range(&mut self) -> Result<Range<usize>, Error> {
         self.range.take().ok_or(Error::NeedRange)
-    }
-
-    /// - `<!-- ORIGINAL --!> is found.
-    #[inline]
-    pub(super) const fn set_is_passed_original(&mut self) {
-        self.is_passed_original = true;
-    }
-
-    #[inline]
-    pub(super) fn judge_operation(&self) -> Op {
-        self.mode_code.map_or(Op::Remove, |_| {
-            if self.force_removed {
-                return Op::Remove;
-            }
-
-            if self.is_passed_original { if self.patch.is_some() { Op::Replace } else { Op::Remove } } else { Op::Add }
-        })
-    }
-
-    #[inline]
-    pub(super) const fn clear_flags(&mut self) {
-        self.mode_code = None;
-        self.is_passed_original = false;
     }
 }

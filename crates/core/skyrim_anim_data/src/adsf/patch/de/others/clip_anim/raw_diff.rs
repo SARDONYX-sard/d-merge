@@ -11,7 +11,10 @@ use winnow_ext::ReadableError;
 
 use super::ClipAnimDiffPatch;
 use crate::{
-    adsf::patch::de::error::{Error, Result},
+    adsf::patch::de::{
+        error::{Error, Result},
+        others::raw_block::{Op, to_json_patch_op},
+    },
     common_parser::{
         delete_line::delete_this_line,
         lines::{one_line, verify_line_parses_to},
@@ -39,15 +42,6 @@ pub(super) struct RawDiff<'a> {
 
     /// Raw text slice covering `OPEN` to `ORIGINAL`/`CLOSE` (exclusive of the comments).
     pub text: &'a str,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(super) enum Op {
-    Add,
-    Replace,
-    Remove,
-    /// Array push.
-    SeqPush,
 }
 
 pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Result<ClipAnimDiffPatch<'_>> {
@@ -181,14 +175,6 @@ const fn make_seq_action(
             json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start: 0, end: new_len } }
         }
         (None, None) => json_patch::Action::SeqPush,
-    }
-}
-
-const fn to_json_patch_op(op: Op) -> json_patch::Op {
-    match op {
-        Op::Replace => json_patch::Op::Replace,
-        Op::Remove => json_patch::Op::Remove,
-        Op::Add | Op::SeqPush => json_patch::Op::Add, // unreachable Op::SeqPush
     }
 }
 

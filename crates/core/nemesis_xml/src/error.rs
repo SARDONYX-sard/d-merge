@@ -38,5 +38,7 @@ pub enum Error {
     ReadableError { source: winnow_ext::ReadableError },
 }
 
+nemesis_patch_syntax::impl_parse_failure!(Error, ContextError, ReadableError);
+
 /// `Result` for this crate.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

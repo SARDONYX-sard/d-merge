@@ -16,7 +16,10 @@ use crate::{
             ClipMotionDiffPatch,
             de::{
                 error::{Error, Result},
-                others::clip_motion::deserializer::ArrayType,
+                others::{
+                    clip_motion::deserializer::ArrayType,
+                    raw_block::{Op, to_json_patch_op},
+                },
             },
         },
     },
@@ -55,15 +58,6 @@ pub(super) struct RawDiff<'a> {
 
     /// Raw text slice covering `OPEN` to `ORIGINAL`/`CLOSE` (inclusive).
     pub text: &'a str,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(super) enum Op {
-    Add,
-    Replace,
-    Remove,
-    /// ArrayPush.
-    SeqPush,
 }
 
 pub(crate) fn into_patch_map(raw_diffs: Vec<RawDiff<'_>>, priority: usize) -> Result<ClipMotionDiffPatch<'_>> {
@@ -237,14 +231,6 @@ const fn make_seq_action(
             json_patch::Action::Seq { op: to_json_patch_op(op), range: Range { start: 0, end: new_len } }
         }
         (None, None) => json_patch::Action::SeqPush,
-    }
-}
-
-const fn to_json_patch_op(op: Op) -> json_patch::Op {
-    match op {
-        Op::Replace => json_patch::Op::Replace,
-        Op::Remove => json_patch::Op::Remove,
-        Op::Add | Op::SeqPush => json_patch::Op::Add, // unreachable Op::SeqPush
     }
 }
 
