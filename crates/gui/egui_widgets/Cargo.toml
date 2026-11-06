@@ -15,6 +15,7 @@ rust-version.workspace = true
 # NOTE: Depends on `egui` only, so it compiles in seconds and can be checked on its own:
 #       `cargo check -p egui_widgets`
 [dependencies]
+stdx = { workspace = true }
 egui = { workspace = true }
 
 [lints]

@@ -2,6 +2,7 @@
 
 use std::{
     path::{Path, PathBuf},
+    rc::Rc,
     time::Instant,
 };
 
@@ -66,7 +67,7 @@ impl PatchTool {
         self.editor_for = None;
         self.draft = Some(before.with_proposal(&self.workspace, behavior, &id));
         self.merge_values = editor::resolve::merge_values(&request, &id);
-        self.selected = Some(id);
+        self.selected = Some(id.into());
         // What is shown is no change of the work yet.
         self.dirty_since = dirty_since;
         self.session_seen = (self.active, self.selected.clone());
@@ -162,7 +163,7 @@ impl PatchTool {
             mod_dir: self.mod_dir.clone(),
             output: self.output.clone(),
             active: name_of(self.active),
-            selected: self.selected.clone(),
+            selected: self.selected.as_deref().map(str::to_owned),
             tabs: self
                 .tabs
                 .all()
@@ -184,7 +185,10 @@ impl PatchTool {
             }
         }
         self.active = at_of(&session.active).unwrap_or(0);
-        self.selected = session.selected.filter(|id| behaviors.get(self.active).is_some_and(|b| b.text(id).is_some()));
+        self.selected = session
+            .selected
+            .filter(|id| behaviors.get(self.active).is_some_and(|b| b.text(id).is_some()))
+            .map(Rc::from);
         if !session.mod_dir.is_empty() {
             self.mod_dir = session.mod_dir;
         }
@@ -356,7 +360,7 @@ impl PatchTool {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
                 "{} ({written}): {}",
                 i18n.t(I18nKey::ExportedMessage),
-                Path::new(&output).join("Nemesis_Engine").join("mod").join(&code).display()
+                workspace::joined(Path::new(&output), &["Nemesis_Engine", "mod", &code]).display()
             )),
             Ok((_, invalid)) => notify.warn(format!(
                 "{} ({}):\n{}",

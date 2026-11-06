@@ -62,7 +62,7 @@ pub fn is_in_kept_array(text: &str, line: usize) -> bool {
     })
 }
 
-fn is_kept_line(lines: &[&str], at: usize) -> bool {
+pub(crate) fn is_kept_line(lines: &[&str], at: usize) -> bool {
     lines[at].trim_end().ends_with(KEPT_LINE_END) && elements_follow(&lines[at + 1..])
 }
 

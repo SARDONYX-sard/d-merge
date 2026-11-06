@@ -1,6 +1,7 @@
 //! One template being patched: its objects, and what the mod changes of them.
 
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
@@ -9,7 +10,7 @@ use gui_shared::settings::pages::patch::behavior::ParserMode;
 use nemesis_diff::{View, XmlObject, normalize, object_patch, objects, resolve};
 
 use super::{
-    locations::{file_stem, meshes_path, nemesis_folder},
+    locations::{file_name_of, file_stem, joined, meshes_path, nemesis_folder},
     read_dir, read_text,
 };
 
@@ -256,18 +257,17 @@ impl Behavior {
     /// e.g. `Nemesis_Engine/mod/mymod/_1stperson/0_master`,
     /// `Nemesis_EngineExt/mod/mymod/meshes/actors/troll/behaviors/trollbehavior.bin`
     pub(crate) fn patch_dir(&self, code: &str) -> PathBuf {
+        let nemesis = Path::new("Nemesis_Engine");
         if self.asdsf {
-            return Path::new("Nemesis_Engine").join("mod").join(code).join(ASDSF);
+            return joined(nemesis, &["mod", code, ASDSF]);
         }
         if self.adsf {
-            return Path::new("Nemesis_Engine").join("mod").join(code).join(ADSF);
+            return joined(nemesis, &["mod", code, ADSF]);
         }
         match self.target() {
-            Target::Nemesis { name, first_person } => {
-                let dir = Path::new("Nemesis_Engine").join("mod").join(code);
-                if first_person { dir.join("_1stperson").join(name) } else { dir.join(name) }
-            }
-            Target::Ext => Path::new("Nemesis_EngineExt").join("mod").join(code).join(&self.meshes_path),
+            Target::Nemesis { name, first_person: true } => joined(nemesis, &["mod", code, "_1stperson", &name]),
+            Target::Nemesis { name, first_person: false } => joined(nemesis, &["mod", code, &name]),
+            Target::Ext => joined(Path::new("Nemesis_EngineExt"), &["mod", code, &self.meshes_path]),
         }
     }
 
@@ -302,7 +302,7 @@ impl Behavior {
     pub(super) fn patch_folders_in(&self, mod_dir: &Path) -> Vec<PathBuf> {
         let mut folders = vec![mod_dir.join(&self.meshes_path)];
         if let Some((name, first_person)) = &self.nemesis {
-            let folder = if *first_person { mod_dir.join("_1stperson").join(name) } else { mod_dir.join(name) };
+            let folder = if *first_person { joined(mod_dir, &["_1stperson", name]) } else { mod_dir.join(name) };
             folders.push(folder);
         }
         folders
@@ -315,7 +315,7 @@ impl Behavior {
         if self.is_anim_data() {
             return;
         }
-        let code = mod_dir.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+        let code = file_name_of(mod_dir);
         let files: Vec<PathBuf> = self
             .patch_folders_in(mod_dir)
             .iter()
@@ -338,15 +338,16 @@ impl Behavior {
     /// The names in `patch` (of the names object) that the template does not have.
     pub(super) fn read_ref_names(&mut self, patch: &str) {
         let Some(id) = self.object_of_class(STRING_DATA) else { return };
-        let template = self.template_object(id).map(|object| object.text.clone()).unwrap_or_default();
+        let template = self.template_object(id).map_or("", |object| &object.text);
         let text = resolve(patch, View::Mod);
         let new_names = |field: &str| {
-            let known = nemesis_diff::vars::names(&template, field);
+            let known = nemesis_diff::vars::names(template, field);
             let names = nemesis_diff::vars::names(&text, field);
-            names.into_iter().filter(|name| !known.contains(name)).collect::<Vec<String>>()
+            names.into_iter().filter(|name| !known.contains(name)).map(str::to_owned).collect::<Vec<String>>()
         };
-        self.ref_events.extend(new_names("eventNames"));
-        self.ref_variables.extend(new_names("variableNames"));
+        let (events, variables) = (new_names("eventNames"), new_names("variableNames"));
+        self.ref_events.extend(events);
+        self.ref_variables.extend(variables);
     }
 
     /// One object with its current text, if it exists.
@@ -425,23 +426,25 @@ impl Behavior {
     }
 
     /// Stores `text` as the new text of `id` (an edit back to the template removes the edit).
-    pub(crate) fn set_text(&mut self, id: &str, text: String) {
+    pub(crate) fn set_text(&mut self, id: &str, text: &str) {
         if let Some(added) = self.added.get_mut(id) {
-            *added = text;
-        } else if self.template_object(id).is_some_and(|o| normalize(&o.text) == normalize(&text)) {
+            text.clone_into(added);
+        } else if self.template_object(id).is_some_and(|o| normalize(&o.text) == normalize(text)) {
             self.edits.remove(id);
+        } else if let Some(edited) = self.edits.get_mut(id) {
+            text.clone_into(edited);
         } else {
-            self.edits.insert(id.to_string(), text);
+            self.edits.insert(id.to_owned(), text.to_owned());
         }
     }
 
     /// The `#XXXX.txt` contents of an edited object, or the new object's text.
-    pub(crate) fn patch(&self, code: &str, id: &str) -> Option<String> {
+    pub(crate) fn patch(&self, code: &str, id: &str) -> Option<Cow<'_, str>> {
         if let Some(text) = self.added.get(id) {
             // Animation data has lines, not XML: nothing to normalize.
-            return Some(if self.is_anim_data() { text.clone() } else { normalize(text) });
+            return Some(if self.is_anim_data() { Cow::Borrowed(text) } else { normalize(text) });
         }
-        object_patch(code, &self.template_object(id)?.text, self.edits.get(id)?)
+        object_patch(code, &self.template_object(id)?.text, self.edits.get(id)?).map(Cow::Owned)
     }
 
     /// `#code$N` with the next free `N`.

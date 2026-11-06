@@ -585,6 +585,7 @@ dependencies = [
  "skyrim_anim_data",
  "snafu",
  "sonic-rs",
+ "stdx",
  "tokio",
  "tracing",
  "tracing_rotation",
@@ -1584,6 +1585,7 @@ name = "egui_widgets"
 version = "0.0.0"
 dependencies = [
  "egui",
+ "stdx",
 ]
 
 [[package]]
@@ -2319,6 +2321,7 @@ dependencies = [
  "skyrim_data_dir",
  "snafu",
  "sonic-rs",
+ "stdx",
  "tracing",
 ]
 
@@ -2502,6 +2505,7 @@ name = "hkanno_lsp"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "stdx",
 ]
 
 [[package]]
@@ -4020,6 +4024,7 @@ dependencies = [
  "rayon",
  "skyrim_data_dir",
  "sonic-rs",
+ "stdx",
  "tokio",
  "tracing",
  "tracing_rotation",
@@ -4045,6 +4050,7 @@ dependencies = [
  "skyrim_anim_data",
  "skyrim_crc",
  "sonic-rs",
+ "stdx",
  "winnow",
 ]
 
@@ -5513,6 +5519,10 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stdx"
+version = "0.0.0"
 
 [[package]]
 name = "strsim"

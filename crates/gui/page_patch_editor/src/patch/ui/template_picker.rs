@@ -5,6 +5,7 @@ use std::path::Path;
 
 use fast_hash::HashSet;
 use gui_shared::i18n::{I18nKey, I18nMap};
+use stdx::text::contains_ignore_case;
 
 use crate::patch::{
     template_tree::{self, RowKind},
@@ -66,8 +67,7 @@ pub(in crate::patch) fn filtered_ui<'a>(
     i18n: &I18nMap,
 ) -> Option<&'a Path> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
-    let filter = filter.to_lowercase();
-    let shown: Vec<&TemplateEntry> = catalog.iter().filter(|e| e.meshes_path.contains(&filter)).collect();
+    let shown: Vec<&TemplateEntry> = catalog.iter().filter(|e| contains_ignore_case(&e.meshes_path, filter)).collect();
     let mut picked = None;
     egui::ScrollArea::vertical().max_height(MAX_HEIGHT).auto_shrink([false, true]).show_rows(
         ui,

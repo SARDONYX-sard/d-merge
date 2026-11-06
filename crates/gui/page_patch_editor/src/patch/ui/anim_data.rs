@@ -183,7 +183,7 @@ fn project_set_ids(project: &SetProject) -> impl Iterator<Item = String> + '_ {
 
 /// The window's contents. Returns whether `Generate` was clicked.
 fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> bool {
-    ui.weak(dialog.root.display().to_string());
+    ui.weak(dialog.root.to_string_lossy().as_ref());
     egui::CollapsingHeader::new(i18n.t(I18nKey::NemesisAnimDataClips)).default_open(true).show(ui, |ui| {
         clips_ui(ui, i18n, &mut dialog.rows);
     });
@@ -478,7 +478,7 @@ impl PatchTool {
         let adsf = &mut self.workspace.behaviors[self.active];
         let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
         if let Some(first) = added.first() {
-            self.selected = Some(first.clone());
+            self.selected = Some(first.as_str().into());
         }
         for id in &added {
             self.object_changed(id);

@@ -22,6 +22,7 @@ use skyrim_anim_data::{
     diff_line::{DiffLines, deserializer::parse_lines_diff_patch},
 };
 use snafu::ResultExt as _;
+use stdx::path::joined;
 use winnow::Parser;
 
 use self::{
@@ -262,7 +263,7 @@ fn write_alt_asdsf_file(
 
 /// Outputs debug JSON files for each patch in the provided slice.
 fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
-    let mut dest_path = config.output_dir.join(".d_merge").join(".debug").join("patches").join(ASDSF_INNER_PATH);
+    let mut dest_path = joined(&config.output_dir, &[".d_merge", ".debug", "patches", ASDSF_INNER_PATH]);
     dest_path.set_extension("patch.json");
     if let Err(_err) = write_patched_json(&dest_path, patches) {
         #[cfg(feature = "tracing")]
@@ -272,7 +273,7 @@ fn output_debug_patch_json(patches: &[AsdsfPatch], config: &Config) {
 
 /// Debug merged json.
 fn output_merged_alt_adsf(alt_adsf: &AltAsdsf, config: &Config) -> Result<(), Error> {
-    let mut dest_path = config.output_dir.join(".d_merge").join(".debug").join(ASDSF_INNER_PATH);
+    let mut dest_path = joined(&config.output_dir, &[".d_merge", ".debug", ASDSF_INNER_PATH]);
     dest_path.set_extension("json");
     write_patched_json(&dest_path, alt_adsf)
 }

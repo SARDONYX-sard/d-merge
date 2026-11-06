@@ -133,7 +133,7 @@ impl Pandora {
         let root = root.as_ref();
 
         let settings_path = root.join(SETTINGS_FILE_NAME);
-        let active_mods_path = root.join(PANDORA_ENGINE_DIR_NAME).join(ACTIVE_MODS_FILE_NAME);
+        let active_mods_path = stdx::path::joined(root, &[PANDORA_ENGINE_DIR_NAME, ACTIVE_MODS_FILE_NAME]);
 
         let settings_text = std::fs::read_to_string(&settings_path)
             .map_err(|e| format!("Failed to read {}: {e}", settings_path.display()))?;

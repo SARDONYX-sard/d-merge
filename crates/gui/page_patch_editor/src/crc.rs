@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 
 use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
+use stdx::text::contains_ignore_case;
 
 /// CRC32 tool state.
 #[derive(Debug, Default)]
@@ -114,11 +115,11 @@ impl CrcTool {
 
     /// One collapsible row per directory, its files inside.
     fn tree(&self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let filter = self.filter.to_lowercase();
+        let filter = self.filter.as_str();
         for dir in &self.dirs {
-            let dir_matches = dir.path.to_lowercase().contains(&filter);
+            let dir_matches = contains_ignore_case(&dir.path, filter);
             let files: Vec<_> =
-                dir.files.iter().filter(|(name, _)| dir_matches || name.to_lowercase().contains(&filter)).collect();
+                dir.files.iter().filter(|(name, _)| dir_matches || contains_ignore_case(name, filter)).collect();
             if files.is_empty() {
                 continue;
             }

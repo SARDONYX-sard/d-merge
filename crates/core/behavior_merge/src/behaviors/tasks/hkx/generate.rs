@@ -112,7 +112,9 @@ pub(crate) fn generate_hkx_files(
 }
 
 fn debug_file_path(output_dir: &Path, inner_path: &Path) -> PathBuf {
-    output_dir.join(".d_merge").join(".debug").join(inner_path)
+    let mut path = stdx::path::joined(output_dir, &[".d_merge", ".debug"]);
+    path.push(inner_path);
+    path
 }
 
 /// Output template.json & template.json debug string

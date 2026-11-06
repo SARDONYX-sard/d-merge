@@ -10,6 +10,7 @@
 use egui_widgets::shadcn::{Button, Icon, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
+use stdx::text::contains_ignore_case;
 
 use super::{
     anim_data::{DuplicateForm, NewClipsForm},
@@ -124,7 +125,8 @@ impl PatchTool {
     fn object_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
         let code_ok = is_valid_mod_code(self.mod_code.trim()) && !asdsf;
         let selected = self.selected.clone();
-        let is_new = selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(id));
+        let is_new =
+            selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(&**id));
         let (icon, hover) = if is_new {
             (Icon::Trash, I18nKey::NemesisDeleteObjectHover)
         } else {
@@ -302,7 +304,7 @@ impl PatchTool {
         let text = egui::RichText::new(format!("    {marker}{name}")).monospace();
         let response = ui.add(egui::Button::selectable(is_selected, text));
         if response.clicked() {
-            graph.id(node).clone_into(self.selected.get_or_insert_default());
+            self.selected = Some(graph.id(node).into());
         }
         if response.double_clicked() {
             action = Some((node, RowAction::KeepOpen));
@@ -339,7 +341,7 @@ impl PatchTool {
                 let selected = self.selected.as_deref() == Some(id);
                 let response = ui.add(egui::Button::selectable(selected, text));
                 if response.clicked() {
-                    id.clone_into(self.selected.get_or_insert_default());
+                    self.selected = Some(id.into());
                 }
                 if response.double_clicked() {
                     menu_action = Some((node, RowAction::KeepOpen));
@@ -389,10 +391,10 @@ impl PatchTool {
             field.request_focus();
         }
         let behavior = &self.workspace.behaviors[self.active];
-        let filter = self.class_filter.to_lowercase();
+        let filter = self.class_filter.as_str();
         let used = |class: &str| behavior.object_of_class(class).is_some();
         let mut classes: Vec<&str> =
-            nemesis_diff::schema::class_names().into_iter().filter(|c| c.to_lowercase().contains(&filter)).collect();
+            nemesis_diff::schema::class_names().into_iter().filter(|c| contains_ignore_case(c, filter)).collect();
         classes.sort_by_key(|class| !used(class)); // stable: alphabetical within each group
 
         let mut picked = None;
@@ -415,7 +417,7 @@ impl PatchTool {
             let code = self.mod_code.trim().to_string();
             if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
                 self.object_changed(&id);
-                self.selected = Some(id);
+                self.selected = Some(id.into());
                 self.class_picker = false;
             }
         }

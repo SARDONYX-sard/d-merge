@@ -27,7 +27,7 @@ mod kept_array;
 pub mod schema;
 pub mod vars;
 
-use std::{fmt::Write as _, ops::Range};
+use std::{borrow::Cow, fmt::Write as _, ops::Range};
 
 use fast_hash::{HashMap, HashSet};
 
@@ -83,30 +83,30 @@ pub fn objects(xml: &str) -> Vec<XmlObject<'_>> {
 
 /// `name="#0106"` -> `#0106`
 pub(crate) fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
-    let key = format!("{name}=\"");
-    let start = tag.find(&key)? + key.len();
+    let (at, _) = tag.match_indices(name).find(|(at, _)| tag[at + name.len()..].starts_with("=\""))?;
+    let start = at + name.len() + 2;
     let len = tag[start..].find('"')?;
     Some(&tag[start..start + len])
 }
 
-/// Splits lines holding only pointers into one pointer per line (same indentation).
+/// Splits lines holding only pointers into one pointer per line (same indentation), and takes out
+/// what the templates do not have. Most texts already are so, and stay borrowed.
 ///
 /// e.g. `\t\t\t\t#0105 #0109 #0107\n` -> `\t\t\t\t#0105\n\t\t\t\t#0109\n\t\t\t\t#0107\n`
-pub fn normalize(text: &str) -> String {
+pub fn normalize(text: &str) -> Cow<'_, str> {
+    if !needs_normalizing(text) {
+        return Cow::Borrowed(text);
+    }
     let mut out = String::with_capacity(text.len());
     for line in text.split_inclusive('\n') {
         let content = line.trim_end_matches(['\n', '\r']);
         let trimmed = content.trim_start();
-        // serde-hkx's `<!-- referenceCount SERIALIZE_IGNORED -->`: not in Nemesis' templates.
-        if trimmed.starts_with("<!--") && trimmed.ends_with("SERIALIZE_IGNORED -->") {
+        if is_ignored_comment(trimmed) {
             continue;
         }
-        let indent = &content[..content.len() - trimmed.len()];
-        let mut tokens = trimmed.split_whitespace().peekable();
-        let only_pointers = tokens.peek().is_some() && trimmed.split_whitespace().all(|t| t.starts_with('#'));
-
-        if only_pointers && trimmed.split_whitespace().nth(1).is_some() {
-            for token in tokens {
+        if has_several_pointers(trimmed) {
+            let indent = &content[..content.len() - trimmed.len()];
+            for token in trimmed.split_whitespace() {
                 let _ = writeln!(out, "{indent}{token}");
             }
         } else {
@@ -114,7 +114,31 @@ pub fn normalize(text: &str) -> String {
             out.push('\n');
         }
     }
-    out
+    Cow::Owned(out)
+}
+
+/// Does [`normalize`] change `text`?
+fn needs_normalizing(text: &str) -> bool {
+    if !text.is_empty() && !text.ends_with('\n') {
+        return true;
+    }
+    text.split_inclusive('\n').any(|line| {
+        let content = line.trim_end_matches('\n');
+        let trimmed = content.trim_start();
+        content.ends_with('\r') || is_ignored_comment(trimmed) || has_several_pointers(trimmed)
+    })
+}
+
+/// serde-hkx's `<!-- referenceCount SERIALIZE_IGNORED -->`: not in Nemesis' templates.
+fn is_ignored_comment(trimmed: &str) -> bool {
+    trimmed.starts_with("<!--") && trimmed.ends_with("SERIALIZE_IGNORED -->")
+}
+
+/// e.g. `#0105 #0109`
+fn has_several_pointers(trimmed: &str) -> bool {
+    let mut tokens = trimmed.split_whitespace();
+    let is_pointer = |token: &str| token.starts_with('#');
+    tokens.next().is_some_and(is_pointer) && tokens.next().is_some_and(is_pointer) && tokens.all(is_pointer)
 }
 
 const fn open_marker(mod_code: &str) -> MarkerOpen<'_> {
@@ -222,53 +246,63 @@ pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
 /// - An array that is empty in the template keeps its line, however its elements were written, so
 ///   that the patch only adds them instead of replacing the array: see [`kept_array`].
 pub fn align_numelements(template: &str, edited: &str) -> String {
-    const KEY: &str = " numelements=\"";
-    let field = |line: &str| -> Option<String> {
-        let rest = line.trim_start().strip_prefix("<hkparam name=\"")?;
-        line.contains(KEY).then(|| rest.split('"').next().unwrap_or_default().to_string())
-    };
-    let count = |line: &str| -> Option<String> {
-        let at = line.find(KEY)? + KEY.len();
-        Some(line[at..].split('"').next()?.to_string())
-    };
     // field name -> its `numelements` values in template order, and the line if it is an empty array
-    let mut template_counts: HashMap<String, Vec<(String, Option<&str>)>> = HashMap::default();
+    let mut template_counts: HashMap<&str, Vec<(&str, Option<&str>)>> = HashMap::default();
     for line in template.lines() {
-        if let (Some(name), Some(n)) = (field(line), count(line)) {
+        if let (Some(name), Some(count)) = (counted_field(line), count_of(line)) {
             let empty = line.trim_end().ends_with("\"0\"></hkparam>").then_some(line);
-            template_counts.entry(name).or_default().push((n, empty));
+            template_counts.entry(name).or_default().push((count, empty));
         }
     }
 
     let lines: Vec<&str> = edited.split_inclusive('\n').collect();
-    let mut seen: HashMap<String, usize> = HashMap::default();
+    let mut seen: HashMap<&str, usize> = HashMap::default();
     let mut out = String::with_capacity(edited.len());
     let mut at = 0;
     while at < lines.len() {
         let line = lines[at];
         at += 1;
-        let template_field = field(line).and_then(|name| {
-            let k = seen.entry(name.clone()).or_default();
-            let found = template_counts.get(&name)?.get(*k)?;
+        let template_field = counted_field(line).and_then(|name| {
+            let k = seen.entry(name).or_default();
+            let found = template_counts.get(name)?.get(*k)?;
             *k += 1;
             Some(found)
         });
-        let Some((original, empty)) = template_field else {
+        let Some(&(original, empty)) = template_field else {
             out.push_str(line);
             continue;
         };
-        if let Some(kept) = *empty
+        if let Some(kept) = empty
             && let Some(skip) = keep_empty_array_line(kept, line, &lines[at..], &mut out)
         {
             at += skip;
             continue;
         }
-        let aligned = count(line)
-            .filter(|current| current != original)
-            .map(|current| line.replacen(&format!("{KEY}{current}\""), &format!("{KEY}{original}\""), 1));
-        out.push_str(aligned.as_deref().unwrap_or(line));
+        match count_of(line).filter(|current| *current != original) {
+            Some(current) => {
+                let (before, after) = line.split_at(line.find(NUMELEMENTS).unwrap_or_default() + NUMELEMENTS.len());
+                out.push_str(before);
+                out.push_str(original);
+                out.push_str(&after[current.len()..]);
+            }
+            None => out.push_str(line),
+        }
     }
     out
+}
+
+const NUMELEMENTS: &str = " numelements=\"";
+
+/// `<hkparam name="x" numelements="2">` -> `x`
+fn counted_field(line: &str) -> Option<&str> {
+    let rest = line.trim_start().strip_prefix("<hkparam name=\"")?;
+    line.contains(NUMELEMENTS).then(|| rest.split('"').next().unwrap_or_default())
+}
+
+/// `<hkparam name="x" numelements="2">` -> `2`
+fn count_of(line: &str) -> Option<&str> {
+    let at = line.find(NUMELEMENTS)? + NUMELEMENTS.len();
+    line[at..].split('"').next()
 }
 
 /// Writes an array that is empty in the template the way that keeps its line (`kept`). Returns how
@@ -308,7 +342,11 @@ pub enum View {
 /// Removes the markers of a patch file, keeping the `view` side.
 ///
 /// e.g. [`View::Mod`] of a `#0106.txt` is the object as the mod changes it.
-pub fn resolve(patch: &str, view: View) -> String {
+pub fn resolve(patch: &str, view: View) -> Cow<'_, str> {
+    // Without a comment, there is no marker to take out.
+    if !patch.contains("<!--") && (patch.is_empty() || patch.ends_with('\n')) {
+        return Cow::Borrowed(patch);
+    }
     #[derive(PartialEq)]
     enum Section {
         Common,
@@ -339,7 +377,7 @@ pub fn resolve(patch: &str, view: View) -> String {
             }
         }
     }
-    out
+    Cow::Owned(out)
 }
 
 /// A patch file's block: `old` lines from line `at` of what the patch says the template is, replaced
@@ -411,13 +449,13 @@ pub fn apply_to_template(patch: &str, template: &str) -> String {
     let template = normalize(template);
     let base = resolve(&patch, View::Original);
     if base == template {
-        return resolve(&patch, View::Mod);
+        return resolve(&patch, View::Mod).into_owned();
     }
     let hunks = line_hunks(&base, &template);
     let blocks = patch_blocks(&patch);
     let places: Option<Vec<Range<usize>>> =
         blocks.iter().map(|block| place_of_lines(&hunks, block.at, block.old)).collect();
-    let Some(places) = places else { return resolve(&patch, View::Mod) };
+    let Some(places) = places else { return resolve(&patch, View::Mod).into_owned() };
 
     let lines: Vec<&str> = template.split_inclusive('\n').collect();
     let mut out = String::with_capacity(template.len() + patch.len());
@@ -481,16 +519,13 @@ pub fn diff_behavior(mod_code: &str, template: &str, edited: &str) -> BehaviorDi
     let edited_objects = objects(edited);
 
     let renames = new_ids(mod_code, &template_objects, &edited_objects);
-    let rename = |text: &str| {
-        if renames.is_empty() { text.to_string() } else { rename_pointers(text, &renames) }
-    };
 
     let mut diff = BehaviorDiff::default();
     let mut seen: HashSet<&str> = HashSet::default();
     for object in &edited_objects {
         seen.insert(object.id);
         if let Some(original) = template_objects.get(object.id) {
-            if let Some(patch) = object_patch(mod_code, original.text, &rename(object.text)) {
+            if let Some(patch) = object_patch(mod_code, original.text, &renamed(object.text, &renames)) {
                 let hunks = patch.matches(CLOSE).count();
                 diff.changed.push(ChangedObject {
                     id: object.id.to_string(),
@@ -505,7 +540,7 @@ pub fn diff_behavior(mod_code: &str, template: &str, edited: &str) -> BehaviorDi
                 renamed_from: (id != object.id).then(|| object.id.to_string()),
                 id,
                 class: object.class.to_string(),
-                text: normalize(&rename(object.text)),
+                text: normalize(&renamed(object.text, &renames)).into_owned(),
             });
         }
     }
@@ -531,6 +566,11 @@ fn new_ids(
 }
 
 /// Replaces whole pointer tokens (`#0109`, not the `#01` in it).
+/// `text` with its pointers to new objects renamed. Without new objects, it stays borrowed.
+fn renamed<'a>(text: &'a str, renames: &HashMap<String, String>) -> Cow<'a, str> {
+    if renames.is_empty() { Cow::Borrowed(text) } else { Cow::Owned(rename_pointers(text, renames)) }
+}
+
 fn rename_pointers(text: &str, renames: &HashMap<String, String>) -> String {
     let is_id_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
     let mut out = String::with_capacity(text.len());
@@ -552,7 +592,7 @@ fn rename_pointers(text: &str, renames: &HashMap<String, String>) -> String {
 /// Changed objects are replaced by their [`View::Mod`]; new objects are appended to the section.
 pub fn apply_patches<'a>(template: &str, patches: impl IntoIterator<Item = (&'a str, &'a str)>) -> String {
     let objects = objects(template);
-    let mut replaced: HashMap<&str, String> = HashMap::default();
+    let mut replaced: HashMap<&str, Cow<'a, str>> = HashMap::default();
     let mut appended = String::new();
     for (stem, contents) in patches {
         let resolved = resolve(contents, View::Mod);

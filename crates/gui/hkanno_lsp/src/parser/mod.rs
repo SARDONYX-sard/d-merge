@@ -15,6 +15,7 @@
 //! assert!(motion.z.is_none()); // still being typed
 //! ```
 
+use stdx::text::{contains_ignore_case, starts_with_ignore_case};
 mod cursor;
 mod lines;
 pub mod nodes;
@@ -44,10 +45,8 @@ pub enum Syntax {
 /// 6. `animmotion` anywhere in the line
 /// 7. otherwise: plain text annotation
 pub fn parse_line(line: &str, syntax: Syntax) -> LineNode<'_> {
-    let lower = line.to_lowercase();
-
     if syntax == Syntax::Extended {
-        if lower.contains("specialframes_invincible") {
+        if contains_ignore_case(line, "specialframes_invincible") {
             return LineNode::IFrame(lines::iframe(line));
         }
         if is_pie_line(line) {
@@ -55,14 +54,14 @@ pub fn parse_line(line: &str, syntax: Syntax) -> LineNode<'_> {
         }
     }
 
-    let trimmed = lower.trim_start();
+    let trimmed = line.trim_start();
     if trimmed.starts_with('#') {
         LineNode::Comment(lines::comment(line))
-    } else if trimmed.starts_with("trackname:") {
+    } else if starts_with_ignore_case(trimmed, "trackname:") {
         LineNode::TrackName(lines::track_name(line))
-    } else if lower.contains("animrotation") {
+    } else if contains_ignore_case(line, "animrotation") {
         LineNode::Rotation(lines::rotation(line))
-    } else if lower.contains("animmotion") {
+    } else if contains_ignore_case(line, "animmotion") {
         LineNode::Motion(lines::motion(line))
     } else {
         LineNode::Text(lines::text(line))
@@ -89,10 +88,7 @@ pub fn is_pie_line(line: &str) -> bool {
     // Skip the time token when present.
     let event = if lines::looks_like_number(first) { tokens.next() } else { Some(first) };
 
-    event.is_some_and(|event| {
-        let lower = event.to_lowercase();
-        lower == "pie" || lower.starts_with("pie.")
-    })
+    event.is_some_and(|event| event.eq_ignore_ascii_case("pie") || starts_with_ignore_case(event, "pie."))
 }
 
 #[cfg(test)]

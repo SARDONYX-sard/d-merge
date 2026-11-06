@@ -143,12 +143,15 @@ pub const USER_PATCH_ID: &str = "user_patch";
 ///
 /// e.g. `D:/out` -> `D:/out/.d_merge/user_patch`
 pub fn user_patch_output(output_dir: &str) -> std::path::PathBuf {
-    std::path::Path::new(output_dir).join(".d_merge").join("user_patch")
+    stdx::path::joined(std::path::Path::new(output_dir), &[".d_merge", "user_patch"])
 }
 
 /// The user patch's patch directory. e.g. `D:/out/.d_merge/user_patch/Nemesis_Engine/mod/upatch`
 pub fn user_patch_mod_dir(output_dir: &str) -> std::path::PathBuf {
-    user_patch_output(output_dir).join("Nemesis_Engine").join("mod").join(USER_PATCH_CODE)
+    stdx::path::joined(
+        std::path::Path::new(output_dir),
+        &[".d_merge", "user_patch", "Nemesis_Engine", "mod", USER_PATCH_CODE],
+    )
 }
 
 /// A conflict's value to keep, from the patch page to the Patch Editor.

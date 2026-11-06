@@ -137,7 +137,8 @@ fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPat
 
     use crate::errors::FailedIoSnafu;
 
-    let mut output_path = output_dir.join(".d_merge").join(".debug").join("patches").join(key.as_meshes_inner_path());
+    let mut output_path = stdx::path::joined(output_dir, &[".d_merge", ".debug", "patches"]);
+    output_path.push(key.as_meshes_inner_path());
     output_path.set_extension("patch.json");
 
     if let Some(parent) = output_path.parent() {

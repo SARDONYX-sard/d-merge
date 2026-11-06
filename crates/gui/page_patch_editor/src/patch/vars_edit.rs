@@ -139,7 +139,7 @@ impl PatchTool {
         }
         let changed = edits.iter().map(|(id, _)| id.clone()).collect();
         for (id, edited) in edits {
-            behavior.set_text(&id, edited);
+            behavior.set_text(&id, &edited);
         }
         self.vars_error = None;
         Ok(changed)

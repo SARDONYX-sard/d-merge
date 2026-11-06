@@ -83,9 +83,7 @@ pub fn complete(line: &str, cursor: usize) -> CompletionList {
         LineNode::Comment(_) | LineNode::IFrame(_) => Vec::new(),
     };
 
-    let typed = typed.to_lowercase();
-    let items =
-        items.into_iter().filter(|item| typed.is_empty() || item.label.to_lowercase().contains(&typed)).collect();
+    let items = items.into_iter().filter(|item| stdx::text::contains_ignore_case(item.label, &typed)).collect();
 
     CompletionList { replace: Span::new(word_start, cursor), items }
 }

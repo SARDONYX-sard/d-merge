@@ -12,6 +12,7 @@
 use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::vars::VariableType;
+use stdx::text::contains_ignore_case;
 
 use crate::patch::{
     PatchTool,
@@ -31,8 +32,8 @@ impl PatchTool {
         if let Some(error) = &self.vars_error {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
-        let filter = self.filter.to_lowercase();
         let names = self.names();
+        let filter = self.filter.as_str();
         let (events, template_events) = (&names.events, names.template_events);
         let (variables, template_variables) = (&names.variables, names.template_variables);
 
@@ -80,7 +81,7 @@ impl PatchTool {
                 template_count: template_variables,
                 is_variable: true,
             };
-            action = name_rows(ui, i18n, list, &filter, &mut self.new_names.renaming).or(action);
+            action = name_rows(ui, i18n, list, filter, &mut self.new_names.renaming).or(action);
         } else {
             ui.horizontal(|ui| {
                 let name = TextEdit::singleline(&mut self.new_names.event)
@@ -93,7 +94,7 @@ impl PatchTool {
             });
             ui.separator();
             let list = NameList { names: events, types: None, template_count: template_events, is_variable: false };
-            action = name_rows(ui, i18n, list, &filter, &mut self.new_names.renaming).or(action);
+            action = name_rows(ui, i18n, list, filter, &mut self.new_names.renaming).or(action);
         }
 
         let Some(action) = action else { return };
@@ -131,10 +132,8 @@ fn name_rows(
     filter: &str,
     renaming: &mut Option<Renaming>,
 ) -> Option<Action> {
-    let shown: Vec<usize> = (0..list.names.len())
-        .rev()
-        .filter(|&i| filter.is_empty() || list.names[i].to_lowercase().contains(filter))
-        .collect();
+    let shown: Vec<usize> =
+        (0..list.names.len()).rev().filter(|&i| contains_ignore_case(&list.names[i], filter)).collect();
     let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 6.0);
     let mut action = None;
     egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {

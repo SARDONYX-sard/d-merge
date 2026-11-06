@@ -27,6 +27,7 @@ use skyrim_anim_data::{
     diff_line::{DiffLines, deserializer::parse_lines_diff_patch},
 };
 use snafu::ResultExt as _;
+use stdx::path::joined;
 
 use self::{
     path_parser::{ParserType, parse_adsf_path},
@@ -364,7 +365,7 @@ fn write_alt_adsf_file(path: impl AsRef<Path>, alt_adsf: AltAdsf, patches: DiffL
 }
 
 fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
-    let mut path = config.output_dir.join(".d_merge").join(".debug").join("patches").join(ADSF_INNER_PATH);
+    let mut path = joined(&config.output_dir, &[".d_merge", ".debug", "patches", ADSF_INNER_PATH]);
 
     path.set_extension("patch.json");
 
@@ -375,7 +376,7 @@ fn output_debug_patch_json(patches: &[AdsfPatch], config: &Config) {
 }
 
 fn output_merged_alt_adsf(alt_adsf: &AltAdsf, config: &Config) -> Result<(), Error> {
-    let mut path = config.output_dir.join(".d_merge").join(".debug").join(ADSF_INNER_PATH);
+    let mut path = joined(&config.output_dir, &[".d_merge", ".debug", ADSF_INNER_PATH]);
     path.set_extension("json");
 
     write_patched_json(&path, alt_adsf)

@@ -65,8 +65,8 @@ impl VimState {
     /// [`VimOptions::indent`]: super::VimOptions::indent
     pub(super) fn shift_lines(&self, first: usize, last: usize, right: bool, exec: &mut Exec) {
         let (unit, width) = match self.options.indent {
-            crate::Indent::Tab(width) => ("\t".to_owned(), width.max(1)),
-            crate::Indent::Spaces(width) => (" ".repeat(width.max(1)), width.max(1)),
+            crate::Indent::Tab(width) => (std::borrow::Cow::Borrowed("\t"), width.max(1)),
+            crate::Indent::Spaces(width) => (std::borrow::Cow::Owned(" ".repeat(width.max(1))), width.max(1)),
         };
         let start = exec.buf.nth_line_start(first);
         let end = exec.buf.line_end(exec.buf.nth_line_start(last));

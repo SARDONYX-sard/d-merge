@@ -684,7 +684,7 @@ impl TreeState {
         &mut self,
         inputs: &[TreeInput],
         graph: &Graph,
-        selected: &mut Option<String>,
+        selected: &mut Option<Rc<str>>,
         changed_only: bool,
     ) -> bool {
         self.prepare(graph, selected.as_deref(), changed_only);
@@ -708,11 +708,11 @@ impl TreeState {
     }
 
     /// Opens the object of the cursor's row, as `j` / `k` do.
-    fn select_cursor(&mut self, graph: &Graph, selected: &mut Option<String>) {
+    fn select_cursor(&mut self, graph: &Graph, selected: &mut Option<Rc<str>>) {
         self.scroll_to = Some(self.cursor);
         if let Some(row) = self.rows.get(self.cursor) {
             self.revealed = Some(Rc::clone(&graph.entry(row.node).id));
-            graph.id(row.node).clone_into(selected.get_or_insert_default());
+            *selected = Some(graph.id(row.node).into());
         }
     }
 

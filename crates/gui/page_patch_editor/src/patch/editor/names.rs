@@ -73,8 +73,8 @@ impl Names {
     }
 
     fn read_names(&mut self, string_data: &str) {
-        self.events = vars::names(string_data, "eventNames");
-        self.variables = vars::names(string_data, "variableNames");
+        self.events = vars::names(string_data, "eventNames").into_iter().map(str::to_owned).collect();
+        self.variables = vars::names(string_data, "variableNames").into_iter().map(str::to_owned).collect();
     }
 }
 
@@ -98,8 +98,8 @@ mod tests {
         let (string_text, graph_text) =
             vars::add_event(behavior.text(&string_data).unwrap(), behavior.text(&graph_data).unwrap(), "myEvent")
                 .unwrap();
-        behavior.set_text(&string_data, string_text.clone());
-        behavior.set_text(&graph_data, graph_text);
+        behavior.set_text(&string_data, &string_text);
+        behavior.set_text(&graph_data, &graph_text);
         names.apply_changes(&behavior, &[string_data.clone(), graph_data]);
         assert_eq!(names.events.len(), before + 1);
         assert_eq!(names.events.last().map(String::as_str), Some("myEvent"));
@@ -108,7 +108,7 @@ mod tests {
             "<hkcstring>myEvent</hkcstring>",
             "<hkcstring>myEvent</hkcstring>\n\t\t\t\t<hkcstring>typed</hkcstring>",
         );
-        behavior.set_text(&string_data, typed);
+        behavior.set_text(&string_data, &typed);
         names.apply_changes(&behavior, &[string_data]);
         assert_eq!(names.events.last().map(String::as_str), Some("typed"));
     }

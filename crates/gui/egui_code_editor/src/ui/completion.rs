@@ -20,7 +20,7 @@ impl CompletionPopup {
         } else {
             (anchor.left_top(), egui::Align2::LEFT_BOTTOM, above)
         };
-        let doc = list.items.get(self.selected).map(|item| item.documentation.as_str()).filter(|d| !d.is_empty());
+        let doc = list.items.get(self.selected).map(|item| item.documentation.as_ref()).filter(|d| !d.is_empty());
         let doc_room = if doc.is_some() { DOC_HEIGHT } else { 0.0 };
         let list_height = (room - doc_room - 32.0).clamp(60.0, 400.0);
         let follow = self.scrolled_to != Some(self.selected);

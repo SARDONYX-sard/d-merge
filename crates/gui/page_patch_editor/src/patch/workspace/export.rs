@@ -1,10 +1,15 @@
 //! Writing the real mod: only what the work read or made is replaced.
 
-use std::path::Path;
+use std::{fmt::Write as _, path::Path};
 
 use gui_shared::settings::pages::patch::behavior::ParserMode;
+use stdx::text::push_joined;
 
-use super::{Workspace, locations::ENGINES, write};
+use super::{
+    Workspace,
+    locations::{ENGINES, joined},
+    write,
+};
 
 /// e.g. `Nemesis_Engine\\mod\\para\\0_master\\#0106.txt` -> `Nemesis_Engine/mod/para/0_master/#0106.txt`
 pub(super) fn owned_key(relative: &Path) -> String {
@@ -45,11 +50,12 @@ impl Workspace {
     pub(super) fn ext_info(&self, info: &str, own_code: &str) -> String {
         let mut out = info.to_owned();
         if !self.info.version.trim().is_empty() {
-            out.push_str(&format!("\nversion={}", self.info.version.trim()));
+            let _ = write!(out, "\nversion={}", self.info.version.trim());
         }
         let deps = self.deps(own_code);
         if !deps.is_empty() {
-            out.push_str(&format!("\ndeps={}", deps.join(",")));
+            out.push_str("\ndeps=");
+            push_joined(&mut out, deps.iter().map(String::as_str), ",");
         }
         out
     }
@@ -86,7 +92,7 @@ impl Workspace {
                 written += 1;
             }
         }
-        let roots = ENGINES.map(|engine| output.join(engine).join("mod").join(code));
+        let roots = ENGINES.map(|engine| joined(output, &[engine, "mod", code]));
         let [nemesis, ext] = roots;
         if nemesis.is_dir() {
             write(&nemesis.join("info.ini"), &info)?;

@@ -97,7 +97,7 @@ fn apply_anim_data(
     let text = read_text(&Path::new(&request.mod_dir).join(stem).join(&id))?;
     let behavior = workspace.anim_behavior(stem, template_root)?;
     if behavior.template_object(&id).is_some() {
-        behavior.set_text(&id, resolve(&text, View::Mod));
+        behavior.set_text(&id, &resolve(&text, View::Mod));
     } else {
         behavior.added.insert(id.clone(), text);
     }
@@ -208,7 +208,7 @@ fn apply_behavior(
     let template = behavior.template_object(id).ok_or_else(|| format!("{id}: not in the template"))?;
     let (edited, line) = apply_block_over(&template.text, current, &block)
         .ok_or_else(|| format!("{}: the lines this change replaces are not in the object", request.path))?;
-    behavior.set_text(id, edited);
+    behavior.set_text(id, &edited);
     Ok(Resolved { behavior: at, id: id.to_owned(), line: Some(line) })
 }
 

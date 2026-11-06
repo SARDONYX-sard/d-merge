@@ -422,10 +422,10 @@ impl ComboBox {
 
             ui.add_space(4.0);
 
-            let query = search_text.to_lowercase();
+            let query = search_text.as_str();
             let filtered: Vec<(usize, egui::WidgetText)> = (0..len)
                 .map(|i| (i, get(i).into()))
-                .filter(|(_, text)| query.is_empty() || text.text().to_lowercase().contains(&query))
+                .filter(|(_, text)| stdx::text::contains_ignore_case(text.text(), query))
                 .collect();
 
             let typed = search_text.trim().to_owned();

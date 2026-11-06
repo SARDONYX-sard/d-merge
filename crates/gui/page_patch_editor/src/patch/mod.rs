@@ -119,7 +119,7 @@ pub(crate) struct PatchTool {
     dirty_since: Option<Instant>,
 
     active: usize,
-    selected: Option<String>,
+    selected: Option<Rc<str>>,
     filter: String,
     changed_only: bool,
 
@@ -196,13 +196,13 @@ pub(crate) struct PatchTool {
     /// The button above the list was clicked: done where the list has its files.
     anim_expand_all: bool,
     /// The selection the way to it was last opened for.
-    anim_revealed: Option<String>,
+    anim_revealed: Option<Rc<str>>,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
     /// The works opened lately, the last one first. From the settings.
     recent: Vec<RecentWork>,
     /// The behavior and the object the work last saved had open.
-    session_seen: (usize, Option<String>),
+    session_seen: (usize, Option<Rc<str>>),
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
@@ -463,7 +463,7 @@ mod tests {
             }};
         }
         let mut names = time!("Names::new", editor::names::Names::new(&behavior));
-        time!("set_text", behavior.set_text(&id, edited.clone()));
+        time!("set_text", behavior.set_text(&id, &edited));
         let patch = time!("patch", behavior.patch("m", &id)).unwrap();
         let check = time!("validate", behavior.validate(&id, &patch, ParserMode::Strict));
         println!("  valid: {}", check.is_ok());
@@ -474,13 +474,13 @@ mod tests {
 
         // A typo in a field name, and fixing it.
         let broken = text.replacen("name=\"", "name=\"x", 2);
-        behavior.set_text(&id, broken.clone());
+        behavior.set_text(&id, &broken);
         let bad_patch = time!("broken: patch", behavior.patch("m", &id)).unwrap();
         let bad = time!("broken: validate", behavior.validate(&id, &bad_patch, ParserMode::Strict));
         println!("  valid: {}, error of {} bytes", bad.is_ok(), bad.as_ref().err().map_or(0, String::len));
         time!("broken: diagnostics", editor::diagnostics::field_diagnostics(&broken, &behavior, false, "m"));
         time!("broken: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
-        behavior.set_text(&id, edited);
+        behavior.set_text(&id, &edited);
         time!("fixed: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
         time!("fixed: graph rows", {
             let mut state = tree::TreeState::default();
@@ -506,7 +506,7 @@ mod tests {
             let ids: Vec<String> = behavior.edits.keys().chain(behavior.added.keys()).cloned().collect();
             for id in ids {
                 println!("{active} {id}");
-                tool.selected = Some(id.clone());
+                tool.selected = Some(id.as_str().into());
                 egui::__run_test_ui(|ui| {
                     tool.object_list(ui, &i18n);
                     tool.object_editor(ui, &i18n);

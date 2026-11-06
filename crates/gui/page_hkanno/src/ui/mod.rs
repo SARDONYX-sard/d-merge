@@ -4,6 +4,8 @@
 mod preview;
 mod toolbar;
 
+use std::borrow::Cow;
+
 use egui_code_editor::{CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, text_pos::LinePos};
 use egui_widgets::shadcn::Button;
 use gui_shared::{
@@ -67,9 +69,14 @@ impl HkannoPage {
                 ui.horizontal(|ui| {
                     for (i, tab) in self.tabs.iter().enumerate() {
                         // `*` marks unsaved edits.
-                        let title = if tab.dirty { format!("{}*", tab.title()) } else { tab.title().to_string() };
-                        let response =
-                            ui.add(Button::selectable(i == self.active, title)).on_hover_text(&tab.settings.input_path);
+                        let title = if tab.dirty {
+                            Cow::Owned(format!("{}*", tab.title()))
+                        } else {
+                            Cow::Borrowed(tab.title())
+                        };
+                        let response = ui
+                            .add(Button::selectable(i == self.active, title.as_ref()))
+                            .on_hover_text(&tab.settings.input_path);
                         if response.clicked() {
                             self.active = i;
                         }

@@ -24,6 +24,7 @@ use nemesis_diff::{
     schema::{self, FieldSchema, TypeKind},
     vars,
 };
+use stdx::text::{contains_ignore_case, push_joined, starts_with_ignore_case};
 
 use crate::patch::{tree::Graph, workspace::Behavior};
 
@@ -172,14 +173,14 @@ impl Language for NemesisXml<'_> {
         if line.trim_start().starts_with("<hkobject")
             && let Some((class, _)) = schema::field_context(text, line_no + 1)
         {
-            doc.push_str(&class_hover(&class));
+            doc.push_str(&class_hover(class));
         }
         // The class around the hovered line (`self.fields` is the one around the cursor).
         if let Some((class, fields)) = schema::field_context(text, line_no)
             && let Some(name) = field_name_of(line)
             && let Some(field) = fields.iter().find(|field| field.name == name)
         {
-            doc.push_str(&field_hover(&class, field));
+            doc.push_str(&field_hover(class, field));
         }
         if nemesis_diff::is_in_kept_array(text, line_no) {
             if !doc.is_empty() {
@@ -240,9 +241,9 @@ impl Language for NemesisXml<'_> {
                     let token = format!("{}{name}]$", kind.prefix()).to_ascii_lowercase();
                     for object in self.behavior.texts() {
                         let lines = object.text.lines().enumerate();
-                        locations.extend(lines.filter(|(_, l)| l.to_ascii_lowercase().contains(&token)).map(
-                            |(line, _)| Location { document: object.id.into(), line, detail: object.class.into() },
-                        ));
+                        locations.extend(lines.filter(|(_, l)| contains_ignore_case(l, &token)).map(|(line, _)| {
+                            Location { document: object.id.into(), line, detail: object.class.into() }
+                        }));
                     }
                     Cow::Owned(token)
                 }
@@ -337,15 +338,14 @@ impl NemesisXml<'_> {
             return None;
         }
         let typed = value.trim_start();
-        let lower = typed.trim_start_matches('$').to_lowercase();
+        let wanted = typed.trim_start_matches('$');
         let items = [(Kind::Event, "⚡"), (Kind::Variable, "𝑥")]
             .into_iter()
             .flat_map(|(kind, icon)| {
-                let lower = &lower;
-                self.names_of(kind).iter().enumerate().filter(move |(_, name)| name.to_lowercase().contains(lower)).map(
+                self.names_of(kind).iter().enumerate().filter(move |(_, name)| contains_ignore_case(name, wanted)).map(
                     move |(index, name)| {
                         let insert = format!("{}{name}]$", kind.prefix());
-                        item(&insert, icon, insert.clone(), self.name_doc(kind, index))
+                        item(insert.clone(), icon, insert, self.name_doc(kind, index))
                     },
                 )
             })
@@ -363,13 +363,13 @@ impl NemesisXml<'_> {
         if let Some(at) = before.rfind(OPEN)
             && !before[at + OPEN.len()..].contains('"')
         {
-            let typed = before[at + OPEN.len()..].to_lowercase();
+            let typed = &before[at + OPEN.len()..];
             let items = fields
                 .iter()
-                .filter(|field| field.name.to_lowercase().contains(&typed))
+                .filter(|field| contains_ignore_case(field.name, typed))
                 .map(|field| {
-                    let snippet = schema::field_snippet(field, depth);
-                    let insert = snippet[OPEN.len()..].to_string();
+                    let mut insert = schema::field_snippet(field, depth);
+                    insert.drain(..OPEN.len());
                     let mut item = item(field.name, "▪", insert, field_doc(class, field));
                     item.select = value_range(&item.insert);
                     item
@@ -416,19 +416,18 @@ impl NemesisXml<'_> {
         }
         let start = before[..at + prefix.len()].chars().count();
         // Replace an existing `]$` too, so accepting does not double it.
-        let after: String = line.chars().skip(column).take(2).collect();
-        let end = if after == "]$" { column + 2 } else { column };
+        let closed = line.chars().skip(column).take(2).eq("]$".chars());
+        let end = if closed { column + 2 } else { column };
 
         let (names, icon) = match kind {
             Kind::Event => (self.events, "⚡"),
             Kind::Variable => (self.variables, "𝑥"),
         };
-        let typed = typed.to_lowercase();
         let items = names
             .iter()
             .enumerate()
-            .filter(|(_, name)| name.to_lowercase().contains(&typed))
-            .map(|(index, name)| item(name, icon, format!("{name}]$"), self.name_doc(kind, index)))
+            .filter(|(_, name)| contains_ignore_case(name, typed))
+            .map(|(index, name)| item(name.clone(), icon, format!("{name}]$"), self.name_doc(kind, index)))
             .collect();
         Some(CompletionList { replace: start..end, items })
     }
@@ -444,17 +443,16 @@ impl NemesisXml<'_> {
             return None;
         }
         let typed = value.rsplit(char::is_whitespace).next().unwrap_or_default();
-        let typed_lower = typed.to_lowercase();
         let fits = |doc: &str| schema::pointer_accepts(field, class_of_doc(doc));
-        let null = (field.kind == TypeKind::Pointer && "null".starts_with(&typed_lower))
-            .then(|| item("null", "∅", "null".to_string(), "No object".to_string()));
+        let null = (field.kind == TypeKind::Pointer && starts_with_ignore_case("null", typed))
+            .then(|| item("null", "∅", "null", "No object"));
         let graph = self.graph;
         let items = null
             .into_iter()
             .chain(
                 graph
                     .nodes()
-                    .filter(|&node| fits(graph.doc(node)) && graph.id(node).to_lowercase().starts_with(&typed_lower))
+                    .filter(|&node| fits(graph.doc(node)) && starts_with_ignore_case(graph.id(node), typed))
                     .take(200)
                     .map(|node| pointer_item(graph, node)),
             )
@@ -469,15 +467,14 @@ impl NemesisXml<'_> {
         if !typed[1..].chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
             return None;
         }
-        let typed_lower = typed.to_lowercase();
         let graph = self.graph;
         let fits = |doc: &str| self.pointer_field.is_none_or(|field| schema::pointer_accepts(field, class_of_doc(doc)));
         let items = graph
             .nodes()
             .filter(|&node| fits(graph.doc(node)))
             .filter(|&node| {
-                graph.id(node).to_lowercase().starts_with(&typed_lower)
-                    || (typed.len() > 1 && graph.doc(node).to_lowercase().contains(&typed_lower[1..]))
+                starts_with_ignore_case(graph.id(node), typed)
+                    || (typed.len() > 1 && contains_ignore_case(graph.doc(node), &typed[1..]))
             })
             .take(200)
             .map(|node| pointer_item(graph, node))
@@ -499,17 +496,16 @@ impl NemesisXml<'_> {
         let schema_values = schema_field
             .map(|f| if f.kind == TypeKind::Bool { BOOL_VALUES } else { f.values })
             .filter(|values| !values.is_empty());
-        let (values, doc): (Vec<&str>, &str) = match schema_values {
-            Some(values) => (values.to_vec(), "class schema"),
-            None => (self.values.get(field)?.iter().map(String::as_str).collect(), "used in the template"),
+        let (values, doc): (Cow<'_, [&str]>, &str) = match schema_values {
+            Some(values) => (Cow::Borrowed(values), "class schema"),
+            None => (Cow::Owned(self.values.get(field)?.iter().map(String::as_str).collect()), "used in the template"),
         };
         // The token after the last `|` (flags) or the start of the value.
         let typed = value.rsplit('|').next().unwrap_or_default().trim_start();
-        let typed_lower = typed.to_lowercase();
         let items = values
             .iter()
-            .filter(|v| v.to_lowercase().contains(&typed_lower))
-            .map(|v| item(v, "◆", (*v).to_string(), format!("`{field}` value ({doc})")))
+            .filter(|v| contains_ignore_case(v, typed))
+            .map(|v| item((*v).to_owned(), "◆", (*v).to_owned(), format!("`{field}` value ({doc})")))
             .collect();
         Some(CompletionList { replace: column - typed.chars().count()..column, items })
     }
@@ -527,7 +523,6 @@ const BOOL_VALUES: &[&str] = &["true", "false"];
 ///
 /// e.g., `hkbModifierList : hkbModifier : hkbBindable`, `signature 0xa4180ca1`
 fn class_hover(class: &str) -> String {
-    use std::fmt::Write as _;
     let mut doc = format!("⟦class|{class}⟧");
     for parent in schema::class_parents(class) {
         let _ = write!(doc, " : ⟦class|{parent}⟧");
@@ -546,7 +541,7 @@ fn class_hover(class: &str) -> String {
 fn field_hover(class: &str, field: &FieldSchema) -> String {
     let mut doc = format!("⟦class|{class}⟧.**{}**: `{}`", field.name, schema::type_label(field));
     if let Some(target) = field.class {
-        doc.push_str(&format!(" → ⟦class|{target}⟧"));
+        let _ = write!(doc, " → ⟦class|{target}⟧");
     }
     doc
 }
@@ -571,11 +566,12 @@ fn missing_fields_fix(text: &str) -> Option<QuickFix> {
 fn field_doc(class: &str, field: &FieldSchema) -> String {
     let mut doc = format!("**{class}.{}**: `{}`", field.name, schema::type_label(field));
     if let Some(target) = field.class {
-        doc.push_str(&format!(" → `{target}`"));
+        let _ = write!(doc, " → `{target}`");
     }
     if !field.values.is_empty() {
         let sep = if field.kind == TypeKind::Flags { " | " } else { ", " };
-        doc.push_str(&format!("\n\n{}", field.values.join(sep)));
+        doc.push_str("\n\n");
+        push_joined(&mut doc, field.values.iter().copied(), sep);
     }
     doc
 }
@@ -588,12 +584,11 @@ pub(in crate::patch) fn trigger_completion(names: &[String], before: &str, colum
     if typed.contains(':') {
         return CompletionList::default();
     }
-    let lower = typed.to_lowercase();
     let items = names
         .iter()
-        .filter(|name| name.to_lowercase().contains(&lower))
+        .filter(|name| contains_ignore_case(name, typed))
         .take(200)
-        .map(|name| item(name, "⚡", format!("{name}:"), String::new()))
+        .map(|name| item(name.clone(), "⚡", format!("{name}:"), ""))
         .collect();
     CompletionList { replace: column - typed.chars().count()..column, items }
 }
@@ -606,7 +601,7 @@ fn class_of_doc(doc: &str) -> &str {
 
 fn pointer_item(graph: &Graph, node: crate::patch::tree::Node) -> CompletionItem {
     let id = graph.id(node);
-    item(id, "→", id.to_owned(), graph.doc(node).to_owned())
+    item(id.to_owned(), "→", id.to_owned(), graph.doc(node).to_owned())
 }
 
 /// On an empty line of an array of strings, or `<`, `<hk`, ...: the tag of its elements, with the
@@ -619,13 +614,24 @@ fn string_element(before: &str, column: usize) -> Option<CompletionList> {
     if !OPEN.starts_with(typed) && !OPEN[1..].starts_with(typed) {
         return None;
     }
-    let mut element = item("hkcstring", "▪", format!("{OPEN}</hkcstring>"), "An element of the array".to_owned());
+    let mut element = item("hkcstring", "▪", "<hkcstring></hkcstring>", "An element of the array");
     element.select = Some(OPEN.len()..OPEN.len());
     Some(CompletionList { replace: column - typed.chars().count()..column, items: vec![element] })
 }
 
-pub(in crate::patch) fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
-    CompletionItem { label: label.to_string(), icon, insert, select: None, documentation }
+pub(in crate::patch) fn item(
+    label: impl Into<Cow<'static, str>>,
+    icon: &'static str,
+    insert: impl Into<Cow<'static, str>>,
+    documentation: impl Into<Cow<'static, str>>,
+) -> CompletionItem {
+    CompletionItem {
+        label: label.into(),
+        icon,
+        insert: insert.into(),
+        select: None,
+        documentation: documentation.into(),
+    }
 }
 
 /// Every `UPPER_CASE` token per field name in the template (enum and flag values).

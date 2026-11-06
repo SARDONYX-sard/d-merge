@@ -270,7 +270,7 @@ pub fn is_subclass(class: &str, base: &str) -> bool {
 
 /// The class (and its XML fields) of the innermost `<hkobject>` open at 0-based `line` of an
 /// object text. A classless nested `<hkobject>` gets the class from its field's type.
-pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static FieldSchema>)> {
+pub fn field_context(object: &str, line: usize) -> Option<(&'static str, Vec<&'static FieldSchema>)> {
     let object = crate::open_kept_arrays(object);
     let mut objects: Vec<Option<&str>> = Vec::new();
     let mut fields: Vec<Option<&'static str>> = Vec::new();
@@ -278,8 +278,8 @@ pub fn field_context(object: &str, line: usize) -> Option<(String, Vec<&'static 
         walk_line(text, &mut objects, &mut fields);
     }
     let class = objects.last().copied().flatten()?;
-    find_class_schema(class)?;
-    Some((class.to_string(), xml_fields(class).collect()))
+    let class = find_class_schema(class)?.name;
+    Some((class, xml_fields(class).collect()))
 }
 
 /// The array of pointers that 0-based `line` of an object text is an element of, if any. A line of it

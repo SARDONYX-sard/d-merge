@@ -13,6 +13,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+stdx      = { workspace = true }
 egui      = { workspace = true }
 phf       = { workspace = true }
 rayon     = { workspace = true }

@@ -8,7 +8,10 @@ use super::{
     Workspace,
     behavior::{ADSF, ASDSF, Behavior},
     export::owned_key,
-    locations::{anim_template_path, code_dirs, code_of, file_stem, meshes_path_of_folder, mod_root_of, patch_folders},
+    locations::{
+        anim_template_path, code_dirs, code_of, file_name_of, file_stem, joined, meshes_path_of_folder, mod_root_of,
+        patch_folders,
+    },
     mod_info::parse_info,
     read_dir, read_text,
 };
@@ -22,9 +25,9 @@ pub(super) fn import_adsf(mod_dir: &Path, template_root: &Path) -> Result<Option
     }
     let mut behavior = Behavior::open(&anim_template_path(template_root, ADSF))?;
     for project in read_dir(&dir)?.filter(|p| p.is_dir()) {
-        let project_name = project.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let project_name = file_name_of(&project);
         for file in read_dir(&project)?.filter(|p| p.is_file()) {
-            let file_name = file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            let file_name = file_name_of(&file);
             behavior.added.insert(format!("{project_name}/{file_name}"), read_text(&file)?);
         }
     }
@@ -45,27 +48,29 @@ pub(super) fn import_asdsf(
     if !dir.is_dir() {
         return Ok(None);
     }
-    let Some(template) = ["bin", "txt"]
-        .iter()
-        .map(|ext| template_root.join("meshes").join(format!("{ASDSF}.{ext}")))
-        .find(|path| path.is_file())
-    else {
+    let mut template = joined(template_root, &["meshes", ASDSF]);
+    if !["bin", "txt"].iter().any(|ext| {
+        template.set_extension(ext);
+        template.is_file()
+    }) {
         skipped.push(ASDSF.to_string());
         return Ok(None);
     };
     let mut behavior = Behavior::open(&template)?;
     for project in read_dir(&dir)?.filter(|p| p.is_dir()) {
-        let project_name = project.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let project_name = file_name_of(&project);
         for file in read_dir(&project)?.filter(|p| p.is_file()) {
-            let file_name = file.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            let file_name = file_name_of(&file);
             let wanted = format!("{project_name}/{file_name}");
             // Folder / file names are case-insensitive.
             let template_id =
                 behavior.objects.iter().find(|o| o.id.eq_ignore_ascii_case(&wanted)).map(|o| o.id.clone());
             match template_id {
                 Some(id) => {
-                    let template = behavior.template_object(&id).map(|object| object.text.clone()).unwrap_or_default();
-                    behavior.set_text(&id, apply_to_template(&read_text(&file)?, &template));
+                    let patch = read_text(&file)?;
+                    let text =
+                        apply_to_template(&patch, behavior.template_object(&id).map_or("", |object| &object.text));
+                    behavior.set_text(&id, &text);
                 }
                 None => {
                     behavior.added.insert(wanted, read_text(&file)?);
@@ -117,11 +122,11 @@ impl Workspace {
                 continue;
             };
             // `.bin` (shipped templates) or `.xml` (a template_dir of xml files).
-            let Some(template) = ["bin", "xml"]
-                .iter()
-                .map(|ext| template_root.join(Path::new(&meshes_path).with_extension(ext)))
-                .find(|path| path.is_file())
-            else {
+            let mut template = template_root.join(&meshes_path);
+            if !["bin", "xml"].iter().any(|ext| {
+                template.set_extension(ext);
+                template.is_file()
+            }) {
                 skipped.push(relative);
                 continue;
             };
@@ -131,10 +136,11 @@ impl Workspace {
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 let id = file_stem(&file);
                 let patch = read_text(&file)?;
-                if let Some(template) = behavior.template_object(&id).map(|object| object.text.clone()) {
-                    behavior.set_text(&id, apply_to_template(&patch, &template));
+                if let Some(template) = behavior.template_object(&id) {
+                    let text = apply_to_template(&patch, &template.text);
+                    behavior.set_text(&id, &text);
                 } else {
-                    behavior.added.insert(id, resolve(&patch, View::Mod));
+                    behavior.added.insert(id, resolve(&patch, View::Mod).into_owned());
                 }
                 self.owned.extend(root.and_then(|root| file.strip_prefix(root).ok()).map(owned_key));
             }

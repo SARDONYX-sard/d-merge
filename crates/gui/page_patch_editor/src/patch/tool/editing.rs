@@ -1,6 +1,6 @@
 //! The open object: its tabs, what it shows beside the text, and what the editor asked for.
 
-use std::{path::Path, rc::Rc, time::Instant};
+use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
 
 use egui_code_editor::{EditorCommand, InlineDiff};
 
@@ -10,7 +10,7 @@ impl PatchTool {
     /// The next or previous tab, with the keyboard staying in the editor.
     pub(in crate::patch) fn step_tab(&mut self, current: &str, forward: bool) {
         if let Some(next) = self.tabs.neighbor(self.active, current, forward) {
-            next.clone_into(self.selected.get_or_insert_default());
+            self.selected = Some(next.into());
             self.focus_editor = Some(FocusAt::Keep);
         }
     }
@@ -20,7 +20,7 @@ impl PatchTool {
         let mut current = current.to_string();
         while let Some(target) = self.history.walk(older, &current) {
             if self.workspace.behaviors[self.active].text(&target).is_some() {
-                self.selected = Some(target);
+                self.selected = Some(target.into());
                 self.focus_editor = Some(FocusAt::Keep);
                 return;
             }
@@ -32,7 +32,7 @@ impl PatchTool {
     pub(in crate::patch) fn open_location(&mut self, current: &str, document: &str, line: usize) {
         if document != current {
             self.history.visit(current);
-            document.clone_into(self.selected.get_or_insert_default());
+            self.selected = Some(document.into());
         }
         self.focus_editor = Some(FocusAt::Line(line));
     }
@@ -42,7 +42,7 @@ impl PatchTool {
         let current = self.selected.as_deref().filter(|selected| *selected != id);
         self.tabs.open(self.active, id, current);
         self.tabs.pin(self.active, id);
-        id.clone_into(self.selected.get_or_insert_default());
+        self.selected = Some(id.into());
     }
 
     /// Loads `id` into the editor if it is not the open object already.
@@ -133,7 +133,7 @@ impl PatchTool {
             let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.editor_text));
             editor::diagnostics::add_parser_error(&mut self.field_problems, &self.editor_text, error, to_editor_line);
         }
-        self.preview = Some((patch, check));
+        self.preview = Some((patch.map(Cow::into_owned), check));
         self.inline_diff = behavior.template_object(id).map_or_else(InlineDiff::default, |template| {
             editor::inline_diff::changes(&template.text, &self.editor_text)
         });
@@ -154,12 +154,12 @@ impl PatchTool {
     pub(in crate::patch) fn apply_tab_event(&mut self, event: Option<TabEvent>, current: &str) {
         let active = self.active;
         match event {
-            Some(TabEvent::Show(id)) => self.selected = Some(id),
+            Some(TabEvent::Show(id)) => self.selected = Some(id.into()),
             Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
             Some(TabEvent::CloseToTheRight(id)) => {
                 self.tabs.close_to_the_right(active, &id);
                 if !self.tabs.of(active).any(|tab| tab.id == current) {
-                    self.selected = Some(id);
+                    self.selected = Some(id.into());
                 }
             }
             Some(TabEvent::CloseAll) => {
@@ -170,13 +170,13 @@ impl PatchTool {
             Some(TabEvent::Close(id)) => {
                 let neighbor = self.tabs.close(active, &id);
                 if id == current {
-                    self.selected = neighbor;
+                    self.selected = neighbor.map(Rc::from);
                     self.editor_for = None; // its editor state went with the tab
                 }
             }
             Some(TabEvent::CloseOthers(id)) => {
                 self.tabs.close_others(active, &id);
-                self.selected = Some(id);
+                self.selected = Some(id.into());
             }
             None => {}
         }
@@ -185,7 +185,7 @@ impl PatchTool {
     /// Does what the editor asked for. Returns whether the keyboard goes to the object tree.
     pub(in crate::patch) fn apply_editor_result(&mut self, result: EditorResult, id: &str) -> bool {
         if result.changed {
-            self.workspace.behaviors[self.active].set_text(id, self.editor_text.clone());
+            self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
             self.typed_at = Some(Instant::now());
             self.tabs.pin(self.active, id); // edited: it stays open
             self.object_changed(id);
@@ -227,7 +227,7 @@ impl PatchTool {
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
         self.editor_text = editor::inline_diff::revert(&template.text, &self.editor_text, index);
-        behavior.set_text(id, self.editor_text.clone());
+        behavior.set_text(id, &self.editor_text);
         self.preview = None;
         self.object_changed(id);
     }
@@ -237,7 +237,7 @@ impl PatchTool {
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
         self.editor_text = nemesis_diff::revert_hunk(&template.text, &self.editor_text, block);
-        behavior.set_text(id, self.editor_text.clone());
+        behavior.set_text(id, &self.editor_text);
         self.preview = None;
         self.object_changed(id);
     }

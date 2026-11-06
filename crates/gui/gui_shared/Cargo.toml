@@ -14,6 +14,7 @@ rust-version.workspace = true
 
 
 [dependencies]
+stdx        = { workspace = true }
 ico         = { workspace = true }
 indexmap    = { workspace = true, features = ["serde"] }
 open        = { workspace = true }

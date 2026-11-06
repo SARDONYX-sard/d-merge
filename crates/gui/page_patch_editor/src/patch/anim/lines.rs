@@ -42,6 +42,8 @@
 //! The format allows too much for these roles to tell what is wrong: they are a guide to reading a
 //! file. What is wrong is for d-merge's parser to say, see [`crate::patch::anim::patch_file`].
 
+use std::borrow::Cow;
+
 use egui_code_editor::{CompletionList, Language, languages::Xml};
 
 use crate::patch::{
@@ -90,35 +92,35 @@ pub(in crate::patch) enum LineRole {
 
 impl LineRole {
     /// The label at the end of the line, e.g., `animInfos[3].file`.
-    pub(in crate::patch) fn hint(self) -> String {
+    pub(in crate::patch) fn hint(self) -> Cow<'static, str> {
         match self {
-            Self::Version => "version".to_owned(),
-            Self::TriggersLen | Self::ClipTriggersLen => "triggers: count".to_owned(),
-            Self::Trigger(i) | Self::ClipTrigger(i) => format!("triggers[{i}]"),
-            Self::ConditionsLen => "conditions: count".to_owned(),
-            Self::ConditionVariable(i) => format!("conditions[{i}].variable"),
-            Self::ConditionA(i) => format!("conditions[{i}].a"),
-            Self::ConditionB(i) => format!("conditions[{i}].b"),
-            Self::AttacksLen => "attacks: count".to_owned(),
-            Self::AttackTrigger(i) => format!("attacks[{i}].trigger"),
-            Self::AttackContextual(i) => format!("attacks[{i}].isContextual"),
-            Self::AttackClipsLen(i) => format!("attacks[{i}].clips: count"),
-            Self::AttackClip(i) => format!("attacks[{i}].clip"),
-            Self::AnimInfosLen => "animInfos: count".to_owned(),
-            Self::AnimDir(i) => format!("animInfos[{i}].dir"),
-            Self::AnimFile(i) => format!("animInfos[{i}].file"),
-            Self::AnimExtension(i) => format!("animInfos[{i}].extension"),
-            Self::ClipName => "clip name".to_owned(),
-            Self::ClipId | Self::MotionId => "clip id".to_owned(),
-            Self::Speed => "speed".to_owned(),
-            Self::CropStart => "crop start".to_owned(),
-            Self::CropEnd => "crop end".to_owned(),
-            Self::Duration => "duration".to_owned(),
-            Self::TranslationsLen => "translations: count".to_owned(),
-            Self::Translation(i) => format!("translations[{i}]: time x y z"),
-            Self::RotationsLen => "rotations: count".to_owned(),
-            Self::Rotation(i) => format!("rotations[{i}]: time x y z w"),
-            Self::Other => String::new(),
+            Self::Version => Cow::Borrowed("version"),
+            Self::TriggersLen | Self::ClipTriggersLen => Cow::Borrowed("triggers: count"),
+            Self::Trigger(i) | Self::ClipTrigger(i) => Cow::Owned(format!("triggers[{i}]")),
+            Self::ConditionsLen => Cow::Borrowed("conditions: count"),
+            Self::ConditionVariable(i) => Cow::Owned(format!("conditions[{i}].variable")),
+            Self::ConditionA(i) => Cow::Owned(format!("conditions[{i}].a")),
+            Self::ConditionB(i) => Cow::Owned(format!("conditions[{i}].b")),
+            Self::AttacksLen => Cow::Borrowed("attacks: count"),
+            Self::AttackTrigger(i) => Cow::Owned(format!("attacks[{i}].trigger")),
+            Self::AttackContextual(i) => Cow::Owned(format!("attacks[{i}].isContextual")),
+            Self::AttackClipsLen(i) => Cow::Owned(format!("attacks[{i}].clips: count")),
+            Self::AttackClip(i) => Cow::Owned(format!("attacks[{i}].clip")),
+            Self::AnimInfosLen => Cow::Borrowed("animInfos: count"),
+            Self::AnimDir(i) => Cow::Owned(format!("animInfos[{i}].dir")),
+            Self::AnimFile(i) => Cow::Owned(format!("animInfos[{i}].file")),
+            Self::AnimExtension(i) => Cow::Owned(format!("animInfos[{i}].extension")),
+            Self::ClipName => Cow::Borrowed("clip name"),
+            Self::ClipId | Self::MotionId => Cow::Borrowed("clip id"),
+            Self::Speed => Cow::Borrowed("speed"),
+            Self::CropStart => Cow::Borrowed("crop start"),
+            Self::CropEnd => Cow::Borrowed("crop end"),
+            Self::Duration => Cow::Borrowed("duration"),
+            Self::TranslationsLen => Cow::Borrowed("translations: count"),
+            Self::Translation(i) => Cow::Owned(format!("translations[{i}]: time x y z")),
+            Self::RotationsLen => Cow::Borrowed("rotations: count"),
+            Self::Rotation(i) => Cow::Owned(format!("rotations[{i}]: time x y z w")),
+            Self::Other => Cow::Borrowed(""),
         }
     }
 
@@ -320,11 +322,11 @@ impl Language for AnimDataLanguage<'_> {
         self.roles.get(line)?.doc().map(str::to_owned)
     }
 
-    fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<String> {
+    fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<Cow<'_, str>> {
         if line.trim().is_empty() {
             return Vec::new();
         }
-        let hint = self.roles.get(line_no).map_or_else(String::new, |role| role.hint());
+        let hint = self.roles.get(line_no).map_or(Cow::Borrowed(""), |role| role.hint());
         if hint.is_empty() { Vec::new() } else { vec![hint] }
     }
 
@@ -334,12 +336,12 @@ impl Language for AnimDataLanguage<'_> {
 
     fn complete(&self, line: &str, column: usize) -> CompletionList {
         let before: String = line.chars().take(column).collect();
-        let whole = |values: &[(&str, &str)]| {
+        let whole = |values: &[(&'static str, &'static str)]| {
             let typed = before.trim_start();
             let items = values
                 .iter()
                 .filter(|(value, _)| value.starts_with(typed))
-                .map(|(value, doc)| item(value, "◆", (*value).to_owned(), (*doc).to_owned()))
+                .map(|&(value, doc)| item(value, "◆", value, doc))
                 .collect();
             CompletionList { replace: column - typed.chars().count()..column, items }
         };

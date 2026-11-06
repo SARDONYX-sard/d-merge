@@ -138,8 +138,8 @@ fn real_add_event_and_variable() {
 
     let (s, g) = add_event(string_data, graph_data, "MyEvent").unwrap();
     let (s, g, v) = add_variable(&s, &g, value_set, "myVar", VariableType::Real, 1_045_220_557).unwrap();
-    assert_eq!(names(&s, "eventNames").last().map(String::as_str), Some("MyEvent"));
-    assert_eq!(names(&s, "variableNames").last().map(String::as_str), Some("myVar"));
+    assert_eq!(names(&s, "eventNames").last().copied(), Some("MyEvent"));
+    assert_eq!(names(&s, "variableNames").last().copied(), Some("myVar"));
 
     // string / graph data: the event and the variable arrays; value set: the value.
     for (original, edited, blocks) in [(string_data, &s, 2), (graph_data, &g, 2), (value_set, &v, 1)] {

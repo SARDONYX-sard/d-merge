@@ -26,6 +26,7 @@ use gui_shared::{
     i18n::{I18nKey, I18nMap},
     patch::{ResolveRequest, ResolveSide},
 };
+use stdx::text::contains_ignore_case;
 
 use super::PatchView;
 use crate::conflicts::{ConflictScan, Point};
@@ -126,12 +127,8 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
         }
     });
 
-    let filter = scan.filter.trim().to_lowercase();
-    let shown: Vec<&Point> = points
-        .iter()
-        .copied()
-        .filter(|point| filter.is_empty() || point.path.to_lowercase().contains(&filter))
-        .collect();
+    let filter = scan.filter.trim();
+    let shown: Vec<&Point> = points.iter().copied().filter(|point| contains_ignore_case(&point.path, filter)).collect();
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
     let is_picked = shown.iter().any(|point| scan.is_selected(point));
     let rows = list_rows(&shown);
@@ -225,13 +222,16 @@ fn row_text(ui: &egui::Ui, glyph: &str, point: &Point, winner: Option<&str>) -> 
     let visuals = ui.visuals();
     let mut job = egui::text::LayoutJob::default();
     let mut add = |text: &str, color| job.append(text, 0.0, egui::TextFormat::simple(font.clone(), color));
-    add(&format!("{glyph} "), glyph_color(visuals, glyph));
-    add(&format!("{}  ", point.path), visuals.text_color());
+    add(glyph, glyph_color(visuals, glyph));
+    add(" ", visuals.text_color());
+    add(&point.path, visuals.text_color());
+    add("  ", visuals.text_color());
     if let Some(kind) = nemesis_diff::schema::type_of_path(&point.path) {
         add(&kind, egui_widgets::markdown::class_color(visuals));
     }
     if let Some(winner) = winner {
-        add(&format!("  -> {winner}"), WINNER_COLOR);
+        add("  -> ", WINNER_COLOR);
+        add(winner, WINNER_COLOR);
     }
     job
 }

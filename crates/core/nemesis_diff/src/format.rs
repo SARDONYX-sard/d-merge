@@ -158,7 +158,7 @@ mod tests {
             for object in objects {
                 let expected = normalize(object.text);
                 let formatted = format_object(object.text);
-                assert_eq!(formatted.as_deref(), Some(expected.as_str()), "{file} {}", object.id);
+                assert_eq!(formatted.as_deref(), Some(expected.as_ref()), "{file} {}", object.id);
             }
         }
     }

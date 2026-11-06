@@ -113,7 +113,7 @@ pub(crate) struct Conflicts {
 
 /// The directory the merge writes the JSON to.
 pub(crate) fn debug_patches_dir(output: &str) -> PathBuf {
-    Path::new(output).join(".d_merge").join(".debug").join("patches")
+    stdx::path::joined(Path::new(output), &[".d_merge", ".debug", "patches"])
 }
 
 impl Conflicts {
@@ -490,7 +490,7 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
                 owners.note_useful(owner); // a header: a list merged by the merge
                 continue;
             };
-            let place = format!("{project}/{name}");
+            let mut place = format!("{project}/{name}");
             match kind {
                 "SpecifiedAnim" | "SpecifiedMotion" | "AddAnimSet" => {
                     if let Some(value) = body.get("patch") {
@@ -499,7 +499,7 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
                 }
                 "EditAnim" | "EditMotion" | "EditAnimSet" => {
                     if let Some(fields) = body.get("patch") {
-                        flatten(&place, fields, owner, &mut places);
+                        flatten(&mut place, fields, owner, &mut places);
                     }
                 }
                 _ => owners.note_useful(owner), // what adds
@@ -512,24 +512,30 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
 }
 
 /// The leaves of a patch, each at `<place>/<field>/..`. See [`read_anim_data`].
-fn flatten(place: &str, value: &sonic_rs::Value, owner: u32, places: &mut BTreeMap<String, Vec<Value>>) {
+///
+/// `place` is one buffer for the whole walk: a patch has many fields, and few of them are leaves.
+fn flatten(place: &mut String, value: &sonic_rs::Value, owner: u32, places: &mut BTreeMap<String, Vec<Value>>) {
     if value.is_null() {
         return;
     }
     // `{ "patch": { "action": .., "value": .. }, "priority": 3 }`: one change.
     if let Some(inner) = value.get("patch").and_then(|patch| patch.get("value")) {
-        places.entry(place.to_owned()).or_default().push(value_of(owner, inner));
+        places.entry(place.clone()).or_default().push(value_of(owner, inner));
         return;
     }
     if let Some(object) = value.as_object() {
         for (key, field) in object.iter() {
             if key != "seq" {
-                flatten(&format!("{place}/{key}"), field, owner, places);
+                let at = place.len();
+                place.push('/');
+                place.push_str(key);
+                flatten(place, field, owner, places);
+                place.truncate(at);
             }
         }
         return;
     }
-    places.entry(place.to_owned()).or_default().push(value_of(owner, value));
+    places.entry(place.clone()).or_default().push(value_of(owner, value));
 }
 
 /// The scan's state in the page. See the module docs.

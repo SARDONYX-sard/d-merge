@@ -86,6 +86,7 @@ pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing     = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
+stdx                 = { path = "./crates/core/stdx" }
 fast_hash            = { path = "./crates/core/fast_hash" }
 fnis_list            = { path = "./crates/core/fnis_list" }
 fnis_patch_gen       = { path = "./crates/core/fnis_patch_gen" }

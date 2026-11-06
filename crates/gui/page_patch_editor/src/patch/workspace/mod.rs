@@ -31,7 +31,7 @@ use std::{
 
 use rayon::prelude::*;
 
-pub(in crate::patch) use self::locations::nemesis_folder;
+pub(in crate::patch) use self::locations::{joined, nemesis_folder};
 use self::{
     behavior::cache_file,
     locations::{anim_template_path, file_stem, patch_dirs_of},
@@ -48,7 +48,7 @@ pub(crate) use self::{
 ///
 /// e.g. `D:/out` -> `D:/out/.d_merge/caches/patch_editor/nemesis`
 pub(crate) fn cache_root_of(output_dir: &str) -> PathBuf {
-    Path::new(output_dir).join(".d_merge").join("caches").join("patch_editor").join("nemesis")
+    joined(Path::new(output_dir), &[".d_merge", "caches", "patch_editor", "nemesis"])
 }
 
 /// See [`WorkspaceFile`].
@@ -390,7 +390,7 @@ mod tests {
             behavior.class_of("#amco$0").map(str::to_owned),
             behavior.is_ref("#amco$0"),
             behavior.text("#amco$0").map(str::to_owned),
-            behavior.patch("upatch", "#amco$0"),
+            behavior.patch("upatch", "#amco$0").map(|patch| patch.into_owned()),
             behavior.edits.len() + behavior.added.len(),
         );
         let shown = shown.map(str::to_owned);

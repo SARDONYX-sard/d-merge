@@ -13,6 +13,10 @@
 //! `numelements` is left as is: Nemesis / d-merge count the elements themselves, and leaving it
 //! keeps patches of different mods from conflicting on that line.
 
+use std::borrow::Cow;
+
+use crate::kept_array::is_kept_line;
+
 /// How patches refer to an event: `$eventID[name]$`.
 pub const EVENT_ID_PREFIX: &str = "$eventID[";
 /// How patches refer to a variable: `$variableID[name]$`.
@@ -67,14 +71,15 @@ impl VariableType {
 }
 
 /// The `<hkcstring>` names of an array, e.g. `eventNames` of a `hkbBehaviorGraphStringData`.
-pub fn names(object: &str, param: &str) -> Vec<String> {
+pub fn names<'a>(object: &'a str, param: &str) -> Vec<&'a str> {
     let Some(array) = Array::find(object, param) else { return Vec::new() };
     array
         .elements
         .iter()
         .filter_map(|lines| {
-            let line = lines.first()?.trim();
-            Some(line.strip_prefix("<hkcstring>")?.strip_suffix("</hkcstring>")?.to_string())
+            // (Only an element just written is not in `object`, and that is not here.)
+            let Cow::Borrowed(line) = lines.first()? else { return None };
+            line.trim().strip_prefix("<hkcstring>")?.strip_suffix("</hkcstring>")
         })
         .collect()
 }
@@ -123,8 +128,8 @@ fn is_nested(line: &str) -> bool {
 pub fn rename(object: &str, param: &str, index: usize, new_name: &str) -> Option<String> {
     let mut array = Array::find(object, param)?;
     let line = array.elements.get_mut(index)?.first_mut()?;
-    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
-    *line = format!("{indent}<hkcstring>{new_name}</hkcstring>");
+    let renamed = format!("{}<hkcstring>{new_name}</hkcstring>", indent_of(line));
+    *line = Cow::Owned(renamed);
     Some(array.join())
 }
 
@@ -161,7 +166,7 @@ pub fn rename_uses(text: &str, prefix: &str, old: &str, new: &str) -> Option<Str
 pub fn push(object: &str, param: &str, element: &[&str]) -> Option<String> {
     let mut array = Array::find(object, param)?;
     let indent = format!("{}\t", array.indent);
-    array.elements.push(element.iter().map(|line| format!("{indent}{line}")).collect());
+    array.elements.push(element.iter().map(|line| Cow::Owned(format!("{indent}{line}"))).collect());
     Some(array.join())
 }
 
@@ -211,41 +216,53 @@ pub fn add_variable(
     Some((string_data, graph_data, value_set))
 }
 
-/// An array field split into its elements.
-struct Array {
-    /// Lines before the field's opening line, and the opening line (`<hkparam name=".." ...>`).
-    head: Vec<String>,
-    /// The field's indent.
-    indent: String,
-    /// Each element's lines: one line (`<hkcstring>`, a pointer) or an `<hkobject>` block.
-    elements: Vec<Vec<String>>,
-    /// The closing `</hkparam>` line and the rest.
-    tail: Vec<String>,
+/// The leading whitespace of `line`.
+fn indent_of(line: &str) -> &str {
+    &line[..line.len() - line.trim_start().len()]
 }
 
-impl Array {
-    fn find(object: &str, param: &str) -> Option<Self> {
-        // A push that kept the line of the empty array has its elements after it.
-        let object = crate::open_kept_arrays(object);
+/// An array field split into its elements. Its lines are the object's, but for what is changed.
+struct Array<'a> {
+    /// Lines before the field's opening line, and the opening line (`<hkparam name=".." ...>`).
+    head: Vec<Cow<'a, str>>,
+    /// The field's indent.
+    indent: &'a str,
+    /// Each element's lines: one line (`<hkcstring>`, a pointer) or an `<hkobject>` block.
+    elements: Vec<Vec<Cow<'a, str>>>,
+    /// The closing `</hkparam>` line and the rest.
+    tail: Vec<Cow<'a, str>>,
+}
+
+/// `lines` as they are.
+fn borrowed<'a>(lines: &[&'a str]) -> impl Iterator<Item = Cow<'a, str>> {
+    lines.iter().map(|line| Cow::Borrowed(*line))
+}
+
+impl<'a> Array<'a> {
+    fn find(object: &'a str, param: &str) -> Option<Self> {
         let lines: Vec<&str> = object.lines().collect();
         let open = format!("<hkparam name=\"{param}\"");
         let at = lines.iter().position(|line| line.trim_start().starts_with(&open))?;
-        let indent: String = lines[at].chars().take_while(|c| c.is_whitespace()).collect();
-        let mut head: Vec<String> = lines[..at].iter().map(|l| (*l).to_string()).collect();
+        let indent = indent_of(lines[at]);
+        let mut head: Vec<Cow<'a, str>> = borrowed(&lines[..at]).collect();
 
-        // `<hkparam name="x" numelements="0"></hkparam>`: no elements yet, split the line.
-        if let Some(opening) = lines[at].strip_suffix("</hkparam>") {
-            head.push(opening.to_string());
-            let mut tail = vec![format!("{indent}</hkparam>")];
-            tail.extend(lines[at + 1..].iter().map(|l| (*l).to_string()));
-            return Some(Self { head, indent, elements: Vec::new(), tail });
+        match lines[at].strip_suffix("</hkparam>") {
+            // `<hkparam name="x" numelements="0"></hkparam>`: no elements yet, split the line.
+            Some(opening) if !is_kept_line(&lines, at) => {
+                head.push(Cow::Borrowed(opening));
+                let mut tail = vec![Cow::Owned(format!("{indent}</hkparam>"))];
+                tail.extend(borrowed(&lines[at + 1..]));
+                return Some(Self { head, indent, elements: Vec::new(), tail });
+            }
+            // A push that kept the line of the empty array has its elements after it.
+            Some(opening) => head.push(Cow::Borrowed(opening)),
+            None => head.push(Cow::Borrowed(lines[at])),
         }
-        head.push(lines[at].to_string());
 
         let close = lines[at + 1..]
             .iter()
             .position(|line| {
-                line.trim() == "</hkparam>" && line.starts_with(&indent) && line[indent.len()..].starts_with('<')
+                line.trim() == "</hkparam>" && line.starts_with(indent) && line[indent.len()..].starts_with('<')
             })
             .map(|i| at + 1 + i)?;
         let mut elements = Vec::new();
@@ -253,22 +270,22 @@ impl Array {
         while i < close {
             let line = lines[i];
             if line.trim() == "<hkobject>" {
-                let element_indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                let element_indent = indent_of(line);
                 let end = (i + 1..close)
                     .find(|&j| {
                         lines[j].trim() == "</hkobject>"
-                            && lines[j].starts_with(&element_indent)
+                            && lines[j].starts_with(element_indent)
                             && lines[j][element_indent.len()..].starts_with('<')
                     })
                     .unwrap_or(close - 1);
-                elements.push(lines[i..=end].iter().map(|l| (*l).to_string()).collect());
+                elements.push(borrowed(&lines[i..=end]).collect());
                 i = end + 1;
             } else {
-                elements.push(vec![line.to_string()]);
+                elements.push(vec![Cow::Borrowed(line)]);
                 i += 1;
             }
         }
-        let tail = lines[close..].iter().map(|l| (*l).to_string()).collect();
+        let tail = borrowed(&lines[close..]).collect();
         Some(Self { head, indent, elements, tail })
     }
 

@@ -1,5 +1,7 @@
 //! Draws the object tree and reads its keys. The logic is in [`crate::patch::tree`].
 
+use std::rc::Rc;
+
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState, has_guide};
@@ -74,7 +76,7 @@ enum RowEvent {
 pub(in crate::patch) fn tree_ui<'g>(
     ui: &mut egui::Ui,
     graph: &'g Graph,
-    selected: &mut Option<String>,
+    selected: &mut Option<Rc<str>>,
     state: &mut TreeState,
     (changed_only, focused): (bool, bool),
     i18n: &I18nMap,
@@ -120,7 +122,7 @@ pub(in crate::patch) fn tree_ui<'g>(
         Some(RowEvent::Select(row)) => {
             state.cursor = row;
             let id = graph.id(state.rows()[row].node);
-            id.clone_into(selected.get_or_insert_default());
+            *selected = Some(id.into());
         }
         Some(RowEvent::SetOpen(node, open)) => state.set_open(graph, node, open),
         Some(RowEvent::SetOpenBelow(node, open)) => state.set_open_below(graph, node, open),
@@ -132,7 +134,7 @@ pub(in crate::patch) fn tree_ui<'g>(
 
 /// `⚠ Not linked (2)` and the new objects nothing points to. Above the tree: always in view,
 /// whatever is expanded.
-fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<String>, i18n: &I18nMap) {
+fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<str>>, i18n: &I18nMap) {
     let unlinked = graph.unlinked();
     if unlinked.is_empty() {
         return;
@@ -144,7 +146,7 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Stri
             let id = graph.id(node);
             let text = object_label(ui, graph, node, false);
             if ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text)).clicked() {
-                id.clone_into(selected.get_or_insert_default());
+                *selected = Some(id.into());
             }
         }
     });

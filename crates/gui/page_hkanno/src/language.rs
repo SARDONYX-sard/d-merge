@@ -3,7 +3,7 @@
 //! This is the only hkanno-specific part of the editor: it translates `hkanno_lsp` results
 //! into the editor's language-neutral types (colors, plain-text completions, ...).
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use egui::Color32;
 use egui_code_editor::{CompletionItem, CompletionList, Diagnostic, Language, QuickFix, Severity, SignatureHelp};
@@ -34,11 +34,11 @@ impl Language for HkannoLanguage {
                 // The editor inserts plain text: expand `${1:placeholder}` here.
                 let expanded = hkanno_lsp::snippet::expand(&item.insert);
                 CompletionItem {
-                    label: item.label.to_string(),
+                    label: item.label.into(),
                     icon: kind_icon(item.kind),
-                    insert: expanded.text,
+                    insert: expanded.text.into(),
                     select: expanded.first_placeholder,
-                    documentation: item.documentation.to_string(),
+                    documentation: item.documentation.into(),
                 }
             })
             .collect();
@@ -63,8 +63,8 @@ impl Language for HkannoLanguage {
         })
     }
 
-    fn inlay_hints(&self, line: &str) -> Vec<String> {
-        features::inlay_hint::inlay_hints(line).iter().map(|h| h.label.to_string()).collect()
+    fn inlay_hints_at(&self, _line_no: usize, line: &str) -> Vec<Cow<'_, str>> {
+        features::inlay_hint::inlay_hints(line).iter().map(|hint| Cow::Borrowed(hint.label)).collect()
     }
 
     fn format(&self, text: &str) -> Option<String> {

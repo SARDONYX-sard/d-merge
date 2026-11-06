@@ -24,7 +24,7 @@ winnow     = { workspace = true }
 winnow_ext = { workspace = true }
 
 # workspace members
-json_patch = { workspace = true }
+json_patch           = { workspace = true }
 nemesis_patch_syntax = { workspace = true }
 
 [dev-dependencies]

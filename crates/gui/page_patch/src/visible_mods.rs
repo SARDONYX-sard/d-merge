@@ -12,6 +12,7 @@ use gui_shared::settings::{
     DataMode,
     pages::patch::{mod_item::ModItem, mod_list::SortColumn},
 };
+use stdx::text::contains_ignore_case;
 
 type ViewState = gui_shared::settings::ViewState;
 
@@ -37,19 +38,16 @@ pub(crate) fn unlock(view: &mut ViewState) {
     view.filter_text.clear();
 }
 
-/// Does `item` match the search text (lowercase)? `None` searches every text column.
+/// Does `item` match the search text? `None` searches every text column.
 fn matches_filter(item: &ModItem, text: &str, column: Option<SortColumn>) -> bool {
-    let contains = |value: &str| value.to_lowercase().contains(text);
+    let contains = |value: &str| contains_ignore_case(value, text);
     match column {
         None => {
-            contains(&item.id)
-                || contains(&item.name)
-                || item.mod_type.as_lower_str().contains(text)
-                || contains(&item.site)
+            contains(&item.id) || contains(&item.name) || contains(item.mod_type.as_lower_str()) || contains(&item.site)
         }
         Some(SortColumn::Id) => contains(&item.id),
         Some(SortColumn::Name) => contains(&item.name),
-        Some(SortColumn::ModType) => item.mod_type.as_lower_str().contains(text),
+        Some(SortColumn::ModType) => contains(item.mod_type.as_lower_str()),
         Some(SortColumn::Site) => contains(&item.site),
         Some(SortColumn::Priority) => item.priority.to_string().contains(text),
     }
@@ -57,12 +55,12 @@ fn matches_filter(item: &ModItem, text: &str, column: Option<SortColumn>) -> boo
 
 /// Indices into `mods` of the rows to show, filtered and sorted.
 fn compute_rows(mods: &[ModItem], view: &ViewState) -> Vec<u32> {
-    let text = view.filter_text.trim().to_lowercase();
+    let text = view.filter_text.trim();
     #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion mods")]
     let mut rows: Vec<u32> = mods
         .iter()
         .enumerate()
-        .filter(|(_, item)| text.is_empty() || matches_filter(item, &text, view.filter_column))
+        .filter(|(_, item)| text.is_empty() || matches_filter(item, text, view.filter_column))
         .map(|(index, _)| index as u32)
         .collect();
     rows.sort_unstable_by(|&a, &b| {

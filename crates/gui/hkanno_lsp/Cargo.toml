@@ -13,6 +13,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+stdx       = { workspace = true }
 serde_json = { workspace = true } # `SpecialFrames_Invincible{...}` payload is JSON.
 
 [lints]

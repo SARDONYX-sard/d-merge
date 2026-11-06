@@ -8,7 +8,10 @@
 //! The template list opens as a window with the filter focused, like VS Code's quick open, but next
 //! to what was clicked.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use egui_widgets::{
     notify::Notification,
@@ -109,7 +112,7 @@ impl PatchTool {
                 if response.clicked() && i != self.active {
                     self.active = i;
                     // Back to where it was left in that behavior.
-                    self.selected = self.tabs.last_of(i).map(str::to_owned);
+                    self.selected = self.tabs.last_of(i).map(Rc::from);
                 }
                 response.context_menu(|ui| {
                     let picked = row_menu(ui, behavior, i, i18n);
@@ -129,7 +132,7 @@ impl PatchTool {
             Some(RowEvent::Check(i)) => {
                 if i != self.active {
                     self.active = i;
-                    self.selected = self.tabs.last_of(i).map(str::to_owned);
+                    self.selected = self.tabs.last_of(i).map(Rc::from);
                 }
                 self.start_work_check(super::work_check::CheckScope::All);
             }

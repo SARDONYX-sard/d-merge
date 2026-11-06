@@ -355,7 +355,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("d_merge_draft_edit_{}", std::process::id()));
         let (mut main, mut notify, i18n) = proposed(&dir);
         let tool = main.user_patch.tool.as_mut().unwrap();
-        tool.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n".to_owned());
+        tool.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n");
         tool.mark_dirty();
 
         main.close_user_patch(&mut notify, &i18n);

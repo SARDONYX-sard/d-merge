@@ -23,7 +23,7 @@ impl FindBar {
         if kind == Kind::Find
             && let Some(current) = self.current_match(ctx, id, text)
         {
-            crate::overlays::block_selection(ui, galley, galley_pos, &[current]);
+            crate::ui::overlays::block_selection(ui, galley, galley_pos, &[current]);
         }
 
         egui::Area::new(id.with("find_bar"))

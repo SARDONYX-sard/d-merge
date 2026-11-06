@@ -3,6 +3,8 @@
 //! Only the text **before** the cursor is parsed, so the active parameter follows the cursor.
 //! e.g., `0.5 animmotion 1 |` (cursor at `|`) -> `animmotion <x> <y> <z>` with `y` active.
 
+use std::fmt::Write as _;
+
 use super::byte_offset;
 use crate::{
     Span,
@@ -102,7 +104,11 @@ fn pie_signature(node: &PieNode) -> Option<SignatureHelp> {
 
     // Each `|` starts the next parameter.
     let separators = ins.parameters.as_ref().map_or(0, |p| p.items.len());
-    let label = format!("{}|{}", def.name, params.iter().map(|p| format!("<{p}>")).collect::<Vec<_>>().join("|"));
+    let mut label = format!("{}|", def.name);
+    for (at, param) in params.iter().enumerate() {
+        let separator = if at == 0 { "" } else { "|" };
+        let _ = write!(label, "{separator}<{param}>");
+    }
 
     Some(SignatureHelp {
         label,

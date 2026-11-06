@@ -30,7 +30,7 @@ use skyrim_anim_data::adsf::alt::AltAdsf;
 
 use crate::patch::{
     anim::patch_file::AdsfFile,
-    workspace::{ADSF, ASDSF, Behavior, Workspace},
+    workspace::{ADSF, ASDSF, Behavior, Workspace, joined},
 };
 
 /// The `~1` of `DefaultMale~1`: which of the projects with that name. Only projects with one of
@@ -167,7 +167,7 @@ pub(in crate::patch) fn default_project(folders: &[&str], hkx: Option<&str>) -> 
 
 /// Reads what the data needs from the clip's hkx under the mod's root.
 pub(in crate::patch) fn read_hkx(mod_root: &Path, clip: &ClipSource) -> Result<HkxInfo, String> {
-    let path = mod_root.join(&clip.base).join(clip.animation.replace('\\', "/"));
+    let path = joined(mod_root, &[&clip.base, &clip.animation.replace('\\', "/")]);
     let error = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
     let bytes = std::fs::read(&path).map_err(|e| error(&e))?;
     let hkanno = serde_hkx_for_gui::hkanno::parse_as_hkanno(&bytes, &path).map_err(|e| error(&e))?;
@@ -250,16 +250,23 @@ fn motion_keys(duration: f32, motion: &[[f32; 4]]) -> (Vec<[f32; 4]>, Vec<[f32; 
 ///
 /// e.g., `SoundPlay.Foo:0.5` -> `SoundPlay.Foo`. Only `.bin` templates; else none.
 pub(in crate::patch) fn template_trigger_names(template_root: &Path) -> BTreeSet<String> {
-    let path = template_root.join("meshes").join(format!("{ADSF}.bin"));
+    let path = anim_template(template_root);
     let Ok(bytes) = std::fs::read(path) else { return BTreeSet::new() };
     let Ok(adsf) = rmp_serde::from_slice::<AltAdsf<'_>>(&bytes) else { return BTreeSet::new() };
     let blocks = adsf.0.values().flat_map(|project| project.clip_anim_blocks.values());
     blocks.flat_map(|block| &block.trigger_names).map(|trigger| trigger_name(trigger).to_owned()).collect()
 }
 
+/// `<template_root>/meshes/animationdatasinglefile.bin`
+fn anim_template(template_root: &Path) -> std::path::PathBuf {
+    let mut path = joined(template_root, &["meshes", ADSF]);
+    path.set_extension("bin");
+    path
+}
+
 /// The projects of the clip data template. e.g. `DefaultMale~1`. Only `.bin` templates; else none.
 pub(in crate::patch) fn template_projects(template_root: &Path) -> Vec<String> {
-    let path = template_root.join("meshes").join(format!("{ADSF}.bin"));
+    let path = anim_template(template_root);
     let Ok(bytes) = std::fs::read(path) else { return Vec::new() };
     let Ok(adsf) = rmp_serde::from_slice::<AltAdsf<'_>>(&bytes) else { return Vec::new() };
     adsf.0.keys().map(|project| project.as_ref().to_owned()).collect()
@@ -329,7 +336,7 @@ pub(in crate::patch) fn duplicate_to(behavior: &mut Behavior, files: &[String], 
             continue;
         }
         if behavior.template_object(&copy).is_some() {
-            behavior.set_text(&copy, text);
+            behavior.set_text(&copy, &text);
         } else {
             behavior.added.insert(copy.clone(), text);
         }
@@ -440,7 +447,7 @@ fn push_to_anim_sets(asdsf: &mut Behavior, push: &AnimSetPush<'_>) -> Result<(),
     for id in &push.sets {
         let text = asdsf.text(id).ok_or_else(|| format!("{id}: not in the template"))?;
         let edited = nemesis_diff::asdsf::add_anim_infos(text, &infos).map_err(|e| format!("{id}: {e}"))?;
-        asdsf.set_text(id, edited);
+        asdsf.set_text(id, &edited);
     }
     Ok(())
 }

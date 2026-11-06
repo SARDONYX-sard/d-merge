@@ -60,13 +60,24 @@ pub(crate) fn inlay_hints(ui: &egui::Ui, galley: &Galley, galley_pos: Pos2, lang
     let color = ui.visuals().weak_text_color().gamma_multiply(0.8);
 
     // Lines are never wrapped (see `layout`), so row `n` is line `n`.
+    let visible = ui.clip_rect().y_range();
     for (line_no, (row, line)) in galley.rows.iter().zip(text.split('\n')).enumerate() {
+        let top = galley_pos.y + row.rect().min.y;
+        if top + row.rect().height() < visible.min {
+            continue;
+        }
+        if top > visible.max {
+            break;
+        }
         let hints = language.inlay_hints_at(line_no, line);
         if hints.is_empty() {
             continue;
         }
         let pos = galley_pos + row.rect().right_top().to_vec2() + egui::vec2(24.0, 0.0);
-        painter.text(pos, egui::Align2::LEFT_TOP, hints.join(" · "), font.clone(), color);
+        match hints.as_slice() {
+            [only] => painter.text(pos, egui::Align2::LEFT_TOP, only, font.clone(), color),
+            _ => painter.text(pos, egui::Align2::LEFT_TOP, hints.join(" · "), font.clone(), color),
+        };
     }
 }
 

@@ -102,9 +102,9 @@ pub trait Language {
 
     /// Like [`Self::inlay_hints`], for languages whose lines mean what their position says.
     /// `line_no` is 0-based.
-    fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<String> {
+    fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<Cow<'_, str>> {
         let _ = line_no;
-        self.inlay_hints(line)
+        self.inlay_hints(line).into_iter().map(Cow::Owned).collect()
     }
 
     /// What one level of indentation is: what `Tab` and Vim's `>` insert, shown in the status bar.
@@ -207,17 +207,17 @@ pub struct CompletionList {
 /// One completion candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionItem {
-    /// Shown in the list.
-    pub label: String,
+    /// Shown in the list. A fixed text stays borrowed: a list is made at each key.
+    pub label: Cow<'static, str>,
     /// Small glyph before the label (e.g., `ƒ` for functions).
     pub icon: &'static str,
     /// Plain text to insert (snippets must already be expanded by the language).
-    pub insert: String,
+    pub insert: Cow<'static, str>,
     /// Char range inside `insert` to select after inserting (e.g., a placeholder).
     /// `None` puts the cursor after the inserted text.
     pub select: Option<Range<usize>>,
     /// Markdown shown next to the list.
-    pub documentation: String,
+    pub documentation: Cow<'static, str>,
 }
 
 /// Result of [`Language::signature_help`].

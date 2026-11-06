@@ -86,7 +86,9 @@ fn place_of<'a>(target: &str, path: &'a str) -> &'a str {
 }
 
 fn rules_key(mod_code: &str, target: &str) -> String {
-    format!("{mod_code}/{target}").replace('\\', "/").to_ascii_lowercase()
+    let mut key = format!("{mod_code}/{target}");
+    key.make_ascii_lowercase();
+    if key.contains('\\') { key.replace('\\', "/") } else { key }
 }
 
 /// All that is hidden. See the module docs. Empty, what a merge is usually given, costs nothing.

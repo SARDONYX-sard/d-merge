@@ -314,7 +314,7 @@ mod tests {
 
         assert!(run(&behavior, "m", &CheckScope::All, ParserMode::Strict).is_empty(), "nothing changed");
         let typo = object.replace("userData", "typoField");
-        behavior.set_text("#0100", typo);
+        behavior.set_text("#0100", &typo);
         let rows = run(&behavior, "m", &CheckScope::All, ParserMode::Strict);
         assert!(rows.iter().any(|row| row.id == "#0100" && row.line == 1), "{rows:?}");
         assert!(rows.iter().all(|row| row.id != "#0101"), "{rows:?}");

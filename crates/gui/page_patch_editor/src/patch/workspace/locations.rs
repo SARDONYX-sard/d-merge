@@ -2,10 +2,22 @@
 
 use std::path::{Path, PathBuf};
 
+pub(in crate::patch) use stdx::path::joined;
+
 use super::read_dir;
 
 /// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
 pub(super) const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
+
+/// The name of the file or folder at `path`, borrowed if it is valid text.
+pub(super) fn file_name_of(path: &Path) -> std::borrow::Cow<'_, str> {
+    path.file_name().map_or(std::borrow::Cow::Borrowed(""), |name| name.to_string_lossy())
+}
+
+/// `<selected>/<engine>/mod`
+fn mods_dir(selected: &Path, engine: &str) -> PathBuf {
+    joined(selected, &[engine, "mod"])
+}
 
 /// The root of the Nemesis mod at `selected`: itself, or what it is the patch directory of.
 /// `None`: it is no Nemesis mod.
@@ -13,9 +25,8 @@ pub(super) const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
 /// e.g. `mods/Paraglider` containing `Nemesis_Engine/mod/para/` -> itself;
 /// `mods/Paraglider/Nemesis_Engine/mod/para` -> `mods/Paraglider`.
 pub(crate) fn mod_root_of(selected: &Path) -> Option<PathBuf> {
-    let has_code = |engine: &str| {
-        read_dir(&selected.join(engine).join("mod")).is_ok_and(|mut codes| codes.any(|path| path.is_dir()))
-    };
+    let has_code =
+        |engine: &str| read_dir(&mods_dir(selected, engine)).is_ok_and(|mut codes| codes.any(|path| path.is_dir()));
     if ENGINES.iter().any(|engine| has_code(engine)) {
         return Some(selected.to_path_buf());
     }
@@ -27,7 +38,7 @@ pub(crate) fn mod_root_of(selected: &Path) -> Option<PathBuf> {
 
 /// The directories of `code` in the mod at `root`, of the engines it has.
 pub(super) fn code_dirs(root: &Path, code: &str) -> Vec<PathBuf> {
-    let dirs = ENGINES.iter().map(|engine| root.join(engine).join("mod").join(code));
+    let dirs = ENGINES.iter().map(|engine| joined(root, &[engine, "mod", code]));
     dirs.filter(|dir| dir.is_dir()).collect()
 }
 
@@ -38,7 +49,7 @@ pub(crate) fn patch_dir_of_code(root: &Path, code: &str) -> Option<PathBuf> {
 
 /// The code of the mod at `selected` (its root or a patch directory). See [`mod_dir_of`].
 pub(crate) fn code_of(selected: &Path) -> String {
-    mod_dir_of(selected).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
+    file_name_of(&mod_dir_of(selected)).into_owned()
 }
 
 /// The patch directory of a mod, given its root (what a mod manager installs).
@@ -50,7 +61,7 @@ pub(crate) fn code_of(selected: &Path) -> String {
 /// The root is also where a later anim set generator finds `meshes/**/animations/*.hkx`.
 pub(super) fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
     let code_dir = ENGINES.iter().find_map(|engine| {
-        let entries = std::fs::read_dir(selected.join(engine).join("mod")).ok()?;
+        let entries = std::fs::read_dir(mods_dir(selected, engine)).ok()?;
         entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).min()
     });
     code_dir.map_or(std::borrow::Cow::Borrowed(selected), std::borrow::Cow::Owned)
@@ -62,7 +73,7 @@ pub(super) fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
 pub(super) fn patch_dirs_of(selected: &Path) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     for engine in ENGINES {
-        if let Ok(codes) = read_dir(&selected.join(engine).join("mod")) {
+        if let Ok(codes) = read_dir(&mods_dir(selected, engine)) {
             dirs.extend(codes.filter(|path| path.is_dir()));
         }
     }
@@ -71,9 +82,15 @@ pub(super) fn patch_dirs_of(selected: &Path) -> Vec<PathBuf> {
 
 /// The template of animation data, `.bin` or `.txt`. (`.bin` if neither exists: clip data needs none.)
 pub(super) fn anim_template_path(template_root: &Path, stem: &str) -> PathBuf {
-    let meshes = template_root.join("meshes");
-    let path = |ext: &str| meshes.join(format!("{stem}.{ext}"));
-    if path("bin").is_file() || !path("txt").is_file() { path("bin") } else { path("txt") }
+    let mut path = joined(template_root, &["meshes", stem]);
+    path.set_extension("bin");
+    if !path.is_file() {
+        path.set_extension("txt");
+        if !path.is_file() {
+            path.set_extension("bin");
+        }
+    }
+    path
 }
 
 pub(super) fn meshes_path(template: &Path) -> String {

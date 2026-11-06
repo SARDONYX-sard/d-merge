@@ -5,6 +5,7 @@ use std::{
 };
 
 use rayon::prelude::*;
+use stdx::path::joined;
 
 /// Is the Skyrim Data directory specified as the output directory?
 ///
@@ -44,9 +45,9 @@ where
             let _ = remove_if_exists(output_dir.join("meshes"));
         },
         || {
-            let _ = fs::remove_file(output_dir.join(".d_merge").join("d_merge_errors.log"));
-            let _ = remove_if_exists(output_dir.join(".d_merge").join(".debug"));
-            let _ = fs::remove_file(output_dir.join("SKSE").join("Plugins").join("fnis_aa").join("config.json"));
+            let _ = fs::remove_file(joined(output_dir, &[".d_merge", "d_merge_errors.log"]));
+            let _ = remove_if_exists(joined(output_dir, &[".d_merge", ".debug"]));
+            let _ = fs::remove_file(joined(output_dir, &["SKSE", "Plugins", "fnis_aa", "config.json"]));
             let _ = fs::remove_file(output_dir.join("FNIS.esp"));
         },
     );

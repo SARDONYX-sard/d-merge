@@ -1,5 +1,9 @@
 //! The list of objects: the keyboard in it, what it shows, and its changes.
 
+use std::rc::Rc;
+
+use stdx::text::{cmp_ignore_case, contains_ignore_case};
+
 use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui};
 
 impl PatchTool {
@@ -29,7 +33,7 @@ impl PatchTool {
             current = input.step(current, rows.len()).unwrap_or(current);
         }
         if let Some(&node) = rows.get(current) {
-            graph.id(node).clone_into(self.selected.get_or_insert_default());
+            self.selected = Some(graph.id(node).into());
         }
         if leave {
             self.leave_tree();
@@ -49,16 +53,16 @@ impl PatchTool {
         if fresh {
             return;
         }
-        let filter = self.filter.to_lowercase();
+        let filter = self.filter.as_str();
         let rows = graph
             .nodes()
             .filter(|&node| !self.changed_only || graph.is_changed(node))
-            .filter(|&node| filter.is_empty() || graph.label(node).to_lowercase().contains(&filter))
+            .filter(|&node| contains_ignore_case(graph.label(node), filter))
             .collect();
         // Anim data is grouped by actor: see `ui::anim_tree`.
         let mut rows: Vec<tree::Node> = rows;
         if self.workspace.behaviors[self.active].is_anim_data() {
-            rows.sort_by_cached_key(|&node| graph.id(node).to_ascii_lowercase());
+            rows.sort_by(|&a, &b| cmp_ignore_case(graph.id(a), graph.id(b)));
         }
         self.list = Some(ObjectList { generation, filter: self.filter.clone(), changed_only: self.changed_only, rows });
     }
@@ -70,7 +74,7 @@ impl PatchTool {
         if behavior.added.remove(id).is_some() {
             let neighbor = self.tabs.close(self.active, id);
             if self.selected.as_deref() == Some(id) {
-                self.selected = neighbor;
+                self.selected = neighbor.map(Rc::from);
             }
         }
         self.editor_for = None;
@@ -82,6 +86,6 @@ impl PatchTool {
         let code = self.mod_code.trim().to_string();
         let id = self.workspace.behaviors[self.active].add_object(&code, from);
         self.object_changed(&id);
-        self.selected = Some(id);
+        self.selected = Some(id.into());
     }
 }

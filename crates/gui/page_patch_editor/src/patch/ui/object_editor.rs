@@ -47,7 +47,7 @@ impl PatchTool {
             && ui.memory(|m| m.has_focus(editor_id))
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
         {
-            self.apply_tab_event(Some(TabEvent::Close(id.clone())), &id);
+            self.apply_tab_event(Some(TabEvent::Close(id.to_string())), &id);
             return;
         }
         self.expire_preview(ui.ctx());
@@ -66,9 +66,9 @@ impl PatchTool {
 
         // No preview for a new object: it is written as is.
         let behavior = &self.workspace.behaviors[self.active];
-        let is_new = behavior.added.contains_key(&id) || behavior.is_ref(&id);
+        let is_new = behavior.added.contains_key(&*id) || behavior.is_ref(&id);
         // What the mods have at the conflict being edited: the preview comes back when it is closed.
-        let is_merging = self.merge_values.as_ref().is_some_and(|values| values.id == id);
+        let is_merging = self.merge_values.as_ref().is_some_and(|values| *values.id == *id);
         let preview_event = if is_merging {
             self.merge_panel(ui, i18n, &id);
             None
@@ -90,9 +90,9 @@ impl PatchTool {
             self.enter_tree(ui, editor_id);
         }
         if let Some((document, line)) = references_window(ui.ctx(), &mut self.references) {
-            if document != id {
+            if *document != *id {
                 self.history.visit(&id);
-                document.clone_into(self.selected.get_or_insert_default());
+                self.selected = Some(document.into());
             }
             self.focus_editor = Some(FocusAt::Line(line));
         }
@@ -127,7 +127,7 @@ impl PatchTool {
         if let Some(lines) = picked {
             let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
             self.editor_text = text;
-            self.workspace.behaviors[self.active].set_text(id, self.editor_text.clone());
+            self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
             self.preview = None;
             self.object_changed(id);
             self.focus_editor = Some(FocusAt::Line(last));
@@ -190,7 +190,7 @@ impl PatchTool {
             variable_types: &names.variable_types,
             values: &values,
             graph: &names.graph,
-            fields: context.as_ref().map(|(class, fields)| (class.as_str(), fields.as_slice())),
+            fields: context.as_ref().map(|(class, fields)| (*class, fields.as_slice())),
             pointer_field: open_field.filter(|field| nemesis_diff::schema::holds_pointers(field)),
             kept_array_hover: i18n.t(I18nKey::NemesisKeptArrayHover),
             in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
