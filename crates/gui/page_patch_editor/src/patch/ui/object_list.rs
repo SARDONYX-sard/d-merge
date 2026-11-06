@@ -18,7 +18,8 @@ use super::{
     work_check::{CheckScope, check_items},
 };
 use crate::patch::{
-    PatchTool, anim_data,
+    PatchTool,
+    anim::data,
     tree::{Graph, Node, TreeState},
 };
 
@@ -231,7 +232,7 @@ impl PatchTool {
                             ui.separator();
                             let projects = self.anim_projects();
                             if let Some(pick) = duplicate_items(ui, i18n, &projects, name) {
-                                let files = anim_data::changed_files(&self.workspace.behaviors[self.active], name);
+                                let files = data::changed_files(&self.workspace.behaviors[self.active], name);
                                 self.ask_duplicate(pick, files, &projects, name);
                             }
                             if let Some(is_row) = check_items(ui, i18n) {
@@ -279,7 +280,7 @@ impl PatchTool {
     /// The files go to the other project, which opens to show them.
     fn duplicate_anim_files(&mut self) {
         let Some((files, to)) = self.pending_duplicate.take() else { return };
-        let made = anim_data::duplicate_to(&mut self.workspace.behaviors[self.active], &files, &to);
+        let made = data::duplicate_to(&mut self.workspace.behaviors[self.active], &files, &to);
         for id in &made {
             self.object_changed(id);
         }
@@ -314,7 +315,7 @@ impl PatchTool {
             let folder = id.split_once('/').map_or(id, |(folder, _)| folder);
             let projects = self.anim_projects();
             if let Some(pick) = duplicate_items(ui, i18n, &projects, folder) {
-                let files = anim_data::with_motion(&self.workspace.behaviors[self.active], id);
+                let files = data::with_motion(&self.workspace.behaviors[self.active], id);
                 self.ask_duplicate(pick, files, &projects, folder);
             }
         });
@@ -434,7 +435,7 @@ enum DuplicatePick {
 fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], current: &str) -> Option<DuplicatePick> {
     let mut picked = None;
     let hover = i18n.t(I18nKey::NemesisDuplicateToHover);
-    let partner = anim_data::partner_of(current);
+    let partner = data::partner_of(current);
     if partner != current && projects.contains(&partner) {
         let label = format!("{} {partner}", i18n.t(I18nKey::NemesisDuplicateTo));
         if ui.button(label).on_hover_text(hover).clicked() {

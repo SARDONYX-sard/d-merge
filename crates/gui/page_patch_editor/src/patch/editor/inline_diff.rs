@@ -8,7 +8,7 @@ use egui_code_editor::{CharChange, DiffHunk, InlineDiff};
 /// The changes from `template` to `text`, with the line numbers of `text`.
 ///
 /// e.g., `a\nb\n` -> `a\nc\n`: line 1 is new, and the old `b` goes above it.
-pub(super) fn changes(template: &str, text: &str) -> InlineDiff {
+pub(in crate::patch) fn changes(template: &str, text: &str) -> InlineDiff {
     let hunks = nemesis_diff::line_changes(template, text);
     if hunks.is_empty() {
         return InlineDiff::default();
@@ -30,7 +30,7 @@ pub(super) fn changes(template: &str, text: &str) -> InlineDiff {
 }
 
 /// The changed place the cursor is at, or else the next one, as `(index, count)`: what `2/5` shows.
-pub(super) fn position(diff: &InlineDiff, cursor_line: usize) -> Option<(usize, usize)> {
+pub(in crate::patch) fn position(diff: &InlineDiff, cursor_line: usize) -> Option<(usize, usize)> {
     let count = diff.hunks.len();
     let at = diff.hunks.iter().position(|hunk| cursor_line <= last_line(hunk));
     (count > 0).then(|| (at.unwrap_or(count - 1), count))
@@ -39,7 +39,7 @@ pub(super) fn position(diff: &InlineDiff, cursor_line: usize) -> Option<(usize, 
 /// The line to go to for the previous or next changed place from the cursor, around the ends.
 ///
 /// e.g., changes at lines 3 and 9: from line 5, next is 9 and previous is 3; from line 9, next is 3.
-pub(super) fn step(diff: &InlineDiff, cursor_line: usize, forward: bool) -> Option<usize> {
+pub(in crate::patch) fn step(diff: &InlineDiff, cursor_line: usize, forward: bool) -> Option<usize> {
     let hunks = &diff.hunks;
     let found = if forward {
         hunks.iter().find(|hunk| hunk.new_lines.start > cursor_line).or_else(|| hunks.first())
@@ -55,7 +55,7 @@ fn last_line(hunk: &DiffHunk) -> usize {
 }
 
 /// `text` with changed place `index` of [`changes`] put back as in `template`.
-pub(super) fn revert(template: &str, text: &str, index: usize) -> String {
+pub(in crate::patch) fn revert(template: &str, text: &str, index: usize) -> String {
     let Some(hunk) = nemesis_diff::line_changes(template, text).into_iter().nth(index) else {
         return text.to_owned();
     };

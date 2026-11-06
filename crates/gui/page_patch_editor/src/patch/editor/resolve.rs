@@ -23,17 +23,17 @@ use nemesis_diff::{
     resolve,
 };
 
-use super::workspace::{ADSF, ASDSF, Workspace, nemesis_folder, read_text};
+use crate::patch::workspace::{ADSF, ASDSF, Workspace, nemesis_folder, read_text};
 
 /// Where the change ended up: to show it.
 #[derive(Debug)]
-pub(super) struct Resolved {
+pub(in crate::patch) struct Resolved {
     /// In `Workspace::behaviors`.
-    pub(super) behavior: usize,
+    pub(in crate::patch) behavior: usize,
     /// e.g. `#0106`
-    pub(super) id: String,
+    pub(in crate::patch) id: String,
     /// The 0-based line in the object, if it is known.
-    pub(super) line: Option<usize>,
+    pub(in crate::patch) line: Option<usize>,
 }
 
 /// The name of the animation data behavior of this target, if it is one. e.g. [`ADSF`]
@@ -45,7 +45,11 @@ fn anim_stem(target: &str) -> Option<&'static str> {
 
 /// The object the request is about, opened if its behavior is not yet: where the user can do by hand
 /// what [`apply`] could not. `None`: it is not in the template.
-pub(super) fn object_of(workspace: &mut Workspace, template_root: &Path, request: &ResolveRequest) -> Option<Resolved> {
+pub(in crate::patch) fn object_of(
+    workspace: &mut Workspace,
+    template_root: &Path,
+    request: &ResolveRequest,
+) -> Option<Resolved> {
     let (behavior, id) = if let Some(stem) = anim_stem(&request.target) {
         let id = anim_file_of(&request.path)?;
         workspace.anim_behavior(stem, template_root).ok()?;
@@ -63,7 +67,7 @@ pub(super) fn object_of(workspace: &mut Workspace, template_root: &Path, request
 /// # Errors
 /// The mod's file cannot be read, has no such change, or does not fit the object. The user can still
 /// edit the object by hand: the message says why it was not done.
-pub(super) fn apply(
+pub(in crate::patch) fn apply(
     workspace: &mut Workspace,
     template_root: &Path,
     request: &ResolveRequest,
@@ -115,11 +119,11 @@ fn patch_file(mod_dir: &str, target: &str, id: &str) -> PathBuf {
 
 /// What a mod has at a conflict. See [`MergeValues`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MergeSide {
+pub(in crate::patch) struct MergeSide {
     /// e.g. `Paraglider`
-    pub(super) name: String,
+    pub(in crate::patch) name: String,
     /// Its lines there. e.g. `\t\t\t\t#para$3`. Empty: it removes them.
-    pub(super) lines: Vec<String>,
+    pub(in crate::patch) lines: Vec<String>,
 }
 
 /// What the mods have at a conflict, to make the result from in the editor: with an array, the elements
@@ -132,19 +136,19 @@ pub(super) struct MergeSide {
 /// Impact     #neymar$1019  [Insert]
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MergeValues {
+pub(in crate::patch) struct MergeValues {
     /// The object: it is shown with this one.
-    pub(super) id: String,
+    pub(in crate::patch) id: String,
     /// e.g. `#2489/hkbManualSelectorGenerator/generators/[0:1]`
-    pub(super) path: String,
+    pub(in crate::patch) path: String,
     /// What the template has there, as the mods say.
-    pub(super) original: Vec<String>,
-    pub(super) sides: Vec<MergeSide>,
+    pub(in crate::patch) original: Vec<String>,
+    pub(in crate::patch) sides: Vec<MergeSide>,
 }
 
 /// What the mods of `request` have at its conflict. `None`: there is nothing to choose from, as with
 /// less than two mods, or animation data, whose files are whole.
-pub(super) fn merge_values(request: &ResolveRequest, id: &str) -> Option<MergeValues> {
+pub(in crate::patch) fn merge_values(request: &ResolveRequest, id: &str) -> Option<MergeValues> {
     if anim_stem(&request.target).is_some() || request.sides.len() < 2 {
         return None;
     }
@@ -173,7 +177,7 @@ pub(super) fn merge_values(request: &ResolveRequest, id: &str) -> Option<MergeVa
 /// `text` with `lines` after line `after`. Returns it, and the last line put in.
 ///
 /// e.g. `a\nb\n`, after line 0, `x`: `a\nx\nb\n`, 1
-pub(super) fn insert_lines(text: &str, after: usize, lines: &[String]) -> (String, usize) {
+pub(in crate::patch) fn insert_lines(text: &str, after: usize, lines: &[String]) -> (String, usize) {
     let mut all: Vec<&str> = text.lines().collect();
     let at = (after + 1).min(all.len());
     all.splice(at..at, lines.iter().map(String::as_str));

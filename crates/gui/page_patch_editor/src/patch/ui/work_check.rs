@@ -27,8 +27,8 @@ use gui_shared::{
 
 use super::anim_tree::FileKind;
 use crate::patch::{
-    PatchTool, diagnostics,
-    preview::Preview,
+    PatchTool,
+    editor::{diagnostics, preview::Preview},
     workspace::{Behavior, ObjectText},
 };
 

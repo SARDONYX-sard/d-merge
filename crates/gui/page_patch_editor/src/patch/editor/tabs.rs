@@ -16,20 +16,20 @@ use egui_code_editor::CodeEditorState;
 
 /// One open object.
 #[derive(Debug)]
-pub(super) struct EditorTab {
+pub(in crate::patch) struct EditorTab {
     /// Index of its behavior in the workspace.
-    pub(super) behavior: usize,
+    pub(in crate::patch) behavior: usize,
     /// e.g. `#0106`
-    pub(super) id: String,
+    pub(in crate::patch) id: String,
     /// `false`: the preview tab, which the next opened object replaces.
-    pub(super) pinned: bool,
+    pub(in crate::patch) pinned: bool,
     /// The editor state while the tab is not shown. `None`: it is in use, or never was.
     editor: Option<CodeEditorState>,
 }
 
 /// See the module docs.
 #[derive(Debug, Default)]
-pub(super) struct EditorTabs {
+pub(in crate::patch) struct EditorTabs {
     tabs: Vec<EditorTab>,
 }
 
@@ -39,29 +39,29 @@ impl EditorTabs {
     }
 
     /// Every tab, to write with the work.
-    pub(super) fn all(&self) -> impl Iterator<Item = &EditorTab> {
+    pub(in crate::patch) fn all(&self) -> impl Iterator<Item = &EditorTab> {
         self.tabs.iter()
     }
 
     /// A tab from when the work was last open. Its editor state starts anew.
-    pub(super) fn restore(&mut self, behavior: usize, id: &str, pinned: bool) {
+    pub(in crate::patch) fn restore(&mut self, behavior: usize, id: &str, pinned: bool) {
         if self.position(behavior, id).is_none() {
             self.tabs.push(EditorTab { behavior, id: id.to_owned(), pinned, editor: None });
         }
     }
 
     /// The tabs of `behavior`, in order.
-    pub(super) fn of(&self, behavior: usize) -> impl Iterator<Item = &EditorTab> {
+    pub(in crate::patch) fn of(&self, behavior: usize) -> impl Iterator<Item = &EditorTab> {
         self.tabs.iter().filter(move |tab| tab.behavior == behavior)
     }
 
     /// The last tab of `behavior`: what to show when going back to it.
-    pub(super) fn last_of(&self, behavior: usize) -> Option<&str> {
+    pub(in crate::patch) fn last_of(&self, behavior: usize) -> Option<&str> {
         self.of(behavior).last().map(|tab| tab.id.as_str())
     }
 
     /// The tab next to `id` of `behavior`, around the ends. `None`: there is no other.
-    pub(super) fn neighbor(&self, behavior: usize, id: &str, forward: bool) -> Option<&str> {
+    pub(in crate::patch) fn neighbor(&self, behavior: usize, id: &str, forward: bool) -> Option<&str> {
         let tabs: Vec<&str> = self.of(behavior).map(|tab| tab.id.as_str()).collect();
         let at = tabs.iter().position(|tab| *tab == id)?;
         let next = if forward { (at + 1) % tabs.len() } else { (at + tabs.len() - 1) % tabs.len() };
@@ -70,7 +70,7 @@ impl EditorTabs {
 
     /// Shows `id` in a tab: its own if it has one, else the preview tab, else a new one right after
     /// `current` (the tab being left), or at the end.
-    pub(super) fn open(&mut self, behavior: usize, id: &str, current: Option<&str>) {
+    pub(in crate::patch) fn open(&mut self, behavior: usize, id: &str, current: Option<&str>) {
         if self.position(behavior, id).is_some() {
             return;
         }
@@ -84,14 +84,14 @@ impl EditorTabs {
     }
 
     /// The tab stays open from now on.
-    pub(super) fn pin(&mut self, behavior: usize, id: &str) {
+    pub(in crate::patch) fn pin(&mut self, behavior: usize, id: &str) {
         if let Some(at) = self.position(behavior, id) {
             self.tabs[at].pinned = true;
         }
     }
 
     /// Closes a tab. Returns the tab that takes its place: the next one, or else the previous one.
-    pub(super) fn close(&mut self, behavior: usize, id: &str) -> Option<String> {
+    pub(in crate::patch) fn close(&mut self, behavior: usize, id: &str) -> Option<String> {
         let at = self.position(behavior, id)?;
         self.tabs.remove(at);
         let next = self.tabs[at..].iter().find(|tab| tab.behavior == behavior);
@@ -100,12 +100,12 @@ impl EditorTabs {
     }
 
     /// Closes every tab of `behavior` but `id`.
-    pub(super) fn close_others(&mut self, behavior: usize, id: &str) {
+    pub(in crate::patch) fn close_others(&mut self, behavior: usize, id: &str) {
         self.tabs.retain(|tab| tab.behavior != behavior || tab.id == id);
     }
 
     /// Closes the tabs of `behavior` right of `id`.
-    pub(super) fn close_to_the_right(&mut self, behavior: usize, id: &str) {
+    pub(in crate::patch) fn close_to_the_right(&mut self, behavior: usize, id: &str) {
         let Some(at) = self.position(behavior, id) else { return };
         let mut index = 0;
         self.tabs.retain(|tab| {
@@ -116,25 +116,25 @@ impl EditorTabs {
     }
 
     /// Closes every tab of `behavior`.
-    pub(super) fn close_all(&mut self, behavior: usize) {
+    pub(in crate::patch) fn close_all(&mut self, behavior: usize) {
         self.tabs.retain(|tab| tab.behavior != behavior);
     }
 
     /// The workspace was replaced, or a behavior removed: the indices no longer hold.
-    pub(super) fn clear(&mut self) {
+    pub(in crate::patch) fn clear(&mut self) {
         self.tabs.clear();
     }
 
     /// Keeps the editor state of a tab that is no longer shown. Gone with the tab, if it has been
     /// replaced or closed.
-    pub(super) fn store_state(&mut self, behavior: usize, id: &str, editor: CodeEditorState) {
+    pub(in crate::patch) fn store_state(&mut self, behavior: usize, id: &str, editor: CodeEditorState) {
         if let Some(at) = self.position(behavior, id) {
             self.tabs[at].editor = Some(editor);
         }
     }
 
     /// The editor state of the tab about to be shown: as it was left, or a new one.
-    pub(super) fn take_state(&mut self, behavior: usize, id: &str) -> CodeEditorState {
+    pub(in crate::patch) fn take_state(&mut self, behavior: usize, id: &str) -> CodeEditorState {
         self.position(behavior, id).and_then(|at| self.tabs[at].editor.take()).unwrap_or_default()
     }
 }

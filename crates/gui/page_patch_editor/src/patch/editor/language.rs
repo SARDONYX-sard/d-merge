@@ -25,7 +25,7 @@ use nemesis_diff::{
     vars,
 };
 
-use super::{tree::Graph, workspace::Behavior};
+use crate::patch::{tree::Graph, workspace::Behavior};
 
 /// Nemesis' variable syntaxes and what they complete with.
 const PREFIXES: [(&str, Kind); 2] = [("$eventID[", Kind::Event), ("$variableID[", Kind::Variable)];
@@ -105,7 +105,7 @@ pub(crate) type FieldValues = HashMap<String, Vec<String>>;
 #[derive(Debug)]
 pub(crate) struct NemesisXml<'a> {
     /// `LspOptions::code_action`
-    pub(super) code_action: bool,
+    pub(in crate::patch) code_action: bool,
     pub(crate) events: &'a [String],
     pub(crate) variables: &'a [String],
     /// The type of each variable by index, e.g. `REAL`.
@@ -583,7 +583,7 @@ fn field_doc(class: &str, field: &FieldSchema) -> String {
 /// The trigger names containing what is typed, up to the `:` before the time (typed by hand).
 ///
 /// e.g., `sound|` -> `SoundPlay.Foo:`; after `SoundPlay.Foo:0` there is nothing to offer.
-pub(super) fn trigger_completion(names: &[String], before: &str, column: usize) -> CompletionList {
+pub(in crate::patch) fn trigger_completion(names: &[String], before: &str, column: usize) -> CompletionList {
     let typed = before.trim_start();
     if typed.contains(':') {
         return CompletionList::default();
@@ -604,7 +604,7 @@ fn class_of_doc(doc: &str) -> &str {
     doc.split_whitespace().next().unwrap_or_default()
 }
 
-fn pointer_item(graph: &Graph, node: super::tree::Node) -> CompletionItem {
+fn pointer_item(graph: &Graph, node: crate::patch::tree::Node) -> CompletionItem {
     let id = graph.id(node);
     item(id, "→", id.to_owned(), graph.doc(node).to_owned())
 }
@@ -624,7 +624,7 @@ fn string_element(before: &str, column: usize) -> Option<CompletionList> {
     Some(CompletionList { replace: column - typed.chars().count()..column, items: vec![element] })
 }
 
-pub(super) fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
+pub(in crate::patch) fn item(label: &str, icon: &'static str, insert: String, documentation: String) -> CompletionItem {
     CompletionItem { label: label.to_string(), icon, insert, select: None, documentation }
 }
 

@@ -28,8 +28,8 @@ use std::{collections::BTreeSet, path::Path};
 
 use skyrim_anim_data::adsf::alt::AltAdsf;
 
-use super::{
-    anim_patch::AdsfFile,
+use crate::patch::{
+    anim::patch_file::AdsfFile,
     workspace::{ADSF, ASDSF, Behavior, Workspace},
 };
 
@@ -42,26 +42,26 @@ const HKX_EXTENSION_CRC: &str = "7891816";
 
 /// A clip of the mod, from a `hkbClipGenerator`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ClipSource {
+pub(in crate::patch) struct ClipSource {
     /// e.g. `Paraglide_Equip`
-    pub(super) name: String,
+    pub(in crate::patch) name: String,
     /// As written in the behavior, e.g. `Animations\NickNak\ParaGlideEquip.hkx`
-    pub(super) animation: String,
+    pub(in crate::patch) animation: String,
     /// What it is relative to, e.g. `meshes/actors/character`
-    pub(super) base: String,
+    pub(in crate::patch) base: String,
     /// e.g. `DefaultMale`, `DefaultFemale`
-    pub(super) projects: Vec<String>,
+    pub(in crate::patch) projects: Vec<String>,
 }
 
 /// What the data needs from a hkx.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct HkxInfo {
+pub(in crate::patch) struct HkxInfo {
     /// Seconds.
-    pub(super) duration: f32,
+    pub(in crate::patch) duration: f32,
     /// Annotations as `(time, text)`, e.g. `(0.03, "AnimObjDraw")`.
-    pub(super) triggers: Vec<(f32, String)>,
+    pub(in crate::patch) triggers: Vec<(f32, String)>,
     /// The root motion, see [`serde_hkx_for_gui::hkanno::parse_root_motion`].
-    pub(super) motion: Vec<[f32; 4]>,
+    pub(in crate::patch) motion: Vec<[f32; 4]>,
 }
 
 /// The value of a field on one line. e.g., `name` in `<hkparam name="name">x</hkparam>` -> `x`
@@ -97,7 +97,7 @@ fn base_of(meshes_path: &str) -> &str {
 }
 
 /// The clips the mod adds or changes, one per clip name.
-pub(super) fn clip_sources(behaviors: &[Behavior]) -> Vec<ClipSource> {
+pub(in crate::patch) fn clip_sources(behaviors: &[Behavior]) -> Vec<ClipSource> {
     let mut clips: Vec<ClipSource> = Vec::new();
     for behavior in behaviors.iter().filter(|behavior| !behavior.is_anim_data()) {
         let generators = behavior.texts().filter(|o| (o.is_new || o.is_edited) && o.class == "hkbClipGenerator");
@@ -138,7 +138,7 @@ fn anim_hkx_path(relative: &Path) -> Option<String> {
 
 /// The animations of the mod at `mod_root`, sorted, as [`anim_hkx_path`] gives them. Folders that
 /// cannot be read are left out: the user sees what is listed, and picks from that.
-pub(super) fn anim_hkx_files(mod_root: &Path) -> Vec<String> {
+pub(in crate::patch) fn anim_hkx_files(mod_root: &Path) -> Vec<String> {
     let mut found = Vec::new();
     let mut folders = vec![mod_root.join(MESHES_DIR)];
     while let Some(folder) = folders.pop() {
@@ -158,7 +158,7 @@ pub(super) fn anim_hkx_files(mod_root: &Path) -> Vec<String> {
 
 /// The project to show first: the one `hkx` (a [`anim_hkx_files`] path) belongs to, else
 /// `DefaultMale`, the most common. An index into `folders` (`DefaultMaleData~DefaultMale`, ...).
-pub(super) fn default_project(folders: &[&str], hkx: Option<&str>) -> usize {
+pub(in crate::patch) fn default_project(folders: &[&str], hkx: Option<&str>) -> usize {
     let projects = hkx.map_or_else(Vec::new, |hkx| projects_of(&hkx.replace('\\', "/")));
     let folder_of = |project: &str| format!("{project}Data~{project}");
     let wanted = projects.iter().map(String::as_str).chain(["DefaultMale"]).map(folder_of);
@@ -166,7 +166,7 @@ pub(super) fn default_project(folders: &[&str], hkx: Option<&str>) -> usize {
 }
 
 /// Reads what the data needs from the clip's hkx under the mod's root.
-pub(super) fn read_hkx(mod_root: &Path, clip: &ClipSource) -> Result<HkxInfo, String> {
+pub(in crate::patch) fn read_hkx(mod_root: &Path, clip: &ClipSource) -> Result<HkxInfo, String> {
     let path = mod_root.join(&clip.base).join(clip.animation.replace('\\', "/"));
     let error = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
     let bytes = std::fs::read(&path).map_err(|e| error(&e))?;
@@ -249,7 +249,7 @@ fn motion_keys(duration: f32, motion: &[[f32; 4]]) -> (Vec<[f32; 4]>, Vec<[f32; 
 /// The trigger names in the template's clips, for completion.
 ///
 /// e.g., `SoundPlay.Foo:0.5` -> `SoundPlay.Foo`. Only `.bin` templates; else none.
-pub(super) fn template_trigger_names(template_root: &Path) -> BTreeSet<String> {
+pub(in crate::patch) fn template_trigger_names(template_root: &Path) -> BTreeSet<String> {
     let path = template_root.join("meshes").join(format!("{ADSF}.bin"));
     let Ok(bytes) = std::fs::read(path) else { return BTreeSet::new() };
     let Ok(adsf) = rmp_serde::from_slice::<AltAdsf<'_>>(&bytes) else { return BTreeSet::new() };
@@ -258,7 +258,7 @@ pub(super) fn template_trigger_names(template_root: &Path) -> BTreeSet<String> {
 }
 
 /// The projects of the clip data template. e.g. `DefaultMale~1`. Only `.bin` templates; else none.
-pub(super) fn template_projects(template_root: &Path) -> Vec<String> {
+pub(in crate::patch) fn template_projects(template_root: &Path) -> Vec<String> {
     let path = template_root.join("meshes").join(format!("{ADSF}.bin"));
     let Ok(bytes) = std::fs::read(path) else { return Vec::new() };
     let Ok(adsf) = rmp_serde::from_slice::<AltAdsf<'_>>(&bytes) else { return Vec::new() };
@@ -268,7 +268,7 @@ pub(super) fn template_projects(template_root: &Path) -> Vec<String> {
 /// Where a file of animation data can go, sorted: `template`, and the folders of the files there are.
 ///
 /// e.g. `DefaultMale~1`, or for anim sets `DefaultMaleData~DefaultMale`
-pub(super) fn project_folders(behavior: &Behavior, template: &[String]) -> Vec<String> {
+pub(in crate::patch) fn project_folders(behavior: &Behavior, template: &[String]) -> Vec<String> {
     let folders = behavior.texts().filter_map(|object| object.id.split_once('/')).map(|(folder, _)| folder);
     let all: BTreeSet<&str> = folders.chain(template.iter().map(String::as_str)).filter(|f| *f != "$header$").collect();
     all.into_iter().map(str::to_owned).collect()
@@ -277,14 +277,14 @@ pub(super) fn project_folders(behavior: &Behavior, template: &[String]) -> Vec<S
 /// The project that usually has the same patches as `project` comes first in `projects`.
 ///
 /// e.g. `DefaultFemale~1` for `DefaultMale~1`
-pub(super) fn partner_first(projects: &mut [String], project: &str) {
+pub(in crate::patch) fn partner_first(projects: &mut [String], project: &str) {
     let partner = partner_of(project);
     projects.sort_by_key(|other| *other != partner);
 }
 
 /// The project that usually has the same patches. e.g. `DefaultFemale~1` for `DefaultMale~1`;
 /// a project without one has itself.
-pub(super) fn partner_of(project: &str) -> String {
+pub(in crate::patch) fn partner_of(project: &str) -> String {
     if project.contains("Male") && !project.contains("Female") {
         project.replacen("Male", "Female", 1)
     } else {
@@ -295,7 +295,7 @@ pub(super) fn partner_of(project: &str) -> String {
 /// `id`, and if it is a clip, its motion if the work has one: one is of no use without the other.
 ///
 /// e.g. `D~1/Idle~m$0.txt` -> that, `D~1/m$0.txt`
-pub(super) fn with_motion(behavior: &Behavior, id: &str) -> Vec<String> {
+pub(in crate::patch) fn with_motion(behavior: &Behavior, id: &str) -> Vec<String> {
     let mut files = vec![id.to_owned()];
     if matches!(AdsfFile::of(id), AdsfFile::AddAnim | AdsfFile::IndexedAnim)
         && let Some((folder, file)) = id.split_once('/')
@@ -310,7 +310,7 @@ pub(super) fn with_motion(behavior: &Behavior, id: &str) -> Vec<String> {
 }
 
 /// The changed files of a project, to duplicate them all.
-pub(super) fn changed_files(behavior: &Behavior, folder: &str) -> Vec<String> {
+pub(in crate::patch) fn changed_files(behavior: &Behavior, folder: &str) -> Vec<String> {
     let prefix = format!("{folder}/");
     let changed = behavior.edits.keys().chain(behavior.added.keys());
     changed.filter(|id| id.starts_with(&prefix)).cloned().collect()
@@ -319,7 +319,7 @@ pub(super) fn changed_files(behavior: &Behavior, folder: &str) -> Vec<String> {
 /// Copies `files` to the project `to`. Returns the ids of the files it made or changed.
 ///
 /// e.g. `DefaultMale~1/Idle~m$0.txt` to `DefaultFemale~1` -> `DefaultFemale~1/Idle~m$0.txt`
-pub(super) fn duplicate_to(behavior: &mut Behavior, files: &[String], to: &str) -> Vec<String> {
+pub(in crate::patch) fn duplicate_to(behavior: &mut Behavior, files: &[String], to: &str) -> Vec<String> {
     let mut made = Vec::new();
     for id in files {
         let Some((_, file)) = id.split_once('/') else { continue };
@@ -339,7 +339,7 @@ pub(super) fn duplicate_to(behavior: &mut Behavior, files: &[String], to: &str) 
 }
 
 /// The names of [`template_trigger_names`] and of the clip files of the work, sorted.
-pub(super) fn trigger_names(template: &BTreeSet<String>, adsf: &Behavior) -> Vec<String> {
+pub(in crate::patch) fn trigger_names(template: &BTreeSet<String>, adsf: &Behavior) -> Vec<String> {
     // After name, id, speed, crop start, crop end and the count.
     const TRIGGERS_START: usize = 6;
     let clips = adsf.added.iter().filter(|(id, text)| AdsfFile::of(id).is_whole_clip(text));
@@ -408,7 +408,7 @@ fn add_clip_files(adsf: &mut Behavior, code: &str, folder: &str, name: &str, inf
 /// `count` of them named `<name>_0`, `<name>_1`, ..., or just `<name>` for one.
 ///
 /// Returns the ids of the files added, of the clips and their motions.
-pub(super) fn add_numbered_clips(
+pub(in crate::patch) fn add_numbered_clips(
     adsf: &mut Behavior,
     code: &str,
     folder: &str,
@@ -427,11 +427,11 @@ pub(super) fn add_numbered_clips(
 
 /// Which animations go into which anim set files. All of `hkx` go into all of `sets`.
 #[derive(Debug, Default)]
-pub(super) struct AnimSetPush<'a> {
+pub(in crate::patch) struct AnimSetPush<'a> {
     /// As [`anim_hkx_files`] gives them, e.g. `meshes\actors\character\animations\A\B.hkx`
-    pub(super) hkx: Vec<&'a str>,
+    pub(in crate::patch) hkx: Vec<&'a str>,
     /// Ids of anim sets, e.g. `DefaultMaleData~DefaultMale/1HMSolo.txt`
-    pub(super) sets: Vec<&'a str>,
+    pub(in crate::patch) sets: Vec<&'a str>,
 }
 
 /// Adds the animations to the anim sets. Those already in a set stay once.
@@ -447,14 +447,18 @@ fn push_to_anim_sets(asdsf: &mut Behavior, push: &AnimSetPush<'_>) -> Result<(),
 
 /// What is written. Each part is independent, and can be empty.
 #[derive(Debug)]
-pub(super) struct Generate<'a> {
-    pub(super) code: &'a str,
-    pub(super) clips: Vec<(&'a ClipSource, &'a HkxInfo)>,
-    pub(super) push: AnimSetPush<'a>,
+pub(in crate::patch) struct Generate<'a> {
+    pub(in crate::patch) code: &'a str,
+    pub(in crate::patch) clips: Vec<(&'a ClipSource, &'a HkxInfo)>,
+    pub(in crate::patch) push: AnimSetPush<'a>,
 }
 
 /// Writes the data into the workspace, adding a behavior only if there is something for it.
-pub(super) fn generate(workspace: &mut Workspace, template_root: &Path, request: &Generate<'_>) -> Result<(), String> {
+pub(in crate::patch) fn generate(
+    workspace: &mut Workspace,
+    template_root: &Path,
+    request: &Generate<'_>,
+) -> Result<(), String> {
     if !request.clips.is_empty() {
         let adsf = workspace.anim_behavior(ADSF, template_root)?;
         for (clip, info) in &request.clips {
@@ -509,10 +513,11 @@ mod tests {
         assert_eq!(projects[0], "DefaultMale~1");
     }
 
-    use super::{super::anim_patch::validate_asdsf, *};
+    use super::*;
+    use crate::patch::anim::patch_file::validate_asdsf;
 
     fn validate_adsf(id: &str, patch: &str) -> Result<(), String> {
-        super::super::anim_patch::validate_adsf(id, patch, ParserMode::Strict)
+        crate::patch::anim::patch_file::validate_adsf(id, patch, ParserMode::Strict)
     }
 
     fn info() -> HkxInfo {

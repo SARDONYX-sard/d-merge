@@ -1,8 +1,8 @@
-//! Draws the patch preview. The data is in [`crate::patch::preview`].
+//! Draws the patch preview. The data is in [`crate::patch::editor::preview`].
 
 use egui_code_editor::languages::Xml;
 
-use crate::patch::preview::{Kind, Preview};
+use crate::patch::editor::preview::{Kind, Preview};
 
 /// Where the text starts: the `↶` gutter is left of it.
 const TEXT_LEFT: f32 = 24.0;

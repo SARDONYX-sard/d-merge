@@ -12,8 +12,10 @@ use gui_shared::{
 
 use super::{preview::PreviewEvent, references::references_window};
 use crate::patch::{
-    EditorResult, FocusAt, PatchTool, TabEvent, anim_lines::AnimDataLanguage, editor_tabs::EditorTabs, inline_diff,
-    language::NemesisXml, resolve, tree::Graph,
+    EditorResult, FocusAt, PatchTool, TabEvent,
+    anim::lines::AnimDataLanguage,
+    editor::{inline_diff, language::NemesisXml, resolve, tabs::EditorTabs},
+    tree::Graph,
 };
 
 /// The id of the palette's "focus the object tree" command.
@@ -378,7 +380,7 @@ fn history_keys(ui: &egui::Ui) -> Option<bool> {
     })
 }
 
-/// `[ GetUpModList ✖ ] [ ● Root ✖ ]`. See [`crate::patch::editor_tabs`].
+/// `[ GetUpModList ✖ ] [ ● Root ✖ ]`. See [`crate::patch::editor::tabs`].
 ///
 /// Only the name, to keep the tabs short: the hover has the whole label, and the tree follows the tab.
 /// A click shows a tab, a double click pins it, a middle click or `✖` closes it.

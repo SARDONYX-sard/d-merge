@@ -2,7 +2,7 @@
 
 use egui_code_editor::{Diagnostic, Severity};
 
-use super::workspace::Behavior;
+use crate::patch::workspace::Behavior;
 
 /// [`nemesis_diff::check_fields`] (names) and [`nemesis_diff::schema::check_pointers`] (pointer
 /// targets: they exist and have the right class) as editor underlines (the trimmed line).
@@ -11,7 +11,12 @@ use super::workspace::Behavior;
 /// while an edited template object starts complete and its patch only holds the changes.
 ///
 /// `code`: this work's mod code. Pointers to new objects of other mods are not looked for.
-pub(super) fn field_diagnostics(text: &str, behavior: &Behavior, is_new: bool, code: &str) -> Vec<Diagnostic> {
+pub(in crate::patch) fn field_diagnostics(
+    text: &str,
+    behavior: &Behavior,
+    is_new: bool,
+    code: &str,
+) -> Vec<Diagnostic> {
     let lines: Vec<&str> = text.lines().collect();
     let class_of = |id: &str| behavior.class_of(id);
     let names = nemesis_diff::check_fields(text).into_iter().map(|p| (p.line, p.message, Severity::Warning));
@@ -33,12 +38,12 @@ pub(super) fn field_diagnostics(text: &str, behavior: &Behavior, is_new: bool, c
 
 /// Where d-merge's parser rejected a patch. See [`parser_problem`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ParserProblem {
+pub(in crate::patch) struct ParserProblem {
     /// 0-based line of the patch.
-    pub(super) line: usize,
+    pub(in crate::patch) line: usize,
     /// 0-based column (chars).
-    pub(super) column: usize,
-    pub(super) message: String,
+    pub(in crate::patch) column: usize,
+    pub(in crate::patch) message: String,
 }
 
 /// Reads the parser's error text, which is drawn for a terminal. There are two ways of drawing it:
@@ -58,7 +63,7 @@ pub(super) struct ParserProblem {
 /// ```
 /// -> line 1, column 0, `expected triggers_len: usize`. Its first line is the message when the place
 /// has none (`error: Parse error`). `None`: another kind of error.
-pub(super) fn parser_problem(error: &str) -> Option<ParserProblem> {
+pub(in crate::patch) fn parser_problem(error: &str) -> Option<ParserProblem> {
     let lines: Vec<&str> = error.lines().collect();
     (0..lines.len().saturating_sub(1)).find_map(|at| {
         let (number, _) = lines[at].split_once(" | ")?;
@@ -85,7 +90,7 @@ fn title_of(error: &str) -> &str {
 /// `problems` with the parser's `error` added, wherever it says: it goes to the line `to_editor_line`
 /// tells for a line of the patch. An error that says no place is on the first line: there is no other
 /// place to show why a patch was rejected.
-pub(super) fn add_parser_error(
+pub(in crate::patch) fn add_parser_error(
     problems: &mut Vec<Diagnostic>,
     text: &str,
     error: &str,

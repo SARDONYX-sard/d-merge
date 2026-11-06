@@ -7,7 +7,7 @@
 
 use nemesis_diff::vars;
 
-use super::{
+use crate::patch::{
     tree::Graph,
     vars_edit::GRAPH_DATA,
     workspace::{Behavior, STRING_DATA},
@@ -15,23 +15,23 @@ use super::{
 
 /// See the module docs.
 #[derive(Debug, Clone, Default)]
-pub(super) struct Names {
-    pub(super) events: Vec<String>,
-    pub(super) variables: Vec<String>,
+pub(in crate::patch) struct Names {
+    pub(in crate::patch) events: Vec<String>,
+    pub(in crate::patch) variables: Vec<String>,
     /// The type of each variable by index, e.g. `REAL`.
-    pub(super) variable_types: Vec<Box<str>>,
+    pub(in crate::patch) variable_types: Vec<Box<str>>,
     /// `events` and `variables` with those of the referenced mods: what can be used, while only the
     /// others can be edited.
-    pub(super) usable_events: Vec<String>,
-    pub(super) usable_variables: Vec<String>,
+    pub(in crate::patch) usable_events: Vec<String>,
+    pub(in crate::patch) usable_variables: Vec<String>,
     /// How many of each the template has (the rest are this mod's).
-    pub(super) template_events: usize,
-    pub(super) template_variables: usize,
-    pub(super) graph: Graph,
+    pub(in crate::patch) template_events: usize,
+    pub(in crate::patch) template_variables: usize,
+    pub(in crate::patch) graph: Graph,
 }
 
 impl Names {
-    pub(super) fn new(behavior: &Behavior) -> Self {
+    pub(in crate::patch) fn new(behavior: &Behavior) -> Self {
         let mut names = Self { graph: Graph::new(behavior), ..Self::default() };
         if let Some(id) = behavior.object_of_class(STRING_DATA) {
             let template = behavior.template_object(id).map(|o| o.text.as_str()).unwrap_or_default();
@@ -47,7 +47,7 @@ impl Names {
     }
 
     /// Takes in the objects with these ids, which changed since the last call.
-    pub(super) fn apply_changes(&mut self, behavior: &Behavior, changed: &[String]) {
+    pub(in crate::patch) fn apply_changes(&mut self, behavior: &Behavior, changed: &[String]) {
         for id in changed {
             let object = behavior.object_text(id);
             self.graph.update(id, object);

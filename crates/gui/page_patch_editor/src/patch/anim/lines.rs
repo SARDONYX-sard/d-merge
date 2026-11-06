@@ -40,18 +40,18 @@
 //! not change the count (see [`nemesis_diff::asdsf::add_anim_infos`]).
 //!
 //! The format allows too much for these roles to tell what is wrong: they are a guide to reading a
-//! file. What is wrong is for d-merge's parser to say, see [`super::anim_patch`].
+//! file. What is wrong is for d-merge's parser to say, see [`crate::patch::anim::patch_file`].
 
 use egui_code_editor::{CompletionList, Language, languages::Xml};
 
-use super::{
-    anim_patch::{AdsfFile, AsdsfFile},
-    language::{item, trigger_completion},
+use crate::patch::{
+    anim::patch_file::{AdsfFile, AsdsfFile},
+    editor::language::{item, trigger_completion},
 };
 
 /// See the module docs. The number is the element's index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum LineRole {
+pub(in crate::patch) enum LineRole {
     Version,
     TriggersLen,
     Trigger(u32),
@@ -90,7 +90,7 @@ pub(super) enum LineRole {
 
 impl LineRole {
     /// The label at the end of the line, e.g., `animInfos[3].file`.
-    pub(super) fn hint(self) -> String {
+    pub(in crate::patch) fn hint(self) -> String {
         match self {
             Self::Version => "version".to_owned(),
             Self::TriggersLen | Self::ClipTriggersLen => "triggers: count".to_owned(),
@@ -123,7 +123,7 @@ impl LineRole {
     }
 
     /// What the hover says.
-    pub(super) const fn doc(self) -> Option<&'static str> {
+    pub(in crate::patch) const fn doc(self) -> Option<&'static str> {
         Some(match self {
             Self::Version => "**Version** of the anim set. Always `V3`.",
             Self::TriggersLen => "**Count** of the triggers below. Nemesis and d-merge count them when merging.",
@@ -277,7 +277,7 @@ fn walk_motion(walk: &mut Walk<'_>) -> Option<()> {
 }
 
 /// The role of every line of an anim set patch or a clip data patch, by the file `id`.
-pub(super) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRole> {
+pub(in crate::patch) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRole> {
     let mut walk = Walk::new(text);
     let _partial = if is_adsf {
         match AdsfFile::of(id) {
@@ -296,13 +296,13 @@ pub(super) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRole> {
 
 /// The editor's language for these files.
 #[derive(Debug)]
-pub(super) struct AnimDataLanguage<'a> {
+pub(in crate::patch) struct AnimDataLanguage<'a> {
     /// See [`roles`], per line of the open file.
-    pub(super) roles: &'a [LineRole],
+    pub(in crate::patch) roles: &'a [LineRole],
     /// The cursor line last frame: [`Language::complete`] only gets the text of a line.
-    pub(super) cursor_line: usize,
+    pub(in crate::patch) cursor_line: usize,
     /// The known trigger names.
-    pub(super) trigger_names: &'a [String],
+    pub(in crate::patch) trigger_names: &'a [String],
 }
 
 impl Language for AnimDataLanguage<'_> {

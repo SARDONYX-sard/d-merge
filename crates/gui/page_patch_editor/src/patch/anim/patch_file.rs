@@ -47,7 +47,7 @@ fn split_id(id: &str) -> (&str, &str) {
 
 /// A file of `animationdatasinglefile`, see the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AdsfFile {
+pub(in crate::patch) enum AdsfFile {
     ProjectNamesHeader,
     AnimHeader,
     AddAnim,
@@ -58,7 +58,7 @@ pub(super) enum AdsfFile {
 
 impl AdsfFile {
     /// Only the file's own name counts: the folder of nearly all of them has a `~` too.
-    pub(super) fn of(id: &str) -> Self {
+    pub(in crate::patch) fn of(id: &str) -> Self {
         let (folder, file) = split_id(id);
         let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
         if stem.eq_ignore_ascii_case(HEADER) {
@@ -73,7 +73,7 @@ impl AdsfFile {
     }
 
     /// Does it hold a whole clip, as opposed to its motion, a header or an edit?
-    pub(super) fn is_whole_clip(self, patch: &str) -> bool {
+    pub(in crate::patch) fn is_whole_clip(self, patch: &str) -> bool {
         match self {
             Self::AddAnim => true,
             Self::IndexedAnim => !is_edit(patch),
@@ -83,13 +83,13 @@ impl AdsfFile {
 }
 
 /// An `Indexed*` file is an edit if it has `MOD_CODE`, else it is whole.
-pub(super) fn is_edit(patch: &str) -> bool {
+pub(in crate::patch) fn is_edit(patch: &str) -> bool {
     patch.contains("<!-- MOD_CODE")
 }
 
 /// A file of `animationsetdatasinglefile`, see the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AsdsfFile {
+pub(in crate::patch) enum AsdsfFile {
     ProjectsHeader,
     SetsHeader,
     AddSet,
@@ -97,7 +97,7 @@ pub(super) enum AsdsfFile {
 }
 
 impl AsdsfFile {
-    pub(super) fn of(id: &str) -> Self {
+    pub(in crate::patch) fn of(id: &str) -> Self {
         let (folder, file) = split_id(id);
         if file.rsplit_once('.').is_some_and(|(stem, _)| stem.eq_ignore_ascii_case(HEADER)) {
             if folder.eq_ignore_ascii_case(HEADER) { Self::ProjectsHeader } else { Self::SetsHeader }
@@ -114,7 +114,7 @@ impl AsdsfFile {
 /// The mode only matters for whole clips and motions. `Lenient` takes a wrong count (`7` triggers,
 /// none listed): d-merge counts them itself, so that is neither an error nor a warning here, as a
 /// message about what will work anyway would only hide the real ones.
-pub(super) fn validate_adsf(id: &str, patch: &str, mode: ParserMode) -> Result<(), String> {
+pub(in crate::patch) fn validate_adsf(id: &str, patch: &str, mode: ParserMode) -> Result<(), String> {
     let text = |e: &dyn std::fmt::Display| e.to_string();
     let strict = matches!(mode, ParserMode::Strict);
     match AdsfFile::of(id) {
@@ -142,7 +142,7 @@ pub(super) fn validate_adsf(id: &str, patch: &str, mode: ParserMode) -> Result<(
 }
 
 /// d-merge's parser check of one `animationsetdatasinglefile` patch. These parsers have no modes.
-pub(super) fn validate_asdsf(id: &str, patch: &str) -> Result<(), String> {
+pub(in crate::patch) fn validate_asdsf(id: &str, patch: &str) -> Result<(), String> {
     let text = |e: &dyn std::fmt::Display| e.to_string();
     match AsdsfFile::of(id) {
         AsdsfFile::ProjectsHeader | AsdsfFile::SetsHeader => {
@@ -164,7 +164,7 @@ mod tests {
     fn a_wrong_attack_trigger_says_where_and_why() {
         let patch = "V3\n0\n0\n1\n<!-- MOD_CODE ~m~ OPEN -->\nattackStat1\n<!-- ORIGINAL -->\nattackStart1\n<!-- CLOSE -->\n0\n0\n0\n";
         let error = validate_asdsf("Project~P/_Set.txt", patch).unwrap_err();
-        let problem = super::super::diagnostics::parser_problem(&error).unwrap();
+        let problem = crate::patch::editor::diagnostics::parser_problem(&error).unwrap();
         assert_eq!(problem.line, 5, "{error}");
         assert!(problem.message.contains("attackStart"), "{error}");
     }

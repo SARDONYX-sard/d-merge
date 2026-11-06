@@ -16,7 +16,7 @@
 //! └──────────────────────────────────────────────────────────┘
 //! ```
 //! The two halves are independent: the user decides which hkx go to which txt.
-//! See [`crate::patch::anim_data`] for what is generated.
+//! See [`crate::patch::anim::data`] for what is generated.
 
 use std::path::{Path, PathBuf};
 
@@ -28,7 +28,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
     PatchTool,
-    anim_data::{self, AnimSetPush, ClipSource, Generate, HkxInfo},
+    anim::data::{self, AnimSetPush, ClipSource, Generate, HkxInfo},
     checklist::Checklist,
     workspace::{ADSF, ASDSF},
 };
@@ -63,7 +63,7 @@ struct SetProject {
 pub(in crate::patch) struct AnimDataDialog {
     root: PathBuf,
     rows: Vec<ClipRow>,
-    /// The mod's animations, as [`anim_data::anim_hkx_files`] gives them.
+    /// The mod's animations, as [`data::anim_hkx_files`] gives them.
     hkx: Checklist,
     projects: Vec<SetProject>,
     /// The project shown, in `projects`.
@@ -89,20 +89,20 @@ impl PatchTool {
     /// Opens the window for the mod at `root`: reads the hkx of every clip of the workspace, and
     /// lists the hkx of the mod and the anim set files of the template.
     pub(in crate::patch) fn open_anim_data_dialog(&mut self, root: &Path) {
-        let clips = anim_data::clip_sources(&self.workspace.behaviors);
+        let clips = data::clip_sources(&self.workspace.behaviors);
         let rows = clips
             .into_iter()
             .map(|clip| {
-                let info = anim_data::read_hkx(root, &clip);
+                let info = data::read_hkx(root, &clip);
                 let checked = info.is_ok();
                 let triggers_on = info.as_ref().map_or_else(|_| Vec::new(), |info| vec![true; info.triggers.len()]);
                 ClipRow { clip, info, checked, triggers_on }
             })
             .collect();
-        let hkx = anim_data::anim_hkx_files(root);
+        let hkx = data::anim_hkx_files(root);
         let sets = self.workspace.anim_set_projects(Path::new(&self.template_dir));
         let folders: Vec<&str> = sets.iter().map(|(folder, _)| folder.as_str()).collect();
-        let project = anim_data::default_project(&folders, hkx.first().map(String::as_str));
+        let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
         self.anim_data_dialog =
@@ -157,7 +157,7 @@ impl PatchTool {
         );
         let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
         let root = PathBuf::from(&self.template_dir);
-        match anim_data::generate(&mut self.workspace, &root, &request) {
+        match data::generate(&mut self.workspace, &root, &request) {
             Ok(()) => {
                 notify.success(summary);
                 self.show_anim_data_result(first_result);
@@ -328,7 +328,7 @@ pub(in crate::patch) struct NewClipsForm {
     folder: String,
     name: String,
     count: usize,
-    /// What `folder` can be: its candidates. See [`anim_data::project_folders`].
+    /// What `folder` can be: its candidates. See [`data::project_folders`].
     projects: Vec<String>,
 }
 
@@ -389,7 +389,7 @@ impl DuplicateForm {
     /// `current`: the project the files are in.
     pub(in crate::patch) fn new(files: Vec<String>, mut projects: Vec<String>, current: &str) -> Self {
         projects.retain(|project| project != current);
-        anim_data::partner_first(&mut projects, current);
+        data::partner_first(&mut projects, current);
         Self { files, projects, picked: 0 }
     }
 }
@@ -432,10 +432,10 @@ impl PatchTool {
     pub(in crate::patch) fn anim_projects(&mut self) -> Vec<String> {
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         if is_adsf && self.template_projects.is_none() {
-            self.template_projects = Some(anim_data::template_projects(Path::new(&self.template_dir)));
+            self.template_projects = Some(data::template_projects(Path::new(&self.template_dir)));
         }
         let template = if is_adsf { self.template_projects.as_deref().unwrap_or_default() } else { &[] };
-        anim_data::project_folders(&self.workspace.behaviors[self.active], template)
+        data::project_folders(&self.workspace.behaviors[self.active], template)
     }
 
     pub(in crate::patch) fn new_clips_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
@@ -476,7 +476,7 @@ impl PatchTool {
         let Some(form) = self.new_clips.take() else { return };
         let code = self.mod_code.trim().to_owned();
         let adsf = &mut self.workspace.behaviors[self.active];
-        let added = anim_data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
+        let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
         if let Some(first) = added.first() {
             self.selected = Some(first.clone());
         }

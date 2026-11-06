@@ -21,7 +21,8 @@ use gui_shared::{
 };
 
 use super::{
-    PatchPaths, PatchTool, resolve,
+    PatchPaths, PatchTool,
+    editor::resolve,
     workspace::{self, Workspace},
 };
 

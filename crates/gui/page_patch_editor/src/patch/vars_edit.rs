@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use nemesis_diff::vars::{self, VariableType};
 
-use super::{PatchTool, names::Names};
+use super::{PatchTool, editor::names::Names};
 
 pub(super) const GRAPH_DATA: &str = "hkbBehaviorGraphData";
 pub(super) const VALUE_SET: &str = "hkbVariableValueSet";

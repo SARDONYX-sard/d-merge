@@ -17,7 +17,7 @@
 use fast_hash::HashSet;
 
 use crate::patch::{
-    anim_patch::{AdsfFile, AsdsfFile},
+    anim::patch_file::{AdsfFile, AsdsfFile},
     tree::Node,
 };
 

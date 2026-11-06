@@ -1,5 +1,5 @@
 //! The patch preview's data: the `#XXXX.txt` of the open object, split into lines to draw like a
-//! git diff (see [`super::ui::preview`]).
+//! git diff (see [`crate::patch::ui::preview`]).
 //!
 //! ```text
 //! Patch preview  ▲ ▼  2/5  ✔
@@ -13,7 +13,7 @@
 
 /// What a preview line is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Kind {
+pub(in crate::patch) enum Kind {
     Common,
     /// `<!-- MOD_CODE ~..~ OPEN -->` of block N.
     Open(usize),
@@ -24,13 +24,13 @@ pub(super) enum Kind {
 
 /// A patch split into lines for drawing.
 #[derive(Debug, Default)]
-pub(super) struct Preview {
+pub(in crate::patch) struct Preview {
     lines: Vec<(Kind, String)>,
     /// Chars of the longest line: the width of the horizontal scroll.
     longest_line: usize,
     blocks: usize,
     /// The block ▲ / ▼ moved to (0-based).
-    pub(super) current: usize,
+    pub(in crate::patch) current: usize,
     /// A pending scroll to `current`.
     scroll_to_current: bool,
     /// The editor line the preview follows, and its row (highlighted so you see where you are).
@@ -40,7 +40,7 @@ pub(super) struct Preview {
 }
 
 impl Preview {
-    pub(super) fn new(patch: &str) -> Self {
+    pub(in crate::patch) fn new(patch: &str) -> Self {
         let mut lines = Vec::new();
         let mut kind = Kind::Common;
         let mut blocks = 0;
@@ -75,25 +75,25 @@ impl Preview {
         }
     }
 
-    pub(super) fn lines(&self) -> &[(Kind, String)] {
+    pub(in crate::patch) fn lines(&self) -> &[(Kind, String)] {
         &self.lines
     }
 
-    pub(super) const fn longest_line(&self) -> usize {
+    pub(in crate::patch) const fn longest_line(&self) -> usize {
         self.longest_line
     }
 
-    pub(super) const fn blocks(&self) -> usize {
+    pub(in crate::patch) const fn blocks(&self) -> usize {
         self.blocks
     }
 
     /// Keeps the ▲ / ▼ position (clamped) after the patch was recomputed.
-    pub(super) fn keep_current(&mut self, current: usize) {
+    pub(in crate::patch) fn keep_current(&mut self, current: usize) {
         self.current = current.min(self.blocks.saturating_sub(1));
     }
 
     /// ▲ / ▼: the previous / next block, wrapping around, and a scroll to it.
-    pub(super) const fn step(&mut self, forward: bool) {
+    pub(in crate::patch) const fn step(&mut self, forward: bool) {
         if self.blocks == 0 {
             return;
         }
@@ -104,7 +104,7 @@ impl Preview {
 
     /// The editor's cursor is on `line`: highlights the row showing it and scrolls there.
     /// Does nothing while the line stays the same, so you can scroll the preview freely.
-    pub(super) fn follow_editor_line(&mut self, line: usize, editor_text: &str) {
+    pub(in crate::patch) fn follow_editor_line(&mut self, line: usize, editor_text: &str) {
         if self.followed.is_some_and(|(followed, _)| followed == line) {
             return;
         }
@@ -114,18 +114,18 @@ impl Preview {
     }
 
     /// The user turned following off: no highlight, and the view stays where it is.
-    pub(super) const fn stop_following(&mut self) {
+    pub(in crate::patch) const fn stop_following(&mut self) {
         self.followed = None;
         self.scroll_to_followed = false;
     }
 
     /// The highlighted row. See [`Self::follow_editor_line`].
-    pub(super) fn followed_row(&self) -> Option<usize> {
+    pub(in crate::patch) fn followed_row(&self) -> Option<usize> {
         self.followed.and_then(|(_, row)| row)
     }
 
     /// The pending scroll: the followed row, which goes to the middle of the view.
-    pub(super) fn take_followed_scroll(&mut self) -> Option<usize> {
+    pub(in crate::patch) fn take_followed_scroll(&mut self) -> Option<usize> {
         std::mem::take(&mut self.scroll_to_followed).then(|| self.followed_row()).flatten()
     }
 
@@ -147,7 +147,7 @@ impl Preview {
     /// in the editor text (the template's lines, the markers) goes to the next line that is.
     ///
     /// e.g., the row of the 2nd `<hkparam name="enable">false</hkparam>` -> that line's number.
-    pub(super) fn editor_line_of(&self, row: usize, editor_text: &str) -> Option<usize> {
+    pub(in crate::patch) fn editor_line_of(&self, row: usize, editor_text: &str) -> Option<usize> {
         let is_mod_line = |kind: Kind| matches!(kind, Kind::Common | Kind::New);
         let next = self.lines.get(row..)?.iter().position(|(kind, _)| is_mod_line(*kind)).map(|at| row + at);
         let target_row = next.or_else(|| self.lines.iter().rposition(|(kind, _)| is_mod_line(*kind)))?;
@@ -162,7 +162,7 @@ impl Preview {
     }
 
     /// The pending scroll: the row of the current block's `OPEN` line, which goes to the top.
-    pub(super) fn take_scroll_row(&mut self) -> Option<usize> {
+    pub(in crate::patch) fn take_scroll_row(&mut self) -> Option<usize> {
         if !std::mem::take(&mut self.scroll_to_current) {
             return None;
         }

@@ -13,14 +13,14 @@ use egui_code_editor::References;
 
 /// Visited objects, for `Ctrl+O` / `Ctrl+I`.
 #[derive(Debug, Default)]
-pub(super) struct History {
+pub(in crate::patch) struct History {
     back: Vec<String>,
     forward: Vec<String>,
 }
 
 impl History {
     /// Leaving `from` for another object.
-    pub(super) fn visit(&mut self, from: &str) {
+    pub(in crate::patch) fn visit(&mut self, from: &str) {
         if self.back.last().map(String::as_str) != Some(from) {
             self.back.push(from.to_owned());
         }
@@ -28,7 +28,7 @@ impl History {
     }
 
     /// The object to go back (`older`) / forward to, from `current`.
-    pub(super) fn walk(&mut self, older: bool, current: &str) -> Option<String> {
+    pub(in crate::patch) fn walk(&mut self, older: bool, current: &str) -> Option<String> {
         let (from, to) = if older { (&mut self.back, &mut self.forward) } else { (&mut self.forward, &mut self.back) };
         let target = from.pop()?;
         to.push(current.to_owned());
@@ -47,27 +47,27 @@ struct ReferenceRow {
 
 /// The open references window. Kept across frames, so it owns what the language lent.
 #[derive(Debug)]
-pub(super) struct ReferenceList {
+pub(in crate::patch) struct ReferenceList {
     title: Box<str>,
     rows: Vec<ReferenceRow>,
 }
 
 impl ReferenceList {
     /// e.g., `References: #0106 (3)`
-    pub(super) fn title(&self) -> &str {
+    pub(in crate::patch) fn title(&self) -> &str {
         &self.title
     }
 
-    pub(super) const fn len(&self) -> usize {
+    pub(in crate::patch) const fn len(&self) -> usize {
         self.rows.len()
     }
 
-    pub(super) fn label(&self, index: usize) -> &str {
+    pub(in crate::patch) fn label(&self, index: usize) -> &str {
         &self.rows[index].label
     }
 
     /// `(document, line)` of row `index`.
-    pub(super) fn location(&self, index: usize) -> Option<(&str, usize)> {
+    pub(in crate::patch) fn location(&self, index: usize) -> Option<(&str, usize)> {
         self.rows.get(index).map(|row| (&*row.document, row.line))
     }
 }

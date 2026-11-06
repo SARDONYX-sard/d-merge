@@ -1,7 +1,7 @@
 //! The references window (`Shift+F12`, Vim `gD`). The list itself is in
-//! [`crate::patch::navigate`].
+//! [`crate::patch::editor::navigate`].
 
-use crate::patch::navigate::ReferenceList;
+use crate::patch::editor::navigate::ReferenceList;
 
 /// Draws the window. Returns the `(document, line)` that was clicked.
 pub(in crate::patch) fn references_window<'a>(
