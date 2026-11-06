@@ -5,7 +5,7 @@
 //! - opens after the pointer rests on a char for [`HOVER_DELAY`]
 //! - stays open while the pointer is on the text or inside the popup (links are clickable)
 //! - closes when the pointer leaves both, on any key press, or on a click outside it
-//! - scrolls when its text is taller than [`MAX_HEIGHT`]
+//! - scrolls when its text is taller than [`max_height`]
 //! - Vim `K` opens it at the text cursor (see [`HoverPopup::open_at`]); `K` again moves the
 //!   keyboard into it if there is anything to do there: `j` / `k` scroll, `Tab` / `Shift+Tab` go
 //!   through the links, `Enter` opens one, `Esc` / `q` close it and return to the editor
@@ -24,8 +24,16 @@ pub(crate) const HOVER_DELAY: f64 = 0.3;
 /// does not close it while the pointer travels into it.
 pub(crate) const POPUP_MARGIN: f32 = 8.0;
 
+/// See [`max_height`].
+const MIN_MAX_HEIGHT: f32 = 320.0;
+
 /// The popup scrolls above this height, so that a long text does not cover the editor.
-pub(crate) const MAX_HEIGHT: f32 = 320.0;
+///
+/// A quarter of the editor as in VS Code, whose least is 250: the height of a small editor is not
+/// reason enough to scroll sooner than that.
+pub(crate) fn max_height(editor_height: f32) -> f32 {
+    (editor_height / 4.0).max(MIN_MAX_HEIGHT)
+}
 
 /// How far `j` / `k` scroll the popup: about three lines.
 pub(crate) const SCROLL_STEP: f32 = 48.0;

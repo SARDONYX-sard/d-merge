@@ -2,10 +2,13 @@
 
 use egui::{Galley, Pos2, Rect, text::CCursor};
 
-use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, MAX_HEIGHT, Open, POPUP_MARGIN, SCROLL_STEP, content};
+use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, Open, POPUP_MARGIN, SCROLL_STEP, content, max_height};
 
 /// The width of the popup's border while the keyboard is in it.
 const FOCUSED_BORDER: f32 = 2.0;
+
+/// The space around the text of the popup: as VS Code's hover (`padding: 4px 8px`).
+const TEXT_MARGIN: egui::Margin = egui::Margin::symmetric(8, 4);
 
 impl HoverPopup {
     /// Handles the keys meant for the popup, and closes it on other keys or a click outside it.
@@ -100,7 +103,7 @@ impl HoverPopup {
         if let Some(open) = &mut self.open {
             // Re-anchor every frame so the popup follows its char when the text scrolls.
             open.anchor = char_rect(ctx.galley, ctx.galley_pos, open.index);
-            open.rect = Some(show(ui.ctx(), ctx.id, open));
+            open.rect = Some(show(ui.ctx(), ctx.id, open, max_height(ctx.response.rect.height())));
         }
     }
 
@@ -185,16 +188,19 @@ fn take_shift_k(ui: &egui::Ui) -> bool {
 }
 
 /// Draws the popup below its anchor and returns its rect.
-fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open) -> Rect {
+fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open, max_height: f32) -> Rect {
     egui::Area::new(id.with("hover_popup"))
         .order(egui::Order::Tooltip)
         .fixed_pos(open.anchor.left_bottom())
         .constrain(true)
+        // An area can't grow beyond its last size, which is that of the last popup: measure new text.
+        // (Not drawn for this one frame, in which egui asks for the next.)
+        .sizing_pass(open.rect.is_none())
         .show(ctx, |ui| {
             popup_frame(ui.style(), open.focused).show(ui, |ui| {
                 // Has the keyboard while no link does, so that it leaves the editor.
                 let popup = ui.allocate_response(egui::Vec2::ZERO, egui::Sense::focusable_noninteractive());
-                let mut area = egui::ScrollArea::vertical().id_salt("hover_scroll").max_height(MAX_HEIGHT);
+                let mut area = egui::ScrollArea::vertical().id_salt("hover_scroll").max_height(max_height);
                 if let Some(offset) = open.scroll_to.take() {
                     area = area.vertical_scroll_offset(offset);
                 }
@@ -225,7 +231,7 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open) -> Rect {
 /// The popup's frame. With the keyboard in the popup its border stands out: keys go there, not to the
 /// editor.
 fn popup_frame(style: &egui::Style, focused: bool) -> egui::Frame {
-    let frame = egui::Frame::popup(style);
+    let frame = egui::Frame::popup(style).inner_margin(TEXT_MARGIN);
     if focused { frame.stroke(egui::Stroke::new(FOCUSED_BORDER, style.visuals.selection.bg_fill)) } else { frame }
 }
 
@@ -279,5 +285,43 @@ mod tests {
         assert!(focused.width > normal.width);
         assert_eq!(focused.color, style.visuals.selection.bg_fill);
         assert_eq!(normal, egui::Frame::popup(&style).stroke);
+    }
+
+    /// Draws `docs` in the popup for some frames, as a new popup. Returns its last rect.
+    fn popup_rect(ctx: &egui::Context, docs: &str) -> Rect {
+        let content = Content { problems: Vec::new(), docs: Some(docs.to_owned()) };
+        let mut open = Open::new(0, Rect::from_min_size(Pos2::new(10.0, 10.0), egui::Vec2::ZERO), content, false);
+        let mut rect = Rect::NOTHING;
+        for _ in 0..4 {
+            let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1200.0, 900.0));
+            let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
+            let mut output = ctx.run_ui(input, |ui| {
+                rect = show(ui.ctx(), egui::Id::NULL.with("editor"), &mut open, 320.0);
+                open.rect = Some(rect);
+            });
+            output.textures_delta.clear();
+        }
+        rect
+    }
+
+    #[test]
+    fn a_popup_is_as_tall_as_its_text_whatever_the_last_one_was() {
+        let ctx = egui::Context::default();
+        let long = "a line\n".repeat(40);
+
+        let first_long = popup_rect(&ctx, &long).height();
+        assert!(first_long > 300.0, "up to the limit: {first_long}");
+
+        let short = popup_rect(&ctx, "one line").height();
+        assert!(short < 60.0, "as small as its text: {short}");
+
+        let long_after_short = popup_rect(&ctx, &long).height();
+        assert!((long_after_short - first_long).abs() < 1.0, "{long_after_short} is not {first_long}");
+    }
+
+    #[test]
+    fn a_tall_editor_has_a_taller_popup() {
+        assert_eq!(max_height(600.0), 320.0);
+        assert_eq!(max_height(2000.0), 500.0);
     }
 }
