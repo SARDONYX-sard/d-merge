@@ -258,8 +258,8 @@ mod tests {
             tracing::debug!("motion_blocks = {}\n", anim_data.clip_motion_blocks.len());
         }
 
-        // std::fs::create_dir_all("../../dummy/debug").unwrap();
-        // std::fs::write("../../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
+        // std::fs::create_dir_all("../../../dummy/debug").unwrap();
+        // std::fs::write("../../../dummy/debug/adsf_debug.txt", format!("{res:#?}")).unwrap();
     }
 
     #[cfg(feature = "tracing")]

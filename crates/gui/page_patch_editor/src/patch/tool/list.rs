@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use stdx::text::{cmp_ignore_case, contains_ignore_case};
 
-use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui};
+use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui, workspace::PANDORA_DOC};
 
 impl PatchTool {
     /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
@@ -71,7 +71,8 @@ impl PatchTool {
     pub(in crate::patch) fn revert_or_delete(&mut self, id: &str) {
         let behavior = &mut self.workspace.behaviors[self.active];
         behavior.edits.remove(id);
-        if behavior.added.remove(id).is_some() {
+        let is_pandora_doc = id == PANDORA_DOC && behavior.pandora_doc.take().is_some();
+        if behavior.added.remove(id).is_some() || is_pandora_doc {
             let neighbor = self.tabs.close(self.active, id);
             if self.selected.as_deref() == Some(id) {
                 self.selected = neighbor.map(Rc::from);

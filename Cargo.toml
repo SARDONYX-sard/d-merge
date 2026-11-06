@@ -24,28 +24,28 @@ bitvec              = "1.0.1"
 chrono              = "0.4.44"
 crc                 = "3.4.0"
 dark-light          = "3.0.0"
-dashmap             = { version = "6.2.1" }
-educe               = { version = "0.8.1" }
+dashmap             = "6.2.1"
+educe               = "0.8.1"
 eframe              = { version = "0.37.0", default-features = false }
-egui                = { version = "0.37.0" } # GUI widgets (shared by the gui crates; eframe stays in the app crate)
+egui                = "0.37.0" # GUI widgets (shared by the gui crates; eframe stays in the app crate)
 egui_dnd            = "0.18.0"
 egui_extras         = "0.37.0"
 egui_flex           = "0.9.0"
 egui_router         = "0.10.0"
 font-kit            = "0.14.3"
-futures             = { version = "0.3.34" }
+futures             = "0.3.34"
 ico                 = "0.6.0"
 image               = "0.25.10"
 imara-diff          = "0.2.0"
 indexmap            = { version = "2.14.2", features = ["rayon"] }
-jwalk               = { version = "0.9.0" }
+jwalk               = "0.9.0"
 mimalloc            = "0.1.52"
 once_cell           = "1.21.4"
 open                = "5.4.4"
 parking_lot         = "0.13.0"
 phf                 = "0.14.0"
 quote               = "1.0.45"
-rapidhash           = { version = "4.5.1" }
+rapidhash           = "4.5.1"
 rayon               = "1.12.0"
 rfd                 = { version = "0.17.2", default-features = false }
 rfd-linux           = { package = "rfd", version = "0.15.4", features = ["xdg-portal"] } # gui_shared re-exports it as `rfd` on Linux
@@ -59,15 +59,15 @@ serde_repr          = "0.1.21" # C like Serialize enum into numbers.(Using progr
 simd-json           = "0.19.0"
 snafu               = "0.9.2"
 sonic-rs            = "0.5.10"
-syn                 = "3.0.0"
-sysinfo             = "0.39.6"
+syn                 = "3.0.9"
+sysinfo             = "0.40.1"
 temp-dir            = "0.2.0"
 tokio               = { version = "1.54.1", features = ["fs", "rt-multi-thread"] } # Async runtime
 tracing             = { version = "0.1.44" } # logger
 tracing-subscriber  = "0.3.23"
 urlencoding         = "2.1.3"
 wgpu                = "30.0.1"
-winnow              = { version = "1.0.4", features = ["simd"] }
+winnow              = { version = "1.0.5", features = ["simd"] }
 winres              = "0.1.12"
 
 auto_charset    = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "e71c602", default-features = false }
@@ -86,36 +86,37 @@ pretty_assertions = "1.4.1" # Color diff assertion
 quick_tracing     = { version = "0.1.5", features = ["derive"] } # Easy logging
 
 # workspace members
-stdx                 = { path = "./crates/core/stdx" }
+behavior_merge       = { path = "./crates/core/behavior_merge" }
+behavior_merge_types = { path = "./crates/core/behavior_merge_types" }
 fast_hash            = { path = "./crates/core/fast_hash" }
 fnis_list            = { path = "./crates/core/fnis_list" }
 fnis_patch_gen       = { path = "./crates/core/fnis_patch_gen" }
-gh_issue_link        = { path = "./crates/gui/gh_issue_link" }
-hkanno_lsp           = { path = "./crates/gui/hkanno_lsp" }
 hkx_io               = { path = "./crates/core/hkx_io" }
 json_patch           = { path = "./crates/core/json_patch" }
 jwalk_glob           = { path = "./crates/core/jwalk_glob" }
-mod_info             = { path = "./crates/gui/mod_info" }
-behavior_merge       = { path = "./crates/core/behavior_merge" }
-behavior_merge_types = { path = "./crates/core/behavior_merge_types" }
 nemesis_diff         = { path = "./crates/core/nemesis_diff" }
 nemesis_patch_syntax = { path = "./crates/core/nemesis_patch_syntax" }
 nemesis_xml          = { path = "./crates/core/nemesis_xml" }
-node_expr            = { path = "./crates/gui/node_expr" }
-serde_hkx_for_gui    = { path = "./crates/gui/serde_hkx_for_gui" }
+pandora_patch        = { path = "./crates/core/pandora_patch" }
 skyrim_anim_data     = { path = "./crates/core/skyrim_anim_data" }
 skyrim_crc           = { path = "./crates/core/skyrim_crc" }
-skyrim_data_dir      = { path = "./crates/gui/skyrim_data_dir" }
 skyrim_esp           = { path = "./crates/core/skyrim_esp" }
-tracing_rotation     = { path = "./crates/gui/tracing_rotation" }
+stdx                 = { path = "./crates/core/stdx" }
 
-gui_shared        = { path = "./crates/gui/gui_shared" }
-egui_widgets      = { path = "./crates/gui/egui_widgets" }
 egui_code_editor  = { path = "./crates/gui/egui_code_editor" }
+egui_widgets      = { path = "./crates/gui/egui_widgets" }
+gh_issue_link     = { path = "./crates/gui/gh_issue_link" }
+gui_shared        = { path = "./crates/gui/gui_shared" }
+hkanno_lsp        = { path = "./crates/gui/hkanno_lsp" }
+mod_info          = { path = "./crates/gui/mod_info" }
+node_expr         = { path = "./crates/gui/node_expr" }
 page_convert      = { path = "./crates/gui/page_convert" }
-page_patch_editor = { path = "./crates/gui/page_patch_editor" }
 page_hkanno       = { path = "./crates/gui/page_hkanno" }
 page_patch        = { path = "./crates/gui/page_patch" }
+page_patch_editor = { path = "./crates/gui/page_patch_editor" }
+serde_hkx_for_gui = { path = "./crates/gui/serde_hkx_for_gui" }
+skyrim_data_dir   = { path = "./crates/gui/skyrim_data_dir" }
+tracing_rotation  = { path = "./crates/gui/tracing_rotation" }
 
 
 # NOTE: Set this to lto because there is a part of CI that assumes release dir, and use lto only when the tag is typed.

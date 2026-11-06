@@ -67,6 +67,14 @@ pub(crate) struct Behavior {
     /// The events and variables the referenced mods add.
     pub(crate) ref_events: Vec<String>,
     pub(crate) ref_variables: Vec<String>,
+    /// The Pandora patch file of this template, once it was opened: what is exported for Pandora from
+    /// then on, as it is. See [`PANDORA_DOC`].
+    pub(crate) pandora_doc: Option<String>,
+    /// The name of that file in the mod it was read from, e.g. `defaultmale~0_master`. Pandora has many
+    /// names for a template: under another name, the old file would stay and the patch apply twice.
+    pub(crate) pandora_file: Option<String>,
+    /// The objects `pandora_doc` was last applied for: what an edit of it may take back.
+    pub(crate) pandora_doc_ids: Vec<String>,
 }
 
 /// A new object of a referenced mod. See [`Workspace::ref_mods`].
@@ -77,6 +85,9 @@ pub(crate) struct RefObject {
     pub(crate) label: String,
     pub(crate) text: String,
 }
+
+/// The id of a behavior's Pandora patch file among its objects: it opens in a tab as they do.
+pub(crate) const PANDORA_DOC: &str = "pandora_patch.xml";
 
 /// The class of the object holding the event and variable names.
 pub(crate) const STRING_DATA: &str = "hkbBehaviorGraphStringData";
@@ -157,6 +168,9 @@ impl Behavior {
                 refs: BTreeMap::new(),
                 ref_events: Vec::new(),
                 ref_variables: Vec::new(),
+                pandora_doc: None,
+                pandora_file: None,
+                pandora_doc_ids: Vec::new(),
             });
         }
         let bytes = std::fs::read(template_path).map_err(|e| format!("{}: {e}", template_path.display()))?;
@@ -189,6 +203,9 @@ impl Behavior {
                 refs: BTreeMap::new(),
                 ref_events: Vec::new(),
                 ref_variables: Vec::new(),
+                pandora_doc: None,
+                pandora_file: None,
+                pandora_doc_ids: Vec::new(),
             });
         }
         let xml = if is_bin {
@@ -219,6 +236,9 @@ impl Behavior {
             refs: BTreeMap::new(),
             ref_events: Vec::new(),
             ref_variables: Vec::new(),
+            pandora_doc: None,
+            pandora_file: None,
+            pandora_doc_ids: Vec::new(),
         })
     }
 
@@ -417,6 +437,9 @@ impl Behavior {
 
     /// The current text of `id`: its edit, a new object, or the template object.
     pub(crate) fn text(&self, id: &str) -> Option<&str> {
+        if id == PANDORA_DOC {
+            return self.pandora_doc.as_deref();
+        }
         self.edits
             .get(id)
             .or_else(|| self.added.get(id))
@@ -427,7 +450,9 @@ impl Behavior {
 
     /// Stores `text` as the new text of `id` (an edit back to the template removes the edit).
     pub(crate) fn set_text(&mut self, id: &str, text: &str) {
-        if let Some(added) = self.added.get_mut(id) {
+        if id == PANDORA_DOC {
+            self.pandora_doc = Some(text.to_owned());
+        } else if let Some(added) = self.added.get_mut(id) {
             text.clone_into(added);
         } else if self.template_object(id).is_some_and(|o| normalize(&o.text) == normalize(text)) {
             self.edits.remove(id);

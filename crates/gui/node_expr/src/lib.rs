@@ -72,12 +72,12 @@ mod tests {
     #[test]
     fn test_directory_tree() {
         let filter = ["hkx", "xml", "json", "yaml"];
-        let test_dir_path = "./../../../d-merge/";
+        let test_dir_path = "../../../";
 
         match build_dir_tree(test_dir_path, filter) {
             Ok(directory_tree) => {
-                fs::create_dir_all("../../dummy/").unwrap();
-                fs::write("../../dummy/dump.txt", format!("{directory_tree:#?}")).unwrap();
+                fs::create_dir_all("../../../dummy/").unwrap();
+                fs::write("../../../dummy/dump.txt", format!("{directory_tree:#?}")).unwrap();
             }
             Err(e) => panic!("Error building directory tree: {e}"),
         }
@@ -89,7 +89,7 @@ mod tests {
 
         const FILTER: [&str; 4] = ["hkx", "xml", "json", "yaml"];
         // const FILTER: [&str; 2] = ["hkx", "xml"];
-        let dirs = ["./../../../d-merge/dummy"];
+        let dirs = ["../../../dummy"];
 
         let (entries, errors): (Vec<_>, Vec<_>) = dirs
             .par_iter()
@@ -105,7 +105,7 @@ mod tests {
             panic!("{}", error_messages.join("\n"));
         }
 
-        fs::create_dir_all("../../dummy/").unwrap();
-        fs::write("../../dummy/dump.txt", format!("{entries:#?}")).unwrap();
+        fs::create_dir_all("../../../dummy/").unwrap();
+        fs::write("../../../dummy/dump.txt", format!("{entries:#?}")).unwrap();
     }
 }

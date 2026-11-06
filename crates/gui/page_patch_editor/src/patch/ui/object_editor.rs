@@ -14,8 +14,15 @@ use super::{preview::PreviewEvent, references::references_window};
 use crate::patch::{
     EditorResult, FocusAt, PatchTool, TabEvent,
     anim::lines::AnimDataLanguage,
-    editor::{inline_diff, language::NemesisXml, resolve, tabs::EditorTabs},
+    editor::{
+        inline_diff,
+        language::NemesisXml,
+        pandora::{self, PandoraXml},
+        resolve,
+        tabs::EditorTabs,
+    },
     tree::Graph,
+    workspace::PANDORA_DOC,
 };
 
 /// The id of the palette's "focus the object tree" command.
@@ -24,12 +31,14 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
 /// What this editor acts on: see [`crate::patch::PatchTool::apply_editor_result`].
-const HOST_COMMANDS: [EditorCommand; 6] = [
+const HOST_COMMANDS: [EditorCommand; 8] = [
     EditorCommand::NextTab,
     EditorCommand::PreviousTab,
     EditorCommand::CloseTab,
     EditorCommand::TogglePreview,
     EditorCommand::ToggleInlineDiff,
+    EditorCommand::NextChange,
+    EditorCommand::PreviousChange,
     EditorCommand::ToggleExplorer,
 ];
 
@@ -66,7 +75,7 @@ impl PatchTool {
 
         // No preview for a new object: it is written as is.
         let behavior = &self.workspace.behaviors[self.active];
-        let is_new = behavior.added.contains_key(&*id) || behavior.is_ref(&id);
+        let is_new = behavior.added.contains_key(&*id) || behavior.is_ref(&id) || *id == *PANDORA_DOC;
         // What the mods have at the conflict being edited: the preview comes back when it is closed.
         let is_merging = self.merge_values.as_ref().is_some_and(|values| *values.id == *id);
         let preview_event = if is_merging {
@@ -141,6 +150,7 @@ impl PatchTool {
     fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
         let mut event = None;
         let panel_id = if self.is_user_patch { "user_patch_preview" } else { "nemesis_preview" };
+        let is_pandora = self.preview_view.as_ref().is_some_and(|view| view.is_pandora());
         egui::Panel::right(panel_id).default_size(520.0).resizable(true).show(ui, |ui| {
             let Some((patch, check)) = &self.preview else { return };
             ui.horizontal(|ui| {
@@ -153,8 +163,8 @@ impl PatchTool {
                         ui.weak(i18n.t(I18nKey::NemesisNoChange));
                     }
                     Ok(()) => {
-                        ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔")
-                            .on_hover_text(i18n.t(I18nKey::NemesisParserOk));
+                        let ok = if is_pandora { I18nKey::NemesisPandoraOpsOk } else { I18nKey::NemesisParserOk };
+                        ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔").on_hover_text(i18n.t(ok));
                     }
                     // The details are in the Problems panel: a long text here would widen this panel.
                     Err(err) => {
@@ -181,8 +191,14 @@ impl PatchTool {
         let names = self.names();
         let values = self.field_values();
         // The class (and fields) around the cursor line of last frame: field names / hover.
-        let context = nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line);
-        let open_field = nemesis_diff::schema::open_field(&self.editor_text, self.cursor_line);
+        let is_pandora_doc = id == PANDORA_DOC;
+        let context = if is_pandora_doc {
+            pandora::fields_at(&self.workspace.behaviors[self.active], &self.editor_text, self.cursor_line)
+        } else {
+            nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line)
+        };
+        let open_field =
+            if is_pandora_doc { None } else { nemesis_diff::schema::open_field(&self.editor_text, self.cursor_line) };
         let language = NemesisXml {
             code_action: self.lsp.code_action,
             events: &names.usable_events,
@@ -203,7 +219,14 @@ impl PatchTool {
             cursor_line: self.cursor_line,
             trigger_names: &self.trigger_names,
         };
-        let shown_language: &dyn egui_code_editor::Language = if anim_data { &anim_language } else { &language };
+        let pandora_language = PandoraXml { inner: &language };
+        let shown_language: &dyn egui_code_editor::Language = if is_pandora_doc {
+            &pandora_language
+        } else if anim_data {
+            &anim_language
+        } else {
+            &language
+        };
         let features = editor_features(&self.lsp, anim_data);
         let keymap = match self.editor_mode {
             EditorMode::Normal => Keymap::Normal,
@@ -226,7 +249,7 @@ impl PatchTool {
             // Like VS Code's: the tabs, and at the far right what splits the editor. A new object has no
             // preview: it is written as is.
             let behavior = &self.workspace.behaviors[self.active];
-            let can_split = !behavior.added.contains_key(id) && !behavior.is_ref(id);
+            let can_split = !behavior.added.contains_key(id) && !behavior.is_ref(id) && !is_pandora_doc;
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if can_split {

@@ -609,6 +609,9 @@ pub enum I18nKey {
     /// d-merge's Nemesis parser accepts this patch.
     NemesisParserOk,
 
+    /// These operations of Pandora give the object as it is edited here.
+    NemesisPandoraOpsOk,
+
     /// Add a behavior (template xml) to start.
     NemesisNoBehavior,
 
@@ -618,7 +621,7 @@ pub enum I18nKey {
     /// Put this changed block back to the template's lines.
     NemesisRevertHunkHover,
 
-    /// Previous / next change
+    /// Previous / next change (Vim: [c, ]c)
     NemesisJumpDiffHover,
 
     /// Class of the new object (filter)
@@ -951,6 +954,15 @@ pub enum I18nKey {
     /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
     NemesisNotAMod,
 
+    /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
+    NemesisPandoraDocHover,
+
+    /// What Export writes. Nemesis: Nemesis_Engine and Nemesis_EngineExt. Pandora: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml, without the animation data. It is the same work: a mod read in one format can be written in the other.
+    NemesisExportFormatHover,
+
+    /// Written for Pandora
+    NemesisExportedPandora,
+
     /// This mod has several mod codes: which one to open?
     NemesisChooseModCode,
 
@@ -984,7 +996,7 @@ pub enum I18nKey {
     /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
     UserPatchClearHover,
 
-    /// Really delete all
+    /// Delete all of the User Patch?
     UserPatchClearConfirm,
 
     /// All this mod's patch does loses to other mods, so it does nothing in the end. Its files are not changed: it still takes part in other mods' merges by the load order.

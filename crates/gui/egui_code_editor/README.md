@@ -244,6 +244,7 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                                                                                |
 | `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                                                                   |
 | `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                                                                   |
+| `]c` `[c`       | Next / previous change (`EditorCommand::NextChange` / `PreviousChange` for the host)                                                                                               |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 

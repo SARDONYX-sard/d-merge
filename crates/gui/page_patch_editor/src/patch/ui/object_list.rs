@@ -22,6 +22,7 @@ use crate::patch::{
     PatchTool,
     anim::data,
     tree::{Graph, Node, TreeState},
+    workspace::PANDORA_DOC,
 };
 
 impl PatchTool {
@@ -123,10 +124,20 @@ impl PatchTool {
     /// `[+] [⧉] [↶]`, drawn right to left. A new object is deleted, a template object goes back to
     /// the template. Anim sets can only be edited, not added; clip data adds clips ([`NewClipsForm`]).
     fn object_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
+        if !self.workspace.behaviors[self.active].is_anim_data()
+            && ui
+                .add(Button::new("").icon(Icon::FilePlus).small())
+                .on_hover_text(i18n.t(I18nKey::NemesisPandoraDocHover))
+                .clicked()
+        {
+            self.open_pandora_doc();
+        }
         let code_ok = is_existing_mod_code(self.mod_code.trim()) && !asdsf;
         let selected = self.selected.clone();
-        let is_new =
-            selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(&**id));
+        let is_new = selected
+            .as_ref()
+            .is_some_and(|id| **id == *PANDORA_DOC || self.workspace.behaviors[self.active].added.contains_key(&**id));
+        let is_pandora_doc = selected.as_deref() == Some(PANDORA_DOC);
         let (icon, hover) = if is_new {
             (Icon::Trash, I18nKey::NemesisDeleteObjectHover)
         } else {
@@ -141,7 +152,7 @@ impl PatchTool {
             self.revert_or_delete(id);
         }
         if ui
-            .add_enabled(code_ok && selected.is_some(), Button::new("").icon(Icon::Copy).small())
+            .add_enabled(code_ok && selected.is_some() && !is_pandora_doc, Button::new("").icon(Icon::Copy).small())
             .on_hover_text(i18n.t(I18nKey::NemesisDuplicate))
             .clicked()
         {

@@ -4,7 +4,10 @@ use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
 
 use egui_code_editor::{EditorCommand, InlineDiff};
 
-use crate::patch::{EditorResult, FocusAt, PatchTool, REFRESH_DELAY, SAVE_DELAY, TabEvent, anim, editor};
+use crate::patch::{
+    EditorResult, FocusAt, PatchTool, REFRESH_DELAY, SAVE_DELAY, TabEvent, anim, editor, workspace,
+    workspace::PANDORA_DOC,
+};
 
 impl PatchTool {
     /// The next or previous tab, with the keyboard staying in the editor.
@@ -43,6 +46,23 @@ impl PatchTool {
         self.tabs.open(self.active, id, current);
         self.tabs.pin(self.active, id);
         self.selected = Some(id.into());
+    }
+
+    /// Opens the Pandora patch file of the active behavior. The first time, it is written from what
+    /// the work has changed so far.
+    pub(in crate::patch) fn open_pandora_doc(&mut self) {
+        let code = self.mod_code.trim().to_owned();
+        let behavior = &mut self.workspace.behaviors[self.active];
+        if behavior.pandora_doc.is_none() {
+            let doc = workspace::pandora::draft_doc(behavior, &code);
+            behavior.pandora_doc_ids = pandora_patch::doc::doc_object_ids(&doc);
+            behavior.pandora_doc = Some(doc);
+            self.mark_dirty();
+        }
+        if let Some(current) = self.selected.as_deref().filter(|id| *id != PANDORA_DOC) {
+            self.history.visit(current);
+        }
+        self.selected = Some(PANDORA_DOC.into());
     }
 
     /// Loads `id` into the editor if it is not the open object already.
@@ -109,10 +129,13 @@ impl PatchTool {
         if self.preview.is_some() {
             return;
         }
+        self.sync_pandora_doc();
         let behavior = &self.workspace.behaviors[self.active];
         let patch = behavior.patch(self.mod_code.trim(), id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
-        self.field_problems = if behavior.is_anim_data() {
+        self.field_problems = if id == PANDORA_DOC {
+            editor::pandora::diagnostics(&self.editor_text, behavior)
+        } else if behavior.is_anim_data() {
             self.anim_roles = anim::lines::roles(behavior.adsf, id, &self.editor_text);
             Vec::new() // Only the parser's, below: see `anim_lines`.
         } else if behavior.is_ref(id) {
@@ -123,15 +146,26 @@ impl PatchTool {
         };
         // Keep the ▲ / ▼ position across edits.
         let current = self.preview_view.as_ref().map_or(0, |view| view.current);
-        self.preview_view = patch.as_deref().map(editor::preview::Preview::new);
-        if let Some(view) = &mut self.preview_view {
-            view.keep_current(current);
-        }
-        // The parser reads the patch, whose lines are the preview's: back to the editor's.
+        let nemesis_view = patch.as_deref().map(editor::preview::Preview::new);
+        // The parser reads the patch, whose lines are the Nemesis preview's: back to the editor's.
         if let Err(error) = &check {
-            let view = self.preview_view.as_ref();
+            let view = nemesis_view.as_ref();
             let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.editor_text));
             editor::diagnostics::add_parser_error(&mut self.field_problems, &self.editor_text, error, to_editor_line);
+        }
+        // What the export would write. Animation data stays lines: Pandora's export doesn't write it.
+        let as_pandora = self.workspace.export_format == workspace::ExportFormat::Pandora && !behavior.is_anim_data();
+        let (view, check) = if as_pandora {
+            match editor::pandora::op_preview(behavior, id) {
+                Ok(view) => (Some(view), Ok(())),
+                Err(problem) => (None, Err(problem)),
+            }
+        } else {
+            (nemesis_view, check)
+        };
+        self.preview_view = view;
+        if let Some(view) = &mut self.preview_view {
+            view.keep_current(current);
         }
         self.preview = Some((patch.map(Cow::into_owned), check));
         self.inline_diff = behavior.template_object(id).map_or_else(InlineDiff::default, |template| {
@@ -189,6 +223,7 @@ impl PatchTool {
             self.typed_at = Some(Instant::now());
             self.tabs.pin(self.active, id); // edited: it stays open
             self.object_changed(id);
+            self.note_pandora_edit(id);
         }
         if let Some(line) = result.jump_to_line {
             self.focus_editor = Some(FocusAt::Line(line));
@@ -210,6 +245,8 @@ impl PatchTool {
             }
             Some(EditorCommand::TogglePreview) => self.show_preview = !self.show_preview,
             Some(EditorCommand::ToggleInlineDiff) => self.show_inline_diff = !self.show_inline_diff,
+            Some(EditorCommand::NextChange) => self.step_change(true),
+            Some(EditorCommand::PreviousChange) => self.step_change(false),
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
@@ -222,6 +259,21 @@ impl PatchTool {
         result.focus_tree || result.command == Some(EditorCommand::ToggleExplorer)
     }
 
+    /// Vim `]c` / `[c`: to the next or previous changed place of what shows the changes, as its `▲ ▼` do.
+    /// The inline diff first, as it is where the cursor is. e.g. changes at lines 3 and 9: from 5, `]c` is 9.
+    pub(in crate::patch) fn step_change(&mut self, forward: bool) {
+        if self.show_inline_diff {
+            let line = editor::inline_diff::step(&self.inline_diff, self.cursor_line, forward);
+            if line.is_some() {
+                self.focus_editor = line.map(FocusAt::Line);
+            }
+        } else if self.show_preview
+            && let Some(view) = &mut self.preview_view
+        {
+            view.step(forward);
+        }
+    }
+
     /// `↶` in the inline diff: puts a changed place back to the template.
     pub(in crate::patch) fn revert_inline(&mut self, id: &str, index: usize) {
         let behavior = &mut self.workspace.behaviors[self.active];
@@ -230,16 +282,52 @@ impl PatchTool {
         behavior.set_text(id, &self.editor_text);
         self.preview = None;
         self.object_changed(id);
+        self.note_pandora_edit(id);
     }
 
     /// `↶` in the preview: puts changed block `block` back to the template.
     pub(in crate::patch) fn revert_block(&mut self, id: &str, block: usize) {
+        let is_pandora = self.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
-        self.editor_text = nemesis_diff::revert_hunk(&template.text, &self.editor_text, block);
+        if is_pandora {
+            let opened = nemesis_diff::open_kept_arrays(&self.editor_text);
+            let Some(text) = pandora_patch::doc::without_op(&template.text, &opened, block) else { return };
+            self.editor_text = text;
+        } else {
+            self.editor_text = nemesis_diff::revert_hunk(&template.text, &self.editor_text, block);
+        }
         behavior.set_text(id, &self.editor_text);
         self.preview = None;
         self.object_changed(id);
+        self.note_pandora_edit(id);
+    }
+
+    /// Object `id` was edited here: its part of the Pandora patch file follows at the next pause.
+    fn note_pandora_edit(&mut self, id: &str) {
+        if self.workspace.behaviors[self.active].pandora_doc.is_some()
+            && !self.pandora_edited.iter().any(|edited| edited == id)
+        {
+            self.pandora_edited.push(id.to_owned());
+        }
+    }
+
+    /// What was edited since the last time goes to the other side: an object to its part of the Pandora
+    /// patch file, the file to the objects. After a pause in typing, as it reads the whole file.
+    pub(in crate::patch) fn sync_pandora_doc(&mut self) {
+        let edited = std::mem::take(&mut self.pandora_edited);
+        let active = self.active;
+        for id in edited {
+            let Some(behavior) = self.workspace.behaviors.get_mut(active) else { continue };
+            if id == PANDORA_DOC {
+                let (changed, _) = behavior.apply_pandora_doc();
+                for changed in changed {
+                    self.object_changed(&changed);
+                }
+            } else {
+                behavior.update_pandora_doc(&id);
+            }
+        }
     }
 
     /// The text of object `id` changed, or it was added or deleted: `names` takes that one in.

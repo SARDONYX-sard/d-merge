@@ -53,10 +53,6 @@ impl PatchTool {
             if ui.add(open).on_hover_text(i18n.t(I18nKey::NemesisOpenModHover)).clicked() {
                 self.pick_mod(notify, i18n);
             }
-            let user_patch = Button::new(i18n.t(I18nKey::UserPatchTitle));
-            if ui.add(user_patch).on_hover_text(i18n.t(I18nKey::UserPatchHover)).clicked() {
-                self.toggle_user_patch();
-            }
             self.open_cache_button(ui, i18n, notify);
         });
     }

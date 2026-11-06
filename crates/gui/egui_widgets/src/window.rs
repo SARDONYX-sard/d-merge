@@ -63,8 +63,9 @@ impl Modal {
             return None;
         }
         let esc = ctx.input(|input| input.key_pressed(egui::Key::Escape));
-        if modal_overlay(ctx, self.overlay_alpha).clicked() || (esc && ctx.memory(|memory| memory.focused().is_none()))
-        {
+        // A dialog over it has that `Esc`.
+        let esc_is_for_this = ctx.memory(|memory| memory.focused().is_none() && memory.top_modal_layer().is_none());
+        if modal_overlay(ctx, self.overlay_alpha).clicked() || (esc && esc_is_for_this) {
             *open = false;
             return None;
         }

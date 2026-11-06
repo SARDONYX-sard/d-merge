@@ -2,7 +2,7 @@
 //! are set once.
 //!
 //! ```text
-//! [File v] > mymod  D:/mods/out                [Open work data] [User Patch] [Export]
+//! [File v] > mymod  D:/mods/out                [Open work data] | [Nemesis v] [Export]
 //! ```
 //! Unfolded: where it is exported to, the mod it was read from, the mods it depends on, and the mod's
 //! `info.ini`. The list of behaviors is in [`super::behaviors`].
@@ -12,14 +12,21 @@ use std::path::Path;
 use egui_widgets::{
     PathActions, PathRow,
     notify::Notification,
-    shadcn::{Button, Icon, TextEdit},
+    shadcn::{Button, ComboBox, Icon, TextEdit},
 };
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::pages::patch_editor::RecentWork,
 };
 
-use crate::patch::{PatchTool, new_work::NewWork, workspace::Workspace};
+use crate::patch::{
+    PatchTool,
+    new_work::NewWork,
+    workspace::{ExportFormat, Workspace},
+};
+
+/// The width of the box of [`PatchTool::export_format_box`].
+const EXPORT_FORMAT_WIDTH: f32 = 96.0;
 
 /// See [`PathRow`].
 pub(super) const PATH_ACTIONS: PathActions =
@@ -43,13 +50,6 @@ impl PatchTool {
             let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.export_button(ui, i18n, notify);
-                if ui
-                    .add(Button::new(i18n.t(I18nKey::UserPatchTitle)))
-                    .on_hover_text(i18n.t(I18nKey::UserPatchHover))
-                    .clicked()
-                {
-                    self.toggle_user_patch();
-                }
                 self.open_cache_button(ui, i18n, notify);
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     toggle |= self.project_summary(ui);
@@ -116,6 +116,28 @@ impl PatchTool {
             .clicked()
         {
             self.export(notify, i18n);
+        }
+        self.export_format_box(ui, i18n);
+        ui.separator();
+    }
+
+    /// What `Export` writes. Beside it, as it belongs to it and not to what opens something.
+    fn export_format_box(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        const FORMATS: [(ExportFormat, &str); 2] =
+            [(ExportFormat::Nemesis, "Nemesis"), (ExportFormat::Pandora, "Pandora")];
+        let format = self.workspace.export_format;
+        let mut selected = FORMATS.iter().position(|(known, _)| *known == format).unwrap_or(0);
+        let response = ComboBox::from_id_salt("nemesis_export_format").width(EXPORT_FORMAT_WIDTH).show_index(
+            ui,
+            &mut selected,
+            FORMATS.len(),
+            |index| FORMATS[index].1,
+        );
+        let response = response.on_hover_text(i18n.t(I18nKey::NemesisExportFormatHover));
+        if response.changed() {
+            self.workspace.export_format = FORMATS[selected].0;
+            self.preview = None; // it says what the export would write
+            self.mark_dirty();
         }
     }
 

@@ -195,7 +195,9 @@ impl HkannoPage {
             | EditorCommand::JumpBack
             | EditorCommand::JumpForward
             | EditorCommand::ToggleExplorer
-            | EditorCommand::ToggleInlineDiff => {}
+            | EditorCommand::ToggleInlineDiff
+            | EditorCommand::NextChange
+            | EditorCommand::PreviousChange => {}
         }
     }
 

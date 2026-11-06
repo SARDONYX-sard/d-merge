@@ -6,12 +6,14 @@
 //! │ (the side bar and the editor, as in the Patch Editor)           │
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! `Delete all` asks first in an [`AlertDialog`], as it can't be undone.
 
 use egui::Vec2;
 use egui_widgets::{
     Modal,
     notify::Notification,
-    shadcn::{Button, Icon},
+    shadcn::{AlertDialog, AlertDialogChoice, Button, Icon},
 };
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -86,19 +88,24 @@ impl PatchTool {
         });
     }
 
-    /// `[Delete all]`, then `[Delete everything?] [Cancel]`: nothing of it can be undone.
+    /// `[Delete all]`, which asks first: nothing of it can be undone.
     fn clear_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
+        if ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
+            self.confirm_clear = true;
+        }
         if !self.confirm_clear {
-            let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
-            self.confirm_clear = ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked();
             return;
         }
-        if ui.add(Button::new(i18n.t(I18nKey::CancelButton))).clicked() {
-            self.confirm_clear = false;
-        }
-        let sure = Button::new(i18n.t(I18nKey::UserPatchClearConfirm)).icon(Icon::Trash).destructive();
-        if ui.add(sure).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
-            self.confirm_clear = false;
+        let dialog = AlertDialog::new(
+            i18n.t(I18nKey::UserPatchClearConfirm),
+            i18n.t(I18nKey::CancelButton),
+            i18n.t(I18nKey::UserPatchClear),
+        );
+        let choice = dialog.description(i18n.t(I18nKey::UserPatchClearHover)).action_icon(Icon::Trash).destructive();
+        let choice = choice.show(ui.ctx());
+        self.confirm_clear = choice.is_none();
+        if choice == Some(AlertDialogChoice::Action) {
             self.clear_user_patch(notify, i18n);
         }
     }
