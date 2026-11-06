@@ -9,12 +9,10 @@
 use std::rc::Rc;
 
 use gui_shared::settings::{
-    DataMode,
+    DataMode, ViewState,
     pages::patch::{mod_item::ModItem, mod_list::SortColumn},
 };
 use stdx::text::contains_ignore_case;
-
-type ViewState = gui_shared::settings::ViewState;
 
 /// Is the table showing the list as it is stored, so that dragging is safe?
 pub(crate) fn is_dnd_allowed(view: &ViewState) -> bool {
