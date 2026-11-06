@@ -54,6 +54,7 @@ impl PatchEditorPage {
     ///
     /// # Errors
     /// The value could not be taken in; the message says why.
+    #[inline]
     pub fn resolve_now(
         &mut self,
         request: &gui_shared::patch::ResolveRequest,
@@ -65,16 +66,19 @@ impl PatchEditorPage {
     }
 
     /// A mod was written since the last call, so that the conflict check can follow.
+    #[inline]
     pub const fn take_mod_written(&mut self) -> bool {
         self.patch.take_mod_written()
     }
 
     /// Opens or closes the window of the user patch.
+    #[inline]
     pub const fn toggle_user_patch(&mut self) {
         self.patch.toggle_user_patch();
     }
 
     /// Draws the window of the user patch, on any page.
+    #[inline]
     pub fn user_patch_window(
         &mut self,
         ctx: &egui::Context,
@@ -88,6 +92,7 @@ impl PatchEditorPage {
     }
 
     /// `Edit...` in a conflict: the value goes into the user patch, and its window shows it.
+    #[inline]
     pub fn open_resolution(
         &mut self,
         request: gui_shared::patch::ResolveRequest,

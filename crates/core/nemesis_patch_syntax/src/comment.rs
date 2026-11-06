@@ -36,6 +36,7 @@ fn mod_code<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 ///
 /// # Errors
 /// Parse failed.
+#[inline]
 pub fn open_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
     let comment = delimited("<!--", mod_code.map(CommentKind::ModCode), "-->");
     delimited_multispace0(comment)
@@ -48,6 +49,7 @@ pub fn open_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
 ///
 /// # Errors
 /// Parse failed.
+#[inline]
 pub fn mod_code_or_other_comment<'a>(input: &mut &'a str) -> ModalResult<CommentKind<'a>> {
     let kind = alt((mod_code.map(CommentKind::ModCode), take_until(0.., "-->").map(CommentKind::Unknown)));
     delimited_multispace0(delimited("<!--", kind, "-->"))
@@ -82,7 +84,7 @@ pub fn original_or_close_comment<'a>(input: &mut &'a str) -> ModalResult<Comment
 ///
 /// # Errors
 /// Parse failed.
-pub fn close_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn close_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     delimited_multispace0(Caseless("CLOSE")).parse_next(input)
 }
 
@@ -90,6 +92,7 @@ pub fn close_parser<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 ///
 /// # Errors
 /// Parse failed.
+#[inline]
 pub fn close_comment_line(input: &mut &str) -> ModalResult<()> {
     delimited("<!--", close_parser, "-->").parse_next(input)?;
     line_ending.parse_next(input)?;
@@ -100,7 +103,7 @@ pub fn close_comment_line(input: &mut &str) -> ModalResult<()> {
 ///
 /// # Errors
 /// Parse failed.
-pub fn take_till_original<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn take_till_original<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     let original = delimited_multispace0(Caseless("ORIGINAL"));
     terminated(
         take_until_ext(0.., delimited("<!--", original.value(CommentKind::Original), "-->")).take(),
@@ -129,6 +132,7 @@ pub fn take_till_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 ///
 /// # Errors
 /// Parse failed.
+#[inline]
 pub fn take_till_exact_close<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     terminated(take_until_ext(0.., Caseless("<!-- CLOSE -->")), Caseless("<!-- CLOSE -->")).parse_next(input)
 }
@@ -171,6 +175,7 @@ pub fn take_raw_block<'a>(input: &mut &'a str) -> ModalResult<Option<(&'a str, O
 }
 
 /// `parser` with any whitespace on both sides.
+#[inline]
 pub fn delimited_multispace0<Input, Output, Error, ParseNext>(
     mut parser: ParseNext,
 ) -> impl Parser<Input, Output, Error>

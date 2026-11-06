@@ -33,6 +33,9 @@ pub struct PathRow<'a> {
     /// See [`Self::help`].
     field_hover: Option<&'a str>,
     hint: Option<&'a str>,
+    label_width: f32,
+    right_margin: f32,
+    button_size: [f32; 2],
 }
 
 /// What happened in a [`PathRow`] this frame.
@@ -50,19 +53,54 @@ pub struct PathRowOutput {
 }
 
 impl<'a> PathRow<'a> {
+    /// Default of [`Self::label_width`].
     const LABEL_WIDTH: f32 = 140.0;
+    /// Default of [`Self::right_margin`].
     const RIGHT_MARGIN: f32 = 8.0;
 
-    /// The size of the buttons on the right. A button in the `trailing` of [`Self::show_with`] should
-    /// have it too.
+    /// Default of [`Self::button_size`]. A button in the `trailing` of [`Self::show_with`] should have
+    /// the same size.
     pub const BUTTON_SIZE: [f32; 2] = [90.0, 32.0];
 
     /// `label`: the button on the left, `select`: the one that opens the dialog.
+    #[inline]
     pub const fn new(label: &'a str, select: &'a str, actions: PathActions) -> Self {
-        Self { label, select, actions, hover: None, field_hover: None, hint: None }
+        Self {
+            label,
+            select,
+            actions,
+            hover: None,
+            field_hover: None,
+            hint: None,
+            label_width: Self::LABEL_WIDTH,
+            right_margin: Self::RIGHT_MARGIN,
+            button_size: Self::BUTTON_SIZE,
+        }
+    }
+
+    /// The width of the label button. Rows that line up need the same one.
+    #[inline]
+    pub const fn label_width(mut self, label_width: f32) -> Self {
+        self.label_width = label_width;
+        self
+    }
+
+    /// The space to the right of the row.
+    #[inline]
+    pub const fn right_margin(mut self, right_margin: f32) -> Self {
+        self.right_margin = right_margin;
+        self
+    }
+
+    /// The size of the select button, whose height the label button has too.
+    #[inline]
+    pub const fn button_size(mut self, button_size: [f32; 2]) -> Self {
+        self.button_size = button_size;
+        self
     }
 
     /// The label button's hover text.
+    #[inline]
     pub const fn hover(mut self, hover: &'a str) -> Self {
         self.hover = Some(hover);
         self
@@ -70,6 +108,7 @@ impl<'a> PathRow<'a> {
 
     /// What to enter: the hover text of both the label button and the field, which is what one looks
     /// at when not knowing what to enter.
+    #[inline]
     pub const fn help(mut self, help: &'a str) -> Self {
         self.hover = Some(help);
         self.field_hover = Some(help);
@@ -77,12 +116,14 @@ impl<'a> PathRow<'a> {
     }
 
     /// The field's text while it is empty.
+    #[inline]
     pub const fn hint(mut self, hint: Option<&'a str>) -> Self {
         self.hint = hint;
         self
     }
 
     /// Draws the row.
+    #[inline]
     pub fn show(self, ui: &mut egui::Ui, path: &mut String) -> PathRowOutput {
         self.show_with(ui, path, |_| {})
     }
@@ -92,7 +133,7 @@ impl<'a> PathRow<'a> {
     pub fn show_read_only(self, ui: &mut egui::Ui, path: &str, trailing: impl FnOnce(&mut egui::Ui)) -> Option<String> {
         let mut open_error = None;
         ui.horizontal(|ui| {
-            let size = [Self::LABEL_WIDTH, Self::BUTTON_SIZE[1]];
+            let size = [self.label_width, self.button_size[1]];
             let mut open = ui.add_sized(size, Button::new(self.label));
             if let Some(hover) = self.hover {
                 open = open.on_hover_text(hover);
@@ -101,7 +142,7 @@ impl<'a> PathRow<'a> {
                 open_error = (self.actions.open)(path).err();
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(Self::RIGHT_MARGIN);
+                ui.add_space(self.right_margin);
                 trailing(ui);
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add(egui::Label::new(egui::RichText::new(path).weak()).truncate());
@@ -120,7 +161,7 @@ impl<'a> PathRow<'a> {
     ) -> PathRowOutput {
         let mut output = PathRowOutput::default();
         ui.horizontal(|ui| {
-            let size = [Self::LABEL_WIDTH, Self::BUTTON_SIZE[1]];
+            let size = [self.label_width, self.button_size[1]];
             let mut open = ui.add_sized(size, Button::new(self.label));
             if let Some(hover) = self.hover {
                 open = open.on_hover_text(hover);
@@ -130,9 +171,9 @@ impl<'a> PathRow<'a> {
             }
             // Right to left: the buttons take their width first, the field gets the rest.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(Self::RIGHT_MARGIN);
+                ui.add_space(self.right_margin);
                 let select = Button::new(self.select).icon(Icon::FolderSearch).full_width();
-                if ui.add_sized(Self::BUTTON_SIZE, select).clicked()
+                if ui.add_sized(self.button_size, select).clicked()
                     && let Some(dir) = (self.actions.pick)(path.as_str())
                 {
                     *path = dir.display().to_string();

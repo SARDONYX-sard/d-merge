@@ -98,7 +98,6 @@ pub(super) struct PatchDeserializer<'de> {
 
 impl<'de> PatchDeserializer<'de> {
     /// Creates a deserializer from patch input.
-    #[inline]
     pub(super) const fn from_str(input: &'de str) -> Self {
         Self { input, original: input }
     }
@@ -107,7 +106,6 @@ impl<'de> PatchDeserializer<'de> {
     ///
     /// # Errors
     /// Returns [`Error::ContextError`] when the supplied parser fails.
-    #[inline]
     pub(super) fn parse_next<O>(
         &mut self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,
@@ -119,7 +117,6 @@ impl<'de> PatchDeserializer<'de> {
     ///
     /// # Errors
     /// Returns [`Error::ContextError`] when the supplied parser fails.
-    #[inline]
     pub(super) fn parse_peek<O>(
         &self,
         mut parser: impl Parser<&'de str, O, ErrMode<ContextError>>,

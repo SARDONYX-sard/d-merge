@@ -12,7 +12,7 @@ use crate::range::{Range, parse::parse_range};
 /// - `pointer_mut`: Takes a slice of `Cow<'v, str>` representing a path,
 ///   and attempts to traverse through the structure, returning a mutable
 ///   reference to the target value if found.
-pub trait PointerMut {
+pub(crate) trait PointerMut {
     /// Get the `&mut Self` corresponding to the specified json path.
     ///
     /// # Note

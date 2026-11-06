@@ -55,6 +55,7 @@ pub struct Button {
 }
 
 impl Button {
+    #[inline]
     pub fn new(text: impl Into<egui::WidgetText>) -> Self {
         Self {
             text: text.into(),
@@ -69,17 +70,20 @@ impl Button {
     /// Creates a toggle-style button, like [`egui::Button::selectable`].
     ///
     /// Inside a [`super::ComboBox`] popup it renders as a menu item instead.
+    #[inline]
     pub fn selectable(selected: bool, text: impl Into<egui::WidgetText>) -> Self {
         Self { variant: ButtonVariant::Selectable { selected }, ..Self::new(text) }
     }
 
     /// Make this a small button.
+    #[inline]
     pub const fn small(mut self) -> Self {
         self.size = ButtonSize::Small;
         self
     }
 
     /// Set the minimum size of the button.
+    #[inline]
     pub const fn min_size(mut self, min_size: egui::Vec2) -> Self {
         self.min_size = min_size;
         self
@@ -88,30 +92,35 @@ impl Button {
     // ── Extensions (not in egui) ────────────────────────────────
 
     /// Shows an icon left of the text (or alone if the text is empty).
+    #[inline]
     pub const fn icon(mut self, icon: Icon) -> Self {
         self.icon = Some(icon);
         self
     }
 
     /// Make this a large button.
+    #[inline]
     pub const fn large(mut self) -> Self {
         self.size = ButtonSize::Large;
         self
     }
 
     /// Filled with the primary color.
+    #[inline]
     pub const fn primary(mut self) -> Self {
         self.variant = ButtonVariant::Primary;
         self
     }
 
     /// Tinted with the destructive color.
+    #[inline]
     pub const fn destructive(mut self) -> Self {
         self.variant = ButtonVariant::Destructive;
         self
     }
 
     /// Stretches to fill the allocated width, adopting the UI's own sizing.
+    #[inline]
     pub const fn full_width(mut self) -> Self {
         self.full_width = true;
         self

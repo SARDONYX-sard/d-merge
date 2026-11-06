@@ -14,6 +14,7 @@ pub struct EditorFeatures {
 }
 
 impl Default for EditorFeatures {
+    #[inline]
     fn default() -> Self {
         Self {
             completion: true,
@@ -90,6 +91,7 @@ impl EditorCommand {
 
     /// This command in the palette (`Ctrl+Shift+P`). Picking it comes back as
     /// [`CodeEditorOutput::command`], the same as its key.
+    #[inline]
     pub const fn action(self, label: &str) -> EditorAction<'_> {
         EditorAction { id: self.action_id(), label }
     }

@@ -111,6 +111,7 @@ impl<'a> CodeEditor<'a> {
 
     /// What the host acts on, so Vim's list of keys offers them. e.g., a host without a tree has no
     /// [`EditorCommand::ToggleExplorer`].
+    #[inline]
     pub const fn host_commands(mut self, host_commands: &'a [EditorCommand]) -> Self {
         self.host_commands = host_commands;
         self
@@ -119,64 +120,75 @@ impl<'a> CodeEditor<'a> {
     /// Everything but changing the text: the cursor, selecting, copying, hover, go to definition.
     /// `changed` stays `false`. Keymaps edit the text directly, so what they did is undone at the end
     /// of the frame.
+    #[inline]
     pub const fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
+    #[inline]
     pub const fn language(mut self, language: &'a dyn Language) -> Self {
         self.language = language;
         self
     }
 
     /// Problems to underline (and show on hover).
+    #[inline]
     pub const fn diagnostics(mut self, diagnostics: &'a [Diagnostic]) -> Self {
         self.diagnostics = diagnostics;
         self
     }
 
+    #[inline]
     pub const fn features(mut self, features: EditorFeatures) -> Self {
         self.features = features;
         self
     }
 
     /// Key binding style. Default: [`Keymap::Normal`].
+    #[inline]
     pub const fn keymap(mut self, keymap: Keymap) -> Self {
         self.keymap = keymap;
         self
     }
 
     /// Shows the changes inside the text, like Monaco's inline diff. See [`InlineDiff`].
+    #[inline]
     pub const fn inline_diff(mut self, diff: Option<&'a InlineDiff>) -> Self {
         self.inline_diff = diff;
         self
     }
 
     /// Translated texts of the right-click menu and the command palette.
+    #[inline]
     pub const fn labels(mut self, labels: EditorLabels<'a>) -> Self {
         self.labels = labels;
         self
     }
 
     /// The host's commands in the palette (`Ctrl+Shift+P`). See [`CodeEditorOutput::action`].
+    #[inline]
     pub const fn actions(mut self, actions: &'a [EditorAction<'a>]) -> Self {
         self.actions = actions;
         self
     }
 
     /// Show `·` / `→` for spaces / tabs and tint the indent levels (default `true`).
+    #[inline]
     pub const fn whitespace(mut self, show: bool) -> Self {
         self.whitespace = show;
         self
     }
 
     /// Show the line number gutter (default `true`).
+    #[inline]
     pub const fn line_numbers(mut self, show: bool) -> Self {
         self.line_numbers = show;
         self
     }
 
     /// Minimum height in text rows (default 30).
+    #[inline]
     pub const fn desired_rows(mut self, rows: usize) -> Self {
         self.desired_rows = rows;
         self

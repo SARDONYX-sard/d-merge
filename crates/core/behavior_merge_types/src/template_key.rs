@@ -48,6 +48,7 @@ impl<'a> TemplateKey<'a> {
 
     /// # Safety
     /// valid template path(from `meshes`)
+    #[inline]
     pub const unsafe fn new_unchecked(template_name: Cow<'a, str>) -> Self {
         Self { template_name }
     }
@@ -130,8 +131,7 @@ impl<'a> TemplateKey<'a> {
     /// # Note
     /// Vanilla Skyrim is configured this way. Removing duplicates causes NPCs to become immobile when casting spells.
     #[allow(unused)]
-    #[inline]
-    pub fn has_duplicate_event_names(&self) -> bool {
+    pub(crate) fn has_duplicate_event_names(&self) -> bool {
         matches!(
             self.as_str(),
             "meshes/actors/character/_1stperson/behaviors/magicbehavior.bin"
@@ -145,12 +145,14 @@ impl<'a> TemplateKey<'a> {
 /* --- Path-like trait impls --- */
 
 impl<'a> AsRef<Path> for TemplateKey<'a> {
+    #[inline]
     fn as_ref(&self) -> &Path {
         self.as_meshes_inner_path()
     }
 }
 
 impl<'a> core::borrow::Borrow<Path> for TemplateKey<'a> {
+    #[inline]
     fn borrow(&self) -> &Path {
         self.as_meshes_inner_path()
     }
@@ -158,6 +160,7 @@ impl<'a> core::borrow::Borrow<Path> for TemplateKey<'a> {
 
 impl<'a> std::ops::Deref for TemplateKey<'a> {
     type Target = Path;
+    #[inline]
     fn deref(&self) -> &Path {
         self.as_meshes_inner_path()
     }
@@ -179,18 +182,21 @@ impl core::fmt::Display for TemplateKey<'_> {
 
 /* Equality comparisons: behave like Path comparisons */
 impl<'a, 'b> PartialEq<TemplateKey<'b>> for TemplateKey<'a> {
+    #[inline]
     fn eq(&self, other: &TemplateKey<'b>) -> bool {
         self.as_meshes_inner_path() == other.as_meshes_inner_path()
     }
 }
 
 impl<'a> PartialEq<Path> for TemplateKey<'a> {
+    #[inline]
     fn eq(&self, other: &Path) -> bool {
         self.as_meshes_inner_path() == other
     }
 }
 
 impl<'a> PartialEq<&Path> for TemplateKey<'a> {
+    #[inline]
     fn eq(&self, other: &&Path) -> bool {
         self.as_meshes_inner_path() == *other
     }
@@ -200,12 +206,14 @@ impl<'a> Eq for TemplateKey<'a> {}
 
 /* Ordering: delegate to Path ordering */
 impl<'a, 'b> PartialOrd<TemplateKey<'b>> for TemplateKey<'a> {
+    #[inline]
     fn partial_cmp(&self, other: &TemplateKey<'b>) -> Option<core::cmp::Ordering> {
         self.as_meshes_inner_path().partial_cmp(other.as_meshes_inner_path())
     }
 }
 
 impl<'a> Ord for TemplateKey<'a> {
+    #[inline]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.as_meshes_inner_path().cmp(other.as_meshes_inner_path())
     }
@@ -213,6 +221,7 @@ impl<'a> Ord for TemplateKey<'a> {
 
 /* Hash: delegate to Path's Hash (so it hashes like Path would) */
 impl<'a> core::hash::Hash for TemplateKey<'a> {
+    #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_meshes_inner_path().hash(state);
     }

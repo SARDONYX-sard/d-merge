@@ -21,7 +21,7 @@ use crate::{
 /// Parses the start tag `<tag>`
 ///
 /// - `tag`: e.g. `<string>`
-pub fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
+pub(crate) fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0(tag),
@@ -32,7 +32,7 @@ pub fn start_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<Cont
 }
 
 /// Parses the end tag `</tag>`
-pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
+pub(crate) fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<ContextError>> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("/"),
@@ -50,7 +50,7 @@ pub fn end_tag<'a>(tag: &'static str) -> impl Parser<&'a str, (), ErrMode<Contex
 ///
 /// # Errors
 /// Parse failed.
-pub fn class_start_tag<'a>(input: &mut &'a str) -> ModalResult<(PointerType<'a>, &'a str)> {
+pub(crate) fn class_start_tag<'a>(input: &mut &'a str) -> ModalResult<(PointerType<'a>, &'a str)> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("hkobject"),
@@ -78,7 +78,7 @@ pub fn class_start_tag<'a>(input: &mut &'a str) -> ModalResult<(PointerType<'a>,
 /// If encountered unexpected string.
 /// # Note
 /// All arguments are used only for clarity of error reporting.
-pub fn field_start_open_tag(input: &mut &str) -> ModalResult<()> {
+pub(crate) fn field_start_open_tag(input: &mut &str) -> ModalResult<()> {
     seq!(
         _: delimited_with_multispace0("<"),
         _: delimited_with_multispace0("hkparam"),
@@ -94,7 +94,7 @@ pub fn field_start_open_tag(input: &mut &str) -> ModalResult<()> {
 ///
 /// # Errors
 /// If encountered unexpected string.
-pub fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
+pub(crate) fn field_start_close_tag(input: &mut &str) -> ModalResult<Option<u64>> {
     seq!(
         winnow::combinator::opt(
             seq!(
@@ -133,7 +133,7 @@ fn find_type(field_name: &str, field_info: &ClassSchema) -> Result<FieldType, Er
 ///
 /// # Errors
 /// Returns a [`ContextError`] if the input does not match the expected structure or if the type cannot be resolved.
-pub fn field_start_tag<'a>(
+pub(crate) fn field_start_tag<'a>(
     field_info: &'static ClassSchema,
 ) -> impl Parser<&'a str, (&'a str, FieldType, Option<u64>), ErrMode<ContextError>> {
     move |input: &mut &'a str| {
@@ -154,8 +154,7 @@ pub fn field_start_tag<'a>(
 ///
 /// # Errors
 /// Returns a [`ContextError`] if the input does not match the expected structure or if the type cannot be resolved.
-#[inline]
-pub fn any_field_start_tag<'a>(input: &mut &'a str) -> ModalResult<(&'a str, Option<u64>)> {
+pub(crate) fn any_field_start_tag<'a>(input: &mut &'a str) -> ModalResult<(&'a str, Option<u64>)> {
     field_start_open_tag.parse_next(input)?; // <hkparam name=
     let field_name = attr_string.parse_next(input)?; // "name"
     let array_len = field_start_close_tag.parse_next(input)?; // > or numelements="">
@@ -182,7 +181,7 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PointerType<'a> {
+pub(crate) enum PointerType<'a> {
     /// Official representation
     Index(&'a str),
     /// # Nemesis mod representation
@@ -203,7 +202,7 @@ fn index_name_attr<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
 ///
 /// # Errors
 /// If parsing failed.
-pub fn index_name<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
+pub(crate) fn index_name<'a>(input: &mut &'a str) -> ModalResult<PointerType<'a>> {
     alt((("#", digit1).take().map(PointerType::Index), take_until(0.., '\"').map(PointerType::Var))).parse_next(input)
 }
 

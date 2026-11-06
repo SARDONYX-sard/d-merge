@@ -156,16 +156,19 @@ impl PatchPage {
     /// The mod list needs no check at all: a new load order or a mod turned off only changes the
     /// flags. Only a mod turned on that the last check did not see waits for the button, as that is
     /// the user's to decide: the check has no business running while mods are being picked.
+    #[inline]
     pub const fn follow_written_mod(&mut self) {
         self.rescan_wanted = true;
     }
 
     /// The user asked for the window of the user patch: the app gives that to the Patch Editor.
+    #[inline]
     pub fn take_user_patch_toggle(&mut self) -> bool {
         std::mem::take(&mut self.user_patch_toggle)
     }
 
     /// What the user wants to keep from a conflict: the app gives it to the Patch Editor.
+    #[inline]
     pub const fn take_resolve(&mut self) -> Option<ResolveRequest> {
         self.resolve.take()
     }

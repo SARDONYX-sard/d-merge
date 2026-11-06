@@ -5,6 +5,7 @@
 ///
 /// e.g., `SoundPlay.Foo` contains `soundp`. Everything contains the empty text.
 #[must_use]
+#[inline]
 pub fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
     let (haystack, needle) = (haystack.as_bytes(), needle.as_bytes());
     needle.is_empty() || haystack.windows(needle.len()).any(|window| window.eq_ignore_ascii_case(needle))
@@ -14,6 +15,7 @@ pub fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
 ///
 /// e.g., `#Mod$0` starts with `#mod`.
 #[must_use]
+#[inline]
 pub fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
     let (text, prefix) = (text.as_bytes(), prefix.as_bytes());
     text.get(..prefix.len()).is_some_and(|start| start.eq_ignore_ascii_case(prefix))
@@ -21,6 +23,7 @@ pub fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
 
 /// The two texts in order, ignoring ASCII case.
 #[must_use]
+#[inline]
 pub fn cmp_ignore_case(a: &str, b: &str) -> core::cmp::Ordering {
     a.bytes().map(|byte| byte.to_ascii_lowercase()).cmp(b.bytes().map(|byte| byte.to_ascii_lowercase()))
 }
@@ -28,6 +31,7 @@ pub fn cmp_ignore_case(a: &str, b: &str) -> core::cmp::Ordering {
 /// `items` with `separator` between them, at the end of `out`.
 ///
 /// e.g., `a`, `b` and `, ` -> `a, b`
+#[inline]
 pub fn push_joined<'a>(out: &mut String, items: impl IntoIterator<Item = &'a str>, separator: &str) {
     for (at, item) in items.into_iter().enumerate() {
         if at > 0 {

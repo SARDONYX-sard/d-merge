@@ -57,6 +57,7 @@ pub struct ClassSchema {
 
 impl ClassSchema {
     /// A field by name.
+    #[inline]
     pub fn field(&self, name: &str) -> Option<&'static FieldSchema> {
         self.index.get(name).and_then(|&i| self.fields.get(usize::from(i)))
     }
@@ -78,11 +79,13 @@ pub struct FieldSchema {
 }
 
 /// Finds a class by name.
+#[inline]
 pub fn find_class_schema(name: &str) -> Option<&'static ClassSchema> {
     CLASSES.get(name)
 }
 
 /// Every class name (any order).
+#[inline]
 pub fn class_schema_names() -> impl Iterator<Item = &'static str> {
     CLASSES.keys().copied()
 }

@@ -118,6 +118,7 @@ pub fn derive_i18n(input: TokenStream) -> TokenStream {
             ];
 
             #[doc = #generated_doc]
+            #[inline]
             pub const fn default_eng(&self) -> &'static str {
                 match self {
                     #(#match_arms),*

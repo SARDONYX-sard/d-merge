@@ -115,17 +115,20 @@ impl HiddenPatches {
     }
 
     #[must_use]
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.list.is_empty()
     }
 
     /// What goes in the file it is kept in.
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &HiddenPatch> {
         self.list.iter()
     }
 
     /// What is hidden of `mod_code` in `target`, if anything.
     #[must_use]
+    #[inline]
     pub fn rules_of(&self, mod_code: &str, target: &str) -> Option<&HiddenRules> {
         if self.is_empty() {
             return None;
@@ -136,6 +139,7 @@ impl HiddenPatches {
     /// Is this operation hidden? `path`: as a conflict names it. Of animation data, any field of a
     /// hidden file is.
     #[must_use]
+    #[inline]
     pub fn contains(&self, mod_code: &str, target: &str, path: &str) -> bool {
         self.rules_of(mod_code, target).is_some_and(|rules| rules.paths.contains(place_of(target, path)))
     }

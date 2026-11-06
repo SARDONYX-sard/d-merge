@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 ///
 /// e.g., `D:/out` and `[".d_merge", ".debug"]` -> `D:/out/.d_merge/.debug`
 #[must_use]
+#[inline]
 pub fn joined(root: &Path, parts: &[&str]) -> PathBuf {
     let capacity = root.as_os_str().len() + parts.iter().map(|part| part.len() + 1).sum::<usize>();
     let mut path = PathBuf::with_capacity(capacity);

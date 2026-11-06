@@ -10,7 +10,7 @@ use crate::parser::PiePrefix;
 
 /// One known instruction.
 #[derive(Debug, Clone, Copy)]
-pub struct PieInstruction {
+pub(crate) struct PieInstruction {
     /// e.g., `SGVB`
     pub name: &'static str,
     /// Markdown shown by completion / signature help.
@@ -24,13 +24,13 @@ impl PieInstruction {
     ///
     /// Derived from the snippet so the two never get out of sync.
     /// e.g., `SGVB|${1:graphVariable}|${2:bool}` -> 2
-    pub fn param_count(&self) -> usize {
+    pub(crate) fn param_count(&self) -> usize {
         self.snippet.matches("${").count()
     }
 }
 
 /// `@` instructions built into Payload Interpreter.
-pub const NATIVE_INSTRUCTIONS: &[PieInstruction] = &[
+pub(crate) const NATIVE_INSTRUCTIONS: &[PieInstruction] = &[
     PieInstruction {
         name: "SGVB",
         documentation: "```hkanno\nPIE.@SGVB|<graphVariable>|<bool>\n```\nSet an animation boolean variable.",
@@ -74,21 +74,21 @@ pub const NATIVE_INSTRUCTIONS: &[PieInstruction] = &[
 ];
 
 /// `$` custom instruction example (the real keys are defined by each user).
-pub const CUSTOM_INSTRUCTIONS: &[PieInstruction] = &[PieInstruction {
+pub(crate) const CUSTOM_INSTRUCTIONS: &[PieInstruction] = &[PieInstruction {
     name: "MyCustom1",
     documentation: "Custom payload mapped via $KEY",
     snippet: "${1:MyCustom1}|${2:param1}|${3:param2}",
 }];
 
 /// `!` async instruction example.
-pub const ASYNC_INSTRUCTIONS: &[PieInstruction] = &[PieInstruction {
+pub(crate) const ASYNC_INSTRUCTIONS: &[PieInstruction] = &[PieInstruction {
     name: "DelayExample",
     documentation: "Async payload example ![time]payload",
     snippet: "[${1:time}]${2:payload}",
 }];
 
 /// Instructions that can follow `prefix`.
-pub const fn instructions_for(prefix: PiePrefix) -> &'static [PieInstruction] {
+pub(crate) const fn instructions_for(prefix: PiePrefix) -> &'static [PieInstruction] {
     match prefix {
         PiePrefix::Native => NATIVE_INSTRUCTIONS,
         PiePrefix::Custom => CUSTOM_INSTRUCTIONS,
@@ -99,7 +99,7 @@ pub const fn instructions_for(prefix: PiePrefix) -> &'static [PieInstruction] {
 /// Finds a native instruction by name (case-insensitive).
 ///
 /// e.g., `find_native("sgvb")` -> `Some(SGVB)`
-pub fn find_native(name: &str) -> Option<&'static PieInstruction> {
+pub(crate) fn find_native(name: &str) -> Option<&'static PieInstruction> {
     NATIVE_INSTRUCTIONS.iter().find(|ins| ins.name.eq_ignore_ascii_case(name))
 }
 

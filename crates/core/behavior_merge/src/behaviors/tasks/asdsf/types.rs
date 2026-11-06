@@ -7,7 +7,6 @@ use indexmap::IndexMap;
 pub(crate) struct OwnedAsdsfPatchMap(pub IndexMap<PathBuf, (String, usize), fast_hash::RandomState>);
 
 impl OwnedAsdsfPatchMap {
-    #[inline]
     pub(crate) fn insert(&mut self, path: PathBuf, patch: (String, usize)) -> Option<(String, usize)> {
         self.0.insert(path, patch)
     }

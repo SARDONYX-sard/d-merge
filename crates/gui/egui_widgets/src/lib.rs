@@ -15,5 +15,5 @@ mod window;
 
 pub use self::{
     path_row::{PathActions, PathRow, PathRowOutput},
-    window::{Modal, show_modal, vertical_splitter, window_near_pointer},
+    window::{Modal, NearPointer, show_modal, vertical_splitter, window_near_pointer},
 };

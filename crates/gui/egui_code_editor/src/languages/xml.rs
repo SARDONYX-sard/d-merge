@@ -20,6 +20,7 @@ pub struct Xml;
 
 impl Language for Xml {
     /// Havok XML files are indented with tabs.
+    #[inline]
     fn indent(&self) -> Indent {
         Indent::Tab(4)
     }

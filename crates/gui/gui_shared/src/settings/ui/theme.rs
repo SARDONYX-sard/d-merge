@@ -285,6 +285,7 @@ pub struct ShadcnThemeConfig {
 // ─── Disk I/O ─────────────────────────────────────────────────────────────────
 
 /// # Errors
+#[inline]
 pub fn load_preset(path: &Path) -> Result<ThemePreset, Error> {
     let text = fs::read_to_string(path).with_context(|_| IoSnafu { path })?;
     sonic_rs::from_str(&text).with_context(|_| JsonSnafu { path })

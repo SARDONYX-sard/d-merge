@@ -183,6 +183,7 @@ where
 /// }
 /// ```
 #[cfg(unix)]
+#[inline]
 pub fn get_file_version<P: AsRef<Path>>(path: P) -> Result<Version, VersionError> {
     let _ = path;
     Err(VersionError)

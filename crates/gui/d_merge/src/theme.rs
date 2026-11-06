@@ -86,12 +86,10 @@ pub(crate) trait EguiColorExt {
 }
 
 impl EguiColorExt for Rgba {
-    #[inline]
     fn to_egui_color32(self) -> egui::Color32 {
         egui::Color32::from_rgba_premultiplied(self.r, self.g, self.b, self.a)
     }
 
-    #[inline]
     fn from_egui_color32(color: egui::Color32) -> Self {
         Self::new(color.r(), color.g(), color.b(), color.a())
     }

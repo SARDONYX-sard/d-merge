@@ -211,7 +211,6 @@ fn rotations<'a>(line_len: usize) -> impl Parser<&'a str, Vec<Rotation<'a>>, Err
 }
 
 /// Get a string up to a space and parse to T, then consume the space.
-#[inline]
 pub(crate) fn from_word_and_space<'a, T: FromStr>(input: &mut &'a str) -> ModalResult<Str<'a>> {
     /// Get a string up to a space and then consume the space.
     fn word_and_space<'a>(input: &mut &'a str) -> ModalResult<&'a str> {

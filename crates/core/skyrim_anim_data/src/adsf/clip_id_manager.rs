@@ -12,7 +12,7 @@ use bitvec::prelude::*;
 /// Each call to `next_id()` returns the next unused ID, incrementing
 /// until it reaches `i16::MAX`. After that, it returns `None`.
 #[derive(Debug)]
-pub struct ClipIdManager {
+pub(crate) struct ClipIdManager {
     used_ids: BitVec,
     current: usize,
 }
@@ -35,14 +35,15 @@ impl ClipIdManager {
     /// `animationdatasinglefile.txt`.
     ///
     /// The next available ID will therefore be `1656`.
-    pub fn new_vanilla() -> Self {
+    pub(crate) fn new_vanilla() -> Self {
         Self::new(1655)
     }
 
     /// Registers an existing used ID.
     ///
     /// * `id` - The clip ID to mark as used.
-    pub fn register(&mut self, id: usize) {
+    #[cfg(test)]
+    pub(crate) fn register(&mut self, id: usize) {
         if id <= Self::MAX_ID {
             self.used_ids.set(id, true);
         }
@@ -53,7 +54,7 @@ impl ClipIdManager {
     /// # Returns
     /// * `Some(id)` - The next unused ID.
     /// * `None` - If all possible IDs are used or the limit (`i16::MAX`) is reached.
-    pub fn next_id(&mut self) -> Option<usize> {
+    pub(crate) fn next_id(&mut self) -> Option<usize> {
         while self.current < Self::MAX_ID {
             self.current += 1;
             if !self.used_ids[self.current] {

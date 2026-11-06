@@ -73,12 +73,14 @@ impl<E> fmt::Debug for Cursor<'_, E> {
 }
 
 impl<E> Clone for Cursor<'_, E> {
+    #[inline]
     fn clone(&self) -> Self {
         Self { input: self.input, original: self.original, _error: PhantomData }
     }
 }
 
 impl<E> Default for Cursor<'_, E> {
+    #[inline]
     fn default() -> Self {
         Self::new("")
     }
@@ -86,6 +88,7 @@ impl<E> Default for Cursor<'_, E> {
 
 impl<'a, E> Cursor<'a, E> {
     #[must_use]
+    #[inline]
     pub const fn new(input: &'a str) -> Self {
         Self { input, original: input, _error: PhantomData }
     }

@@ -3,7 +3,7 @@ use crate::asdsf::patch::de::diff::patch_map::{OnePatchMap, SeqPatchMap};
 /// Attacks diff patch
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct AttacksDiff<'a> {
+pub(crate) struct AttacksDiff<'a> {
     /// modifying fields of a single attack.
     ///
     /// - key(json path): e.g.,

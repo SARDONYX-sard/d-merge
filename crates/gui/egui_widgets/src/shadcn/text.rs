@@ -26,6 +26,7 @@ impl std::fmt::Debug for TextEdit<'_> {
 }
 
 impl<'a> TextEdit<'a> {
+    #[inline]
     pub fn singleline(text: &'a mut dyn egui::TextBuffer) -> Self {
         Self {
             text,
@@ -39,36 +40,42 @@ impl<'a> TextEdit<'a> {
     }
 
     /// A source for the unique [`egui::Id`], e.g. `.id_salt("second_text_edit_field")`.
+    #[inline]
     pub fn id_salt(mut self, id_salt: impl egui::AsIdSalt) -> Self {
         self.id_salt = Some(egui::IdSalt::new(id_salt));
         self
     }
 
     /// If true, hide the letters from view and prevent copying from the field.
+    #[inline]
     pub const fn password(mut self, password: bool) -> Self {
         self.password = password;
         self
     }
 
     /// Sets the limit for the amount of characters can be entered
+    #[inline]
     pub const fn char_limit(mut self, limit: usize) -> Self {
         self.char_limit = limit;
         self
     }
 
     /// Default is `true`. If set to `false` then you cannot interact with the text.
+    #[inline]
     pub const fn interactive(mut self, interactive: bool) -> Self {
         self.interactive = interactive;
         self
     }
 
     /// Show a faint hint text when the text field is empty.
+    #[inline]
     pub fn hint_text(mut self, hint_text: impl Into<egui::WidgetText>) -> Self {
         self.hint_text = hint_text.into();
         self
     }
 
     /// Defaults to the available width.
+    #[inline]
     pub const fn desired_width(mut self, desired_width: f32) -> Self {
         self.desired_width = Some(desired_width);
         self
@@ -147,6 +154,7 @@ pub struct Label {
 }
 
 impl Label {
+    #[inline]
     pub fn new(text: impl Into<egui::WidgetText>) -> Self {
         Self { text: text.into() }
     }

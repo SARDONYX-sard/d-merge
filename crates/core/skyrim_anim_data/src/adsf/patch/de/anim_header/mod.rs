@@ -17,7 +17,7 @@ pub struct AnimHeaderDiffPatch<'a> {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
-pub struct DiffProjectAssets<'a> {
+pub(crate) struct DiffProjectAssets<'a> {
     op: Op,
     range: Range<usize>,
     values: Vec<Cow<'a, str>>,
@@ -26,6 +26,7 @@ pub struct DiffProjectAssets<'a> {
 impl AnimHeaderDiffPatch<'_> {
     const DEFAULT: Self = Self { lead_int: None, project_assets: None };
 
+    #[inline]
     pub fn merge(&mut self, other: Self) {
         if other.lead_int.is_some() {
             self.lead_int = other.lead_int;

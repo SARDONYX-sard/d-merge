@@ -138,7 +138,7 @@ impl<'a> From<AltAdsf<'a>> for Adsf<'a> {
 ///
 /// A `Cow<str>` containing the cleaned project name with the numeric index removed,
 /// or the original `key` as a borrowed string if no match is found.
-pub fn to_adsf_key<'a>(key: std::borrow::Cow<'a, str>) -> std::borrow::Cow<'a, str> {
+pub(crate) fn to_adsf_key<'a>(key: std::borrow::Cow<'a, str>) -> std::borrow::Cow<'a, str> {
     (|| {
         let start_index = key.rfind('~')?;
         let base = &key[..start_index];

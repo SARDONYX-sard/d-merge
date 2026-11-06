@@ -135,7 +135,7 @@ pub fn semantic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
 }
 
 /// Word scanner (layer 1). Mirrors the old Monarch tokenizer.
-pub fn basic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
+pub(crate) fn basic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
     const IDENTIFIERS: [&str; 7] = [
         "animmotion",
         "animrotation",
@@ -195,7 +195,7 @@ pub fn basic_tokens(line: &str) -> Vec<(Span, TokenKind)> {
 ///
 /// e.g., `0.1 SCAR_ActionData{"Type":"RA", "Chance":30}` ->
 /// `{` `"Type"`(key) `:` `"RA"`(string) `,` `"Chance"`(key) `:` `30`(number) `}`
-pub fn json_tokens(line: &str) -> Vec<(Span, TokenKind)> {
+pub(crate) fn json_tokens(line: &str) -> Vec<(Span, TokenKind)> {
     let chars: Vec<char> = line.chars().collect();
     // Only event payloads, not `#` comments or annotation text with a stray brace.
     let Some(open) = chars.iter().position(|&c| c == '{') else { return Vec::new() };

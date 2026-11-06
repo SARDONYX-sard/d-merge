@@ -5,15 +5,9 @@ use rayon::prelude::*;
 /// A map that stores a **single** value for each JSON path,
 /// ensuring that only the value with the highest priority is kept.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct OnePatchMap<'a>(pub HashMap<JsonPath<'a>, ValueWithPriority<'a>>);
+pub(crate) struct OnePatchMap<'a>(pub HashMap<JsonPath<'a>, ValueWithPriority<'a>>);
 
 impl<'a> OnePatchMap<'a> {
-    /// Constructs a new, empty [`OnePatchMap`].
-    #[inline]
-    pub fn new() -> Self {
-        Self(HashMap::default())
-    }
-
     /// Inserts a value for the given JSON path.
     ///
     /// If an existing value is present, its priority is compared with
@@ -23,7 +17,7 @@ impl<'a> OnePatchMap<'a> {
     ///
     /// - `key`: The JSON path associated with the value.
     /// - `new_value`: The value with an associated priority.
-    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+    pub(crate) fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         if let Some(existing) = self.0.get_mut(&key) {
             let new_priority = new_value.priority;
             let existing_priority = existing.priority;
@@ -59,13 +53,12 @@ impl<'a> OnePatchMap<'a> {
 /// A map that stores **multiple** values per JSON path,
 /// allowing parallel insertion and extension.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct SeqPatchMap<'a>(pub HashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
+pub(crate) struct SeqPatchMap<'a>(pub HashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>>);
 
 impl<'a> SeqPatchMap<'a> {
     /// Constructs a new, empty [`SeqPatchMap`].
-    #[inline]
     #[allow(unused)]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(HashMap::default())
     }
 
@@ -73,7 +66,7 @@ impl<'a> SeqPatchMap<'a> {
     ///
     /// - If the path already has an entry, the new value is pushed to the list.
     /// - Otherwise, a new list is created with the value.
-    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+    pub(crate) fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
         match self.0.entry(key) {
             Entry::Occupied(mut existing) => {
                 existing.get_mut().push(new_value);
@@ -85,7 +78,7 @@ impl<'a> SeqPatchMap<'a> {
     }
 
     /// Extends the list of values for the given JSON path.
-    pub fn merge(&mut self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         for (path, other_vals) in other.0 {
             match self.0.entry(path) {
                 Entry::Occupied(mut occ) => {

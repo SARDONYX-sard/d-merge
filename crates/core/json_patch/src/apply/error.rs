@@ -84,25 +84,25 @@ impl JsonPatchError {
     }
 
     /// Creates a `NotFoundTarget` error from the given path and value.
-    pub fn not_found_target_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
+    pub(crate) fn not_found_target_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::NotFoundTarget { path, value }
     }
 
     /// Creates an `EmptyPointer` error from the given path and value.
-    pub fn empty_pointer_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
+    pub(crate) fn empty_pointer_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::EmptyPointer { path, value }
     }
 
     /// Creates an `InvalidIndex` error with the specified index, path, and value.
-    pub fn invalid_index_from<'a>(index: usize, path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
+    pub(crate) fn invalid_index_from<'a>(index: usize, path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::InvalidIndex { index: index.to_string(), path, value }
     }
 
     /// Creates a `MismatchApplyType` error with the unexpected type, path, and value.
-    pub fn mismatch_apply_type_from<'a>(
+    pub(crate) fn mismatch_apply_type_from<'a>(
         unexpected: crate::Action,
         path: &[Cow<'a, str>],
         value: impl core::fmt::Debug,
@@ -118,13 +118,13 @@ impl JsonPatchError {
     }
 
     /// Creates an `InvalidString` error from the given path and value.
-    pub fn invalid_string_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
+    pub(crate) fn invalid_string_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::InvalidString { path, value }
     }
 
     /// Creates an `InvalidTarget` error from the given path and value.
-    pub fn invalid_target_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
+    pub(crate) fn invalid_target_from<'a>(path: &[Cow<'a, str>], value: impl core::fmt::Debug) -> Self {
         let (path, value) = Self::format_path_value(path, value);
         Self::InvalidTarget { path, value }
     }

@@ -13,24 +13,8 @@
 
 use egui::{Pos2, Rect, Vec2, pos2};
 
-/// How far a window stays from the edges of the screen.
-const SCREEN_MARGIN: f32 = 12.0;
-
-/// What the window should not cover, around the pointer: about the largest button of the app. The
-/// widget that was clicked is not known here.
+/// Default of [`NearPointer::clicked_size`]: about the largest button of the app.
 const CLICKED_SIZE: Vec2 = Vec2::new(180.0, 48.0);
-
-/// The space between what was clicked and the window.
-const GAP: f32 = 4.0;
-
-/// For how many frames after opening a window is placed: its size settles in the first few.
-const PLACING_FRAMES: u8 = 3;
-
-/// How much of the app's window a [`show_modal`] takes: width, height.
-const MODAL_SHARE: Vec2 = Vec2::new(0.8, 0.85);
-
-/// What dims the app behind a [`show_modal`].
-const MODAL_OVERLAY_ALPHA: u8 = 160;
 
 /// A window that takes most of the app's, in its center, with the rest dimmed: for what is read at
 /// length.
@@ -42,16 +26,34 @@ const MODAL_OVERLAY_ALPHA: u8 = 160;
 pub struct Modal {
     title: egui::WidgetText,
     to_top: bool,
+    size: Vec2,
+    overlay_alpha: u8,
 }
 
 impl Modal {
+    #[inline]
     pub fn new(title: impl Into<egui::WidgetText>) -> Self {
-        Self { title: title.into(), to_top: false }
+        Self { title: title.into(), to_top: false, size: Vec2::new(0.85, 0.85), overlay_alpha: 160 }
     }
 
     /// Comes above the other windows on this frame, e.g. another modal it was opened from.
+    #[inline]
     pub const fn to_top(mut self, to_top: bool) -> Self {
         self.to_top = to_top;
+        self
+    }
+
+    /// How much of the app's window a [`show_modal`] takes: width, height.
+    #[inline]
+    pub const fn size(mut self, size: Vec2) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// How dark the backdrop is: `0` shows the app as it is, `255` hides it.
+    #[inline]
+    pub const fn overlay_alpha(mut self, overlay_alpha: u8) -> Self {
+        self.overlay_alpha = overlay_alpha;
         self
     }
 
@@ -61,7 +63,8 @@ impl Modal {
             return None;
         }
         let esc = ctx.input(|input| input.key_pressed(egui::Key::Escape));
-        if modal_overlay(ctx).clicked() || (esc && ctx.memory(|memory| memory.focused().is_none())) {
+        if modal_overlay(ctx, self.overlay_alpha).clicked() || (esc && ctx.memory(|memory| memory.focused().is_none()))
+        {
             *open = false;
             return None;
         }
@@ -69,7 +72,7 @@ impl Modal {
         if self.to_top {
             ctx.move_to_top(egui::LayerId::new(egui::Order::Middle, id));
         }
-        let size = ctx.content_rect().size() * MODAL_SHARE;
+        let size = ctx.content_rect().size() * self.size;
         egui::Window::new(self.title)
             .id(id)
             .open(open)
@@ -88,6 +91,7 @@ impl Modal {
 }
 
 /// A [`Modal`] with nothing more to it.
+#[inline]
 pub fn show_modal<R>(
     ctx: &egui::Context,
     title: impl Into<egui::WidgetText>,
@@ -98,13 +102,13 @@ pub fn show_modal<R>(
 }
 
 /// Draws the dimmed backdrop. The response tells whether it was clicked.
-fn modal_overlay(ctx: &egui::Context) -> egui::Response {
+fn modal_overlay(ctx: &egui::Context, alpha: u8) -> egui::Response {
     egui::Area::new(egui::Id::NULL.with("modal_overlay"))
         .order(egui::Order::Background)
         .fixed_pos(ctx.content_rect().min)
         .show(ctx, |ui| {
             let rect = ui.ctx().content_rect();
-            ui.painter().rect_filled(rect, 0.0, egui::Color32::from_black_alpha(MODAL_OVERLAY_ALPHA));
+            ui.painter().rect_filled(rect, 0.0, egui::Color32::from_black_alpha(alpha));
             ui.allocate_response(rect.size(), egui::Sense::click())
         })
         .inner
@@ -130,56 +134,110 @@ pub fn vertical_splitter(ui: &mut egui::Ui, height: f32) -> f32 {
 /// is closed. It stays a little away from the edges of the screen, where its border can be reached.
 ///
 /// "Opens" = it was not drawn in the frame before: closing a window just stops drawing it.
+#[inline]
 pub fn window_near_pointer<'a>(ctx: &egui::Context, title: impl Into<egui::WidgetText>) -> egui::Window<'a> {
-    let title = title.into();
-    let id = egui::Id::NULL.with(("window_near_pointer", title.text()));
-    let placing_id = id.with("placing");
-    let frame = ctx.cumulative_pass_nr();
-    let last_drawn = ctx.data_mut(|data| data.get_temp::<u64>(id));
-    ctx.data_mut(|data| data.insert_temp(id, frame));
+    NearPointer::default().window(ctx, title)
+}
 
-    let screen = ctx.content_rect().shrink(SCREEN_MARGIN);
-    let window = egui::Window::new(title).id(id).constrain_to(screen);
-    if just_opened(last_drawn, frame) {
-        let Some(pointer) = ctx.input(|input| input.pointer.latest_pos()) else { return window };
-        ctx.data_mut(|data| data.insert_temp(placing_id, (pointer, PLACING_FRAMES)));
-        return window.current_pos(place(pointer, Vec2::ZERO, screen));
+/// How [`window_near_pointer`] places a window, when its defaults don't fit.
+#[derive(Debug, Clone, Copy)]
+#[must_use = "Call `window` to get the window"]
+pub struct NearPointer {
+    screen_margin: f32,
+    clicked_size: Vec2,
+    gap: f32,
+    placing_frames: u8,
+}
+
+impl Default for NearPointer {
+    #[inline]
+    fn default() -> Self {
+        Self { screen_margin: 12.0, clicked_size: CLICKED_SIZE, gap: 4.0, placing_frames: 3 }
+    }
+}
+
+impl NearPointer {
+    /// How far the window stays from the edges of the screen.
+    #[inline]
+    pub const fn screen_margin(mut self, screen_margin: f32) -> Self {
+        self.screen_margin = screen_margin;
+        self
     }
 
-    let placing = ctx.data_mut(|data| data.get_temp::<(Pos2, u8)>(placing_id));
-    let (Some((pointer, frames_left)), Some(rect)) = (placing, ctx.memory(|memory| memory.area_rect(id))) else {
-        return window;
-    };
-    ctx.data_mut(|data| {
-        if frames_left > 1 {
-            data.insert_temp(placing_id, (pointer, frames_left - 1));
-        } else {
-            data.remove_temp::<(Pos2, u8)>(placing_id);
+    /// What the window should not cover, around the pointer. The widget that was clicked is not known
+    /// here, so this is about the largest one.
+    #[inline]
+    pub const fn clicked_size(mut self, clicked_size: Vec2) -> Self {
+        self.clicked_size = clicked_size;
+        self
+    }
+
+    /// The space between what was clicked and the window.
+    #[inline]
+    pub const fn gap(mut self, gap: f32) -> Self {
+        self.gap = gap;
+        self
+    }
+
+    /// For how many frames after opening the window is placed: its size settles in the first few.
+    #[inline]
+    pub const fn placing_frames(mut self, placing_frames: u8) -> Self {
+        self.placing_frames = placing_frames;
+        self
+    }
+
+    /// See [`window_near_pointer`].
+    pub fn window<'a>(self, ctx: &egui::Context, title: impl Into<egui::WidgetText>) -> egui::Window<'a> {
+        let title = title.into();
+        let id = egui::Id::NULL.with(("window_near_pointer", title.text()));
+        let placing_id = id.with("placing");
+        let frame = ctx.cumulative_pass_nr();
+        let last_drawn = ctx.data_mut(|data| data.get_temp::<u64>(id));
+        ctx.data_mut(|data| data.insert_temp(id, frame));
+
+        let screen = ctx.content_rect().shrink(self.screen_margin);
+        let window = egui::Window::new(title).id(id).constrain_to(screen);
+        if just_opened(last_drawn, frame) {
+            let Some(pointer) = ctx.input(|input| input.pointer.latest_pos()) else { return window };
+            ctx.data_mut(|data| data.insert_temp(placing_id, (pointer, self.placing_frames)));
+            return window.current_pos(self.place(pointer, Vec2::ZERO, screen));
         }
-    });
-    ctx.request_repaint();
-    window.current_pos(place(pointer, rect.size(), screen))
+
+        let placing = ctx.data_mut(|data| data.get_temp::<(Pos2, u8)>(placing_id));
+        let (Some((pointer, frames_left)), Some(rect)) = (placing, ctx.memory(|memory| memory.area_rect(id))) else {
+            return window;
+        };
+        ctx.data_mut(|data| {
+            if frames_left > 1 {
+                data.insert_temp(placing_id, (pointer, frames_left - 1));
+            } else {
+                data.remove_temp::<(Pos2, u8)>(placing_id);
+            }
+        });
+        ctx.request_repaint();
+        window.current_pos(self.place(pointer, rect.size(), screen))
+    }
+
+    /// Where a window of `size` goes (its top left), with `pointer` at what was clicked. See the module
+    /// docs. If it fits nowhere: below, moved up as far as it must, as egui would.
+    fn place(self, pointer: Pos2, size: Vec2, screen: Rect) -> Pos2 {
+        let clicked = Rect::from_center_size(pointer, self.clicked_size).expand(self.gap);
+        let fits = |at: Pos2| screen.contains_rect(Rect::from_min_size(at, size));
+        // Along the side it opens at, it moves as little as it must to stay on the screen.
+        let x = pointer.x.min(screen.right() - size.x).max(screen.left());
+        let y = pointer.y.min(screen.bottom() - size.y).max(screen.top());
+
+        let below = pos2(x, clicked.bottom());
+        let right = pos2(clicked.right(), y);
+        let left = pos2(clicked.left() - size.x, y);
+        let above = pos2(x, clicked.top() - size.y);
+        [below, right, left, above].into_iter().find(|at| fits(*at)).unwrap_or_else(|| pos2(x, y.min(below.y)))
+    }
 }
 
 /// See [`window_near_pointer`]. `last_drawn`: the frame it was last drawn in, if any.
 fn just_opened(last_drawn: Option<u64>, frame: u64) -> bool {
     last_drawn.is_none_or(|last| last + 1 < frame)
-}
-
-/// Where a window of `size` goes (its top left), with `pointer` at what was clicked. See the module
-/// docs. If it fits nowhere: below, moved up as far as it must, as egui would.
-fn place(pointer: Pos2, size: Vec2, screen: Rect) -> Pos2 {
-    let clicked = Rect::from_center_size(pointer, CLICKED_SIZE).expand(GAP);
-    let fits = |at: Pos2| screen.contains_rect(Rect::from_min_size(at, size));
-    // Along the side it opens at, it moves as little as it must to stay on the screen.
-    let x = pointer.x.min(screen.right() - size.x).max(screen.left());
-    let y = pointer.y.min(screen.bottom() - size.y).max(screen.top());
-
-    let below = pos2(x, clicked.bottom());
-    let right = pos2(clicked.right(), y);
-    let left = pos2(clicked.left() - size.x, y);
-    let above = pos2(x, clicked.top() - size.y);
-    [below, right, left, above].into_iter().find(|at| fits(*at)).unwrap_or_else(|| pos2(x, y.min(below.y)))
 }
 
 #[cfg(test)]
@@ -210,7 +268,7 @@ mod tests {
         let rect = modal_frame(&ctx, &mut open, Vec::new()).unwrap();
         // The title bar and the frame are around what `content` is given.
         assert!((rect.center() - SCREEN.center()).length() < 24.0, "{rect:?}");
-        assert!((rect.width() - 800.0).abs() < 24.0, "{rect:?}");
+        assert!((rect.width() - 850.0).abs() < 24.0, "{rect:?}");
         assert!((rect.height() - 680.0).abs() < 60.0, "{rect:?}");
         assert!(open);
     }
@@ -245,6 +303,17 @@ mod tests {
         assert!(modal_frame(&ctx, &mut open, Vec::new()).is_none(), "closed: nothing is drawn");
     }
     const SIZE: Vec2 = Vec2::new(300.0, 200.0);
+
+    fn place(pointer: Pos2, size: Vec2, screen: Rect) -> Pos2 {
+        NearPointer::default().place(pointer, size, screen)
+    }
+
+    #[test]
+    fn the_gap_and_what_is_not_covered_can_be_changed() {
+        let pointer = pos2(400.0, 100.0);
+        let at = NearPointer::default().gap(10.0).clicked_size(Vec2::new(100.0, 100.0)).place(pointer, SIZE, SCREEN);
+        assert_eq!(at, pos2(400.0, 160.0)); // 100 + 100 / 2 + 10
+    }
 
     fn covers_the_click(at: Pos2, pointer: Pos2) -> bool {
         Rect::from_min_size(at, SIZE).intersects(Rect::from_center_size(pointer, CLICKED_SIZE))

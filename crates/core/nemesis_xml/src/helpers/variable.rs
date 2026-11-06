@@ -67,6 +67,7 @@ use winnow::{
 
 /// # Errors
 /// If not found `$eventID[` `]`
+#[inline]
 pub fn event_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     separated_pair(Caseless("$eventID["), take_until(0.., "]$"), "]$")
         .take()
@@ -76,7 +77,7 @@ pub fn event_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
 
 /// # Errors
 /// If not found `$variableID[` `]`
-pub fn variable_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
+pub(crate) fn variable_id<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     separated_pair(Caseless("$variableID["), take_until(0.., "]$"), "]$")
         .take()
         .context(Expected(Description("variableID(e.g. `$variableID[sampleName]$`)")))

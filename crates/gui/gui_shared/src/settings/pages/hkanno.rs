@@ -28,6 +28,7 @@ pub struct HkannoSettings {
 }
 
 impl Default for HkannoSettings {
+    #[inline]
     fn default() -> Self {
         Self { tabs: Vec::new(), active_tab: 0, show_preview: true }
     }

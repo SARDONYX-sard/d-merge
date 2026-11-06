@@ -78,6 +78,7 @@ pub use walk::walk_files;
 ///     println!("{}", dir.display());
 /// }
 /// ```
+#[inline]
 pub fn glob_dirs(pattern: &str) -> Vec<PathBuf> {
     expand(pattern, true)
 }
@@ -94,6 +95,7 @@ pub fn glob_dirs(pattern: &str) -> Vec<PathBuf> {
 ///     println!("{}", file.display());
 /// }
 /// ```
+#[inline]
 pub fn glob_files(pattern: &str) -> Vec<PathBuf> {
     expand(pattern, false)
 }

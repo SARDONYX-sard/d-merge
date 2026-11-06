@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// Returns `Err(String)` when:
 /// - No ancestor exists (reached the filesystem root without a hit).
 /// - [`std::fs::canonicalize`] fails on the found path.
-pub fn find_existing_dir_or_ancestor<P>(dir: P) -> Result<PathBuf, String>
+pub(crate) fn find_existing_dir_or_ancestor<P>(dir: P) -> Result<PathBuf, String>
 where
     P: AsRef<Path>,
 {
@@ -63,11 +63,13 @@ where
 ///
 /// # Errors
 /// Neither the directory nor an ancestor could be opened.
+#[inline]
 pub fn open_dir_of(path: &str) -> Result<(), String> {
     open_existing_dir_or_ancestor(path)
 }
 
 /// The folder dialog, starting from `current` or else what exists of it. `None`: cancelled.
+#[inline]
 pub fn pick_folder_from(current: &str) -> Option<std::path::PathBuf> {
     let dialog = crate::rfd::FileDialog::new();
     let dialog = match find_existing_dir_or_ancestor(current) {

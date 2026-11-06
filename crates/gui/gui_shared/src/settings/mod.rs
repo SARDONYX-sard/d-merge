@@ -47,6 +47,7 @@ pub struct Settings {
 }
 
 impl Default for Settings {
+    #[inline]
     fn default() -> Self {
         Self {
             app_version: LAYOUT_VERSION,
@@ -117,6 +118,7 @@ impl Settings {
     ///
     /// # Errors
     /// failed to serialize self or read json
+    #[inline]
     pub fn save(&self) -> Result<(), Error> {
         let json = sonic_rs::to_string_pretty(self).context(SerializeJsonSnafu { path: Self::PATH })?;
         std::fs::write(Self::PATH, json).context(WriteFileSnafu { path: Self::PATH })

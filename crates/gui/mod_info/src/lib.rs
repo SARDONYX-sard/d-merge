@@ -40,6 +40,7 @@ use crate::error::Error;
 /// let mods_mo2 = mod_info::get_all("C:/Modding/MO2/mods/*", false)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+#[inline]
 pub fn get_all(skyrim_data_dir: &str, is_vfs: bool) -> Result<Vec<ModInfo>, Error> {
     let mut mods = Vec::new();
     mods.par_extend(get_all_nemesis(skyrim_data_dir, is_vfs)?);
@@ -223,6 +224,7 @@ impl ModType {
     /// assert_eq!(mod_info::ModType::Nemesis.as_str(), "Nemesis");
     /// assert_eq!(mod_info::ModType::Fnis.as_str(), "FNIS");
     /// ```
+    #[inline]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Nemesis => "Nemesis",
@@ -239,6 +241,7 @@ impl ModType {
     /// assert_eq!(mod_info::ModType::Nemesis.as_lower_str(), "nemesis");
     /// assert_eq!(mod_info::ModType::Fnis.as_lower_str(), "fnis");
     /// ```
+    #[inline]
     pub const fn as_lower_str(&self) -> &'static str {
         match self {
             Self::Nemesis => "nemesis",

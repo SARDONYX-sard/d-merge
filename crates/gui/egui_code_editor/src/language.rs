@@ -21,6 +21,7 @@ pub enum Indent {
 }
 
 impl Default for Indent {
+    #[inline]
     fn default() -> Self {
         Self::Spaces(4)
     }
@@ -169,6 +170,7 @@ pub enum Severity {
 
 impl Severity {
     /// Theme color (underline, icon, message).
+    #[inline]
     pub const fn color(self, visuals: &egui::Visuals) -> Color32 {
         match self {
             Self::Error => visuals.error_fg_color,
@@ -177,6 +179,7 @@ impl Severity {
     }
 
     /// Short icon for lists.
+    #[inline]
     pub const fn icon(self) -> &'static str {
         match self {
             Self::Error => "✖",

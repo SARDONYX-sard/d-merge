@@ -18,12 +18,13 @@ use crate::parser::{LineNode, Syntax, parse_line};
 /// let formatted = hkanno_lsp::features::format::format_document("  0.1   animrotation   90  ");
 /// assert_eq!(formatted, "0.100000 animrotation 90.000000");
 /// ```
+#[inline]
 pub fn format_document(text: &str) -> String {
     crate::lines(text).map(format_line).collect::<Vec<_>>().join("\n")
 }
 
 /// Formats one line.
-pub fn format_line(line: &str) -> String {
+pub(crate) fn format_line(line: &str) -> String {
     let number = |value: f64| format!("{value:.6}");
 
     // `None` parts are skipped, present ones are joined by exactly one space.

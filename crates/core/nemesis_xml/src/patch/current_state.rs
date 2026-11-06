@@ -69,12 +69,10 @@ impl<'de> CurrentState<'de> {
     }
 
     /// - `<!-- ORIGINAL --!> is found.
-    #[inline]
     pub(super) const fn set_is_passed_original(&mut self) {
         self.is_passed_original = true;
     }
 
-    #[inline]
     pub(super) fn judge_operation(&self) -> Op {
         self.mode_code.map_or(Op::Remove, |_| {
             if self.is_passed_original {
@@ -85,14 +83,12 @@ impl<'de> CurrentState<'de> {
         })
     }
 
-    #[inline]
     pub(super) const fn clear_flags(&mut self) {
         self.mode_code = None;
         self.is_passed_original = false;
     }
 
     /// Judge Op + clear flags + take patches
-    #[inline]
     pub(super) fn take_patches(&mut self) -> (Op, Patches<'de>) {
         let op = self.judge_operation();
         self.clear_flags();

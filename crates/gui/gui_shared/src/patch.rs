@@ -29,7 +29,7 @@ pub mod phase {
     pub const ERROR: u8 = 7;
 
     /// Number of steps shown as `[n/STEPS]`.
-    pub const STEPS: u8 = DONE;
+    pub(crate) const STEPS: u8 = DONE;
 }
 
 #[derive(Debug, Default)]
@@ -63,6 +63,7 @@ impl PatchProgress {
     ///
     /// This operation is intentionally lock-free except for the rare
     /// `error` field.
+    #[inline]
     pub fn clear(&self) {
         self.phase.store(phase::IDLE, Ordering::Relaxed);
         self.index.store(0, Ordering::Relaxed);
@@ -73,6 +74,7 @@ impl PatchProgress {
     /// Returns a lightweight snapshot of the current progress state.
     ///
     /// Intended for UI polling from the egui frame loop.
+    #[inline]
     pub fn snapshot(&self) -> PatchProgressSnapshot {
         PatchProgressSnapshot {
             phase: self.phase.load(Ordering::Relaxed),
@@ -142,11 +144,13 @@ pub const USER_PATCH_ID: &str = "user_patch";
 /// output, and its own conflicts. Not among the mods, like MO2's overwrite.
 ///
 /// e.g. `D:/out` -> `D:/out/.d_merge/user_patch`
+#[inline]
 pub fn user_patch_output(output_dir: &str) -> std::path::PathBuf {
     stdx::path::joined(std::path::Path::new(output_dir), &[".d_merge", "user_patch"])
 }
 
 /// The user patch's patch directory. e.g. `D:/out/.d_merge/user_patch/Nemesis_Engine/mod/upatch`
+#[inline]
 pub fn user_patch_mod_dir(output_dir: &str) -> std::path::PathBuf {
     stdx::path::joined(
         std::path::Path::new(output_dir),

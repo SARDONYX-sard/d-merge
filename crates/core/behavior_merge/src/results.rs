@@ -2,7 +2,6 @@ use rayon::prelude::*;
 
 use crate::errors::Error;
 
-#[inline]
 pub(crate) fn filter_results<T>(results: Vec<Result<T, Error>>) -> Result<(), Vec<Error>>
 where
     T: Send + Sync,

@@ -63,6 +63,7 @@ impl PatchEditorSettings {
 }
 
 impl Default for PatchEditorSettings {
+    #[inline]
     fn default() -> Self {
         Self { inline_diff: true, follow_preview: true, show_preview: true, ..Self::empty() }
     }

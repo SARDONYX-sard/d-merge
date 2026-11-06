@@ -30,6 +30,7 @@ pub enum PandoraVersion {
 }
 
 impl PandoraVersion {
+    #[inline]
     pub const fn to_static_str(&self) -> &'static str {
         match self {
             Self::V4_4_0Beta => "v4.4.0-beta",
@@ -100,6 +101,7 @@ impl Pandora {
     /// Returns an error if Pandora files cannot be read or parsed, if the
     /// selected Pandora version is unsupported, or if duplicate Pandora mod
     /// codes are found.
+    #[inline]
     pub fn import_to<P>(root: P, settings: &mut PatchSettings, version: PandoraVersion) -> Result<Self, String>
     where
         P: AsRef<Path>,
@@ -115,6 +117,7 @@ impl Pandora {
     ///
     /// Returns an error if the Pandora configuration cannot be generated or
     /// written, or if the selected Pandora version is unsupported.
+    #[inline]
     pub fn export_from<P>(root: P, settings: &PatchSettings, version: PandoraVersion) -> Result<(), String>
     where
         P: AsRef<Path>,

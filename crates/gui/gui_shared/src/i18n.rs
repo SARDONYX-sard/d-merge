@@ -1418,6 +1418,7 @@ pub enum I18nKey {
 pub struct I18nMap(IndexMap<I18nKey, Cow<'static, str>, fast_hash::RandomState>);
 
 impl I18nMap {
+    #[inline]
     pub fn new() -> Self {
         Self(IndexMap::default())
     }
@@ -1426,6 +1427,7 @@ impl I18nMap {
     pub const PATH: &'static str = "./.d_merge/translation.json";
 
     /// Translate given key or fallback to default English.
+    #[inline]
     pub fn t(&self, key: I18nKey) -> &str {
         self.0.get(&key).map_or_else(|| key.default_eng(), |s| s.as_ref())
     }

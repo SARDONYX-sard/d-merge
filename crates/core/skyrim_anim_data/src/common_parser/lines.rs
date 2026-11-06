@@ -40,7 +40,6 @@ pub(crate) fn txt_one_line<'a>(input: &mut &'a str) -> ModalResult<Str<'a>> {
 }
 
 /// Parse one line and then parse to T.
-#[inline]
 pub(crate) fn verify_line_parses_to<'a, T>(input: &mut &'a str) -> ModalResult<Str<'a>>
 where
     T: FromStr,
@@ -52,7 +51,6 @@ where
 }
 
 /// Parse one line and then parse to T.
-#[inline]
 pub(crate) fn parse_one_line<T: FromStr>(input: &mut &str) -> ModalResult<T> {
     // For some reason, using parse_to for Cow causes an error, so the method chain of the existing parser is used.
     let line = till_line_ending.parse_to().parse_next(input)?;

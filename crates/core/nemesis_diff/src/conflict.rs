@@ -173,7 +173,7 @@ fn line_key(line: &str) -> &str {
 /// where a mod has one per line. e.g. `#0338 #0340` holds what `#0338` replaces.
 ///
 /// `None`: those lines are not there. e.g., a mod made for another version of the template.
-pub fn apply_block(text: &str, block: &Replaced) -> Option<(String, usize)> {
+pub(crate) fn apply_block(text: &str, block: &Replaced) -> Option<(String, usize)> {
     let text = crate::normalize(text);
     let original = crate::normalize(&block.original);
     let lines: Vec<&str> = text.split('\n').collect();
@@ -207,6 +207,7 @@ fn splice(lines: &[&str], at: usize, len: usize, new_text: &str) -> String {
 /// the block's lines became, so it gives way to this one. The object's other changes stay.
 ///
 /// e.g. `#0338` was replaced by `#flinch$2`, and now `#zcbe$107` is picked for that place.
+#[inline]
 pub fn apply_block_over(template: &str, text: &str, block: &Replaced) -> Option<(String, usize)> {
     apply_block(text, block).or_else(|| replace_in_hunk(template, text, block)).or_else(|| {
         (0..crate::hunks(template, text).len())

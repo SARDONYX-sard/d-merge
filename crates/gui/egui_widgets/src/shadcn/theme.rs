@@ -84,6 +84,7 @@ impl ShadcnTheme {
     }
 
     /// Returns the current theme (light by default).
+    #[inline]
     pub fn get(ctx: &egui::Context) -> Self {
         ctx.data(|d| d.get_temp::<Self>(egui::Id::NULL)).unwrap_or_else(Self::light)
     }
@@ -100,30 +101,32 @@ impl ShadcnTheme {
     }
 
     /// Corner radius from `radius`.
+    #[inline]
     pub const fn corner_radius(&self) -> egui::CornerRadius {
         egui::CornerRadius::same(self.radius.round() as u8)
     }
 }
 
 /// Shadow shared by popups.
+#[inline]
 pub const fn popup_shadow() -> egui::Shadow {
     egui::Shadow { offset: [0, 4], blur: 12, spread: 0, color: Color32::from_black_alpha(8) }
 }
 
 /// Linearly interpolates between two colors by factor `t` (0.0 = a, 1.0 = b).
-pub fn interpolate_color(a: Color32, b: Color32, t: f32) -> Color32 {
+pub(crate) fn interpolate_color(a: Color32, b: Color32, t: f32) -> Color32 {
     let t = t.clamp(0.0, 1.0);
     let lerp = |x: u8, y: u8| (f32::from(x) * (1.0 - t) + f32::from(y) * t).round() as u8;
     Color32::from_rgba_unmultiplied(lerp(a.r(), b.r()), lerp(a.g(), b.g()), lerp(a.b(), b.b()), lerp(a.a(), b.a()))
 }
 
 /// Returns `c` with its alpha replaced by `a`.
-pub fn with_alpha(c: Color32, a: u8) -> Color32 {
+pub(crate) fn with_alpha(c: Color32, a: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), a)
 }
 
 /// Paints a 3px focus ring around `rect`.
-pub fn paint_focus_ring(painter: &egui::Painter, rect: egui::Rect, corner_radius: f32, ring_color: Color32) {
+pub(crate) fn paint_focus_ring(painter: &egui::Painter, rect: egui::Rect, corner_radius: f32, ring_color: Color32) {
     painter.rect_stroke(
         rect.expand(2.0),
         egui::CornerRadius::same((corner_radius + 2.0).round() as u8),

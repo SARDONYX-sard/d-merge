@@ -38,6 +38,7 @@ pub const fn calc_crc32_from_u32(input: u32) -> u32 {
 ///
 /// - `decode_crc32(7891816);` => `// Found match: [e4, 35, 83, 50](hex) | 1350776292 (dec)`
 /// - u32::MAX process time: 42.30s(single: 220s)
+#[inline]
 pub fn decode_crc32(target_crc: u32) -> Option<u32> {
     let crc32 = Crc::<u32>::new(&SKYRIM_CRC32_ALG);
 

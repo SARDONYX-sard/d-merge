@@ -26,7 +26,6 @@ pub struct RotationData<'a> {
 }
 
 impl<'a> RotationData<'a> {
-    #[inline]
     pub fn into_rotation(self) -> Rotation<'a> {
         use std::borrow::Cow;
 

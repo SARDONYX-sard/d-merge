@@ -128,6 +128,28 @@ pub struct OwnedFnisInjection {
 }
 
 impl OwnedFnisInjection {
+    /// All indexes start from 1: the Nemesis variables they stand for are 1-based.
+    pub(crate) const fn new(
+        animations_mod_dir: PathBuf,
+        behavior_entry: &'static BehaviorEntry,
+        namespace: String,
+        priority: usize,
+        list_content: String,
+        behavior_path: String,
+    ) -> Self {
+        Self {
+            animations_mod_dir,
+            behavior_entry,
+            namespace,
+            priority,
+            list_content,
+            behavior_path,
+            current_class_index: AtomicUsize::new(1),
+            current_adsf_index: AtomicUsize::new(1),
+            current_asdsf_index: AtomicUsize::new(1),
+        }
+    }
+
     /// Returns relative `meshes/.../FNIS_*_List.txt` path.
     /// - Humanoid: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_List.txt`
     /// - Creature: `meshes/{base_dir}/animations/{namespace}/FNIS_{namespace}_{behavior_object}_List.txt`
@@ -192,6 +214,10 @@ impl OwnedFnisInjection {
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$1");
     /// assert_eq!(inj.next_class_name_attribute(), "#FNIS_Flyer$2");
     /// ```
+    ///
+    /// # Note
+    /// Don't call this from a parallel iterator: the numbers would differ from run to run, and with them
+    /// the generated output.
     pub(crate) fn next_class_name_attribute(&self) -> String {
         let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire);
         format!("#{}${idx}", self.namespace)
@@ -256,17 +282,14 @@ where
     let list_content = load_fnis_list_file(&animations_mod_dir, behavior_entry, namespace).await?;
     let behavior_path = find_behavior_file(&animations_mod_dir, behavior_entry, namespace)?;
 
-    Ok(OwnedFnisInjection {
+    Ok(OwnedFnisInjection::new(
         animations_mod_dir,
         behavior_entry,
-        namespace: namespace.to_string(),
+        namespace.to_string(),
         priority,
         list_content,
         behavior_path,
-        current_class_index: AtomicUsize::new(1),
-        current_adsf_index: AtomicUsize::new(1),
-        current_asdsf_index: AtomicUsize::new(1),
-    })
+    ))
 }
 
 /// Load all FNIS list files for a given namespace using glob.

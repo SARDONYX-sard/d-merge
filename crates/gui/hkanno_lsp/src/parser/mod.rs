@@ -82,7 +82,7 @@ pub fn parse_document(text: &str, syntax: Syntax) -> Vec<LineNode<'_>> {
 /// # Why not `contains("pie")`?
 /// The old TS implementation used a plain substring check, which mis-detected ordinary
 /// events such as `MCO_Pierce`. Only the event token is checked here.
-pub fn is_pie_line(line: &str) -> bool {
+pub(crate) fn is_pie_line(line: &str) -> bool {
     let mut tokens = line.split_whitespace();
     let Some(first) = tokens.next() else { return false };
     // Skip the time token when present.

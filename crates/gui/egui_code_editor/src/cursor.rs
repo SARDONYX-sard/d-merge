@@ -5,6 +5,7 @@ use egui::text::{CCursor, CCursorRange};
 /// The `TextEdit` id used by `CodeEditor::new(id_salt, ..)`.
 ///
 /// Lets a host address the editor (e.g., [`set_cursor`]) without holding the text.
+#[inline]
 pub fn editor_id(id_salt: impl egui::AsIdSalt) -> egui::Id {
     egui::Id::unique(("code_editor", id_salt))
 }
@@ -12,6 +13,7 @@ pub fn editor_id(id_salt: impl egui::AsIdSalt) -> egui::Id {
 /// Moves the cursor of the editor `id` and scrolls it into view (applied on the next frame).
 ///
 /// e.g., jumping to a diagnostic from a problems list. Get `id` from [`editor_id`].
+#[inline]
 pub fn set_cursor(ctx: &egui::Context, id: egui::Id, index: usize) {
     set_selection(ctx, id, index..index);
     // `TextEdit` only scrolls for cursor moves it makes itself, so ask `show` to do it.

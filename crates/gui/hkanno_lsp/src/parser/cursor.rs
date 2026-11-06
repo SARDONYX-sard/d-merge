@@ -25,24 +25,20 @@ impl<'a> Cursor<'a> {
         Self { line, byte: 0, col: 0 }
     }
 
-    #[inline]
     pub(crate) fn peek(&self) -> Option<char> {
         self.line[self.byte..].chars().next()
     }
 
     /// Current char column.
-    #[inline]
     pub(crate) const fn col(&self) -> usize {
         self.col
     }
 
-    #[inline]
     pub(crate) const fn is_eof(&self) -> bool {
         self.byte >= self.line.len()
     }
 
     /// Consumes one char (no-op at the end of the line).
-    #[inline]
     pub(crate) fn bump(&mut self) {
         if let Some(c) = self.peek() {
             self.byte += c.len_utf8();
@@ -117,7 +113,6 @@ impl<'a> Cursor<'a> {
     }
 
     /// Consumes the rest of the line.
-    #[inline]
     pub(crate) fn rest(&mut self) -> Option<Field<&'a str>> {
         self.until(&[])
     }

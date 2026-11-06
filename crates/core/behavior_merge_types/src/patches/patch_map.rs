@@ -137,6 +137,7 @@ impl<'a> OnePatchMap<'a> {
     /// This method should only be used when all patches are known to be unique additions.
     ///
     /// For example, FNIS patches only performs additional operations, and this makes it very useful.
+    #[inline]
     pub fn par_extend<I>(&mut self, patches: I)
     where
         I: IntoParallelIterator<Item = (JsonPath<'a>, ValueWithPriority<'a>)>,
@@ -157,6 +158,7 @@ impl<'a> OnePatchMap<'a> {
     }
 
     /// Consumes this map and returns the underlying `DashMap` of patches.
+    #[inline]
     pub fn into_inner(self) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
         self.patches
     }

@@ -97,7 +97,6 @@ impl Version {
 /// ```text
 /// [tag: 4 bytes][size: u16 LE][data: n bytes]
 /// ```
-#[inline]
 fn write_sub_record(w: &mut impl Write, tag: &[u8; 4], data: &[u8]) -> io::Result<()> {
     let size = u16::try_from(data.len()).map_err(|_| {
         io::Error::new(
@@ -120,7 +119,6 @@ fn write_sub_record(w: &mut impl Write, tag: &[u8; 4], data: &[u8]) -> io::Resul
 /// ```text
 /// sub_record_size(data) == 4 (tag) + 2 (size field) + data.len()
 /// ```
-#[inline]
 const fn sub_record_size(data_len: usize) -> usize {
     4 + 2 + data_len
 }

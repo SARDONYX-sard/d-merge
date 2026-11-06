@@ -30,7 +30,6 @@ impl<'de> Default for CurrentState<'de> {
 }
 
 impl<'de> CurrentState<'de> {
-    #[inline]
     pub(super) const fn new() -> Self {
         Self { flags: DiffFlags::new(), patch: None, range: None }
     }

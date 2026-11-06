@@ -168,7 +168,7 @@ pub enum PiePrefix {
 
 impl PiePrefix {
     /// Parses the prefix char.
-    pub const fn from_char(c: char) -> Option<Self> {
+    pub(crate) const fn from_char(c: char) -> Option<Self> {
         match c {
             '@' => Some(Self::Native),
             '$' => Some(Self::Custom),
@@ -178,7 +178,7 @@ impl PiePrefix {
     }
 
     /// Human readable kind (used by hover).
-    pub const fn display_name(self) -> &'static str {
+    pub(crate) const fn display_name(self) -> &'static str {
         match self {
             Self::Native => "Native",
             Self::Custom => "Custom",

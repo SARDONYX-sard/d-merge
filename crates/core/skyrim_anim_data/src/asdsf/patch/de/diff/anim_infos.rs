@@ -1,6 +1,6 @@
 use json_patch::ValueWithPriority;
 
-use crate::{asdsf::patch::de::patch_map::OnePatchMap, common_parser::lines::Str};
+use crate::asdsf::patch::de::patch_map::OnePatchMap;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -21,18 +21,4 @@ pub(crate) struct NonNestedArrayDiff<'a> {
         serde(borrow, bound(deserialize = "Vec<ValueWithPriority<'a>>: serde::Deserialize<'de>"))
     )]
     pub seq: Vec<ValueWithPriority<'a>>,
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AnimInfoDiff<'a> {
-    /// CRC32 representation path
-    /// - type: [`u32`]
-    pub hashed_path: Option<Str<'a>>,
-    /// CRC32 representation file name
-    /// - type: [`u32`]
-    pub hashed_file_name: Option<Str<'a>>,
-    /// Always `7891816`
-    /// - type: [`u32`]
-    pub ascii_extension: Option<Str<'a>>,
 }

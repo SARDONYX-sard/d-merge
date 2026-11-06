@@ -70,7 +70,6 @@ impl Notification {
     }
 
     /// Sets a message with a color specification.
-    #[inline]
     fn set_with_color(&mut self, msg: impl Into<String>, color: NotificationColor) {
         self.message = msg.into();
         self.color = color;

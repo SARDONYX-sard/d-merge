@@ -11,11 +11,13 @@
 //! Anything else is shown as plain text. A full CommonMark renderer would be overkill here.
 
 /// The color of a class name in lists and tooltips.
+#[inline]
 pub const fn class_color(visuals: &egui::Visuals) -> egui::Color32 {
     if visuals.dark_mode { egui::Color32::from_rgb(86, 182, 194) } else { egui::Color32::from_rgb(0, 110, 130) }
 }
 
 /// The color of an object's name in lists and tooltips.
+#[inline]
 pub const fn name_color(visuals: &egui::Visuals) -> egui::Color32 {
     if visuals.dark_mode { egui::Color32::from_rgb(229, 192, 123) } else { egui::Color32::from_rgb(150, 90, 0) }
 }

@@ -28,8 +28,7 @@ impl PatchSettings {
     ///
     /// Centralizes the `match self.behavior.mode { … }` branch so
     /// call-sites never repeat it.
-    #[inline]
-    pub const fn current_mod_list_settings(&self) -> &ModListSettings {
+    pub(crate) const fn current_mod_list_settings(&self) -> &ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &self.vfs,
             DataMode::Manual => &self.manual,
@@ -37,8 +36,7 @@ impl PatchSettings {
     }
 
     /// Returns a mutable reference to the active [`ModeSettings`].
-    #[inline]
-    pub const fn current_mod_list_settings_mut(&mut self) -> &mut ModListSettings {
+    pub(crate) const fn current_mod_list_settings_mut(&mut self) -> &mut ModListSettings {
         match self.behavior.mode {
             DataMode::Vfs => &mut self.vfs,
             DataMode::Manual => &mut self.manual,

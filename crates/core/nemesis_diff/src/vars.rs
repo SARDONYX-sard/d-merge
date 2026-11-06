@@ -36,7 +36,7 @@ impl VariableType {
     pub const ALL: [Self; 5] = [Self::Bool, Self::Int8, Self::Int16, Self::Int32, Self::Real];
 
     /// e.g. `VARIABLE_TYPE_REAL`
-    pub const fn havok_name(self) -> &'static str {
+    pub(crate) const fn havok_name(self) -> &'static str {
         match self {
             Self::Bool => "VARIABLE_TYPE_BOOL",
             Self::Int8 => "VARIABLE_TYPE_INT8",
@@ -171,6 +171,7 @@ pub fn push(object: &str, param: &str, element: &[&str]) -> Option<String> {
 }
 
 /// Removes element `index` of array `param` of `object`.
+#[inline]
 pub fn remove(object: &str, param: &str, index: usize) -> Option<String> {
     let mut array = Array::find(object, param)?;
     (index < array.elements.len()).then(|| array.elements.remove(index))?;

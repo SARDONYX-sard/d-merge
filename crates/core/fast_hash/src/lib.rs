@@ -31,7 +31,7 @@ pub type IndexMap<K, V, S = RandomState> = indexmap::IndexMap<K, V, S>;
 
 /// [`indexmap::IndexSet`] with [`RandomState`].
 #[cfg(feature = "indexmap")]
-pub type IndexSet<T, S = RandomState> = indexmap::IndexSet<T, S>;
+pub(crate) type IndexSet<T, S = RandomState> = indexmap::IndexSet<T, S>;
 
 /// [`dashmap::DashMap`] with [`RandomState`].
 #[cfg(feature = "dashmap")]

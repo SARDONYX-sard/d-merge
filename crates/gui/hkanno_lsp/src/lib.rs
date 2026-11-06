@@ -44,6 +44,7 @@ const NULL_STR: &str = "\u{2400}";
 /// let lines: Vec<&str> = hkanno_lsp::lines("a\r\nb").collect();
 /// assert_eq!(lines, ["a", "b"]);
 /// ```
+#[inline]
 pub fn lines(text: &str) -> impl Iterator<Item = &str> {
     text.split('\n').map(|line| line.strip_suffix('\r').unwrap_or(line))
 }

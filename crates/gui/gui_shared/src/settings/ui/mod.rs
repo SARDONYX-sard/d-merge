@@ -64,6 +64,7 @@ impl Page {
     pub const ALL: [Self; 4] = [Self::Patch, Self::PatchEditor, Self::Convert, Self::Hkanno];
 
     /// Router path. e.g., `/convert`
+    #[inline]
     pub const fn path(self) -> &'static str {
         match self {
             Self::Patch => "/patch",
@@ -117,6 +118,7 @@ pub struct WindowGeometry {
 }
 
 impl Default for WindowGeometry {
+    #[inline]
     fn default() -> Self {
         Self { pos_x: 100.0, pos_y: 100.0, width: 1280.0, height: 720.0, maximized: false }
     }

@@ -50,7 +50,6 @@ fn classify(mod_dir: &Path, path: &Path) -> Option<Category> {
     }
 }
 
-#[inline]
 fn is_txt_file(file_name: impl AsRef<Path>) -> bool {
     file_name.as_ref().extension().is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
 }

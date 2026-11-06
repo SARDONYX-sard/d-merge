@@ -128,7 +128,7 @@ impl<'a> Hkanno<'a> {
     ///
     /// # Errors
     /// If missing/multiple `hkaSplineCompressedAnimation`.
-    pub fn write_to_classmap(self, class_map: &mut ClassMap<'a>) -> Result<(), HkannoError> {
+    pub(crate) fn write_to_classmap(self, class_map: &mut ClassMap<'a>) -> Result<(), HkannoError> {
         use havok_classes::Classes;
         use havok_types::{I32, StringPtr};
 
@@ -370,7 +370,7 @@ fn parse_float_prefix(s: &str) -> f32 {
 /// - [`HkannoError::MissingHkaAnimationClass`] – no `hkaAnimation` found in the `ClassMap`.
 /// - [`HkannoError::MultipleHkaAnimationFound`] – more than one found.
 /// - [`HkannoError::UnsupportedI32Variant`] – the number-of-frames field is an unsupported variant (`EventId` or `VariableId`).
-pub fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, HkannoError> {
+pub(crate) fn parse_hkanno_borrowed<'a>(class_map: ClassMap<'a>) -> Result<Hkanno<'a>, HkannoError> {
     use havok_types::I32;
 
     // Find the one `hkaAnimation`

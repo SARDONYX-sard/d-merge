@@ -42,6 +42,7 @@ impl OutputFormat {
     pub const ALL: [Self; 4] = [Self::Amd64, Self::Win32, Self::Xml, Self::Json];
 
     /// Label shown in the UI. e.g., `HKX SE (64-bit)`
+    #[inline]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Amd64 => "HKX SE (64-bit)",
@@ -52,6 +53,7 @@ impl OutputFormat {
     }
 
     /// File extension written for this format. e.g., `hkx`
+    #[inline]
     pub const fn extension(self) -> &'static str {
         match self {
             Self::Amd64 | Self::Win32 => "hkx",

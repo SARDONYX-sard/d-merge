@@ -15,7 +15,7 @@ pub struct LinePos {
 
 impl LinePos {
     /// Char index -> line/column. Indices past the end clamp to the end.
-    pub fn from_char_index(text: &str, index: usize) -> Self {
+    pub(crate) fn from_char_index(text: &str, index: usize) -> Self {
         let mut pos = Self { line: 0, column: 0 };
         for c in text.chars().take(index) {
             if c == '\n' {
@@ -42,6 +42,7 @@ impl LinePos {
 }
 
 /// Char index -> byte offset (clamped to the text end).
+#[inline]
 pub fn char_to_byte(text: &str, index: usize) -> usize {
     text.char_indices().nth(index).map_or(text.len(), |(i, _)| i)
 }

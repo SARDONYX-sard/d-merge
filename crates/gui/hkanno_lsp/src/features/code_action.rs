@@ -49,7 +49,7 @@ pub fn code_action(text: &str, diagnostic: &Diagnostic) -> Option<CodeAction> {
 /// e.g., `{"Duratoin":0.5}` -> `{"Duration":0.5}`
 ///
 /// When several keys exist, the last value wins (same as the former TS implementation).
-pub fn fix_iframe_key(json: &str) -> Option<String> {
+pub(crate) fn fix_iframe_key(json: &str) -> Option<String> {
     let object = serde_json::from_str::<serde_json::Value>(json.trim()).ok()?;
     let value = object.as_object()?.values().next_back()?.clone();
 

@@ -50,6 +50,7 @@ pub struct ModListSettings {
 }
 
 impl Default for ModListSettings {
+    #[inline]
     fn default() -> Self {
         Self { skyrim_data_dir: String::new(), output_dir: "./d_merge_output".into(), mod_list: Vec::new() }
     }
@@ -88,6 +89,7 @@ pub struct ViewState {
 }
 
 impl Default for ViewState {
+    #[inline]
     fn default() -> Self {
         Self { filter_text: String::new(), filter_column: None, sort_column: SortColumn::Priority, sort_asc: true }
     }

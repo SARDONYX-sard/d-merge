@@ -16,10 +16,12 @@ pub struct Checkbox<'a> {
 }
 
 impl<'a> Checkbox<'a> {
+    #[inline]
     pub fn new(checked: &'a mut bool, text: impl Into<egui::WidgetText>) -> Self {
         Self { checked, text: text.into(), indeterminate: false }
     }
 
+    #[inline]
     pub fn without_text(checked: &'a mut bool) -> Self {
         Self::new(checked, egui::WidgetText::default())
     }
@@ -28,6 +30,7 @@ impl<'a> Checkbox<'a> {
     ///
     /// Purely visual (e.g., a tree node whose children are only partly checked);
     /// clicking still toggles `checked`.
+    #[inline]
     pub const fn indeterminate(mut self, indeterminate: bool) -> Self {
         self.indeterminate = indeterminate;
         self
@@ -133,6 +136,7 @@ pub struct RadioButton {
 }
 
 impl RadioButton {
+    #[inline]
     pub fn new(checked: bool, text: impl Into<egui::WidgetText>) -> Self {
         Self { checked, text: text.into() }
     }
@@ -204,6 +208,7 @@ impl egui::Widget for RadioButton {
 pub struct ToggleGroup;
 
 impl ToggleGroup {
+    #[inline]
     pub const fn new() -> Self {
         Self
     }
@@ -319,6 +324,7 @@ impl std::fmt::Debug for Slider<'_> {
 }
 
 impl<'a> Slider<'a> {
+    #[inline]
     pub fn new<Num: egui::emath::Numeric>(value: &'a mut Num, range: std::ops::RangeInclusive<Num>) -> Self {
         let get_set_value = move |v: Option<f64>| {
             if let Some(v) = v {
@@ -341,36 +347,42 @@ impl<'a> Slider<'a> {
     }
 
     /// Show a text field showing the current value? Default: `true`.
+    #[inline]
     pub const fn show_value(mut self, show_value: bool) -> Self {
         self.show_value = show_value;
         self
     }
 
     /// Show a prefix before the number, e.g. "x: "
+    #[inline]
     pub fn prefix(mut self, prefix: impl ToString) -> Self {
         self.prefix = prefix.to_string();
         self
     }
 
     /// Add a suffix to the number, this can be e.g. a unit ("°" or " m")
+    #[inline]
     pub fn suffix(mut self, suffix: impl ToString) -> Self {
         self.suffix = suffix.to_string();
         self
     }
 
     /// Show a text next to the slider (e.g. explaining what the slider controls).
+    #[inline]
     pub fn text(mut self, text: impl Into<egui::WidgetText>) -> Self {
         self.text = text.into();
         self
     }
 
     /// Sets the minimal change of the value. `0.0` means no step.
+    #[inline]
     pub fn step_by(mut self, step: f64) -> Self {
         self.step = (step != 0.0).then_some(step);
         self
     }
 
     /// Set the number of decimals to display. Default: 0 for integers, 2 otherwise.
+    #[inline]
     pub const fn fixed_decimals(mut self, num_decimals: usize) -> Self {
         self.decimals = Some(num_decimals);
         self
@@ -379,6 +391,7 @@ impl<'a> Slider<'a> {
     // ── Extensions (not in egui) ────────────────────────────────
 
     /// Track width. Default: `min(available_width, 200)` (egui uses `spacing().slider_width`).
+    #[inline]
     pub const fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self

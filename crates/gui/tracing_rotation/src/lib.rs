@@ -38,16 +38,13 @@ use crate::{
 
 /// NOTE: For some reason, the last data written using [`io::BufWriter`] isn't flushed properly.
 #[derive(Clone)]
-#[expect(missing_debug_implementations)]
-pub struct SwappableWriter(Arc<Mutex<File>>);
+pub(crate) struct SwappableWriter(Arc<Mutex<File>>);
 
 impl SwappableWriter {
-    #[inline]
     fn new(file: File) -> Self {
         Self(Arc::new(Mutex::new(file)))
     }
 
-    #[inline]
     pub(crate) fn swap(&self, file: File) -> Result<()> {
         let mut guard = self.0.lock();
         guard.flush().ok();
@@ -58,12 +55,10 @@ impl SwappableWriter {
 }
 
 impl io::Write for SwappableWriter {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.lock().write(buf)
     }
 
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.0.lock().flush()
     }
@@ -72,7 +67,6 @@ impl io::Write for SwappableWriter {
 impl<'a> fmt_layer::MakeWriter<'a> for SwappableWriter {
     type Writer = Self;
 
-    #[inline]
     fn make_writer(&'a self) -> Self::Writer {
         self.clone()
     }
@@ -85,7 +79,6 @@ trait LevelReloader: Send + Sync + 'static {
 struct HandleReloader<S>(reload::Handle<LevelFilter, S>);
 
 impl<S: 'static + Send + Sync> LevelReloader for HandleReloader<S> {
-    #[inline]
     fn reload(&self, filter: LevelFilter) -> Result<()> {
         self.0.modify(|f| *f = filter).map_err(|e| Error::Reload { source: e })
     }
@@ -95,7 +88,7 @@ impl<S: 'static + Send + Sync> LevelReloader for HandleReloader<S> {
 ///
 /// Cheap to clone; every clone shares the same internal state.
 #[derive(Clone)]
-pub struct RotationHandle {
+pub(crate) struct RotationHandle {
     reloader: Arc<dyn LevelReloader>,
     writer: SwappableWriter,
     max_files: usize,
@@ -107,8 +100,7 @@ impl RotationHandle {
     /// # Errors
     /// [`Error::NotInit`] if the handle was not properly initialized via
     /// [`global::init`] or [`Builder::build`].
-    #[inline]
-    pub fn set_level(&self, level: &str) -> Result<()> {
+    pub(crate) fn set_level(&self, level: &str) -> Result<()> {
         let new = LevelFilter::from_str(level).unwrap_or_else(|_| {
             tracing::warn!("Unknown log level `{level}`, falling back to ERROR");
             LevelFilter::ERROR
@@ -122,8 +114,7 @@ impl RotationHandle {
     /// - [`Error::NotInit`] if the handle was not properly initialized via
     ///   [`global::init`] or [`Builder::build`].
     /// - Any I/O error encountered during rotation or file creation
-    #[inline]
-    pub fn set_path(&self, log_dir: impl AsRef<Path>, log_stem: &str) -> Result<()> {
+    pub(crate) fn set_path(&self, log_dir: impl AsRef<Path>, log_stem: &str) -> Result<()> {
         let file = rotate_files(log_dir, log_stem, self.max_files)?;
         self.writer.swap(file)
     }
@@ -137,7 +128,7 @@ impl fmt::Debug for RotationHandle {
 
 /// Builder for [`RotationLayer`].
 #[derive(Debug)]
-pub struct RotationBuilder {
+pub(crate) struct RotationBuilder {
     pub log_dir: PathBuf,
     pub log_file: String,
     pub max_files: usize,

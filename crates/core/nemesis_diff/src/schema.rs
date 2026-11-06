@@ -17,6 +17,7 @@ pub fn class_names() -> Vec<&'static str> {
 }
 
 /// The class of an `<hkobject .. class="x" ..>` line.
+#[inline]
 pub fn class_of_line(line: &str) -> Option<&str> {
     attribute(line, "class")
 }
@@ -56,6 +57,7 @@ pub fn type_of_path(path: &str) -> Option<String> {
 }
 
 /// The fields written in XML (not `SERIALIZE_IGNORED`), in order.
+#[inline]
 pub fn xml_fields(class: &str) -> impl Iterator<Item = &'static FieldSchema> {
     find_class_schema(class).into_iter().flat_map(|c| c.fields.iter()).filter(|f| !f.serialize_ignored)
 }
@@ -213,6 +215,7 @@ pub fn missing_fields(object: &str) -> Vec<&'static str> {
 }
 
 /// `<signature of the class>`, e.g. `hkbModifierList` -> `0xa4180ca1`.
+#[inline]
 pub fn class_signature(class: &str) -> Option<&'static str> {
     find_class_schema(class).map(|schema| schema.signature)
 }
@@ -257,7 +260,7 @@ fn same_signature(a: &str, b: &str) -> bool {
 }
 
 /// Is `class` `base` or one of its subclasses?
-pub fn is_subclass(class: &str, base: &str) -> bool {
+pub(crate) fn is_subclass(class: &str, base: &str) -> bool {
     let mut current = Some(class);
     while let Some(name) = current {
         if name == base {
@@ -286,16 +289,19 @@ pub fn field_context(object: &str, line: usize) -> Option<(&'static str, Vec<&'s
 /// only has the pointers, so the line alone does not tell what they should be.
 ///
 /// e.g. the line of `#0107` in `<hkparam name="modifiers" numelements="2">\n#0107\n#0108\n</hkparam>`
+#[inline]
 pub fn open_pointer_field(object: &str, line: usize) -> Option<&'static FieldSchema> {
     open_field(object, line).filter(|field| holds_pointers(field))
 }
 
 /// Does `field` hold pointers: itself, or as an array of them?
+#[inline]
 pub fn holds_pointers(field: &FieldSchema) -> bool {
     field.kind == TypeKind::Pointer || field.sub_kind == TypeKind::Pointer
 }
 
 /// Is `field` an array of strings, whose elements are `<hkcstring>a</hkcstring>`?
+#[inline]
 pub const fn holds_strings(field: &FieldSchema) -> bool {
     matches!(field.kind, TypeKind::Array | TypeKind::SimpleArray)
         && matches!(field.sub_kind, TypeKind::CString | TypeKind::StringPtr)
@@ -323,6 +329,7 @@ pub fn open_field(object: &str, line: usize) -> Option<&'static FieldSchema> {
 }
 
 /// Can a pointer of `field` point to an object of `class`? Any object, if it does not say.
+#[inline]
 pub fn pointer_accepts(field: &FieldSchema, class: &str) -> bool {
     field.class.is_none_or(|expected| is_subclass(class, expected))
 }
@@ -430,7 +437,7 @@ pub struct PointerProblem {
 /// The mod a pointer's object is from, if it is a new object of a mod and not `own_code`'s.
 ///
 /// e.g. `#amco$17` with `upatch` -> `amco`; `#upatch$0` with `upatch`, or `#0106` -> `None`.
-pub fn other_mod_of_pointer<'a>(pointer: &'a str, own_code: &str) -> Option<&'a str> {
+pub(crate) fn other_mod_of_pointer<'a>(pointer: &'a str, own_code: &str) -> Option<&'a str> {
     let (code, _) = pointer.strip_prefix('#')?.split_once('$')?;
     (!code.eq_ignore_ascii_case(own_code)).then_some(code)
 }

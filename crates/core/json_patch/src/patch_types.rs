@@ -59,8 +59,7 @@ impl Action {
     ///
     /// # Errors
     /// If the kind is `Pure`/ `SeqPush`
-    #[inline]
-    pub fn try_as_seq(&self) -> Result<(Op, Range<usize>), JsonPatchError> {
+    pub(crate) fn try_as_seq(&self) -> Result<(Op, Range<usize>), JsonPatchError> {
         match self {
             Self::Seq { op, range } => Ok((*op, range.clone())),
             _ => Err(JsonPatchError::ExpectedSeq { unexpected: self.clone() }),

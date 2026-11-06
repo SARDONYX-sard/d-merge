@@ -78,6 +78,7 @@ impl StatusMode {
 
     /// Badge color (One Dark palette, like Neovim status lines: Normal blue, Insert green,
     /// Visual purple, Command yellow).
+    #[inline]
     pub const fn color(self) -> egui::Color32 {
         match self {
             Self::Normal => egui::Color32::from_rgb(97, 175, 239),
@@ -122,7 +123,7 @@ pub struct KeymapState {
 
 impl KeymapState {
     /// Vim settings, e.g., the Insert-mode escape sequences (`jk`, ...).
-    pub const fn vim_options_mut(&mut self) -> &mut vim::VimOptions {
+    pub(crate) const fn vim_options_mut(&mut self) -> &mut vim::VimOptions {
         &mut self.vim.options
     }
 
@@ -194,6 +195,7 @@ impl KeymapState {
 
     /// The status line (mode + details), or `None` if the keymap has no modes.
     /// Draw it with [`crate::status_line`].
+    #[inline]
     pub fn status(&self, keymap: Keymap) -> Option<StatusLine> {
         match keymap {
             Keymap::Normal => None,

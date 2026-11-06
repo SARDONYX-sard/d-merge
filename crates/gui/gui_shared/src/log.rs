@@ -73,5 +73,5 @@ impl From<LogLevel> for tracing::Level {
     }
 }
 
-pub const LOG_DIR: &str = ".d_merge/logs";
+pub(crate) const LOG_DIR: &str = ".d_merge/logs";
 pub const LOG_FILENAME: &str = "d_merge.log";

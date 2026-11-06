@@ -6,7 +6,7 @@ use json_patch::{JsonPatchError, ValueWithPriority, apply_seq_array_directly};
 use rayon::prelude::*;
 use simd_json::{base::ValueTryAsArrayMut, borrowed::Value, serde::from_borrowed_value};
 
-pub use self::{anim_infos::*, attacks::*};
+pub(crate) use self::{anim_infos::*, attacks::*};
 use crate::{
     asdsf::{normal::AnimSetData, patch::de::error::Error},
     common_parser::lines::Str,

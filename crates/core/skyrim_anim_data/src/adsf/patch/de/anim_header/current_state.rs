@@ -38,7 +38,6 @@ pub(super) struct PartialProjectAssets<'input> {
 }
 
 impl<'de> CurrentState<'de> {
-    #[inline]
     pub(super) fn new() -> Self {
         Self { line_kinds: LINE_KINDS.iter(), current_kind: None, flags: DiffFlags::new(), patch: None }
     }

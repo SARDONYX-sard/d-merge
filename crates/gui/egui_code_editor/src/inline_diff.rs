@@ -46,6 +46,7 @@ impl CharChange {
     ///
     /// e.g., `n>1<` and `n>25<`: `1` is chars 2..3, `25` is chars 2..4.
     #[must_use]
+    #[inline]
     pub fn between(old: &str, new: &str) -> Self {
         let (old_len, new_len) = (old.chars().count(), new.chars().count());
         let start = old.chars().zip(new.chars()).take_while(|(a, b)| a == b).count();

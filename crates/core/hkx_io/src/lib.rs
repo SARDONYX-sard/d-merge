@@ -33,9 +33,9 @@ pub use serde_hkx::{EventIdMap, VariableIdMap, bytes::serde::hkx_header::HkxHead
 pub use serde_hkx_features::{ClassMap, Format};
 
 /// Deserialization error of `serde_hkx`.
-pub type DeError = serde_hkx::errors::de::Error;
+pub(crate) type DeError = serde_hkx::errors::de::Error;
 /// Serialization error of `serde_hkx`.
-pub type SerError = serde_hkx::errors::ser::Error;
+pub(crate) type SerError = serde_hkx::errors::ser::Error;
 
 /// `.hkx` bytes -> classes.
 ///
@@ -160,6 +160,7 @@ pub fn convert(
 ///
 /// # Errors
 /// The file cannot be read.
+#[inline]
 pub fn read_file(path: &Path) -> serde_hkx_features::Result<Vec<u8>> {
     std::fs::read(path).map_err(|err| serde_hkx_features::error::Error::from(err).with_path(path))
 }

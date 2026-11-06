@@ -42,6 +42,7 @@ use crate::{hash::hash_djb2, path::infer::generate_output_path};
 /// The (de)serialization of every havok class is generic code; whatever instantiates it gets a
 /// copy (~15 MB in a non-LTO build). So this function is not generic (`status_sender` is a trait
 /// object) and returns a boxed future: a plain `async fn` body would be built in the caller crate.
+#[inline]
 pub fn convert(
     inputs: Vec<String>,
     output: Option<String>,

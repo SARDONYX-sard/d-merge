@@ -14,25 +14,29 @@ pub struct FieldType {
 
 impl FieldType {
     /// A struct field of `class`, e.g. `hkbEventProperty`.
+    #[inline]
     pub const fn object(class: &'static str) -> Self {
         Self { kind: TypeKind::Struct, sub_kind: TypeKind::Void, class: Some(class) }
     }
 
     /// A single pointer.
-    pub const POINTER: Self = Self { kind: TypeKind::Pointer, sub_kind: TypeKind::Void, class: None };
+    pub(crate) const POINTER: Self = Self { kind: TypeKind::Pointer, sub_kind: TypeKind::Void, class: None };
 
     /// The type of one element of this array.
+    #[inline]
     pub const fn element(self) -> Self {
         Self { kind: self.sub_kind, sub_kind: TypeKind::Void, class: self.class }
     }
 
     /// Read as a string (`<hkcstring>` in arrays): text, enums and flags.
+    #[inline]
     pub const fn is_string(self) -> bool {
         matches!(self.kind, TypeKind::Char | TypeKind::CString | TypeKind::StringPtr | TypeKind::Enum | TypeKind::Flags)
     }
 }
 
 impl From<&FieldSchema> for FieldType {
+    #[inline]
     fn from(field: &FieldSchema) -> Self {
         Self { kind: field.kind, sub_kind: field.sub_kind, class: field.class }
     }

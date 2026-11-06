@@ -17,6 +17,7 @@ impl EditorMode {
     pub const ALL: [Self; 2] = [Self::Normal, Self::Vim];
 
     /// Label shown in the UI.
+    #[inline]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Normal => "Normal",

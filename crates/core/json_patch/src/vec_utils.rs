@@ -44,7 +44,6 @@ pub(crate) trait SmartIntoIter {
 // === Vec<T> Implementation ===
 
 impl<T: Send> SmartExtend<T> for Vec<T> {
-    #[inline]
     fn smart_extend<I>(&mut self, iter: I)
     where
         I: SmartIntoIter<Item = T>,
@@ -71,7 +70,6 @@ where
     type Item = T;
     type Iter = I::IntoIter;
 
-    #[inline]
     fn smart_iter(self) -> Self::Iter {
         self.into_iter()
     }
@@ -88,7 +86,6 @@ where
     type Item = T;
     type Iter = I::Iter;
 
-    #[inline]
     fn smart_iter(self) -> Self::Iter {
         self.into_par_iter()
     }
@@ -118,7 +115,6 @@ impl<'a, T> SmartIterMut<'a, T> for &'a mut Vec<T> {
     type Item = &'a mut T;
     type Iter = std::slice::IterMut<'a, T>;
 
-    #[inline]
     fn smart_iter_mut(self) -> Self::Iter {
         self.iter_mut()
     }
@@ -129,7 +125,6 @@ impl<'a, T: Send> SmartIterMut<'a, T> for &'a mut Vec<T> {
     type Item = &'a mut T;
     type Iter = rayon::slice::IterMut<'a, T>;
 
-    #[inline]
     fn smart_iter_mut(self) -> Self::Iter {
         self.par_iter_mut()
     }
@@ -140,7 +135,6 @@ impl<'a, T> SmartIterMut<'a, T> for &'a mut [T] {
     type Item = &'a mut T;
     type Iter = std::slice::IterMut<'a, T>;
 
-    #[inline]
     fn smart_iter_mut(self) -> Self::Iter {
         self.iter_mut()
     }
@@ -151,7 +145,6 @@ impl<'a, T: Send> SmartIterMut<'a, T> for &'a mut [T] {
     type Item = &'a mut T;
     type Iter = rayon::slice::IterMut<'a, T>;
 
-    #[inline]
     fn smart_iter_mut(self) -> Self::Iter {
         self.par_iter_mut()
     }

@@ -16,13 +16,13 @@ use super::{
 const TRIGGER_CHROME: f32 = 36.0;
 /// What a menu row has beside its text: the padding, the check mark, a scroll bar.
 const ITEM_CHROME: f32 = 40.0;
-/// The button is at least this wide, however short its text.
+/// Default of [`ComboBox::min_width`].
 const MIN_TRIGGER_WIDTH: f32 = 72.0;
-/// The button is at most this wide unless [`ComboBox::width`] says otherwise: longer text is clipped.
+/// Default of [`ComboBox::max_width`].
 const MAX_TRIGGER_WIDTH: f32 = 320.0;
-/// The menu shows long items whole up to this width, however narrow the button.
+/// Default of [`ComboBox::max_menu_width`].
 const MAX_MENU_WIDTH: f32 = 480.0;
-/// The height of the button.
+/// Default of [`ComboBox::trigger_height`].
 const TRIGGER_HEIGHT: f32 = 32.0;
 
 /// [`egui::UiStackInfo`] tag telling [`Button::selectable`] to render as a menu item.
@@ -72,21 +72,28 @@ pub struct ComboBox {
     no_results_text: egui::WidgetText,
     /// The width of the text of the widest item, if the items are known. See [`Self::show_index`].
     widest_item: Option<f32>,
+    min_width: f32,
+    max_width: f32,
+    max_menu_width: f32,
+    trigger_height: f32,
 }
 
 impl ComboBox {
     /// Create new [`ComboBox`] with id and label
+    #[inline]
     pub fn new(id_salt: impl egui::AsIdSalt, label: impl Into<egui::WidgetText>) -> Self {
         Self { label: Some(label.into()), ..Self::from_id_salt(id_salt) }
     }
 
     /// Label shown next to the combo box
+    #[inline]
     pub fn from_label(label: impl Into<egui::WidgetText>) -> Self {
         let label = label.into();
         Self::new(label.text().to_owned(), label)
     }
 
     /// Without label.
+    #[inline]
     pub fn from_id_salt(id_salt: impl egui::AsIdSalt) -> Self {
         Self {
             id_salt: egui::IdSalt::new(id_salt),
@@ -99,22 +106,58 @@ impl ComboBox {
             search_hint: None,
             no_results_text: "No results found".into(),
             widest_item: None,
+            min_width: MIN_TRIGGER_WIDTH,
+            max_width: MAX_TRIGGER_WIDTH,
+            max_menu_width: MAX_MENU_WIDTH,
+            trigger_height: TRIGGER_HEIGHT,
         }
     }
 
     /// Set the outer width of the button and menu. Without it, they are as wide as what they show.
+    #[inline]
     pub const fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self
     }
 
     /// Set the maximum outer height of the menu (scrolls beyond it).
+    #[inline]
     pub const fn height(mut self, height: f32) -> Self {
         self.height = Some(height);
         self
     }
 
+    /// The button is at least this wide, however short its text. Default: `72.0`.
+    #[inline]
+    pub const fn min_width(mut self, min_width: f32) -> Self {
+        self.min_width = min_width;
+        self
+    }
+
+    /// The button is at most this wide unless [`Self::width`] says otherwise: longer text is clipped.
+    /// Default: `320.0`.
+    #[inline]
+    pub const fn max_width(mut self, max_width: f32) -> Self {
+        self.max_width = max_width;
+        self
+    }
+
+    /// The menu shows long items whole up to this width, however narrow the button. Default: `480.0`.
+    #[inline]
+    pub const fn max_menu_width(mut self, max_menu_width: f32) -> Self {
+        self.max_menu_width = max_menu_width;
+        self
+    }
+
+    /// The height of the button. Default: `32.0`.
+    #[inline]
+    pub const fn trigger_height(mut self, trigger_height: f32) -> Self {
+        self.trigger_height = trigger_height;
+        self
+    }
+
     /// What we show as the currently selected value.
+    #[inline]
     pub fn selected_text(mut self, selected_text: impl Into<egui::WidgetText>) -> Self {
         self.selected_text = selected_text.into();
         self
@@ -123,6 +166,7 @@ impl ComboBox {
     /// Controls the close behavior for the popup.
     ///
     /// By default, `PopupCloseBehavior::CloseOnClick` will be used.
+    #[inline]
     pub const fn close_behavior(mut self, close_behavior: egui::PopupCloseBehavior) -> Self {
         self.close_behavior = Some(close_behavior);
         self
@@ -131,18 +175,21 @@ impl ComboBox {
     // ── Extensions (not in egui) ────────────────────────────────
 
     /// Muted text shown while `selected_text` is empty. Default: `"Select..."`.
+    #[inline]
     pub fn placeholder(mut self, placeholder: impl Into<egui::WidgetText>) -> Self {
         self.placeholder = placeholder.into();
         self
     }
 
     /// Makes [`Self::show_index`] searchable, with a search field showing this hint.
+    #[inline]
     pub fn search_hint(mut self, search_hint: impl Into<egui::WidgetText>) -> Self {
         self.search_hint = Some(search_hint.into());
         self
     }
 
     /// Text shown when a search matches nothing. Default: `"No results found"`.
+    #[inline]
     pub fn no_results_text(mut self, no_results_text: impl Into<egui::WidgetText>) -> Self {
         self.no_results_text = no_results_text.into();
         self
@@ -153,13 +200,13 @@ impl ComboBox {
         let text = self
             .widest_item
             .unwrap_or_else(|| selected_galley(ui, theme, &self.selected_text, &self.placeholder).size().x);
-        let fitting = (text + TRIGGER_CHROME).clamp(MIN_TRIGGER_WIDTH, MAX_TRIGGER_WIDTH);
+        let fitting = (text + TRIGGER_CHROME).min(self.max_width).max(self.min_width);
         self.width.unwrap_or(fitting).min(ui.available_width())
     }
 
     /// The inner width of the menu: at least the button's and `min`, and what its items need.
     fn menu_width(&self, trigger: f32, min: f32) -> f32 {
-        let items = self.widest_item.map_or(0.0, |text| (text + ITEM_CHROME).min(MAX_MENU_WIDTH));
+        let items = self.widest_item.map_or(0.0, |text| (text + ITEM_CHROME).min(self.max_menu_width));
         trigger.max(min).max(items)
     }
 
@@ -168,6 +215,7 @@ impl ComboBox {
     /// Show the combo box, with the given ui code for the menu contents.
     ///
     /// Returns `InnerResponse { inner: None }` if the combo box is closed.
+    #[inline]
     pub fn show_ui<R>(
         self,
         ui: &mut egui::Ui,
@@ -259,7 +307,7 @@ impl ComboBox {
         let chevron_width: f32 = 20.0;
         let width = self.trigger_width(ui, &theme);
 
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(width, TRIGGER_HEIGHT), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(width, self.trigger_height), egui::Sense::hover());
         let response = ui.interact(rect, ui.make_persistent_id(self.id_salt), egui::Sense::click());
 
         if ui.is_rect_visible(rect) {
@@ -345,7 +393,7 @@ impl ComboBox {
         let menu_height = self.height.unwrap_or(250.0);
 
         let id = ui.make_persistent_id(self.id_salt);
-        let (trigger_rect, _) = ui.allocate_exact_size(egui::vec2(width, TRIGGER_HEIGHT), egui::Sense::hover());
+        let (trigger_rect, _) = ui.allocate_exact_size(egui::vec2(width, self.trigger_height), egui::Sense::hover());
         let mut trigger = ui.interact(trigger_rect, id, egui::Sense::click());
 
         if ui.is_rect_visible(trigger_rect) {
@@ -713,6 +761,33 @@ mod tests {
         // It is in the list: that is no new value, whatever its case.
         assert_eq!(type_and_enter("defaultmale~1"), None);
         assert_eq!(type_and_enter("   "), None);
+    }
+
+    #[test]
+    fn the_limits_can_be_changed() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 900.0));
+        let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
+        let (mut narrow, mut wide) = (egui::Rect::NOTHING, egui::Rect::NOTHING);
+        let mut output = ctx.run_ui(input, |ui| {
+            let mut selected = 0;
+            narrow = ComboBox::from_id_salt("narrow")
+                .max_width(100.0)
+                .trigger_height(50.0)
+                .show_index(ui, &mut selected, LONG.len(), |i| LONG[i])
+                .rect;
+            wide = ComboBox::from_id_salt("wide")
+                .min_width(500.0)
+                .show_index(ui, &mut selected, SHORT.len(), |i| SHORT[i])
+                .rect;
+        });
+        output.textures_delta.clear();
+        assert!((narrow.width() - 100.0).abs() < 0.5, "{narrow:?}");
+        assert!((narrow.height() - 50.0).abs() < 0.5, "{narrow:?}");
+        assert!((wide.width() - 500.0).abs() < 0.5, "{wide:?}");
+
+        let combo = ComboBox { widest_item: Some(1000.0), ..ComboBox::from_id_salt("menu") };
+        assert_eq!(combo.max_menu_width(200.0).menu_width(100.0, 0.0), 200.0);
     }
 
     #[test]

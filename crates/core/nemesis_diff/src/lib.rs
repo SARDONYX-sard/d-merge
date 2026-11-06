@@ -212,11 +212,13 @@ fn line_hunks(before: &str, after: &str) -> Vec<Hunk> {
 /// changes on the text being edited: the line numbers are those of `new`.
 ///
 /// e.g., `a\nb\n` -> `a\nc\nd\n`: one hunk, `old` = `1..2` (`b`), `new` = `1..3` (`c`, `d`).
+#[inline]
 pub fn line_changes(old: &str, new: &str) -> Vec<Hunk> {
     line_hunks(old, new)
 }
 
 /// The changed blocks of an edited object (the `OPEN` blocks of its patch, in order).
+#[inline]
 pub fn hunks(template: &str, edited: &str) -> Vec<Hunk> {
     let before = normalize(template);
     line_hunks(&before, &align_numelements(&before, &normalize(edited)))
@@ -245,7 +247,7 @@ pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
 ///   a changed `<hkparam ...>` line would become a patch block where the parsers do not accept one.
 /// - An array that is empty in the template keeps its line, however its elements were written, so
 ///   that the patch only adds them instead of replacing the array: see [`kept_array`].
-pub fn align_numelements(template: &str, edited: &str) -> String {
+pub(crate) fn align_numelements(template: &str, edited: &str) -> String {
     // field name -> its `numelements` values in template order, and the line if it is an empty array
     let mut template_counts: HashMap<&str, Vec<(&str, Option<&str>)>> = HashMap::default();
     for line in template.lines() {
@@ -505,6 +507,7 @@ pub struct BehaviorDiff {
 }
 
 impl BehaviorDiff {
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.changed.is_empty() && self.added.is_empty()
     }
@@ -697,6 +700,7 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
 }
 
 /// Is `code` a valid Nemesis mod code? (4-6 ASCII letters/digits, not `vanilla`)
+#[inline]
 pub fn is_valid_mod_code(code: &str) -> bool {
     (4..=6).contains(&code.len())
         && code.chars().all(|c| c.is_ascii_alphanumeric())
