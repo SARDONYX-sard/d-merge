@@ -242,6 +242,7 @@ impl PatchTool {
                         self.focus_editor = Some(FocusAt::Line(line));
                     }
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        result.walk_history = history_buttons(ui, i18n, &self.history);
                         result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
                     });
                 });
@@ -282,11 +283,11 @@ impl PatchTool {
                 result.inline_revert = output.inline_revert;
                 result.command = output.command;
                 result.focus_tree = output.action == Some(ACTION_FOCUS_TREE);
-                result.walk_history = match output.action {
-                    Some(ACTION_BACK) => Some(true),
-                    Some(ACTION_FORWARD) => Some(false),
-                    _ => None,
-                };
+                match output.action {
+                    Some(ACTION_BACK) => result.walk_history = Some(true),
+                    Some(ACTION_FORWARD) => result.walk_history = Some(false),
+                    _ => {}
+                }
                 // Kept past the borrows of this frame, so owned here.
                 match output.navigation {
                     Some(Navigation::Definition(location)) => {
@@ -378,6 +379,30 @@ fn history_keys(ui: &egui::Ui) -> Option<bool> {
             None
         }
     })
+}
+
+/// `<-` `->` at the left of the tabs, which scroll without them. Returns `Some(true)` to go back,
+/// `Some(false)` to go forward. They are for those who don't know `Alt+Left` / `Alt+Right`, so their
+/// hovers tell.
+fn history_buttons(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    history: &crate::patch::editor::navigate::History,
+) -> Option<bool> {
+    let buttons = [
+        (true, Icon::ArrowLeft, I18nKey::NemesisGoBack, "Alt+←"),
+        (false, Icon::ArrowRight, I18nKey::NemesisGoForward, "Alt+→"),
+    ];
+    let mut walk = None;
+    for (older, icon, label, keys) in buttons {
+        let button = Button::new("").icon(icon).small();
+        let response = ui.add_enabled(history.can_walk(older), button);
+        let response = response.on_hover_text(format!("{} ({keys})", i18n.t(label)));
+        if response.clicked() {
+            walk = Some(older);
+        }
+    }
+    walk
 }
 
 /// `[ GetUpModList ✖ ] [ ● Root ✖ ]`. See [`crate::patch::editor::tabs`].

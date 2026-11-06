@@ -94,6 +94,8 @@ pub(crate) struct PatchTool {
     mod_dir: String,
     /// See [`Self::take_mod_written`].
     mod_written: bool,
+    /// A mod with several codes was opened: which of them? See [`ui::code_choice`].
+    code_choice: Option<ui::code_choice::ModCodeChoice>,
     /// See [`new_work`]. `Some`: its form is shown on the start screen.
     new_work: Option<new_work::NewWork>,
     mod_code: String,
@@ -385,6 +387,7 @@ impl PatchTool {
     }
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        self.code_choice_window(ui.ctx(), i18n, notify);
         if self.is_user_patch {
             self.user_patch_bar(ui, i18n, notify);
         } else if self.loaded_for.is_none() {
@@ -588,6 +591,60 @@ mod work_tests {
         let in_one = Workspace::exists(&workspace::cache_root_of(&dir.join("one").display().to_string()), "aaaa");
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(in_one);
+    }
+
+    /// A mod manager's mod with a patch directory for each of `codes`.
+    fn mod_with_codes(root: &Path, codes: &[&str]) {
+        for code in codes {
+            std::fs::create_dir_all(root.join("Nemesis_Engine/mod").join(code)).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_mod_with_several_codes_asks_which_one() {
+        let dir = std::env::temp_dir().join(format!("d_merge_code_choice_{}", std::process::id()));
+        let root = dir.join("Elden Counter");
+        mod_with_codes(&root, &["ecnpc", "ecdmg", "nemesis", "ab-cd"]);
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut tool = tool_in(&dir.join("out"));
+
+        tool.open_mod(&root, &mut notify, &i18n);
+        let opened_at_once = tool.loaded_for.clone();
+        let choice = tool
+            .code_choice
+            .as_ref()
+            .map(|choice| choice.codes.iter().map(|code| code.code.clone()).collect::<Vec<_>>());
+
+        tool.open_chosen_code("ecnpc", &mut notify, &i18n);
+        let opened = tool.loaded_for.clone();
+        let asked_again = tool.code_choice.is_some();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(opened_at_once, None);
+        assert_eq!(choice.unwrap(), ["ecdmg", "ecnpc", "nemesis"], "what can't be opened isn't offered");
+        assert_eq!(opened.as_deref(), Some("ecnpc"));
+        assert!(!asked_again);
+    }
+
+    #[test]
+    fn a_mod_with_one_code_or_a_patch_directory_opens_at_once() {
+        let dir = std::env::temp_dir().join(format!("d_merge_code_direct_{}", std::process::id()));
+        let (one, several) = (dir.join("one"), dir.join("several"));
+        mod_with_codes(&one, &["para"]);
+        mod_with_codes(&several, &["nemesis", "tudm"]);
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut tool = tool_in(&dir.join("out"));
+
+        tool.open_mod(&one, &mut notify, &i18n);
+        let of_one = (tool.loaded_for.clone(), tool.code_choice.is_some());
+
+        // The code of 7 letters, as Nemesis' own mod has it.
+        tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
+        let of_patch_dir = (tool.loaded_for.clone(), tool.code_choice.is_some());
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(of_one, (Some("para".to_owned()), false));
+        assert_eq!(of_patch_dir, (Some("nemesis".to_owned()), false));
     }
 
     /// `LspOptions` holds the keymap too: it must not put back the one it was given.

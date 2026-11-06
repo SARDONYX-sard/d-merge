@@ -11,10 +11,12 @@ use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::pages::patch_editor::RecentWork,
 };
-use nemesis_diff::is_valid_mod_code;
+use nemesis_diff::is_existing_mod_code;
 
 use crate::patch::{
-    FocusAt, PatchTool, SAVE_DELAY, editor, remember_recent, user_patch, workspace,
+    FocusAt, PatchTool, SAVE_DELAY, editor, remember_recent,
+    ui::code_choice::ModCodeChoice,
+    user_patch, workspace,
     workspace::{Behavior, Session, SessionTab, Workspace},
 };
 
@@ -92,7 +94,7 @@ impl PatchTool {
     /// Loads the work of the code when it changes, and saves pending edits.
     pub(in crate::patch) fn sync_workspace(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         let code = self.mod_code.trim();
-        if is_valid_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
+        if is_existing_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
             let code = code.to_owned();
             self.save_now(notify, i18n); // the previous workspace
             match Workspace::load(&self.cache_root, &code) {
@@ -245,15 +247,40 @@ impl PatchTool {
         }
     }
 
-    /// Opens a mod (its root or a patch directory), like VS Code a folder: the work on it goes on if
-    /// there is one, with its unexported edits. Else it is read, and exported back to where it is.
+    /// Opens a mod (its root or a patch directory). A work is of one mod code: of a root with several
+    /// of them, the one to open is asked for, see [`crate::patch::ui::code_choice`].
     pub(in crate::patch) fn open_mod(&mut self, selected: &Path, notify: &mut Notification, i18n: &I18nMap) {
+        let mut codes = workspace::mod_codes_of_root(selected);
+        codes.retain(|mod_code| {
+            is_existing_mod_code(&mod_code.code)
+                && !mod_code.code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE)
+        });
+        if codes.len() > 1 {
+            self.code_choice = Some(ModCodeChoice { root: selected.to_path_buf(), codes });
+            return;
+        }
+        let only = codes.first().and_then(|mod_code| workspace::patch_dir_of_code(selected, &mod_code.code));
+        self.open_patch_dir(only.as_deref().unwrap_or(selected), notify, i18n);
+    }
+
+    /// The answer to the question of [`Self::open_mod`].
+    pub(in crate::patch) fn open_chosen_code(&mut self, code: &str, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(choice) = self.code_choice.take() else { return };
+        match workspace::patch_dir_of_code(&choice.root, code) {
+            Some(dir) => self.open_patch_dir(&dir, notify, i18n),
+            None => notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), choice.root.display())),
+        }
+    }
+
+    /// Opens one mod code, like VS Code a folder: the work on it goes on if there is one, with its
+    /// unexported edits. Else it is read, and exported back to where it is.
+    fn open_patch_dir(&mut self, selected: &Path, notify: &mut Notification, i18n: &I18nMap) {
         let not_a_mod = |notify: &mut Notification| {
             notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), selected.display()));
         };
         let Some(root) = workspace::mod_root_of(selected) else { return not_a_mod(notify) };
         let code = workspace::code_of(selected);
-        if !is_valid_mod_code(&code) {
+        if !is_existing_mod_code(&code) {
             return not_a_mod(notify);
         }
         if code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) {

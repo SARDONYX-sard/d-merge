@@ -699,7 +699,16 @@ pub fn check_fields(object: &str) -> Vec<FieldProblem> {
     problems
 }
 
-/// Is `code` a valid Nemesis mod code? (4-6 ASCII letters/digits, not `vanilla`)
+/// Can a code be used of a mod that already exists? Any ASCII letters/digits, not `vanilla`.
+///
+/// Mods don't keep to what [`is_valid_mod_code`] asks of a new one, and Nemesis itself ships with
+/// `nemesis`. e.g. `nemesis`, `throwws`: yes. `ab-cd`, an empty one: no.
+#[inline]
+pub fn is_existing_mod_code(code: &str) -> bool {
+    !code.is_empty() && code.chars().all(|c| c.is_ascii_alphanumeric()) && !code.eq_ignore_ascii_case("vanilla")
+}
+
+/// Is `code` valid for a **new** Nemesis mod? (4-6 ASCII letters/digits, not `vanilla`)
 #[inline]
 pub fn is_valid_mod_code(code: &str) -> bool {
     (4..=6).contains(&code.len())
@@ -924,5 +933,16 @@ mod tests {
         assert!(!is_valid_mod_code("abc"));
         assert!(!is_valid_mod_code("vanilla"));
         assert!(!is_valid_mod_code("ab-cd"));
+    }
+
+    #[test]
+    fn existing_mods_have_longer_codes() {
+        assert!(!is_valid_mod_code("nemesis"));
+        assert!(is_existing_mod_code("nemesis"));
+        assert!(is_existing_mod_code("throwws"));
+        assert!(is_existing_mod_code("abc"));
+        assert!(!is_existing_mod_code(""));
+        assert!(!is_existing_mod_code("VANILLA"));
+        assert!(!is_existing_mod_code("ab-cd"));
     }
 }

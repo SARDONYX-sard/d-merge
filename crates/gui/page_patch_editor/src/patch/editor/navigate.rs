@@ -8,6 +8,7 @@
 //! | `F12`, `Ctrl+click`, `gd` | Open the object / line that defines the symbol       |
 //! | `Shift+F12`, `gD`         | List the places that use it (click one to go)        |
 //! | Vim `Ctrl+O` / `Ctrl+I`   | Back / forward through the visited objects           |
+//! | `Alt+Left` / `Alt+Right`  | The same, also the `<-` `->` buttons of the tab bar  |
 
 use egui_code_editor::References;
 
@@ -25,6 +26,11 @@ impl History {
             self.back.push(from.to_owned());
         }
         self.forward.clear();
+    }
+
+    /// Is there an object to go back (`older`) / forward to?
+    pub(in crate::patch) const fn can_walk(&self, older: bool) -> bool {
+        !(if older { &self.back } else { &self.forward }).is_empty()
     }
 
     /// The object to go back (`older`) / forward to, from `current`.
@@ -95,7 +101,9 @@ mod tests {
     #[test]
     fn history_goes_back_and_forward() {
         let mut history = History::default();
+        assert!(!history.can_walk(true) && !history.can_walk(false), "nowhere to go at the start");
         history.visit("#a"); // a -> b
+        assert!(history.can_walk(true) && !history.can_walk(false));
         history.visit("#b"); // b -> c
         assert_eq!(history.walk(true, "#c").as_deref(), Some("#b"));
         assert_eq!(history.walk(true, "#b").as_deref(), Some("#a"));

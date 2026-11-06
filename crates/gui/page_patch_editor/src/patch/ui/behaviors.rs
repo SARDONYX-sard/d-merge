@@ -18,7 +18,7 @@ use egui_widgets::{
     shadcn::{Button, Checkbox, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
-use nemesis_diff::is_valid_mod_code;
+use nemesis_diff::is_existing_mod_code;
 
 use crate::patch::{
     PatchTool,
@@ -102,7 +102,7 @@ impl PatchTool {
             ui.weak(i18n.t(I18nKey::NemesisNoBehavior));
             return None;
         }
-        let code = if is_valid_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
+        let code = if is_existing_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
         let mut event = None;
         egui::ScrollArea::vertical().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
             for (i, behavior) in self.workspace.behaviors.iter().enumerate() {

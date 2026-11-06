@@ -11,6 +11,8 @@ use egui::{Pos2, pos2};
 /// Lucide icons (ISC License: https://lucide.dev/license).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
+    ArrowLeft,
+    ArrowRight,
     Check,
     ChevronDown,
     ChevronRight,
@@ -41,6 +43,8 @@ impl Icon {
     /// Inner SVG XML (elements inside the 24x24 `<svg>` wrapper).
     const fn svg_data(self) -> &'static str {
         match self {
+            Self::ArrowLeft => r#"<path d="m12 19-7-7 7-7" /> <path d="M19 12H5" />"#,
+            Self::ArrowRight => r#"<path d="M5 12h14" /> <path d="m12 5 7 7-7 7" />"#,
             Self::Check => r#"<path d="M20 6 9 17l-5-5" />"#,
             Self::ChevronDown => r#"<path d="m6 9 6 6 6-6" />"#,
             Self::ChevronRight => r#"<path d="m9 18 6-6-6-6" />"#,

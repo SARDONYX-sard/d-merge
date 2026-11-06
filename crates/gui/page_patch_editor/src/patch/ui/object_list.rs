@@ -9,7 +9,7 @@
 
 use egui_widgets::shadcn::{Button, Icon, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
-use nemesis_diff::is_valid_mod_code;
+use nemesis_diff::is_existing_mod_code;
 use stdx::text::contains_ignore_case;
 
 use super::{
@@ -123,7 +123,7 @@ impl PatchTool {
     /// `[+] [⧉] [↶]`, drawn right to left. A new object is deleted, a template object goes back to
     /// the template. Anim sets can only be edited, not added; clip data adds clips ([`NewClipsForm`]).
     fn object_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
-        let code_ok = is_valid_mod_code(self.mod_code.trim()) && !asdsf;
+        let code_ok = is_existing_mod_code(self.mod_code.trim()) && !asdsf;
         let selected = self.selected.clone();
         let is_new =
             selected.as_ref().is_some_and(|id| self.workspace.behaviors[self.active].added.contains_key(&**id));
@@ -151,7 +151,7 @@ impl PatchTool {
         let hover = if adsf { I18nKey::NemesisNewClipsHover } else { I18nKey::NemesisNewObject };
         if ui
             .add_enabled(
-                code_ok || (adsf && is_valid_mod_code(self.mod_code.trim())),
+                code_ok || (adsf && is_existing_mod_code(self.mod_code.trim())),
                 Button::new("").icon(Icon::Plus).small(),
             )
             .on_hover_text(i18n.t(hover))

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 pub(in crate::patch) use stdx::path::joined;
 
-use super::read_dir;
+use super::{mod_info::parse_info, read_dir};
 
 /// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
 pub(super) const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
@@ -47,6 +47,37 @@ pub(crate) fn patch_dir_of_code(root: &Path, code: &str) -> Option<PathBuf> {
     code_dirs(root, code).into_iter().next()
 }
 
+/// A mod code in a mod's root, and the name its `info.ini` has for it.
+///
+/// e.g. `ecnpc`, `Elden Counter NPC`. The name is empty if it can't be read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ModCode {
+    pub(crate) code: String,
+    pub(crate) name: String,
+}
+
+/// All the mod codes of the mod whose root is `selected`, sorted, whichever engine has them: a code in
+/// both of them is one work. Empty if `selected` is no mod's root, e.g. a patch directory.
+///
+/// e.g. `mods/Elden Counter` containing `Nemesis_Engine/mod/{ecdmg,ecnpc}` -> `ecdmg`, `ecnpc`
+pub(crate) fn mod_codes_of_root(selected: &Path) -> Vec<ModCode> {
+    let mut codes: Vec<ModCode> = Vec::new();
+    for engine in ENGINES {
+        let mods = mods_dir(selected, engine);
+        let Ok(entries) = read_dir(&mods) else { continue };
+        for dir in entries.filter(|path| path.is_dir()) {
+            let code = file_name_of(&dir);
+            if !codes.iter().any(|known| known.code.eq_ignore_ascii_case(&code)) {
+                let info = std::fs::read_to_string(dir.join("info.ini")).ok();
+                let name = info.map(|info| parse_info(&info).name).unwrap_or_default();
+                codes.push(ModCode { code: code.into_owned(), name });
+            }
+        }
+    }
+    codes.sort_unstable_by(|a, b| stdx::text::cmp_ignore_case(&a.code, &b.code));
+    codes
+}
+
 /// The code of the mod at `selected` (its root or a patch directory). See [`mod_dir_of`].
 pub(crate) fn code_of(selected: &Path) -> String {
     file_name_of(&mod_dir_of(selected)).into_owned()
@@ -56,7 +87,7 @@ pub(crate) fn code_of(selected: &Path) -> String {
 ///
 /// e.g., `mods/Paraglider` containing `Nemesis_Engine/mod/para/` -> `.../Nemesis_Engine/mod/para`.
 /// A directory that is not a mod root is returned as is. If a mod has several codes, the first one
-/// by name is taken.
+/// by name is taken: to choose among them is for the one asking, see [`mod_codes_of_root`].
 ///
 /// The root is also where a later anim set generator finds `meshes/**/animations/*.hkx`.
 pub(super) fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {

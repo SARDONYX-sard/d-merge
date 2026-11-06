@@ -40,7 +40,7 @@ use self::{
 pub(crate) use self::{
     behavior::{ADSF, ASDSF, Behavior, ObjectText, STRING_DATA, Target},
     catalog::{TemplateEntry, catalog},
-    locations::{code_of, mod_root_of, patch_dir_of_code},
+    locations::{ModCode, code_of, mod_codes_of_root, mod_root_of, patch_dir_of_code},
     mod_info::ModInfo,
 };
 
@@ -499,6 +499,29 @@ mod tests {
         assert_eq!(kept, (true, true));
         assert_eq!(removed, (false, false));
         assert_eq!(kept_after, (true, true));
+    }
+
+    #[test]
+    fn the_codes_of_a_mod_are_listed_once_with_their_names() {
+        let dir = std::env::temp_dir().join(format!("d_merge_mod_codes_{}", std::process::id()));
+        let root = dir.join("Elden Counter");
+        let (npc, dmg, ext) = (
+            root.join("Nemesis_Engine/mod/ecnpc"),
+            root.join("Nemesis_Engine/mod/ecdmg"),
+            root.join("Nemesis_EngineExt/mod/ECNPC"),
+        );
+        for path in [&npc, &dmg, &ext] {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        std::fs::write(npc.join("info.ini"), "name=NPC counter\nauthor=a\n").unwrap();
+
+        let codes = mod_codes_of_root(&root);
+        let of_patch_dir = mod_codes_of_root(&npc);
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let code = |code: &str, name: &str| ModCode { code: code.to_owned(), name: name.to_owned() };
+        assert_eq!(codes, [code("ecdmg", ""), code("ecnpc", "NPC counter")]);
+        assert_eq!(of_patch_dir, []);
     }
 
     #[test]

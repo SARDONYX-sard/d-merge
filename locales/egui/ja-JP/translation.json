@@ -197,6 +197,7 @@
   "nemesis_anim_kind_set": "アニメーションセット",
   "nemesis_author_hover": "mod の作者です (info.ini の author)。",
   "nemesis_author_label": "作者:",
+  "nemesis_choose_mod_code": "この mod には複数の mod コードがあります。どれを開きますか?",
   "nemesis_need_patch_output": "先に Patch ページの出力ディレクトリを指定してください。作業データと User Patch はその中に保存します。Skyrim Data ディレクトリも指定できますが、意図しない上書きが起こる可能性があります。",
   "nemesis_user_patch_reserved": "User Patch は専用のウィンドウ (User Patch ボタン) で編集します。",
   "nemesis_version_label": "バージョン:",

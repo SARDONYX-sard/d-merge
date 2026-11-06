@@ -951,6 +951,9 @@ pub enum I18nKey {
     /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
     NemesisNotAMod,
 
+    /// This mod has several mod codes: which one to open?
+    NemesisChooseModCode,
+
     /// A work on another mod had this mod code: it was replaced by this mod
     NemesisWorkReplaced,
 
