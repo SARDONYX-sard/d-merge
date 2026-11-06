@@ -715,6 +715,39 @@ mod work_tests {
         assert_eq!(format, workspace::ExportFormat::Pandora);
     }
 
+    /// Vim `]c`: in the text while the inline diff shows, else in the preview.
+    #[test]
+    fn the_change_keys_go_to_what_shows_the_changes() {
+        let mut tool = PatchTool::default();
+        tool.inline_diff = editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n");
+        tool.preview_view = Some(editor::preview::Preview::new(
+            "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
+        ));
+        let current = |tool: &PatchTool| tool.preview_view.as_ref().map(|view| view.current);
+
+        tool.show_inline_diff = true;
+        tool.show_preview = true;
+        tool.step_change(true);
+        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
+        tool.cursor_line = 1;
+        tool.step_change(true);
+        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(3))));
+        tool.cursor_line = 3;
+        tool.step_change(false);
+        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
+        assert_eq!(current(&tool), Some(0), "the preview stays");
+
+        tool.focus_editor = None;
+        tool.show_inline_diff = false;
+        tool.step_change(true);
+        assert_eq!(current(&tool), Some(1));
+        assert!(tool.focus_editor.is_none(), "the cursor stays");
+
+        tool.show_preview = false;
+        tool.step_change(true);
+        assert_eq!(current(&tool), Some(1), "neither shows");
+    }
+
     /// The preview says what `Export` would write, and its `↶` takes back what it shows.
     #[test]
     fn the_preview_follows_the_export_format() {

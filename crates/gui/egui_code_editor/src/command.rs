@@ -52,10 +52,14 @@ pub enum EditorCommand {
     TogglePreview,
     /// Vim `<Space>d`, `:diff`: show or hide the changes inside the editor.
     ToggleInlineDiff,
+    /// Vim `]c`: the host's next change.
+    NextChange,
+    /// Vim `[c`: the host's previous change.
+    PreviousChange,
 }
 
 impl EditorCommand {
-    pub(crate) const ALL: [Self; 11] = [
+    pub(crate) const ALL: [Self; 13] = [
         Self::Save,
         Self::GoToDefinition,
         Self::FindReferences,
@@ -67,6 +71,8 @@ impl EditorCommand {
         Self::CloseTab,
         Self::TogglePreview,
         Self::ToggleInlineDiff,
+        Self::NextChange,
+        Self::PreviousChange,
     ];
 
     pub(crate) const fn action_id(self) -> &'static str {
@@ -82,6 +88,8 @@ impl EditorCommand {
             Self::CloseTab => "close_tab",
             Self::TogglePreview => "toggle_preview",
             Self::ToggleInlineDiff => "toggle_inline_diff",
+            Self::NextChange => "next_change",
+            Self::PreviousChange => "previous_change",
         }
     }
 

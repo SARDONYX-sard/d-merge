@@ -245,6 +245,8 @@ impl PatchTool {
             }
             Some(EditorCommand::TogglePreview) => self.show_preview = !self.show_preview,
             Some(EditorCommand::ToggleInlineDiff) => self.show_inline_diff = !self.show_inline_diff,
+            Some(EditorCommand::NextChange) => self.step_change(true),
+            Some(EditorCommand::PreviousChange) => self.step_change(false),
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
@@ -255,6 +257,21 @@ impl PatchTool {
             self.open_location(id, &document, line);
         }
         result.focus_tree || result.command == Some(EditorCommand::ToggleExplorer)
+    }
+
+    /// Vim `]c` / `[c`: to the next or previous changed place of what shows the changes, as its `▲ ▼` do.
+    /// The inline diff first, as it is where the cursor is. e.g. changes at lines 3 and 9: from 5, `]c` is 9.
+    pub(in crate::patch) fn step_change(&mut self, forward: bool) {
+        if self.show_inline_diff {
+            let line = editor::inline_diff::step(&self.inline_diff, self.cursor_line, forward);
+            if line.is_some() {
+                self.focus_editor = line.map(FocusAt::Line);
+            }
+        } else if self.show_preview
+            && let Some(view) = &mut self.preview_view
+        {
+            view.step(forward);
+        }
     }
 
     /// `↶` in the inline diff: puts a changed place back to the template.

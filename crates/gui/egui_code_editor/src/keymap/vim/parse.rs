@@ -281,7 +281,9 @@ const fn simple(keys: &[VimKey]) -> Step<Command> {
         [Ctrl('w'), ..] => Simple::Nop,
 
         // Two keys
-        [Char('r' | 'm' | 'q' | '@' | 'g' | 'z')] => return Step::NeedMore,
+        [Char('r' | 'm' | 'q' | '@' | 'g' | 'z' | ']' | '[')] => return Step::NeedMore,
+        [Char(']'), Char('c'), ..] => Simple::Ask(EditorCommand::NextChange),
+        [Char('['), Char('c'), ..] => Simple::Ask(EditorCommand::PreviousChange),
         [Char('r'), Char(c), ..] => Simple::Replace(*c),
         [Char('m'), Char(c), ..] => Simple::SetMark(*c),
         [Char('q'), Char(c), ..] => Simple::Record(*c),
@@ -386,13 +388,16 @@ mod tests {
         assert_eq!(command(" c"), Command::Simple(Simple::Ask(EditorCommand::CloseTab)));
         assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));
         assert_eq!(command(" d"), Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)));
+        assert_eq!(command("]c"), Command::Simple(Simple::Ask(EditorCommand::NextChange)));
+        assert_eq!(command("[c"), Command::Simple(Simple::Ask(EditorCommand::PreviousChange)));
+        assert_eq!(parse(&keys("]x")), Parse::Invalid);
         assert_eq!(parse(&keys(" ")), Parse::Incomplete);
         assert_eq!(parse(&keys(" z")), Parse::Invalid);
     }
 
     #[test]
     fn incomplete_and_invalid() {
-        for pending in ["d", "g", "r", "f", "\"", "\"a", "di", "gu", "z", "'"] {
+        for pending in ["d", "g", "r", "f", "\"", "\"a", "di", "gu", "z", "'", "]", "["] {
             assert_eq!(parse(&keys(pending)), Parse::Incomplete, "{pending}");
         }
         assert_eq!(parse(&keys("Q")), Parse::Invalid);

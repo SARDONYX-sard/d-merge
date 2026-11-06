@@ -621,7 +621,7 @@ pub enum I18nKey {
     /// Put this changed block back to the template's lines.
     NemesisRevertHunkHover,
 
-    /// Previous / next change
+    /// Previous / next change (Vim: [c, ]c)
     NemesisJumpDiffHover,
 
     /// Class of the new object (filter)

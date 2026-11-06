@@ -283,7 +283,7 @@
   "editor_go_to_definition": "定義へ移動",
   "nemesis_inline_diff": "インライン差分",
   "nemesis_inline_diff_hover": "変更をエディタ内に表示します。新しい行は緑、元の行は赤で間に表示します。",
-  "nemesis_jump_diff_hover": "前 / 次の変更箇所",
+  "nemesis_jump_diff_hover": "前 / 次の変更箇所 (Vim: [c, ]c)",
   "nemesis_keep_open": "開いたままにする",
   "load_failed_message": "読み込みに失敗しました",
   "nemesis_locate_selected": "選択中のオブジェクトをツリーで表示",

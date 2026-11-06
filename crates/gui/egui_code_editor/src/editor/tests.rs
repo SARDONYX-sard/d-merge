@@ -293,6 +293,17 @@ fn a_key_that_waits_starts_the_list_of_keys() {
 }
 
 #[test]
+fn vim_asks_the_host_for_the_next_change() {
+    let mut frames = Frames::new("first");
+    frames.keymap = Keymap::Vim;
+    frames.frame(vec![egui::Event::Text("]".to_owned())]);
+    assert_eq!(frames.command, None, "waiting");
+    frames.frame(vec![egui::Event::Text("c".to_owned())]);
+    assert_eq!(frames.command, Some(EditorCommand::NextChange));
+    assert_eq!(frames.text, "first");
+}
+
+#[test]
 fn vim_space_w_formats_then_saves() {
     let mut frames = Frames::new("first\nsecond");
     frames.keymap = Keymap::Vim;

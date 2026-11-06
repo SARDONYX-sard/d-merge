@@ -31,12 +31,14 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
 /// What this editor acts on: see [`crate::patch::PatchTool::apply_editor_result`].
-const HOST_COMMANDS: [EditorCommand; 6] = [
+const HOST_COMMANDS: [EditorCommand; 8] = [
     EditorCommand::NextTab,
     EditorCommand::PreviousTab,
     EditorCommand::CloseTab,
     EditorCommand::TogglePreview,
     EditorCommand::ToggleInlineDiff,
+    EditorCommand::NextChange,
+    EditorCommand::PreviousChange,
     EditorCommand::ToggleExplorer,
 ];
 
