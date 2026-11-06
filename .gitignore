@@ -6,24 +6,14 @@
 # Test
 dummy/
 
-# /////////////////////////////////////////////////////
-# Frontend
-
-# Node.js dependencies
-node_modules/
-
-# next.js build cache
-.next/
-.swc
-out/
+# Release artifacts (see `.github/actions/setup-release`)
 build/
-dist/
+
+# Former Tauri/Node.js frontend leftovers in old clones
+node_modules/
 
 # /////////////////////////////////////////////////////
 # Backend
-
-# tauri build cache
-**/gen/
 
 # Rust build cache
 **/target

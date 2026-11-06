@@ -1,0 +1,541 @@
+# template meshes/actors/character/behaviors/0_master.bin
+one #FNIS_aa_global_auto_gen2526/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2526"
+    events: [
+      {
+        id: I64(366)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2527/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2527"
+    events: [
+      {
+        id: I64(367)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2528/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2528"
+    events: [
+      {
+        id: I64(543)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2529/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2529"
+    events: [
+      {
+        id: I64(367)
+        payload: "#0000"
+      }
+      {
+        id: I64(543)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2530/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2530"
+    events: [
+      {
+        id: I64(1061)
+        payload: "#FNIS_aa_global_auto_gen2531"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2531/hkbStringEventPayload
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2531"
+    data: "Camera3rd [Cam3]"
+  }
+one #FNIS_aa_global_auto_gen2532/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2532"
+    events: [
+      {
+        id: I64(1062)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2533/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2533"
+    events: [
+      {
+        id: I64(915)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2534/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2534"
+    events: [
+      {
+        id: I64(1061)
+        payload: "#FNIS_aa_global_auto_gen2531"
+      }
+      {
+        id: I64(915)
+        payload: "#0000"
+      }
+    ]
+  }
+one #Sample$1/hkbBehaviorReferenceGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$1"
+    behaviorName: "Behaviors\\FNIS_Sample_Behavior.hkx"
+    name: "FNIS_ROOT_BFR_Sample_7"
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$2/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$2"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$1"
+    listeners: []
+    name: "FNIS_State#Sample$2"
+    probability: F64(1.0)
+    stateId: I64(1311301462)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+seq #0106/hkbBehaviorGraphStringData/eventNames
+  SeqPush priority=7 [
+    "sample_first"
+    "sample_last"
+    "sample_second"
+  ]
+seq #0108/hkbBehaviorGraphData/eventInfos
+  SeqPush priority=7 [
+    {
+      flags: "0"
+    }
+    {
+      flags: "0"
+    }
+    {
+      flags: "0"
+    }
+  ]
+seq #0340/hkbStateMachine/states
+  SeqPush priority=7 [
+    "#Sample$2"
+  ]
+# template meshes/actors/character/behaviors/mt_behavior.bin
+one #FNIS_aa_global_auto_gen5218/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5218"
+    events: [
+      {
+        id: I64(18)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5219/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5219"
+    events: [
+      {
+        id: I64(20)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5220/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5220"
+    events: [
+      {
+        id: I64(461)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5221/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5221"
+    events: [
+      {
+        id: I64(462)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5222/hkbClipTriggerArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5222"
+    triggers: [
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(91)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(-0.2)
+        relativeToEndOfClip: Bool(true)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(20)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(1.0)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(18)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(-1.0)
+        relativeToEndOfClip: Bool(false)
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5232/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5232"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(1.2)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_FROM_WORLD_FROM_MODEL"
+    name: "FNIS_BlendTransition2"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_aa_global_auto_gen5235/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5235"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.6)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_FROM_WORLD_FROM_MODEL"
+    name: "FNIS_BlendTransition1"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5200/hkbStateMachineStateInfo
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5200"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#FNIS_fu_global_auto_gen5202"
+    listeners: []
+    name: "FNIS_FurnitureState"
+    probability: F64(1.0)
+    stateId: I64(555)
+    transitions: "#FNIS_fu_global_auto_gen5201"
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5201/hkbStateMachineTransitionInfoArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5201"
+    transitions: [
+      {
+        condition: "#0000"
+        eventId: I64(5)
+        flags: "FLAG_DISABLE_CONDITION"
+        fromNestedStateId: I64(0)
+        initiateInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+        priority: I64(0)
+        toNestedStateId: I64(0)
+        toStateId: I64(0)
+        transition: "#FNIS_fu_global_auto_gen5214"
+        triggerInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+      }
+      {
+        condition: "#0000"
+        eventId: I64(473)
+        flags: "FLAG_DISABLE_CONDITION"
+        fromNestedStateId: I64(0)
+        initiateInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+        priority: I64(0)
+        toNestedStateId: I64(0)
+        toStateId: I64(0)
+        transition: "#FNIS_fu_global_auto_gen5215"
+        triggerInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+      }
+    ]
+  }
+one #FNIS_fu_global_auto_gen5202/hkbModifierGenerator
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5202"
+    generator: "#FNIS_fu_global_auto_gen5212"
+    modifier: "#FNIS_fu_global_auto_gen5203"
+    name: "FNIS_Furniture_MG"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5203/hkbModifierList
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5203"
+    enable: Bool(true)
+    modifiers: [
+      "#FNIS_fu_global_auto_gen5204"
+      "#FNIS_fu_global_auto_gen5206"
+      "#FNIS_fu_global_auto_gen5209"
+      "#FNIS_fu_global_auto_gen5211"
+    ]
+    name: "FNIS_Furniture_ModifierList"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5204/BSIsActiveModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5204"
+    bInvertActive0: Bool(true)
+    bInvertActive1: Bool(true)
+    bInvertActive2: Bool(true)
+    bInvertActive3: Bool(true)
+    bInvertActive4: Bool(true)
+    bIsActive0: Bool(false)
+    bIsActive1: Bool(false)
+    bIsActive2: Bool(false)
+    bIsActive3: Bool(false)
+    bIsActive4: Bool(false)
+    enable: Bool(true)
+    name: "bHeadTrackSpine_IsActiveModifier"
+    userData: I64(2)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5205"
+  }
+one #FNIS_fu_global_auto_gen5205/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5205"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(41)
+      }
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive1"
+        variableIndex: I64(63)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5206/BSModifyOnceModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5206"
+    enable: Bool(true)
+    name: "SetSneakFalse"
+    pOnActivateModifier: "#FNIS_fu_global_auto_gen5207"
+    pOnDeactivateModifier: "#0000"
+    userData: I64(3)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5207/hkbEvaluateExpressionModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5207"
+    enable: Bool(true)
+    expressions: "#FNIS_fu_global_auto_gen5208"
+    name: "SetSneakFalse_EEM"
+    userData: I64(2)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5208/hkbExpressionDataArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5208"
+    expressionsData: [
+      {
+        assignmentEventIndex: I64(-1)
+        assignmentVariableIndex: I64(-1)
+        eventMode: "EVENT_MODE_SEND_ONCE"
+        expression: "iIsInSneak = 0"
+      }
+    ]
+  }
+one #FNIS_fu_global_auto_gen5209/BSIsActiveModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5209"
+    bInvertActive0: Bool(true)
+    bInvertActive1: Bool(false)
+    bInvertActive2: Bool(false)
+    bInvertActive3: Bool(false)
+    bInvertActive4: Bool(false)
+    bIsActive0: Bool(false)
+    bIsActive1: Bool(false)
+    bIsActive2: Bool(false)
+    bIsActive3: Bool(false)
+    bIsActive4: Bool(false)
+    enable: Bool(true)
+    name: "bEquipOK_IsNotActive"
+    userData: I64(2)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5210"
+  }
+one #FNIS_fu_global_auto_gen5210/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5210"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(51)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5211/BSEventOnDeactivateModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5211"
+    enable: Bool(true)
+    event: {
+      id: I64(15)
+      payload: "#0000"
+    }
+    name: "IdelChairGetUp_DeactivateMod"
+    userData: I64(3)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5212/hkbStateMachine
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5212"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "FNIS_Furniture_BehaviorGraph"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_FORCE_TRANSITION_TO_START_STATE"
+    startStateChooser: "#0000"
+    startStateId: I64(1)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: []
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5213"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #FNIS_fu_global_auto_gen5213/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5213"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "isActive"
+        variableIndex: I64(1)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5214/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5214"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.2)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_TO_WORLD_FROM_MODEL"
+    name: "DefaultBlend_FromAnimationDriven"
+    selfTransitionMode: "SELF_TRANSITION_MODE_BLEND"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5215/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5215"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(1.0)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_TO_WORLD_FROM_MODEL"
+    name: "SlowBlendTransitionFromAnimationDriven"
+    selfTransitionMode: "SELF_TRANSITION_MODE_BLEND"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5216/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5216"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.5)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "0"
+    name: "0.5secondBlendToFurniture"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+seq #5195/hkbStateMachine/states
+  SeqPush priority=0 [
+    "#FNIS_fu_global_auto_gen5200"
+  ]
+# template meshes/actors/character/characters female/defaultfemale.bin
+seq #0029/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_first.hkx"
+    "Animations\\Sample\\sample_last.hkx"
+    "Animations\\Sample\\sample_second.hkx"
+  ]
+# template meshes/actors/character/characters/defaultmale.bin
+seq #0029/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_first.hkx"
+    "Animations\\Sample\\sample_last.hkx"
+    "Animations\\Sample\\sample_second.hkx"
+  ]
+# index meshes/actors/character/behaviors/0_master.bin BehaviorIndexes { string_data: "#0106", behavior_graph: Some("#0108") }
+# index meshes/actors/character/behaviors/mt_behavior.bin BehaviorIndexes { string_data: "#0083", behavior_graph: Some("#0085") }
+# next class #Sample$3

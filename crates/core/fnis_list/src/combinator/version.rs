@@ -1,0 +1,54 @@
+//! Version line parsing: `Version V<n>.<m>`
+
+use winnow::{
+    ModalResult, Parser,
+    ascii::{Caseless, digit1, space0},
+    combinator::{opt, preceded, seq},
+    error::{StrContext, StrContextValue},
+};
+
+use crate::combinator::comment::skip_ws_and_comments0;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Version {
+    pub major: u64,
+    pub minor: u64,
+}
+
+/// Version line parsing: `Version V<n>.<m>`
+pub(crate) fn parse_version_line(input: &mut &str) -> ModalResult<Version> {
+    seq! {
+        Version {
+            _: Caseless("Version"),
+            _: space0,
+            _: opt(Caseless("v")),
+            _: space0,
+            major: digit1.parse_to(),
+            _: space0,
+            minor: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)),
+            _: opt(preceded(".", digit1.parse_to())).map(|n| n.unwrap_or(0)), // NOTE: Handle situations where people enter the wrong version.
+            _: skip_ws_and_comments0,
+        }
+    }
+    .context(StrContext::Label("Minimum Version Requirement for FNIS"))
+    .context(StrContext::Expected(StrContextValue::Description("Format: Version V<n>.<m> (e.g. Version V7.3)")))
+    .parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::{must_fail, must_parse};
+
+    #[test]
+    fn test_parse_version_line_ok() {
+        let parsed = must_parse(parse_version_line, "Version 7.2\n");
+        assert_eq!(parsed.major, 7);
+        assert_eq!(parsed.minor, 2);
+    }
+
+    #[test]
+    fn test_parse_version_line_invalid() {
+        must_fail(parse_version_line, "Ver 7.2\n");
+    }
+}

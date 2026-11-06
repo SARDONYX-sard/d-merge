@@ -1,0 +1,1117 @@
+# template meshes/actors/character/behaviors/0_master.bin
+one #FNIS_aa_global_auto_gen2526/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2526"
+    events: [
+      {
+        id: I64(366)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2527/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2527"
+    events: [
+      {
+        id: I64(367)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2528/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2528"
+    events: [
+      {
+        id: I64(543)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2529/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2529"
+    events: [
+      {
+        id: I64(367)
+        payload: "#0000"
+      }
+      {
+        id: I64(543)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2530/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2530"
+    events: [
+      {
+        id: I64(1061)
+        payload: "#FNIS_aa_global_auto_gen2531"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2531/hkbStringEventPayload
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2531"
+    data: "Camera3rd [Cam3]"
+  }
+one #FNIS_aa_global_auto_gen2532/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2532"
+    events: [
+      {
+        id: I64(1062)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2533/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2533"
+    events: [
+      {
+        id: I64(915)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen2534/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen2534"
+    events: [
+      {
+        id: I64(1061)
+        payload: "#FNIS_aa_global_auto_gen2531"
+      }
+      {
+        id: I64(915)
+        payload: "#0000"
+      }
+    ]
+  }
+one #Sample$1/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$1"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$2"
+    listeners: []
+    name: "Player_FNISkm66720258"
+    probability: F64(1.0)
+    stateId: I64(794506053)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$10/BSSynchronizedClipGenerator
+  Pure { op: Add } priority=7 {
+    SyncAnimPrefix: Null
+    __ptr: "#Sample$10"
+    bApplyMotionFromRoot: Bool(false)
+    bLeadCharacter: Bool(false)
+    bReorientSupportChar: Bool(true)
+    bSyncClipIgnoreMarkPlacement: Bool(false)
+    fGetToMarkTime: F64(0.0)
+    fMarkErrorThreshold: F64(0.1)
+    name: "pa_sample_kill"
+    pClipGenerator: "#Sample$11"
+    sAnimationBindingIndex: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$11/hkbClipGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$11"
+    animationBindingIndex: I64(-1)
+    animationName: "Animations\\Sample\\sample_kill.hkx"
+    cropEndAmountLocalTime: F64(0.0)
+    cropStartAmountLocalTime: F64(0.0)
+    enforcedDuration: F64(0.0)
+    flags: I64(0)
+    mode: "MODE_SINGLE_PLAY"
+    name: "Paired_FNISkm66720258"
+    playbackSpeed: F64(1.0)
+    startTime: F64(0.0)
+    triggers: "#Sample$12"
+    userControlledTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$12/hkbClipTriggerArray
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$12"
+    triggers: [
+      {
+        acyclic: Bool(false)
+        event: {
+          id: U64(615)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(0.0)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: "$eventID[SoundPlay.NPCKillClutch]$"
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(0.8999999761581421)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: "$eventID[NPCHitFrame]$"
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(4.632999897003174)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(156)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(616)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(1070)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+    ]
+  }
+one #Sample$13/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$13"
+    enable: Bool(true)
+    enterNotifyEvents: "#FNIS_aa_global_auto_gen2533"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$14"
+    listeners: []
+    name: "NPC_FNISkm705217420"
+    probability: F64(1.0)
+    stateId: I64(776057076)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$14/hkbModifierGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$14"
+    generator: "#Sample$17"
+    modifier: "#Sample$15"
+    name: "NPC_FNISkm66720258_ModGen"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #Sample$15/BSIsActiveModifier
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$15"
+    bInvertActive0: Bool(false)
+    bInvertActive1: Bool(false)
+    bInvertActive2: Bool(false)
+    bInvertActive3: Bool(false)
+    bInvertActive4: Bool(false)
+    bIsActive0: Bool(false)
+    bIsActive1: Bool(false)
+    bIsActive2: Bool(false)
+    bIsActive3: Bool(false)
+    bIsActive4: Bool(false)
+    enable: Bool(true)
+    name: "FNISkm66720258_ActiveModifier"
+    userData: I64(2)
+    variableBindingSet: "#Sample$16"
+  }
+one #Sample$16/hkbVariableBindingSet
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$16"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(213)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #Sample$17/hkbStateMachine
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$17"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "NPC_FNISkm66720258_Behavior"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_NO_TRANSITION"
+    startStateChooser: "#0000"
+    startStateId: I64(0)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: [
+      "#Sample$19"
+    ]
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#Sample$18"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #Sample$18/hkbVariableBindingSet
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$18"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(51)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #Sample$19/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$19"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$20"
+    listeners: []
+    name: "NPC_FNISkm66720258_DisablePitch"
+    probability: F64(1.0)
+    stateId: I64(0)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$2/hkbModifierGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$2"
+    generator: "#Sample$3"
+    modifier: "#Sample$15"
+    name: "Player_FNISkm66720258_ModGen"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #Sample$20/hkbStateMachine
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$20"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "NPC_FNISkm66720258_DisablePitch_Behavior"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_NO_TRANSITION"
+    startStateChooser: "#0000"
+    startStateId: I64(0)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: [
+      "#Sample$22"
+    ]
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#Sample$21"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #Sample$21/hkbVariableBindingSet
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$21"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "isActive"
+        variableIndex: I64(58)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #Sample$22/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$22"
+    enable: Bool(true)
+    enterNotifyEvents: "#Sample$23"
+    exitNotifyEvents: "#FNIS_aa_global_auto_gen2529"
+    generator: "#Sample$24"
+    listeners: []
+    name: "sample_kill"
+    probability: F64(1.0)
+    stateId: I64(0)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$23/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$23"
+    events: [
+      {
+        id: I64(366)
+        payload: "#0000"
+      }
+    ]
+  }
+one #Sample$24/BSSynchronizedClipGenerator
+  Pure { op: Add } priority=7 {
+    SyncAnimPrefix: "2_"
+    __ptr: "#Sample$24"
+    bApplyMotionFromRoot: Bool(false)
+    bLeadCharacter: Bool(true)
+    bReorientSupportChar: Bool(true)
+    bSyncClipIgnoreMarkPlacement: Bool(false)
+    fGetToMarkTime: F64(0.0)
+    fMarkErrorThreshold: F64(0.1)
+    name: "sample_kill"
+    pClipGenerator: "#Sample$25"
+    sAnimationBindingIndex: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$25/hkbClipGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$25"
+    animationBindingIndex: I64(-1)
+    animationName: "Animations\\Sample\\sample_kill.hkx"
+    cropEndAmountLocalTime: F64(0.0)
+    cropStartAmountLocalTime: F64(0.0)
+    enforcedDuration: F64(0.0)
+    flags: I64(0)
+    mode: "MODE_SINGLE_PLAY"
+    name: "NPCPaired_FNISkm66720258"
+    playbackSpeed: F64(1.0)
+    startTime: F64(0.0)
+    triggers: "#Sample$26"
+    userControlledTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$26/hkbClipTriggerArray
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$26"
+    triggers: [
+      {
+        acyclic: Bool(false)
+        event: {
+          id: U64(614)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(0.0)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: "$eventID[2_KillActor]$"
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(5.867000102996826)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(622)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(167)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(1120)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(6.266665935516357)
+        relativeToEndOfClip: Bool(false)
+      }
+    ]
+  }
+one #Sample$27/hkbStringEventPayload
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$27"
+    data: "AnimObjectSword"
+  }
+one #Sample$28/hkbBehaviorReferenceGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$28"
+    behaviorName: "Behaviors\\FNIS_Sample_Behavior.hkx"
+    name: "FNIS_ROOT_BFR_Sample_7"
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$29/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$29"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$28"
+    listeners: []
+    name: "FNIS_State#Sample$29"
+    probability: F64(1.0)
+    stateId: I64(33186040)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$3/hkbStateMachine
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$3"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "Player_FNISkm66720258$_Behavior"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_NO_TRANSITION"
+    startStateChooser: "#0000"
+    startStateId: I64(0)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: [
+      "#Sample$5"
+    ]
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#Sample$4"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #Sample$4/hkbVariableBindingSet
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$4"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "isActive"
+        variableIndex: I64(51)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #Sample$5/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$5"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$6"
+    listeners: []
+    name: "Player_FNISkm66720258_DisablePitch"
+    probability: F64(1.0)
+    stateId: I64(0)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$6/hkbStateMachine
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$6"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "Player_FNISkm66720258_DisablePitch_Behavior"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_NO_TRANSITION"
+    startStateChooser: "#0000"
+    startStateId: I64(0)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: [
+      "#Sample$8"
+    ]
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#Sample$7"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #Sample$7/hkbVariableBindingSet
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$7"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "isActive"
+        variableIndex: I64(58)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #Sample$8/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$8"
+    enable: Bool(true)
+    enterNotifyEvents: "#Sample$9"
+    exitNotifyEvents: "#FNIS_aa_global_auto_gen2529"
+    generator: "#Sample$10"
+    listeners: []
+    name: "pa_sample_kill"
+    probability: F64(1.0)
+    stateId: I64(0)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+one #Sample$9/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$9"
+    events: [
+      {
+        id: I64(366)
+        payload: "#0000"
+      }
+      {
+        id: I64(937)
+        payload: "#Sample$27"
+      }
+      {
+        id: I64(936)
+        payload: "#Sample$27"
+      }
+    ]
+  }
+seq #0106/hkbBehaviorGraphStringData/eventNames
+  SeqPush priority=7 [
+    "sample_kill"
+    "pa_sample_kill"
+  ]
+  SeqPush priority=7 [
+    "2_KillActor"
+    "NPCHitFrame"
+    "SoundPlay.NPCKillClutch"
+  ]
+seq #0108/hkbBehaviorGraphData/eventInfos
+  SeqPush priority=7 [
+    {
+      flags: "0"
+    }
+    {
+      flags: "0"
+    }
+  ]
+  SeqPush priority=7 [
+    {
+      flags: "0"
+    }
+    {
+      flags: "0"
+    }
+    {
+      flags: "0"
+    }
+  ]
+seq #0340/hkbStateMachine/states
+  SeqPush priority=7 [
+    "#Sample$29"
+  ]
+seq #0788/hkbStateMachine/states
+  SeqPush priority=7 [
+    "#Sample$1"
+    "#Sample$13"
+  ]
+seq #0789/hkbStateMachineTransitionInfoArray/transitions
+  SeqPush priority=7 [
+    {
+      condition: "#0000"
+      eventId: "$eventID[sample_kill]$"
+      flags: "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
+      fromNestedStateId: I64(0)
+      initiateInterval: {
+        enterEventId: I64(-1)
+        enterTime: F64(0.0)
+        exitEventId: I64(-1)
+        exitTime: F64(0.0)
+      }
+      priority: I64(0)
+      toNestedStateId: I64(0)
+      toStateId: I64(794506053)
+      transition: "#0111"
+      triggerInterval: {
+        enterEventId: I64(-1)
+        enterTime: F64(0.0)
+        exitEventId: I64(-1)
+        exitTime: F64(0.0)
+      }
+    }
+    {
+      condition: "#0000"
+      eventId: "$eventID[pa_sample_kill]$"
+      flags: "FLAG_IS_LOCAL_WILDCARD|FLAG_IS_GLOBAL_WILDCARD|FLAG_DISABLE_CONDITION"
+      fromNestedStateId: I64(0)
+      initiateInterval: {
+        enterEventId: I64(-1)
+        enterTime: F64(0.0)
+        exitEventId: I64(-1)
+        exitTime: F64(0.0)
+      }
+      priority: I64(0)
+      toNestedStateId: I64(0)
+      toStateId: I64(776057076)
+      transition: "#0111"
+      triggerInterval: {
+        enterEventId: I64(-1)
+        enterTime: F64(0.0)
+        exitEventId: I64(-1)
+        exitTime: F64(0.0)
+      }
+    }
+  ]
+# template meshes/actors/character/behaviors/mt_behavior.bin
+one #FNIS_aa_global_auto_gen5218/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5218"
+    events: [
+      {
+        id: I64(18)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5219/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5219"
+    events: [
+      {
+        id: I64(20)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5220/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5220"
+    events: [
+      {
+        id: I64(461)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5221/hkbStateMachineEventPropertyArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5221"
+    events: [
+      {
+        id: I64(462)
+        payload: "#0000"
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5222/hkbClipTriggerArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5222"
+    triggers: [
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(91)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(-0.2)
+        relativeToEndOfClip: Bool(true)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(20)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(1.0)
+        relativeToEndOfClip: Bool(false)
+      }
+      {
+        acyclic: Bool(false)
+        event: {
+          id: I64(18)
+          payload: "#0000"
+        }
+        isAnnotation: Bool(false)
+        localTime: F64(-1.0)
+        relativeToEndOfClip: Bool(false)
+      }
+    ]
+  }
+one #FNIS_aa_global_auto_gen5232/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5232"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(1.2)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_FROM_WORLD_FROM_MODEL"
+    name: "FNIS_BlendTransition2"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_aa_global_auto_gen5235/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_aa_global_auto_gen5235"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.6)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_FROM_WORLD_FROM_MODEL"
+    name: "FNIS_BlendTransition1"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5200/hkbStateMachineStateInfo
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5200"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#FNIS_fu_global_auto_gen5202"
+    listeners: []
+    name: "FNIS_FurnitureState"
+    probability: F64(1.0)
+    stateId: I64(555)
+    transitions: "#FNIS_fu_global_auto_gen5201"
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5201/hkbStateMachineTransitionInfoArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5201"
+    transitions: [
+      {
+        condition: "#0000"
+        eventId: I64(5)
+        flags: "FLAG_DISABLE_CONDITION"
+        fromNestedStateId: I64(0)
+        initiateInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+        priority: I64(0)
+        toNestedStateId: I64(0)
+        toStateId: I64(0)
+        transition: "#FNIS_fu_global_auto_gen5214"
+        triggerInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+      }
+      {
+        condition: "#0000"
+        eventId: I64(473)
+        flags: "FLAG_DISABLE_CONDITION"
+        fromNestedStateId: I64(0)
+        initiateInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+        priority: I64(0)
+        toNestedStateId: I64(0)
+        toStateId: I64(0)
+        transition: "#FNIS_fu_global_auto_gen5215"
+        triggerInterval: {
+          enterEventId: I64(-1)
+          enterTime: F64(0.0)
+          exitEventId: I64(-1)
+          exitTime: F64(0.0)
+        }
+      }
+    ]
+  }
+one #FNIS_fu_global_auto_gen5202/hkbModifierGenerator
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5202"
+    generator: "#FNIS_fu_global_auto_gen5212"
+    modifier: "#FNIS_fu_global_auto_gen5203"
+    name: "FNIS_Furniture_MG"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5203/hkbModifierList
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5203"
+    enable: Bool(true)
+    modifiers: [
+      "#FNIS_fu_global_auto_gen5204"
+      "#FNIS_fu_global_auto_gen5206"
+      "#FNIS_fu_global_auto_gen5209"
+      "#FNIS_fu_global_auto_gen5211"
+    ]
+    name: "FNIS_Furniture_ModifierList"
+    userData: I64(1)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5204/BSIsActiveModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5204"
+    bInvertActive0: Bool(true)
+    bInvertActive1: Bool(true)
+    bInvertActive2: Bool(true)
+    bInvertActive3: Bool(true)
+    bInvertActive4: Bool(true)
+    bIsActive0: Bool(false)
+    bIsActive1: Bool(false)
+    bIsActive2: Bool(false)
+    bIsActive3: Bool(false)
+    bIsActive4: Bool(false)
+    enable: Bool(true)
+    name: "bHeadTrackSpine_IsActiveModifier"
+    userData: I64(2)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5205"
+  }
+one #FNIS_fu_global_auto_gen5205/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5205"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(41)
+      }
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive1"
+        variableIndex: I64(63)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5206/BSModifyOnceModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5206"
+    enable: Bool(true)
+    name: "SetSneakFalse"
+    pOnActivateModifier: "#FNIS_fu_global_auto_gen5207"
+    pOnDeactivateModifier: "#0000"
+    userData: I64(3)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5207/hkbEvaluateExpressionModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5207"
+    enable: Bool(true)
+    expressions: "#FNIS_fu_global_auto_gen5208"
+    name: "SetSneakFalse_EEM"
+    userData: I64(2)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5208/hkbExpressionDataArray
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5208"
+    expressionsData: [
+      {
+        assignmentEventIndex: I64(-1)
+        assignmentVariableIndex: I64(-1)
+        eventMode: "EVENT_MODE_SEND_ONCE"
+        expression: "iIsInSneak = 0"
+      }
+    ]
+  }
+one #FNIS_fu_global_auto_gen5209/BSIsActiveModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5209"
+    bInvertActive0: Bool(true)
+    bInvertActive1: Bool(false)
+    bInvertActive2: Bool(false)
+    bInvertActive3: Bool(false)
+    bInvertActive4: Bool(false)
+    bIsActive0: Bool(false)
+    bIsActive1: Bool(false)
+    bIsActive2: Bool(false)
+    bIsActive3: Bool(false)
+    bIsActive4: Bool(false)
+    enable: Bool(true)
+    name: "bEquipOK_IsNotActive"
+    userData: I64(2)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5210"
+  }
+one #FNIS_fu_global_auto_gen5210/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5210"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "bIsActive0"
+        variableIndex: I64(51)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5211/BSEventOnDeactivateModifier
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5211"
+    enable: Bool(true)
+    event: {
+      id: I64(15)
+      payload: "#0000"
+    }
+    name: "IdelChairGetUp_DeactivateMod"
+    userData: I64(3)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5212/hkbStateMachine
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5212"
+    eventToSendWhenStateOrTransitionChanges: {
+      id: I64(-1)
+      payload: "#0000"
+    }
+    maxSimultaneousTransitions: I64(32)
+    name: "FNIS_Furniture_BehaviorGraph"
+    randomTransitionEventId: I64(-1)
+    returnToPreviousStateEventId: I64(-1)
+    selfTransitionMode: "SELF_TRANSITION_MODE_FORCE_TRANSITION_TO_START_STATE"
+    startStateChooser: "#0000"
+    startStateId: I64(1)
+    startStateMode: "START_STATE_MODE_DEFAULT"
+    states: []
+    syncVariableIndex: I64(-1)
+    transitionToNextHigherStateEventId: I64(-1)
+    transitionToNextLowerStateEventId: I64(-1)
+    userData: I64(0)
+    variableBindingSet: "#FNIS_fu_global_auto_gen5213"
+    wildcardTransitions: "#0000"
+    wrapAroundStateId: Bool(false)
+  }
+one #FNIS_fu_global_auto_gen5213/hkbVariableBindingSet
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5213"
+    bindings: [
+      {
+        bindingType: "BINDING_TYPE_VARIABLE"
+        bitIndex: I64(-1)
+        memberPath: "isActive"
+        variableIndex: I64(1)
+      }
+    ]
+    indexOfBindingToEnable: I64(-1)
+  }
+one #FNIS_fu_global_auto_gen5214/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5214"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.2)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_TO_WORLD_FROM_MODEL"
+    name: "DefaultBlend_FromAnimationDriven"
+    selfTransitionMode: "SELF_TRANSITION_MODE_BLEND"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5215/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5215"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(1.0)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "FLAG_IGNORE_TO_WORLD_FROM_MODEL"
+    name: "SlowBlendTransitionFromAnimationDriven"
+    selfTransitionMode: "SELF_TRANSITION_MODE_BLEND"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #FNIS_fu_global_auto_gen5216/hkbBlendingTransitionEffect
+  Pure { op: Add } priority=0 {
+    __ptr: "#FNIS_fu_global_auto_gen5216"
+    blendCurve: "BLEND_CURVE_SMOOTH"
+    duration: F64(0.5)
+    endMode: "END_MODE_NONE"
+    eventMode: "EVENT_MODE_PROCESS_ALL"
+    flags: "0"
+    name: "0.5secondBlendToFurniture"
+    selfTransitionMode: "SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC"
+    toGeneratorStartTimeFraction: F64(0.0)
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+seq #5195/hkbStateMachine/states
+  SeqPush priority=0 [
+    "#FNIS_fu_global_auto_gen5200"
+  ]
+# template meshes/actors/character/characters female/defaultfemale.bin
+seq #0029/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_kill.hkx"
+  ]
+# template meshes/actors/character/characters/defaultmale.bin
+seq #0029/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_kill.hkx"
+  ]
+# index meshes/actors/character/behaviors/0_master.bin BehaviorIndexes { string_data: "#0106", behavior_graph: Some("#0108") }
+# index meshes/actors/character/behaviors/mt_behavior.bin BehaviorIndexes { string_data: "#0083", behavior_graph: Some("#0085") }
+# asdsf AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: "Sample", patch: AddAnimSet { patch: AnimSetData { version: "V3", triggers_len: 1, triggers: ["sample_kill"], conditions_len: 0, conditions: [], attacks_len: 0, attacks: [], anim_infos_len: 1, anim_infos: [AnimInfo { hashed_path: "1697945044", hashed_file_name: "3499673032", ascii_extension: "7891816" }] }, priority: 7, file_name: "NPCFNIS1Start.txt" } }
+# asdsf AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: "Sample", patch: AddAnimSet { patch: AnimSetData { version: "V3", triggers_len: 1, triggers: ["pa_sample_kill"], conditions_len: 0, conditions: [], attacks_len: 0, attacks: [], anim_infos_len: 1, anim_infos: [AnimInfo { hashed_path: "1697945044", hashed_file_name: "3499673032", ascii_extension: "7891816" }] }, priority: 7, file_name: "PlayerFNIS1Start.txt" } }
+# asdsf AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: "Sample", patch: AddAnimSet { patch: AnimSetData { version: "V3", triggers_len: 1, triggers: ["sample_kill"], conditions_len: 0, conditions: [], attacks_len: 0, attacks: [], anim_infos_len: 1, anim_infos: [AnimInfo { hashed_path: "1697945044", hashed_file_name: "3499673032", ascii_extension: "7891816" }] }, priority: 7, file_name: "NPCFNIS1Start.txt" } }
+# asdsf AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: "Sample", patch: AddAnimSet { patch: AnimSetData { version: "V3", triggers_len: 1, triggers: ["pa_sample_kill"], conditions_len: 0, conditions: [], attacks_len: 0, attacks: [], anim_infos_len: 1, anim_infos: [AnimInfo { hashed_path: "1697945044", hashed_file_name: "3499673032", ascii_extension: "7891816" }] }, priority: 7, file_name: "PlayerFNIS1Start.txt" } }
+# next class #Sample$30

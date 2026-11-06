@@ -1,0 +1,13 @@
+use std::path::PathBuf;
+
+use indexmap::IndexMap;
+/// - key: full path(For adsf)
+/// - value: adsf patch
+#[derive(Debug, Default)]
+pub(crate) struct OwnedAdsfPatchMap(pub IndexMap<PathBuf, (String, usize), fast_hash::RandomState>);
+
+impl OwnedAdsfPatchMap {
+    pub(crate) fn insert(&mut self, path: PathBuf, patch: (String, usize)) -> Option<(String, usize)> {
+        self.0.insert(path, patch)
+    }
+}

@@ -1,0 +1,20 @@
+[package]
+name        = "nemesis_patch_syntax"
+version     = "0.0.0"
+description = "D merge core: what every Nemesis patch parser shares: the marker comments, the parse position and readable errors"
+
+authors.workspace      = true
+categories             = ["development-tools"]
+edition.workspace      = true
+keywords               = ["skyrim", "nemesis"]
+license                = "GPL-3.0-or-later"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+winnow     = { workspace = true }
+winnow_ext = { workspace = true }
+
+[lints]
+workspace = true

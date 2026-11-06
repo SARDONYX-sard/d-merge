@@ -1,0 +1,71 @@
+use std::borrow::Cow;
+
+use fast_hash::{HashMap, hash_map::Entry};
+use rayon::prelude::*;
+
+use super::{AsdsfPatch, PatchKind};
+
+#[derive(Hash, Eq, PartialEq)]
+enum PatchKey<'a> {
+    TxtProjectHeader,
+    SubTxtHeader,
+
+    // (target, id, file_name)
+    EditAnim(&'a str, &'a str, &'a str),
+
+    // (target, id, file_name)
+    AddAnim(&'a str, &'a str, Cow<'a, str>),
+}
+
+pub(super) fn dedup_patches_by_priority_parallel<'a>(patches: Vec<AsdsfPatch<'a>>) -> Vec<AsdsfPatch<'a>> {
+    patches
+        .into_par_iter()
+        .fold(HashMap::default, |mut map: HashMap<PatchKey<'_>, AsdsfPatch<'a>>, patch| {
+            let key = match &patch.patch {
+                PatchKind::EditAnimSet(edit) => PatchKey::EditAnim(patch.target, patch.id, edit.file_name),
+                PatchKind::AddAnimSet { file_name, .. } => PatchKey::AddAnim(patch.target, patch.id, file_name.clone()),
+                PatchKind::TxtProjectHeader(_) => PatchKey::TxtProjectHeader,
+                PatchKind::SubTxtHeader(_) => PatchKey::SubTxtHeader,
+            };
+
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => match (&mut entry.get_mut().patch, patch.patch) {
+                    (PatchKind::EditAnimSet(existing_edit), PatchKind::EditAnimSet(new_edit))
+                        if new_edit.priority > existing_edit.priority =>
+                    {
+                        existing_edit.patch.merge(new_edit.patch);
+                        existing_edit.file_name = new_edit.file_name;
+                        existing_edit.priority = new_edit.priority;
+                    }
+                    _ => {}
+                },
+                Entry::Vacant(entry) => {
+                    entry.insert(patch);
+                }
+            }
+
+            map
+        })
+        .reduce(HashMap::default, |mut map1, map2| {
+            for (key, patch2) in map2 {
+                match map1.entry(key) {
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
+                        match (&entry.get().patch, &patch2.patch) {
+                            (PatchKind::EditAnimSet(edit_anim), PatchKind::EditAnimSet(edit_anim2))
+                                if edit_anim2.priority > edit_anim.priority =>
+                            {
+                                entry.insert(patch2);
+                            }
+                            _ => {}
+                        }
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(patch2);
+                    }
+                }
+            }
+            map1
+        })
+        .into_values()
+        .collect()
+}

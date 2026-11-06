@@ -1,1 +1,0 @@
-export { TabPositionList } from './TabPositionList';

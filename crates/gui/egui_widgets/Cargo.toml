@@ -1,0 +1,22 @@
+[package]
+name        = "egui_widgets"
+version     = "0.0.0"
+description = "Reusable egui widgets: shadcn-styled controls, mini Markdown, notifications"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["egui"]
+license                = "MIT"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+# NOTE: Depends on `egui` only, so it compiles in seconds and can be checked on its own:
+#       `cargo check -p egui_widgets`
+[dependencies]
+stdx = { workspace = true }
+egui = { workspace = true }
+
+[lints]
+workspace = true

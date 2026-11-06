@@ -1,22 +1,14 @@
 {
-  "[javascript][javascriptreact][typescript][typescriptreact]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
-  "[css][json][jsonc][toml][yaml]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
-  // NOTE: YAML ignores the configuration for some reason when multiple formatters are
-  // specified as a pattern, so they are specified individually.
-  "[yaml]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
   "editor.codeActionsOnSave": {
     // "source.fixAll.oxc": "explicit",
     "source.fixAll.sortJSON": "never"
   },
+  "[toml]": {
+    "editor.defaultFormatter": "Dylan23691.toml-analyzer"
+  },
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
-  "evenBetterToml.formatter.alignComments": true,
+  "toml.formatter.alignEntries": true,
   "files.associations": {
     "**/dummy/mods/**/*.txt": "xml"
   },
@@ -31,14 +23,18 @@
   },
   "json.schemas": [
     {
-      "fileMatch": ["/dummy/convert/input/*.json", "/dummy/behavior_gen/output/.d_merge/.debug/meshes/**/*.json"],
+      "fileMatch": [
+        "/dummy/convert/input/*.json",
+        "/dummy/behavior_gen/output/.d_merge/.debug/meshes/**/*.json"
+      ],
       "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
-  "oxc.disableNestedConfig": true,
-  "oxc.fmt.disableNestedConfig": true,
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.linkedProjects": ["Cargo.toml"],
-  "rust-analyzer.runnables.extraTestBinaryArgs": ["--show-output", "--nocapture"]
+  "rust-analyzer.runnables.extraTestBinaryArgs": [
+    "--show-output",
+    "--nocapture"
+  ]
 }
