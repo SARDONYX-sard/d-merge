@@ -1,9 +1,8 @@
 use std::{borrow::Cow, fs, path::Path};
 
 use havok_classes::Classes;
-use json_patch::{Action, JsonPatch, ValueWithPriority, json_path};
+use json_patch::{Action, JsonPatch, ValueWithPriority, json_path, json_value};
 use serde_hkx_features::ClassMap;
-use simd_json::json_typed;
 
 use crate::{
     patch_gen::JsonPatchPairs,
@@ -273,7 +272,7 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
     seq_patches.push((
         json_path!["#0028", "hkbMirroredSkeletonInfo", "bonePairMap"],
         ValueWithPriority {
-            patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, missing_bone_indices) },
+            patch: JsonPatch { action: Action::SeqPush, value: json_value!(missing_bone_indices) },
             priority: 0,
         },
     ));
@@ -284,7 +283,7 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
         seq_patches.push((
             json_path![class_index, "hkbBoneWeightArray", "boneWeights"],
             ValueWithPriority {
-                patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, zero_weights) },
+                patch: JsonPatch { action: Action::SeqPush, value: json_value!(zero_weights.clone()) },
                 priority: 0,
             },
         ));
@@ -295,7 +294,7 @@ fn build_skeleton_arm_fix_patches(bone_len: usize) -> JsonPatchPairs<'static> {
         seq_patches.push((
             json_path![class_index, "hkbBoneWeightArray", "boneWeights"],
             ValueWithPriority {
-                patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, one_weights) },
+                patch: JsonPatch { action: Action::SeqPush, value: json_value!(one_weights.clone()) },
                 priority: 0,
             },
         ));

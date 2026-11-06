@@ -7,6 +7,7 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
+use egui::Vec2;
 use egui_widgets::{
     Modal,
     notify::Notification,
@@ -37,12 +38,16 @@ impl PatchTool {
         let has_output = !paths.patch_output_dir.trim().is_empty();
         let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
         let mut open = true;
-        Modal::new(i18n.t(I18nKey::UserPatchTitle)).to_top(to_top).show(ctx, &mut open, |ui| match &mut tool {
-            Some(tool) => tool.user_patch_ui(ui, i18n, notify, settings, editor),
-            None => {
-                ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
-            }
-        });
+        Modal::new(i18n.t(I18nKey::UserPatchTitle)).size(Vec2::new(0.90, 0.95)).to_top(to_top).show(
+            ctx,
+            &mut open,
+            |ui| match &mut tool {
+                Some(tool) => tool.user_patch_ui(ui, i18n, notify, settings, editor),
+                None => {
+                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
+                }
+            },
+        );
         self.user_patch.open = open;
         if !open {
             self.close_user_patch(notify, i18n);

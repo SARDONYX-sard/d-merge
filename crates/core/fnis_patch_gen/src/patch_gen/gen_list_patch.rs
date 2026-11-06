@@ -68,7 +68,7 @@ pub(super) struct OneListPatch<'a> {
 
     /// One group of furniture syntax must be pushed to the states of the Furniture root.
     /// Therefore, it is placed here to be pushed when the furniture root is generated.
-    pub furniture_group_root_indexes: Vec<String>,
+    pub furniture_group_root_indexes: Vec<&'a str>,
 
     pub conversion_jobs: Vec<AnimIoJob>,
 }
@@ -125,7 +125,7 @@ pub(super) fn generate_patch<'a>(
                         .chain(flag_set.triggers2.iter())
                         .map(|trigger| Cow::Borrowed(trigger.event)),
                 );
-                all_asdsf_patches.extend(new_asdsf_patch(owned_data, anim_event, anim_file)?);
+                all_asdsf_patches.extend(new_asdsf_patch(owned_data, anim_event, anim_file));
 
                 let (one, seq) = match kind {
                     FNISPairedType::KilMove => new_kill_patches(paired_and_kill_anim, owned_data),
@@ -269,7 +269,7 @@ fn new_adsf_patch<'a>(owned_data: &'a OwnedFnisInjection, fnis_animation: FNISAn
 
     // To link them, `translation` and `rotation` must always use the same ID.
     // use Nemesis variable(`ALltAdsf` is implemented to automatically assign IDs during serialization, so it's fine.)
-    let clip_id: Cow<'a, str> = Cow::Owned(owned_data.next_adsf_id());
+    let clip_id: Cow<'a, str> = Cow::Borrowed(owned_data.next_adsf_id());
 
     let anim_block = PatchKind::AddAnim(ClipAnimDataBlock {
         name: anim_event,
@@ -341,30 +341,15 @@ fn new_asdsf_patch<'a>(
     owned_data: &'a OwnedFnisInjection,
     anim_event: &'a str,
     anim_file: &str,
-) -> Result<Vec<AsdsfPatch<'a>>, FnisPatchGenerationError> {
-    use std::path::PathBuf;
-
+) -> Vec<AsdsfPatch<'a>> {
     use crate::asdsf::PatchKind;
 
     let priority = owned_data.priority;
     let namespace = &owned_data.namespace;
 
     // NOTE: need lowercase
-    let lower_anim_file =
-        PathBuf::from(format!("meshes\\actors\\character\\animations\\{namespace}\\{anim_file}").to_lowercase());
-
-    // Intended:
-    // `meshes\actors\character\animations\foo\bar.hkx`
-    // -> `meshes\actors\character\animations\foo`
-    let parent = lower_anim_file
-        .parent()
-        .and_then(|dir| dir.to_str())
-        .ok_or_else(|| FnisPatchGenerationError::MissingAnimationParent { path: lower_anim_file.clone() })?;
-
-    let file_stem = lower_anim_file
-        .file_stem()
-        .and_then(|path| path.to_str())
-        .ok_or_else(|| FnisPatchGenerationError::MissingAnimationFileStem { path: lower_anim_file.clone() })?;
+    let lower_anim_file = format!("meshes\\actors\\character\\animations\\{namespace}\\{anim_file}").to_lowercase();
+    let (parent, file_stem) = split_game_path(&lower_anim_file);
 
     let anim_info = skyrim_anim_data::asdsf::normal::AnimInfo {
         hashed_path: skyrim_crc::calc_crc32(parent).to_string().into(),
@@ -408,10 +393,40 @@ fn new_asdsf_patch<'a>(
     let npc_patch = make_patch(anim_event, false);
     let player_patch = make_patch(anim_event, true);
 
-    Ok(vec![
+    vec![
         AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: namespace, patch: npc_patch.clone() },
         AsdsfPatch { target: "DefaultFemaleData~DefaultFemale", id: namespace, patch: player_patch.clone() },
         AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: namespace, patch: npc_patch },
         AsdsfPatch { target: "DefaultMaleData~DefaultMale", id: namespace, patch: player_patch },
-    ])
+    ]
+}
+
+/// Splits a path as the game writes it into its directory and the file name without its extension.
+///
+/// It is hashed for `animationsetdatasinglefile.txt`, so it has to come out the same on any OS: not
+/// with `std::path`, which on Unix doesn't see `\` as a separator and takes the whole as a file name.
+///
+/// e.g. `meshes\actors\character\animations\foo\bar.hkx` -> (`meshes\actors\character\animations\foo`, `bar`)
+fn split_game_path(path: &str) -> (&str, &str) {
+    let (parent, file) = path.rsplit_once(['\\', '/']).unwrap_or(("", path));
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _extension)| if stem.is_empty() { file } else { stem });
+    (parent, stem)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_game_path;
+
+    #[test]
+    fn a_game_path_splits_the_same_on_any_os() {
+        let foo = "meshes\\actors\\character\\animations\\foo";
+        assert_eq!(split_game_path("meshes\\actors\\character\\animations\\foo\\bar.hkx"), (foo, "bar"));
+        // A list file may go up, or use the other separator. Only the last one counts.
+        assert_eq!(split_game_path("a\\foo\\..\\bar.hkx"), ("a\\foo\\..", "bar"));
+        assert_eq!(split_game_path("a\\foo/bar.hkx"), ("a\\foo", "bar"));
+        // Only the last extension goes, and a name of only an extension stays.
+        assert_eq!(split_game_path("a\\bar.1.hkx"), ("a", "bar.1"));
+        assert_eq!(split_game_path("a\\.hkx"), ("a", ".hkx"));
+        assert_eq!(split_game_path("bar"), ("", "bar"));
+    }
 }

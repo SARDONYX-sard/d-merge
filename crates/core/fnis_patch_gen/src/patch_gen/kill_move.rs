@@ -5,22 +5,47 @@ use fnis_list::{
     combinator::{Trigger, flags::FNISAnimFlags},
     patterns::pair_and_kill::{ActorRole, AnimObject, FNISPairedAndKillAnimation},
 };
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
+use json_patch::{Action, JsonPatch, ValueWithPriority, json_path, json_value};
 use rayon::prelude::*;
-use simd_json::json_typed;
 
 use crate::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
         JsonPatchPairs,
+        classes::{
+            ClipGenerator, ModifierGenerator, StateInfo, StateMachine, new_anim_object, new_clip_trigger_array,
+            new_event_array, new_variable_binding_set,
+        },
         global::_0_master::{
             FNIS_AA_GLOBAL_AUTO_GEN_2526, FNIS_AA_GLOBAL_AUTO_GEN_2527, FNIS_AA_GLOBAL_AUTO_GEN_2528,
             FNIS_AA_GLOBAL_AUTO_GEN_2529, FNIS_AA_GLOBAL_AUTO_GEN_2530, FNIS_AA_GLOBAL_AUTO_GEN_2532,
             FNIS_AA_GLOBAL_AUTO_GEN_2533, FNIS_AA_GLOBAL_AUTO_GEN_2534,
         },
-        new_push_events_seq_patch,
+        new_class_patch, new_push_events_seq_patch, new_seq_push,
     },
 };
+
+/// What the patches of a paired animation (`pa`, `km`) of two actors have in common.
+#[derive(Clone, Copy)]
+pub(super) struct PairedAnimation<'a, 'b> {
+    pub animation: &'b FNISPairedAndKillAnimation<'a>,
+    /// The new classes, in the order the `$RI+n` comments count them.
+    pub class_indexes: &'b [&'a str],
+    pub class_index_0_id: i32,
+    pub player_event: &'a str,
+    /// `pa_<player_event>`
+    pub npc_event: &'a str,
+    pub player_root_state_name: &'a str,
+    pub npc_root_state_name: &'a str,
+    /// e.g. `Animations\FNISZoo\back_grab.hkx`
+    pub anim_file: &'a str,
+    pub flags: FNISAnimFlags,
+    pub duration: f32,
+    /// The animation objects of each actor. See `AnimObject`.
+    pub active_indexes: &'b [&'a str],
+    pub passive_indexes: &'b [&'a str],
+    pub priority: usize,
+}
 
 /// Into `meshes\actors\character\behaviors\0_master.xml`.
 pub(super) fn new_kill_patches<'a>(
@@ -28,17 +53,18 @@ pub(super) fn new_kill_patches<'a>(
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
     // new C++ Havok class XML name attributes
-    let class_indexes: [String; 26] = core::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [&'a str; 26] = core::array::from_fn(|_| owned_data.next_class_name_attribute());
 
     let player_event = paired_and_kill_animation.anim_event;
-    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
-    let player_root_state_name = format!("Player_FNISkm{class_index_0_id}"); // NOTE: must be unique in 0_master.xml
+    let class_index_0_id = calculate_hash(class_indexes[0]); // Must be 1 file unique
+    let player_root_state_name = owned_data.keep(format!("Player_FNISkm{class_index_0_id}")); // NOTE: must be unique in 0_master.xml
 
-    let npc_event = format!("pa_{player_event}"); // NOTE: Since items in eventNames are inherently unique, this approach is acceptable.
-    let class_index_12_id = calculate_hash(&class_indexes[12]); // Must be 1 file unique
-    let npc_root_state_name = format!("NPC_FNISkm{class_index_12_id}"); // NOTE: must be unique in 0_master.xml
+    let npc_event = owned_data.keep(format!("pa_{player_event}")); // NOTE: Since items in eventNames are inherently unique, this approach is acceptable.
+    let class_index_12_id = calculate_hash(class_indexes[12]); // Must be 1 file unique
+    let npc_root_state_name = owned_data.keep(format!("NPC_FNISkm{class_index_12_id}")); // NOTE: must be unique in 0_master.xml
 
-    let anim_file = format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file); // Animations\\$Fkm$
+    let anim_file =
+        owned_data.keep(format!("Animations\\{}\\{}", owned_data.namespace, paired_and_kill_animation.anim_file)); // Animations\\$Fkm$
     let priority = owned_data.priority;
     let flags = paired_and_kill_animation.flag_set.flags;
     let duration = paired_and_kill_animation.flag_set.duration;
@@ -47,7 +73,7 @@ pub(super) fn new_kill_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.extend(new_push_events_seq_patch(
-        &[player_event.into(), (&npc_event).into()],
+        vec![player_event.into(), npc_event.into()],
         owned_data.behavior_entry.master_string_data_index,
         owned_data.behavior_entry.master_behavior_graph_index,
         priority,
@@ -55,293 +81,193 @@ pub(super) fn new_kill_patches<'a>(
     seq_patches.push(new_push_transitions_seq_patch(
         "#0789",
         "#0111",
-        [player_event, npc_event.as_str()],
-        [&player_root_state_name, &npc_root_state_name],
+        [player_event, npc_event],
+        [player_root_state_name, npc_root_state_name],
         priority,
     ));
     // Push and register the Root `hkbStateMachineStateInfo` for both Player and NPC.
-    seq_patches.push((
+    seq_patches.push(new_seq_push(
         json_path!["#0788", "hkbStateMachine", "states"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0], class_indexes[12]]),
-            },
-            priority,
-        },
+        priority,
+        json_value!([class_indexes[0], class_indexes[12]]),
     ));
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let (active_indexes, passive_indexes, patches) = paired_and_kill_animation
-        .anim_objects
-        .par_iter()
-        .fold(
-            || (Vec::new(), Vec::new(), Vec::new()),
-            |mut acc, AnimObject { name, role }| {
-                let new_anim_object_index = owned_data.next_class_name_attribute();
+    let mut active_indexes = Vec::new();
+    let mut passive_indexes = Vec::new();
+    for AnimObject { name, role } in &paired_and_kill_animation.anim_objects {
+        let new_anim_object_index = owned_data.next_class_name_attribute();
 
-                acc.2.push((
-                    vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
-                    ValueWithPriority {
-                        patch: JsonPatch {
-                            action: Action::Pure { op: Op::Add },
-                            value: simd_json::json_typed!(borrowed, {
-                                "__ptr": new_anim_object_index,
-                                "data": name, // StringPtr
-                            }),
-                        },
-                        priority,
-                    },
-                ));
+        one_patches.push(new_anim_object(new_anim_object_index, name, priority));
 
-                match role {
-                    ActorRole::Active => acc.0.push(new_anim_object_index),
-                    ActorRole::Passive => acc.1.push(new_anim_object_index),
-                }
+        match role {
+            ActorRole::Active => active_indexes.push(new_anim_object_index),
+            ActorRole::Passive => passive_indexes.push(new_anim_object_index),
+        }
+    }
 
-                acc
-            },
-        )
-        .reduce(
-            || (Vec::new(), Vec::new(), Vec::new()),
-            |mut a, b| {
-                a.0.extend(b.0);
-                a.1.extend(b.1);
-                a.2.extend(b.2);
-                a
-            },
-        );
-    one_patches.par_extend(patches);
+    let paired = PairedAnimation {
+        animation: &paired_and_kill_animation,
+        class_indexes: &class_indexes,
+        class_index_0_id,
+        player_event,
+        npc_event,
+        player_root_state_name,
+        npc_root_state_name,
+        anim_file,
+        flags,
+        duration,
+        active_indexes: &active_indexes,
+        passive_indexes: &passive_indexes,
+        priority,
+    };
+    player_patches(&paired, &mut one_patches);
+    npc_patches(&paired, &mut one_patches);
+
+    (one_patches, seq_patches)
+}
+
+/// What the killer plays: `$RI` to `$RI+11`.
+fn player_patches<'a>(paired: &PairedAnimation<'a, '_>, one_patches: &mut JsonPatchPairs<'a>) {
+    let PairedAnimation {
+        animation,
+        class_indexes,
+        class_index_0_id,
+        npc_event,
+        player_root_state_name,
+        anim_file,
+        flags,
+        duration,
+        active_indexes,
+        priority,
+        ..
+    } = *paired;
 
     // $RI
     one_patches.push(make_player_root_state_info_patch(
-        &class_indexes[0],
-        &class_indexes[1],
+        class_indexes[0],
+        class_indexes[1],
         flags,
         priority,
         player_root_state_name,
     ));
 
     // $RI+1
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbModifierGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_indexes[1],
-                    "variableBindingSet": "#0000", // null ptr
-                    "userData": 1,
-                    "name": format!("Player_FNISkm{class_index_0_id}_ModGen"), // StringPtr
-                    "modifier": class_indexes[14],
-                    "generator": class_indexes[2],
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        ModifierGenerator {
+            index: class_indexes[1],
+            name: format!("Player_FNISkm{class_index_0_id}_ModGen").into(), // StringPtr
+            modifier: class_indexes[14],
+            generator: class_indexes[2],
+        }
+        .into_patch(priority),
+    );
 
     // $RI+2
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("hkbStateMachine")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_indexes[2],
-                    "variableBindingSet": class_indexes[3],
-                    "userData": 0,
-                    "name": format!("Player_FNISkm{class_index_0_id}$_Behavior"), // FIXME? $1/1$
-                    "eventToSendWhenStateOrTransitionChanges": {
-                        "id": -1,
-                        "payload": "#0000"
-                    },
-                    "startStateChooser": "#0000",
-                    "startStateId": 0,
-                    "returnToPreviousStateEventId": -1,
-                    "randomTransitionEventId": -1,
-                    "transitionToNextHigherStateEventId": -1,
-                    "transitionToNextLowerStateEventId": -1,
-                    "syncVariableIndex": -1,
-                    "wrapAroundStateId": false,
-                    "maxSimultaneousTransitions": 32,
-                    "startStateMode": "START_STATE_MODE_DEFAULT",
-                    "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [class_indexes[4]],
-                    "wildcardTransitions": "#0000"
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateMachine {
+            index: class_indexes[2],
+            variable_binding_set: class_indexes[3],
+            name: format!("Player_FNISkm{class_index_0_id}$_Behavior").into(), // FIXME? $1/1$
+            states: vec![class_indexes[4]],
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+3
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[3],
-                        "bindings": [
-                            {
-                                "memberPath": "isActive",
-                                "variableIndex": 51,
-                                "bitIndex": -1,
-                                "bindingType": "BINDING_TYPE_VARIABLE"
-                            }
-                        ],
-                        "indexOfBindingToEnable": -1
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_variable_binding_set(
+        class_indexes[3],
+        priority,
+        json_value!([
+            {
+                "memberPath": "isActive",
+                "variableIndex": 51, // bIsSynced
+                "bitIndex": -1,
+                "bindingType": "BINDING_TYPE_VARIABLE"
+            }
+        ]),
     ));
 
     // $RI+4
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[4],
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": "#0000",
-                    "exitNotifyEvents": "#0000",
-                    "transitions": "#0000",
-                    "generator": &class_indexes[5],
-                    "name": format!("Player_FNISkm{class_index_0_id}_DisablePitch"),
-                    "stateId": 0,
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateInfo {
+            index: class_indexes[4],
+            generator: class_indexes[5],
+            name: format!("Player_FNISkm{class_index_0_id}_DisablePitch").into(),
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+5
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("hkbStateMachine")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[5],
-                    "variableBindingSet": &class_indexes[6],
-                    "userData": 0,
-                    "name": format!("Player_FNISkm{class_index_0_id}_DisablePitch_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": {
-                        "id": -1,
-                        "payload": "#0000"
-                    },
-                    "startStateChooser": "#0000",
-                    "startStateId": 0,
-                    "returnToPreviousStateEventId": -1,
-                    "randomTransitionEventId": -1,
-                    "transitionToNextHigherStateEventId": -1,
-                    "transitionToNextLowerStateEventId": -1,
-                    "syncVariableIndex": -1,
-                    "wrapAroundStateId": false,
-                    "maxSimultaneousTransitions": 32,
-                    "startStateMode": "START_STATE_MODE_DEFAULT",
-                    "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [&class_indexes[7]],
-                    "wildcardTransitions": "#0000"
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateMachine {
+            index: class_indexes[5],
+            variable_binding_set: class_indexes[6],
+            name: format!("Player_FNISkm{class_index_0_id}_DisablePitch_Behavior").into(),
+            states: vec![class_indexes[7]],
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+6
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[6].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[6],
-                    "bindings": [
-                        {
-                            "memberPath": "isActive",
-                            "variableIndex": 58,
-                            "bitIndex": -1,
-                            "bindingType": "BINDING_TYPE_VARIABLE"
-                        }
-                    ],
-                    "indexOfBindingToEnable": -1
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_variable_binding_set(
+        class_indexes[6],
+        priority,
+        json_value!([
+            {
+                "memberPath": "isActive",
+                "variableIndex": 58, // 2_FootScuffLeft
+                "bitIndex": -1,
+                "bindingType": "BINDING_TYPE_VARIABLE"
+            }
+        ]),
     ));
 
     // $RI+7
     one_patches.push(make_event_state_info_patch(
-        &class_indexes[7],
+        class_indexes[7],
         flags,
-        &class_indexes[8],
-        &class_indexes[9],
+        class_indexes[8],
+        class_indexes[9],
         priority,
-        &npc_event, // pa_$Ekm$
+        npc_event, // pa_$Ekm$
     ));
 
     // $RI+8
     one_patches.push({
         // "payload": "#$:AnimObj+&ao1$"
-        new_event_property_array(flags, &active_indexes, &class_indexes[8], priority)
+        new_event_property_array(flags, active_indexes, class_indexes[8], priority)
     });
 
     // $RI+9
-    one_patches.push(new_npc_synchronized_clip_generator(
-        &class_indexes[9],
-        npc_event.as_str(),
-        &class_indexes[10],
-        priority,
-    ));
+    one_patches.push(new_npc_synchronized_clip_generator(class_indexes[9], npc_event, class_indexes[10], priority));
 
     // $RI+10
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[10].clone()), Cow::Borrowed("hkbClipGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[10],
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": format!("Paired_FNISkm{class_index_0_id}"), // FIXME?: priority <- $1/1$
-                    "animationName": anim_file, // Animations\\$Fkm$
-                    "triggers": &class_indexes[11],
-                    "cropStartAmountLocalTime": 0.0,
-                    "cropEndAmountLocalTime": 0.0,
-                    "startTime": 0.0,
-                    "playbackSpeed": 1.0,
-                    "enforcedDuration": 0.0,
-                    "userControlledTimeFraction": 0.0,
-                    "animationBindingIndex": -1,
-                    "mode": "MODE_SINGLE_PLAY",
-                    "flags": 0
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        ClipGenerator {
+            index: class_indexes[10],
+            name: format!("Paired_FNISkm{class_index_0_id}").into(), // FIXME?: priority <- $1/1$
+            animation_name: anim_file.into(),                        // Animations\\$Fkm$
+            triggers: class_indexes[11],
+            mode: "MODE_SINGLE_PLAY",
+        }
+        .into_patch(priority),
+    );
 
     // $RI+11
     one_patches.push({
         // "id": 615, // NPCKillMoveStart
-        let mut triggers = new_values_from_triggers(615, &paired_and_kill_animation.flag_set.triggers);
+        let mut triggers = new_values_from_triggers(615, &animation.flag_set.triggers);
 
         //  156: NPCPairedStop
         //  616: NPCKillMoveEnd
         // 1070: NPCPairEnd (159: PairEnd)
         triggers.par_extend([156, 616, 1070].par_iter().map(|&id| {
-            json_typed!(borrowed, {
+            json_value!({
                 "localTime": duration, // $-D$
                 "event": {
                     "id": id,
@@ -353,244 +279,153 @@ pub(super) fn new_kill_patches<'a>(
             })
         }));
 
-        (
-            vec![Cow::Owned(class_indexes[11].clone()), Cow::Borrowed("hkbClipTriggerArray")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[11],
-                        "triggers": triggers
-                    }),
-                },
-                priority,
-            },
-        )
+        new_clip_trigger_array(class_indexes[11], priority, json_value!(triggers))
     });
+}
+
+/// What the victim plays: `$RI+12` to `$RI+25`.
+fn npc_patches<'a>(paired: &PairedAnimation<'a, '_>, one_patches: &mut JsonPatchPairs<'a>) {
+    let PairedAnimation {
+        animation,
+        class_indexes,
+        class_index_0_id,
+        player_event,
+        npc_root_state_name,
+        anim_file,
+        flags,
+        duration,
+        passive_indexes,
+        priority,
+        ..
+    } = *paired;
 
     // $RI+12
     one_patches.push(make_npc_root_state_info_patch(
-        &class_indexes[12],
-        &class_indexes[13],
+        class_indexes[12],
+        class_indexes[13],
         flags,
         priority,
         npc_root_state_name,
     ));
 
     // $RI+13
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[13].clone()), Cow::Borrowed("hkbModifierGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[13],
-                    "variableBindingSet": "#0000",
-                    "userData": 1,
-                    "name": format!("NPC_FNISkm{class_index_0_id}_ModGen"),
-                    "modifier": &class_indexes[14],
-                    "generator": &class_indexes[16]
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        ModifierGenerator {
+            index: class_indexes[13],
+            name: format!("NPC_FNISkm{class_index_0_id}_ModGen").into(),
+            modifier: class_indexes[14],
+            generator: class_indexes[16],
+        }
+        .into_patch(priority),
+    );
 
     // $RI+14
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[14].clone()), Cow::Borrowed("BSIsActiveModifier")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[14],
-                    "variableBindingSet": &class_indexes[15],
-                    "userData": 2,
-                    "name": format!("FNISkm{class_index_0_id}_ActiveModifier"),
-                    "enable": true,
-                    "bIsActive0": false,
-                    "bInvertActive0": false,
-                    "bIsActive1": false,
-                    "bInvertActive1": false,
-                    "bIsActive2": false,
-                    "bInvertActive2": false,
-                    "bIsActive3": false,
-                    "bInvertActive3": false,
-                    "bIsActive4": false,
-                    "bInvertActive4": false
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_class_patch(
+        class_indexes[14],
+        "BSIsActiveModifier",
+        priority,
+        json_value!({
+            "__ptr": class_indexes[14],
+            "variableBindingSet": class_indexes[15],
+            "userData": 2,
+            "name": format!("FNISkm{class_index_0_id}_ActiveModifier"),
+            "enable": true,
+            "bIsActive0": false,
+            "bInvertActive0": false,
+            "bIsActive1": false,
+            "bInvertActive1": false,
+            "bIsActive2": false,
+            "bInvertActive2": false,
+            "bIsActive3": false,
+            "bInvertActive3": false,
+            "bIsActive4": false,
+            "bInvertActive4": false
+        }),
     ));
 
     // $RI+15
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[15].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[15],
-                    "bindings": [
-                        {
-                            "memberPath": "bIsActive0",
-                            "variableIndex": 213,
-                            "bitIndex": -1,
-                            "bindingType": "BINDING_TYPE_VARIABLE"
-                        }
-                    ],
-                    "indexOfBindingToEnable": -1
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_variable_binding_set(
+        class_indexes[15],
+        priority,
+        json_value!([
+            {
+                "memberPath": "bIsActive0",
+                "variableIndex": 213,
+                "bitIndex": -1,
+                "bindingType": "BINDING_TYPE_VARIABLE"
+            }
+        ]),
     ));
 
     // $RI+16
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[16].clone()), Cow::Borrowed("hkbStateMachine")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[16],
-                    "variableBindingSet": &class_indexes[17],
-                    "userData": 0,
-                    "name": format!("NPC_FNISkm{class_index_0_id}_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": {
-                        "id": -1,
-                        "payload": "#0000"
-                    },
-                    "startStateChooser": "#0000",
-                    "startStateId": 0,
-                    "returnToPreviousStateEventId": -1,
-                    "randomTransitionEventId": -1,
-                    "transitionToNextHigherStateEventId": -1,
-                    "transitionToNextLowerStateEventId": -1,
-                    "syncVariableIndex": -1,
-                    "wrapAroundStateId": false,
-                    "maxSimultaneousTransitions": 32,
-                    "startStateMode": "START_STATE_MODE_DEFAULT",
-                    "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [&class_indexes[18]],
-                    "wildcardTransitions": "#0000"
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateMachine {
+            index: class_indexes[16],
+            variable_binding_set: class_indexes[17],
+            name: format!("NPC_FNISkm{class_index_0_id}_Behavior").into(),
+            states: vec![class_indexes[18]],
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+17
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[17].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[17],
-                    "bindings": [
-                        {
-                            "memberPath": "bIsActive0",
-                            "variableIndex": 51,
-                            "bitIndex": -1,
-                            "bindingType": "BINDING_TYPE_VARIABLE"
-                        }
-                    ],
-                    "indexOfBindingToEnable": -1
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_variable_binding_set(
+        class_indexes[17],
+        priority,
+        json_value!([
+            {
+                "memberPath": "bIsActive0",
+                "variableIndex": 51, // bIsSynced
+                "bitIndex": -1,
+                "bindingType": "BINDING_TYPE_VARIABLE"
+            }
+        ]),
     ));
 
     // $RI+18
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[18].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[18],
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": "#0000",
-                    "exitNotifyEvents": "#0000",
-                    "transitions": "#0000",
-                    "generator": &class_indexes[19],
-                    "name": format!("NPC_FNISkm{class_index_0_id}_DisablePitch"),
-                    "stateId": 0,
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateInfo {
+            index: class_indexes[18],
+            generator: class_indexes[19],
+            name: format!("NPC_FNISkm{class_index_0_id}_DisablePitch").into(),
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+19
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[19].clone()), Cow::Borrowed("hkbStateMachine")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[19],
-                    "variableBindingSet": &class_indexes[20],
-                    "userData": 0,
-                    "name": format!("NPC_FNISkm{class_index_0_id}_DisablePitch_Behavior"),
-                    "eventToSendWhenStateOrTransitionChanges": {
-                        "id": -1,
-                        "payload": "#0000"
-                    },
-                    "startStateChooser": "#0000",
-                    "startStateId": 0,
-                    "returnToPreviousStateEventId": -1,
-                    "randomTransitionEventId": -1,
-                    "transitionToNextHigherStateEventId": -1,
-                    "transitionToNextLowerStateEventId": -1,
-                    "syncVariableIndex": -1,
-                    "wrapAroundStateId": false,
-                    "maxSimultaneousTransitions": 32,
-                    "startStateMode": "START_STATE_MODE_DEFAULT",
-                    "selfTransitionMode": "SELF_TRANSITION_MODE_NO_TRANSITION",
-                    "states": [&class_indexes[21]],
-                    "wildcardTransitions": "#0000"
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateMachine {
+            index: class_indexes[19],
+            variable_binding_set: class_indexes[20],
+            name: format!("NPC_FNISkm{class_index_0_id}_DisablePitch_Behavior").into(),
+            states: vec![class_indexes[21]],
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // $RI+20
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[20].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[20],
-                    "bindings": [
-                        {
-                            "memberPath": "isActive",
-                            "variableIndex": 58,
-                            "bitIndex": -1,
-                            "bindingType": "BINDING_TYPE_VARIABLE"
-                        }
-                    ],
-                    "indexOfBindingToEnable": -1
-                }),
-            },
-            priority,
-        },
+    one_patches.push(new_variable_binding_set(
+        class_indexes[20],
+        priority,
+        json_value!([
+            {
+                "memberPath": "isActive",
+                "variableIndex": 58, // 2_FootScuffLeft
+                "bitIndex": -1,
+                "bindingType": "BINDING_TYPE_VARIABLE"
+            }
+        ]),
     ));
 
     // $RI+21
     one_patches.push(make_event_state_info_patch(
-        &class_indexes[21],
+        class_indexes[21],
         flags,
-        &class_indexes[22],
-        &class_indexes[23],
+        class_indexes[22],
+        class_indexes[23],
         priority,
         player_event,
     ));
@@ -598,49 +433,33 @@ pub(super) fn new_kill_patches<'a>(
     // $RI+22
     one_patches.push({
         // "payload": "#$:AnimObj+&ao2$"
-        new_event_property_array(flags, &passive_indexes, &class_indexes[22], priority)
+        new_event_property_array(flags, passive_indexes, class_indexes[22], priority)
     });
 
     // $RI+23
     one_patches.push(new_player_synchronized_clip_generator(
-        &class_indexes[23],
+        class_indexes[23],
         player_event,
-        &class_indexes[24],
+        class_indexes[24],
         priority,
     ));
 
     // $RI+24
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[24].clone()), Cow::Borrowed("hkbClipGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_indexes[24],
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": format!("NPCPaired_FNISkm{class_index_0_id}"),
-                    "animationName": anim_file, // Animations\\$Fkm$
-                    "triggers": &class_indexes[25],
-                    "cropStartAmountLocalTime": 0.0,
-                    "cropEndAmountLocalTime": 0.0,
-                    "startTime": 0.0,
-                    "playbackSpeed": 1.0,
-                    "enforcedDuration": 0.0,
-                    "userControlledTimeFraction": 0.0,
-                    "animationBindingIndex": -1,
-                    "mode": "MODE_SINGLE_PLAY",
-                    "flags": 0
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        ClipGenerator {
+            index: class_indexes[24],
+            name: format!("NPCPaired_FNISkm{class_index_0_id}").into(),
+            animation_name: anim_file.into(), // Animations\\$Fkm$
+            triggers: class_indexes[25],
+            mode: "MODE_SINGLE_PLAY",
+        }
+        .into_patch(priority),
+    );
 
     // $RI+25
     one_patches.push({
         // Syntaxes starting with `T2`, such as `T2_KillActor/5.867`, are processed here.
-        let mut triggers = new_values_from_triggers(614, &paired_and_kill_animation.flag_set.triggers2);
+        let mut triggers = new_values_from_triggers(614, &animation.flag_set.triggers2);
 
         // NOTE: The insertion of the following triggers is not documented even in 0_master.TEMPLATE.txt.
         //       This was discovered by reading the differences from `temporary_logs/0_master.xml`.
@@ -649,7 +468,7 @@ pub(super) fn new_kill_patches<'a>(
         //    167: 2_KillActor
         //   1120: 2_PairEnd
         triggers.par_extend([622, 167, 1120].par_iter().map(|&id| {
-            json_typed!(borrowed, {
+            json_value!({
                 "localTime": duration,
                 "event": {
                     "id": id,
@@ -661,22 +480,8 @@ pub(super) fn new_kill_patches<'a>(
             })
         }));
 
-        (
-            vec![Cow::Owned(class_indexes[25].clone()), Cow::Borrowed("hkbClipTriggerArray")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[25],
-                        "triggers": triggers,
-                    }),
-                },
-                priority,
-            },
-        )
+        new_clip_trigger_array(class_indexes[25], priority, json_value!(triggers))
     });
-
-    (one_patches, seq_patches)
 }
 
 /// New `hkbStateMachineStateInfo` patch.
@@ -687,11 +492,11 @@ pub(super) fn new_kill_patches<'a>(
 /// - `exit_notify_events`: #2532 or null
 #[must_use]
 pub(super) fn make_player_root_state_info_patch<'a>(
-    class_index: &str,
-    generator_index: &str,
+    class_index: &'a str,
+    generator_index: &'a str,
     flags: FNISAnimFlags,
     priority: usize,
-    state_name: String,
+    state_name: &'a str,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     // NOTE: Why contains `ac`(`FNISAnimFlags::AnimatedCamera`)?
     // Based on the template, it doesn't seem to be enabled when -ac is used,
@@ -712,28 +517,16 @@ pub(super) fn make_player_root_state_info_patch<'a>(
         false => "#0000",
     };
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": enter_notify_events,
-                    "exitNotifyEvents": exit_notify_events,
-                    "transitions": "#0000",
-                    "generator": generator_index,
-                    "name": state_name,
-                    "stateId": calculate_hash(&state_name), // pa: `$171/2$` km: `$148/2$`
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    )
+    StateInfo {
+        index: class_index,
+        enter_notify_events,
+        exit_notify_events,
+        generator: generator_index,
+        state_id: calculate_hash(state_name),
+        name: state_name.into(), // pa: `$171/2$` km: `$148/2$`
+        ..Default::default()
+    }
+    .into_patch(priority)
 }
 
 /// New `hkbStateMachineStateInfo` patch
@@ -745,12 +538,12 @@ pub(super) fn make_player_root_state_info_patch<'a>(
 /// - `exit_notify_events`: `$-h,o|#2528|h|null|o|#2529|#2527$`
 #[must_use]
 pub(super) fn make_event_state_info_patch<'a>(
-    class_index: &str,
+    class_index: &'a str,
     flags: FNISAnimFlags,
-    enter_notify_events_index: &str,
-    generator_index: &str,
+    enter_notify_events_index: &'a str,
+    generator_index: &'a str,
     priority: usize,
-    state_name: &str,
+    state_name: impl Into<Cow<'a, str>>,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
         enter_notify_events_index
@@ -770,38 +563,25 @@ pub(super) fn make_event_state_info_patch<'a>(
         FNIS_AA_GLOBAL_AUTO_GEN_2527
     };
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": enter_notify_events,
-                    "exitNotifyEvents": exit_notify_events,
-                    "transitions": "#0000",
-                    "generator": generator_index,
-                    "name": state_name,
-                    "stateId": 0,
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    )
+    StateInfo {
+        index: class_index,
+        enter_notify_events,
+        exit_notify_events,
+        generator: generator_index,
+        name: state_name.into(),
+        ..Default::default()
+    }
+    .into_patch(priority)
 }
 
 /// - `state_name`:  e.g. `NPC_FNIS_km{class_index_0_id}`, `NPC_FNISpa$1/1$`
 #[must_use]
 pub(super) fn make_npc_root_state_info_patch<'a>(
-    class_index: &str,
-    generator_index: &str,
+    class_index: &'a str,
+    generator_index: &'a str,
     flags: FNISAnimFlags,
     priority: usize,
-    state_name: String,
+    state_name: &'a str,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     // $-ac1|#2534|#2533$
     let enter_notify_events = match flags.contains(FNISAnimFlags::AnimatedCameraSet) {
@@ -814,108 +594,88 @@ pub(super) fn make_npc_root_state_info_patch<'a>(
         false => "#0000",
     };
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": enter_notify_events,
-                    "exitNotifyEvents": exit_notify_events,
-                    "transitions": "#0000",
-                    "generator": generator_index,
-                    "name": state_name,
-                    "stateId": calculate_hash(&state_name),
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    )
+    StateInfo {
+        index: class_index,
+        enter_notify_events,
+        exit_notify_events,
+        generator: generator_index,
+        state_id: calculate_hash(state_name),
+        name: state_name.into(),
+        ..Default::default()
+    }
+    .into_patch(priority)
 }
 
 #[must_use]
 pub(super) fn new_player_synchronized_clip_generator<'a>(
-    class_index: &String,
-    event: &str,
-    generator_index: &str,
+    class_index: &'a str,
+    event: impl Into<Cow<'a, str>>,
+    generator_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
-    (
-        vec![Cow::Owned(class_index.clone()), Cow::Borrowed("BSSynchronizedClipGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": event, // $Ekm$ or $Epa$
-                    "pClipGenerator": generator_index,
-                    "SyncAnimPrefix": "2_", // <- Important.
-                    "bSyncClipIgnoreMarkPlacement": false,
-                    "fGetToMarkTime": 0.0,
-                    "fMarkErrorThreshold": 0.1,
-                    "bLeadCharacter": true,
-                    "bReorientSupportChar": true,
-                    "bApplyMotionFromRoot": false,
-                    "sAnimationBindingIndex": -1
-                }),
-            },
-            priority,
-        },
+    new_class_patch(
+        class_index,
+        "BSSynchronizedClipGenerator",
+        priority,
+        json_value!({
+            "__ptr": class_index,
+            "variableBindingSet": "#0000",
+            "userData": 0,
+            "name": event.into(), // $Ekm$ or $Epa$
+            "pClipGenerator": generator_index,
+            "SyncAnimPrefix": "2_", // <- Important.
+            "bSyncClipIgnoreMarkPlacement": false,
+            "fGetToMarkTime": 0.0,
+            "fMarkErrorThreshold": 0.1,
+            "bLeadCharacter": true,
+            "bReorientSupportChar": true,
+            "bApplyMotionFromRoot": false,
+            "sAnimationBindingIndex": -1
+        }),
     )
 }
 
 #[must_use]
 pub(super) fn new_npc_synchronized_clip_generator<'a>(
-    class_index: &String,
-    event: &str,
-    generator_index: &str,
+    class_index: &'a str,
+    event: impl Into<Cow<'a, str>>,
+    generator_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
-    (
-        vec![Cow::Owned(class_index.clone()), Cow::Borrowed("BSSynchronizedClipGenerator")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "variableBindingSet": "#0000",
-                    "userData": 0,
-                    "name": event,
-                    "pClipGenerator": generator_index,
-                    // See: https://github.com/SARDONYX-sard/serde-hkx/blob/main/crates/havok_types/src/string_ptr.rs#L181
-                    "SyncAnimPrefix": null, // <- XML(&#9216;) null symbol to json
-                    "bSyncClipIgnoreMarkPlacement": false,
-                    "fGetToMarkTime": 0.0,
-                    "fMarkErrorThreshold": 0.1,
-                    "bLeadCharacter": false,
-                    "bReorientSupportChar": true,
-                    "bApplyMotionFromRoot": false,
-                    "sAnimationBindingIndex": -1
-                }),
-            },
-            priority,
-        },
+    new_class_patch(
+        class_index,
+        "BSSynchronizedClipGenerator",
+        priority,
+        json_value!({
+            "__ptr": class_index,
+            "variableBindingSet": "#0000",
+            "userData": 0,
+            "name": event.into(),
+            "pClipGenerator": generator_index,
+            // See: https://github.com/SARDONYX-sard/serde-hkx/blob/main/crates/havok_types/src/string_ptr.rs#L181
+            "SyncAnimPrefix": null, // <- XML(&#9216;) null symbol to json
+            "bSyncClipIgnoreMarkPlacement": false,
+            "fGetToMarkTime": 0.0,
+            "fMarkErrorThreshold": 0.1,
+            "bLeadCharacter": false,
+            "bReorientSupportChar": true,
+            "bApplyMotionFromRoot": false,
+            "sAnimationBindingIndex": -1
+        }),
     )
 }
 
 #[must_use]
 pub(super) fn new_event_property_array<'a>(
     flags: FNISAnimFlags,
-    anim_object_indexes: &[String],
-    class_index: &str,
+    anim_object_indexes: &[&'a str],
+    class_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let mut events = vec![];
 
     if !flags.contains(FNISAnimFlags::HeadTracking) {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 366, // HeadTrackingOff
             "payload": "#0000"
         }));
@@ -925,33 +685,21 @@ pub(super) fn new_event_property_array<'a>(
     for anim_object_index in anim_object_indexes {
         // 937: AnimObjLoad
         // 936: AnimObjDraw
-        events.extend([937, 936].iter().map(|id| {
-            json_typed!(borrowed, {
+        events.extend([937, 936].into_iter().map(|id| {
+            json_value!({
                 "id": id,
-                "payload": anim_object_index
+                "payload": *anim_object_index
             })
         }));
     }
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "events": events
-                }),
-            },
-            priority,
-        },
-    )
+    new_event_array(class_index, priority, json_value!(events))
 }
 
 #[must_use]
 fn new_values_from_triggers<'a>(event_id: u64, triggers: &[Trigger<'a>]) -> Vec<simd_json::borrowed::Value<'a>> {
     let mut values: Vec<simd_json::borrowed::Value> = vec![];
-    values.push(json_typed!(borrowed, {
+    values.push(json_value!({
         "localTime": 0.0,
         "event": {
             "id": event_id,
@@ -963,8 +711,8 @@ fn new_values_from_triggers<'a>(event_id: u64, triggers: &[Trigger<'a>]) -> Vec<
     }));
 
     values.par_extend(triggers.par_iter().map(|Trigger { event, time }| {
-        json_typed!(borrowed, {
-            "localTime": time, // $&TT1$
+        json_value!({
+            "localTime": *time, // $&TT1$
             "event": {
                 "id": format!("$eventID[{event}]$"), // use Nemesis eventID variable. instead of $&TAE1$
                 "payload": "#0000"
@@ -1029,14 +777,14 @@ pub(super) fn new_push_transitions_seq_patch<'a, const N: usize>(
     index: &'static str,
     transition_index: &'static str,
     events: [&str; N],
-    root_state_names: [&String; N],
+    root_state_names: [&str; N],
     priority: usize,
 ) -> (json_path::JsonPath<'a>, ValueWithPriority<'a>) {
     let transitions: Vec<_> = events
         .iter()
-        .zip(root_state_names.iter())
+        .zip(root_state_names.iter().copied())
         .map(|(event_name, root_state_name)| {
-            json_typed!(borrowed, {
+            json_value!({
                 "triggerInterval": {
                     "enterEventId": -1,
                     "exitEventId": -1,
@@ -1065,9 +813,6 @@ pub(super) fn new_push_transitions_seq_patch<'a, const N: usize>(
 
     (
         json_path![index, "hkbStateMachineTransitionInfoArray", "transitions"],
-        ValueWithPriority {
-            patch: JsonPatch { action: Action::SeqPush, value: json_typed!(borrowed, transitions) },
-            priority,
-        },
+        ValueWithPriority { patch: JsonPatch { action: Action::SeqPush, value: json_value!(transitions) }, priority },
     )
 }

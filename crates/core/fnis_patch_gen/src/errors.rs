@@ -120,17 +120,4 @@ pub enum FnisPatchGenerationError {
     /// The addition of OffsetArm animation applies only to 3rd person character; `_1stperson`, creatures are not supported.
     #[snafu(display("The addition of OffsetArm(ofa) animation applies only to 3rd person `character`; `_1stperson`, creatures are not supported.: {}", path.display()))]
     UnsupportedOffsetArmAnimationToCreature { path: PathBuf },
-
-    // AnimSet Patch error ----------
-    /// The generated animation path unexpectedly has no parent directory.
-    #[snafu(display("Failed to determine the parent directory of the animation path: {}", path.display()))]
-    MissingAnimationParent { path: PathBuf },
-
-    /// The parent directory of the generated animation path is not valid UTF-8.
-    #[snafu(display("The parent directory of the animation path is not valid UTF-8: {}", path.display()))]
-    InvalidAnimationParent { path: PathBuf },
-
-    /// The generated animation path has no valid file stem.
-    #[snafu(display("Failed to determine the file stem of the animation path: {}", path.display()))]
-    MissingAnimationFileStem { path: PathBuf },
 }

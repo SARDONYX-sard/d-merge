@@ -1,6 +1,6 @@
 pub(crate) mod alternate;
 
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path, json_value};
 use rayon::prelude::*;
 
 use crate::patch_gen::JsonPatchPairs;
@@ -69,7 +69,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
+                        value: json_value!({
                             "__ptr": class_index,
                             "events": [
                                 {
@@ -90,7 +90,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2529,
                     "events": [
                         { "id": 367, "payload": "#0000" }, // HeadTrackingOn
@@ -106,7 +106,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_GLOBAL_AUTO_GEN_2534,
                     "events": [
                         { "id": 1061, "payload": FNIS_AA_STRING_PAYLOAD_2531 }, // StartAnimatedCamera
@@ -122,7 +122,7 @@ pub(crate) fn new_global_master_patch<'a>(priority: usize) -> JsonPatchPairs<'a>
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_STRING_PAYLOAD_2531,
                     "data": "Camera3rd [Cam3]"
                 }),

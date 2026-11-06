@@ -1,0 +1,49 @@
+# template meshes/actors/draugr/behaviors/draugrbehavior.bin
+one #Sample$1/hkbBehaviorReferenceGenerator
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$1"
+    behaviorName: "Behaviors\\FNIS_Sample_Behavior.hkx"
+    name: "FNIS_ROOT_BFR_Sample_7"
+    userData: I64(0)
+    variableBindingSet: "#0000"
+  }
+one #Sample$2/hkbStateMachineStateInfo
+  Pure { op: Add } priority=7 {
+    __ptr: "#Sample$2"
+    enable: Bool(true)
+    enterNotifyEvents: "#0000"
+    exitNotifyEvents: "#0000"
+    generator: "#Sample$1"
+    listeners: []
+    name: "FNIS_State#Sample$2"
+    probability: F64(1.0)
+    stateId: I64(1311301462)
+    transitions: "#0000"
+    variableBindingSet: "#0000"
+  }
+seq #0092/hkbBehaviorGraphStringData/eventNames
+  SeqPush priority=7 [
+    "sample_idle"
+  ]
+seq #0094/hkbBehaviorGraphData/eventInfos
+  SeqPush priority=7 [
+    {
+      flags: "0"
+    }
+  ]
+seq #2026/hkbStateMachine/states
+  SeqPush priority=7 [
+    "#Sample$2"
+  ]
+# template meshes/actors/draugr/characters/draugr.bin
+seq #0024/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_idle.hkx"
+  ]
+# template meshes/actors/draugr/characterskeleton/draugr_skeleton.bin
+seq #0024/hkbCharacterStringData/animationNames
+  SeqPush priority=7 [
+    "Animations\\Sample\\sample_idle.hkx"
+  ]
+# index meshes/actors/draugr/behaviors/draugrbehavior.bin BehaviorIndexes { string_data: "#0092", behavior_graph: Some("#0094") }
+# next class #Sample$3

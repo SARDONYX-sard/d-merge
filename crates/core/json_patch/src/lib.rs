@@ -8,6 +8,7 @@
 //! a specific index range.
 mod apply;
 pub mod json_path;
+mod json_value;
 mod operation;
 mod patch_types;
 pub mod ptr_mut;
@@ -21,6 +22,7 @@ pub use self::{
         seq::{apply_seq_array_directly, apply_seq_by_priority},
     },
     json_path::JsonPath,
+    json_value::__private,
     operation::Op,
     patch_types::{Action, JsonPatch, ValueWithPriority},
     range::parse::parse_range,

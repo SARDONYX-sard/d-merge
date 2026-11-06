@@ -13,15 +13,21 @@ use fnis_list::combinator::{
     flags::{AnimVar, FNISAnimFlags},
     fnis_animation::FNISAnimation,
 };
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
+use json_patch::{ValueWithPriority, json_path, json_value};
 use rayon::prelude::*;
-use simd_json::{borrowed::Value, json_typed};
+use simd_json::borrowed::Value;
 
 use crate::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
-        JsonPatchPairs, global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5235, kill_move::calculate_hash,
-        new_push_events_seq_patch,
+        JsonPatchPairs,
+        classes::{
+            ClipGenerator, ModifierGenerator, StateInfo, new_anim_object, new_clip_trigger_array, new_event_array,
+            new_variable_binding_set,
+        },
+        global::mt_behavior::FNIS_AA_MT_AUTO_GEN_5235,
+        kill_move::calculate_hash,
+        new_class_patch, new_push_events_seq_patch, new_seq_push,
     },
 };
 
@@ -61,7 +67,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     owned_data: &'a OwnedFnisInjection,
     has_any_anim_obj: bool,
     current_phase: FurniturePhase,
-    class_indexes: &[String; 9],
+    class_indexes: &[&'a str; 9],
     end_anim_state_id: i32,
     next_event_name: Option<&'a str>,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
@@ -73,7 +79,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     let is_empty_anim_vars = animation.flag_set.anim_vars.is_empty();
 
     // NOTE: Must be 1 file unique ID
-    let class_index_0_id = calculate_hash(&class_indexes[0]);
+    let class_index_0_id = calculate_hash(class_indexes[0]);
 
     let anim_file = format!("Animations\\{namespace}\\{}", animation.anim_file); // Animations\\$Foa$
 
@@ -81,10 +87,10 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
     let mut seq_patches = vec![];
 
     seq_patches.extend({
-        let events: &[Cow<'_, str>] = if matches!(current_phase, FurniturePhase::End(_)) {
-            &[event_name.into(), format!("{}_DONE", event_name).into()]
+        let events: Vec<Cow<'a, str>> = if matches!(current_phase, FurniturePhase::End(_)) {
+            vec![event_name.into(), format!("{}_DONE", event_name).into()]
         } else {
-            &[event_name.into()]
+            vec![event_name.into()]
         };
 
         new_push_events_seq_patch(events, "#0083", "#0085", priority)
@@ -101,25 +107,13 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map = dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
-    one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
+    let mut anim_object_indexes = Vec::with_capacity(animation.anim_objects.len());
+    one_patches.extend(animation.anim_objects.iter().map(|name| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
-        class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+        anim_object_indexes.push(new_anim_object_index);
 
         // One anim object
-        (
-            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": new_anim_object_index,
-                        "data": name, // StringPtr
-                    }),
-                },
-                priority,
-            },
-        )
+        new_anim_object(new_anim_object_index, name, priority)
     }));
 
     // $RI
@@ -131,7 +125,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                 || !flags.contains(FNISAnimFlags::HeadTracking)
                 || flags.contains(FNISAnimFlags::AnimatedCameraSet))
         {
-            &class_indexes[1]
+            class_indexes[1]
         } else {
             "#0000"
         };
@@ -144,7 +138,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                 || matches!(current_phase, FurniturePhase::Start) // F
                 || flags.contains(FNISAnimFlags::AnimatedCameraReset))
         {
-            &class_indexes[2]
+            class_indexes[2]
         } else {
             "#0000"
         };
@@ -154,11 +148,11 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
             "#0000"
         } else {
             // first phase $RI+3
-            &class_indexes[3] // `#%:FuTransExit` only matched two entries within mt_behavior, both pointing to RI+3.
+            class_indexes[3] // `#%:FuTransExit` only matched two entries within mt_behavior, both pointing to RI+3.
         };
 
         // #$-AV|%RI+4%|%RI+7%$
-        let generator = if is_empty_anim_vars { &class_indexes[7] } else { &class_indexes[4] };
+        let generator = if is_empty_anim_vars { class_indexes[7] } else { class_indexes[4] };
 
         // Actually, since this comes in as 1, 2, 3... every sequence, it seems fine to reuse the same stateId.
         // one FNIS_List.txt
@@ -169,128 +163,99 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
             FurniturePhase::Middle(i) | FurniturePhase::End(i) => (i + 1) as i32,
         };
 
-        (
-            vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[0],
-                        "variableBindingSet": "#0000",
-                        "listeners": [],
-                        "enterNotifyEvents": enter_notify_events,
-                        "exitNotifyEvents": exit_notify_events,
-                        "transitions": transition,
-                        "generator": generator,
-                        "name": event_name,
-                        "stateId": state_id, // $1+.fu$
-                        "probability": 1.0,
-                        "enable": true
-                    }),
-                },
-                priority,
-            },
-        )
+        StateInfo {
+            index: class_indexes[0],
+            enter_notify_events,
+            exit_notify_events,
+            transitions: transition,
+            generator,
+            name: event_name.into(),
+            state_id, // $1+.fu$
+        }
+        .into_patch(priority)
     });
     one_patches.push({
         // #$:AnimObj+&ao$
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&0).map(|v| v.clone());
-        new_event_property_array_ri1(flags, anim_obj_class_index.as_deref(), &class_indexes[1], priority)
+        new_event_property_array_ri1(flags, anim_object_indexes.first().copied(), class_indexes[1], priority)
     });
-    one_patches.push(new_event_property_array_ri2(flags, has_any_anim_obj, current_phase, &class_indexes[2], priority));
+    one_patches.push(new_event_property_array_ri2(flags, has_any_anim_obj, current_phase, class_indexes[2], priority));
 
     // #$RI+3$ hkbStateMachineTransitionInfoArray
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbStateMachineTransitionInfoArray")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_indexes[3],
-                    "transitions": [
-                        {
-                            "triggerInterval": {
-                                "enterEventId": -1,
-                                "exitEventId": -1,
-                                "enterTime": 0.0,
-                                "exitTime": 0.0,
-                            },
-                            "initiateInterval": {
-                                "enterEventId": -1,
-                                "exitEventId": -1,
-                                "enterTime": 0.0,
-                                "exitTime": 0.0,
-                            },
-                            "transition": FNIS_AA_MT_AUTO_GEN_5235, // #$:BlendTransition+&bl$
-                            "condition": "#0000",
-                            "eventId": 152, // IdleChairExitStart
+    one_patches.push(new_class_patch(
+        class_indexes[3],
+        "hkbStateMachineTransitionInfoArray",
+        priority,
+        json_value!({
+            "__ptr": class_indexes[3],
+            "transitions": [
+                {
+                    "triggerInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0,
+                    },
+                    "initiateInterval": {
+                        "enterEventId": -1,
+                        "exitEventId": -1,
+                        "enterTime": 0.0,
+                        "exitTime": 0.0,
+                    },
+                    "transition": FNIS_AA_MT_AUTO_GEN_5235, // #$:BlendTransition+&bl$
+                    "condition": "#0000",
+                    "eventId": 152, // IdleChairExitStart
 
-                            // Last index of the sequence. (e.g., len 4 is 4. However,
-                            // we use the hash of the last seq state class index here.)
-                            "toStateId": end_anim_state_id, // $&fu$
-                            "fromNestedStateId": 0,
-                            "toNestedStateId": 0,
-                            "priority": 0,
-                            "flags": "FLAG_DISABLE_CONDITION",
-                        }
-                    ],
-                }),
-            },
-            priority,
-        },
+                    // Last index of the sequence. (e.g., len 4 is 4. However,
+                    // we use the hash of the last seq state class index here.)
+                    "toStateId": end_anim_state_id, // $&fu$
+                    "fromNestedStateId": 0,
+                    "toNestedStateId": 0,
+                    "priority": 0,
+                    "flags": "FLAG_DISABLE_CONDITION",
+                }
+            ],
+        }),
     ));
 
     // Skip to RI+7 if non use anim_vars
     if !is_empty_anim_vars {
         // RI+4
-        one_patches.push((
-            vec![Cow::Owned(class_indexes[4].clone()), Cow::Borrowed("hkbModifierGenerator")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[4],
-                        "variableBindingSet": "#0000", // null
-                        "userData": 1,
-                        "name": "IdleMesmerizes_MG",
-                        "modifier": class_indexes[5],
-                        "generator": class_indexes[7],
-                    }),
-                },
-                priority,
-            },
-        ));
+        one_patches.push(
+            ModifierGenerator {
+                index: class_indexes[4],
+                name: "IdleMesmerizes_MG".into(),
+                modifier: class_indexes[5],
+                generator: class_indexes[7],
+            }
+            .into_patch(priority),
+        );
 
         // #RI+5
         one_patches.push({
             let inverse_flags: [bool; 5] =
                 core::array::from_fn(|i| animation.flag_set.anim_vars.get(i).is_some_and(|v| v.inverse));
 
-            (
-                vec![Cow::Owned(class_indexes[5].clone()), Cow::Borrowed("BSIsActiveModifier")],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
-                            "__ptr": class_indexes[5],
-                            "variableBindingSet": &class_indexes[6],
-                            "userData": 2,
-                            "name": "bMesmerizeIsActive",
-                            "enable": true,
-                            "bIsActive0": false,
-                            "bInvertActive0": inverse_flags[0],
-                            "bIsActive1": false,
-                            "bInvertActive1": inverse_flags[1],
-                            "bIsActive2": false,
-                            "bInvertActive2": inverse_flags[2],
-                            "bIsActive3": false,
-                            "bInvertActive3": inverse_flags[3],
-                            "bIsActive4": false,
-                            "bInvertActive4": inverse_flags[4],
-                        }),
-                    },
-                    priority,
-                },
+            new_class_patch(
+                class_indexes[5],
+                "BSIsActiveModifier",
+                priority,
+                json_value!({
+                    "__ptr": class_indexes[5],
+                    "variableBindingSet": class_indexes[6],
+                    "userData": 2,
+                    "name": "bMesmerizeIsActive",
+                    "enable": true,
+                    "bIsActive0": false,
+                    "bInvertActive0": inverse_flags[0],
+                    "bIsActive1": false,
+                    "bInvertActive1": inverse_flags[1],
+                    "bIsActive2": false,
+                    "bInvertActive2": inverse_flags[2],
+                    "bIsActive3": false,
+                    "bInvertActive3": inverse_flags[3],
+                    "bIsActive4": false,
+                    "bInvertActive4": inverse_flags[4],
+                }),
             )
         });
 
@@ -301,7 +266,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                 .iter()
                 .enumerate()
                 .map(|(i, var)| {
-                    simd_json::json_typed!(borrowed, {
+                    json_value!({
                         "memberPath": format!("bIsActive{i}"), // FIXME ?: Is this correct?
                         "variableIndex": format!("$variableID{}$", var.name),  // $&AVI$
                         "bitIndex": -1,
@@ -310,20 +275,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
                 })
                 .collect();
 
-            (
-                vec![Cow::Owned(class_indexes[6].clone()), Cow::Borrowed("hkbVariableBindingSet")],
-                ValueWithPriority {
-                    patch: JsonPatch {
-                        action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
-                            "__ptr": class_indexes[6],
-                            "bindings": bindings,
-                            "indexOfBindingToEnable": -1
-                        }),
-                    },
-                    priority,
-                },
-            )
+            new_variable_binding_set(class_indexes[6], priority, json_value!(bindings))
         });
     }
 
@@ -349,7 +301,7 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
             || flags.contains(FNISAnimFlags::Acyclic)
             || !animation.flag_set.triggers.is_empty()
         {
-            &class_indexes[8]
+            class_indexes[8]
         } else {
             "#0000"
         };
@@ -357,50 +309,20 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
         let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
-        (
-            vec![Cow::Owned(class_indexes[7].clone()), Cow::Borrowed("hkbClipGenerator")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[7],
-                        "variableBindingSet": "#0000",
-                        "userData": 0,
-                        "name": name,
-                        "animationName": anim_file, // Animations\\Ffu$
-                        "triggers": triggers_index,
-                        "cropStartAmountLocalTime": 0.0,
-                        "cropEndAmountLocalTime": 0.0,
-                        "startTime": 0.0,
-                        "playbackSpeed": 1.0,
-                        "enforcedDuration": 0.0,
-                        "userControlledTimeFraction": 0.0,
-                        "animationBindingIndex": -1,
-                        "mode": mode,
-                        "flags": 0
-                    }),
-                },
-                priority,
-            },
-        )
+        ClipGenerator {
+            index: class_indexes[7],
+            name,
+            animation_name: anim_file.into(), // Animations\\Ffu$
+            triggers: triggers_index,
+            mode,
+        }
+        .into_patch(priority)
     });
     one_patches.push({
         let triggers =
             new_values_from_triggers(flags, &animation.flag_set.triggers, event_name, next_event_name, current_phase);
 
-        (
-            vec![Cow::Owned(class_indexes[8].clone()), Cow::Borrowed("hkbClipTriggerArray")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": class_indexes[8],
-                        "triggers": triggers,
-                    }),
-                },
-                priority,
-            },
-        )
+        new_clip_trigger_array(class_indexes[8], priority, json_value!(triggers))
     });
 
     (one_patches, seq_patches)
@@ -409,8 +331,8 @@ pub(super) fn new_furniture_one_anim_patches<'a>(
 #[must_use]
 fn new_event_property_array_ri1<'a>(
     flags: FNISAnimFlags,
-    anim_object_index: Option<&str>,
-    class_index: &str,
+    anim_object_index: Option<&'a str>,
+    class_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let mut events = Vec::new();
@@ -419,7 +341,7 @@ fn new_event_property_array_ri1<'a>(
     if let Some(anim_obj_index) = anim_object_index {
         // 393: AnimObjLoad / 394: AnimObjDraw
         for id in [393, 394] {
-            events.push(json_typed!(borrowed, {
+            events.push(json_value!({
                 "id": id,
                 "payload": anim_obj_index
             }));
@@ -427,32 +349,20 @@ fn new_event_property_array_ri1<'a>(
     }
 
     // HeadTracking OFF block (h-)
-    events.push(json_typed!(borrowed, {
+    events.push(json_value!({
         "id": 20, // HeadTrackingOff
         "payload": "#0000"
     }));
 
     // AnimatedCameraSet block (-ac1)
     if flags.contains(FNISAnimFlags::AnimatedCameraSet) {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 461, // StartAnimatedCamera
             "payload": "#1978"
         }));
     }
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "events": events
-                }),
-            },
-            priority,
-        },
-    )
+    new_event_array(class_index, priority, json_value!(events))
 }
 
 #[must_use]
@@ -460,14 +370,14 @@ fn new_event_property_array_ri2<'a>(
     flags: FNISAnimFlags,
     has_any_anim_obj: bool,
     current_phase: FurniturePhase,
-    class_index: &str,
+    class_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let mut events = Vec::new();
 
     // `$-o-$`: Whether any furniture sequence contains an animation object
     if has_any_anim_obj {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 165, // AnimObjectUnequip
             "payload": "#0000"
         }));
@@ -475,7 +385,7 @@ fn new_event_property_array_ri2<'a>(
 
     // HeadTracking ON block (-h+)
     if matches!(current_phase, FurniturePhase::End(_)) {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 18, // HeadTrackingOn
             "payload": "#0000"
         }));
@@ -483,7 +393,7 @@ fn new_event_property_array_ri2<'a>(
 
     // $-F$: Furniture Start block
     if matches!(current_phase, FurniturePhase::Start) {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 14, // IdleChairSitting
             "payload": "#0000"
         }));
@@ -491,25 +401,13 @@ fn new_event_property_array_ri2<'a>(
 
     // AnimatedCameraReset block (-ac0)
     if flags.contains(FNISAnimFlags::AnimatedCameraReset) {
-        events.push(json_typed!(borrowed, {
+        events.push(json_value!({
             "id": 462, // EndAnimatedCamera
             "payload": "#0000"
         }));
     }
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "events": events
-                }),
-            },
-            priority,
-        },
-    )
+    new_event_array(class_index, priority, json_value!(events))
 }
 
 #[must_use]
@@ -522,8 +420,8 @@ fn new_values_from_triggers<'a>(
 ) -> Vec<Value<'a>> {
     let mut values: Vec<Value> = vec![];
     values.par_extend(triggers.par_iter().map(|Trigger { event, time }| {
-        json_typed!(borrowed, {
-            "localTime": time, // $&TT$
+        json_value!({
+            "localTime": *time, // $&TT$
             "event": {
                 "id": format!("$eventID[{event}]$"), // use Nemesis eventID variable. instead of $&TAE$
                 "payload": "#0000"
@@ -539,7 +437,7 @@ fn new_values_from_triggers<'a>(
     // `$-L$` <- When Furniture seq is last
     if matches!(current_phase, FurniturePhase::End(_)) {
         // "$AE1fug+&fug$", "5"
-        values.push(json_typed!(borrowed, {
+        values.push(json_value!({
             "localTime": -0.05,
             "event": {
                 "id": 130, // IdleForceDefaultState
@@ -549,7 +447,7 @@ fn new_values_from_triggers<'a>(
             "acyclic": false,
             "isAnnotation": false
         }));
-        values.push(json_typed!(borrowed, {
+        values.push(json_value!({
             "localTime": -0.2,
             "event": {
                 "id": format!("$eventID[{current_event_name}_DONE]$"), // DONE AnimEvent: $AE1fug+&fug$ (Need: seq last event + _DONE suffix)
@@ -559,7 +457,7 @@ fn new_values_from_triggers<'a>(
             "acyclic": false,
             "isAnnotation": false
         }));
-        values.push(json_typed!(borrowed, {
+        values.push(json_value!({
             "localTime": -0.2,
             "event": {
                 "id": 5, // IdleFurnitureExit
@@ -576,7 +474,7 @@ fn new_values_from_triggers<'a>(
     if flags.contains(FNISAnimFlags::Acyclic) {
         // If there is no next, then it is last.
         if let Some(next_event_name) = next_event_name {
-            values.push(json_typed!(borrowed, {
+            values.push(json_value!({
                 "localTime": 0.0,
                 "event": {
                     "id": format!("$eventID[{next_event_name}]$"), // next AnimEvent: $AE1fu+1/1$
@@ -604,56 +502,42 @@ pub(crate) fn new_push_values_seq_patch<'a>(
     priority: usize,
 ) -> [(json_path::JsonPath<'a>, ValueWithPriority<'a>); 3] {
     [
-        (
+        new_seq_push(
             json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],
-            ValueWithPriority {
-                patch: JsonPatch { action: Action::SeqPush, value: values.iter().map(|value| value.name).collect() },
-                priority,
-            },
+            priority,
+            values.iter().map(|value| value.name).collect(),
         ),
-        (
+        new_seq_push(
             json_path![variable_index, "hkbVariableValueSet", "wordVariableValues"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: simd_json::json_typed!(
-                        borrowed,
-                        values
-                            .par_iter()
-                            .map(|_| {
-                                simd_json::json_typed!(borrowed, {
-                                    "value": 0
-                                })
-                            })
-                            .collect::<Vec<_>>()
-                    ),
-                },
-                priority,
-            },
+            priority,
+            json_value!(
+                values
+                    .par_iter()
+                    .map(|_| {
+                        json_value!({
+                            "value": 0
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            ),
         ),
-        (
+        new_seq_push(
             json_path![behavior_graph_index, "hkbBehaviorGraphData", "variableInfos",],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: simd_json::json_typed!(
-                        borrowed,
-                        values
-                            .par_iter()
-                            .map(|_| {
-                                simd_json::json_typed!(borrowed, {
-                                    "role": {
-                                        "role": "ROLE_DEFAULT",
-                                        "flags": "0"
-                                    },
-                                    "type": "VARIABLE_TYPE_INT32"
-                                })
-                            })
-                            .collect::<Vec<_>>()
-                    ),
-                },
-                priority,
-            },
+            priority,
+            json_value!(
+                values
+                    .par_iter()
+                    .map(|_| {
+                        json_value!({
+                            "role": {
+                                "role": "ROLE_DEFAULT",
+                                "flags": "0"
+                            },
+                            "type": "VARIABLE_TYPE_INT32"
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            ),
         ),
     ]
 }

@@ -1924,6 +1924,7 @@ dependencies = [
  "skyrim_esp",
  "snafu",
  "sonic-rs",
+ "stdx",
  "tokio",
  "tracing",
  "winnow",

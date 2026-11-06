@@ -30,6 +30,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use stdx::arena::StrArena;
 use tokio::fs;
 
 use crate::{errors::FnisError, patch_gen::generated_behaviors::BehaviorEntry};
@@ -125,11 +126,14 @@ pub struct OwnedFnisInjection {
 
     /// New ID for adding a patch to the new `animationsetdatasinglefile.txt`
     current_asdsf_index: AtomicUsize,
+
+    /// What the patches generated from this mod borrow, and is not in its list: see [`Self::keep`].
+    generated_text: StrArena,
 }
 
 impl OwnedFnisInjection {
     /// All indexes start from 1: the Nemesis variables they stand for are 1-based.
-    pub(crate) const fn new(
+    pub(crate) fn new(
         animations_mod_dir: PathBuf,
         behavior_entry: &'static BehaviorEntry,
         namespace: String,
@@ -147,6 +151,7 @@ impl OwnedFnisInjection {
             current_class_index: AtomicUsize::new(1),
             current_adsf_index: AtomicUsize::new(1),
             current_asdsf_index: AtomicUsize::new(1),
+            generated_text: StrArena::new(),
         }
     }
 
@@ -218,16 +223,23 @@ impl OwnedFnisInjection {
     /// # Note
     /// Don't call this from a parallel iterator: the numbers would differ from run to run, and with them
     /// the generated output.
-    pub(crate) fn next_class_name_attribute(&self) -> String {
+    pub(crate) fn next_class_name_attribute(&self) -> &str {
         let idx = &self.current_class_index.fetch_add(1, Ordering::Acquire);
-        format!("#{}${idx}", self.namespace)
+        self.keep(format!("#{}${idx}", self.namespace))
+    }
+
+    /// Keeps generated text for as long as this mod, for the patches to borrow it instead of copying it.
+    ///
+    /// Only for what is used in more than one place: otherwise the patch can own it.
+    pub(crate) fn keep(&self, text: String) -> &str {
+        self.generated_text.keep(text)
     }
 
     /// Returns a new ID for adding a patch to the new `animationdatasinglefile.txt`.
     /// - `#FNIS_{namespace}${idx}`
-    pub(crate) fn next_adsf_id(&self) -> String {
+    pub(crate) fn next_adsf_id(&self) -> &str {
         let idx = &self.current_adsf_index.fetch_add(1, Ordering::Acquire);
-        format!("#FNIS_{}${idx}", self.namespace)
+        self.keep(format!("#FNIS_{}${idx}", self.namespace))
     }
 
     /// Returns a new ID for adding a patch to the new `animationsetdatasinglefile.txt`.

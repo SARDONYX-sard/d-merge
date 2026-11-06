@@ -205,7 +205,6 @@ impl AAGroupName {
     /// assert_eq!(AAGroupName::OneHmEqp.group_id(), 37);
     /// assert_eq!(AAGroupName::Shield.group_id(),  53);
     /// ```
-    #[inline]
     pub(crate) const fn group_id(self) -> u64 {
         match self {
             Self::MtIdle => 0,
@@ -266,7 +265,6 @@ impl AAGroupName {
     }
 
     /// Returns the FNIS wire string for this group, e.g. `"_1hmeqp"`.
-    #[inline]
     pub(crate) const fn as_fnis_str(self) -> &'static str {
         match self {
             Self::MtIdle => "_mtidle",

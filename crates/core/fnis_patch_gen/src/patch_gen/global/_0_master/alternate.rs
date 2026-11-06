@@ -1,12 +1,13 @@
 use std::borrow::Cow;
 
-use json_patch::{Action, JsonPatch, ValueWithPriority, json_path};
+use json_patch::{Action, JsonPatch, ValueWithPriority, json_path, json_value};
 use rayon::prelude::*;
 use simd_json::borrowed::Value;
 
 use crate::patch_gen::{
     alternate::generated_group_table::ALT_GROUPS,
     generated_behaviors::{BehaviorEntry, DEFAULT_FEMALE},
+    new_seq_push,
 };
 
 /// This variable likely needs to be registered below.
@@ -43,47 +44,35 @@ pub(crate) fn new_push_alt_anim_values_seq_patch<'a>(
     };
 
     [
-        (
+        new_seq_push(
             json_path!["#0107", "hkbVariableValueSet", "wordVariableValues"],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: simd_json::json_typed!(
-                        borrowed,
-                        keys.par_iter()
-                            .map(|_| {
-                                simd_json::json_typed!(borrowed, {
-                                    "value": 0
-                                })
-                            })
-                            .collect::<Vec<_>>()
-                    ),
-                },
-                priority,
-            },
+            priority,
+            json_value!(
+                keys.par_iter()
+                    .map(|_| {
+                        json_value!({
+                            "value": 0
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            ),
         ),
-        (
+        new_seq_push(
             json_path![behavior_graph_index, "hkbBehaviorGraphData", "variableInfos",],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::SeqPush,
-                    value: simd_json::json_typed!(
-                        borrowed,
-                        keys.par_iter()
-                            .map(|_| {
-                                simd_json::json_typed!(borrowed, {
-                                    "role": {
-                                        "role": "ROLE_DEFAULT",
-                                        "flags": "0"
-                                    },
-                                    "type": "VARIABLE_TYPE_INT32"
-                                })
-                            })
-                            .collect::<Vec<_>>()
-                    ),
-                },
-                priority,
-            },
+            priority,
+            json_value!(
+                keys.par_iter()
+                    .map(|_| {
+                        json_value!({
+                            "role": {
+                                "role": "ROLE_DEFAULT",
+                                "flags": "0"
+                            },
+                            "type": "VARIABLE_TYPE_INT32"
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            ),
         ),
         (
             json_path![string_data_index, "hkbBehaviorGraphStringData", "variableNames",],

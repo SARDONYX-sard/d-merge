@@ -1,6 +1,6 @@
 //! For `character/behaviors/mt_behavior.xml` 1 file patch
 
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
+use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path, json_value};
 use rayon::prelude::*;
 
 use crate::patch_gen::JsonPatchPairs;
@@ -53,7 +53,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
                 ValueWithPriority {
                     patch: JsonPatch {
                         action: Action::Pure { op: Op::Add },
-                        value: simd_json::json_typed!(borrowed, {
+                        value: json_value!({
                             "__ptr": class_index,
                             "events": [
                                 {
@@ -75,7 +75,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_MT_AUTO_GEN_5222,
                     "triggers": [
                         {
@@ -111,7 +111,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_MT_AUTO_GEN_5235,
                     "variableBindingSet": "#0000",
                     "userData": 0,
@@ -133,7 +133,7 @@ pub(super) fn new_mt_global_patch<'a>(priority: usize) -> JsonPatchPairs<'a> {
         ValueWithPriority {
             patch: JsonPatch {
                 action: Action::Pure { op: Op::Add },
-                value: simd_json::json_typed!(borrowed, {
+                value: json_value!({
                     "__ptr": FNIS_AA_MT_AUTO_GEN_5232,
                     "variableBindingSet": "#0000",
                     "userData": 0,

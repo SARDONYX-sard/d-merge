@@ -33,7 +33,6 @@ pub struct FNISIoJobRunner {
 }
 
 impl FNISIoJobRunner {
-    #[inline]
     pub(crate) const fn new(
         jobs: Vec<AnimIoJob>,
         output_target: OutPutTarget,

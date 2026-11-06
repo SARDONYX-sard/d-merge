@@ -82,7 +82,6 @@ impl BehaviorEntry {
     }
 
     /// Is `character` patch.
-    #[inline]
     pub(crate) fn is_3rd_person_character(&self) -> bool {
         self.behavior_object == "character"
     }
@@ -93,7 +92,6 @@ impl BehaviorEntry {
     /// Regarding characters, in addition to `default_behavior: "characters/defaultmale.hkx"`,
     /// the same animation path must also be registered in `characters/female/defaultfemale.hkx`.
     /// This is the condition check for that purpose.
-    #[inline]
     pub(crate) fn is_humanoid(&self) -> bool {
         HUMANOID.contains_key(self.behavior_object)
     }
@@ -103,7 +101,6 @@ impl BehaviorEntry {
     /// # Use cases for this API
     /// `draugr` shares `draugrskeleton` and skeleton, so the same Animation must be registered. This is used for that determination.
     /// Consequently, `event` and `animationdatasinglefile.txt` are also synchronized. (It's unclear if this is actually correct)
-    #[inline]
     pub(crate) fn is_draugr(&self) -> bool {
         self.behavior_object == "draugr"
     }

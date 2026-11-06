@@ -20,7 +20,7 @@ use crate::patch_gen::JsonPatchPairs;
 ///
 /// See: `FNIS Behavior SE 7.6\tools\GenerateFNIS_for_Users\templates\mt_behavior_TEMPLATE.txt`
 pub(crate) fn new_mt_global_patch<'a>(
-    anim_groups_states: Vec<String>,
+    anim_groups_states: Vec<&'a str>,
     priority: usize,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
     let mut one_patches = self::alternate::new_mt_global_patch(priority);

@@ -2,17 +2,16 @@
 use std::borrow::Cow;
 
 use fnis_list::combinator::{flags::FNISAnimFlags, fnis_animation::FNISAnimation};
-use json_patch::{Action, JsonPatch, Op, ValueWithPriority, json_path};
-use rayon::prelude::*;
-use simd_json::json_typed;
+use json_patch::{ValueWithPriority, json_path, json_value};
 
 use crate::{
     collect::owned::OwnedFnisInjection,
     patch_gen::{
         JsonPatchPairs,
+        classes::{ClipGenerator, StateInfo, new_anim_object, new_event_array},
         global::mt_behavior::{self, FNIS_AA_MT_AUTO_GEN_5235},
         kill_move::{calculate_hash, new_push_transitions_seq_patch},
-        new_push_events_seq_patch,
+        new_push_events_seq_patch, new_seq_push,
     },
 };
 
@@ -22,19 +21,19 @@ pub(super) fn new_offset_arm_patches<'a>(
     animation: &FNISAnimation<'a>,
     owned_data: &'a OwnedFnisInjection,
 ) -> (JsonPatchPairs<'a>, JsonPatchPairs<'a>) {
-    let class_indexes: [String; 5] = std::array::from_fn(|_| owned_data.next_class_name_attribute());
+    let class_indexes: [&'a str; 5] = std::array::from_fn(|_| owned_data.next_class_name_attribute());
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;
     let flags = animation.flag_set.flags;
 
     // NOTE: Assign a unique ID for each sentence in `ofa`(OffsetArm) to the event + Right & Left stateId.
-    let class_index_0_id = calculate_hash(&class_indexes[0]); // Must be 1 file unique
+    let class_index_0_id = calculate_hash(class_indexes[0]); // Must be 1 file unique
 
-    let class_index_1_id = calculate_hash(&class_indexes[1]); // Must be 1 file unique
+    let class_index_1_id = calculate_hash(class_indexes[1]); // Must be 1 file unique
 
     let right_offset_event = format!("FNIS_RightOffsetCG{class_index_0_id}");
     let left_offset_event = format!("FNIS_LeftOffsetCG{class_index_1_id}");
-    let anim_file = format!("Animations\\{namespace}\\{}", animation.anim_file); // Animations\\$Foa$
+    let anim_file = owned_data.keep(format!("Animations\\{namespace}\\{}", animation.anim_file)); // Animations\\$Foa$
 
     let mut one_patches = vec![];
     let mut seq_patches = vec![];
@@ -42,113 +41,67 @@ pub(super) fn new_offset_arm_patches<'a>(
     let right_offset_state_name = format!("FNIS_RightOffset{class_index_0_id}");
     let left_offset_state_name = format!("FNIS_LeftOffset{class_index_1_id}");
 
-    seq_patches.extend(new_push_events_seq_patch(&[animation.anim_event.into()], "#0083", "#0085", priority));
+    seq_patches.extend(new_push_events_seq_patch(vec![animation.anim_event.into()], "#0083", "#0085", priority));
 
     seq_patches.push(new_push_transitions_seq_patch(
         "#4038",
         FNIS_AA_MT_AUTO_GEN_5235,
         [animation.anim_event],
-        [&class_indexes[0]],
+        [class_indexes[0]],
         priority,
     ));
 
     // Push and register the Root `hkbStateMachineStateInfo` for both Right & Left offset arms.
-    seq_patches.push((
+    seq_patches.push(new_seq_push(
         json_path!["#5138", "hkbStateMachine", "states"],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::SeqPush,
-                value: json_typed!(borrowed, [class_indexes[0], class_indexes[2]]),
-            },
-            priority,
-        },
+        priority,
+        json_value!([class_indexes[0], class_indexes[2]]),
     ));
 
     // Associate the number of times an assigned index occurs with the name of the AnimObject at that time, and use this association to reference the eventID.
     // e.g. (#FNIS$1, 1)
-    let class_index_to_anim_object_map = dashmap::DashMap::<_, _, fast_hash::RandomState>::default();
-    one_patches.par_extend(animation.anim_objects.par_iter().enumerate().map(|(index, name)| {
+    let mut anim_object_indexes = Vec::with_capacity(animation.anim_objects.len());
+    one_patches.extend(animation.anim_objects.iter().map(|name| {
         let new_anim_object_index = owned_data.next_class_name_attribute();
-        class_index_to_anim_object_map.insert(index, new_anim_object_index.clone());
+        anim_object_indexes.push(new_anim_object_index);
 
         // One anim object
-        (
-            vec![Cow::Owned(new_anim_object_index.clone()), Cow::Borrowed("hkbStringEventPayload")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: simd_json::json_typed!(borrowed, {
-                        "__ptr": new_anim_object_index,
-                        "data": name, // StringPtr
-                    }),
-                },
-                priority,
-            },
-        )
+        new_anim_object(new_anim_object_index, name, priority)
     }));
 
     // $RI
-    one_patches.push((
-        vec![Cow::Owned(class_indexes[0].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_indexes[0],
-                    "variableBindingSet": "#0000",
-                    "listeners": [],
-                    "enterNotifyEvents": "#0000",
-                    "exitNotifyEvents": "#0000",
-                    "transitions": "#5111",
-                    "generator": &class_indexes[1],
-                    "name": right_offset_state_name,
-                    "stateId": class_index_0_id, // $99/1$
-                    "probability": 1.0,
-                    "enable": true
-                }),
-            },
-            priority,
-        },
-    ));
+    one_patches.push(
+        StateInfo {
+            index: class_indexes[0],
+            transitions: "#5111",
+            generator: class_indexes[1],
+            name: right_offset_state_name.into(),
+            state_id: class_index_0_id, // $99/1$
+            ..Default::default()
+        }
+        .into_patch(priority),
+    );
 
     // #$RI+1$  hkbClipGenerator
     one_patches.push({
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
         let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
-        (
-            vec![Cow::Owned(class_indexes[1].clone()), Cow::Borrowed("hkbClipGenerator")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[1],
-                        "variableBindingSet": "#0000",
-                        "userData": 0,
-                        "name": right_offset_event,
-                        "animationName": anim_file,
-                        "triggers": "#0000",
-                        "cropStartAmountLocalTime": 0.0,
-                        "cropEndAmountLocalTime": 0.0,
-                        "startTime": 0.0,
-                        "playbackSpeed": 1.0,
-                        "enforcedDuration": 0.0,
-                        "userControlledTimeFraction": 0.0,
-                        "animationBindingIndex": -1,
-                        "mode": mode,
-                        "flags": 0
-                    }),
-                },
-                priority,
-            },
-        )
+        ClipGenerator {
+            index: class_indexes[1],
+            name: right_offset_event.into(),
+            animation_name: anim_file.into(),
+            triggers: "#0000",
+            mode,
+        }
+        .into_patch(priority)
     });
 
     // #$RI+2$  hkbStateMachineStateInfo
     one_patches.push({
         // $-o|#%RI+4%|h|null|#5219$
         let enter_notify_events = if flags.contains(FNISAnimFlags::AnimObjects) {
-            class_indexes[4].as_str()
+            class_indexes[4]
         } else if flags.contains(FNISAnimFlags::HeadTracking) {
             "#0000"
         } else {
@@ -160,28 +113,16 @@ pub(super) fn new_offset_arm_patches<'a>(
         // $-o|#5147|#5152$
         let transition = if flags.contains(FNISAnimFlags::AnimObjects) { "#5147" } else { "#5152" };
 
-        (
-            vec![Cow::Owned(class_indexes[2].clone()), Cow::Borrowed("hkbStateMachineStateInfo")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[2],
-                        "variableBindingSet": "#0000",
-                        "listeners": [],
-                        "enterNotifyEvents": enter_notify_events,
-                        "exitNotifyEvents": exit_notify_events,
-                        "transitions": transition,
-                        "generator": &class_indexes[3],
-                        "name": left_offset_state_name,
-                        "stateId": class_index_0_id,
-                        "probability": 1.0,
-                        "enable": true
-                    }),
-                },
-                priority,
-            },
-        )
+        StateInfo {
+            index: class_indexes[2],
+            enter_notify_events,
+            exit_notify_events,
+            transitions: transition,
+            generator: class_indexes[3],
+            name: left_offset_state_name.into(),
+            state_id: class_index_0_id,
+        }
+        .into_patch(priority)
     });
 
     // TODO: refactor $RI+1 & $RI+3 are same pattern
@@ -191,39 +132,18 @@ pub(super) fn new_offset_arm_patches<'a>(
         // $-a|MODE_SINGLE_PLAY|MODE_LOOPING$
         let mode = if flags.contains(FNISAnimFlags::Acyclic) { "MODE_SINGLE_PLAY" } else { "MODE_LOOPING" };
 
-        (
-            vec![Cow::Owned(class_indexes[3].clone()), Cow::Borrowed("hkbClipGenerator")],
-            ValueWithPriority {
-                patch: JsonPatch {
-                    action: Action::Pure { op: Op::Add },
-                    value: json_typed!(borrowed, {
-                        "__ptr": class_indexes[3],
-                        "variableBindingSet": "#0000",
-                        "userData": 0,
-                        "name": left_offset_event,
-                        "animationName": anim_file, // Animations\\Fofa$
-                        "triggers": "#0000",
-                        "cropStartAmountLocalTime": 0.0,
-                        "cropEndAmountLocalTime": 0.0,
-                        "startTime": 0.0,
-                        "playbackSpeed": 1.0,
-                        "enforcedDuration": 0.0,
-                        "userControlledTimeFraction": 0.0,
-                        "animationBindingIndex": -1,
-                        "mode": mode,
-                        "flags": 0
-                    }),
-                },
-                priority,
-            },
-        )
+        ClipGenerator {
+            index: class_indexes[3],
+            name: left_offset_event.into(),
+            animation_name: anim_file.into(), // Animations\\Fofa$
+            triggers: "#0000",
+            mode,
+        }
+        .into_patch(priority)
     });
 
     // #$RI+4$  hkbStateMachineEventPropertyArray
-    one_patches.push({
-        let anim_obj_class_index = class_index_to_anim_object_map.get(&0).map(|v| v.clone());
-        new_event_property_array(flags, anim_obj_class_index, &class_indexes[4], priority)
-    });
+    one_patches.push(new_event_property_array(flags, anim_object_indexes.first().copied(), class_indexes[4], priority));
 
     (one_patches, seq_patches)
 }
@@ -233,14 +153,14 @@ pub(super) fn new_offset_arm_patches<'a>(
 #[must_use]
 fn new_event_property_array<'a>(
     flags: FNISAnimFlags,
-    anim_object_index: Option<String>,
-    class_index: &str,
+    anim_object_index: Option<&'a str>,
+    class_index: &'a str,
     priority: usize,
 ) -> (Vec<Cow<'a, str>>, ValueWithPriority<'a>) {
     let mut events = if flags.contains(FNISAnimFlags::HeadTracking) {
         vec![]
     } else {
-        vec![json_typed!(borrowed, {
+        vec![json_value!({
             "id": 20, // HeadTrackingOff
             "payload": "#0000"
         })]
@@ -249,25 +169,13 @@ fn new_event_property_array<'a>(
     if let Some(anim_object_index) = anim_object_index {
         // 393: AnimObjLoad
         // 394: AnimObjDraw
-        events.extend([393, 394].iter().map(|id| {
-            json_typed!(borrowed, {
+        events.extend([393, 394].into_iter().map(|id| {
+            json_value!({
                     "id": id,
                     "payload": anim_object_index
             })
         }));
     }
 
-    (
-        vec![Cow::Owned(class_index.to_string()), Cow::Borrowed("hkbStateMachineEventPropertyArray")],
-        ValueWithPriority {
-            patch: JsonPatch {
-                action: Action::Pure { op: Op::Add },
-                value: json_typed!(borrowed, {
-                    "__ptr": class_index,
-                    "events": events
-                }),
-            },
-            priority,
-        },
-    )
+    new_event_array(class_index, priority, json_value!(events))
 }
