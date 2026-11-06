@@ -10,9 +10,9 @@ use super::{
     export::owned_key,
     locations::{
         anim_template_path, code_dirs, code_of, file_name_of, file_stem, joined, meshes_path_of_folder, mod_root_of,
-        patch_folders,
+        pandora_dir, patch_folders,
     },
-    mod_info::parse_info,
+    mod_info::{pandora_info, parse_info},
     read_dir, read_text,
 };
 
@@ -96,11 +96,19 @@ impl Workspace {
         // A mod has its patches for templates Nemesis does not know in the other engine's directory.
         // Reading one of them would lose the other's at the next export to the same place.
         let dirs = root.as_ref().map_or_else(|| vec![selected.to_path_buf()], |root| code_dirs(root, &code));
+        let pandora = root.as_ref().and_then(|root| pandora_dir(root, &code));
         let info = dirs.iter().find_map(|dir| std::fs::read_to_string(dir.join("info.ini")).ok());
-        let mut workspace = Self { info: info.map(|info| parse_info(&info)).unwrap_or_default(), ..Self::default() };
+        let info = info
+            .map(|info| parse_info(&info))
+            .or_else(|| pandora.as_deref().and_then(pandora_info))
+            .unwrap_or_default();
+        let mut workspace = Self { info, ..Self::default() };
         let mut skipped = Vec::new();
         for dir in &dirs {
             workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped)?;
+        }
+        if let Some(pandora) = &pandora {
+            workspace.read_pandora_dir(pandora, template_root, &mut skipped)?;
         }
         Ok((workspace, code, skipped))
     }

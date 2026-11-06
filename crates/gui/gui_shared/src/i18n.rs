@@ -609,6 +609,9 @@ pub enum I18nKey {
     /// d-merge's Nemesis parser accepts this patch.
     NemesisParserOk,
 
+    /// These operations of Pandora give the object as it is edited here.
+    NemesisPandoraOpsOk,
+
     /// Add a behavior (template xml) to start.
     NemesisNoBehavior,
 
@@ -950,6 +953,15 @@ pub enum I18nKey {
 
     /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
     NemesisNotAMod,
+
+    /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
+    NemesisPandoraDocHover,
+
+    /// What Export writes. Nemesis: Nemesis_Engine and Nemesis_EngineExt. Pandora: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml, without the animation data. It is the same work: a mod read in one format can be written in the other.
+    NemesisExportFormatHover,
+
+    /// Written for Pandora
+    NemesisExportedPandora,
 
     /// This mod has several mod codes: which one to open?
     NemesisChooseModCode,

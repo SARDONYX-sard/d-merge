@@ -709,6 +709,8 @@ pub fn is_existing_mod_code(code: &str) -> bool {
 }
 
 /// Is `code` valid for a **new** Nemesis mod? (4-6 ASCII letters/digits, not `vanilla`)
+///
+/// The rule of the Nemesis Sub-tool, which makes patches (`T2/main.cpp`).
 #[inline]
 pub fn is_valid_mod_code(code: &str) -> bool {
     (4..=6).contains(&code.len())

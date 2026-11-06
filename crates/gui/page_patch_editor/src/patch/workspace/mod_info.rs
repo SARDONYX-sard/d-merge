@@ -53,6 +53,21 @@ pub(super) fn parse_info(ini: &str) -> ModInfo {
     info
 }
 
+/// What the `info.xml` of the Pandora mod at `dir` says. `null` is what Pandora writes for what is not
+/// known. `None`: it has none, or it can't be read.
+///
+/// e.g. `<mod code="amco"><name>Attack MCO</name><author>a</author><site>null</site></mod>`
+pub(super) fn pandora_info(dir: &std::path::Path) -> Option<ModInfo> {
+    let text = std::fs::read(dir.join("info.xml")).ok()?;
+    let text = String::from_utf8_lossy(&text);
+    let root = pandora_patch::tree::parse(text.trim_start_matches('\u{feff}'))?;
+    let field = |name: &str| {
+        let words = root.children.iter().find(|child| child.tag == name).map(|child| child.words.join(" "));
+        words.filter(|words| !words.eq_ignore_ascii_case("null")).unwrap_or_default()
+    };
+    Some(ModInfo { name: field("name"), author: field("author"), site: field("site"), ..ModInfo::default() })
+}
+
 impl ModInfo {
     /// `info.ini` of the mod, without a line end at the end. Nemesis wants `auto`, so a mod has it.
     pub(super) fn exported(&self) -> String {

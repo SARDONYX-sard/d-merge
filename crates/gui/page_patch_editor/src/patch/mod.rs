@@ -94,6 +94,8 @@ pub(crate) struct PatchTool {
     mod_dir: String,
     /// See [`Self::take_mod_written`].
     mod_written: bool,
+    /// What was edited of the active behavior since [`Self::sync_pandora_doc`].
+    pandora_edited: Vec<String>,
     /// A mod with several codes was opened: which of them? See [`ui::code_choice`].
     code_choice: Option<ui::code_choice::ModCodeChoice>,
     /// See [`new_work`]. `Some`: its form is shown on the start screen.
@@ -645,6 +647,117 @@ mod work_tests {
 
         assert_eq!(of_one, (Some("para".to_owned()), false));
         assert_eq!(of_patch_dir, (Some("nemesis".to_owned()), false));
+    }
+
+    /// A work kept from when a Pandora mod was read without being applied: only its file is in the cache.
+    /// Opening it goes on with that work, so that is where the edits have to come from.
+    #[test]
+    fn a_pandora_mod_shows_its_changes_also_from_an_old_work() {
+        let dir = std::env::temp_dir().join(format!("d_merge_pandora_cache_{}", std::process::id()));
+        let meshes = dir.join("templates/meshes/actors/character/behaviors");
+        std::fs::create_dir_all(&meshes).unwrap();
+        std::fs::write(
+            meshes.join("0_master.xml"),
+            "<hkpackfile><hksection name=\"__data__\">\n<hkobject name=\"#0001\" class=\"hkbStateMachine\" signature=\"0x1\">\n\t<hkparam name=\"enable\">true</hkparam>\n</hkobject>\n</hksection></hkpackfile>\n",
+        )
+        .unwrap();
+        let root = dir.join("mods/Pandora");
+        let mod_dir = root.join("Pandora_Engine/mod/pandora");
+        std::fs::create_dir_all(mod_dir.join("patches")).unwrap();
+        std::fs::write(
+            mod_dir.join("patches/0_master.xml"),
+            "<patch>\n\t<Replace path=\"#0001/enable\">\n\t\t<hkparam name=\"enable\">false</hkparam>\n\t</Replace>\n</patch>\n",
+        )
+        .unwrap();
+
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let open = |notify: &mut Notification| {
+            let mut tool = tool_in(&dir.join("out"));
+            tool.template_dir = dir.join("templates").display().to_string();
+            tool.open_mod(&mod_dir, notify, &i18n);
+            tool.sync_workspace(notify, &i18n);
+            tool
+        };
+
+        let mut first = open(&mut notify);
+        assert!(first.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
+        assert_eq!(first.workspace.export_format, workspace::ExportFormat::Pandora);
+        first.mark_dirty();
+        first.save_now(&mut notify, &i18n);
+
+        // What an old build left: the file, no edits, and no format.
+        let cache = first.cache_root.join("pandora");
+        let behavior_dir =
+            std::fs::read_dir(&cache).unwrap().flatten().map(|entry| entry.path()).find(|path| path.is_dir()).unwrap();
+        for file in std::fs::read_dir(&behavior_dir).unwrap().flatten() {
+            let name = file.file_name().to_string_lossy().into_owned();
+            if name.starts_with('#') {
+                std::fs::remove_file(file.path()).unwrap();
+            }
+        }
+        let json = cache.join("workspace.json");
+        let text = std::fs::read_to_string(&json).unwrap();
+        std::fs::write(&json, text.replace("\"export_format\":\"Pandora\",", "")).unwrap();
+
+        let second = open(&mut notify);
+        let edits = second.workspace.behaviors.first().map(|behavior| behavior.edits.len());
+        let edited = second.workspace.behaviors[0].edits.get("#0001").cloned();
+        let format = second.workspace.export_format;
+        let changed = {
+            let graph = tree::Graph::new(&second.workspace.behaviors[0]);
+            graph.node_of("#0001").is_some_and(|node| graph.is_changed(node))
+        };
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(edits, Some(1));
+        assert!(edited.unwrap().contains(">false<"));
+        assert!(changed, "the list marks it");
+        assert_eq!(format, workspace::ExportFormat::Pandora);
+    }
+
+    /// The preview says what `Export` would write, and its `↶` takes back what it shows.
+    #[test]
+    fn the_preview_follows_the_export_format() {
+        let dir = std::env::temp_dir().join(format!("d_merge_pandora_preview_{}", std::process::id()));
+        let meshes = dir.join("templates/meshes/actors/character/behaviors");
+        std::fs::create_dir_all(&meshes).unwrap();
+        std::fs::write(
+            meshes.join("0_master.xml"),
+            "<hkpackfile><hksection name=\"__data__\">\n<hkobject name=\"#0001\" class=\"hkbStateMachine\" signature=\"0x1\">\n\t<hkparam name=\"enable\">true</hkparam>\n</hkobject>\n</hksection></hkpackfile>\n",
+        )
+        .unwrap();
+        let mod_dir = dir.join("mods/Pandora/Pandora_Engine/mod/pandora");
+        std::fs::create_dir_all(mod_dir.join("patches")).unwrap();
+        std::fs::write(
+            mod_dir.join("patches/0_master.xml"),
+            "<patch>\n\t<Replace path=\"#0001/enable\">\n\t\t<hkparam name=\"enable\">false</hkparam>\n\t</Replace>\n</patch>\n",
+        )
+        .unwrap();
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut tool = tool_in(&dir.join("out"));
+        tool.template_dir = dir.join("templates").display().to_string();
+        tool.open_mod(&mod_dir, &mut notify, &i18n);
+        tool.sync_workspace(&mut notify, &i18n);
+        tool.editor_text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
+
+        let shown = |tool: &mut PatchTool| {
+            tool.preview = None;
+            tool.refresh_preview("#0001");
+            let lines = tool.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
+            lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
+        };
+        let as_pandora = shown(&mut tool);
+        tool.workspace.export_format = workspace::ExportFormat::Nemesis;
+        let as_nemesis = shown(&mut tool);
+        tool.workspace.export_format = workspace::ExportFormat::Pandora;
+        shown(&mut tool);
+        tool.revert_block("#0001", 0);
+        let edits = tool.workspace.behaviors[0].edits.len();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(as_pandora.starts_with("<Replace path=\"#0001/enable\">"), "{as_pandora}");
+        assert!(as_nemesis.contains("<!-- MOD_CODE ~"), "{as_nemesis}");
+        assert_eq!(edits, 0, "back to the template");
     }
 
     /// `LspOptions` holds the keymap too: it must not put back the one it was given.

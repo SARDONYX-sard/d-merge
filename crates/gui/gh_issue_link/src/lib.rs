@@ -10,12 +10,15 @@ use urlencoding::encode;
 /// # Example
 ///
 /// ```
-/// let sys = gh_issue_link::create_system();
+/// let sys = gh_issue_link::create_system().unwrap();
 /// ```
-pub fn create_system() -> System {
+///
+/// # Errors
+/// If this system isn't supported by `sysinfo`.
+pub fn create_system() -> Result<System, sysinfo::Error> {
     System::new_with_specifics(
         RefreshKind::nothing()
-            .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+            .with_cpu(CpuRefreshKind::nothing().with_usage())
             .with_memory(MemoryRefreshKind::nothing().with_ram()),
     )
 }
@@ -31,7 +34,7 @@ pub fn create_system() -> System {
 /// ```
 /// use gh_issue_link::{create_system, EnvInfo};
 ///
-/// let sys = create_system();
+/// let sys = create_system().unwrap();
 /// let env = EnvInfo::new(&sys);
 ///
 /// println!("CPU: {:?}", env.cpu);
@@ -93,7 +96,9 @@ pub fn new_gh_issue_link(d_merge_version: &str, skyrim_runtime: Runtime, skyrim_
         url.push_str(&encode(v));
     };
 
-    let sys = create_system();
+    let Ok(sys) = create_system() else {
+        return url;
+    };
     let env = EnvInfo::new(&sys);
 
     append_param("version", d_merge_version);
@@ -127,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_env_info_link() {
-        let sys = create_system();
+        let sys = create_system().unwrap();
         let env = EnvInfo::new(&sys);
         println!("env: {env:#?}");
 

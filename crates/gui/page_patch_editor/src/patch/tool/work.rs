@@ -131,6 +131,7 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn save_now(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        self.sync_pandora_doc();
         let Some(code) = self.loaded_for.clone() else { return };
         if self.dirty_since.take().is_none() {
             return;
@@ -377,7 +378,33 @@ impl PatchTool {
         }
     }
 
+    /// `Export` as Pandora: see [`workspace::ExportFormat`].
+    fn export_pandora(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        self.save_now(notify, i18n);
+        let Some(code) = self.loaded_for.clone() else { return };
+        let output = self.output.trim().to_owned();
+        match self.workspace.export_pandora(Path::new(&output), &code) {
+            Ok(export) if export.problems.is_empty() => notify.success(format!(
+                "{} ({}): {}",
+                i18n.t(I18nKey::NemesisExportedPandora),
+                export.written,
+                workspace::joined(Path::new(&output), &["Pandora_Engine", "mod", &code]).display()
+            )),
+            Ok(export) => notify.warn(format!(
+                "{} ({}):\n{}",
+                i18n.t(I18nKey::NemesisExportedPandora),
+                export.written,
+                export.problems.join("\n")
+            )),
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+        }
+    }
+
     pub(in crate::patch) fn export(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        if self.workspace.export_format == workspace::ExportFormat::Pandora {
+            self.export_pandora(notify, i18n);
+            return;
+        }
         self.save_now(notify, i18n);
         let Some(code) = self.loaded_for.clone() else { return };
         let output = self.output.trim().to_owned();

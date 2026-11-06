@@ -4,10 +4,19 @@ use std::path::{Path, PathBuf};
 
 pub(in crate::patch) use stdx::path::joined;
 
-use super::{mod_info::parse_info, read_dir};
+use super::{
+    mod_info::{pandora_info, parse_info},
+    read_dir,
+};
 
 /// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
 pub(super) const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
+
+/// The directory of a mod's root with its Pandora patches, in `<here>/mod/<code>/patches`.
+pub(super) const PANDORA_ENGINE: &str = "Pandora_Engine";
+
+/// All that can hold a mod code.
+const SOURCES: [&str; 3] = [ENGINES[0], ENGINES[1], PANDORA_ENGINE];
 
 /// The name of the file or folder at `path`, borrowed if it is valid text.
 pub(super) fn file_name_of(path: &Path) -> std::borrow::Cow<'_, str> {
@@ -27,12 +36,12 @@ fn mods_dir(selected: &Path, engine: &str) -> PathBuf {
 pub(crate) fn mod_root_of(selected: &Path) -> Option<PathBuf> {
     let has_code =
         |engine: &str| read_dir(&mods_dir(selected, engine)).is_ok_and(|mut codes| codes.any(|path| path.is_dir()));
-    if ENGINES.iter().any(|engine| has_code(engine)) {
+    if SOURCES.iter().any(|engine| has_code(engine)) {
         return Some(selected.to_path_buf());
     }
     let is_named = |path: &Path, name: &str| path.file_name().is_some_and(|found| found.eq_ignore_ascii_case(name));
     let mods = selected.parent().filter(|path| is_named(path, "mod"))?;
-    let engine = mods.parent().filter(|path| ENGINES.iter().any(|name| is_named(path, name)))?;
+    let engine = mods.parent().filter(|path| SOURCES.iter().any(|name| is_named(path, name)))?;
     engine.parent().map(Path::to_path_buf)
 }
 
@@ -44,7 +53,12 @@ pub(super) fn code_dirs(root: &Path, code: &str) -> Vec<PathBuf> {
 
 /// A patch directory of `code` in the mod at `root`, if it has one.
 pub(crate) fn patch_dir_of_code(root: &Path, code: &str) -> Option<PathBuf> {
-    code_dirs(root, code).into_iter().next()
+    code_dirs(root, code).into_iter().next().or_else(|| pandora_dir(root, code))
+}
+
+/// The Pandora mod of `code` in the mod at `root`, if it has one.
+pub(super) fn pandora_dir(root: &Path, code: &str) -> Option<PathBuf> {
+    Some(joined(root, &[PANDORA_ENGINE, "mod", code])).filter(|dir| dir.is_dir())
 }
 
 /// A mod code in a mod's root, and the name its `info.ini` has for it.
@@ -62,14 +76,16 @@ pub(crate) struct ModCode {
 /// e.g. `mods/Elden Counter` containing `Nemesis_Engine/mod/{ecdmg,ecnpc}` -> `ecdmg`, `ecnpc`
 pub(crate) fn mod_codes_of_root(selected: &Path) -> Vec<ModCode> {
     let mut codes: Vec<ModCode> = Vec::new();
-    for engine in ENGINES {
+    for engine in SOURCES {
         let mods = mods_dir(selected, engine);
         let Ok(entries) = read_dir(&mods) else { continue };
         for dir in entries.filter(|path| path.is_dir()) {
             let code = file_name_of(&dir);
             if !codes.iter().any(|known| known.code.eq_ignore_ascii_case(&code)) {
-                let info = std::fs::read_to_string(dir.join("info.ini")).ok();
-                let name = info.map(|info| parse_info(&info).name).unwrap_or_default();
+                let name = std::fs::read_to_string(dir.join("info.ini")).map_or_else(
+                    |_| pandora_info(&dir).map(|info| info.name).unwrap_or_default(),
+                    |info| parse_info(&info).name,
+                );
                 codes.push(ModCode { code: code.into_owned(), name });
             }
         }
@@ -91,7 +107,7 @@ pub(crate) fn code_of(selected: &Path) -> String {
 ///
 /// The root is also where a later anim set generator finds `meshes/**/animations/*.hkx`.
 pub(super) fn mod_dir_of(selected: &Path) -> std::borrow::Cow<'_, Path> {
-    let code_dir = ENGINES.iter().find_map(|engine| {
+    let code_dir = SOURCES.iter().find_map(|engine| {
         let entries = std::fs::read_dir(mods_dir(selected, engine)).ok()?;
         entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).min()
     });

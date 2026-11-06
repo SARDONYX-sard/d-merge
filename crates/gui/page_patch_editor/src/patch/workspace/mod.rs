@@ -22,6 +22,7 @@ mod export;
 mod import;
 mod locations;
 mod mod_info;
+pub(in crate::patch) mod pandora;
 
 use std::{
     borrow::Cow,
@@ -38,7 +39,7 @@ use self::{
     mod_info::{info_ini, parse_info},
 };
 pub(crate) use self::{
-    behavior::{ADSF, ASDSF, Behavior, ObjectText, STRING_DATA, Target},
+    behavior::{ADSF, ASDSF, Behavior, ObjectText, PANDORA_DOC, STRING_DATA, Target},
     catalog::{TemplateEntry, catalog},
     locations::{ModCode, code_of, mod_codes_of_root, mod_root_of, patch_dir_of_code},
     mod_info::ModInfo,
@@ -91,19 +92,37 @@ fn read_cached_behavior(entry: &Path) -> Result<Option<Behavior>, String> {
     };
     let mut behavior = Behavior::open(Path::new(template.trim()))?;
     behavior.force_ext = entry.join("force_ext").exists();
+    behavior.pandora_file = std::fs::read_to_string(entry.join("pandora_file")).ok();
     for file in read_dir(entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
         let id = file_stem(&file).replace("%2F", "/");
         let text = read_text(&file)?;
-        if behavior.template_object(&id).is_some() {
+        if id == PANDORA_DOC {
+            behavior.pandora_doc_ids = pandora_patch::doc::doc_object_ids(&text);
+            behavior.pandora_doc = Some(text);
+        } else if behavior.template_object(&id).is_some() {
             behavior.edits.insert(id, text);
         } else {
             behavior.added.insert(id, text);
         }
     }
+    // The file of a Pandora mod says what its edits are, also if the work was kept without them.
+    if behavior.pandora_file.is_some() {
+        behavior.apply_pandora_doc();
+    }
     Ok(Some(behavior))
 }
 
 /// The whole patch being made.
+/// What a work is written as. It is the same work: edits of the objects of templates.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum ExportFormat {
+    /// `Nemesis_Engine/mod/<code>`, and `Nemesis_EngineExt/mod/<code>` for what Nemesis doesn't know.
+    #[default]
+    Nemesis,
+    /// `Pandora_Engine/mod/<code>`
+    Pandora,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Workspace {
     /// See [`Workspace::save`].
@@ -117,6 +136,8 @@ pub(crate) struct Workspace {
     /// their events. Those are read as they are, can be looked at and pointed to, and are not edited
     /// or exported: they come with that mod when merging.
     pub(crate) ref_mods: Vec<String>,
+    /// What `Export` writes.
+    pub(crate) export_format: ExportFormat,
     /// What was open when it was saved. See [`Session`].
     pub(crate) session: Session,
     /// The files of the mod this work read or wrote, relative to the mod's root: what the next export
@@ -152,6 +173,8 @@ pub(crate) struct SessionTab {
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct WorkspaceFile {
+    /// `None`: a work kept before there was a choice.
+    export_format: Option<ExportFormat>,
     ref_mods: Vec<String>,
     session: Session,
     owned: std::collections::BTreeSet<String>,
@@ -221,6 +244,10 @@ impl Workspace {
         // A work without the file, from before it existed, has nothing to restore.
         let file = std::fs::read_to_string(dir.join(WORKSPACE_FILE)).unwrap_or_default();
         let file: WorkspaceFile = sonic_rs::from_str(&file).unwrap_or_default();
+        // Until then, what was read from Pandora was to go back to it.
+        let from_pandora = workspace.behaviors.iter().any(|behavior| behavior.pandora_file.is_some());
+        let format_of_old_work = if from_pandora { ExportFormat::Pandora } else { ExportFormat::Nemesis };
+        workspace.export_format = file.export_format.unwrap_or(format_of_old_work);
         workspace.ref_mods = file.ref_mods;
         workspace.session = file.session;
         workspace.owned = file.owned;
@@ -234,8 +261,12 @@ impl Workspace {
     fn files_to_save(&self) -> Result<BTreeMap<PathBuf, Cow<'_, str>>, String> {
         let mut files = BTreeMap::new();
         files.insert(PathBuf::from("info.ini"), Cow::Owned(info_ini(&self.info)));
-        let file =
-            WorkspaceFile { ref_mods: self.ref_mods.clone(), session: self.session.clone(), owned: self.owned.clone() };
+        let file = WorkspaceFile {
+            export_format: Some(self.export_format),
+            ref_mods: self.ref_mods.clone(),
+            session: self.session.clone(),
+            owned: self.owned.clone(),
+        };
         let file = sonic_rs::to_string_pretty(&file).map_err(|e| e.to_string())?;
         files.insert(PathBuf::from(WORKSPACE_FILE), Cow::Owned(file));
         for behavior in &self.behaviors {
@@ -247,6 +278,12 @@ impl Workspace {
             }
             for (id, text) in behavior.edits.iter().chain(&behavior.added) {
                 files.insert(behavior_dir.join(cache_file(id)), Cow::Borrowed(text.as_str()));
+            }
+            if let Some(name) = &behavior.pandora_file {
+                files.insert(behavior_dir.join("pandora_file"), Cow::Borrowed(name.as_str()));
+            }
+            if let Some(doc) = &behavior.pandora_doc {
+                files.insert(behavior_dir.join(cache_file(PANDORA_DOC)), Cow::Borrowed(doc.as_str()));
             }
         }
         Ok(files)

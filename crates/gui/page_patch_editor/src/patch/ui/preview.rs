@@ -69,14 +69,14 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
             }
             // `↶` at the start of each block, like git's conflict buttons.
             let gutter = egui::Rect::from_min_size(rect.min, egui::vec2(20.0, row_height));
-            if let Kind::Open(block) = kind
+            if let Some(block) = kind.block()
                 && ui.put(gutter, egui::Button::new("↶").small()).on_hover_text(revert_hover).clicked()
             {
-                event = Some(PreviewEvent::Revert(*block));
+                event = Some(PreviewEvent::Revert(block));
             }
             let pos = rect.left_center() + egui::vec2(TEXT_LEFT, 0.0);
             if matches!(kind, Kind::Open(_) | Kind::Marker) {
-                // The markers are not XML: they stay out of the way.
+                // The markers are not XML: they stay out of the way. Pandora's operations are.
                 let color = ui.visuals().weak_text_color();
                 ui.painter().text(pos, egui::Align2::LEFT_CENTER, text, font.clone(), color);
             } else {
@@ -94,9 +94,11 @@ pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, rever
 /// The background of a line: git's green / red, and a tint on the current block's `OPEN` line.
 fn line_fill(ui: &egui::Ui, kind: Kind, current: usize) -> Option<egui::Color32> {
     match kind {
+        Kind::Open(block) | Kind::Op { block, .. } if block == current => {
+            Some(ui.visuals().selection.bg_fill.gamma_multiply(0.35))
+        }
         Kind::New => Some(egui::Color32::from_rgb(46, 160, 67).gamma_multiply(0.18)),
-        Kind::Old => Some(egui::Color32::from_rgb(248, 81, 73).gamma_multiply(0.18)),
-        Kind::Open(block) if block == current => Some(ui.visuals().selection.bg_fill.gamma_multiply(0.35)),
+        Kind::Old | Kind::Op { removes: true, .. } => Some(egui::Color32::from_rgb(248, 81, 73).gamma_multiply(0.18)),
         _ => None,
     }
 }
