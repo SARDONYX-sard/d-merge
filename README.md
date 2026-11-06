@@ -1,5 +1,7 @@
 # D Merge(Diff & Merge) hkx patcher
 
+NOTE: DMerge has fully adopted Claude Code starting with v3.0.0. The last version written mostly by hand is 2.8.0.
+
 <div align="center">
   <a href="https://github.com/SARDONYX-sard/d-merge/releases">
     <img src="./crates/gui/gui_shared/assets/icon.svg" alt="D Merge"/>
