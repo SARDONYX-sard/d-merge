@@ -7,9 +7,12 @@ use nemesis_xml::patch::{PatchesMap, parse_nemesis_patch};
 use rayon::{iter::Either, prelude::*};
 use snafu::{OptionExt as _, ResultExt as _};
 
-use super::paths::{
-    collect::{Category, collect_nemesis_paths},
-    parse::parse_nemesis_path,
+use super::{
+    paths::{
+        collect::{Category, collect_nemesis_paths},
+        parse::parse_nemesis_path,
+    },
+    read_stats::{self, ModTimer, log_slowest_mods},
 };
 use crate::{
     Config, PriorityMap,
@@ -41,12 +44,14 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
     #[cfg(feature = "tracing")]
     let start = std::time::Instant::now();
 
-    let owned = nemesis_entries
+    let measure = read_stats::is_enabled();
+    let (owned, mod_read_times) = nemesis_entries
         .par_iter()
         .map(|(mod_dir, &priority)| {
+            let timer = measure.then(|| ModTimer::start(mod_dir));
             let patches = collect_nemesis_paths(Path::new(mod_dir))
                 .fold(OwnedPatches::default, |mut acc, (category, path)| {
-                    match std::fs::read_to_string(&path) {
+                    match read_stats::read_to_string(timer.as_ref(), &path) {
                         Ok(content) => match category {
                             Category::Nemesis => {
                                 acc.owned_patches.insert(path, (content, priority));
@@ -64,9 +69,15 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
                 })
                 .reduce(OwnedPatches::default, OwnedPatches::merge);
             reporter.increment();
-            patches
+            (patches, timer.map(ModTimer::finish).into_iter().collect::<Vec<_>>())
         })
-        .reduce(OwnedPatches::default, OwnedPatches::merge);
+        .reduce(
+            || (OwnedPatches::default(), Vec::new()),
+            |(patches, mut times), (other_patches, other_times)| {
+                times.extend(other_times);
+                (patches.merge(other_patches), times)
+            },
+        );
 
     // NOTE: With a cold OS file cache, the time is dominated by the fixed cost per file open
     // (e.g. ~25k files, 54MB: ~1ms/file, even on SSD), not by the bandwidth.
@@ -82,6 +93,7 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
         elapsed = ?start.elapsed(),
         "Read Nemesis patch files"
     );
+    log_slowest_mods(mod_read_times);
 
     owned
 }
