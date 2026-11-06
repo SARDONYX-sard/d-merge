@@ -319,7 +319,10 @@ mod tests {
 
     /// A template of a state machine with a list of transitions, kept until the end of the test.
     fn behavior() -> (Behavior, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("d_merge_pandora_language_{:?}", std::thread::current().id()));
+        // Both: `cargo test` has its tests in threads of one process, nextest each in a process of its own,
+        // where the thread id is the same in all of them.
+        let unique = format!("{}_{:?}", std::process::id(), std::thread::current().id());
+        let dir = std::env::temp_dir().join(format!("d_merge_pandora_language_{unique}"));
         let meshes = dir.join("meshes/actors/character/behaviors");
         std::fs::create_dir_all(&meshes).unwrap();
         let path = meshes.join("0_master.xml");

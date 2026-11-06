@@ -306,7 +306,7 @@ mod tests {
         let info = get_all(pattern, false).unwrap();
 
         dbg!(info.len());
-        std::fs::create_dir_all("../../../dummy").unwrap();
+        std::fs::create_dir_all("../../../dummy/debug").unwrap();
         std::fs::write("../../../dummy/debug/get_all_mods_info.log", format!("{info:#?}")).unwrap();
     }
 

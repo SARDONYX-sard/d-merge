@@ -11,8 +11,7 @@ use crate::behaviors::tasks::templates::collect::borrowed::template_xml_to_value
 /// ```no_run
 /// use std::path::Path;
 ///
-/// let paths = "../../resource/templates/default/
-/// ../resource/templates/creatures/";
+/// let paths = "../../../resource/xml/templates";
 ///
 /// let output_dir = Path::new("../../../dummy/templates/bins");
 /// behavior_merge::create_bin_templates(paths.split("\n"), output_dir);
