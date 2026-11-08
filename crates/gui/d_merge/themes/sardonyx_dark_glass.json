@@ -94,7 +94,7 @@
     "foreground": "#E5DBDB",
     "card": "#0E0E0E96",
     "card_foreground": "#FAFAFA",
-    "popover": "#17181BF5",
+    "popover": "#161719E6",
     "popover_foreground": "#FAFAFA",
     "primary": "#3E5457",
     "primary_foreground": "#E0DCDC",
@@ -110,5 +110,6 @@
     "input": "#26262626",
     "ring": "#737373",
     "radius": 20.0
-  }
+  },
+  "glass": true
 }

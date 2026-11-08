@@ -107,8 +107,9 @@ impl Root {
 }
 
 impl eframe::App for Root {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.app.sync_os_backdrop(frame);
 
         self.app.frame_begin(&ctx);
 
@@ -125,6 +126,12 @@ impl eframe::App for Root {
         }
 
         self.app.frame_end(&ctx);
+    }
+
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        // eframe's own, for the other themes: they are opaque over it.
+        let other = egui::Color32::from_rgba_unmultiplied(12, 12, 12, 180);
+        self.app.clear_color().unwrap_or(other).to_normalized_gamma_f32()
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

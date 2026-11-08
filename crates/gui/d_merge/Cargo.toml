@@ -55,6 +55,9 @@ page_patch        = { workspace = true }
 tracing_rotation  = { workspace = true }
 gui_shared        = { path = "../gui_shared", features = ["tracing"] }
 
+[target.'cfg(windows)'.dependencies]
+window-vibrancy = { workspace = true }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { workspace = true, features = ["wayland", "x11"] }
 wgpu = { workspace = true, features = [

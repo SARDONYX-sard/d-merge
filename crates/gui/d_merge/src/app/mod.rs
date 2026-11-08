@@ -21,6 +21,7 @@ use parking_lot::RwLock;
 
 use crate::{
     app::log::LogQueueLock,
+    theme::EguiColorExt as _,
     ui::{notify::Notification, theme::ThemeManager},
 };
 
@@ -50,6 +51,12 @@ pub(crate) struct App {
     pub show_theme_editor: bool,
 
     pub bg_img_handle: Option<egui::TextureHandle>,
+
+    /// The background image as a glass theme shows it: see [`crate::glass::blur_wallpaper`].
+    pub bg_blur_handle: Option<egui::TextureHandle>,
+
+    /// Windows' acrylic behind the window, for a glass theme.
+    pub os_backdrop: crate::glass::OsBackdrop,
 
     // ── Notification bar ──────────────────────────────────────────────────────
     ///  shown in the notification bar at the bottom.
@@ -114,6 +121,8 @@ impl App {
             show_theme_editor: false,
 
             bg_img_handle: None,
+            bg_blur_handle: None,
+            os_backdrop: crate::glass::OsBackdrop::default(),
 
             notify,
 
@@ -169,6 +178,29 @@ impl App {
     pub(crate) fn frame_end(&mut self, ctx: &egui::Context) {
         self.ui_log_window(ctx);
         self.ui_help_window(ctx);
+    }
+
+    /// What the window is cleared to before the app is drawn: nothing where the desktop shows through,
+    /// the base of the materials where there is nothing behind the glass.
+    pub(crate) fn clear_color(&self) -> Option<egui::Color32> {
+        let dark = self.glass()?.visuals.dark_mode;
+        Some(if self.os_backdrop.is_shown() { egui::Color32::TRANSPARENT } else { crate::glass::base(dark) })
+    }
+
+    /// The preset while a custom theme with `glass` is used. See [`crate::glass`].
+    pub(crate) fn glass(&self) -> Option<&gui_shared::settings::ui::theme::ThemePreset> {
+        if self.settings.ui.theme != gui_shared::settings::ui::theme::Theme::Custom {
+            return None;
+        }
+        self.theme_manager.editing.as_ref().filter(|preset| preset.glass)
+    }
+
+    /// Glass shows the desktop behind the window, unless the background image covers it.
+    pub(crate) fn sync_os_backdrop(&mut self, frame: &eframe::Frame) {
+        let image = &self.settings.ui.background_image;
+        let covered = image.enabled && !image.path.is_empty();
+        let tint = self.glass().filter(|_| !covered).map(|preset| preset.visuals.panel_fill.to_egui_color32());
+        self.os_backdrop.sync(frame, tint);
     }
 
     /// Persists everything on shutdown.

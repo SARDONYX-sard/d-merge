@@ -67,6 +67,7 @@ tracing             = { version = "0.1.44" } # logger
 tracing-subscriber  = "0.3.23"
 urlencoding         = "2.1.3"
 wgpu                = "30.0.1"
+window-vibrancy     = "0.8.1" # Windows' acrylic behind the window, for the Glass theme
 winnow              = { version = "1.0.5", features = ["simd"] }
 winres              = "0.1.12"
 

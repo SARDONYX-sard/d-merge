@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
 mod fonts;
+mod glass;
 pub(crate) mod theme;
 mod ui;
 

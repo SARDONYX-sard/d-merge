@@ -8,6 +8,8 @@
 //! │  Save as [_________________ ] [Save]                    │
 //! │  <status message (yellow)>                              |
 //! ├─────────────────────────────────────────────────────────┤
+//! │  Glass [✓]  tint [■]                                    │
+//! ├─────────────────────────────────────────────────────────┤
 //! │  ▼ egui Visuals                                         │
 //! │    dark mode [✓]                                        │
 //! │    disabled alpha [────●────]                           │
@@ -267,6 +269,8 @@ impl ThemeManager {
 
         // ── Editor sections (only shown when a preset is loaded) ──────────────
         if let Some(editing) = &mut self.editing {
+            visuals_changed |= glass_ui(ui, editing);
+            ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {
                 egui::CollapsingHeader::new("egui Visuals").default_open(true).show(ui, |ui| {
                     visuals_changed |= visuals_ui(ui, &mut editing.visuals);
@@ -325,6 +329,20 @@ pub(crate) struct SettingsUpdate {
 }
 
 // ─── Section UIs ─────────────────────────────────────────────────────────────
+
+/// `Glass [✓] tint [■]`. Glass only shows through colors that are translucent, like those of the
+/// `*_glass` presets: see [`crate::glass`].
+fn glass_ui(ui: &mut egui::Ui, preset: &mut ThemePreset) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.add(Label::new("Glass")).on_hover_text(GLASS_HOVER);
+        changed |= ui.add(Checkbox::without_text(&mut preset.glass)).on_hover_text(GLASS_HOVER).changed();
+    });
+    changed
+}
+
+const GLASS_HOVER: &str = "What is behind the window shows through the translucent colors, blurred, like macOS: \
+the desktop, or the background image if one is set.";
 
 fn visuals_ui(ui: &mut egui::Ui, v: &mut VisualsConfig) -> bool {
     let mut changed = false;
@@ -522,12 +540,18 @@ pub(crate) fn apply(preset: &ThemePreset, ctx: &egui::Context) {
     ctx.set_global_style(egui::Style { visuals: preset::to_egui_visuals(&preset.visuals), ..Default::default() });
 
     preset::to_shadcn_theme(&preset.shadcn).set(ctx);
+    // shadcn's popups have a faint shadow: glass windows lift off what is under them with a larger one.
+    if preset.glass {
+        let shadow = crate::glass::window_shadow(preset.visuals.dark_mode);
+        ctx.global_style_mut(|style| style.visuals.window_shadow = shadow);
+    }
 }
 
 fn dark_preset() -> ThemePreset {
     ThemePreset {
         visuals: preset::from_egui_visuals(&egui::Visuals::dark(), 1.0),
         shadcn: preset::from_shadcn_theme(&ShadcnTheme::dark()),
+        glass: false,
     }
 }
 
@@ -536,5 +560,6 @@ fn light_preset() -> ThemePreset {
     ThemePreset {
         visuals: preset::from_egui_visuals(&egui::Visuals::light(), 1.0),
         shadcn: preset::from_shadcn_theme(&ShadcnTheme::light()),
+        glass: false,
     }
 }

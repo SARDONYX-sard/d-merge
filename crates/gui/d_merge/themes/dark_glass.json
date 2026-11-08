@@ -1,0 +1,115 @@
+{
+  "visuals": {
+    "dark_mode": true,
+    "override_text_color": null,
+    "hyperlink_color": "#0A84FF",
+    "faint_bg_color": "#08080808",
+    "extreme_bg_color": "#111112D6",
+    "text_edit_bg_color": null,
+    "code_bg_color": "#10101010",
+    "warn_fg_color": "#FF8F00",
+    "error_fg_color": "#FF0000",
+    "window_fill": "#27272BE2",
+    "window_stroke": {
+      "width": 1.0,
+      "color": "#22222222"
+    },
+    "panel_fill": "#12121496",
+    "window_corner_radius": 12,
+    "menu_corner_radius": 10,
+    "button_frame": true,
+    "striped": false,
+    "slider_trailing_fill": false,
+    "disabled_alpha": 0.5,
+    "widgets": {
+      "noninteractive": {
+        "bg_fill": "#1B1B1B",
+        "weak_bg_fill": "#1B1B1B",
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#16161616"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#8C8C8C"
+        },
+        "corner_radius": 6
+      },
+      "inactive": {
+        "bg_fill": "#10101010",
+        "weak_bg_fill": "#10101010",
+        "bg_stroke": {
+          "width": 0.0,
+          "color": "#00000000"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#D7D7D7"
+        },
+        "corner_radius": 6
+      },
+      "hovered": {
+        "bg_fill": "#1C1C1C1C",
+        "weak_bg_fill": "#1C1C1C1C",
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#969696"
+        },
+        "fg_stroke": {
+          "width": 1.5,
+          "color": "#F5F5F5"
+        },
+        "corner_radius": 6
+      },
+      "active": {
+        "bg_fill": "#28282828",
+        "weak_bg_fill": "#28282828",
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#FFFFFF"
+        },
+        "fg_stroke": {
+          "width": 2.0,
+          "color": "#FFFFFF"
+        },
+        "corner_radius": 6
+      },
+      "open": {
+        "bg_fill": "#1C1C1C1C",
+        "weak_bg_fill": "#1C1C1C1C",
+        "bg_stroke": {
+          "width": 1.0,
+          "color": "#3C3C3C"
+        },
+        "fg_stroke": {
+          "width": 1.0,
+          "color": "#D2D2D2"
+        },
+        "corner_radius": 6
+      }
+    }
+  },
+  "shadcn": {
+    "background": "#12121496",
+    "foreground": "#ECECF0",
+    "card": "#27272BE2",
+    "card_foreground": "#ECECF0",
+    "popover": "#27272BE2",
+    "popover_foreground": "#ECECF0",
+    "primary": "#0A84FF",
+    "primary_foreground": "#FFFFFF",
+    "secondary": "#14141414",
+    "secondary_foreground": "#ECECF0",
+    "muted": "#10101010",
+    "muted_foreground": "#9898A0",
+    "accent": "#1C1C1C1C",
+    "accent_foreground": "#ECECF0",
+    "destructive": "#FF453A",
+    "destructive_foreground": "#FFFFFF",
+    "border": "#1E1E1E1E",
+    "input": "#22222222",
+    "ring": "#0A84FF",
+    "radius": 8.0
+  },
+  "glass": true
+}

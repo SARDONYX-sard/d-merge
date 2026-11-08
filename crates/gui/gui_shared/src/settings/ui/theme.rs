@@ -158,6 +158,11 @@ pub struct ThemePreset {
 
     /// shadcn theme configuration.
     pub shadcn: ShadcnThemeConfig,
+
+    /// Glass: what is behind the window shows through its translucent colors, blurred: the desktop, or
+    /// the background image if one is set. Older presets don't have it: off.
+    #[serde(default)]
+    pub glass: bool,
 }
 
 /// Serializable egui visuals configuration.
