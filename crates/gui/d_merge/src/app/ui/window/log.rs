@@ -5,7 +5,7 @@ use std::sync::Arc;
 use gui_shared::i18n::I18nKey;
 
 use crate::{
-    app::{App, update_window_geometry},
+    app::{App, background_image::paint_background, update_window_geometry},
     ui::shadcn::Button,
 };
 
@@ -26,23 +26,28 @@ impl App {
         let log_lines = Arc::clone(&self.log_lines);
         let log_window_info = Arc::clone(&self.log_window_info);
 
-        let (inner_size, position) = {
+        let (inner_size, position, maximized) = {
             let log_window_info = log_window_info.read().clone();
             let inner_size = Some(egui::Vec2::new(log_window_info.width, log_window_info.height));
             let position = Some(egui::Pos2::new(log_window_info.pos_x, log_window_info.pos_y));
-            (inner_size, position)
+            let maximized = Some(log_window_info.maximized);
+            (inner_size, position, maximized)
         };
 
+        // cloned self fields(to avoid ownership err & DeadLock)
+        let bg_handle = self.bg_img_handle.clone();
         let log_viewer_id = egui::ViewportId::from_hash_of("log_viewer");
+        let copy_button_name = self.i18n.t(I18nKey::EditorCopy).to_string();
         let clear_button_name = self.i18n.t(I18nKey::ClearButton).to_string();
+        let frame = self.panel_frame();
 
         ctx.show_viewport_deferred(
             log_viewer_id,
             egui::ViewportBuilder {
                 title: Some("Log viewer".to_string()),
-                transparent: Some(false), // Cannot now: https://github.com/emilk/egui/issues/3632
+                transparent: Some(true), // OK since egui 0.37
                 position,
-                maximized: Some(self.settings.log.window.maximized),
+                maximized,
                 inner_size,
                 resizable: Some(true),
                 ..Default::default()
@@ -54,14 +59,15 @@ impl App {
                 );
 
                 let ctx = &ui.ctx().clone();
-                egui::CentralPanel::default().frame(egui::Frame::new()).show(ui, |ui| {
+                paint_background(&bg_handle, ctx);
+                egui::CentralPanel::default().frame(frame).show(ui, |ui| {
                     update_window_geometry(ctx, log_viewer_id, &mut log_window_info.write());
 
                     ui.horizontal(|ui| {
                         if ui.add(Button::new(&clear_button_name)).clicked() {
                             log_lines.write().clear();
                         }
-                        if ui.add(Button::new("Copy")).clicked() {
+                        if ui.add(Button::new(&copy_button_name)).clicked() {
                             let text =
                                 log_lines.read().iter().map(|log| log.raw.as_str()).collect::<Vec<_>>().join("\n");
                             ui.ctx().copy_text(text);

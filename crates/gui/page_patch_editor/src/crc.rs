@@ -163,7 +163,7 @@ fn row(ui: &mut egui::Ui, name: &str, crc: u32, i18n: &I18nMap, is_dir: bool) {
 
 /// `[Copy] 0xbe34c373 3191128947` (drawn right to left). Copies the decimal value.
 fn crc_cells(ui: &mut egui::Ui, crc: u32, i18n: &I18nMap) {
-    if ui.small_button(i18n.t(I18nKey::CrcCopy)).clicked() {
+    if ui.small_button(i18n.t(I18nKey::EditorCopy)).clicked() {
         ui.ctx().copy_text(crc.to_string());
     }
     ui.monospace(format!("{crc:#010x}"));

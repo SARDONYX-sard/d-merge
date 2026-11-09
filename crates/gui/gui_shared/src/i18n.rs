@@ -1226,9 +1226,6 @@ pub enum I18nKey {
     /// No .hkx files found.
     CrcNoHkx,
 
-    /// Copy
-    CrcCopy,
-
     /// Filter
     CrcFilterHint,
 

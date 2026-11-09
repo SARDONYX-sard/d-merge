@@ -25,26 +25,30 @@ impl super::App {
         if !self.settings.ui.background_image.enabled {
             return;
         }
-
         if self.bg_img_handle.is_none() {
             self.reload_background(ctx);
         }
-        let Some(texture) = &self.bg_img_handle else {
-            return;
-        };
+        paint_background(&self.bg_img_handle, ctx);
+    }
+}
 
+pub(crate) fn paint_background(handle: &Option<egui::TextureHandle>, ctx: &egui::Context) {
+    let Some(handle) = handle else {
+        return;
+    };
+
+    let dest = {
         let rect = ctx.content_rect();
-        let tex = texture.size_vec2();
+        let tex = handle.size_vec2();
         let scale = (rect.width() / tex.x).max(rect.height() / tex.y);
         let size = tex * scale;
+        egui::Rect::from_center_size(rect.center(), size)
+    };
 
-        let dest = egui::Rect::from_center_size(rect.center(), size);
-
-        ctx.layer_painter(egui::LayerId::background()).image(
-            texture.id(),
-            dest,
-            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-            egui::Color32::WHITE,
-        );
-    }
+    ctx.layer_painter(egui::LayerId::background()).image(
+        handle.id(),
+        dest,
+        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
 }
