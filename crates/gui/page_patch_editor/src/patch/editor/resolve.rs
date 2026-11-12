@@ -12,11 +12,14 @@
 //!
 //! Clip data has one file per clip, and an anim set's lines are positions, so these are copied as they are.
 
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::Write as _,
+    path::{Path, PathBuf},
+};
 
-use gui_shared::patch::ResolveRequest;
 #[cfg(test)]
 use gui_shared::patch::ResolveSide;
+use gui_shared::patch::{ResolveRequest, USER_PATCH_CODE};
 use nemesis_diff::{
     View,
     conflict::{apply_block_over, block_of_change, blocks_of_change, replacing_blocks},
@@ -74,8 +77,150 @@ pub(in crate::patch) fn apply(
 ) -> Result<Resolved, String> {
     match anim_stem(&request.target) {
         Some(stem) => apply_anim_data(workspace, template_root, request, stem),
+        None if request.keep_all_events => apply_event_arrays(workspace, template_root, request),
         None => apply_behavior(workspace, template_root, request),
     }
+}
+
+/// The class `enterNotifyEvents` / `exitNotifyEvents` point to. See [`apply_event_arrays`].
+const EVENT_ARRAY_CLASS: &str = "hkbStateMachineEventPropertyArray";
+
+/// Keeps the events of every mod of `request.sides` at an `enterNotifyEvents` / `exitNotifyEvents`
+/// conflict ([`gui_shared::patch::is_event_array_conflict`]). Each mod points the field to an array of
+/// its own; the user patch gets one array with all their events, and points the field to it. The mods'
+/// objects are not changed.
+///
+/// ```text
+/// #1821 enterNotifyEvents: #modA$1 (events: 10)   |   #modB$1 (events: 20)
+/// -> #upatch$0 (events: 10, 20), #1821 enterNotifyEvents: #upatch$0
+/// ```
+/// Doing it again rewrites the user patch's array, instead of adding another.
+fn apply_event_arrays(
+    workspace: &mut Workspace,
+    template_root: &Path,
+    request: &ResolveRequest,
+) -> Result<Resolved, String> {
+    let mut parts = request.path.split('/');
+    let (id, field) = (parts.next().unwrap_or_default(), parts.next_back().unwrap_or_default());
+    // Each mod's array, by what its patch points the field to.
+    let mut arrays = Vec::new();
+    for side in &request.sides {
+        let Ok(patch) = read_text(&patch_file(&side.mod_dir, &request.target, id)) else { continue };
+        let object = resolve(&patch, View::Mod);
+        let Some(pointer) = field_value(&object, field).filter(|value| *value != "null") else { continue };
+        let array = read_text(&patch_file(&side.mod_dir, &request.target, pointer))?;
+        arrays.push(resolve(&array, View::Mod).into_owned());
+    }
+    if arrays.len() < 2 {
+        return Err(format!("{}: fewer than two mods have an array of events here", request.path));
+    }
+
+    let at = workspace.open_behavior(&template_root.join(&request.target), &request.target)?;
+    let behavior = &mut workspace.behaviors[at];
+    let current = behavior.text(id).ok_or_else(|| format!("{id}: not in the template"))?.to_owned();
+    // The array made the last time, if the field still points to it.
+    let made_before = field_value(&current, field)
+        .filter(|value| value.starts_with(&format!("#{USER_PATCH_CODE}$")) && behavior.added.contains_key(*value))
+        .map(str::to_owned);
+    let new_id = made_before.unwrap_or_else(|| behavior.add_object(USER_PATCH_CODE, None));
+    let texts: Vec<&str> = arrays.iter().map(String::as_str).collect();
+    let merged = merged_event_array(&new_id, &texts)?;
+    behavior.added.insert(new_id.clone(), merged);
+    let edited = with_field_value(&current, field, &new_id).ok_or_else(|| format!("{id}: no field `{field}`"))?;
+    behavior.set_text(id, &edited);
+    Ok(Resolved { behavior: at, id: id.to_owned(), line: None })
+}
+
+/// The value of the one-line field `field` of an object. e.g. `<hkparam name="a">#m$1</hkparam>` -> `#m$1`
+fn field_value<'a>(object: &'a str, field: &str) -> Option<&'a str> {
+    let open = format!("<hkparam name=\"{field}\">");
+    object.lines().find_map(|line| line.trim().strip_prefix(open.as_str())?.strip_suffix("</hkparam>"))
+}
+
+/// `object` with the value of its one-line field `field` set to `value`. `None`: it has no such line.
+fn with_field_value(object: &str, field: &str, value: &str) -> Option<String> {
+    let open = format!("<hkparam name=\"{field}\">");
+    let mut found = false;
+    let mut out = String::with_capacity(object.len() + value.len());
+    for line in object.split_inclusive('\n') {
+        match line.find(open.as_str()) {
+            Some(at) if !found && line.trim_end().ends_with("</hkparam>") => {
+                found = true;
+                let ending = &line[line.trim_end().len()..];
+                out.push_str(&line[..at + open.len()]);
+                out.push_str(value);
+                out.push_str("</hkparam>");
+                out.push_str(ending);
+            }
+            _ => out.push_str(line),
+        }
+    }
+    found.then_some(out)
+}
+
+/// The elements (`<hkobject>` blocks, with their lines) of the array field `field` of `object`.
+fn array_elements<'a>(object: &'a str, field: &str) -> Vec<&'a str> {
+    let open = format!("<hkparam name=\"{field}\"");
+    let mut lines = object.split_inclusive('\n').scan(0, |offset, line| {
+        let at = *offset;
+        *offset += line.len();
+        Some((at, line))
+    });
+    if !lines.by_ref().any(|(_, line)| line.trim_start().starts_with(open.as_str())) {
+        return Vec::new();
+    }
+    let (mut elements, mut depth, mut start) = (Vec::new(), 0_usize, 0);
+    for (at, line) in lines {
+        let trimmed = line.trim();
+        if trimmed.starts_with("</hkobject>") {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                elements.push(&object[start..at + line.len()]);
+            }
+        } else if trimmed.starts_with("<hkobject") && !trimmed.ends_with("/>") {
+            if depth == 0 {
+                start = at;
+            }
+            depth += 1;
+        } else if depth == 0 && trimmed.starts_with("</hkparam>") {
+            break;
+        }
+    }
+    elements
+}
+
+/// One `hkbStateMachineEventPropertyArray` `new_id` with the events of all `arrays` (in their order,
+/// each the same event once), from the first one's head line.
+///
+/// # Errors
+/// One of them is not of that class.
+fn merged_event_array(new_id: &str, arrays: &[&str]) -> Result<String, String> {
+    let mut events: Vec<&str> = Vec::new();
+    for array in arrays {
+        let head = array.lines().next().unwrap_or_default();
+        if !head.contains(&format!("class=\"{EVENT_ARRAY_CLASS}\"")) {
+            return Err(format!("not an array of events: {}", head.trim()));
+        }
+        for event in array_elements(array, "events") {
+            if !events.iter().any(|known| known.trim() == event.trim()) {
+                events.push(event);
+            }
+        }
+    }
+    let head = arrays.first().and_then(|array| array.lines().next()).unwrap_or_default();
+    let indent = &head[..head.len() - head.trim_start().len()];
+    let name_start = head.find("name=\"").map_or(0, |at| at + "name=\"".len());
+    let name_end = head[name_start..].find('"').map_or(name_start, |len| name_start + len);
+    let mut out = format!("{}{new_id}{}\n", &head[..name_start], &head[name_end..]);
+    let _ = writeln!(out, "{indent}\t<hkparam name=\"events\" numelements=\"{}\">", events.len());
+    for event in &events {
+        out.push_str(event);
+        if !event.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    let _ = writeln!(out, "{indent}\t</hkparam>\n{indent}</hkobject>");
+    Ok(out)
 }
 
 /// `DefaultMale~1/Idle~348/play_back_speed` -> `DefaultMale~1/Idle~348.txt`
@@ -252,6 +397,7 @@ mod tests {
             mod_dir: String::new(),
             edit: true,
             sides,
+            keep_all_events: false,
         };
 
         let values = merge_values(&request(vec![flinch.clone(), gone, impact]), "#2489").unwrap();
@@ -264,6 +410,34 @@ mod tests {
         assert_eq!(values.sides[0].lines, ["\t\t\t\t#flinch$2"]);
         assert_eq!(values.sides[1].lines, ["\t\t\t\t#neymar$1019"]);
         assert_eq!(alone, None, "one mod: nothing to choose from");
+    }
+
+    /// The example of the request: two mods each with an array of one event.
+    fn event_array(id: &str, event: u32) -> String {
+        format!(
+            "\t\t<hkobject name=\"{id}\" class=\"hkbStateMachineEventPropertyArray\" signature=\"0xb07b4388\">\n\t\t\t<hkparam name=\"events\" numelements=\"1\">\n\t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"id\">{event}</hkparam>\n\t\t\t\t\t<hkparam name=\"payload\">null</hkparam>\n\t\t\t\t</hkobject>\n\t\t\t</hkparam>\n\t\t</hkobject>\n"
+        )
+    }
+
+    #[test]
+    fn the_events_of_every_mod_are_kept() {
+        let (a, b) = (event_array("#modA$1", 10), event_array("#modB$1", 20));
+        let merged = merged_event_array("#upatch$0", &[&a, &b, &a]).unwrap();
+        assert!(merged.starts_with("\t\t<hkobject name=\"#upatch$0\" class=\"hkbStateMachineEventPropertyArray\""));
+        assert!(merged.contains("numelements=\"2\""), "the same event once: {merged}");
+        let ten = merged.find(">10<").unwrap();
+        assert!(ten < merged.find(">20<").unwrap(), "in their order");
+        assert!(nemesis_diff::validate(&merged).is_ok(), "{merged}");
+        assert!(merged_event_array("#u$0", &["\t\t<hkobject name=\"#x\" class=\"hkbClipGenerator\">\n"]).is_err());
+    }
+
+    #[test]
+    fn the_field_points_to_the_merged_array() {
+        let object = "\t\t<hkobject name=\"#1821\" class=\"hkbStateMachineStateInfo\">\n\t\t\t<hkparam name=\"enterNotifyEvents\">null</hkparam>\n\t\t</hkobject>\n";
+        assert_eq!(field_value(object, "enterNotifyEvents"), Some("null"));
+        let edited = with_field_value(object, "enterNotifyEvents", "#upatch$0").unwrap();
+        assert_eq!(edited, object.replace(">null<", ">#upatch$0<"));
+        assert_eq!(with_field_value(object, "exitNotifyEvents", "#x"), None);
     }
 
     #[test]

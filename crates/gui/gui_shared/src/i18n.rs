@@ -17,6 +17,11 @@ use crate::error::{Error, *};
 ///
 /// e.g. `NemesisAddBehavior` (`nemesis_add_behavior`) comes before `NemesisAnimData`
 /// (`nemesis_anim_data`), as `_` sorts before letters.
+///
+/// # Rule: Japanese (`ja-JP`)
+/// - No half-width space between Japanese and ASCII: `modのファイル`, `.hkxファイル`, `プレビュー(XML)`.
+///   A list marker keeps its own (`- 起動時`, `1. MOD`, `# 注意`).
+/// - "User Patch" is `ユーザーパッチ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
@@ -174,6 +179,12 @@ pub enum I18nKey {
 
     /// Leaves this operation of this mod out of the merge, as if the mod did not do it, like MO2's mohidden. The mod's files do not change. The flags change at once, what is generated at the next patch. Animation data goes by the whole file. Off with Apply User Patch.
     ConflictHideHover,
+
+    /// Keep all events
+    ConflictKeepAllEvents,
+
+    /// Each mod points this field to an array of events of its own. The user patch gets one array with the events of every mod, and points the field to it. The mods' files do not change.
+    ConflictKeepAllEventsHover,
 
     /// In effect
     ConflictKept,

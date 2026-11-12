@@ -265,6 +265,7 @@ fn resolve_request(point: &Point, mod_dir: &str, sides: Option<Vec<ResolveSide>>
         mod_dir: mod_dir.to_owned(),
         edit: sides.is_some(),
         sides: sides.unwrap_or_default(),
+        keep_all_events: false,
     }
 }
 
@@ -284,11 +285,24 @@ fn point_ui(
     let mut request = None;
     let start = values.iter().find_map(|(owner, _)| owner.dir.as_ref());
     let by_hand = Button::new(i18n.t(I18nKey::ConflictEdit)).small();
-    if ui.add_enabled(start.is_some(), by_hand).on_hover_text(i18n.t(I18nKey::ConflictEditHover)).clicked()
-        && let Some(dir) = start
-    {
-        request = Some(resolve_request(point, dir, Some(resolve_sides(found, point))));
-    }
+    ui.horizontal(|ui| {
+        if ui.add_enabled(start.is_some(), by_hand).on_hover_text(i18n.t(I18nKey::ConflictEditHover)).clicked()
+            && let Some(dir) = start
+        {
+            request = Some(resolve_request(point, dir, Some(resolve_sides(found, point))));
+        }
+        // `enterNotifyEvents` / `exitNotifyEvents`: the events of every mod can be kept.
+        if gui_shared::patch::is_event_array_conflict(&point.path)
+            && let Some(dir) = start
+            && ui
+                .add(Button::new(i18n.t(I18nKey::ConflictKeepAllEvents)).small())
+                .on_hover_text(i18n.t(I18nKey::ConflictKeepAllEventsHover))
+                .clicked()
+        {
+            let sides = resolve_sides(found, point);
+            request = Some(ResolveRequest { keep_all_events: true, sides, ..resolve_request(point, dir, None) });
+        }
+    });
 
     let mut toggle = None;
     let height = ui.available_height().max(MIN_VALUES_HEIGHT);

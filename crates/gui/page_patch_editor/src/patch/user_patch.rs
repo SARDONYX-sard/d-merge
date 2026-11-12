@@ -300,6 +300,7 @@ mod tests {
             mod_dir: "D:/mods/a".into(),
             edit: false,
             sides: Vec::new(),
+            keep_all_events: false,
         };
         let mut main = PatchTool::default();
         assert!(main.resolve_now(&request, paths(""), &mut notify, &i18n).is_err());
@@ -320,6 +321,7 @@ mod tests {
             mod_dir: dir.join("mods/a").display().to_string(),
             edit: true,
             sides: Vec::new(),
+            keep_all_events: false,
         };
         main.open_resolution(request, paths(&output), &mut notify, &i18n);
         main.user_patch.tool.as_mut().unwrap().take_in_resolution(&mut notify, &i18n);

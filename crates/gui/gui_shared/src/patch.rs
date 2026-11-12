@@ -170,8 +170,22 @@ pub struct ResolveRequest {
     /// `false`: the value goes in at once (`Use this`). `true`: to the editor as well, to change it.
     pub edit: bool,
     /// When editing: every mod with a value there, to make the result from. e.g., of an array, where the
-    /// elements of several mods are wanted.
+    /// elements of several mods are wanted. With `keep_all_events`, the mods whose events are kept.
     pub sides: Vec<ResolveSide>,
+    /// Keep the events of every mod of `sides`, instead of one mod's value. Only for a conflict that
+    /// [`is_event_array_conflict`].
+    pub keep_all_events: bool,
+}
+
+/// Is the conflict at `path` one of `enterNotifyEvents` / `exitNotifyEvents`?
+///
+/// Each mod points it to an array of events of its own (`hkbStateMachineEventPropertyArray`), and all
+/// the events can be kept, instead of one mod's.
+///
+/// e.g. `#1821/hkbStateMachineStateInfo/enterNotifyEvents`: yes. `#0106/hkbModifierList/enable`: no.
+#[must_use]
+pub fn is_event_array_conflict(path: &str) -> bool {
+    path.rsplit('/').next().is_some_and(|field| matches!(field, "enterNotifyEvents" | "exitNotifyEvents"))
 }
 
 /// A mod with a value at a conflict. See [`ResolveRequest::sides`].
@@ -181,4 +195,16 @@ pub struct ResolveSide {
     pub name: String,
     /// e.g. `D:/mods/a/Nemesis_Engine/mod/a`
     pub mod_dir: String,
+}
+
+#[cfg(test)]
+mod event_array_tests {
+    use super::*;
+
+    #[test]
+    fn tells_an_event_array_conflict() {
+        assert!(is_event_array_conflict("#1821/hkbStateMachineStateInfo/enterNotifyEvents"));
+        assert!(is_event_array_conflict("#1821/hkbStateMachineStateInfo/exitNotifyEvents"));
+        assert!(!is_event_array_conflict("#0106/hkbModifierList/enable"));
+    }
 }
