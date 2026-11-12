@@ -104,6 +104,26 @@ impl Draft {
     }
 }
 
+/// Writing the user patch as a mod of its own, e.g. into MO2's `mods` to manage or share it there:
+/// to `output`, as `format`. Its own place (`<output>/.d_merge/user_patch`, NemesisExt) and what it
+/// wrote there stay as they are.
+///
+/// As `Nemesis`, the templates Nemesis does not know can't be in `Nemesis_Engine`: they go to
+/// `Nemesis_EngineExt` as always ([`workspace::Workspace::outside_nemesis`]), and the window says so.
+///
+/// ```text
+/// [Export as mod…] -> Output: [D:/MO2/mods/My Patch] [Select]   Format: [Nemesis ▼]   [Export]
+///                     ⚠ Nemesis does not know these templates: ... (1)   <- only as Nemesis
+/// ```
+#[derive(Debug, Default)]
+pub(super) struct ModExport {
+    pub(super) open: bool,
+    /// The mod's root, e.g. `D:/MO2/mods/My Patch`.
+    pub(super) output: String,
+    /// Any of them. See the struct docs for `Nemesis`.
+    pub(super) format: workspace::ExportFormat,
+}
+
 /// The window's state. See the module docs.
 #[derive(Debug, Default)]
 pub(super) struct UserPatchView {
@@ -261,6 +281,50 @@ impl PatchTool {
         self.pane.preview = None;
         match self.write_user_patch() {
             Ok(_) => self.mod_written = true,
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+        }
+    }
+
+    /// Writes the user patch as a mod: see [`ModExport`].
+    pub(super) fn export_user_patch_as_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let output = self.mod_export.output.trim().to_owned();
+        if output.is_empty() {
+            return;
+        }
+        let root = Path::new(&output);
+        let chosen = self.mod_export.format;
+        let written = if chosen == workspace::ExportFormat::PandoraV5 {
+            self.workspace.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
+        } else {
+            // The files of its own place are what its next save replaces: not those of this mod.
+            let work = &mut self.workspace;
+            let owned = std::mem::take(&mut work.owned);
+            let format = std::mem::replace(&mut work.export_format, chosen);
+            let written = work.export(root, USER_PATCH_CODE, self.parser_mode).map(|(_, invalid)| invalid);
+            (work.owned, work.export_format) = (owned, format);
+            written
+        };
+        let outside: Vec<&str> = match chosen {
+            workspace::ExportFormat::Nemesis => self.workspace.outside_nemesis().collect(),
+            _ => Vec::new(),
+        };
+        match written {
+            Ok(problems) if problems.is_empty() && outside.is_empty() => {
+                notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
+            }
+            Ok(problems) if problems.is_empty() => notify.warn(format!(
+                "{}: {output}\n{} ({}):\n{}",
+                i18n.t(I18nKey::ExportedMessage),
+                i18n.t(I18nKey::UserPatchOutsideNemesis),
+                outside.len(),
+                outside.join("\n")
+            )),
+            Ok(problems) => notify.warn(format!(
+                "{} ({}):\n{}",
+                i18n.t(I18nKey::NemesisRejected),
+                problems.len(),
+                problems.join("\n")
+            )),
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
     }

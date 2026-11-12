@@ -1503,11 +1503,20 @@ pub enum I18nKey {
     /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
     UserPatchClearHover,
 
+    /// Export as mod…
+    UserPatchExportMod,
+
+    /// Writes the user patch as a mod of its own (code upatch) to the folder chosen, e.g. into MO2's mods to manage or share it there: as Nemesis, Nemesis Ext or Pandora v5. Its own place and what is merged stay as they are.
+    UserPatchExportModHover,
+
     /// All that the user patch has: the values chosen in conflicts and what was edited by hand.
     UserPatchHover,
 
     /// Decided by the output directory of the Patch page, as each profile has its own conflicts. It cannot be changed here. Edits are written a moment later.
     UserPatchOutputHover,
+
+    /// Nemesis does not know these templates: their patches go to Nemesis_EngineExt, which only d-merge reads
+    UserPatchOutsideNemesis,
 
     /// User Patch
     UserPatchTitle,

@@ -77,10 +77,15 @@ impl PatchTool {
 
     /// Where it goes, which is not for the user to change, and deleting all of it.
     pub(in crate::patch) fn user_patch_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        self.mod_export_window(ui.ctx(), i18n, notify);
         ui.horizontal(|ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.clear_button(ui, i18n, notify);
                 self.open_cache_button(ui, i18n, notify);
+                let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchExportMod));
+                if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchExportModHover)).clicked() {
+                    self.mod_export.open = true;
+                }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     let output = egui::RichText::new(self.output.trim()).weak();
                     ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
@@ -90,6 +95,63 @@ impl PatchTool {
     }
 
     /// `[Delete all]`, which asks first: nothing of it can be undone.
+    /// `Output: [...] [Select]  Format: [Nemesis Ext ▼]  [Export]`: see `user_patch::ModExport`.
+    fn mod_export_window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification) {
+        use crate::patch::workspace::ExportFormat;
+        if !self.mod_export.open {
+            return;
+        }
+        let label = |format: ExportFormat| {
+            ExportFormat::ALL.iter().find(|(known, _)| *known == format).map_or("", |(_, label)| *label)
+        };
+        let (mut open, mut export) = (true, false);
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::UserPatchExportMod)).open(&mut open);
+        window.show(ctx, |ui| {
+            let path = super::top_bar::PATH_ACTIONS;
+            let row = egui_widgets::PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), path)
+                .help(i18n.t(I18nKey::UserPatchExportModHover))
+                .show(ui, &mut self.mod_export.output);
+            if let Some(err) = row.open_error {
+                notify.error(err);
+            }
+            ui.horizontal(|ui| {
+                ui.label(i18n.t(I18nKey::OutputFormatLabel));
+                let combo = egui::ComboBox::from_id_salt("user_patch_mod_format");
+                combo.selected_text(label(self.mod_export.format)).show_ui(ui, |ui| {
+                    for &(format, text) in &ExportFormat::ALL {
+                        ui.selectable_value(&mut self.mod_export.format, format, text);
+                    }
+                });
+            });
+            if self.mod_export.format == ExportFormat::Nemesis {
+                self.outside_nemesis_note(ui, i18n);
+            }
+            let ready = !self.mod_export.output.trim().is_empty();
+            let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::NemesisExport)).primary();
+            export = ui.add_enabled(ready, button).clicked();
+        });
+        if export {
+            self.export_user_patch_as_mod(notify, i18n);
+        }
+        self.mod_export.open = open && !export;
+    }
+
+    /// `⚠ Nemesis does not know these templates: ... (2)`, the templates on hover. Nothing if all
+    /// are ones Nemesis knows. See `user_patch::ModExport`.
+    fn outside_nemesis_note(&self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        let count = self.workspace.outside_nemesis().count();
+        if count == 0 {
+            return;
+        }
+        let text = format!("⚠ {} ({count})", i18n.t(I18nKey::UserPatchOutsideNemesis));
+        let note = ui.colored_label(ui.visuals().warn_fg_color, text);
+        note.on_hover_ui(|ui| {
+            for template in self.workspace.outside_nemesis() {
+                ui.label(template);
+            }
+        });
+    }
+
     fn clear_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
         if ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {

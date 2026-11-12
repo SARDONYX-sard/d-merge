@@ -439,8 +439,11 @@
   "user_patch_clear": "すべて削除",
   "user_patch_clear_confirm": "ユーザーパッチをすべて削除しますか？",
   "user_patch_clear_hover": "ユーザーパッチの内容をすべて削除して書き出します。競合はロード順で勝つmodの値に戻ります。隠した操作はそのままです。元に戻せません。",
+  "user_patch_export_mod": "modとして書き出し…",
+  "user_patch_export_mod_hover": "ユーザーパッチを独立したmod(コードupatch)として、選んだフォルダ(例: MO2のmods)にNemesis、Nemesis Ext、Pandora v5のいずれかで書き出します。MO2での管理や共有のためのものです。ユーザーパッチ本来の出力先やマージの内容は変わりません。",
   "user_patch_hover": "ユーザーパッチの内容をすべて表示します。競合で選んだ値と手で編集した内容です。",
   "user_patch_output_hover": "Patchページの出力ディレクトリで決まります。プロファイルごとに競合が異なるためで、ここでは変更できません。編集は少し後に自動で書き出します。",
+  "user_patch_outside_nemesis": "Nemesisが知らないテンプレートです。パッチはNemesis_EngineExtに入り、d-mergeだけが読めます",
   "user_patch_title": "ユーザーパッチ",
   "vfs_mode": "VFSモード",
   "vfs_mode_hover": "MO2などの仮想環境を使用して起動する場合に使用します"

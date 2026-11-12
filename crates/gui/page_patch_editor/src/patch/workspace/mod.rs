@@ -526,6 +526,29 @@ mod tests {
         assert!(found && gone && !again);
     }
 
+    /// Only a patched template Nemesis does not know is outside what Nemesis reads: not one it
+    /// knows, not one without patches, not animation data.
+    #[test]
+    fn the_templates_outside_nemesis() {
+        let template = |meshes_path: &str, nemesis: Option<(String, bool)>, patched: bool| {
+            let mut behavior = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+            (behavior.adsf, behavior.meshes_path, behavior.nemesis) = (false, meshes_path.to_owned(), nemesis);
+            if patched {
+                behavior.edits.insert("#0001".to_owned(), String::new());
+            }
+            behavior
+        };
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(template("meshes/troll.bin", None, true));
+        workspace.behaviors.push(template("meshes/bear.bin", None, false));
+        workspace.behaviors.push(template("meshes/0_master.bin", Some(("0_master".to_owned(), false)), true));
+        let mut clips = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
+        workspace.behaviors.push(clips);
+
+        assert_eq!(workspace.outside_nemesis().collect::<Vec<_>>(), ["meshes/troll.bin"]);
+    }
+
     /// A mod of Nemesis only is a Nemesis work; one written elsewhere is an `Extended` one.
     #[test]
     fn the_scope_of_a_read_mod() {

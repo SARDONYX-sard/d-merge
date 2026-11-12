@@ -166,6 +166,8 @@ pub(crate) struct PatchTool {
     session_seen: (usize, Option<Rc<str>>),
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
+    /// The user patch written as a mod of its own. See [`user_patch::ModExport`].
+    mod_export: user_patch::ModExport,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
     template_projects: Option<Vec<String>>,
     /// The "duplicate to" window.
