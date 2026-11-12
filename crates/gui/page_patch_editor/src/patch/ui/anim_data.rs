@@ -7,6 +7,7 @@
 //! │   ☑ Paraglide_Equip  Animations\..\Equip.hkx   3.30 s    │
 //! │   ☐ Broken           Animations\..\Gone.hkx    ✖         │  <- hover: why
 //! │ ▼ Anim sets                                              │
+//! │   ☑ Also add the checked hkx to their characters         │  <- anim::character
 //! │   Project: [DefaultMaleData~DefaultMale (1) ▼]           │
 //! │   hkx  1 / 12  [All] [None]   txt  1 / 374  [All] [None] │
 //! │   [filter               ]     [filter                ]   │
@@ -68,6 +69,9 @@ pub(in crate::patch) struct AnimDataDialog {
     projects: Vec<SetProject>,
     /// The project shown, in `projects`.
     project: usize,
+    /// The checked hkx also go to the `animationNames` of their actors' characters. See
+    /// [`crate::patch::anim::character`].
+    add_names: bool,
 }
 
 impl AnimDataDialog {
@@ -79,9 +83,11 @@ impl AnimDataDialog {
         self.projects.iter().map(|project| project.files.checked_count()).sum()
     }
 
-    /// Whether `Generate` has anything to do. hkx without a txt (or the reverse) is not a request.
+    /// Whether `Generate` has anything to do. hkx without a txt (or the reverse) is not a request,
+    /// unless they go to the characters.
     fn can_generate(&self) -> bool {
-        self.checked_clips() > 0 || (self.hkx.checked_count() > 0 && self.checked_sets() > 0)
+        let hkx = self.hkx.checked_count() > 0;
+        self.checked_clips() > 0 || (hkx && (self.checked_sets() > 0 || self.add_names))
     }
 }
 
@@ -105,8 +111,14 @@ impl PatchTool {
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
-        self.anim_data_dialog =
-            Some(AnimDataDialog { root: root.to_path_buf(), rows, hkx: Checklist::new(hkx), projects, project });
+        self.anim_data_dialog = Some(AnimDataDialog {
+            root: root.to_path_buf(),
+            rows,
+            hkx: Checklist::new(hkx),
+            projects,
+            project,
+            add_names: true,
+        });
     }
 
     /// Draws the window if it is open, and generates what was asked for.
@@ -157,10 +169,38 @@ impl PatchTool {
         );
         let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
         let root = PathBuf::from(&self.template_dir);
-        match data::generate(&mut self.workspace, &root, &request) {
-            Ok(()) => {
-                notify.success(summary);
-                self.show_anim_data_result(first_result);
+        if let Err(err) = data::generate(&mut self.workspace, &root, &request) {
+            notify.error(err);
+            return;
+        }
+        notify.success(summary);
+        if dialog.add_names {
+            self.add_names_to_characters(&root, &request.push.hkx, i18n, notify);
+        }
+        self.show_anim_data_result(first_result);
+    }
+
+    /// The checked hkx to the `animationNames` of their characters, those the work's scope allows.
+    fn add_names_to_characters(&mut self, root: &Path, hkx: &[&str], i18n: &I18nMap, notify: &mut Notification) {
+        let scope = self.workspace.scope;
+        let allows = |behavior: &crate::patch::workspace::Behavior| scope.allows(behavior.nemesis.is_some());
+        match self.workspace.add_animation_names(root, hkx, allows) {
+            Ok(done) => {
+                if !done.characters.is_empty() {
+                    notify.success(format!(
+                        "{}: {}",
+                        i18n.t(I18nKey::NemesisAnimNamesAdded),
+                        done.characters.join(", ")
+                    ));
+                }
+                if !done.no_character.is_empty() {
+                    notify.warn(format!(
+                        "{}: {}",
+                        i18n.t(I18nKey::NemesisAnimNamesNoCharacter),
+                        done.no_character.join(", ")
+                    ));
+                }
+                self.reset_names();
             }
             Err(err) => notify.error(err),
         }
@@ -212,6 +252,8 @@ fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
 
 /// The project, and side by side the hkx and the txt of that project.
 fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
+    ui.checkbox(&mut dialog.add_names, i18n.t(I18nKey::NemesisAnimNamesToCharacters))
+        .on_hover_text(i18n.t(I18nKey::NemesisAnimNamesToCharactersHover));
     project_combo(ui, i18n, dialog);
     let AnimDataDialog { hkx, projects, project, .. } = dialog;
     ui.columns(2, |columns| {

@@ -726,6 +726,18 @@ pub enum I18nKey {
     /// Anim Sets
     NemesisAnimKindSet,
 
+    /// Added the animations to the characters
+    NemesisAnimNamesAdded,
+
+    /// No character template for these actors
+    NemesisAnimNamesNoCharacter,
+
+    /// Also add the checked hkx to their characters
+    NemesisAnimNamesToCharacters,
+
+    /// A behavior plays a hkx only if its character lists it. Each checked hkx goes to the animationNames of the characters of its actor, told by its folder: e.g. meshes\actors\character\animations\Para\Equip.hkx -> Animations\Para\Equip.hkx in defaultmale and defaultfemale. Names already there are left.
+    NemesisAnimNamesToCharactersHover,
+
     /// Who made the mod (author in info.ini).
     NemesisAuthorHover,
 
