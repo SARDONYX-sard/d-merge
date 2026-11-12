@@ -157,23 +157,10 @@ impl PatchTool {
         }
     }
 
-    /// `CHANGES  [✓]`, the message and `Commit`, the changes since the last revision, and the history:
+    /// `CHANGES`, the message and `Commit`, the changes since the last revision, and the history:
     /// like VS Code's Source Control. See [`crate::patch::workspace::history`].
     fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut egui_widgets::notify::Notification) {
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(i18n.t(I18nKey::SideChanges).to_uppercase()).small().strong());
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // As Source Control's title actions: on all that changed.
-                let check = Button::new("").icon(Icon::ScanSearch).small();
-                let hover = |ui: &mut egui::Ui| {
-                    ui.strong(i18n.t(I18nKey::NemesisCheckWork));
-                    ui.label(i18n.t(I18nKey::NemesisCheckWorkHover));
-                };
-                if ui.add(check).on_hover_ui(hover).clicked() {
-                    self.start_whole_work_check();
-                }
-            });
-        });
+        view_title(ui, i18n.t(I18nKey::SideChanges));
         self.branch_row(ui, i18n, notify);
         self.pending.refresh(&self.workspace, self.edits);
         self.commit_box(ui, i18n);
@@ -336,6 +323,10 @@ impl PatchTool {
                     local_time(revision.time)
                 );
                 let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
+                if response.clicked() {
+                    let parent = self.workspace.history.parent_number(revision.number);
+                    picked = Some(ChangeAction::Compare(self.active, id.to_owned(), parent, Some(revision.number)));
+                }
                 response.context_menu(|ui| {
                     let parent = self.workspace.history.parent_number(revision.number);
                     if ui.button(i18n.t(I18nKey::SideComparePrevious)).clicked() {
@@ -430,8 +421,15 @@ fn change_row(
         let (class, label) = object.map_or(("", ""), |object| (object.class, object.name));
         let text = format!("{name}  {}  {class}  {label}", change.id);
         let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
-        if let (true, Some(at)) = (response.clicked(), behavior.filter(|_| object.is_some())) {
-            picked = Some(ChangeAction::Open(at, change.id.clone()));
+        // As VS Code's Source Control: a change opens its object; a file of a revision, what that
+        // revision changed of it.
+        match (response.clicked(), behavior, revision) {
+            (true, Some(at), Some(number)) => {
+                let parent = workspace.history.parent_number(number);
+                picked = Some(ChangeAction::Compare(at, change.id.clone(), parent, Some(number)));
+            }
+            (true, Some(at), None) if object.is_some() => picked = Some(ChangeAction::Open(at, change.id.clone())),
+            _ => {}
         }
         if let Some(at) = behavior {
             response.context_menu(|ui| {

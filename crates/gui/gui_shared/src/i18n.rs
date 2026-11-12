@@ -750,33 +750,6 @@ pub enum I18nKey {
     /// Changed only
     NemesisChangedOnly,
 
-    /// Check
-    NemesisCheck,
-
-    /// Check all
-    NemesisCheckAll,
-
-    /// Errors
-    NemesisCheckErrors,
-
-    /// Checks without opening them. Animation data: d-merge's parser on its patches. Behaviors: the fields and pointers of what the mod changes, and d-merge's parser on its patches.
-    NemesisCheckHover,
-
-    /// No problems found.
-    NemesisCheckNone,
-
-    /// Check results
-    NemesisCheckTitle,
-
-    /// Warnings
-    NemesisCheckWarnings,
-
-    /// Check the whole work
-    NemesisCheckWork,
-
-    /// Checks what the mod changes in every behavior and animation data of this work, without opening them.
-    NemesisCheckWorkHover,
-
     /// This mod has several mod codes: which one to open?
     NemesisChooseModCode,
 
@@ -1320,6 +1293,9 @@ pub enum I18nKey {
 
     /// Updating list...
     PatchFetchingButton,
+
+    /// No problems have been found in the work.
+    ProblemsNone,
 
     /// Reload
     ReloadButton,

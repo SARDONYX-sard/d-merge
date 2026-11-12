@@ -16,7 +16,6 @@ use super::{
     anim_data::{DuplicateForm, NewClipsForm},
     anim_tree::{self, AnimFile, AnimRow, FileKind},
     behaviors::quick_pick_window,
-    work_check::{CheckScope, check_items},
 };
 use crate::patch::{
     PatchTool,
@@ -209,10 +208,6 @@ impl PatchTool {
                                 let files = data::changed_files(&self.workspace.behaviors[self.active], name);
                                 self.ask_duplicate(pick, files, &projects, name);
                             }
-                            if let Some(is_row) = check_items(ui, i18n) {
-                                let folder = is_row.then(|| CheckScope::Folder((*name).to_owned()));
-                                self.start_work_check(folder.unwrap_or(CheckScope::All));
-                            }
                         });
                     }
                     AnimRow::Group { kind, key, files, changed, open } => {
@@ -221,14 +216,6 @@ impl PatchTool {
                         if response.clicked() {
                             toggled = Some(key.clone());
                         }
-                        // `DefaultMale~1/Clip`
-                        let folder = key.rsplit_once('/').map_or(key.as_str(), |(folder, _)| folder);
-                        response.context_menu(|ui| {
-                            if let Some(is_row) = check_items(ui, i18n) {
-                                let of_kind = CheckScope::Kind { folder: folder.to_owned(), kind: *kind };
-                                self.start_work_check(if is_row { of_kind } else { CheckScope::All });
-                            }
-                        });
                     }
                     AnimRow::File { node, name } => {
                         menu_action = self.anim_file_row(ui, i18n, graph, *node, name).or(menu_action);

@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! ▼ BEHAVIORS                    [+]   <- templates, a file of your own, animation data
-//!   0_master (3)                       <- right click: check, remove. Hover: where it goes.
+//!   0_master (3)                       <- right click: remove. Hover: where it goes.
 //!   ⚠ draugrbehavior                   <- only d-merge will read this one
 //! ```
 //! The template list opens as a window with the filter focused, like VS Code's quick open, but next
@@ -32,8 +32,6 @@ const LIST_HEIGHT: f32 = 130.0;
 #[derive(Debug, Clone, Copy)]
 enum RowEvent {
     Remove(usize),
-    /// Check what it changes, see [`super::work_check`].
-    Check(usize),
 }
 
 /// What the buttons of the header asked for.
@@ -126,13 +124,6 @@ impl PatchTool {
 
     fn apply_row_event(&mut self, event: Option<RowEvent>) {
         match event {
-            Some(RowEvent::Check(i)) => {
-                if i != self.active {
-                    self.active = i;
-                    self.selected = self.tabs.last_of(i).map(Rc::from);
-                }
-                self.start_work_check(super::work_check::CheckScope::All);
-            }
             Some(RowEvent::Remove(i)) => {
                 self.workspace.behaviors.remove(i);
                 self.reset_names(); // the numbers of the others shift
@@ -256,14 +247,9 @@ fn row_hover(behavior: &Behavior, code: &str, ext: bool, i18n: &I18nMap) -> Stri
     hover
 }
 
-/// `Check`, `Remove`. Where it is written is the export's choice: see `ExportFormat`.
+/// `Remove`. Where it is written is the export's choice: see `ExportFormat`.
 fn row_menu(ui: &mut egui::Ui, index: usize, i18n: &I18nMap) -> Option<RowEvent> {
     let mut event = None;
-    if ui.button(i18n.t(I18nKey::NemesisCheck)).on_hover_text(i18n.t(I18nKey::NemesisCheckHover)).clicked() {
-        event = Some(RowEvent::Check(index));
-        ui.close();
-    }
-    ui.separator();
     let remove = Button::new(i18n.t(I18nKey::NemesisRemoveBehavior)).destructive().icon(Icon::Trash);
     if ui.add(remove).on_hover_text(i18n.t(I18nKey::NemesisRemoveBehaviorHover)).clicked() {
         event = Some(RowEvent::Remove(index));

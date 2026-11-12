@@ -133,6 +133,9 @@ impl PatchTool {
         match loaded {
             Ok(workspace) => {
                 self.workspace = workspace;
+                if self.is_user_patch {
+                    self.workspace.use_user_patch_format();
+                }
                 self.reset_names();
                 self.tabs.clear();
             }

@@ -117,7 +117,10 @@ pub(super) struct UserPatchView {
 impl PatchTool {
     fn for_user_patch(paths: PatchPaths<'_>) -> Self {
         let output = paths.patch_output_dir.trim();
+        let mut workspace = Workspace::default();
+        workspace.use_user_patch_format();
         Self {
+            workspace,
             is_user_patch: true,
             restored: true,
             patch_output: output.to_owned(),

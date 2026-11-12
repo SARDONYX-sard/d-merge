@@ -125,7 +125,7 @@ impl PatchTool {
             }
         }
         self.editor_for = None;
-        self.refresh_work_check(id);
+        self.refresh_problems(id);
         self.object_changed(id);
     }
 

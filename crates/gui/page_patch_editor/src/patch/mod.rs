@@ -20,6 +20,7 @@ mod changes;
 mod checklist;
 mod editor;
 mod new_work;
+mod problems;
 mod search;
 mod template_tree;
 mod tool;
@@ -220,10 +221,12 @@ pub(crate) struct PatchTool {
     new_branch: Option<String>,
     /// The window of a diff or a blame of the history. See [`ui::revision_view`].
     revision_view: Option<ui::revision_view::RevisionView>,
-    /// The problems of the whole work, for the status bar's counts. See [`ui::work_check`].
-    diagnostics: Option<ui::work_check::WorkCheck>,
-    /// The work changed as a whole: `diagnostics` is found again.
-    diagnostics_stale: bool,
+    /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
+    problems: Option<Vec<problems::Problem>>,
+    /// The work changed as a whole: `problems` are found again.
+    problems_stale: bool,
+    /// The Problems panel shows: a click on the status bar's counts.
+    problems_open: bool,
     /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
     anim_folders_open: fast_hash::HashSet<String>,
     /// The button above the list was clicked: done where the list has its files.
@@ -240,8 +243,6 @@ pub(crate) struct PatchTool {
     user_patch: user_patch::UserPatchView,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
     template_projects: Option<Vec<String>>,
-    /// The window of what was checked on request.
-    work_check: Option<ui::work_check::WorkCheck>,
     /// The "duplicate to" window.
     duplicate_form: Option<ui::anim_data::DuplicateForm>,
     /// What a row's menu asked to duplicate: `(files, to the project)`.
@@ -449,7 +450,6 @@ impl PatchTool {
         self.anim_data_window(ui.ctx(), i18n, notify);
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
-        self.work_check_window(ui.ctx(), i18n);
         self.revision_view_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 

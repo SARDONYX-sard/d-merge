@@ -248,8 +248,8 @@ impl PatchTool {
         ];
 
         let mut result = EditorResult::default();
-        // Read before the panel borrows the work; a click lists them after it.
-        let (counts, mut show_problems) = (self.diagnostic_counts(), false);
+        // Read before the panel borrows the work; what a click asks for is done after it.
+        let (counts, mut toggle_problems, mut go_to_problem) = (self.problem_counts(), false, None);
         egui::CentralPanel::default().show(ui, |ui| {
             // Like VS Code's: the tabs, and at the far right what splits the editor. A new object has no
             // preview: it is written as is.
@@ -286,12 +286,16 @@ impl PatchTool {
             let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
             egui::Panel::bottom(status_id).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    show_problems |= problem_counts(ui, i18n, counts);
+                    toggle_problems |= problem_counts(ui, i18n, counts);
                     toolbar(ui, i18n, &mut self.editor_mode, &mut self.show_lsp_options);
                     egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
                 });
             });
-            result.jump_to_line = super::problems::problems_panel(ui, i18n, &self.field_problems);
+            if self.problems_open
+                && let Some(problems) = &self.problems
+            {
+                go_to_problem = super::problems::problems_panel(ui, i18n, problems, &self.workspace.behaviors);
+            }
             // Per object: each tab keeps where it was scrolled to.
             egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false).show(ui, |ui| {
                 let output = CodeEditor::new(("nemesis_object", self.is_user_patch, id), &mut self.editor_text)
@@ -327,8 +331,16 @@ impl PatchTool {
                 }
             });
         });
-        if show_problems {
-            self.show_diagnostics();
+        if toggle_problems {
+            self.problems_open = !self.problems_open;
+        }
+        if let Some((behavior, object, line)) = go_to_problem {
+            if behavior != self.active {
+                self.active = behavior;
+                self.selected = None;
+            }
+            let current = self.selected.clone().unwrap_or_default();
+            self.open_location(&current, &object, line);
         }
         result
     }
@@ -566,7 +578,7 @@ fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions,
 }
 
 /// `✖ 2  ⚠ 5` at the left of the status bar, as VS Code's: the problems of the whole work (`counts`:
-/// errors, warnings; `None` until it was checked). Returns whether it was clicked, to list them.
+/// errors, warnings; `None` until it was checked). Returns whether it was clicked: that shows or hides the Problems panel.
 fn problem_counts(ui: &mut egui::Ui, i18n: &I18nMap, counts: Option<(usize, usize)>) -> bool {
     let Some((errors, warnings)) = counts else { return false };
     let visuals = ui.visuals();
@@ -580,7 +592,7 @@ fn problem_counts(ui: &mut egui::Ui, i18n: &I18nMap, counts: Option<(usize, usiz
     job.append(&format!("✖ {errors}"), 0.0, egui::TextFormat::simple(font.clone(), error_color));
     job.append(&format!("  ⚠ {warnings}"), 0.0, egui::TextFormat::simple(font, warn_color));
     let clicked =
-        ui.add(egui::Button::new(job).frame(false)).on_hover_text(i18n.t(I18nKey::NemesisCheckWorkHover)).clicked();
+        ui.add(egui::Button::new(job).frame(false)).on_hover_text(i18n.t(I18nKey::HkannoProblemsLabel)).clicked();
     ui.separator();
     clicked
 }

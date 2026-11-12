@@ -267,6 +267,13 @@ struct WorkspaceFile {
 }
 
 impl Workspace {
+    /// The user patch is read by d-merge only (it is the conflict tool's): it is NemesisExt, which takes
+    /// any template, whatever it was kept as.
+    pub(crate) const fn use_user_patch_format(&mut self) {
+        self.export_format = ExportFormat::NemesisExt;
+        self.scope = TemplateScope::Extended;
+    }
+
     /// Adds the mod at `selected` (its root or a patch directory) to [`Self::ref_mods`], except for
     /// the code `own_code`, which is this mod.
     pub(crate) fn add_ref(&mut self, selected: &Path, own_code: &str) {

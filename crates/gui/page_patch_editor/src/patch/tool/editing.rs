@@ -189,7 +189,7 @@ impl PatchTool {
         self.inline_diff = behavior.template_object(id).map_or_else(InlineDiff::default, |template| {
             editor::inline_diff::changes(&template.text, &self.editor_text)
         });
-        self.refresh_work_check(id);
+        self.refresh_problems(id);
     }
 
     /// Enum / flag values only depend on the template: computed once per behavior.
@@ -361,7 +361,7 @@ impl PatchTool {
         self.names = None;
         self.changed_objects.clear();
         self.edits += 1; // what was found of the work before is not of this one
-        self.diagnostics_stale = true;
+        self.problems_stale = true;
     }
 }
 
