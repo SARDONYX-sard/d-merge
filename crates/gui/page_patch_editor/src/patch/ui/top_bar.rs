@@ -26,7 +26,7 @@ use crate::patch::{
 };
 
 /// The width of the box of [`PatchTool::export_format_box`].
-const EXPORT_FORMAT_WIDTH: f32 = 96.0;
+const EXPORT_FORMAT_WIDTH: f32 = 112.0;
 
 /// See [`PathRow`].
 pub(super) const PATH_ACTIONS: PathActions =
@@ -99,7 +99,7 @@ impl PatchTool {
                 // Usually next to the one that was open.
                 let output = self.output.clone();
                 self.close_work(notify, i18n);
-                self.new_work = Some(NewWork { code: String::new(), output });
+                self.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
             }
             Some(FileAction::Open) => self.pick_mod(notify, i18n),
             Some(FileAction::Recent(work)) => self.open_recent(&work, notify, i18n),
@@ -123,19 +123,17 @@ impl PatchTool {
 
     /// What `Export` writes. Beside it, as it belongs to it and not to what opens something.
     fn export_format_box(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        const FORMATS: [(ExportFormat, &str); 2] =
-            [(ExportFormat::Nemesis, "Nemesis"), (ExportFormat::Pandora, "Pandora")];
         let format = self.workspace.export_format;
-        let mut selected = FORMATS.iter().position(|(known, _)| *known == format).unwrap_or(0);
+        let mut selected = ExportFormat::ALL.iter().position(|(known, _)| *known == format).unwrap_or(0);
         let response = ComboBox::from_id_salt("nemesis_export_format").width(EXPORT_FORMAT_WIDTH).show_index(
             ui,
             &mut selected,
-            FORMATS.len(),
-            |index| FORMATS[index].1,
+            ExportFormat::ALL.len(),
+            |index| ExportFormat::ALL[index].1,
         );
         let response = response.on_hover_text(i18n.t(I18nKey::NemesisExportFormatHover));
         if response.changed() {
-            self.workspace.export_format = FORMATS[selected].0;
+            self.workspace.export_format = ExportFormat::ALL[selected].0;
             self.preview = None; // it says what the export would write
             self.mark_dirty();
         }

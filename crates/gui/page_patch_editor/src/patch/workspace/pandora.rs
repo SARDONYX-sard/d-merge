@@ -202,7 +202,7 @@ impl Workspace {
             behavior.pandora_file = Some(name);
             let (_, failed) = behavior.apply_pandora_doc();
             skipped.extend(failed);
-            self.export_format = ExportFormat::Pandora;
+            self.export_format = ExportFormat::PandoraV5;
         }
         if dir.join(ASDSF).is_dir() {
             skipped.push(ASDSF.to_owned());

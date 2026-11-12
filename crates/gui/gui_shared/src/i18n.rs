@@ -960,7 +960,7 @@ pub enum I18nKey {
     /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
     NemesisPandoraDocHover,
 
-    /// What Export writes. Nemesis: Nemesis_Engine and Nemesis_EngineExt. Pandora: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml, without the animation data. It is the same work: a mod read in one format can be written in the other.
+    /// What Export writes. Nemesis: Nemesis_Engine, and Nemesis_EngineExt for the templates Nemesis does not support. Nemesis Ext: every template to Nemesis_EngineExt (only d-merge reads it). Pandora v5: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml of Pandora Behaviour Engine v5, without the animation data. It is the same work: a mod read in one format can be written in another.
     NemesisExportFormatHover,
 
     /// Written for Pandora
@@ -1068,6 +1068,15 @@ pub enum I18nKey {
 
     /// Check all
     NemesisCheckAll,
+
+    /// Templates
+    NemesisScopeLabel,
+
+    /// Which templates this work can patch. It can't be changed later. Nemesis: only those Nemesis knows. Nemesis Ext / Pandora v5: all of them, and template files of your own. Either can be exported in any format.
+    NemesisScopeHover,
+
+    /// Only the templates Nemesis knows (this work is a Nemesis one).
+    NemesisScopeNemesisOnly,
 
     /// Check the whole work
     NemesisCheckWork,
@@ -1203,15 +1212,6 @@ pub enum I18nKey {
 
     /// Removes this behavior and discards all its edits and new objects.
     NemesisRemoveBehaviorHover,
-
-    /// NemesisExt
-    NemesisForceExt,
-
-    /// Write to Nemesis_EngineExt/mod/<code>/meshes/... even though Nemesis supports this template.
-    NemesisForceExtHover,
-
-    /// Nemesis does not support this template: it can only be written as NemesisExt.
-    NemesisUnsupportedTemplate,
 
     /// ⚠ NemesisExt is read by d-merge only (not by Nemesis or Pandora).
     NemesisExtOnlyWarning,

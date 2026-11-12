@@ -6,6 +6,7 @@ use std::{
 };
 
 use super::{
+    TemplateScope,
     behavior::ASDSF,
     locations::{meshes_path, nemesis_folder},
     read_dir,
@@ -25,8 +26,9 @@ pub(crate) struct TemplateEntry {
     pub(crate) nemesis: bool,
 }
 
-/// Every `.bin` / `.xml` template under `template_dir` (sorted; a `.bin` wins over its `.xml`).
-pub(crate) fn catalog(template_dir: &Path) -> Vec<TemplateEntry> {
+/// Every `.bin` / `.xml` template under `template_dir` that a work of `scope` can patch (sorted; a
+/// `.bin` wins over its `.xml`).
+pub(crate) fn catalog(template_dir: &Path, scope: TemplateScope) -> Vec<TemplateEntry> {
     let mut found: BTreeMap<String, TemplateEntry> = BTreeMap::new();
     let mut stack = vec![template_dir.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -53,5 +55,5 @@ pub(crate) fn catalog(template_dir: &Path) -> Vec<TemplateEntry> {
             }
         }
     }
-    found.into_values().collect()
+    found.into_values().filter(|entry| scope.allows(entry.nemesis)).collect()
 }

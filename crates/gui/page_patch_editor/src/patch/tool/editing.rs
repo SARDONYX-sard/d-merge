@@ -172,7 +172,7 @@ impl PatchTool {
             editor::diagnostics::add_parser_error(&mut self.field_problems, &self.editor_text, error, to_editor_line);
         }
         // What the export would write. Animation data stays lines: Pandora's export doesn't write it.
-        let as_pandora = self.workspace.export_format == workspace::ExportFormat::Pandora && !behavior.is_anim_data();
+        let as_pandora = self.workspace.export_format == workspace::ExportFormat::PandoraV5 && !behavior.is_anim_data();
         let (view, check) = if as_pandora {
             match editor::pandora::op_preview(behavior, id) {
                 Ok(view) => (Some(view), Ok(())),

@@ -79,8 +79,9 @@ impl Workspace {
         let info = self.info.exported();
 
         let (mut written, mut invalid) = (0, Vec::new());
+        let ext = self.export_format.is_ext();
         for behavior in &self.behaviors {
-            let relative = behavior.patch_dir(code);
+            let relative = behavior.patch_dir(code, ext);
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };
                 if let Err(err) = behavior.validate(id, &patch, mode) {

@@ -12,12 +12,15 @@
 use egui_widgets::{
     PathRow,
     notify::Notification,
-    shadcn::{Button, Icon, TextEdit},
+    shadcn::{Button, ComboBox, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::top_bar::{PATH_ACTIONS, recent_list};
-use crate::patch::{PatchTool, workspace::Workspace};
+use crate::patch::{
+    PatchTool,
+    workspace::{TemplateScope, Workspace},
+};
 
 impl PatchTool {
     pub(in crate::patch) fn start_screen(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
@@ -73,6 +76,7 @@ impl PatchTool {
         if let Some(err) = output.open_error {
             notify.error(err);
         }
+        scope_box(ui, &mut form.scope, i18n);
 
         let problem = form.problem(|code| Workspace::exists(&self.cache_root, code));
         let (mut create, mut cancel) = (false, false);
@@ -87,10 +91,29 @@ impl PatchTool {
         if create {
             let code = form.code.trim().to_owned();
             let output = form.output.trim().to_owned();
-            self.create_work(code, output);
+            let scope = form.scope;
+            self.create_work(code, output, scope);
             ui.ctx().request_repaint();
         } else if cancel {
             self.new_work = None;
         }
     }
+}
+
+/// `Templates [Nemesis v]`: which templates the new work can patch. It can't be changed later.
+fn scope_box(ui: &mut egui::Ui, scope: &mut TemplateScope, i18n: &I18nMap) {
+    ui.horizontal(|ui| {
+        let hover = i18n.t(I18nKey::NemesisScopeHover);
+        ui.label(i18n.t(I18nKey::NemesisScopeLabel)).on_hover_text(hover);
+        let mut selected = TemplateScope::ALL.iter().position(|(known, _)| known == scope).unwrap_or(0);
+        let response = ComboBox::from_id_salt("nemesis_new_work_scope").show_index(
+            ui,
+            &mut selected,
+            TemplateScope::ALL.len(),
+            |index| TemplateScope::ALL[index].1,
+        );
+        if response.on_hover_text(hover).changed() {
+            *scope = TemplateScope::ALL[selected].0;
+        }
+    });
 }

@@ -5,7 +5,7 @@ use std::path::Path;
 use nemesis_diff::{View, apply_to_template, resolve};
 
 use super::{
-    Workspace,
+    ExportFormat, TemplateScope, Workspace,
     behavior::{ADSF, ASDSF, Behavior},
     export::owned_key,
     locations::{
@@ -110,6 +110,8 @@ impl Workspace {
         if let Some(pandora) = &pandora {
             workspace.read_pandora_dir(pandora, template_root, &mut skipped)?;
         }
+        // A mod of Nemesis only: its work shows only the templates Nemesis knows.
+        workspace.scope = TemplateScope::of(&workspace);
         Ok((workspace, code, skipped))
     }
 
@@ -140,7 +142,10 @@ impl Workspace {
             };
             let at = self.open_behavior(&template, &meshes_path)?;
             let behavior = &mut self.behaviors[at];
-            behavior.force_ext |= relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
+            // A template Nemesis knows, patched in `Nemesis_EngineExt`: the mod is written as NemesisExt.
+            if relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some() {
+                self.export_format = ExportFormat::NemesisExt;
+            }
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 let id = file_stem(&file);
                 let patch = read_text(&file)?;

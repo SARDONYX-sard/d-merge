@@ -9,12 +9,12 @@
 //! info.ini                      name / author / site
 //! meshes~actors~draugr~behaviors~draugrbehavior.bin/
 //!   template.path               the template xml this behavior was made from
-//!   force_ext                   (present = write as NemesisExt)
 //!   #0106.xml                   an edited template object (full object text)
 //!   #mymod$0.xml                a new object
 //! ```
 //! [`Workspace::export`] writes the real mod: `<output>/Nemesis_Engine/mod/<code>/` for templates
-//! Nemesis supports, `<output>/Nemesis_EngineExt/mod/<code>/meshes/...` for the others.
+//! Nemesis supports, `<output>/Nemesis_EngineExt/mod/<code>/meshes/...` for the others, or for all of
+//! them as [`ExportFormat::NemesisExt`].
 
 mod behavior;
 mod catalog;
@@ -85,13 +85,26 @@ fn remove_saved(dir: &Path, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Removes the `<behavior>/force_ext` files of a work kept when NemesisExt was chosen per behavior.
+/// Returns whether there was one: the work is then written as [`ExportFormat::NemesisExt`].
+fn take_old_force_ext(dir: &Path, entries: &[PathBuf]) -> bool {
+    let mut found = false;
+    for entry in entries {
+        let file = entry.join("force_ext");
+        if file.is_file() {
+            found = true;
+            let _gone_anyway = remove_saved(dir, file.strip_prefix(dir).unwrap_or(&file));
+        }
+    }
+    found
+}
+
 /// A behavior of a cache dir: `<dir>/<behavior>/template.path` and its objects. `None`: no behavior.
 fn read_cached_behavior(entry: &Path) -> Result<Option<Behavior>, String> {
     let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
         return Ok(None);
     };
     let mut behavior = Behavior::open(Path::new(template.trim()))?;
-    behavior.force_ext = entry.join("force_ext").exists();
     behavior.pandora_file = std::fs::read_to_string(entry.join("pandora_file")).ok();
     for file in read_dir(entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
         let id = file_stem(&file).replace("%2F", "/");
@@ -112,16 +125,76 @@ fn read_cached_behavior(entry: &Path) -> Result<Option<Behavior>, String> {
     Ok(Some(behavior))
 }
 
-/// The whole patch being made.
 /// What a work is written as. It is the same work: edits of the objects of templates.
+///
+/// Animation data is written to `Nemesis_Engine` in both Nemesis formats.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum ExportFormat {
     /// `Nemesis_Engine/mod/<code>`, and `Nemesis_EngineExt/mod/<code>` for what Nemesis doesn't know.
     #[default]
     Nemesis,
-    /// `Pandora_Engine/mod/<code>`
-    Pandora,
+    /// `Nemesis_EngineExt/mod/<code>/meshes/...` for every template: only d-merge reads it.
+    NemesisExt,
+    /// `Pandora_Engine/mod/<code>` of Pandora Behaviour Engine v5. A later version that changes the
+    /// format would be another variant.
+    #[serde(alias = "Pandora")]
+    PandoraV5,
 }
+
+impl ExportFormat {
+    /// In the order of the export's list: `(format, label)`.
+    pub(crate) const ALL: [(Self, &'static str); 3] =
+        [(Self::Nemesis, "Nemesis"), (Self::NemesisExt, "Nemesis Ext"), (Self::PandoraV5, "Pandora v5")];
+
+    /// Are the templates Nemesis knows written to `Nemesis_EngineExt` too? See [`Behavior::target`].
+    #[inline]
+    pub(crate) const fn is_ext(self) -> bool {
+        matches!(self, Self::NemesisExt)
+    }
+}
+
+/// Which templates a work can patch: chosen when it is made, and fixed. The export can still write it
+/// in any [`ExportFormat`].
+///
+/// | scope    | templates                         | made for                    |
+/// | -------- | --------------------------------- | --------------------------- |
+/// | Nemesis  | those Nemesis knows (`nemesis`)   | Nemesis, and the others     |
+/// | Extended | all, and template files of yours  | Nemesis Ext, Pandora v5     |
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum TemplateScope {
+    #[default]
+    Nemesis,
+    Extended,
+}
+
+impl TemplateScope {
+    /// In the order of the new work's list: `(scope, label)`.
+    pub(crate) const ALL: [(Self, &'static str); 2] =
+        [(Self::Nemesis, "Nemesis"), (Self::Extended, "Nemesis Ext / Pandora v5")];
+
+    /// Can a work of this scope patch a template? `nemesis`: Nemesis knows it ([`TemplateEntry::nemesis`]).
+    #[inline]
+    pub(crate) const fn allows(self, nemesis: bool) -> bool {
+        nemesis || matches!(self, Self::Extended)
+    }
+
+    /// The scope of a work read from a mod, or kept before there was one: `Extended` if it has what
+    /// Nemesis can't read (a template it doesn't know, or patches in `Nemesis_EngineExt` / Pandora's).
+    pub(crate) fn of(workspace: &Workspace) -> Self {
+        let unknown = workspace.behaviors.iter().any(|behavior| !behavior.is_anim_data() && behavior.nemesis.is_none());
+        if unknown || workspace.export_format != ExportFormat::Nemesis { Self::Extended } else { Self::Nemesis }
+    }
+
+    /// What a new work of this scope is exported as, until changed.
+    pub(crate) const fn default_format(self) -> ExportFormat {
+        match self {
+            Self::Nemesis => ExportFormat::Nemesis,
+            Self::Extended => ExportFormat::NemesisExt,
+        }
+    }
+}
+
+/// The whole patch being made.
 
 #[derive(Debug, Default)]
 pub(crate) struct Workspace {
@@ -138,6 +211,8 @@ pub(crate) struct Workspace {
     pub(crate) ref_mods: Vec<String>,
     /// What `Export` writes.
     pub(crate) export_format: ExportFormat,
+    /// Which templates can be added. See [`TemplateScope`].
+    pub(crate) scope: TemplateScope,
     /// What was open when it was saved. See [`Session`].
     pub(crate) session: Session,
     /// The files of the mod this work read or wrote, relative to the mod's root: what the next export
@@ -175,6 +250,8 @@ pub(crate) struct SessionTab {
 struct WorkspaceFile {
     /// `None`: a work kept before there was a choice.
     export_format: Option<ExportFormat>,
+    /// `None`: a work kept before there was a choice, see [`TemplateScope::of`].
+    template_scope: Option<TemplateScope>,
     ref_mods: Vec<String>,
     session: Session,
     owned: std::collections::BTreeSet<String>,
@@ -246,8 +323,12 @@ impl Workspace {
         let file: WorkspaceFile = sonic_rs::from_str(&file).unwrap_or_default();
         // Until then, what was read from Pandora was to go back to it.
         let from_pandora = workspace.behaviors.iter().any(|behavior| behavior.pandora_file.is_some());
-        let format_of_old_work = if from_pandora { ExportFormat::Pandora } else { ExportFormat::Nemesis };
+        let format_of_old_work = if from_pandora { ExportFormat::PandoraV5 } else { ExportFormat::Nemesis };
         workspace.export_format = file.export_format.unwrap_or(format_of_old_work);
+        if take_old_force_ext(&dir, &entries) && workspace.export_format == ExportFormat::Nemesis {
+            workspace.export_format = ExportFormat::NemesisExt;
+        }
+        workspace.scope = file.template_scope.unwrap_or_else(|| TemplateScope::of(&workspace));
         workspace.ref_mods = file.ref_mods;
         workspace.session = file.session;
         workspace.owned = file.owned;
@@ -263,6 +344,7 @@ impl Workspace {
         files.insert(PathBuf::from("info.ini"), Cow::Owned(info_ini(&self.info)));
         let file = WorkspaceFile {
             export_format: Some(self.export_format),
+            template_scope: Some(self.scope),
             ref_mods: self.ref_mods.clone(),
             session: self.session.clone(),
             owned: self.owned.clone(),
@@ -273,9 +355,6 @@ impl Workspace {
             let behavior_dir = PathBuf::from(behavior.cache_name());
             let template = behavior.template_path.display().to_string();
             files.insert(behavior_dir.join("template.path"), Cow::Owned(template));
-            if behavior.force_ext {
-                files.insert(behavior_dir.join("force_ext"), Cow::Borrowed(""));
-            }
             for (id, text) in behavior.edits.iter().chain(&behavior.added) {
                 files.insert(behavior_dir.join(cache_file(id)), Cow::Borrowed(text.as_str()));
             }
@@ -384,6 +463,41 @@ mod tests {
     use gui_shared::settings::pages::patch::behavior::ParserMode;
 
     use super::{import::import_asdsf, locations::code_dirs, *};
+
+    /// A work kept when the format was only `Pandora` is a Pandora v5 one.
+    #[test]
+    fn an_old_pandora_work_is_pandora_v5() {
+        let file: WorkspaceFile = sonic_rs::from_str(r#"{"export_format":"Pandora"}"#).unwrap();
+        assert_eq!(file.export_format, Some(ExportFormat::PandoraV5));
+    }
+
+    /// NemesisExt was once chosen per behavior by a `force_ext` file: the work becomes NemesisExt and
+    /// the file goes, or choosing Nemesis again would not last.
+    #[test]
+    fn an_old_force_ext_makes_the_work_nemesis_ext() {
+        let dir = std::env::temp_dir().join(format!("d_merge_force_ext_{}", std::process::id()));
+        let entry = dir.join("meshes~x.bin");
+        std::fs::create_dir_all(&entry).unwrap();
+        std::fs::write(entry.join("force_ext"), "").unwrap();
+
+        let found = take_old_force_ext(&dir, std::slice::from_ref(&entry));
+        let gone = !entry.join("force_ext").exists();
+        let again = take_old_force_ext(&dir, &[entry]);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(found && gone && !again);
+    }
+
+    /// A mod of Nemesis only is a Nemesis work; one written elsewhere is an `Extended` one.
+    #[test]
+    fn the_scope_of_a_read_mod() {
+        let mut workspace = Workspace::default();
+        assert_eq!(TemplateScope::of(&workspace), TemplateScope::Nemesis);
+        assert!(!TemplateScope::Nemesis.allows(false) && TemplateScope::Extended.allows(false));
+        for format in [ExportFormat::NemesisExt, ExportFormat::PandoraV5] {
+            workspace.export_format = format;
+            assert_eq!(TemplateScope::of(&workspace), TemplateScope::Extended, "{format:?}");
+        }
+    }
 
     /// The shipped `.bin` gives the same anim sets as the `.txt` template.
     #[test]

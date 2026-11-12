@@ -232,8 +232,10 @@ impl PatchTool {
     }
 
     /// `New` of the start screen: the work's first save makes it exist.
-    pub(in crate::patch) fn create_work(&mut self, code: String, output: String) {
+    pub(in crate::patch) fn create_work(&mut self, code: String, output: String, scope: workspace::TemplateScope) {
         self.new_work = None;
+        self.workspace.scope = scope;
+        self.workspace.export_format = scope.default_format();
         self.mod_code = code;
         self.output = output;
         self.mod_dir.clear();
@@ -407,7 +409,7 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn export(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.workspace.export_format == workspace::ExportFormat::Pandora {
+        if self.workspace.export_format == workspace::ExportFormat::PandoraV5 {
             self.export_pandora(notify, i18n);
             return;
         }

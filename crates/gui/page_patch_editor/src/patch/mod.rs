@@ -103,9 +103,10 @@ pub(crate) struct PatchTool {
     mod_code: String,
     /// `settings.behavior.template_dir` (`.bin` or `.xml` templates under `meshes/`).
     template_dir: String,
-    /// Templates found in `template_dir`, for the picker.
+    /// Templates found in `template_dir` that the work's scope allows, for the picker.
     catalog: Vec<TemplateEntry>,
-    catalog_for: Option<String>,
+    /// `(template_dir, scope)` of `catalog`.
+    catalog_for: Option<(String, workspace::TemplateScope)>,
     picker_open: bool,
     picker_filter: String,
     /// The next quick pick window drawn takes the keyboard.
@@ -553,7 +554,7 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir);
 
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("aaaa"));
         tool.workspace.info.name = "first".to_owned();
@@ -563,7 +564,7 @@ mod work_tests {
         // `File > New`: the first one goes away, and the second one starts empty.
         tool.close_work(&mut notify, &i18n);
         assert_eq!(tool.loaded_for, None);
-        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("bbbb"));
         assert_eq!(tool.workspace.info.name, "");
@@ -588,7 +589,7 @@ mod work_tests {
         let dir = std::env::temp_dir().join(format!("d_merge_other_output_{}", std::process::id()));
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("one"));
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
@@ -684,7 +685,7 @@ mod work_tests {
 
         let mut first = open(&mut notify);
         assert!(first.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
-        assert_eq!(first.workspace.export_format, workspace::ExportFormat::Pandora);
+        assert_eq!(first.workspace.export_format, workspace::ExportFormat::PandoraV5);
         first.mark_dirty();
         first.save_now(&mut notify, &i18n);
 
@@ -700,7 +701,7 @@ mod work_tests {
         }
         let json = cache.join("workspace.json");
         let text = std::fs::read_to_string(&json).unwrap();
-        std::fs::write(&json, text.replace("\"export_format\":\"Pandora\",", "")).unwrap();
+        std::fs::write(&json, text.replace("\"export_format\":\"PandoraV5\",", "")).unwrap();
 
         let second = open(&mut notify);
         let edits = second.workspace.behaviors.first().map(|behavior| behavior.edits.len());
@@ -715,7 +716,7 @@ mod work_tests {
         assert_eq!(edits, Some(1));
         assert!(edited.unwrap().contains(">false<"));
         assert!(changed, "the list marks it");
-        assert_eq!(format, workspace::ExportFormat::Pandora);
+        assert_eq!(format, workspace::ExportFormat::PandoraV5);
     }
 
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.
@@ -787,7 +788,7 @@ mod work_tests {
         let as_pandora = shown(&mut tool);
         tool.workspace.export_format = workspace::ExportFormat::Nemesis;
         let as_nemesis = shown(&mut tool);
-        tool.workspace.export_format = workspace::ExportFormat::Pandora;
+        tool.workspace.export_format = workspace::ExportFormat::PandoraV5;
         shown(&mut tool);
         tool.revert_block("#0001", 0);
         let edits = tool.workspace.behaviors[0].edits.len();
