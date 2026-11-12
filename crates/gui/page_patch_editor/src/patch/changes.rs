@@ -1,57 +1,30 @@
-//! What the work changes, for the side bar's Changes view: like VS Code's Source Control, the files
-//! changed, each marked `M` (modified) or `A` (added), under its behavior. Drawn by
-//! [`super::ui::side_bar`].
+//! What the work changes since its last revision, for the side bar's Changes view: like VS Code's
+//! Source Control, the objects marked `A` / `M` / `D` under their behavior. Drawn by
+//! [`super::ui::side_bar`]; the revisions are [`super::workspace::history`].
 //!
-//! ```text
-//! ▼ 0_master (2)
-//!     M #0106  hkbModifierList  GetUpModList
-//!     A #mymod$0  hkbClipGenerator
-//! ```
+//! Comparing the work with the last revision goes through every changed object, so it is done again
+//! only after an edit or a commit, not each frame: see [`Pending::refresh`].
 
-use super::workspace::Workspace;
+use super::workspace::{Workspace, history::ObjectChange};
 
-/// One changed object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Change<'a> {
-    /// In `Workspace::behaviors`.
-    pub(super) behavior: usize,
-    /// e.g. `#0106`
-    pub(super) id: &'a str,
-    /// e.g. `hkbModifierList`
-    pub(super) class: &'a str,
-    /// The template's `name` field, e.g. `GetUpModList` (`""` for new objects).
-    pub(super) name: &'a str,
-    /// `A`: new. Else `M`: an edited template object.
-    pub(super) added: bool,
+/// The changes since the last revision, and what they were found for.
+#[derive(Debug, Default)]
+pub(super) struct Pending {
+    /// `(edits counted, revisions, behaviors)` when they were found.
+    found_for: Option<(u64, usize, usize)>,
+    pub(super) changes: Vec<ObjectChange>,
 }
 
-impl Change<'_> {
-    /// `A` or `M`, as Source Control marks them.
-    pub(super) const fn mark(&self) -> &'static str {
-        if self.added { "A" } else { "M" }
+impl Pending {
+    /// Finds the changes again if the work was edited (`edits`: see `PatchTool::edits`), committed, or
+    /// got or lost a behavior since.
+    pub(super) fn refresh(&mut self, workspace: &Workspace, edits: u64) {
+        let now = (edits, workspace.history.revisions.len(), workspace.behaviors.len());
+        if self.found_for != Some(now) {
+            self.changes = workspace.history.pending(workspace);
+            self.found_for = Some(now);
+        }
     }
-}
-
-/// Every change of the work: by behavior, the new objects first (as the lists show them).
-pub(super) fn changes(workspace: &Workspace) -> Vec<Change<'_>> {
-    let mut found = Vec::new();
-    for (behavior, of) in workspace.behaviors.iter().enumerate() {
-        let changed =
-            of.texts().filter(|object| object.is_new || object.is_edited).filter(|object| !of.is_ref(object.id));
-        found.extend(changed.map(|object| Change {
-            behavior,
-            id: object.id,
-            class: object.class,
-            name: object.name,
-            added: object.is_new,
-        }));
-    }
-    found
-}
-
-/// How many changes there are: the badge of the view's icon. Without going through the objects.
-pub(super) fn count(workspace: &Workspace) -> usize {
-    workspace.behaviors.iter().map(|behavior| behavior.edits.len() + behavior.added.len()).sum()
 }
 
 #[cfg(test)]
@@ -60,19 +33,19 @@ mod tests {
     use crate::patch::workspace::{ADSF, Behavior};
 
     #[test]
-    fn the_changes_are_listed_by_behavior_with_their_mark() {
+    fn the_changes_are_found_again_only_after_an_edit() {
         let mut workspace = Workspace::default();
-        for files in [&["M~1/a.txt"][..], &[], &["F~1/b.txt", "F~1/c.txt"]] {
-            let mut behavior = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
-            for file in files {
-                behavior.added.insert((*file).to_owned(), String::new());
-            }
-            workspace.behaviors.push(behavior);
-        }
-        let found = changes(&workspace);
-        let listed: Vec<(usize, &str, &str)> =
-            found.iter().map(|change| (change.behavior, change.id, change.mark())).collect();
-        assert_eq!(listed, [(0, "M~1/a.txt", "A"), (2, "F~1/b.txt", "A"), (2, "F~1/c.txt", "A")]);
-        assert_eq!(count(&workspace), 3);
+        let mut behavior = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        behavior.added.insert("M~1/a.txt".to_owned(), "1".to_owned());
+        workspace.behaviors.push(behavior);
+        let mut pending = Pending::default();
+        pending.refresh(&workspace, 0);
+        assert_eq!(pending.changes.len(), 1);
+
+        workspace.behaviors[0].added.insert("M~1/b.txt".to_owned(), "1".to_owned());
+        pending.refresh(&workspace, 0);
+        assert_eq!(pending.changes.len(), 1, "no edit counted: as it was");
+        pending.refresh(&workspace, 1);
+        assert_eq!(pending.changes.len(), 2);
     }
 }

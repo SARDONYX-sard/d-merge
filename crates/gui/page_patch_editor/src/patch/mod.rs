@@ -210,6 +210,12 @@ pub(crate) struct PatchTool {
     side_bar_hidden: bool,
     /// The OBJECTS section of the explorer is folded.
     objects_closed: bool,
+    /// Edits made, counted: what is found anew after one, e.g. [`changes::Pending`].
+    edits: u64,
+    /// The changes since the last revision. See [`changes`].
+    pending: changes::Pending,
+    /// The message of the next revision, as it is typed.
+    commit_message: String,
     /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
     anim_folders_open: fast_hash::HashSet<String>,
     /// The button above the list was clicked: done where the list has its files.

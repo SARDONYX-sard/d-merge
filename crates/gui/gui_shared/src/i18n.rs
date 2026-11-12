@@ -1359,8 +1359,23 @@ pub enum I18nKey {
     /// Changes
     SideChanges,
 
+    /// Commit
+    SideCommit,
+
+    /// Keeps the changes as a revision of this work, with the message (Ctrl+Enter in the field). The history is in the work data, not in the mod.
+    SideCommitHover,
+
+    /// Message
+    SideCommitMessageHint,
+
+    /// Discard changes
+    SideDiscard,
+
     /// Explorer
     SideExplorer,
+
+    /// History
+    SideHistory,
 
     /// Nothing is changed yet.
     SideNoChanges,

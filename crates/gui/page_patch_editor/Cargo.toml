@@ -16,6 +16,7 @@ rust-version.workspace = true
 stdx      = { workspace = true }
 egui      = { workspace = true }
 phf       = { workspace = true }
+chrono    = { workspace = true } # the time of a revision
 rayon     = { workspace = true }
 regex     = { workspace = true }
 rmp-serde = { workspace = true }

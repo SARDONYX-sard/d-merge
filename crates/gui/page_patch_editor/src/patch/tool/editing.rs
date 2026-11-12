@@ -360,6 +360,7 @@ impl PatchTool {
     pub(in crate::patch) fn reset_names(&mut self) {
         self.names = None;
         self.changed_objects.clear();
+        self.edits += 1; // what was found of the work before is not of this one
     }
 }
 

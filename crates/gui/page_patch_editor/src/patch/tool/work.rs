@@ -392,6 +392,7 @@ impl PatchTool {
     /// Something to save.
     pub(in crate::patch) fn mark_dirty(&mut self) {
         self.dirty_since.get_or_insert_with(Instant::now);
+        self.edits += 1;
     }
 
     pub(in crate::patch) fn add_behavior(&mut self, path: &Path, notify: &mut Notification, i18n: &I18nMap) {

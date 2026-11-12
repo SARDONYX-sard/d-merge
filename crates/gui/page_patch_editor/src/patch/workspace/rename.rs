@@ -93,6 +93,13 @@ impl Workspace {
         for tab in &mut self.session.tabs {
             rename_in_place(&mut tab.id, old, new);
         }
+        // The history names the objects as the work does.
+        for change in self.history.revisions.iter_mut().flat_map(|revision| &mut revision.changes) {
+            rename_in_place(&mut change.id, old, new);
+            if let Some(text) = &mut change.text {
+                rename_in_place(text, old, new);
+            }
+        }
         // The next export takes out what was exported under the old code.
         let infos = [("Nemesis_Engine", "info.ini"), ("Nemesis_EngineExt", "info.ini"), ("Pandora_Engine", "info.xml")];
         self.owned.extend(infos.map(|(engine, file)| format!("{engine}/mod/{old}/{file}")));

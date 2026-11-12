@@ -19,6 +19,7 @@
 mod behavior;
 mod catalog;
 mod export;
+pub(crate) mod history;
 mod import;
 mod locations;
 mod mod_info;
@@ -56,6 +57,8 @@ pub(crate) fn cache_root_of(output_dir: &str) -> PathBuf {
 
 /// See [`WorkspaceFile`].
 const WORKSPACE_FILE: &str = "workspace.json";
+/// See [`history`].
+const HISTORY_FILE: &str = "history.json";
 
 /// What a cache dir holds, as of the last save or load. See [`Workspace::save`].
 #[derive(Debug, Clone, Default)]
@@ -213,6 +216,8 @@ pub(crate) struct Workspace {
     /// their events. Those are read as they are, can be looked at and pointed to, and are not edited
     /// or exported: they come with that mod when merging.
     pub(crate) ref_mods: Vec<String>,
+    /// The revisions of the work. See [`history`].
+    pub(crate) history: history::History,
     /// What `Export` writes.
     pub(crate) export_format: ExportFormat,
     /// Which templates can be added. See [`TemplateScope`].
@@ -342,6 +347,9 @@ impl Workspace {
         workspace.ref_mods = file.ref_mods;
         workspace.session = file.session;
         workspace.owned = file.owned;
+        // A work kept before there was a history has none.
+        let history = std::fs::read_to_string(dir.join(HISTORY_FILE)).unwrap_or_default();
+        workspace.history = sonic_rs::from_str(&history).unwrap_or_default();
         workspace.reload_refs();
         let hashes = workspace.files_to_save()?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
         workspace.saved = Some(SavedFiles { dir, hashes });
@@ -361,6 +369,10 @@ impl Workspace {
         };
         let file = sonic_rs::to_string_pretty(&file).map_err(|e| e.to_string())?;
         files.insert(PathBuf::from(WORKSPACE_FILE), Cow::Owned(file));
+        if !self.history.revisions.is_empty() {
+            let history = sonic_rs::to_string(&self.history).map_err(|e| e.to_string())?;
+            files.insert(PathBuf::from(HISTORY_FILE), Cow::Owned(history));
+        }
         for behavior in &self.behaviors {
             let behavior_dir = PathBuf::from(behavior.cache_name());
             let template = behavior.template_path.display().to_string();
