@@ -271,7 +271,7 @@
   "nemesis_merge_removes": "このmodはこの行を削除します。",
   "nemesis_merge_title": "各modの値",
   "nemesis_mod_code_hint": "例: mymod",
-  "nemesis_mod_code_hover": "modを識別する4〜6文字の英数字です。\"vanilla\"は使えません。他のmodと重ならないものにします。\n\nフォルダ名と、新規オブジェクトのid (#mymod$0)に使うため、作業を作ったあとは変更できません。",
+  "nemesis_mod_code_hover": "modを識別する4〜6文字の英数字です。\"vanilla\"は使えません。他のmodと重ならないものにします。\n\nフォルダ名と、新規オブジェクトのid(#mymod$0)に使います。作業を作ったあとは、プロジェクト詳細の「名前変更…」で変更でき、それらのidもまとめて変わります。",
   "nemesis_mod_code_invalid": "modコードは4〜6文字の英数字で、\"vanilla\"以外です。",
   "nemesis_mod_code_label": "modコード:",
   "nemesis_mod_dir_label": "読み込み元",

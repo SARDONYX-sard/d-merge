@@ -943,7 +943,7 @@ pub enum I18nKey {
     /// e.g. mymod
     NemesisModCodeHint,
 
-    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0), so it cannot be changed once the work is made.
+    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0). Once the work is made, "Rename…" of the project details changes it, and those ids with it.
     NemesisModCodeHover,
 
     /// A mod code is 4-6 ASCII letters/digits and not "vanilla".
