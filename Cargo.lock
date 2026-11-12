@@ -614,6 +614,7 @@ dependencies = [
  "rayon",
  "serde",
  "skyrim_anim_data",
+ "stdx",
  "tracing",
 ]
 
@@ -5355,6 +5356,7 @@ dependencies = [
  "simd-json",
  "skyrim_crc",
  "snafu",
+ "stdx",
  "tracing",
  "winnow",
  "winnow_ext",

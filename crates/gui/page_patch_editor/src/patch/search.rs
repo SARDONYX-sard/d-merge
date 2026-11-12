@@ -4,7 +4,9 @@
 //! Text ignoring ASCII case, or with `.*` on a regex ignoring case (e.g. `#0\d{3}`). A regex not
 //! finished yet finds nothing. Drawn by [`super::ui::search`].
 
-use super::{checklist::contains_ignore_ascii_case, workspace::ObjectText};
+use stdx::text::contains_ignore_case;
+
+use super::workspace::ObjectText;
 
 /// The most hits kept: a short query matches nearly every line of a big behavior.
 const MAX_HITS: usize = 1000;
@@ -50,7 +52,7 @@ impl Search {
                     .build()
                     .map_or_else(|_| Vec::new(), |regex| find(objects, query, |line| regex.is_match(line)))
             } else {
-                find(objects, query, |line| contains_ignore_ascii_case(line, query))
+                find(objects, query, |line| contains_ignore_case(line, query))
             };
             self.searched = Some((self.query.clone(), self.regex, behavior, generation));
         }
