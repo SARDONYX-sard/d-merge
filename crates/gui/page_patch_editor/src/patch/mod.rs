@@ -124,16 +124,10 @@ pub(crate) struct PatchTool {
 
     active: usize,
     selected: Option<Rc<str>>,
-    filter: String,
-    changed_only: bool,
-    /// Only the new objects nothing links to. See [`tree::Graph::unlinked`].
-    unlinked_only: bool,
+    /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
+    explorer: tool::list::Explorer,
     /// The editor had the keyboard last frame. See [`PatchTool::note_editor_focus`].
     editor_had_focus: bool,
-    /// The side bar shows the selected object again, even if it was shown already.
-    reveal_in_side_bar: bool,
-    /// The selection the flat list was scrolled to. See [`tool::list::take_reveal`].
-    list_revealed: Option<Rc<str>>,
     /// The mod code being typed to rename the work to, while that form is open.
     rename_to: Option<String>,
     /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
@@ -175,10 +169,6 @@ pub(crate) struct PatchTool {
     /// The keyboard goes to the editor on the next frame, and the cursor to this place.
     /// (An editor's id depends on its object, so this can only be done once the object is open.)
     focus_editor: Option<FocusAt>,
-    /// The keyboard is in the object tree (Vim `Space e`).
-    tree_focus: bool,
-    /// The flat object list after its filter, cached: it is drawn every frame.
-    list: Option<ObjectList>,
 
     /// Normal / Vim keys of the object editor.
     editor_mode: EditorMode,
@@ -190,15 +180,9 @@ pub(crate) struct PatchTool {
 
     /// `(behavior, values)`: enum / flag values per field, for the completion.
     field_values: Option<(usize, std::rc::Rc<editor::language::FieldValues>)>,
-    /// Object list as a tree from the root container.
-    tree_view: bool,
     /// The "New" class list is open, and its filter.
     class_picker: bool,
     class_filter: String,
-    /// The tree of each behavior, by template path.
-    trees: fast_hash::HashMap<String, tree::TreeState>,
-    /// `Space` was pressed with the keyboard in the flat list. See [`tree::TreeState::leader`].
-    list_leader: bool,
     search: search::Search,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
@@ -285,7 +269,7 @@ enum TabEvent {
     CloseAll,
 }
 
-/// See [`PatchTool::list`].
+/// See [`tool::list::Explorer::list`].
 #[derive(Debug)]
 struct ObjectList {
     /// The state of the graph it was computed from.
@@ -330,14 +314,14 @@ impl PatchTool {
         self.show_inline_diff = settings.inline_diff;
         self.follow_preview = settings.follow_preview;
         self.show_preview = settings.show_preview;
-        self.tree_view = settings.tree_view;
+        self.explorer.tree_view = settings.tree_view;
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
         settings.inline_diff = self.show_inline_diff;
         settings.show_preview = self.show_preview;
         settings.follow_preview = self.follow_preview;
-        settings.tree_view = self.tree_view;
+        settings.tree_view = self.explorer.tree_view;
     }
 
     pub(crate) fn ui(
@@ -374,11 +358,11 @@ impl PatchTool {
             // What is set once stays out of the way, unless it still has to be set.
             self.project_open = false;
             self.behaviors_open = true;
-            self.trees =
+            self.explorer.trees =
                 settings.tree_open.iter().map(|(path, open)| (path.clone(), tree::TreeState::restored(open))).collect();
         }
         self.read_view_settings(settings);
-        self.changed_only = settings.changed_only;
+        self.explorer.changed_only = settings.changed_only;
         if self.poll_job(notify, i18n) {
             ui.ctx().request_repaint();
         }
@@ -394,8 +378,8 @@ impl PatchTool {
             settings.recent.clone_from(&self.recent);
         }
         self.write_view_settings(settings);
-        settings.changed_only = self.changed_only;
-        for (path, tree) in &mut self.trees {
+        settings.changed_only = self.explorer.changed_only;
+        for (path, tree) in &mut self.explorer.trees {
             if let Some(open) = tree.take_open_changes() {
                 settings.tree_open.insert(path.clone(), open);
             }
@@ -527,7 +511,8 @@ mod tests {
         let selected = std::env::var("PATCH_EDITOR_MOD").unwrap();
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
-        let mut tool = PatchTool { workspace, mod_code: code, tree_view: true, ..PatchTool::default() };
+        let explorer = tool::list::Explorer { tree_view: true, ..Default::default() };
+        let mut tool = PatchTool { workspace, mod_code: code, explorer, ..PatchTool::default() };
         let i18n = I18nMap::new();
 
         for active in 0..tool.workspace.behaviors.len() {
@@ -546,7 +531,7 @@ mod tests {
                 }
                 let names = tool.names();
                 let path = &tool.workspace.behaviors[active].meshes_path;
-                let tree = &tool.trees[path];
+                let tree = &tool.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
                 assert_eq!(tool.editor_for.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));

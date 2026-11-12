@@ -6,6 +6,35 @@ use stdx::text::{cmp_ignore_case, contains_ignore_case};
 
 use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui, workspace::PANDORA_DOC};
 
+/// The state of the objects in the explorer.
+///
+/// ```text
+/// [filter.......]  ⋯ changed only / unlinked only    [≡] tree_view
+/// tree (trees, by behavior) or flat list (list)       tree_focus: the keyboard is in it
+/// ```
+#[derive(Debug, Default)]
+pub(in crate::patch) struct Explorer {
+    pub(in crate::patch) filter: String,
+    /// Only the objects changed, and the way to them in the tree.
+    pub(in crate::patch) changed_only: bool,
+    /// Only the new objects nothing links to. See [`crate::patch::tree::Graph::unlinked`].
+    pub(in crate::patch) unlinked_only: bool,
+    /// A tree from the root container, else a flat list.
+    pub(in crate::patch) tree_view: bool,
+    /// The tree of each behavior, by template path.
+    pub(in crate::patch) trees: fast_hash::HashMap<String, crate::patch::tree::TreeState>,
+    /// The flat list, as it was computed. See [`PatchTool::refresh_list`].
+    pub(in crate::patch) list: Option<crate::patch::ObjectList>,
+    /// The selection the flat list was scrolled to. See [`take_reveal`].
+    pub(in crate::patch) list_revealed: Option<Rc<str>>,
+    /// `Space` was pressed with the keyboard in the flat list. See [`crate::patch::tree::TreeState::leader`].
+    pub(in crate::patch) list_leader: bool,
+    /// The keyboard is in the tree or the list (Vim `Space e`).
+    pub(in crate::patch) tree_focus: bool,
+    /// Show the selected object again, even if it was shown already: the editor got the keyboard.
+    pub(in crate::patch) reveal: bool,
+}
+
 /// Rows kept above a revealed row, so that it is not at the very top of the list.
 const ROWS_ABOVE_REVEALED: usize = 3;
 
@@ -35,7 +64,7 @@ impl PatchTool {
     /// object again (next frame: the side bar is drawn first).
     pub(in crate::patch) fn note_editor_focus(&mut self, ctx: &egui::Context, has_focus: bool) {
         if has_focus && !self.editor_had_focus {
-            self.reveal_in_side_bar = true;
+            self.explorer.reveal = true;
             ctx.request_repaint();
         }
         self.editor_had_focus = has_focus;
@@ -43,28 +72,28 @@ impl PatchTool {
 
     /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
     pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
-        self.tree_focus = true;
-        self.tree_view = true;
+        self.explorer.tree_focus = true;
+        self.explorer.tree_view = true;
         self.side.view = crate::patch::ui::side_bar::SideView::Explorer;
         self.side.hidden = false;
         self.side.objects_closed = false;
-        self.filter.clear();
+        self.explorer.filter.clear();
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
     /// The keyboard goes back to the editor.
     pub(in crate::patch) const fn leave_tree(&mut self) {
-        self.tree_focus = false;
+        self.explorer.tree_focus = false;
         self.focus_editor = Some(FocusAt::Keep);
     }
 
     /// The flat list has the same keys as the tree, without the folding.
     pub(in crate::patch) fn list_keys(&mut self, ui: &egui::Ui, graph: &tree::Graph) {
-        let rows = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+        let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let selected = self.selected.as_deref();
         let mut current = rows.iter().position(|&node| selected == Some(graph.id(node))).unwrap_or(0);
         let mut leave = false;
-        for input in ui::tree::read_keys(ui, &mut self.list_leader) {
+        for input in ui::tree::read_keys(ui, &mut self.explorer.list_leader) {
             leave |= input == tree::TreeInput::Leave;
             current = input.step(current, rows.len()).unwrap_or(current);
         }
@@ -82,21 +111,21 @@ impl PatchTool {
     ///
     /// Without a filter the labels do not matter, so typing in the editor does not recompute it.
     pub(in crate::patch) fn refresh_list(&mut self, graph: &tree::Graph) {
-        let generation = if self.filter.is_empty() { graph.tree_generation() } else { graph.generation() };
-        let fresh = self.list.as_ref().is_some_and(|list| {
+        let generation = if self.explorer.filter.is_empty() { graph.tree_generation() } else { graph.generation() };
+        let fresh = self.explorer.list.as_ref().is_some_and(|list| {
             list.generation == generation
-                && list.filter == self.filter
-                && list.changed_only == self.changed_only
-                && list.unlinked_only == self.unlinked_only
+                && list.filter == self.explorer.filter
+                && list.changed_only == self.explorer.changed_only
+                && list.unlinked_only == self.explorer.unlinked_only
         });
         if fresh {
             return;
         }
-        let filter = self.filter.as_str();
+        let filter = self.explorer.filter.as_str();
         let rows = graph
             .nodes()
-            .filter(|&node| !self.changed_only || graph.is_changed(node))
-            .filter(|&node| !self.unlinked_only || graph.is_unlinked(node))
+            .filter(|&node| !self.explorer.changed_only || graph.is_changed(node))
+            .filter(|&node| !self.explorer.unlinked_only || graph.is_unlinked(node))
             .filter(|&node| contains_ignore_case(graph.label(node), filter))
             .collect();
         // Anim data is grouped by actor: see `ui::anim_tree`.
@@ -104,11 +133,11 @@ impl PatchTool {
         if self.workspace.behaviors[self.active].is_anim_data() {
             rows.sort_by(|&a, &b| cmp_ignore_case(graph.id(a), graph.id(b)));
         }
-        self.list = Some(ObjectList {
+        self.explorer.list = Some(ObjectList {
             generation,
-            filter: self.filter.clone(),
-            changed_only: self.changed_only,
-            unlinked_only: self.unlinked_only,
+            filter: self.explorer.filter.clone(),
+            changed_only: self.explorer.changed_only,
+            unlinked_only: self.explorer.unlinked_only,
             rows,
         });
     }
@@ -165,11 +194,11 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tool = PatchTool::default();
         tool.note_editor_focus(&ctx, true);
-        assert!(std::mem::take(&mut tool.reveal_in_side_bar));
+        assert!(std::mem::take(&mut tool.explorer.reveal));
         tool.note_editor_focus(&ctx, true);
-        assert!(!tool.reveal_in_side_bar);
+        assert!(!tool.explorer.reveal);
         tool.note_editor_focus(&ctx, false);
         tool.note_editor_focus(&ctx, true);
-        assert!(tool.reveal_in_side_bar);
+        assert!(tool.explorer.reveal);
     }
 }

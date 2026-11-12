@@ -40,20 +40,20 @@ impl PatchTool {
             return;
         }
         ui.add(
-            TextEdit::singleline(&mut self.filter)
+            TextEdit::singleline(&mut self.explorer.filter)
                 .hint_text(i18n.t(I18nKey::NemesisFilterHint))
                 .desired_width(ui.available_width()),
         );
 
         // Clicking any text field takes the keyboard out of the tree.
         if ui.memory(|m| m.focused().is_some()) {
-            self.tree_focus = false;
+            self.explorer.tree_focus = false;
         }
         let names = self.names();
         // A tree from the root container, unless filtering: a filter wants the flat list.
         if anim {
             self.anim_tree_panel(ui, i18n, &names.graph);
-        } else if self.tree_view && self.filter.is_empty() && !self.unlinked_only {
+        } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
             self.tree_panel(ui, i18n, &names.graph);
         } else {
             self.flat_list(ui, i18n, &names.graph);
@@ -71,9 +71,9 @@ impl PatchTool {
             }
             return;
         }
-        let tree = Button::selectable(self.tree_view, "").icon(Icon::ListTree).small();
+        let tree = Button::selectable(self.explorer.tree_view, "").icon(Icon::ListTree).small();
         if ui.add(tree).on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover)).clicked() {
-            self.tree_view = !self.tree_view;
+            self.explorer.tree_view = !self.explorer.tree_view;
         }
     }
 
@@ -81,9 +81,9 @@ impl PatchTool {
     /// file, and duplicate / revert of the selected object (also in its right-click menu).
     fn more_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, anim: bool) {
         ui.menu_button("⋯", |ui| {
-            ui.checkbox(&mut self.changed_only, i18n.t(I18nKey::NemesisChangedOnly));
+            ui.checkbox(&mut self.explorer.changed_only, i18n.t(I18nKey::NemesisChangedOnly));
             if !anim {
-                ui.checkbox(&mut self.unlinked_only, i18n.t(I18nKey::NemesisUnlinkedOnly));
+                ui.checkbox(&mut self.explorer.unlinked_only, i18n.t(I18nKey::NemesisUnlinkedOnly));
                 ui.separator();
                 if ui.button(i18n.t(I18nKey::NemesisPandoraDocHover)).clicked() {
                     self.open_pandora_doc();
@@ -134,22 +134,22 @@ impl PatchTool {
     /// The tree, and its keys while it has the keyboard.
     fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
         let path = &self.workspace.behaviors[self.active].meshes_path;
-        if !self.trees.contains_key(path) {
-            self.trees.insert(path.clone(), TreeState::default());
+        if !self.explorer.trees.contains_key(path) {
+            self.explorer.trees.insert(path.clone(), TreeState::default());
         }
-        let Some(tree) = self.trees.get_mut(path) else { return };
-        if std::mem::take(&mut self.reveal_in_side_bar) {
+        let Some(tree) = self.explorer.trees.get_mut(path) else { return };
+        if std::mem::take(&mut self.explorer.reveal) {
             tree.reveal_again();
         }
-        if self.tree_focus {
+        if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             let inputs = super::tree::read_keys(ui, &mut tree.leader);
-            if tree.apply_inputs(&inputs, graph, &mut self.selected, self.changed_only) {
+            if tree.apply_inputs(&inputs, graph, &mut self.selected, self.explorer.changed_only) {
                 self.leave_tree();
                 return;
             }
         }
-        let flags = (self.changed_only, self.tree_focus);
+        let flags = (self.explorer.changed_only, self.explorer.tree_focus);
         let action = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n);
         self.apply_row_action(ui, graph, action);
     }
@@ -157,24 +157,24 @@ impl PatchTool {
     /// The anim data files after the filter: the rows of [`anim_tree::rows`].
     fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
         self.refresh_list(graph);
-        if self.tree_focus {
+        if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             self.list_keys(ui, graph);
         }
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         // Only when the selection changes or the editor gets the keyboard: else what is open is the user's.
-        let forced = std::mem::take(&mut self.reveal_in_side_bar);
+        let forced = std::mem::take(&mut self.explorer.reveal);
         let reveal = take_reveal(&mut self.anim_tree.revealed, self.selected.as_ref(), forced);
         if reveal && let Some(id) = &self.selected {
             anim_tree::reveal(&mut self.anim_tree.open, is_adsf, id);
         }
-        let nodes = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+        let nodes = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let files: Vec<AnimFile<'_>> =
             nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect();
         if std::mem::take(&mut self.anim_tree.expand_all) {
             anim_tree::expand_all(&mut self.anim_tree.open, &files);
         }
-        let rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, !self.filter.is_empty());
+        let rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, !self.explorer.filter.is_empty());
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
@@ -286,16 +286,16 @@ impl PatchTool {
     /// The flat list after the filter (only the rows on screen are laid out).
     fn flat_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
         self.refresh_list(graph);
-        if self.tree_focus {
+        if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             self.list_keys(ui, graph);
         }
-        let rows = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+        let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
         let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
-        let forced = std::mem::take(&mut self.reveal_in_side_bar);
-        if take_reveal(&mut self.list_revealed, self.selected.as_ref(), forced) {
+        let forced = std::mem::take(&mut self.explorer.reveal);
+        if take_reveal(&mut self.explorer.list_revealed, self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
             if let Some(at) = selected.and_then(|node| rows.iter().position(|&row| row == node)) {
                 scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));

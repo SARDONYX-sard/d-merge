@@ -130,7 +130,7 @@ impl PatchTool {
             template_dir: paths.template_dir.to_owned(),
             parser_mode: paths.parser_mode,
             behaviors_open: true,
-            changed_only: true,
+            explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
             ..Self::default()
         }
     }

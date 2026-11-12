@@ -33,7 +33,7 @@ impl PatchTool {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
         let names = self.names();
-        let filter = self.filter.as_str();
+        let filter = self.explorer.filter.as_str();
         let (events, template_events) = (&names.events, names.template_events);
         let (variables, template_variables) = (&names.variables, names.template_variables);
 
