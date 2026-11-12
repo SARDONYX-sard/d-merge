@@ -189,7 +189,7 @@ pub enum I18nKey {
     FontModeSystem,
 
     /// File
-    FontModeFile,
+    FileLabel,
 
     /// Font Path:
     FontFileLabel,
@@ -376,9 +376,6 @@ pub enum I18nKey {
     /// - `v4.4.0-beta`: Compatible with `v5.0.0`.
     PandoraTargetVersionHover,
 
-    /// output dir:
-    PandoraOutputDirLabel,
-
     /// Takes the settings of Pandora Behaviour Engine into d-merge's VFS mode, or gives them to it.
     PandoraButtonHover,
 
@@ -428,7 +425,7 @@ pub enum I18nKey {
     RuntimeTargetHover,
 
     /// Output format:
-    RuntimeTargetLabel,
+    OutputFormatLabel,
 
     /// Search
     SearchLabel,
@@ -513,14 +510,11 @@ pub enum I18nKey {
     PagePatchEditor,
 
     // ── Patch Editor page ─────────────────────────────────────────────────
-    /// Patch
-    NemesisPatchTab,
-
     /// CRC32
     NemesisCrcTab,
 
     /// Output:
-    NemesisOutputLabel,
+    OutputLabel,
 
     /// The root directory of the mod Export writes to, e.g. D:\MO2\mods\MyMod: by default the mod that was opened. Export writes <here>\Nemesis_Engine\mod\<mod code> (Nemesis_EngineExt for NemesisExt templates), replacing only the files this work read or wrote. The button on the left opens the directory.
     NemesisOutputHover,
@@ -536,9 +530,6 @@ pub enum I18nKey {
 
     /// Name:
     NemesisNameLabel,
-
-    /// Author:
-    NemesisAuthorLabel,
 
     /// Site:
     NemesisSiteLabel,
@@ -774,9 +765,6 @@ pub enum I18nKey {
     /// Could not take the conflict's value
     NemesisResolveFailed,
 
-    /// User Patch
-    NemesisUserPatchName,
-
     /// Header
     NemesisAnimKindHeader,
 
@@ -810,9 +798,6 @@ pub enum I18nKey {
     /// Behaviors
     NemesisBehaviorsSection,
 
-    /// Search
-    NemesisSearchTab,
-
     /// Text of every object, e.g. $eventID[moveStart]$ (Ctrl+Shift+F)
     NemesisSearchHint,
 
@@ -830,9 +815,6 @@ pub enum I18nKey {
 
     /// Actor
     NemesisClipActor,
-
-    /// Name
-    NemesisClipName,
 
     /// Count
     NemesisClipCount,
@@ -868,10 +850,7 @@ pub enum I18nKey {
     NemesisAnimDataNoHkx,
 
     /// Filter
-    NemesisAnimDataFilter,
-
-    /// All
-    NemesisAnimDataAll,
+    FilterLabel,
 
     /// None
     NemesisAnimDataNone,
@@ -923,9 +902,6 @@ pub enum I18nKey {
 
     /// A directory to list the CRC32 of every .hkx under it, e.g. the mod's root D:\MO2\mods\MyMod. Any directory will do, or drop one here.
     CrcModDirHover,
-
-    /// File
-    NemesisFileMenu,
 
     /// Make a new patch mod, or open an existing one to edit it.
     NemesisStartHint,
@@ -1154,7 +1130,7 @@ pub enum I18nKey {
     EditorPaste,
 
     /// Select All
-    EditorSelectAll,
+    SelectAll,
 
     /// Command Palette
     EditorCommandPalette,
@@ -1235,15 +1211,9 @@ pub enum I18nKey {
     /// No .hkx files found.
     CrcNoHkx,
 
-    /// Filter
-    CrcFilterHint,
-
     // ── Convert page ────────────────────────────────────────────────────────
     /// Inputs
     ConvertInputsLabel,
-
-    /// Clear
-    ConvertClearButton,
 
     /// Add Files…
     ConvertAddFiles,
@@ -1275,17 +1245,8 @@ pub enum I18nKey {
     /// Open the output directory
     ConvertOpenOutputHover,
 
-    /// Output:
-    ConvertOutputLabel,
-
     /// Output directory. If empty, each output is written next to its input.
     ConvertOutputHover,
-
-    /// Output format:
-    ConvertOutputFormatLabel,
-
-    /// Convert
-    ConvertButton,
 
     /// Converting...
     ConvertingButton,
@@ -1295,9 +1256,6 @@ pub enum I18nKey {
 
     /// No input selected.
     ConvertNoInput,
-
-    /// Select All
-    ConvertSelectAll,
 
     /// Unselect All
     ConvertUnselectAll,
@@ -1523,7 +1481,7 @@ pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 15] {
         i18n.t(I18nKey::EditorCut),
         i18n.t(I18nKey::EditorCopy),
         i18n.t(I18nKey::EditorPaste),
-        i18n.t(I18nKey::EditorSelectAll),
+        i18n.t(I18nKey::SelectAll),
         i18n.t(I18nKey::EditorCommandPalette),
         i18n.t(I18nKey::EditorRevertChange),
         i18n.t(I18nKey::EditorPaletteHint),

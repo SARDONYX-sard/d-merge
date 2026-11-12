@@ -45,7 +45,7 @@ impl PatchTool {
         let before = user_patch::Draft::before(&self.workspace);
         let dirty_since = self.dirty_since;
         if self.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::NemesisUserPatchName).clone_into(&mut self.workspace.info.name);
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
         }
         // What the value points to is that mod's.
         self.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);

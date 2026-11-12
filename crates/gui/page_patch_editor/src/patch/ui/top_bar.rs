@@ -68,7 +68,7 @@ impl PatchTool {
     fn file_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut action = None;
         // With a frame and an arrow: it should be seen to be a menu.
-        let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::NemesisFileMenu)));
+        let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::FileLabel)));
         egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
             let mut item = |ui: &mut egui::Ui, label, hover, picked| {
                 if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
@@ -150,7 +150,7 @@ impl PatchTool {
 
     /// The directories, and the mod's `info.ini`.
     fn project_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let output = PathRow::new(i18n.t(I18nKey::NemesisOutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+        let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::NemesisOutputHover))
             .show(ui, &mut self.output);
         if let Some(err) = output.open_error {
@@ -172,7 +172,7 @@ impl PatchTool {
             let mut changed = false;
             for (label, hover, value, width) in [
                 (I18nKey::NemesisNameLabel, I18nKey::NemesisNameHover, &mut info.name, 260.0),
-                (I18nKey::NemesisAuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
+                (I18nKey::AuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
                 (I18nKey::NemesisSiteLabel, I18nKey::NemesisSiteHover, &mut info.site, 320.0),
                 (I18nKey::NemesisVersionLabel, I18nKey::NemesisVersionHover, &mut info.version, 70.0),
             ] {

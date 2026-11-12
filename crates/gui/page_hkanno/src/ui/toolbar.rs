@@ -18,7 +18,7 @@ impl HkannoPage {
     pub(crate) fn file_bar(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
         ui.horizontal(|ui| {
-            ui.label(ctx.i18n.t(I18nKey::ConvertOutputLabel));
+            ui.label(ctx.i18n.t(I18nKey::OutputLabel));
 
             // Right-to-left: the format box takes its width first, the path gets the rest.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -30,7 +30,7 @@ impl HkannoPage {
                 {
                     tab.set_format(OutputFormat::ALL[index]); // also fixes the output extension
                 }
-                ui.label(ctx.i18n.t(I18nKey::ConvertOutputFormatLabel));
+                ui.label(ctx.i18n.t(I18nKey::OutputFormatLabel));
 
                 let width = ui.available_width();
                 ui.add(TextEdit::singleline(&mut tab.settings.output_path).desired_width(width));

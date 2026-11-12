@@ -70,7 +70,7 @@ impl PatchTool {
             let code = TextEdit::singleline(&mut form.code).hint_text(i18n.t(I18nKey::NemesisModCodeHint));
             ui.add(code.desired_width(90.0)).on_hover_text(hover);
         });
-        let output = PathRow::new(i18n.t(I18nKey::NemesisOutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+        let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::NemesisOutputHover))
             .show(ui, &mut form.output);
         if let Some(err) = output.open_error {

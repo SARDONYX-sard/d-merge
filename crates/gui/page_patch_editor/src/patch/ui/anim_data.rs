@@ -249,14 +249,14 @@ fn checklist_ui(ui: &mut egui::Ui, i18n: &I18nMap, title: &str, list: &mut Check
         ui.horizontal(|ui| {
             ui.strong(title);
             ui.weak(format!("{} / {}", list.checked_count(), list.len()));
-            if ui.small_button(i18n.t(I18nKey::NemesisAnimDataAll)).clicked() {
+            if ui.small_button(i18n.t(I18nKey::FilterTextAll)).clicked() {
                 list.set_visible(true);
             }
             if ui.small_button(i18n.t(I18nKey::NemesisAnimDataNone)).clicked() {
                 list.set_visible(false);
             }
         });
-        let filter = egui::TextEdit::singleline(&mut list.query).hint_text(i18n.t(I18nKey::NemesisAnimDataFilter));
+        let filter = egui::TextEdit::singleline(&mut list.query).hint_text(i18n.t(I18nKey::FilterLabel));
         if ui.add(filter.desired_width(f32::INFINITY)).changed() {
             list.refilter();
         }
@@ -452,7 +452,7 @@ impl PatchTool {
                     actor_field(ui, i18n, &mut form.folder, &form.projects, hover);
                     ui.end_row();
                     let hover = i18n.t(I18nKey::NemesisClipNameHover);
-                    ui.label(i18n.t(I18nKey::NemesisClipName)).on_hover_text(hover);
+                    ui.label(i18n.t(I18nKey::ColumnName)).on_hover_text(hover);
                     ui.add(TextEdit::singleline(&mut form.name).desired_width(220.0)).on_hover_text(hover);
                     ui.end_row();
                     let hover = i18n.t(I18nKey::NemesisClipCountHover);

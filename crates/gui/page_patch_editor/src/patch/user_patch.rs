@@ -189,7 +189,7 @@ impl PatchTool {
         let root = PathBuf::from(paths.template_dir);
         let tool = self.user_patch_tool(paths, notify, i18n);
         if tool.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::NemesisUserPatchName).clone_into(&mut tool.workspace.info.name);
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut tool.workspace.info.name);
         }
         // What the value points to is that mod's.
         tool.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);

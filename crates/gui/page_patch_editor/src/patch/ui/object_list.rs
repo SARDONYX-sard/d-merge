@@ -93,7 +93,7 @@ impl PatchTool {
             self.show_vars = true;
             self.show_search = false;
         }
-        if ui.add(Button::selectable(self.show_search, i18n.t(I18nKey::NemesisSearchTab)).small()).clicked() {
+        if ui.add(Button::selectable(self.show_search, i18n.t(I18nKey::SearchLabel)).small()).clicked() {
             self.show_search = true;
             self.focus_search = true;
         }
