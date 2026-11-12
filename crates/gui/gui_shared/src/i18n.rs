@@ -154,10 +154,10 @@ pub enum I18nKey {
     /// Checked for conflicts
     ConflictDone,
 
-    /// Edit…
+    /// Resolve by hand…
     ConflictEdit,
 
-    /// Takes this value into the user patch and opens it in the Patch Editor, to change it by hand. Export it there when done.
+    /// Opens this conflict in the user patch of the Patch Editor, from the value kept now, with each mod's value beside it. Export it there when done.
     ConflictEditHover,
 
     /// Filter by path
