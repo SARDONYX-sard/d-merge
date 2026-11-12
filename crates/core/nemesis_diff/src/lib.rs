@@ -174,6 +174,10 @@ pub fn object_patch(mod_code: &str, template: &str, edited: &str) -> Option<Stri
         before_lines[at..old.start].iter().for_each(|line| out.push_str(line));
 
         let _ = writeln!(out, "{}", open_marker(mod_code));
+        if new.is_empty() {
+            // Nemesis' way of deleting: a blank line for each line taken out. See `is_deletion_mark`.
+            old.clone().for_each(|_| out.push('\n'));
+        }
         after_lines[new].iter().for_each(|line| out.push_str(line));
         if !old.is_empty() {
             let _ = writeln!(out, "{ORIGINAL}");
@@ -368,7 +372,7 @@ pub fn resolve(patch: &str, view: View) -> Cow<'_, str> {
         } else {
             let keep = match section {
                 Section::Common => true,
-                Section::New => view == View::Mod,
+                Section::New => view == View::Mod && !is_deletion_mark(line),
                 Section::Old => view == View::Original,
             };
             if keep {
@@ -380,6 +384,23 @@ pub fn resolve(patch: &str, view: View) -> Cow<'_, str> {
         }
     }
     Cow::Owned(out)
+}
+
+/// A blank line in the `OPEN` section of a block: Nemesis' mark of a deleted line, not a line of the
+/// object. It must not be read as one, or writing the patch again makes a block that adds blank lines.
+///
+/// e.g., this block deletes the two lines of its `ORIGINAL`:
+/// ```text
+/// <!-- MOD_CODE ~mymod~ OPEN -->
+/// (blank)
+/// (blank)
+/// <!-- ORIGINAL -->
+///     <hkparam name="a">1</hkparam>
+///     <hkparam name="b">2</hkparam>
+/// <!-- CLOSE -->
+/// ```
+fn is_deletion_mark(line: &str) -> bool {
+    line.trim().is_empty()
 }
 
 /// A patch file's block: `old` lines from line `at` of what the patch says the template is, replaced
@@ -405,6 +426,7 @@ fn patch_blocks(patch: &str) -> Vec<PatchBlock<'_>> {
             blocks.extend(current.take().map(|(block, _)| block));
         } else {
             match &mut current {
+                Some((_, false)) if is_deletion_mark(line) => {}
                 Some((block, false)) => block.new.push(line),
                 Some((block, true)) => {
                     block.old += 1;
@@ -927,6 +949,34 @@ mod tests {
         let edited = apply_to_template(&patch, template);
         assert_eq!(edited, "a\nb\nC\nd\n");
         assert_eq!(object_patch("m", template, &edited).as_deref(), Some(patch.as_str()));
+    }
+
+    /// `Combat Gameplay Overhaul` (`#0521`): blank lines in a block delete the lines of its `ORIGINAL`.
+    ///
+    /// e.g., `a`, [`b`, `c` -> 2 blank lines], `d` -> `a`, `d`
+    #[test]
+    fn blank_lines_of_a_block_delete() {
+        let template = "a\nb\nc\nd\n";
+        let patch = patch_of("a\n", "\n\n<!-- ORIGINAL -->\nb\nc\n", "d\n");
+        assert_eq!(resolve(&patch, View::Mod), "a\nd\n");
+        assert_eq!(apply_to_template(&patch, template), "a\nd\n");
+        // Before its fix the blank lines were read as lines, and written again as a block adding them.
+        assert_eq!(object_patch("m", template, "a\nd\n").as_deref(), Some(patch.as_str()));
+    }
+
+    /// A deletion written again passes d-merge's parser.
+    #[test]
+    fn a_deleted_array_element_passes_the_check() {
+        let template = "\t\t<hkobject name=\"#0521\" class=\"hkbClipTriggerArray\" signature=\"0x59c23a0f\">\n\
+                        \t\t\t<hkparam name=\"triggers\" numelements=\"2\">\n\
+                        \t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">0.000000</hkparam>\n\t\t\t\t</hkobject>\n\
+                        \t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">1.000000</hkparam>\n\t\t\t\t</hkobject>\n\
+                        \t\t\t</hkparam>\n\
+                        \t\t</hkobject>\n";
+        let edited = template.replace("\t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">1.000000</hkparam>\n\t\t\t\t</hkobject>\n", "");
+        let patch = object_patch("mymod", template, &edited).unwrap();
+        assert!(patch.contains("OPEN -->\n\n\n\n<!-- ORIGINAL -->"), "{patch}");
+        validate(&patch).unwrap();
     }
 
     #[test]
