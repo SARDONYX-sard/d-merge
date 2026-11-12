@@ -84,6 +84,17 @@ pub(super) fn import_asdsf(
     Ok(Some(behavior))
 }
 
+/// The id of the object a patch file patches: the `name` of its first `<hkobject>`, which is what
+/// Nemesis and d-merge go by, not the file's name. `None`: the file has none (e.g. animation data).
+///
+/// e.g. BFCO's `1hm_behavior/#3018.txt` patches `#3108`: its name has the digits swapped, but the
+/// patch is right, and must be read as `#3108`'s, or its blocks would go on another object.
+fn patched_id(patch: &str) -> Option<&str> {
+    let head = patch.lines().find(|line| line.trim_start().starts_with("<hkobject"))?;
+    let (_, rest) = head.split_once("name=\"")?;
+    rest.split('"').next().filter(|id| id.starts_with('#'))
+}
+
 impl Workspace {
     /// Imports a mod. `selected` is its root (see [`mod_dir_of`]) or
     /// `.../Nemesis_Engine/mod/<code>` or `.../Nemesis_EngineExt/mod/<code>`.
@@ -163,8 +174,8 @@ impl Workspace {
             }
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
                 done.fetch_add(1, Ordering::Relaxed);
-                let id = file_stem(&file);
                 let patch = read_text(&file)?;
+                let id = patched_id(&patch).map_or_else(|| file_stem(&file), str::to_owned);
                 if let Some(template) = behavior.template_object(&id) {
                     let text = apply_to_template(&patch, &template.text);
                     behavior.set_text(&id, &text);
@@ -220,6 +231,23 @@ mod tests {
     ///
     /// `PATCH_EDITOR_ONLY`: only the mods whose folder name contains it, with the patches that break
     /// printed whole.
+    /// A file is read as the patch of the object it names, not of its file name.
+    #[test]
+    fn a_patch_is_of_the_object_it_names() {
+        let patch = "		<hkobject name=\"#3108\" class=\"hkbClipTriggerArray\" signature=\"0x59c23a0f\">
+";
+        assert_eq!(patched_id(patch), Some("#3108"));
+        assert_eq!(
+            patched_id(
+                "V3
+1
+"
+            ),
+            None,
+            "animation data"
+        );
+    }
+
     #[test]
     #[ignore = "needs real mods"]
     fn a_patch_read_and_written_again_still_parses() {
@@ -234,14 +262,13 @@ mod tests {
                 let Ok((workspace, code, _)) = Workspace::import(&code_dir, &template_root()) else { continue };
                 for behavior in workspace.behaviors.iter().filter(|behavior| !behavior.is_anim_data()) {
                     for id in behavior.edits.keys() {
-                        let mut file =
-                            behavior.patch_folders_in(&code_dir).into_iter().map(|dir| dir.join(format!("{id}.txt")));
-                        let Some(original) = file.find_map(|path| read_text(&path).ok()) else { continue };
+                        // By the object it patches: e.g. BFCO's `#3018.txt` is `#3108`'s.
+                        let files =
+                            behavior.patch_folders_in(&code_dir).into_iter().filter_map(|dir| read_dir(&dir).ok());
+                        let mut texts = files.flatten().filter_map(|path| read_text(&path).ok());
+                        let Some(original) = texts.find(|text| patched_id(text) == Some(id.as_str())) else { continue };
                         if nemesis_diff::validate(&original).is_err() {
                             continue; // d-merge rejects it as well: not ours to fix.
-                        }
-                        if !original.contains(&format!("name=\"{id}\"")) {
-                            continue; // Another object in it, e.g. `BFCO`'s `#3018.txt` holds `#3108`.
                         }
                         total += 1;
                         let written = behavior.patch(&code, id).unwrap_or_default();

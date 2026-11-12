@@ -479,7 +479,7 @@ impl Workspace {
     }
 }
 
-fn read_dir(dir: &Path) -> Result<impl Iterator<Item = PathBuf>, String> {
+fn read_dir(dir: &Path) -> Result<impl Iterator<Item = PathBuf> + use<>, String> {
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     Ok(entries.flatten().map(|e| e.path()))
 }
