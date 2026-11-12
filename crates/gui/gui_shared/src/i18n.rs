@@ -1344,8 +1344,14 @@ pub enum I18nKey {
     /// Search
     SearchLabel,
 
+    /// objects
+    SearchObjects,
+
     /// Use a regular expression (ignoring case)
     SearchRegexHover,
+
+    /// results in
+    SearchResultsIn,
 
     /// Select All
     SelectAll,

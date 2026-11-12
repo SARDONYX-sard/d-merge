@@ -3,9 +3,9 @@
 //!
 //! ```text
 //! ┌──┬────────────────────────────────┐
-//! │📂│ EXPLORER                       │  Ctrl+Shift+E
-//! │🔍│ ▼ BEHAVIORS               [+]  │
-//! │Δ³│   0_master (3)                 │
+//! │🔍│ EXPLORER                       │  Ctrl+Shift+E
+//! │Δ³│ ▼ BEHAVIORS               [+]  │
+//! │📂│   0_master (3)                 │
 //! │▤ │ ▼ OBJECTS          [+] [≡] [⋯] │
 //! │  │ [filter..................]     │
 //! │  │   (the tree or the list)       │
@@ -14,9 +14,9 @@
 //!
 //! | Icon | View               | Key            | VS Code's        |
 //! | ---- | ------------------ | -------------- | ---------------- |
-//! | 📂   | Explorer           | `Ctrl+Shift+E` | Explorer         |
 //! | 🔍   | Search             | `Ctrl+Shift+F` | Search           |
 //! | Δ    | Changes (+ badge)  | `Ctrl+Shift+G` | Source Control   |
+//! | 📂   | Explorer           | `Ctrl+Shift+E` | Explorer         |
 //! | ▤    | Events / Variables |                | Outline          |
 
 use egui_widgets::shadcn::{Button, Icon};
@@ -38,10 +38,12 @@ pub(in crate::patch) enum SideView {
 }
 
 /// The views in the activity bar, top to bottom: `(view, icon, name, key)`.
+/// The order is the user's (not VS Code's): from the bottom, events / variables, explorer, changes,
+/// search.
 const VIEWS: [(SideView, Icon, I18nKey, &str); 4] = [
-    (SideView::Explorer, Icon::FolderOpen, I18nKey::SideExplorer, "Ctrl+Shift+E"),
     (SideView::Search, Icon::Search, I18nKey::SearchLabel, "Ctrl+Shift+F"),
     (SideView::Changes, Icon::Diff, I18nKey::SideChanges, "Ctrl+Shift+G"),
+    (SideView::Explorer, Icon::FolderOpen, I18nKey::SideExplorer, "Ctrl+Shift+E"),
     (SideView::Variables, Icon::Layers, I18nKey::NemesisVarsTab, ""),
 ];
 
@@ -130,7 +132,9 @@ impl PatchTool {
         let mut clicked = None;
         for (view, icon, name, key) in VIEWS {
             let shown = view == self.side_view && !self.side_bar_hidden;
-            let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(ACTIVITY_SIZE), egui::Sense::click());
+            // As wide as the panel lets it: `ACTIVITY_SIZE` is the panel's, its margins included.
+            let size = egui::vec2(ui.available_width(), ACTIVITY_SIZE);
+            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
             let visuals = ui.visuals();
             let color =
                 if shown || response.hovered() { visuals.strong_text_color() } else { visuals.weak_text_color() };
