@@ -259,31 +259,49 @@ impl HkannoPage {
         let (show_diagnostics, show_fixes) = (ctx.lsp_settings.diagnostics, ctx.lsp_settings.code_action);
         let title = ctx.i18n.t(I18nKey::HkannoProblemsLabel);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
+        let id = tab.editor_id();
+        let cursor = &mut self.problems_cursor;
+        // `Ctrl+Shift+L`: the keyboard to the panel (shown if hidden), or back to the editor.
+        if egui_code_editor::ProblemsCursor::toggle_key(ui.ctx()) {
+            if cursor.focused {
+                cursor.focused = false;
+                ui.memory_mut(|m| m.request_focus(id));
+            } else if show_diagnostics && !tab.diagnostics.is_empty() {
+                (cursor.focused, self.problems_hidden) = (true, false);
+                ui.memory_mut(|m| m.surrender_focus(id));
+            }
+        } else if ui.memory(|m| m.has_focus(id)) {
+            cursor.focused = false; // e.g. a click in the editor
+        }
         if !show_diagnostics || self.problems_hidden || tab.diagnostics.is_empty() {
+            cursor.focused = false;
             return;
         }
-
-        let id = tab.editor_id();
         let mut fix = None;
 
         // One file: its problems without a header, each with its quick fix if it has one.
         let group = ProblemGroup { title: std::borrow::Cow::Borrowed(""), problems: &tab.editor_diagnostics };
         let text = &tab.text;
-        let clicked =
-            ProblemsPanel::new("hkanno_problems", title).default_height(120.0).show(ui, &[group], |ui, _, index| {
-                // Both lists are built from the same source, in the same order.
-                if show_fixes
-                    && let Some(action) = tab.diagnostics.get(index).and_then(|lsp_diag| code_action(text, lsp_diag))
-                    && ui.add(Button::new(&action.title).small()).clicked()
-                {
-                    fix = Some(action.edit);
-                }
-            });
+        let was_focused = cursor.focused;
+        let panel = ProblemsPanel::new("hkanno_problems", title).default_height(120.0).cursor(cursor);
+        let clicked = panel.show(ui, &[group], |ui, _, index| {
+            // Both lists are built from the same source, in the same order.
+            if show_fixes
+                && let Some(action) = tab.diagnostics.get(index).and_then(|lsp_diag| code_action(text, lsp_diag))
+                && ui.add(Button::new(&action.title).small()).clicked()
+            {
+                fix = Some(action.edit);
+            }
+        });
         if let Some((_, index)) = clicked
             && let Some(diagnostic) = tab.editor_diagnostics.get(index)
         {
             let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
             egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
+        }
+        // `Enter` / `Esc` in the panel: the keyboard is the editor's again.
+        if was_focused && !self.problems_cursor.focused {
+            ui.memory_mut(|m| m.request_focus(id));
         }
 
         if let Some(edit) = fix {

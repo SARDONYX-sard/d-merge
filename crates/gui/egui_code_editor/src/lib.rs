@@ -62,7 +62,7 @@ pub use self::{
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},
-    problems::{ProblemGroup, ProblemsPanel},
+    problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
     state::CodeEditorState,
     status::status_line,
 };

@@ -59,6 +59,11 @@ impl PatchTool {
         // Like VS Code: getting into the editor shows its object in the side bar.
         let has_focus = ui.memory(|m| m.has_focus(editor_id));
         self.note_editor_focus(ui.ctx(), has_focus);
+        if egui_code_editor::ProblemsCursor::toggle_key(ui.ctx()) {
+            self.toggle_problems_focus(ui, editor_id);
+        } else if has_focus {
+            self.problems.cursor.focused = false; // e.g. a click in the editor
+        }
         // `Ctrl+W` closes the tab, as in VS Code. (Vim uses that key itself.)
         if self.pane.mode == EditorMode::Normal
             && ui.memory(|m| m.has_focus(editor_id))
@@ -284,6 +289,7 @@ impl PatchTool {
         let mut result = EditorResult::default();
         // Read before the panel borrows the work; what a click asks for is done after it.
         let (counts, mut toggle_problems, mut go_to_problem) = (self.problem_counts(), false, None);
+        let mut left_problems = false;
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
         self.pane.state.set_status_problems(counts);
@@ -332,7 +338,11 @@ impl PatchTool {
             if self.problems.open
                 && let Some(problems) = &self.problems.list
             {
-                go_to_problem = super::problems::problems_panel(ui, i18n, problems, &self.workspace.behaviors);
+                let (behaviors, cursor) = (&self.workspace.behaviors, &mut self.problems.cursor);
+                let was_focused = cursor.focused;
+                go_to_problem = super::problems::problems_panel(ui, i18n, problems, behaviors, cursor);
+                // `Esc`: back to the editor, where it was. (`Enter` goes to the problem's line.)
+                left_problems = was_focused && !cursor.focused && go_to_problem.is_none();
             }
             // Per object: each tab keeps where it was scrolled to.
             egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false).show(ui, |ui| {
@@ -371,6 +381,9 @@ impl PatchTool {
         });
         if toggle_problems {
             self.problems.open = !self.problems.open;
+        }
+        if left_problems {
+            self.pane.focus = Some(FocusAt::Keep);
         }
         if let Some((behavior, object, line)) = go_to_problem {
             if behavior != self.active {

@@ -10,7 +10,7 @@
 
 use std::borrow::Cow;
 
-use egui_code_editor::{ProblemGroup, ProblemsPanel};
+use egui_code_editor::{ProblemGroup, ProblemsCursor, ProblemsPanel};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{problems::ObjectProblems, workspace::Behavior};
@@ -21,6 +21,7 @@ pub(in crate::patch) fn problems_panel(
     i18n: &I18nMap,
     groups: &[ObjectProblems],
     behaviors: &[Behavior],
+    cursor: &mut ProblemsCursor,
 ) -> Option<(usize, String, usize)> {
     let shown: Vec<ProblemGroup<'_>> = groups
         .iter()
@@ -31,6 +32,7 @@ pub(in crate::patch) fn problems_panel(
         .collect();
     let (at, index) = ProblemsPanel::new("nemesis_problems", i18n.t(I18nKey::HkannoProblemsLabel))
         .empty_text(i18n.t(I18nKey::ProblemsNone))
+        .cursor(cursor)
         .show(ui, &shown, |_, _, _| {})?;
     let group = &groups[at];
     Some((group.behavior, group.id.clone(), group.problems[index].line))

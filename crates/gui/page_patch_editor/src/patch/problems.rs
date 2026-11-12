@@ -33,6 +33,8 @@ pub(super) struct Problems {
     pub(super) stale: bool,
     /// The Problems panel shows: a click on the status bar's counts.
     pub(super) open: bool,
+    /// The keyboard in the panel: `Ctrl+Shift+L` moves it there and back.
+    pub(super) cursor: egui_code_editor::ProblemsCursor,
 }
 
 /// The problems of one object: a group of the Problems panel.

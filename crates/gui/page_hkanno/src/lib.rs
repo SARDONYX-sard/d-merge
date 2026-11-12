@@ -59,6 +59,8 @@ pub struct HkannoPage {
     show_revert: bool,
     /// The Problems panel is hidden: a click on the status bar's counts. It shows by default.
     problems_hidden: bool,
+    /// The keyboard in the Problems panel: `Ctrl+Shift+L` moves it there and back.
+    problems_cursor: egui_code_editor::ProblemsCursor,
 }
 
 impl std::fmt::Debug for HkannoPage {

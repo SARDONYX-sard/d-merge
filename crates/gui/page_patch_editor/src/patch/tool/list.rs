@@ -72,6 +72,24 @@ impl PatchTool {
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
+    /// `Ctrl+Shift+L`: the keyboard goes to the Problems panel (shown if hidden), or from it back to
+    /// the editor. See [`egui_code_editor::problems`].
+    pub(in crate::patch) fn toggle_problems_focus(&mut self, ui: &egui::Ui, editor: egui::Id) {
+        let cursor = &mut self.problems.cursor;
+        if cursor.focused {
+            cursor.focused = false;
+            self.pane.focus = Some(FocusAt::Keep);
+            return;
+        }
+        self.problems.open = true;
+        if self.problems.list.is_none() {
+            return; // Not checked yet: no panel to take the keyboard.
+        }
+        self.problems.cursor.focused = true;
+        self.explorer.tree_focus = false;
+        ui.memory_mut(|m| m.surrender_focus(editor));
+    }
+
     /// The keyboard goes back to the editor.
     pub(in crate::patch) const fn leave_tree(&mut self) {
         self.explorer.tree_focus = false;

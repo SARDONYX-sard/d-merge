@@ -32,6 +32,22 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 | `Shift+F12`          | Find references (`Language::references`)  |
 | Mouse rest on a word | Hover (diagnostics + docs)                |
 
+## Problems panel
+
+`ProblemsPanel` (`problems` module) lists the host's diagnostics; `status_counts` shows `✖ 2  ⚠ 5`
+in the status bar, and a click on it shows or hides the panel. With `.cursor(&mut ProblemsCursor)`
+the keyboard works it too:
+
+| Key                          | Action                                        |
+| ---------------------------- | --------------------------------------------- |
+| `Ctrl+Shift+L`               | Keyboard to the panel / back to the editor    |
+| `j` `k`, `↓` `↑`             | Next / previous problem                       |
+| `g` `G`, `Home` `End`        | First / last problem                          |
+| `Enter`                      | Go to the problem (the editor gets the keys)  |
+| `Esc`                        | Back to the editor                            |
+
+`Ctrl+Shift+L` is read by the host (`ProblemsCursor::toggle_key`), which owns the focus.
+
 ## Command palette and host API
 
 `Ctrl+Shift+P` lists the editor's commands and the host's, like Monaco's `editor.addAction`:
