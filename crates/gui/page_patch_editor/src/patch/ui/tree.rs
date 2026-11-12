@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use gui_shared::i18n::{I18nKey, I18nMap};
 
+use super::object_list::{RowAction, row_menu};
 use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState, has_guide};
 
 /// Pixels of indent per tree level.
@@ -63,8 +64,8 @@ enum RowEvent {
     SetOpenBelow(Node, bool),
     /// Bring the selected row into view.
     Locate,
-    /// Double click or menu: the row's object stays in a tab.
-    KeepOpen(usize),
+    /// Double click (`KeepOpen`) or the menu of the row with this index: see [`RowAction`].
+    Menu(usize, RowAction),
 }
 
 /// Draws the tree; a click selects an object (`selected`).
@@ -72,15 +73,15 @@ enum RowEvent {
 /// `changed_only`: only the branches leading to edited / new objects.
 /// `focused`: the keyboard is in the tree: the selected row gets a frame.
 ///
-/// Returns the object to keep open in a tab (double click, menu).
-pub(in crate::patch) fn tree_ui<'g>(
+/// Returns what a row's menu (or a double click: keep it open) asked for, of the row's object.
+pub(super) fn tree_ui(
     ui: &mut egui::Ui,
-    graph: &'g Graph,
+    graph: &Graph,
     selected: &mut Option<Rc<str>>,
     state: &mut TreeState,
     (changed_only, focused): (bool, bool),
     i18n: &I18nMap,
-) -> Option<&'g str> {
+) -> Option<(Node, RowAction)> {
     state.prepare(graph, selected.as_deref(), changed_only);
     unlinked_section(ui, graph, selected, i18n);
     let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
@@ -113,11 +114,11 @@ pub(in crate::patch) fn tree_ui<'g>(
     state.view_width = output.inner_rect.width();
     event = sticky_rows_ui(ui, graph, state, output.inner_rect, row_with_spacing).or(event);
 
-    let mut keep_open = None;
+    let mut action = None;
     match event {
-        Some(RowEvent::KeepOpen(row)) => {
+        Some(RowEvent::Menu(row, picked)) => {
             state.cursor = row;
-            keep_open = state.rows().get(row).map(|row| graph.id(row.node));
+            action = state.rows().get(row).map(|row| (row.node, picked));
         }
         Some(RowEvent::Select(row)) => {
             state.cursor = row;
@@ -129,7 +130,7 @@ pub(in crate::patch) fn tree_ui<'g>(
         Some(RowEvent::Locate) => state.scroll_to = Some(state.cursor),
         None => {}
     }
-    keep_open
+    action
 }
 
 /// `⚠ Not linked (2)` and the new objects nothing points to. Above the tree: always in view,
@@ -183,15 +184,16 @@ fn row_ui(
             event = Some(RowEvent::Select(index));
         }
         if response.double_clicked() {
-            event = Some(RowEvent::KeepOpen(index));
+            event = Some(RowEvent::Menu(index, RowAction::KeepOpen));
         }
         if focused && is_selected {
             let stroke = ui.visuals().selection.stroke;
             ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
         }
         response.context_menu(|ui| {
-            if ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked() {
-                event = Some(RowEvent::KeepOpen(index));
+            // The same as the flat list's, then what only a tree has.
+            if let Some(picked) = row_menu(ui, i18n, graph.is_new(row.node), graph.is_changed(row.node)) {
+                event = Some(RowEvent::Menu(index, picked));
                 ui.close();
             }
             if row.expandable {

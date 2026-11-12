@@ -205,9 +205,8 @@ impl PatchTool {
             }
         }
         let flags = (self.changed_only, self.tree_focus);
-        if let Some(id) = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n) {
-            self.keep_open(id);
-        }
+        let action = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n);
+        self.apply_row_action(ui, graph, action);
     }
 
     /// The anim data files after the filter: the rows of [`anim_tree::rows`].
@@ -396,6 +395,10 @@ impl PatchTool {
         let id = graph.id(node);
         match action {
             RowAction::KeepOpen => self.keep_open(id),
+            RowAction::NewObject => {
+                self.class_picker = true;
+                self.focus_quick_pick = true;
+            }
             RowAction::Duplicate => self.new_object(Some(id)),
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
@@ -513,18 +516,23 @@ const fn anim_kind_label(kind: FileKind) -> I18nKey {
     }
 }
 
-/// What a row's right-click menu asked for.
-#[derive(Debug, Clone, Copy)]
-enum RowAction {
+/// What a row's right-click menu asked for, in the flat list and the tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RowAction {
     KeepOpen,
+    /// A new object of a class to pick, as `[+]`.
+    NewObject,
     Duplicate,
     CopyId,
     RevertOrDelete,
 }
 
-/// `Keep Open / Duplicate / Copy id / Revert (or Delete for a new object)`.
-fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
+/// `Keep Open / New / Duplicate / Copy id / Revert (or Delete for a new object)`, for the flat list and
+/// the tree alike.
+pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
     let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
+    ui.separator();
+    let new = ui.button(i18n.t(I18nKey::NemesisNewObject)).clicked();
     let duplicate = ui.button(i18n.t(I18nKey::NemesisDuplicate)).clicked();
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
     let revert = changed && {
@@ -534,6 +542,7 @@ fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> O
     };
     [
         (keep_open, RowAction::KeepOpen),
+        (new, RowAction::NewObject),
         (duplicate, RowAction::Duplicate),
         (copy, RowAction::CopyId),
         (revert, RowAction::RevertOrDelete),
