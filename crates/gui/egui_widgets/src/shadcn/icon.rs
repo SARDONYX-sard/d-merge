@@ -210,7 +210,12 @@ impl Pen<'_> {
     }
 
     /// Paint an SVG path `d` attribute.
+    ///
+    /// Each `<path>` starts with no current point, so its first `m` is from the origin: e.g., in
+    /// `ArrowRight`, `m12 5` of the 2nd path is `(12, 5)`, not `(12, 5)` from the end `(19, 12)` of the 1st.
     fn path(&mut self, d: &str) {
+        self.cur = Pos2::ZERO;
+        self.start = Pos2::ZERO;
         let tokens = tokenize(d);
         let mut cmd = b'M';
         let mut i = 0;
@@ -446,6 +451,36 @@ mod tests {
             })
             .collect();
         assert_eq!(nums, [0.5, 0.5, 0.0, 0.0, 1.0, 0.923, 0.0, 11.0, -0.16]);
+    }
+
+    /// Every point of the shapes `icon` paints into a 24x24 rect at the origin.
+    fn painted_points(icon: Icon) -> Vec<Pos2> {
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let rect = egui::Rect::from_min_size(Pos2::ZERO, egui::Vec2::splat(24.0));
+            paint_icon(ui.painter(), rect, icon, egui::Color32::WHITE);
+        });
+        output.textures_delta.clear(); // No renderer to hand the font atlas to.
+        let mut points = Vec::new();
+        for clipped in &output.shapes {
+            match &clipped.shape {
+                egui::Shape::Path(path) => points.extend_from_slice(&path.points),
+                egui::Shape::LineSegment { points: segment, .. } => points.extend_from_slice(segment),
+                _ => {}
+            }
+        }
+        points
+    }
+
+    /// The 2nd path of `ArrowRight` (`m12 5 7 7-7 7`, the `>`) starts with a relative `m`: it is from
+    /// the origin, and the `>` stays in the 24x24 box instead of going down to the right.
+    #[test]
+    fn a_relative_move_starts_each_path_from_the_origin() {
+        let points = painted_points(Icon::ArrowRight);
+        assert!(!points.is_empty());
+        let inside = egui::Rect::from_min_size(Pos2::ZERO, egui::Vec2::splat(24.0));
+        assert!(points.iter().all(|p| inside.contains(*p)), "{points:?}");
+        assert!(points.contains(&pos2(12.0, 5.0)) && points.contains(&pos2(19.0, 12.0)), "{points:?}");
     }
 
     #[test]
