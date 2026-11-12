@@ -98,6 +98,8 @@ impl PatchTool {
                 SideView::Changes => self.changes_view(ui, i18n, notify),
                 SideView::Variables => {
                     view_title(ui, i18n.t(title));
+                    // The events and variables are a behavior's: which one, here as well.
+                    self.behavior_select(ui, i18n);
                     let has_vars =
                         self.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
                     if has_vars {
@@ -108,6 +110,28 @@ impl PatchTool {
                 }
             }
         });
+    }
+
+    /// `Template: [0_master ▼]`: the behavior the view is of (animation data has no events or
+    /// variables). Another one goes back to where it was left in it, as a click in BEHAVIORS does.
+    fn behavior_select(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        let current = self.workspace.behaviors.get(self.active).map_or("", |behavior| behavior.name.as_str());
+        let mut picked = None;
+        ui.horizontal(|ui| {
+            ui.label(i18n.t(I18nKey::SideTemplate));
+            egui::ComboBox::from_id_salt("side_vars_behavior").selected_text(current).show_ui(ui, |ui| {
+                let behaviors = self.workspace.behaviors.iter().enumerate();
+                for (at, behavior) in behaviors.filter(|(_, behavior)| !behavior.is_anim_data()) {
+                    if ui.selectable_label(at == self.active, &behavior.name).clicked() {
+                        picked = Some(at);
+                    }
+                }
+            });
+        });
+        if let Some(at) = picked.filter(|at| *at != self.active) {
+            self.active = at;
+            self.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
+        }
     }
 
     /// Shows `view`, or hides the side bar if it is the one shown, as a click on its icon does.

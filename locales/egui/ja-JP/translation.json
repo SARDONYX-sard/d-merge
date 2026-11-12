@@ -416,6 +416,7 @@
   "side_restore_object": "このオブジェクトをこのリビジョンに戻す",
   "side_restore_revision": "作業をこのリビジョンに戻す",
   "side_restore_revision_hover": "すべてのオブジェクトをこのリビジョンの状態にします。履歴は残り、最新のリビジョンとの違いは変更として扱われます(コミットまたは破棄できます)。",
+  "side_template": "テンプレート:",
   "skyrim_data_dir_label": "Skyrim Dataディレクトリ:",
   "source_code_label": "ソースコード:",
   "status_applying_patches": "FNISとNemesisのパッチを適用しています...",

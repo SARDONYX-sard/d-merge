@@ -1434,6 +1434,9 @@ pub enum I18nKey {
     /// Puts every object as it was at this revision. The history stays: what differs from the last revision is a change, to commit or to discard.
     SideRestoreRevisionHover,
 
+    /// Template:
+    SideTemplate,
+
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
 
