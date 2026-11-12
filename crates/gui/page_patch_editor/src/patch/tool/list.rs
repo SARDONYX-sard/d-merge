@@ -6,7 +6,41 @@ use stdx::text::{cmp_ignore_case, contains_ignore_case};
 
 use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui, workspace::PANDORA_DOC};
 
+/// Rows kept above a revealed row, so that it is not at the very top of the list.
+const ROWS_ABOVE_REVEALED: usize = 3;
+
+/// Should a list show the selection again? When it changed since `revealed`, or when `forced` (the
+/// editor got the keyboard: like VS Code, the side bar follows the file being edited). Notes the
+/// selection as revealed.
+///
+/// e.g. `revealed` = `#0106`, `selected` = `#0106`: only if `forced`. `selected` = `#0107`: yes.
+pub(in crate::patch) fn take_reveal(revealed: &mut Option<Rc<str>>, selected: Option<&Rc<str>>, forced: bool) -> bool {
+    let changed = revealed.as_ref() != selected;
+    if changed {
+        *revealed = selected.cloned();
+    }
+    (changed || forced) && selected.is_some()
+}
+
+/// The scroll offset showing `row` of a list of rows of `row_height` (spacing included), with a few
+/// rows above it. e.g. row 10, 20 px: 140 px (row 7 at the top).
+pub(in crate::patch) fn reveal_offset(row: usize, row_height: f32) -> f32 {
+    #[expect(clippy::cast_precision_loss, reason = "far fewer rows than f32 can count")]
+    let top = row.saturating_sub(ROWS_ABOVE_REVEALED) as f32;
+    top * row_height
+}
+
 impl PatchTool {
+    /// Notes whether the editor `has_focus` this frame. Getting it asks the side bar to show the
+    /// object again (next frame: the side bar is drawn first).
+    pub(in crate::patch) fn note_editor_focus(&mut self, ctx: &egui::Context, has_focus: bool) {
+        if has_focus && !self.editor_had_focus {
+            self.reveal_in_side_bar = true;
+            ctx.request_repaint();
+        }
+        self.editor_had_focus = has_focus;
+    }
+
     /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
     pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
         self.tree_focus = true;
@@ -98,5 +132,42 @@ impl PatchTool {
         let id = self.workspace.behaviors[self.active].add_object(&code, from);
         self.object_changed(&id);
         self.selected = Some(id.into());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_list_shows_a_new_selection_or_when_the_editor_gets_the_keyboard() {
+        let (a, b): (Rc<str>, Rc<str>) = ("#a".into(), "#b".into());
+        let mut revealed = None;
+        assert!(take_reveal(&mut revealed, Some(&a), false), "new");
+        assert!(!take_reveal(&mut revealed, Some(&a), false), "shown already");
+        assert!(take_reveal(&mut revealed, Some(&a), true), "the editor got the keyboard");
+        assert!(take_reveal(&mut revealed, Some(&b), false), "another one");
+        assert!(!take_reveal(&mut revealed, None, true), "nothing to show");
+        assert_eq!(revealed, None);
+    }
+
+    #[test]
+    fn a_revealed_row_has_rows_above_it() {
+        assert_eq!(reveal_offset(10, 20.0), 140.0);
+        assert_eq!(reveal_offset(1, 20.0), 0.0);
+    }
+
+    /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.
+    #[test]
+    fn getting_into_the_editor_asks_the_side_bar_to_follow() {
+        let ctx = egui::Context::default();
+        let mut tool = PatchTool::default();
+        tool.note_editor_focus(&ctx, true);
+        assert!(std::mem::take(&mut tool.reveal_in_side_bar));
+        tool.note_editor_focus(&ctx, true);
+        assert!(!tool.reveal_in_side_bar);
+        tool.note_editor_focus(&ctx, false);
+        tool.note_editor_focus(&ctx, true);
+        assert!(tool.reveal_in_side_bar);
     }
 }

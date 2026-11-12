@@ -129,6 +129,12 @@ pub(crate) struct PatchTool {
     changed_only: bool,
     /// Only the new objects nothing links to. See [`tree::Graph::unlinked`].
     unlinked_only: bool,
+    /// The editor had the keyboard last frame. See [`PatchTool::note_editor_focus`].
+    editor_had_focus: bool,
+    /// The side bar shows the selected object again, even if it was shown already.
+    reveal_in_side_bar: bool,
+    /// The selection the flat list was scrolled to. See [`tool::list::take_reveal`].
+    list_revealed: Option<Rc<str>>,
 
     /// The text in the editor and what it belongs to (`(behavior, id)`).
     editor_text: String,

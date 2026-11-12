@@ -613,6 +613,12 @@ impl TreeState {
         }
     }
 
+    /// The next [`Self::prepare`] shows the selection again (opens its parents, scrolls to it), even if
+    /// it did already: the editor got the keyboard, and the tree follows it.
+    pub(super) fn reveal_again(&mut self) {
+        self.revealed = None;
+    }
+
     /// Opens the parents of `selected` if it is a new selection. Returns whether it was.
     fn reveal(&mut self, graph: &Graph, selected: Option<&str>, changed_only: bool) -> bool {
         let new_selection = selected.filter(|id| self.revealed.as_deref() != Some(*id));

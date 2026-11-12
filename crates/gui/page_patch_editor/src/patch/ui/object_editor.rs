@@ -51,6 +51,9 @@ impl PatchTool {
         self.open_in_editor(&id);
         let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, &id));
         self.apply_focus_request(ui.ctx(), editor_id);
+        // Like VS Code: getting into the editor shows its object in the side bar.
+        let has_focus = ui.memory(|m| m.has_focus(editor_id));
+        self.note_editor_focus(ui.ctx(), has_focus);
         // `Ctrl+W` closes the tab, as in VS Code. (Vim uses that key itself.)
         if self.editor_mode == EditorMode::Normal
             && ui.memory(|m| m.has_focus(editor_id))

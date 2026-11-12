@@ -21,6 +21,7 @@ use super::{
 use crate::patch::{
     PatchTool,
     anim::data,
+    tool::list::{reveal_offset, take_reveal},
     tree::{Graph, Node, TreeState},
     workspace::PANDORA_DOC,
 };
@@ -192,6 +193,9 @@ impl PatchTool {
             self.trees.insert(path.clone(), TreeState::default());
         }
         let Some(tree) = self.trees.get_mut(path) else { return };
+        if std::mem::take(&mut self.reveal_in_side_bar) {
+            tree.reveal_again();
+        }
         if self.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             let inputs = super::tree::read_keys(ui, &mut tree.leader);
@@ -214,12 +218,11 @@ impl PatchTool {
             self.list_keys(ui, graph);
         }
         let is_adsf = self.workspace.behaviors[self.active].adsf;
-        // Only when the selection changes: after that, what is open is the user's.
-        if self.anim_revealed != self.selected {
-            self.anim_revealed.clone_from(&self.selected);
-            if let Some(id) = &self.selected {
-                anim_tree::reveal(&mut self.anim_folders_open, is_adsf, id);
-            }
+        // Only when the selection changes or the editor gets the keyboard: else what is open is the user's.
+        let forced = std::mem::take(&mut self.reveal_in_side_bar);
+        let reveal = take_reveal(&mut self.anim_revealed, self.selected.as_ref(), forced);
+        if reveal && let Some(id) = &self.selected {
+            anim_tree::reveal(&mut self.anim_folders_open, is_adsf, id);
         }
         let nodes = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let files: Vec<AnimFile<'_>> =
@@ -231,7 +234,14 @@ impl PatchTool {
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
-        egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
+        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
+        let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
+        let at = selected
+            .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
+        if let Some(at) = at.filter(|_| reveal) {
+            scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));
+        }
+        scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
             for row in &rows[range] {
                 match row {
                     AnimRow::Folder { name, files, changed, open } => {
@@ -351,7 +361,15 @@ impl PatchTool {
         let rows = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
-        egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, rows.len(), |ui, range| {
+        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
+        let forced = std::mem::take(&mut self.reveal_in_side_bar);
+        if take_reveal(&mut self.list_revealed, self.selected.as_ref(), forced) {
+            let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
+            if let Some(at) = selected.and_then(|node| rows.iter().position(|&row| row == node)) {
+                scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));
+            }
+        }
+        scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
             for &node in &rows[range] {
                 let id = graph.id(node);
                 let text = super::tree::object_label(ui, graph, node, false);
