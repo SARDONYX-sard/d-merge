@@ -21,7 +21,7 @@ use crate::error::{Error, *};
 /// # Rule: Japanese (`ja-JP`)
 /// - No half-width space between Japanese and ASCII: `modのファイル`, `.hkxファイル`, `プレビュー(XML)`.
 ///   A list marker keeps its own (`- 起動時`, `1. MOD`, `# 注意`).
-/// - "User Patch" is `ユーザーパッチ`.
+/// - "User Patch" is `ユーザーパッチ`; "behavior" and "actor" stay English (`behavior`, `actor`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
