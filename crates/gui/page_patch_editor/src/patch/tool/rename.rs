@@ -1,51 +1,23 @@
-//! Renaming the mod code of the open work, on another thread with a progress bar. The renaming itself
-//! is [`workspace::rename`].
+//! Renaming the mod code of the open work, as a [`Job`]: the renaming itself is [`workspace::rename`].
 //!
 //! ```text
 //! [Rename…] -> [newc] [Rename] [Cancel]   (Rename while the code is free and valid)
-//!   -> another thread: Workspace::rename_code      the editor shows the progress, and nothing else
+//!   -> a job: Workspace::rename_code          the editor shows the progress, and nothing else
 //!   -> back: saved under newc, the cache of oldc removed, the recent works updated
 //! ```
-//! Until it is back the work is not here: nothing may save it, or the empty work would be saved over it.
+//! Until it is back the work is not here: see [`crate::patch::tool::job`] for why nothing saves.
 
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    thread::JoinHandle,
-    time::Instant,
-};
+use std::time::Instant;
 
 use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
 
+use super::job::{Done, Job};
 use crate::patch::{
     PatchTool,
     workspace::{self, Workspace},
 };
-
-/// A rename running. See the module docs.
-#[derive(Debug)]
-pub(in crate::patch) struct Renaming {
-    pub(in crate::patch) old: String,
-    pub(in crate::patch) new: String,
-    /// Objects done, of `total`.
-    pub(in crate::patch) done: Arc<AtomicUsize>,
-    pub(in crate::patch) total: usize,
-    work: JoinHandle<Workspace>,
-}
-
-impl Renaming {
-    /// How far it is, from 0 to 1.
-    pub(in crate::patch) fn progress(&self) -> f32 {
-        #[expect(clippy::cast_precision_loss, reason = "a ratio for a progress bar")]
-        let ratio = self.done.load(Ordering::Relaxed) as f32 / self.total.max(1) as f32;
-        ratio.min(1.0)
-    }
-}
-
 /// Why `new` can not be the work's code instead of `old`, if so. `exists`: is there a work with it?
 ///
 /// e.g. `oldc` -> `newc`: none. -> `ab`: invalid (4-6 letters or digits). -> `OLDC`: the same code.
@@ -68,37 +40,21 @@ impl PatchTool {
         self.save_now(notify, i18n);
         let mut work = std::mem::take(&mut self.workspace);
         let total = workspace::rename::object_count(&work);
-        let done = Arc::new(AtomicUsize::new(0));
         let new = new.trim().to_owned();
-        let work = {
-            let (old, new, done) = (old.clone(), new.clone(), Arc::clone(&done));
-            std::thread::spawn(move || {
-                work.rename_code(&old, &new, &done);
-                work
-            })
-        };
-        self.renaming = Some(Renaming { old, new, done, total, work });
+        let detail = format!("{old} -> {new}");
+        self.job = Some(Job::spawn(I18nKey::NemesisRenameCodeRunning, detail, total, move |done| {
+            work.rename_code(&old, &new, done);
+            Done::Renamed { work, old, new }
+        }));
     }
-
-    /// Takes the work back once the rename is done, and finishes it. Call each frame.
-    pub(in crate::patch) fn poll_rename(&mut self, ctx: &egui::Context, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(renaming) = self.renaming.take_if(|renaming| renaming.work.is_finished()) else {
-            if self.renaming.is_some() {
-                ctx.request_repaint();
-            }
-            return;
-        };
-        let Renaming { old, new, work, .. } = renaming;
-        if let Ok(work) = work.join() {
-            self.finish_rename(work, &old, &new, notify, i18n);
-        } else {
-            // The work under the old code is as it was saved: read again.
-            self.loaded_for = None;
-            notify.error(format!("{}: {old}", i18n.t(I18nKey::NemesisRenameCodeFailed)));
-        }
-    }
-
-    fn finish_rename(&mut self, work: Workspace, old: &str, new: &str, notify: &mut Notification, i18n: &I18nMap) {
+    pub(super) fn finish_rename(
+        &mut self,
+        work: Workspace,
+        old: &str,
+        new: &str,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+    ) {
         self.workspace = work;
         new.clone_into(&mut self.mod_code);
         self.loaded_for = Some(new.to_owned());
@@ -156,11 +112,8 @@ mod tests {
         assert!(Workspace::exists(&dir, "oldc"));
 
         tool.start_rename("newc", &mut notify, &i18n);
-        assert!(tool.renaming.is_some() && tool.workspace.behaviors.is_empty());
-        let ctx = egui::Context::default();
-        while tool.renaming.is_some() {
-            tool.poll_rename(&ctx, &mut notify, &i18n);
-        }
+        assert!(tool.job.is_some() && tool.workspace.behaviors.is_empty());
+        tool.wait_job(&mut notify, &i18n);
         let renamed = tool.workspace.behaviors[0].added.contains_key("M~1/Idle~newc$0.txt");
         let (old_gone, new_there) = (!Workspace::exists(&dir, "oldc"), Workspace::exists(&dir, "newc"));
         std::fs::remove_dir_all(&dir).unwrap();

@@ -1,6 +1,9 @@
 //! Reading a mod's patches into a work: only their blocks go on the templates.
 
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use nemesis_diff::{View, apply_to_template, resolve};
 
@@ -90,7 +93,18 @@ impl Workspace {
     /// - `meshes/.../<x>.bin/` (NemesisExt): by that path (`.bin` -> `.xml`)
     ///
     /// Returns `(workspace, code, folders without a template)`.
+    #[cfg(test)]
     pub(crate) fn import(selected: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
+        Self::import_counted(selected, template_root, &AtomicUsize::new(0))
+    }
+
+    /// [`Self::import`], counting the patch files read in `done`: a big mod has thousands, and the
+    /// editor shows how far it is (see `tool::job`).
+    pub(crate) fn import_counted(
+        selected: &Path,
+        template_root: &Path,
+        done: &AtomicUsize,
+    ) -> Result<(Self, String, Vec<String>), String> {
         let code = code_of(selected);
         let root = mod_root_of(selected);
         // A mod has its patches for templates Nemesis does not know in the other engine's directory.
@@ -105,7 +119,7 @@ impl Workspace {
         let mut workspace = Self { info, ..Self::default() };
         let mut skipped = Vec::new();
         for dir in &dirs {
-            workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped)?;
+            workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped, done)?;
         }
         if let Some(pandora) = &pandora {
             workspace.read_pandora_dir(pandora, template_root, &mut skipped)?;
@@ -123,6 +137,7 @@ impl Workspace {
         root: Option<&Path>,
         template_root: &Path,
         skipped: &mut Vec<String>,
+        done: &AtomicUsize,
     ) -> Result<(), String> {
         for folder in patch_folders(mod_dir) {
             let relative = folder.strip_prefix(mod_dir).unwrap_or(&folder);
@@ -147,6 +162,7 @@ impl Workspace {
                 self.export_format = ExportFormat::NemesisExt;
             }
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
+                done.fetch_add(1, Ordering::Relaxed);
                 let id = file_stem(&file);
                 let patch = read_text(&file)?;
                 if let Some(template) = behavior.template_object(&id) {

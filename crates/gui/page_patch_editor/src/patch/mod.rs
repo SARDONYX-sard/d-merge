@@ -137,8 +137,8 @@ pub(crate) struct PatchTool {
     list_revealed: Option<Rc<str>>,
     /// The mod code being typed to rename the work to, while that form is open.
     rename_to: Option<String>,
-    /// A rename running: the work is on another thread. See [`tool::rename`].
-    renaming: Option<tool::rename::Renaming>,
+    /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
+    job: Option<tool::job::Job>,
 
     /// The text in the editor and what it belongs to (`(behavior, id)`).
     editor_text: String,
@@ -379,7 +379,9 @@ impl PatchTool {
         }
         self.read_view_settings(settings);
         self.changed_only = settings.changed_only;
-        self.poll_rename(ui.ctx(), notify, i18n);
+        if self.poll_job(notify, i18n) {
+            ui.ctx().request_repaint();
+        }
         self.sync_workspace(notify, i18n);
         self.draw(ui, i18n, notify);
 
@@ -405,11 +407,15 @@ impl PatchTool {
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         // The work is on another thread: only how far it is.
-        if let Some(renaming) = &self.renaming {
-            ui.label(format!("{}: {} -> {}", i18n.t(I18nKey::NemesisRenameCodeRunning), renaming.old, renaming.new));
-            let done = renaming.done.load(std::sync::atomic::Ordering::Relaxed);
-            let bar = egui::ProgressBar::new(renaming.progress()).text(format!("{done} / {}", renaming.total));
-            ui.add(bar.animate(true));
+        if let Some(job) = &self.job {
+            ui.add_space(12.0);
+            ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
+            let done = job.done.load(std::sync::atomic::Ordering::Relaxed);
+            let (ratio, text) = match job.progress() {
+                Some(ratio) => (ratio, format!("{done} / {}", job.total)),
+                None => (0.0, done.to_string()),
+            };
+            ui.add(egui::ProgressBar::new(ratio).text(text).animate(true));
             return;
         }
         self.code_choice_window(ui.ctx(), i18n, notify);
@@ -575,6 +581,7 @@ mod work_tests {
 
         tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("aaaa"));
         tool.workspace.info.name = "first".to_owned();
         tool.mark_dirty();
@@ -585,6 +592,7 @@ mod work_tests {
         assert_eq!(tool.loaded_for, None);
         tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("bbbb"));
         assert_eq!(tool.workspace.info.name, "");
         tool.save_now(&mut notify, &i18n);
@@ -595,6 +603,7 @@ mod work_tests {
         // Back to the first one.
         tool.switch_work("aaaa", "D:/mods/a", "", &mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let name = tool.workspace.info.name.clone();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -610,6 +619,7 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("one"));
         tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
         assert_eq!(tool.loaded_for, None);
@@ -634,6 +644,8 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
 
         tool.open_mod(&root, &mut notify, &i18n);
+
+        tool.wait_job(&mut notify, &i18n);
         let opened_at_once = tool.loaded_for.clone();
         let choice = tool
             .code_choice
@@ -641,6 +653,7 @@ mod work_tests {
             .map(|choice| choice.codes.iter().map(|code| code.code.clone()).collect::<Vec<_>>());
 
         tool.open_chosen_code("ecnpc", &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let opened = tool.loaded_for.clone();
         let asked_again = tool.code_choice.is_some();
         std::fs::remove_dir_all(&dir).unwrap();
@@ -661,10 +674,13 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
 
         tool.open_mod(&one, &mut notify, &i18n);
+
+        tool.wait_job(&mut notify, &i18n);
         let of_one = (tool.loaded_for.clone(), tool.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
         tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let of_patch_dir = (tool.loaded_for.clone(), tool.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -698,7 +714,9 @@ mod work_tests {
             let mut tool = tool_in(&dir.join("out"));
             tool.template_dir = dir.join("templates").display().to_string();
             tool.open_mod(&mod_dir, notify, &i18n);
+            tool.wait_job(notify, &i18n);
             tool.sync_workspace(notify, &i18n);
+            tool.wait_job(notify, &i18n);
             tool
         };
 
@@ -795,7 +813,9 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
         tool.template_dir = dir.join("templates").display().to_string();
         tool.open_mod(&mod_dir, &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         tool.editor_text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
 
         let shown = |tool: &mut PatchTool| {

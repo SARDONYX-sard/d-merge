@@ -306,6 +306,7 @@
   "nemesis_pandora_ops_ok": "このPandoraの操作で、ここで編集したとおりのオブジェクトになります。",
   "nemesis_parser_ok": "d-mergeのNemesisパーサで読めるパッチです。",
   "nemesis_patch_preview": "パッチのプレビュー",
+  "nemesis_reading_work": "読み込み中",
   "nemesis_recent_missing": "作業データもmodも見つからないため、一覧から外しました",
   "nemesis_ref_mods": "参照mod:",
   "nemesis_ref_mods_hover": "このmodが依存するmodです(アドオンの本体、ユーザーパッチが値を取り込むmod)。+で各modのルートかパッチのディレクトリを選びます。\n\n新規オブジェクト、イベント、変数を参照して閲覧できます。編集も書き出しもしません。マージ時にそのmodから読み込まれます。",

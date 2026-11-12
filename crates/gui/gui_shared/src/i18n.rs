@@ -1048,6 +1048,9 @@ pub enum I18nKey {
     /// Patch preview
     NemesisPatchPreview,
 
+    /// Reading
+    NemesisReadingWork,
+
     /// Neither its work nor its mod is there any more, so it left the list
     NemesisRecentMissing,
 

@@ -29,6 +29,7 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use rayon::prelude::*;
@@ -101,13 +102,15 @@ fn take_old_force_ext(dir: &Path, entries: &[PathBuf]) -> bool {
 }
 
 /// A behavior of a cache dir: `<dir>/<behavior>/template.path` and its objects. `None`: no behavior.
-fn read_cached_behavior(entry: &Path) -> Result<Option<Behavior>, String> {
+/// `done`: counts the objects read.
+fn read_cached_behavior(entry: &Path, done: &AtomicUsize) -> Result<Option<Behavior>, String> {
     let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
         return Ok(None);
     };
     let mut behavior = Behavior::open(Path::new(template.trim()))?;
     behavior.pandora_file = std::fs::read_to_string(entry.join("pandora_file")).ok();
     for file in read_dir(entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
+        done.fetch_add(1, Ordering::Relaxed);
         let id = file_stem(&file).replace("%2F", "/");
         let text = read_text(&file)?;
         if id == PANDORA_DOC {
@@ -306,7 +309,13 @@ impl Workspace {
     }
 
     /// Loads a cached workspace (an empty one if there is none).
+    #[cfg(test)]
     pub(crate) fn load(root: &Path, code: &str) -> Result<Self, String> {
+        Self::load_counted(root, code, &AtomicUsize::new(0))
+    }
+
+    /// [`Self::load`], counting the objects read in `done`. See [`Self::import_counted`].
+    pub(crate) fn load_counted(root: &Path, code: &str, done: &AtomicUsize) -> Result<Self, String> {
         let dir = Self::cache_dir(root, code);
         let mut workspace = Self::default();
         if !dir.is_dir() {
@@ -317,7 +326,7 @@ impl Workspace {
         // Each one reads and indexes a whole template: at the same time, in the order of the directory.
         let entries: Vec<PathBuf> = read_dir(&dir)?.filter(|p| p.is_dir()).collect();
         let behaviors: Vec<Option<Behavior>> =
-            entries.par_iter().map(|entry| read_cached_behavior(entry)).collect::<Result<_, String>>()?;
+            entries.par_iter().map(|entry| read_cached_behavior(entry, done)).collect::<Result<_, String>>()?;
         workspace.behaviors = behaviors.into_iter().flatten().collect();
         // A work without the file, from before it existed, has nothing to restore.
         let file = std::fs::read_to_string(dir.join(WORKSPACE_FILE)).unwrap_or_default();

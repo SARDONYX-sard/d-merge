@@ -13,6 +13,7 @@ use gui_shared::{
 };
 use nemesis_diff::is_existing_mod_code;
 
+use super::job::{Done, Job, Kept};
 use crate::patch::{
     FocusAt, PatchTool, SAVE_DELAY, editor, remember_recent,
     ui::code_choice::ModCodeChoice,
@@ -93,31 +94,19 @@ impl PatchTool {
 
     /// Loads the work of the code when it changes, and saves pending edits.
     pub(in crate::patch) fn sync_workspace(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.renaming.is_some() {
-            return; // The work is not here: see `tool::rename`.
+        if self.job.is_some() {
+            return; // See `tool::job`: nothing is done to the work meanwhile.
         }
         let code = self.mod_code.trim();
         if is_existing_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
             let code = code.to_owned();
             self.save_now(notify, i18n); // the previous workspace
-            match Workspace::load(&self.cache_root, &code) {
-                Ok(workspace) => {
-                    self.workspace = workspace;
-                    self.reset_names();
-                    self.tabs.clear();
-                }
-                Err(err) => {
-                    notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage)));
-                }
-            }
-            self.editor_for = None;
-            self.selected = None;
-            self.restore_session();
-            remember_recent(
-                &mut self.recent,
-                RecentWork { output: self.output.trim().to_owned(), mod_code: code.clone() },
-            );
-            self.loaded_for = Some(code);
+            let root = self.cache_root.clone();
+            self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, code.clone(), 0, move |done| Done::Loaded {
+                loaded: Workspace::load_counted(&root, &code, done),
+                code,
+            }));
+            return;
         }
 
         // What is open is part of the work: back to it when it is opened again.
@@ -133,9 +122,32 @@ impl PatchTool {
         }
     }
 
+    /// The work of `code` is loaded: see [`Self::sync_workspace`].
+    pub(super) fn finish_load(
+        &mut self,
+        loaded: Result<Workspace, String>,
+        code: String,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+    ) {
+        match loaded {
+            Ok(workspace) => {
+                self.workspace = workspace;
+                self.reset_names();
+                self.tabs.clear();
+            }
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
+        }
+        self.editor_for = None;
+        self.selected = None;
+        self.restore_session();
+        remember_recent(&mut self.recent, RecentWork { output: self.output.trim().to_owned(), mod_code: code.clone() });
+        self.loaded_for = Some(code);
+    }
+
     pub(in crate::patch) fn save_now(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.renaming.is_some() {
-            return; // The empty work here would be saved over it: see `tool::rename`.
+        if self.job.is_some() {
+            return; // A rename has taken the work: see `tool::job`.
         }
         self.sync_pandora_doc();
         let Some(code) = self.loaded_for.clone() else { return };
@@ -306,49 +318,62 @@ impl PatchTool {
             Some(_) => notify.warn(format!("{}: {code}", i18n.t(I18nKey::NemesisWorkReplaced))),
             None => {}
         }
-        self.read_mod(selected, source, notify, i18n);
+        self.read_mod(selected, source, None);
     }
 
-    /// Replaces the work by what is in the mod at `selected`. Returns whether it could be read.
-    pub(in crate::patch) fn read_mod(
+    /// Replaces the work by what is in the mod at `selected`, as a job: see [`Self::finish_read`].
+    /// `kept`: what a reload keeps of the work.
+    pub(in crate::patch) fn read_mod(&mut self, selected: &Path, source: String, kept: Option<Kept>) {
+        let (selected, templates) = (selected.to_path_buf(), PathBuf::from(&self.template_dir));
+        let detail = selected.display().to_string();
+        self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, detail, 0, move |done| Done::Read {
+            read: Workspace::import_counted(&selected, &templates, done),
+            source,
+            kept,
+        }));
+    }
+
+    /// The mod is read: it is the work now. `source`: its root.
+    pub(super) fn finish_read(
         &mut self,
-        selected: &Path,
+        read: Result<(Workspace, String, Vec<String>), String>,
         source: String,
+        kept: Option<Kept>,
         notify: &mut Notification,
         i18n: &I18nMap,
-    ) -> bool {
-        match Workspace::import(selected, Path::new(&self.template_dir)) {
-            Ok((workspace, code, skipped)) => {
-                // Read again: the object that was being worked on comes back.
-                let was_open =
-                    self.loaded_for.as_deref().is_some_and(|loaded| loaded == code).then(|| self.editor_place());
-                self.save_now(notify, i18n);
-                self.workspace = workspace;
-                self.reset_names();
-                self.tabs.clear();
-                self.mod_code.clone_from(&code);
-                self.output.clone_from(&source);
-                self.mod_dir = source;
-                self.new_work = None;
-                // What was read is the work, rather than what may be in the cache.
-                remember_recent(&mut self.recent, RecentWork { output: self.output.clone(), mod_code: code.clone() });
-                self.loaded_for = Some(code);
-                self.mark_dirty();
-                self.active = 0;
-                self.selected = None;
-                self.editor_for = None;
-                if let Some(Some(place)) = was_open {
-                    self.reopen_editor_place(&place);
-                }
-                if !skipped.is_empty() {
-                    notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
-                }
-                true
-            }
-            Err(err) => {
-                notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage)));
-                false
-            }
+    ) {
+        let (workspace, code, skipped) = match read {
+            Ok(read) => read,
+            Err(err) => return notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
+        };
+        // Read again: the object that was being worked on comes back.
+        let was_open = self.loaded_for.as_deref().is_some_and(|loaded| loaded == code).then(|| self.editor_place());
+        self.save_now(notify, i18n);
+        self.workspace = workspace;
+        self.tabs.clear();
+        self.mod_code.clone_from(&code);
+        self.output.clone_from(&source);
+        self.mod_dir = source;
+        self.new_work = None;
+        // What was read is the work, rather than what may be in the cache.
+        remember_recent(&mut self.recent, RecentWork { output: self.output.clone(), mod_code: code.clone() });
+        self.loaded_for = Some(code);
+        // A reload: where it is exported to and the mods it refers to are not in the mod.
+        if let Some(Kept { output, refs }) = kept {
+            self.output = output;
+            self.workspace.ref_mods = refs;
+            self.workspace.reload_refs();
+        }
+        self.reset_names();
+        self.mark_dirty();
+        self.active = 0;
+        self.selected = None;
+        self.editor_for = None;
+        if let Some(Some(place)) = was_open {
+            self.reopen_editor_place(&place);
+        }
+        if !skipped.is_empty() {
+            notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
         }
     }
 
@@ -361,15 +386,9 @@ impl PatchTool {
             notify.error(format!("{}: {source}", i18n.t(I18nKey::NemesisNotAMod)));
             return;
         };
-        let (output, refs) = (self.output.clone(), self.workspace.ref_mods.clone());
-        if self.read_mod(&dir, source, notify, i18n) {
-            self.output = output;
-            self.workspace.ref_mods = refs;
-            self.workspace.reload_refs();
-            self.reset_names();
-        }
+        let kept = Kept { output: self.output.clone(), refs: self.workspace.ref_mods.clone() };
+        self.read_mod(&dir, source, Some(kept));
     }
-
     /// Something to save.
     pub(in crate::patch) fn mark_dirty(&mut self) {
         self.dirty_since.get_or_insert_with(Instant::now);

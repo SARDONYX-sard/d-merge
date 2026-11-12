@@ -159,6 +159,8 @@ impl PatchTool {
             paths.template_dir.clone_into(&mut tool.template_dir);
         }
         tool.sync_workspace(notify, i18n);
+        // Small, and what comes next uses it at once.
+        tool.wait_job(notify, i18n);
         tool
     }
 
