@@ -12,17 +12,21 @@ use crate::patch::PatchTool;
 
 impl PatchTool {
     pub(in crate::patch) fn search_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        // Right to left: `.*` takes its width first, the field gets the rest.
+        // One row, right to left: `.*` takes its width first, the field gets the rest. (Without the
+        // row, the layout takes all the height left, with the field in its middle and no room below.)
         let field = ui
-            .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let regex = Button::selectable(self.search.regex, ".*").small();
-                if ui.add(regex).on_hover_text(i18n.t(I18nKey::SearchRegexHover)).clicked() {
-                    self.search.regex = !self.search.regex;
-                }
-                let field = TextEdit::singleline(&mut self.search.query)
-                    .hint_text(i18n.t(I18nKey::NemesisSearchHint))
-                    .desired_width(ui.available_width());
-                ui.add(field)
+            .horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let regex = Button::selectable(self.search.regex, ".*").small();
+                    if ui.add(regex).on_hover_text(i18n.t(I18nKey::SearchRegexHover)).clicked() {
+                        self.search.regex = !self.search.regex;
+                    }
+                    let field = TextEdit::singleline(&mut self.search.query)
+                        .hint_text(i18n.t(I18nKey::NemesisSearchHint))
+                        .desired_width(ui.available_width());
+                    ui.add(field)
+                })
+                .inner
             })
             .inner;
         if std::mem::take(&mut self.focus_search) {
