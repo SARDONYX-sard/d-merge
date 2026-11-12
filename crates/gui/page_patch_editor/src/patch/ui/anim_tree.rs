@@ -28,9 +28,6 @@ pub(in crate::patch) struct AnimTreeState {
     pub(in crate::patch) open: HashSet<String>,
     /// `Expand all` was clicked: every folder opens on the next frame.
     pub(in crate::patch) expand_all: bool,
-    /// The selection the tree was opened to. Only a new one opens folders: after that, what is open is
-    /// the user's.
-    pub(in crate::patch) revealed: Option<std::rc::Rc<str>>,
 }
 /// A kind of file, in the order they are shown. See [`AdsfFile`], [`AsdsfFile`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -162,9 +162,9 @@ impl PatchTool {
             self.list_keys(ui, graph);
         }
         let is_adsf = self.workspace.behaviors[self.active].adsf;
-        // Only when the selection changes or the editor gets the keyboard: else what is open is the user's.
+        // Only when the editor gets the keyboard: else what is open, and where it is scrolled, is the user's.
         let forced = std::mem::take(&mut self.explorer.reveal);
-        let reveal = take_reveal(&mut self.anim_tree.revealed, self.selected.as_ref(), forced);
+        let reveal = take_reveal(self.selected.as_ref(), forced);
         if reveal && let Some(id) = &self.selected {
             anim_tree::reveal(&mut self.anim_tree.open, is_adsf, id);
         }
@@ -295,7 +295,7 @@ impl PatchTool {
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
         let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
         let forced = std::mem::take(&mut self.explorer.reveal);
-        if take_reveal(&mut self.explorer.list_revealed, self.selected.as_ref(), forced) {
+        if take_reveal(self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
             if let Some(at) = selected.and_then(|node| rows.iter().position(|&row| row == node)) {
                 scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));

@@ -25,8 +25,7 @@ pub(in crate::patch) struct Explorer {
     pub(in crate::patch) trees: fast_hash::HashMap<String, crate::patch::tree::TreeState>,
     /// The flat list, as it was computed. See [`PatchTool::refresh_list`].
     pub(in crate::patch) list: Option<crate::patch::ObjectList>,
-    /// The selection the flat list was scrolled to. See [`take_reveal`].
-    pub(in crate::patch) list_revealed: Option<Rc<str>>,
+
     /// `Space` was pressed with the keyboard in the flat list. See [`crate::patch::tree::TreeState::leader`].
     pub(in crate::patch) list_leader: bool,
     /// The keyboard is in the tree or the list (Vim `Space e`).
@@ -38,19 +37,11 @@ pub(in crate::patch) struct Explorer {
 /// Rows kept above a revealed row, so that it is not at the very top of the list.
 const ROWS_ABOVE_REVEALED: usize = 3;
 
-/// Should a list show the selection again? When it changed since `revealed`, or when `forced` (the
-/// editor got the keyboard: like VS Code, the side bar follows the file being edited). Notes the
-/// selection as revealed.
-///
-/// e.g. `revealed` = `#0106`, `selected` = `#0106`: only if `forced`. `selected` = `#0107`: yes.
-pub(in crate::patch) fn take_reveal(revealed: &mut Option<Rc<str>>, selected: Option<&Rc<str>>, forced: bool) -> bool {
-    let changed = revealed.as_ref() != selected;
-    if changed {
-        *revealed = selected.cloned();
-    }
-    (changed || forced) && selected.is_some()
+/// Should a list scroll to the selection? Only when `forced`: the editor got the keyboard, as VS Code's
+/// explorer follows the file being edited. A selection alone moves nothing, or a list being used would.
+pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bool) -> bool {
+    forced && selected.is_some()
 }
-
 /// The scroll offset showing `row` of a list of rows of `row_height` (spacing included), with a few
 /// rows above it. e.g. row 10, 20 px: 140 px (row 7 at the top).
 pub(in crate::patch) fn reveal_offset(row: usize, row_height: f32) -> f32 {
@@ -171,15 +162,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_list_shows_a_new_selection_or_when_the_editor_gets_the_keyboard() {
-        let (a, b): (Rc<str>, Rc<str>) = ("#a".into(), "#b".into());
-        let mut revealed = None;
-        assert!(take_reveal(&mut revealed, Some(&a), false), "new");
-        assert!(!take_reveal(&mut revealed, Some(&a), false), "shown already");
-        assert!(take_reveal(&mut revealed, Some(&a), true), "the editor got the keyboard");
-        assert!(take_reveal(&mut revealed, Some(&b), false), "another one");
-        assert!(!take_reveal(&mut revealed, None, true), "nothing to show");
-        assert_eq!(revealed, None);
+    fn a_list_scrolls_only_when_the_editor_gets_the_keyboard() {
+        let a: Rc<str> = "#a".into();
+        assert!(!take_reveal(Some(&a), false), "a selection alone");
+        assert!(take_reveal(Some(&a), true), "the editor got the keyboard");
+        assert!(!take_reveal(None, true), "nothing to show");
     }
 
     #[test]
