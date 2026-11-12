@@ -6,14 +6,15 @@
 //! The left part is the keymap's (e.g., Vim's mode badge and `:w`, `/foo [2/5]`); keymaps without
 //! modes have none. The right part says where the cursor is and what the text is.
 
-use crate::{CodeEditorState, Keymap, Severity, keymap::StatusLine, text_pos::LinePos};
+use crate::{CodeEditorState, Keymap, keymap::StatusLine, text_pos::LinePos};
 
 /// How wide a tab counts for `Col`, like the tabs drawn in the editor.
 const TAB_WIDTH: usize = 4;
 
 /// Draws the status bar of an editor showing `text`.
 ///
-/// The badge color follows the mode (see [`crate::StatusMode::color`]).
+/// The badge color follows the mode (see [`crate::StatusMode::color`]). Returns the response of the
+/// problem counts: a click on them shows or hides the host's Problems panel (see [`crate::problems`]).
 pub fn status_line(ui: &mut egui::Ui, state: &CodeEditorState, keymap: Keymap, text: &str) -> egui::Response {
     ui.horizontal(|ui| {
         if let Some(StatusLine { mode, text }) = state.keymap.status(keymap) {
@@ -23,9 +24,9 @@ pub fn status_line(ui: &mut egui::Ui, state: &CodeEditorState, keymap: Keymap, t
             ui.label(egui::RichText::new(badge).monospace().strong().color(dark_text).background_color(mode.color()));
             ui.label(egui::RichText::new(text).monospace());
         }
-        let (errors, warnings) = state.status_problems;
-        ui.colored_label(Severity::Error.color(ui.visuals()), format!("{} {errors}", Severity::Error.icon()));
-        ui.colored_label(Severity::Warning.color(ui.visuals()), format!("{} {warnings}", Severity::Warning.icon()));
+        let counts = state.host_problems.unwrap_or(state.status_problems);
+        let problem_response = crate::problems::status_counts(ui, counts);
+
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 16.0;
             ui.weak(line_ending(text));
@@ -35,8 +36,10 @@ pub fn status_line(ui: &mut egui::Ui, state: &CodeEditorState, keymap: Keymap, t
                 ui.weak(cursor_text(text, cursor, selected));
             }
         });
+
+        problem_response
     })
-    .response
+    .inner
 }
 
 /// What the lines of `text` end with: `CRLF` if any line does, else `LF`.

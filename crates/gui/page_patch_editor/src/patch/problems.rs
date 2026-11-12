@@ -14,7 +14,7 @@
 //!
 //! A template object nobody changed has nothing of the mod's to find, so only changes are checked.
 
-use egui_code_editor::{Diagnostic, Severity};
+use egui_code_editor::Diagnostic;
 use gui_shared::settings::pages::patch::behavior::ParserMode;
 use rayon::prelude::*;
 
@@ -28,24 +28,22 @@ use super::{
 #[derive(Debug, Default)]
 pub(super) struct Problems {
     /// `None` until the work was checked.
-    pub(super) list: Option<Vec<Problem>>,
+    pub(super) list: Option<Vec<ObjectProblems>>,
     /// The work changed as a whole (read, loaded, restored): `list` is found again.
     pub(super) stale: bool,
     /// The Problems panel shows: a click on the status bar's counts.
     pub(super) open: bool,
 }
 
-/// One problem.
+/// The problems of one object: a group of the Problems panel.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Problem {
+pub(super) struct ObjectProblems {
     /// In `Workspace::behaviors`.
     pub(super) behavior: usize,
     /// e.g. `#0106`
     pub(super) id: String,
-    /// 0-based line of the object.
-    pub(super) line: usize,
-    pub(super) message: String,
-    pub(super) severity: Severity,
+    /// Never empty. Their lines are the object's.
+    pub(super) problems: Vec<Diagnostic>,
 }
 
 /// What is checked and how: the same for every object of a behavior.
@@ -64,8 +62,8 @@ fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
     !behavior.is_ref(object.id) && (behavior.is_anim_data() || object.is_new || object.is_edited)
 }
 
-/// The problems of one object.
-fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Vec<Problem> {
+/// The problems of one object. `None`: it has none.
+fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<ObjectProblems> {
     let Checker { index, behavior, code, mode } = checker;
     let (id, text) = (object.id, object.text);
     // Animation data only has the parser's word: see `anim_lines`.
@@ -81,33 +79,20 @@ fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Vec<Problem
         let to_editor_line = |line| Preview::new(&patch).editor_line_of(line, text);
         diagnostics::add_parser_error(&mut found, text, &error, to_editor_line);
     }
-    let to_problem = |problem: Diagnostic| Problem {
-        behavior: index,
-        id: id.to_owned(),
-        line: problem.line,
-        message: problem.message,
-        severity: problem.severity,
-    };
-    found.into_iter().map(to_problem).collect()
+    (!found.is_empty()).then(|| ObjectProblems { behavior: index, id: id.to_owned(), problems: found })
 }
 
 /// The problems of every checked object of a behavior, in parallel: a work has thousands, and the
 /// parser reads each one's patch.
-fn behavior_problems(checker: Checker<'_>) -> Vec<Problem> {
+fn behavior_problems(checker: Checker<'_>) -> Vec<ObjectProblems> {
     let behavior = checker.behavior;
     let objects: Vec<ObjectText<'_>> = behavior.texts().filter(|object| is_checked(behavior, object)).collect();
-    objects.par_iter().flat_map_iter(|object| object_problems(checker, object)).collect()
+    objects.par_iter().filter_map(|object| object_problems(checker, object)).collect()
 }
 
-/// By behavior, object, line.
-fn sort(problems: &mut [Problem]) {
-    problems.sort_by(|a, b| (a.behavior, &a.id, a.line).cmp(&(b.behavior, &b.id, b.line)));
-}
-
-/// `(errors, warnings)` of `problems`.
-pub(super) fn counts(problems: &[Problem]) -> (usize, usize) {
-    let errors = problems.iter().filter(|problem| problem.severity == Severity::Error).count();
-    (errors, problems.len() - errors)
+/// By behavior, then object.
+fn sort(groups: &mut [ObjectProblems]) {
+    groups.sort_by(|a, b| (a.behavior, &a.id).cmp(&(b.behavior, &b.id)));
 }
 
 impl PatchTool {
@@ -122,7 +107,7 @@ impl PatchTool {
         if !self.problems.stale || self.job.is_some() || self.loaded_for.is_none() {
             return;
         }
-        let mut found: Vec<Problem> =
+        let mut found: Vec<ObjectProblems> =
             (0..self.workspace.behaviors.len()).flat_map(|index| behavior_problems(self.checker(index))).collect();
         sort(&mut found);
         self.problems.list = Some(found);
@@ -131,7 +116,8 @@ impl PatchTool {
 
     /// The errors and warnings of the work, once it was checked: the status bar's counts.
     pub(super) fn problem_counts(&self) -> Option<(usize, usize)> {
-        self.problems.list.as_deref().map(counts)
+        let groups = self.problems.list.as_deref()?;
+        Some(egui_code_editor::problems::counts(groups.iter().flat_map(|group| &group.problems)))
     }
 
     /// The object `id` of the active behavior changed: only its problems are found again. After
@@ -140,12 +126,12 @@ impl PatchTool {
         let index = self.active;
         let Some(behavior) = self.workspace.behaviors.get(index) else { return };
         let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
-        let found = object.map(|object| object_problems(self.checker(index), &object)).unwrap_or_default();
-        let Some(problems) = &mut self.problems.list else { return };
-        problems.retain(|problem| problem.behavior != index || problem.id != id);
-        if !found.is_empty() {
-            problems.extend(found);
-            sort(problems);
+        let found = object.and_then(|object| object_problems(self.checker(index), &object));
+        let Some(groups) = &mut self.problems.list else { return };
+        groups.retain(|group| group.behavior != index || group.id != id);
+        if let Some(found) = found {
+            groups.push(found);
+            sort(groups);
         }
     }
 }
@@ -184,7 +170,7 @@ mod tests {
         tool.reset_names(); // as a read or a load does
         tool.diagnose_work();
         assert_eq!(tool.problem_counts(), Some((3, 0)));
-        let ids: Vec<&str> = tool.problems.list.iter().flatten().map(|problem| problem.id.as_str()).collect();
+        let ids: Vec<&str> = tool.problems.list.iter().flatten().map(|group| group.id.as_str()).collect();
         assert_eq!(ids, ["Female~1/Bad~m$0.txt", "Male~1/Bad~m$0.txt", "Male~1/m$2.txt"]);
 
         let motion = "Male~1/m$2.txt";
@@ -224,14 +210,22 @@ mod tests {
             .unwrap();
         let mut behavior = Behavior::open(&template).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
-        let checker = |behavior: &Behavior| -> Vec<Problem> {
+        let checker = |behavior: &Behavior| -> Vec<ObjectProblems> {
             behavior_problems(Checker { index: 0, behavior, code: "m", mode: ParserMode::Strict })
         };
 
         assert!(checker(&behavior).is_empty(), "nothing changed");
         behavior.set_text("#0100", &object.replace("userData", "typoField"));
         let problems = checker(&behavior);
-        assert!(problems.iter().any(|problem| problem.id == "#0100" && problem.line == 1), "{problems:?}");
-        assert!(problems.iter().all(|problem| problem.id != "#0101"), "{problems:?}");
+        let lines = |id: &str| {
+            problems
+                .iter()
+                .filter(|group| group.id == id)
+                .flat_map(|group| &group.problems)
+                .map(|problem| problem.line)
+                .collect::<Vec<_>>()
+        };
+        assert!(lines("#0100").contains(&1), "{problems:?}");
+        assert!(lines("#0101").is_empty(), "{problems:?}");
     }
 }

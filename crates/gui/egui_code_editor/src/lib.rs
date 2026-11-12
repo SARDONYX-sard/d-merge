@@ -41,6 +41,7 @@ pub mod language;
 pub mod languages;
 mod layout;
 mod palette;
+pub mod problems;
 mod quick_fix;
 mod search;
 mod state;
@@ -61,6 +62,7 @@ pub use self::{
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},
+    problems::{ProblemGroup, ProblemsPanel},
     state::CodeEditorState,
     status::status_line,
 };

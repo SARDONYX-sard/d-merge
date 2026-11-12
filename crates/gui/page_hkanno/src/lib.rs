@@ -57,6 +57,8 @@ pub struct HkannoPage {
     show_lsp_options: bool,
     /// "Revert?" confirmation modal.
     show_revert: bool,
+    /// The Problems panel is hidden: a click on the status bar's counts. It shows by default.
+    problems_hidden: bool,
 }
 
 impl std::fmt::Debug for HkannoPage {

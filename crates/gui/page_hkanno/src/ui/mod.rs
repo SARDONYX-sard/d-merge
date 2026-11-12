@@ -6,7 +6,9 @@ mod toolbar;
 
 use std::borrow::Cow;
 
-use egui_code_editor::{CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, text_pos::LinePos};
+use egui_code_editor::{
+    CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, ProblemGroup, ProblemsPanel, text_pos::LinePos,
+};
 use egui_widgets::shadcn::Button;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -147,9 +149,15 @@ impl HkannoPage {
         }
 
         // Status line first (bottom of the area), so it stays visible while the text scrolls.
+        let mut toggle_problems = false;
         egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
-            egui_code_editor::status_line(ui, &tab.editor, keymap, &tab.text);
+            // Its counts show or hide the Problems panel, as VS Code's.
+            toggle_problems = egui_code_editor::status_line(ui, &tab.editor, keymap, &tab.text).clicked();
         });
+        if toggle_problems {
+            self.problems_hidden = !self.problems_hidden;
+        }
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
         let CodeEditorOutput { changed, cursor, command, .. } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
@@ -251,39 +259,32 @@ impl HkannoPage {
         let (show_diagnostics, show_fixes) = (ctx.lsp_settings.diagnostics, ctx.lsp_settings.code_action);
         let title = ctx.i18n.t(I18nKey::HkannoProblemsLabel);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
-        if !show_diagnostics || tab.diagnostics.is_empty() {
+        if !show_diagnostics || self.problems_hidden || tab.diagnostics.is_empty() {
             return;
         }
 
         let id = tab.editor_id();
         let mut fix = None;
 
-        egui::Panel::bottom("hkanno_problems").resizable(true).default_size(120.0).show(ui, |ui| {
-            ui.weak(format!("{title} ({})", tab.diagnostics.len()));
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+        // One file: its problems without a header, each with its quick fix if it has one.
+        let group = ProblemGroup { title: std::borrow::Cow::Borrowed(""), problems: &tab.editor_diagnostics };
+        let text = &tab.text;
+        let clicked =
+            ProblemsPanel::new("hkanno_problems", title).default_height(120.0).show(ui, &[group], |ui, _, index| {
                 // Both lists are built from the same source, in the same order.
-                for (lsp_diag, diagnostic) in tab.diagnostics.iter().zip(&tab.editor_diagnostics) {
-                    ui.horizontal(|ui| {
-                        let severity = diagnostic.severity;
-                        ui.colored_label(severity.color(ui.visuals()), severity.icon());
-
-                        // e.g., `Ln 5, Col 1: Missing z value in animmotion.` -> click jumps there.
-                        let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
-                        let location = format!("Ln {}, Col {}: {}", pos.line + 1, pos.column + 1, diagnostic.message);
-                        if ui.link(location).clicked() {
-                            egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
-                        }
-
-                        if show_fixes
-                            && let Some(action) = code_action(&tab.text, lsp_diag)
-                            && ui.add(Button::new(&action.title).small()).clicked()
-                        {
-                            fix = Some(action.edit);
-                        }
-                    });
+                if show_fixes
+                    && let Some(action) = tab.diagnostics.get(index).and_then(|lsp_diag| code_action(text, lsp_diag))
+                    && ui.add(Button::new(&action.title).small()).clicked()
+                {
+                    fix = Some(action.edit);
                 }
             });
-        });
+        if let Some((_, index)) = clicked
+            && let Some(diagnostic) = tab.editor_diagnostics.get(index)
+        {
+            let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
+            egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
+        }
 
         if let Some(edit) = fix {
             replace_columns(&mut tab.text, edit.range.line, edit.range.span.start..edit.range.span.end, &edit.new_text);
