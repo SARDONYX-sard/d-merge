@@ -16,6 +16,7 @@
 //! Work is cached under the patch page's output dir and saved a moment after each edit (see [`workspace`]).
 
 mod anim;
+mod changes;
 mod checklist;
 mod editor;
 mod new_work;
@@ -200,14 +201,15 @@ pub(crate) struct PatchTool {
     trees: fast_hash::HashMap<String, tree::TreeState>,
     /// `Space` was pressed with the keyboard in the flat list. See [`tree::TreeState::leader`].
     list_leader: bool,
-
-    /// Left panel shows events / variables instead of objects.
-    show_vars: bool,
-    /// Left panel shows the text search instead of those. See [`search`].
-    show_search: bool,
     search: search::Search,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
+    /// The view of the side bar. See [`ui::side_bar`].
+    side_view: ui::side_bar::SideView,
+    /// Only the activity bar shows: its icon of the view shown was clicked.
+    side_bar_hidden: bool,
+    /// The OBJECTS section of the explorer is folded.
+    objects_closed: bool,
     /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
     anim_folders_open: fast_hash::HashSet<String>,
     /// The button above the list was clicked: done where the list has its files.
@@ -435,14 +437,8 @@ impl PatchTool {
         self.work_check_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
-        // Like VS Code: the side bar, and the editor with what belongs to it on the right of it.
-        let objects_id = if self.is_user_patch { "user_patch_objects" } else { "nemesis_objects" };
-        egui::Panel::left(objects_id).resizable(true).default_size(320.0).show(ui, |ui| {
-            self.behaviors_section(ui, i18n, notify);
-            if !self.workspace.behaviors.is_empty() {
-                self.object_list(ui, i18n);
-            }
-        });
+        // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
+        self.side_bar(ui, i18n, notify);
         if self.workspace.behaviors.is_empty() {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
             return;

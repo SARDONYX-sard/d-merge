@@ -11,6 +11,7 @@ pub(super) mod preview;
 mod problems;
 pub(super) mod references;
 mod search;
+pub(super) mod side_bar;
 mod start_screen;
 pub(super) mod template_picker;
 mod top_bar;

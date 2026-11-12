@@ -1344,6 +1344,18 @@ pub enum I18nKey {
     /// selected
     SelectedLabel,
 
+    /// Changes
+    SideChanges,
+
+    /// Explorer
+    SideExplorer,
+
+    /// Nothing is changed yet.
+    SideNoChanges,
+
+    /// Animation data has no events or variables.
+    SideNoVariables,
+
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
 

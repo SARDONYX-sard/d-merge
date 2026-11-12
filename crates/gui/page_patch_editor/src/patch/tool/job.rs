@@ -15,6 +15,18 @@
 //!
 //! While one runs nothing saves: a rename has taken the work away, and the empty one left would be
 //! saved over it.
+//!
+//! # Why a `std::thread` (not rayon or tokio)
+//! - The heavy part is parallel already, with rayon: `load_counted` reads the behaviors with
+//!   `par_iter`, `rename_code` their objects. The job's thread only takes it off the UI thread and is
+//!   waited for.
+//! - `rayon::spawn` returns no `JoinHandle` (a channel would be needed for the result), and the job
+//!   would hold one worker of the pool until it ends: one thread less for its own `par_iter`.
+//! - tokio is for async IO; this is CPU and blocking file reads, so it would be `spawn_blocking` (a
+//!   thread too), plus a runtime handle for this crate to get.
+//! - Only one job runs at a time (`PatchTool::job` is an `Option`): a pool brings nothing.
+//!
+//! Worth changing if jobs are to be cancelled or to run several at once.
 
 use std::{
     sync::{

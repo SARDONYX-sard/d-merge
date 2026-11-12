@@ -1,7 +1,7 @@
 //! The top of the side bar: the template files being patched, and how to add one.
 //!
 //! ```text
-//! ▼ BEHAVIORS               [✓] [+]    <- check the whole work; templates, a file of your own, animation data
+//! ▼ BEHAVIORS                    [+]   <- templates, a file of your own, animation data
 //!   0_master (3)                       <- right click: check, remove. Hover: where it goes.
 //!   ⚠ draugrbehavior                   <- only d-merge will read this one
 //! ```
@@ -42,8 +42,6 @@ enum AddEvent {
     Template,
     File,
     AnimData,
-    /// See [`PatchTool::start_whole_work_check`].
-    CheckWork,
 }
 
 /// `▼ TITLE ........ actions`: a side bar section's header. A click on the title folds it.
@@ -73,7 +71,6 @@ impl PatchTool {
             }
             Some(AddEvent::File) => self.add_custom_template(notify, i18n),
             Some(AddEvent::AnimData) => self.open_anim_data_for_mod(),
-            Some(AddEvent::CheckWork) => self.start_whole_work_check(),
             None => {}
         }
         if self.behaviors_open {
@@ -207,18 +204,11 @@ pub(super) fn quick_pick_window<'a>(ctx: &egui::Context, title: &str) -> egui::W
     egui_widgets::window_near_pointer(ctx, title).collapsible(false).resizable(false).default_width(460.0)
 }
 
-/// `[+]` and its menu, and `[✓]` checking the whole work (right to left). A template file of your own
+/// `[+]` and its menu. A template file of your own
 /// is never one Nemesis knows: only for the `Extended` scope.
 fn add_menu(ui: &mut egui::Ui, scope: TemplateScope, i18n: &I18nMap) -> Option<AddEvent> {
     let mut event = None;
-    let check = Button::new("").icon(Icon::ScanSearch).small();
-    let hover = |ui: &mut egui::Ui| {
-        ui.strong(i18n.t(I18nKey::NemesisCheckWork));
-        ui.label(i18n.t(I18nKey::NemesisCheckWorkHover));
-    };
-    if ui.add(check).on_hover_ui(hover).clicked() {
-        event = Some(AddEvent::CheckWork);
-    }
+
     let items = [
         (I18nKey::NemesisAddBehavior, None, AddEvent::Template),
         (I18nKey::NemesisCustomXml, Some(I18nKey::NemesisCustomXmlHover), AddEvent::File),
