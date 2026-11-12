@@ -1,21 +1,30 @@
 //! The side bar's search: a field and the matching lines. The logic is in [`crate::patch::search`].
 //!
 //! ```text
-//! [$eventID[moveStart]$     ]  3
+//! [$eventID[moveStart]$     ] [.*]  3
 //! #0106:12  <hkparam name="id">$eventID[moveStart]$</hkparam>     <- a click opens that line
 //! ```
 
-use egui_widgets::shadcn::TextEdit;
+use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::PatchTool;
 
 impl PatchTool {
     pub(in crate::patch) fn search_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let field = TextEdit::singleline(&mut self.search.query)
-            .hint_text(i18n.t(I18nKey::NemesisSearchHint))
-            .desired_width(ui.available_width());
-        let field = ui.add(field);
+        // Right to left: `.*` takes its width first, the field gets the rest.
+        let field = ui
+            .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let regex = Button::selectable(self.search.regex, ".*").small();
+                if ui.add(regex).on_hover_text(i18n.t(I18nKey::SearchRegexHover)).clicked() {
+                    self.search.regex = !self.search.regex;
+                }
+                let field = TextEdit::singleline(&mut self.search.query)
+                    .hint_text(i18n.t(I18nKey::NemesisSearchHint))
+                    .desired_width(ui.available_width());
+                ui.add(field)
+            })
+            .inner;
         if std::mem::take(&mut self.focus_search) {
             field.request_focus();
         }

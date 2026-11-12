@@ -14,7 +14,8 @@ rust-version.workspace = true
 
 # NOTE: No language or app logic here; a language plugs in through the `Language` trait.
 [dependencies]
-egui = { workspace = true }
+egui  = { workspace = true }
+regex = { workspace = true } # Vim `/`, the find bar
 
 # workspace members
 egui_widgets = { workspace = true } # Markdown for hover / completion docs

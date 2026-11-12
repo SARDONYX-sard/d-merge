@@ -1,7 +1,8 @@
 //! Searching the text of every object of a behavior, like VS Code's `Ctrl+Shift+F`.
 //!
 //! e.g., `$eventID[moveStart]$` finds where a mod uses that event; `#0106` finds who points to it.
-//! Plain text, ignoring ASCII case. Drawn by [`super::ui::search`].
+//! Text ignoring ASCII case, or with `.*` on a regex ignoring case (e.g. `#0\d{3}`). A regex not
+//! finished yet finds nothing. Drawn by [`super::ui::search`].
 
 use super::{checklist::contains_ignore_ascii_case, workspace::ObjectText};
 
@@ -22,9 +23,11 @@ pub(super) struct Hit {
 #[derive(Debug, Default)]
 pub(super) struct Search {
     pub(super) query: String,
+    /// `.*`: `query` is a regex.
+    pub(super) regex: bool,
     pub(super) hits: Vec<Hit>,
-    /// What `hits` was computed from: the query, and the state of the objects.
-    searched: Option<(String, usize, u64)>,
+    /// What `hits` was computed from: the query, `regex`, and the state of the objects.
+    searched: Option<(String, bool, usize, u64)>,
 }
 
 impl Search {
@@ -35,12 +38,21 @@ impl Search {
         generation: u64,
         objects: impl Iterator<Item = ObjectText<'a>>,
     ) {
-        let unchanged = self.searched.as_ref().is_some_and(|(query, searched, searched_generation)| {
-            *query == self.query && *searched == behavior && *searched_generation == generation
+        let unchanged = self.searched.as_ref().is_some_and(|(query, regex, searched, searched_generation)| {
+            *query == self.query && *regex == self.regex && *searched == behavior && *searched_generation == generation
         });
         if !unchanged {
-            self.hits = find(objects, self.query.trim());
-            self.searched = Some((self.query.clone(), behavior, generation));
+            let query = self.query.trim();
+            self.hits = if self.regex {
+                // `(?i)`: as the text search, case does not matter.
+                regex::RegexBuilder::new(query)
+                    .case_insensitive(true)
+                    .build()
+                    .map_or_else(|_| Vec::new(), |regex| find(objects, query, |line| regex.is_match(line)))
+            } else {
+                find(objects, query, |line| contains_ignore_ascii_case(line, query))
+            };
+            self.searched = Some((self.query.clone(), self.regex, behavior, generation));
         }
     }
 
@@ -50,15 +62,15 @@ impl Search {
     }
 }
 
-/// The lines containing `query`.
-fn find<'a>(objects: impl Iterator<Item = ObjectText<'a>>, query: &str) -> Vec<Hit> {
+/// The lines `is_hit` says match `query` (none for an empty one).
+fn find<'a>(objects: impl Iterator<Item = ObjectText<'a>>, query: &str, is_hit: impl Fn(&str) -> bool) -> Vec<Hit> {
     if query.is_empty() {
         return Vec::new();
     }
     let mut hits = Vec::new();
     for object in objects {
         for (line, text) in object.text.lines().enumerate() {
-            if contains_ignore_ascii_case(text, query) {
+            if is_hit(text) {
                 hits.push(Hit { object: object.id.into(), line, text: text.trim().into() });
                 if hits.len() >= MAX_HITS {
                     return hits;
@@ -81,10 +93,24 @@ mod tests {
     fn finds_lines_ignoring_case() {
         let objects =
             [object("#1", "a\n\t$eventID[moveStart]$\n"), object("#2", "$EVENTID[movestart]$"), object("#3", "b")];
-        let hits = find(objects.into_iter(), "$eventid[moveStart]$");
-        assert_eq!(hits.len(), 2);
-        assert_eq!(hits[0], Hit { object: "#1".into(), line: 1, text: "$eventID[moveStart]$".into() });
-        assert_eq!(&*hits[1].object, "#2");
+        let mut search = Search { query: "$eventid[moveStart]$".to_owned(), ..Search::default() };
+        search.refresh(0, 1, objects.into_iter());
+        assert_eq!(search.hits.len(), 2);
+        assert_eq!(search.hits[0], Hit { object: "#1".into(), line: 1, text: "$eventID[moveStart]$".into() });
+        assert_eq!(&*search.hits[1].object, "#2");
+    }
+
+    /// `.*`: the same query is a regex, ignoring case too; one not finished yet finds nothing.
+    #[test]
+    fn a_regex_finds_lines_too() {
+        let objects = || [object("#1", "<hkparam>#0106</hkparam>\n#M$0"), object("#2", "#12")];
+        let mut search = Search { query: r"#\d{4}|#m\$".to_owned(), regex: true, ..Search::default() };
+        search.refresh(0, 1, objects().into_iter());
+        assert_eq!(search.hits.iter().map(|hit| hit.line).collect::<Vec<_>>(), [0, 1]);
+
+        search.query = "[0-".to_owned();
+        search.refresh(0, 1, objects().into_iter());
+        assert!(search.hits.is_empty());
     }
 
     #[test]

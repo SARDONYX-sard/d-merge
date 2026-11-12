@@ -1303,6 +1303,9 @@ pub enum I18nKey {
     /// Search
     SearchLabel,
 
+    /// Use a regular expression (ignoring case)
+    SearchRegexHover,
+
     /// Select All
     SelectAll,
 
