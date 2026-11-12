@@ -220,6 +220,8 @@ pub(crate) struct PatchTool {
     commit_message: String,
     /// The name of a new branch, while it is typed.
     new_branch: Option<String>,
+    /// The lines accepted last in the merge panel: where the conflict is now. See [`editor::merge`].
+    merge_accepted: Vec<String>,
     /// The window making many objects from one. See [`repeat`].
     repeat: Option<ui::repeat::RepeatForm>,
     /// The window of a diff or a blame of the history. See [`ui::revision_view`].

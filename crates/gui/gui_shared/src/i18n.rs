@@ -647,6 +647,21 @@ pub enum I18nKey {
     /// - In manual mode, absolute paths are used as identifiers to prevent duplication. This makes configuration sharing unsuitable.
     ManualModeHover,
 
+    /// Accept
+    MergeAccept,
+
+    /// Accept all
+    MergeAcceptAll,
+
+    /// Puts the lines of every mod in place of the conflict, each line once, as git's "accept both". The resolution is kept, and done again the next time this conflict comes.
+    MergeAcceptAllHover,
+
+    /// Puts this mod's lines in place of the conflict. The resolution is kept, and done again the next time this conflict comes.
+    MergeAcceptHover,
+
+    /// Resolved as before: this conflict was resolved the same way the last time.
+    MergeReused,
+
     /// Mod Test Status:
     ModTestStatusLabel,
 
@@ -897,9 +912,6 @@ pub enum I18nKey {
 
     /// What each mod has at this conflict. Put together in the editor what is wanted: with an array, the elements of several mods are often wanted. Closed with its x, the patch preview comes back.
     NemesisMergeHover,
-
-    /// Insert
-    NemesisMergeInsert,
 
     /// Puts it below the line of the cursor in the editor. What it replaces stays: delete it there if it is not wanted.
     NemesisMergeInsertHover,

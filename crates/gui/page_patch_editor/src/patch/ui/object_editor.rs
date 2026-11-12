@@ -17,6 +17,7 @@ use crate::patch::{
     editor::{
         inline_diff,
         language::NemesisXml,
+        merge,
         pandora::{self, PandoraXml},
         resolve,
         tabs::EditorTabs,
@@ -118,37 +119,63 @@ impl PatchTool {
         }
     }
 
-    /// See [`resolve::MergeValues`]. What is picked goes below the cursor in the editor.
+    /// The mods' values side by side, as git's merge editor: see [`crate::patch::editor::merge`].
     fn merge_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) {
         let Some(values) = self.merge_values.take() else { return };
         let (mut picked, mut close) = (None, false);
         let panel_id = if self.is_user_patch { "user_patch_merge" } else { "nemesis_merge" };
-        egui::Panel::right(panel_id).default_size(520.0).resizable(true).show(ui, |ui| {
+        egui::Panel::right(panel_id).default_size(620.0).resizable(true).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.strong(i18n.t(I18nKey::NemesisMergeTitle)).on_hover_text(i18n.t(I18nKey::NemesisMergeHover));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     close = ui.small_button("✖").clicked();
+                    let all = Button::new(i18n.t(I18nKey::MergeAcceptAll)).small();
+                    if ui.add(all).on_hover_text(i18n.t(I18nKey::MergeAcceptAllHover)).clicked() {
+                        picked = Some(MergePick::Accept(merge::all_lines(&values)));
+                    }
                 });
             });
             ui.add(egui::Label::new(egui::RichText::new(&values.path).monospace().weak()).truncate());
             ui.separator();
             egui::ScrollArea::both().id_salt(("nemesis_merge_values", id)).auto_shrink(false).show(ui, |ui| {
-                picked = merge_values_ui(ui, i18n, &values);
+                if let Some(pick) = merge_columns(ui, i18n, &values) {
+                    picked = Some(pick);
+                }
             });
         });
-        if let Some(lines) = picked {
-            let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
-            self.editor_text = text;
-            self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
-            self.preview = None;
-            self.object_changed(id);
-            self.focus_editor = Some(FocusAt::Line(last));
+        match picked {
+            Some(MergePick::Insert(lines)) => {
+                let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
+                self.set_merged_text(id, text, last);
+            }
+            Some(MergePick::Accept(lines)) => {
+                let candidates = merge::candidates(&values, &self.merge_accepted);
+                if let Some(text) = merge::replace_block(&self.editor_text, &candidates, &lines) {
+                    merge::remember(&mut self.workspace.resolutions, &values, lines.clone());
+                    self.merge_accepted = lines;
+                    let line = self.cursor_line;
+                    self.set_merged_text(id, text, line);
+                } else {
+                    // Not found where it was: below the cursor, as `+` does.
+                    let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
+                    self.set_merged_text(id, text, last);
+                }
+            }
+            None => {}
         }
         if !close {
             self.merge_values = Some(values);
         }
     }
 
+    /// The object's text after a pick of the merge panel.
+    fn set_merged_text(&mut self, id: &str, text: String, line: usize) {
+        self.editor_text = text;
+        self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
+        self.preview = None;
+        self.object_changed(id);
+        self.focus_editor = Some(FocusAt::Line(line));
+    }
     /// `Patch preview ▲ ▼ 2/5 ✔ ... [follow]` and its lines.
     fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
         let mut event = None;
@@ -346,44 +373,63 @@ impl PatchTool {
     }
 }
 
-/// The original lines, then each mod's with `Insert`, for all of them and for each line. Returns the
-/// lines picked.
-fn merge_values_ui(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<Vec<String>> {
-    let line_of = |ui: &egui::Ui, line: &str| egui_code_editor::line_job(ui, line.trim_start(), &Xml);
-    ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
-    for line in &values.original {
-        ui.add(egui::Label::new(line_of(ui, line)));
-    }
-    let mut picked = None;
-    for side in &values.sides {
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.strong(&side.name);
-            let insert =
-                ui.add_enabled(!side.lines.is_empty(), Button::new(i18n.t(I18nKey::NemesisMergeInsert)).small());
-            if insert.on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
-                picked = Some(side.lines.clone());
-            }
-        });
-        if side.lines.is_empty() {
-            ui.weak(i18n.t(I18nKey::NemesisMergeRemoves));
-        }
-        // Several lines: one of them may be all that is wanted.
-        for line in side.lines.iter().filter(|_| side.lines.len() > 1) {
-            ui.horizontal(|ui| {
-                if ui.small_button("+").on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
-                    picked = Some(vec![line.clone()]);
-                }
-                ui.add(egui::Label::new(line_of(ui, line)));
-            });
-        }
-        if let [line] = side.lines.as_slice() {
-            ui.add(egui::Label::new(line_of(ui, line)));
-        }
-    }
-    picked
+/// What the merge panel asked for.
+#[derive(Debug)]
+enum MergePick {
+    /// These lines below the cursor.
+    Insert(Vec<String>),
+    /// These lines in place of the conflict's: see [`merge::replace_block`].
+    Accept(Vec<String>),
 }
 
+/// The width of a column of the merge panel.
+const MERGE_COLUMN: f32 = 240.0;
+
+/// `Original | Flinching [Accept] | Impact [Accept]`: a column per mod, its lines that the original
+/// does not have tinted, each with `+` to put it below the cursor.
+fn merge_columns(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<MergePick> {
+    let mut picked = None;
+    let is_original = |line: &String| values.original.iter().any(|original| original.trim() == line.trim());
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(MERGE_COLUMN);
+            ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
+            for line in &values.original {
+                ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)));
+            }
+        });
+        for side in &values.sides {
+            ui.separator();
+            ui.vertical(|ui| {
+                ui.set_width(MERGE_COLUMN);
+                ui.horizontal(|ui| {
+                    ui.strong(&side.name);
+                    let accept = Button::new(i18n.t(I18nKey::MergeAccept)).small();
+                    if ui.add(accept).on_hover_text(i18n.t(I18nKey::MergeAcceptHover)).clicked() {
+                        picked = Some(MergePick::Accept(side.lines.clone()));
+                    }
+                });
+                if side.lines.is_empty() {
+                    ui.weak(i18n.t(I18nKey::NemesisMergeRemoves));
+                }
+                for line in &side.lines {
+                    ui.horizontal(|ui| {
+                        if ui.small_button("+").on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
+                            picked = Some(MergePick::Insert(vec![line.clone()]));
+                        }
+                        let label = ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)));
+                        // What this mod changes, as a diff's added line.
+                        if !is_original(line) {
+                            let tint = egui::Color32::from_rgba_unmultiplied(60, 180, 90, 40);
+                            ui.painter().rect_filled(label.rect.expand(1.0), 0.0, tint);
+                        }
+                    });
+                }
+            });
+        }
+    });
+    picked
+}
 /// `▲ ▼ 2/5` of the changes shown in the editor, drawn right to left. Returns the line to go to.
 fn inline_diff_nav(ui: &mut egui::Ui, i18n: &I18nMap, diff: &InlineDiff, cursor_line: usize) -> Option<usize> {
     let (at, count) = inline_diff::position(diff, cursor_line)?;

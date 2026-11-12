@@ -59,6 +59,8 @@ pub(crate) fn cache_root_of(output_dir: &str) -> PathBuf {
 const WORKSPACE_FILE: &str = "workspace.json";
 /// See [`history`].
 const HISTORY_FILE: &str = "history.json";
+/// See [`Workspace::resolutions`].
+const RESOLUTIONS_FILE: &str = "resolutions.json";
 
 /// What a cache dir holds, as of the last save or load. See [`Workspace::save`].
 #[derive(Debug, Clone, Default)]
@@ -218,6 +220,8 @@ pub(crate) struct Workspace {
     pub(crate) ref_mods: Vec<String>,
     /// The revisions of the work. See [`history`].
     pub(crate) history: history::History,
+    /// How conflicts were resolved, to do it again. See [`crate::patch::editor::merge`].
+    pub(crate) resolutions: Vec<crate::patch::editor::merge::Resolution>,
     /// What `Export` writes.
     pub(crate) export_format: ExportFormat,
     /// Which templates can be added. See [`TemplateScope`].
@@ -357,6 +361,8 @@ impl Workspace {
         // A work kept before there was a history has none.
         let history = std::fs::read_to_string(dir.join(HISTORY_FILE)).unwrap_or_default();
         workspace.history = sonic_rs::from_str(&history).unwrap_or_default();
+        let resolutions = std::fs::read_to_string(dir.join(RESOLUTIONS_FILE)).unwrap_or_default();
+        workspace.resolutions = sonic_rs::from_str(&resolutions).unwrap_or_default();
         workspace.reload_refs();
         let hashes = workspace.files_to_save()?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
         workspace.saved = Some(SavedFiles { dir, hashes });
@@ -379,6 +385,10 @@ impl Workspace {
         if !self.history.revisions.is_empty() {
             let history = sonic_rs::to_string(&self.history).map_err(|e| e.to_string())?;
             files.insert(PathBuf::from(HISTORY_FILE), Cow::Owned(history));
+        }
+        if !self.resolutions.is_empty() {
+            let resolutions = sonic_rs::to_string(&self.resolutions).map_err(|e| e.to_string())?;
+            files.insert(PathBuf::from(RESOLUTIONS_FILE), Cow::Owned(resolutions));
         }
         for behavior in &self.behaviors {
             let behavior_dir = PathBuf::from(behavior.cache_name());

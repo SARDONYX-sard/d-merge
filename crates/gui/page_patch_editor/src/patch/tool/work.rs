@@ -70,12 +70,29 @@ impl PatchTool {
         self.editor_for = None;
         self.draft = Some(before.with_proposal(&self.workspace, behavior, &id));
         self.merge_values = editor::resolve::merge_values(&request, &id);
+        self.merge_accepted.clear();
+        self.reuse_resolution(behavior, &id, notify, i18n);
         self.selected = Some(id.into());
         // What is shown is no change of the work yet.
         self.dirty_since = dirty_since;
         self.session_seen = (self.active, self.selected.clone());
         // Picking another value of the object shown has no other sign of having gone anywhere.
         self.focus_editor = line.map(FocusAt::Line);
+    }
+
+    /// The conflict just taken in was resolved before, by the same mods with the same values: it is
+    /// resolved the same way at once. See [`editor::merge`].
+    fn reuse_resolution(&mut self, behavior: usize, id: &str, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(values) = &self.merge_values else { return };
+        let Some(resolution) = editor::merge::find(&self.workspace.resolutions, values) else { return };
+        let result = resolution.result.clone();
+        let Some(text) = self.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return };
+        let candidates = editor::merge::candidates(values, &[]);
+        if let Some(resolved) = editor::merge::replace_block(text, &candidates, &result) {
+            self.workspace.behaviors[behavior].set_text(id, &resolved);
+            self.merge_accepted = result;
+            notify.info(i18n.t(I18nKey::MergeReused));
+        }
     }
 
     /// The patch page's output directory may have changed: the works are others then. What is open is
