@@ -105,14 +105,21 @@ impl EditorCommand {
     }
 }
 
-/// `Ctrl+PageDown`: `Some(true)`, the next tab. `Ctrl+PageUp`: `Some(false)`, the previous one. As in
-/// VS Code, in every keymap. For a host with tabs to ask before showing its editor.
+/// The keys of the next / previous tab, in every keymap. For a host with tabs to ask before showing
+/// its editor.
+///
+/// | Keys                        | Tab               |
+/// | --------------------------- | ----------------- |
+/// | `Ctrl+PageDown` / `Alt+L`   | `Some(true)`: next |
+/// | `Ctrl+PageUp` / `Alt+H`     | `Some(false)`: previous |
+///
+/// `Ctrl+Page*` as VS Code; `Alt+H` / `Alt+L` as `h` / `l` of Vim, without leaving the keyboard's row.
 pub fn tab_switch_keys(ui: &egui::Ui) -> Option<bool> {
     use egui::{Key, Modifiers};
     ui.input_mut(|input| {
-        if input.consume_key(Modifiers::COMMAND, Key::PageDown) {
+        if input.consume_key(Modifiers::COMMAND, Key::PageDown) || input.consume_key(Modifiers::ALT, Key::L) {
             Some(true)
-        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) {
+        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) || input.consume_key(Modifiers::ALT, Key::H) {
             Some(false)
         } else {
             None

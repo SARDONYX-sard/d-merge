@@ -72,8 +72,6 @@ const fn host(keys: &'static str, command: EditorCommand, text: &'static str) ->
 const LEADER: &[WhichKey] = &[
     own(" f", "Format"),
     own(" w", "Format and save"),
-    host(" l", EditorCommand::NextTab, "Next tab"),
-    host(" h", EditorCommand::PreviousTab, "Previous tab"),
     host(" c", EditorCommand::CloseTab, "Close the tab"),
     host(" p", EditorCommand::TogglePreview, "Show or hide the preview"),
     host(" d", EditorCommand::ToggleInlineDiff, "Show or hide the inline diff"),
@@ -148,7 +146,7 @@ mod tests {
     fn a_host_is_offered_what_it_acts_on() {
         let keys = |prefix: Prefix, host: &[EditorCommand]| prefix.hints(host).map(WhichKey::key).collect::<Vec<_>>();
         assert_eq!(keys(Prefix::Leader, &[]), ["f", "w"]);
-        assert_eq!(keys(Prefix::Leader, &[EditorCommand::NextTab]), ["f", "w", "l"]);
+        assert_eq!(keys(Prefix::Leader, &[EditorCommand::CloseTab]), ["f", "w", "c"]);
         assert!(!keys(Prefix::G, &[]).contains(&"t"));
         assert!(keys(Prefix::G, &[EditorCommand::NextTab]).contains(&"t"));
         assert!(keys(Prefix::G, &[]).contains(&"d"), "the language answers that");

@@ -353,7 +353,7 @@ pub enum I18nKey {
     /// Hide Preview
     EditorHidePreview,
 
-    /// Next tab (Vim: Space l, gt, :tabn)
+    /// Next tab (Alt+L, Ctrl+PageDown; Vim: gt, :tabn)
     EditorNextTab,
 
     /// Type a command
@@ -362,7 +362,7 @@ pub enum I18nKey {
     /// Paste
     EditorPaste,
 
-    /// Previous tab (Vim: Space h, gT, :tabp)
+    /// Previous tab (Alt+H, Ctrl+PageUp; Vim: gT, :tabp)
     EditorPreviousTab,
 
     /// Quick Fix

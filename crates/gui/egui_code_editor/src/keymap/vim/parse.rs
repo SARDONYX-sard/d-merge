@@ -58,12 +58,7 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
     match after_count {
         [VimKey::Char(' ')] => return Parse::Incomplete,
         [VimKey::Char(' '), VimKey::Char('e'), ..] => return done(Command::Simple(Simple::ToggleExplorer), None),
-        [VimKey::Char(' '), VimKey::Char('l'), ..] => {
-            return done(Command::Simple(Simple::Ask(EditorCommand::NextTab)), None);
-        }
-        [VimKey::Char(' '), VimKey::Char('h'), ..] => {
-            return done(Command::Simple(Simple::Ask(EditorCommand::PreviousTab)), None);
-        }
+
         [VimKey::Char(' '), VimKey::Char('f'), ..] => {
             return done(Command::Simple(Simple::Format { save: false }), None);
         }
@@ -383,8 +378,7 @@ mod tests {
         assert_eq!(command("gT"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
         assert_eq!(command(" f"), Command::Simple(Simple::Format { save: false }));
         assert_eq!(command(" w"), Command::Simple(Simple::Format { save: true }));
-        assert_eq!(command(" l"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
-        assert_eq!(command(" h"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
+
         assert_eq!(command(" c"), Command::Simple(Simple::Ask(EditorCommand::CloseTab)));
         assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));
         assert_eq!(command(" d"), Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)));
