@@ -248,6 +248,8 @@ impl PatchTool {
         ];
 
         let mut result = EditorResult::default();
+        // Read before the panel borrows the work; a click lists them after it.
+        let (counts, mut show_problems) = (self.diagnostic_counts(), false);
         egui::CentralPanel::default().show(ui, |ui| {
             // Like VS Code's: the tabs, and at the far right what splits the editor. A new object has no
             // preview: it is written as is.
@@ -284,6 +286,7 @@ impl PatchTool {
             let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
             egui::Panel::bottom(status_id).show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    show_problems |= problem_counts(ui, i18n, counts);
                     toolbar(ui, i18n, &mut self.editor_mode, &mut self.show_lsp_options);
                     egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
                 });
@@ -324,6 +327,9 @@ impl PatchTool {
                 }
             });
         });
+        if show_problems {
+            self.show_diagnostics();
+        }
         result
     }
 }
@@ -557,6 +563,26 @@ fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions,
                 ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
             }
         });
+}
+
+/// `✖ 2  ⚠ 5` at the left of the status bar, as VS Code's: the problems of the whole work (`counts`:
+/// errors, warnings; `None` until it was checked). Returns whether it was clicked, to list them.
+fn problem_counts(ui: &mut egui::Ui, i18n: &I18nMap, counts: Option<(usize, usize)>) -> bool {
+    let Some((errors, warnings)) = counts else { return false };
+    let visuals = ui.visuals();
+    let (error_color, warn_color) = if errors + warnings == 0 {
+        (visuals.weak_text_color(), visuals.weak_text_color())
+    } else {
+        (visuals.error_fg_color, visuals.warn_fg_color)
+    };
+    let mut job = egui::text::LayoutJob::default();
+    let font = egui::TextStyle::Body.resolve(ui.style());
+    job.append(&format!("✖ {errors}"), 0.0, egui::TextFormat::simple(font.clone(), error_color));
+    job.append(&format!("  ⚠ {warnings}"), 0.0, egui::TextFormat::simple(font, warn_color));
+    let clicked =
+        ui.add(egui::Button::new(job).frame(false)).on_hover_text(i18n.t(I18nKey::NemesisCheckWorkHover)).clicked();
+    ui.separator();
+    clicked
 }
 
 #[cfg(test)]

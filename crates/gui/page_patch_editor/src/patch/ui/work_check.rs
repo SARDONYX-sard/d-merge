@@ -73,7 +73,7 @@ struct CheckRow {
 }
 
 /// What the window shows. See the module docs.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::patch) struct WorkCheck {
     /// In `Workspace::behaviors`. `None`: the whole work, with [`CheckScope::All`].
     behavior: Option<usize>,
@@ -125,13 +125,25 @@ fn object_rows(checker: Checker<'_>, object: &ObjectText<'_>) -> Vec<CheckRow> {
     found.into_iter().map(to_row).collect()
 }
 
-/// The problems of the files of `scope`, unsorted.
+/// The problems of the files of `scope`, unsorted. The objects in parallel: a work has thousands, and
+/// the parser reads each one's patch.
 fn run(checker: Checker<'_>, scope: &CheckScope, rows: &mut Vec<CheckRow>) {
+    use rayon::prelude::*;
     let behavior = checker.behavior;
-    let objects = behavior.texts().filter(|object| {
-        !behavior.is_ref(object.id) && is_checked(behavior, object) && scope.contains(behavior.adsf, object.id)
-    });
-    rows.extend(objects.flat_map(|object| object_rows(checker, &object)));
+    let objects: Vec<ObjectText<'_>> = behavior
+        .texts()
+        .filter(|object| {
+            !behavior.is_ref(object.id) && is_checked(behavior, object) && scope.contains(behavior.adsf, object.id)
+        })
+        .collect();
+    let found: Vec<Vec<CheckRow>> = objects.par_iter().map(|object| object_rows(checker, object)).collect();
+    rows.extend(found.into_iter().flatten());
+}
+
+/// `(errors, warnings)` of `rows`.
+fn counts(rows: &[CheckRow]) -> (usize, usize) {
+    let errors = rows.iter().filter(|row| row.severity == Severity::Error).count();
+    (errors, rows.len() - errors)
 }
 
 /// By behavior, file, line.
@@ -168,36 +180,67 @@ impl PatchTool {
         self.work_check = Some(WorkCheck { behavior: Some(self.active), scope, rows });
     }
 
-    /// Checks every behavior of the work, and opens the window.
-    pub(in crate::patch) fn start_whole_work_check(&mut self) {
+    /// The problems of every behavior of the work.
+    fn whole_work_check(&self) -> WorkCheck {
         let mut rows = Vec::new();
         for index in 0..self.workspace.behaviors.len() {
             run(self.checker(index), &CheckScope::All, &mut rows);
         }
         sort_rows(&mut rows);
-        self.work_check = Some(WorkCheck { behavior: None, scope: CheckScope::All, rows });
+        WorkCheck { behavior: None, scope: CheckScope::All, rows }
+    }
+
+    /// Checks every behavior of the work, and opens the window.
+    pub(in crate::patch) fn start_whole_work_check(&mut self) {
+        let check = self.whole_work_check();
+        self.diagnostics = Some(check.clone());
+        self.diagnostics_stale = false;
+        self.work_check = Some(check);
+    }
+
+    /// Checks the whole work again if it changed as a whole (read, loaded, restored), as VS Code checks
+    /// what it opens: its counts are in the status bar. An edit only checks its object again, see
+    /// [`Self::refresh_work_check`]. Call each frame.
+    pub(in crate::patch) fn diagnose_work(&mut self) {
+        if self.diagnostics_stale && self.job.is_none() && self.loaded_for.is_some() {
+            self.diagnostics = Some(self.whole_work_check());
+            self.diagnostics_stale = false;
+        }
+    }
+
+    /// The errors and warnings of the work, if it was checked: the status bar's counts.
+    pub(in crate::patch) fn diagnostic_counts(&self) -> Option<(usize, usize)> {
+        self.diagnostics.as_ref().map(|check| counts(&check.rows))
+    }
+
+    /// The status bar's counts were clicked: the window lists the work's problems.
+    pub(in crate::patch) fn show_diagnostics(&mut self) {
+        self.work_check.clone_from(&self.diagnostics);
     }
 
     /// The object `id` of the active behavior changed: only its rows are found again, so a correction
-    /// goes from the list, even with thousands of objects. Only when the window is open, after typing
-    /// has paused.
+    /// goes from the list, even with thousands of objects. After typing has paused: in the work's
+    /// counts, and in the window if it is open.
     pub(in crate::patch) fn refresh_work_check(&mut self, id: &str) {
-        let Some(check) = &self.work_check else { return };
         let index = self.active;
-        if check.behavior.is_some_and(|checked| checked != index) || index >= self.workspace.behaviors.len() {
+        if index >= self.workspace.behaviors.len() {
             return;
         }
         let checker = self.checker(index);
         let behavior = checker.behavior;
-        let object = behavior.object_text(id).filter(|object| {
-            !behavior.is_ref(object.id) && is_checked(behavior, object) && check.scope.contains(behavior.adsf, id)
-        });
+        let object =
+            behavior.object_text(id).filter(|object| !behavior.is_ref(object.id) && is_checked(behavior, object));
         let found = object.map(|object| object_rows(checker, &object)).unwrap_or_default();
-        let Some(check) = &mut self.work_check else { return };
-        check.rows.retain(|row| row.behavior != index || row.id != id);
-        if !found.is_empty() {
-            check.rows.extend(found);
-            sort_rows(&mut check.rows);
+        let adsf = behavior.adsf;
+        for check in [&mut self.work_check, &mut self.diagnostics].into_iter().flatten() {
+            if check.behavior.is_some_and(|checked| checked != index) {
+                continue;
+            }
+            check.rows.retain(|row| row.behavior != index || row.id != id);
+            if check.scope.contains(adsf, id) && !found.is_empty() {
+                check.rows.extend(found.iter().cloned());
+                sort_rows(&mut check.rows);
+            }
         }
     }
 
@@ -296,6 +339,29 @@ mod tests {
         run(Checker { index: 0, behavior, code: "m", mode }, scope, &mut rows);
         sort_rows(&mut rows);
         rows
+    }
+
+    /// What is read is checked at once, for the status bar; then an edit only checks its object again.
+    #[test]
+    fn the_work_is_checked_when_read_and_then_per_edit() {
+        let mut tool = PatchTool::default();
+        tool.workspace.behaviors.push(clip_data());
+        tool.mod_code = "m".to_owned();
+        tool.parser_mode = ParserMode::Strict;
+        tool.loaded_for = Some("m".to_owned());
+        assert_eq!(tool.diagnostic_counts(), None, "not checked yet");
+
+        tool.reset_names(); // as a read or a load does
+        tool.diagnose_work();
+        assert_eq!(tool.diagnostic_counts(), Some((3, 0)));
+
+        let motion = "Male~1/m$2.txt";
+        tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
+        tool.refresh_work_check(motion);
+        assert_eq!(tool.diagnostic_counts(), Some((2, 0)));
+        assert!(tool.work_check.is_none(), "the window stays closed");
+        tool.show_diagnostics();
+        assert_eq!(tool.work_check.as_ref().map(|check| check.rows.len()), Some(2));
     }
 
     /// Every behavior is checked; a correction in one leaves the rows of the others.

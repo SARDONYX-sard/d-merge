@@ -216,6 +216,10 @@ pub(crate) struct PatchTool {
     pending: changes::Pending,
     /// The message of the next revision, as it is typed.
     commit_message: String,
+    /// The problems of the whole work, for the status bar's counts. See [`ui::work_check`].
+    diagnostics: Option<ui::work_check::WorkCheck>,
+    /// The work changed as a whole: `diagnostics` is found again.
+    diagnostics_stale: bool,
     /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
     anim_folders_open: fast_hash::HashSet<String>,
     /// The button above the list was clicked: done where the list has its files.
@@ -391,6 +395,7 @@ impl PatchTool {
             ui.ctx().request_repaint();
         }
         self.sync_workspace(notify, i18n);
+        self.diagnose_work();
         self.draw(ui, i18n, notify);
 
         self.write_editor_options(editor);
