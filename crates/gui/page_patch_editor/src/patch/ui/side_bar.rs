@@ -85,7 +85,7 @@ impl PatchTool {
                         self.search_panel(ui, i18n);
                     }
                 }
-                SideView::Changes => self.changes_view(ui, i18n),
+                SideView::Changes => self.changes_view(ui, i18n, notify),
                 SideView::Variables => {
                     view_title(ui, i18n.t(title));
                     let has_vars =
@@ -159,7 +159,7 @@ impl PatchTool {
 
     /// `CHANGES  [✓]`, the message and `Commit`, the changes since the last revision, and the history:
     /// like VS Code's Source Control. See [`crate::patch::workspace::history`].
-    fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+    fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut egui_widgets::notify::Notification) {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(i18n.t(I18nKey::SideChanges).to_uppercase()).small().strong());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -174,6 +174,7 @@ impl PatchTool {
                 }
             });
         });
+        self.branch_row(ui, i18n, notify);
         self.pending.refresh(&self.workspace, self.edits);
         self.commit_box(ui, i18n);
 
@@ -196,7 +197,7 @@ impl PatchTool {
             egui::CollapsingHeader::new(i18n.t(I18nKey::SideHistory)).id_salt("side_history").default_open(true).show(
                 ui,
                 |ui| {
-                    for revision in self.workspace.history.revisions.iter().rev() {
+                    for revision in self.workspace.history.log() {
                         let title = format!(
                             "#{} {}  {}  ({})",
                             revision.number,
@@ -246,7 +247,61 @@ impl PatchTool {
                 self.workspace.restore_revision(number);
                 self.work_restored();
             }
+            Some(ChangeAction::Compare(behavior, id, from, to)) => self.open_compare(behavior, &id, from, to),
+            Some(ChangeAction::Blame(behavior, id)) => self.open_blame(behavior, &id),
             None => {}
+        }
+    }
+
+    /// `⎇ [main ▼] [+]`: the branch the work is on, as VS Code's status of git. Another one puts the
+    /// work on it, unless that would lose its changes; `+` starts one where the work is.
+    fn branch_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut egui_widgets::notify::Notification) {
+        let names: Vec<String> = self.workspace.history.branch_names().into_iter().map(str::to_owned).collect();
+        let current = self.workspace.history.branch_name().to_owned();
+        let mut switch = None;
+        ui.horizontal(|ui| {
+            ui.label("⎇").on_hover_text(i18n.t(I18nKey::SideBranchHover));
+            egui::ComboBox::from_id_salt("side_branch").selected_text(&current).show_ui(ui, |ui| {
+                for name in &names {
+                    if ui.selectable_label(*name == current, name).clicked() && *name != current {
+                        switch = Some(name.clone());
+                    }
+                }
+            });
+            match &mut self.new_branch {
+                None => {
+                    if ui
+                        .add(Button::new("").icon(Icon::Plus).small())
+                        .on_hover_text(i18n.t(I18nKey::SideNewBranch))
+                        .clicked()
+                    {
+                        self.new_branch = Some(String::new());
+                    }
+                }
+                Some(name) => {
+                    let field = ui.add(
+                        egui::TextEdit::singleline(name).hint_text(i18n.t(I18nKey::SideNewBranch)).desired_width(120.0),
+                    );
+                    if field.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                        let name = std::mem::take(name);
+                        self.new_branch = None;
+                        if self.workspace.history.create_branch(&name) {
+                            self.mark_dirty();
+                        }
+                    } else if field.lost_focus() {
+                        self.new_branch = None;
+                    } else {
+                        field.request_focus();
+                    }
+                }
+            }
+        });
+        if let Some(name) = switch {
+            if self.workspace.switch_branch(&name) {
+                self.work_restored();
+            } else {
+                notify.warn(i18n.t(I18nKey::SideBranchHasChanges));
+            }
         }
     }
 
@@ -267,6 +322,9 @@ impl PatchTool {
         let mut picked = None;
         let title = format!("{}  {id}", i18n.t(I18nKey::SideObjectHistory));
         egui::CollapsingHeader::new(title).id_salt("side_object_history").default_open(true).show(ui, |ui| {
+            if ui.small_button(i18n.t(I18nKey::SideBlame)).on_hover_text(i18n.t(I18nKey::SideBlameHover)).clicked() {
+                picked = Some(ChangeAction::Blame(self.active, id.to_owned()));
+            }
             let mut any = false;
             for (revision, change) in self.workspace.history.of_object(&key) {
                 any = true;
@@ -279,6 +337,16 @@ impl PatchTool {
                 );
                 let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
                 response.context_menu(|ui| {
+                    let parent = self.workspace.history.parent_number(revision.number);
+                    if ui.button(i18n.t(I18nKey::SideComparePrevious)).clicked() {
+                        picked = Some(ChangeAction::Compare(self.active, id.to_owned(), parent, Some(revision.number)));
+                        ui.close();
+                    }
+                    if ui.button(i18n.t(I18nKey::SideCompareWorking)).clicked() {
+                        picked = Some(ChangeAction::Compare(self.active, id.to_owned(), revision.number, None));
+                        ui.close();
+                    }
+                    ui.separator();
                     if ui.add(Button::new(i18n.t(I18nKey::SideRestoreObject)).destructive()).clicked() {
                         picked = Some(ChangeAction::RestoreObject(self.active, id.to_owned(), revision.number));
                         ui.close();
@@ -331,6 +399,10 @@ enum ChangeAction {
     RestoreObject(usize, String, u32),
     /// The whole work as it was at that revision: as git's `restore --source <rev> .`.
     RestoreRevision(u32),
+    /// The object from revision `.2` to `.3` (`None`: the work now): as git's `diff`.
+    Compare(usize, String, u32, Option<u32>),
+    /// Each line of the object with the revision that last changed it.
+    Blame(usize, String),
 }
 
 /// `M  0_master  #0106  hkbModifierList  GetUpModList`. `revision`: `None` for a change since the last
@@ -363,11 +435,27 @@ fn change_row(
         }
         if let Some(at) = behavior {
             response.context_menu(|ui| {
-                let (label, action) = match revision {
-                    None => (I18nKey::SideDiscard, ChangeAction::Discard(at, change.id.clone())),
-                    Some(number) => {
-                        (I18nKey::SideRestoreObject, ChangeAction::RestoreObject(at, change.id.clone(), number))
+                let id = change.id.clone();
+                // Of the history: what it changed, and against the work now.
+                if let Some((number, parent)) = revision.map(|number| (number, workspace.history.parent_number(number)))
+                {
+                    if ui.button(i18n.t(I18nKey::SideComparePrevious)).clicked() {
+                        picked = Some(ChangeAction::Compare(at, id.clone(), parent, Some(number)));
+                        ui.close();
                     }
+                    if ui.button(i18n.t(I18nKey::SideCompareWorking)).clicked() {
+                        picked = Some(ChangeAction::Compare(at, id.clone(), number, None));
+                        ui.close();
+                    }
+                    ui.separator();
+                } else if ui.button(i18n.t(I18nKey::SideCompareWorking)).clicked() {
+                    // A change: against the last revision.
+                    picked = Some(ChangeAction::Compare(at, id.clone(), workspace.history.head_number(), None));
+                    ui.close();
+                }
+                let (label, action) = match revision {
+                    None => (I18nKey::SideDiscard, ChangeAction::Discard(at, id)),
+                    Some(number) => (I18nKey::SideRestoreObject, ChangeAction::RestoreObject(at, id, number)),
                 };
                 if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
                     picked = Some(action);

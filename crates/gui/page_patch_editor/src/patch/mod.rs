@@ -216,6 +216,10 @@ pub(crate) struct PatchTool {
     pending: changes::Pending,
     /// The message of the next revision, as it is typed.
     commit_message: String,
+    /// The name of a new branch, while it is typed.
+    new_branch: Option<String>,
+    /// The window of a diff or a blame of the history. See [`ui::revision_view`].
+    revision_view: Option<ui::revision_view::RevisionView>,
     /// The problems of the whole work, for the status bar's counts. See [`ui::work_check`].
     diagnostics: Option<ui::work_check::WorkCheck>,
     /// The work changed as a whole: `diagnostics` is found again.
@@ -446,6 +450,7 @@ impl PatchTool {
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
         self.work_check_window(ui.ctx(), i18n);
+        self.revision_view_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.

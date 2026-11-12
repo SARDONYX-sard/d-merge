@@ -10,6 +10,7 @@ mod object_list;
 pub(super) mod preview;
 mod problems;
 pub(super) mod references;
+pub(super) mod revision_view;
 mod search;
 pub(super) mod side_bar;
 mod start_screen;

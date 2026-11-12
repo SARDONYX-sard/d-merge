@@ -1362,6 +1362,18 @@ pub enum I18nKey {
     /// selected
     SelectedLabel,
 
+    /// Blame
+    SideBlame,
+
+    /// Each line of this object with the revision that last changed it.
+    SideBlameHover,
+
+    /// The work has changes since its last revision: commit or discard them before switching the branch.
+    SideBranchHasChanges,
+
+    /// The branch the work is on. Another one puts the work as it is at its newest revision.
+    SideBranchHover,
+
     /// Changes
     SideChanges,
 
@@ -1374,6 +1386,12 @@ pub enum I18nKey {
     /// Message
     SideCommitMessageHint,
 
+    /// Compare with the revision before
+    SideComparePrevious,
+
+    /// Compare with the work now
+    SideCompareWorking,
+
     /// Discard changes
     SideDiscard,
 
@@ -1382,6 +1400,9 @@ pub enum I18nKey {
 
     /// History
     SideHistory,
+
+    /// New branch (Enter)
+    SideNewBranch,
 
     /// Nothing is changed yet.
     SideNoChanges,
