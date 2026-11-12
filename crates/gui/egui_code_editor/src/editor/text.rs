@@ -95,6 +95,9 @@ pub(crate) fn show_text_edit(
     look: TextLook,
     layouter: &mut dyn FnMut(&egui::Ui, &dyn egui::TextBuffer, f32) -> std::sync::Arc<egui::Galley>,
 ) -> (f32, egui::text_edit::TextEditOutput) {
+    // As VS Code's: the whole view takes a click, not only as many rows as the text has. In a scroll
+    // area the height left is the view's; elsewhere it may be unbounded, and the rows decide.
+    let fill = Some(ui.available_height()).filter(|height| height.is_finite()).unwrap_or_default();
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         let gutter_left = ui.cursor().left();
@@ -116,6 +119,7 @@ pub(crate) fn show_text_edit(
                 .code_editor()
                 .desired_width(f32::INFINITY)
                 .desired_rows(look.desired_rows)
+                .min_size(egui::vec2(0.0, fill))
                 .layouter(layouter)
                 .show(ui)
         });
