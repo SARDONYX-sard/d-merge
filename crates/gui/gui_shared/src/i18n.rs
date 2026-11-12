@@ -1303,6 +1303,24 @@ pub enum I18nKey {
     /// Removing the `<output_dir>/meshes` directory...
     RemovingMeshesMessage,
 
+    /// Create
+    RepeatCreate,
+
+    /// Makes many new objects from this one, one per line of values: {{name}} in the template takes the value of the column name, {{i}} the line number from 0.
+    RepeatHover,
+
+    /// objects to create
+    RepeatObjects,
+
+    /// Template ({{name}}: the value of the column, {{i}}: the line number)
+    RepeatTemplate,
+
+    /// Repeat…
+    RepeatTitle,
+
+    /// Values (the first line names the columns; tabs or commas between them)
+    RepeatValues,
+
     /// Revert
     RevertButton,
 

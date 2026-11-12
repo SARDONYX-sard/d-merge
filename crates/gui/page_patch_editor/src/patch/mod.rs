@@ -21,6 +21,7 @@ mod checklist;
 mod editor;
 mod new_work;
 mod problems;
+mod repeat;
 mod search;
 mod template_tree;
 mod tool;
@@ -219,6 +220,8 @@ pub(crate) struct PatchTool {
     commit_message: String,
     /// The name of a new branch, while it is typed.
     new_branch: Option<String>,
+    /// The window making many objects from one. See [`repeat`].
+    repeat: Option<ui::repeat::RepeatForm>,
     /// The window of a diff or a blame of the history. See [`ui::revision_view`].
     revision_view: Option<ui::revision_view::RevisionView>,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
@@ -451,6 +454,7 @@ impl PatchTool {
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
         self.revision_view_window(ui.ctx(), i18n);
+        self.repeat_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.

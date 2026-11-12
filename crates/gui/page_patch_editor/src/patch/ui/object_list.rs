@@ -333,6 +333,7 @@ impl PatchTool {
                 self.focus_quick_pick = true;
             }
             RowAction::Duplicate => self.new_object(Some(id)),
+            RowAction::Repeat => self.open_repeat(id),
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
         }
@@ -456,17 +457,20 @@ pub(super) enum RowAction {
     /// A new object of a class to pick, as `[+]`.
     NewObject,
     Duplicate,
+    /// Many new objects from this one: see [`crate::patch::repeat`].
+    Repeat,
     CopyId,
     RevertOrDelete,
 }
 
-/// `Keep Open / New / Duplicate / Copy id / Revert (or Delete for a new object)`, for the flat list and
+/// `Keep Open / New / Duplicate / Repeat / Copy id / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.
 pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
     let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
     ui.separator();
     let new = ui.button(i18n.t(I18nKey::NemesisNewObject)).clicked();
     let duplicate = ui.button(i18n.t(I18nKey::NemesisDuplicate)).clicked();
+    let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_text(i18n.t(I18nKey::RepeatHover)).clicked();
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
     let revert = changed && {
         ui.separator();
@@ -477,6 +481,7 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
         (keep_open, RowAction::KeepOpen),
         (new, RowAction::NewObject),
         (duplicate, RowAction::Duplicate),
+        (repeat, RowAction::Repeat),
         (copy, RowAction::CopyId),
         (revert, RowAction::RevertOrDelete),
     ]
