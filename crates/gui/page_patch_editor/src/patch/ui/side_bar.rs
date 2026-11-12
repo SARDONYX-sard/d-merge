@@ -185,11 +185,14 @@ impl PatchTool {
                     ui.weak(i18n.t(I18nKey::SideNoChanges));
                 }
                 for change in &self.pending.changes {
-                    if let Some(action) = change_row(ui, i18n, &self.workspace, change, true) {
+                    if let Some(action) = change_row(ui, i18n, &self.workspace, change, None) {
                         picked = Some(action);
                     }
                 }
             });
+            if let Some(action) = self.object_history(ui, i18n) {
+                picked = Some(action);
+            }
             egui::CollapsingHeader::new(i18n.t(I18nKey::SideHistory)).id_salt("side_history").default_open(true).show(
                 ui,
                 |ui| {
@@ -201,11 +204,22 @@ impl PatchTool {
                             local_time(revision.time),
                             revision.changes.len()
                         );
-                        egui::CollapsingHeader::new(title).id_salt(("side_revision", revision.number)).show(ui, |ui| {
-                            for change in &revision.changes {
-                                if let Some(action) = change_row(ui, i18n, &self.workspace, change, false) {
-                                    picked = Some(action);
+                        let shown = egui::CollapsingHeader::new(title)
+                            .id_salt(("side_revision", revision.number))
+                            .show(ui, |ui| {
+                                for change in &revision.changes {
+                                    let row = change_row(ui, i18n, &self.workspace, change, Some(revision.number));
+                                    if let Some(action) = row {
+                                        picked = Some(action);
+                                    }
                                 }
+                            });
+                        // As GitLens' "Restore": the whole work as it was then.
+                        shown.header_response.context_menu(|ui| {
+                            let restore = Button::new(i18n.t(I18nKey::SideRestoreRevision)).destructive();
+                            if ui.add(restore).on_hover_text(i18n.t(I18nKey::SideRestoreRevisionHover)).clicked() {
+                                picked = Some(ChangeAction::RestoreRevision(revision.number));
+                                ui.close();
                             }
                         });
                     }
@@ -222,13 +236,60 @@ impl PatchTool {
             }
             Some(ChangeAction::Discard(behavior, id)) => {
                 self.workspace.discard_change(behavior, &id);
-                self.reset_names();
-                self.editor_for = None;
-                self.preview = None;
-                self.mark_dirty();
+                self.work_restored();
+            }
+            Some(ChangeAction::RestoreObject(behavior, id, number)) => {
+                self.workspace.restore_object(behavior, &id, number);
+                self.work_restored();
+            }
+            Some(ChangeAction::RestoreRevision(number)) => {
+                self.workspace.restore_revision(number);
+                self.work_restored();
             }
             None => {}
         }
+    }
+
+    /// The objects changed under the editor: what shows them is made again.
+    fn work_restored(&mut self) {
+        self.reset_names();
+        self.editor_for = None;
+        self.preview = None;
+        self.mark_dirty();
+    }
+
+    /// `OBJECT HISTORY  #0106`: the revisions that changed the selected object, newest first, as
+    /// GitLens' File History. Each one's menu puts the object as it was then.
+    fn object_history(&self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<ChangeAction> {
+        let id = self.selected.as_deref()?;
+        let behavior = self.workspace.behaviors.get(self.active)?;
+        let key = (behavior.meshes_path.clone(), id.to_owned());
+        let mut picked = None;
+        let title = format!("{}  {id}", i18n.t(I18nKey::SideObjectHistory));
+        egui::CollapsingHeader::new(title).id_salt("side_object_history").default_open(true).show(ui, |ui| {
+            let mut any = false;
+            for (revision, change) in self.workspace.history.of_object(&key) {
+                any = true;
+                let text = format!(
+                    "{} #{} {}  {}",
+                    change.kind.mark(),
+                    revision.number,
+                    revision.message,
+                    local_time(revision.time)
+                );
+                let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
+                response.context_menu(|ui| {
+                    if ui.add(Button::new(i18n.t(I18nKey::SideRestoreObject)).destructive()).clicked() {
+                        picked = Some(ChangeAction::RestoreObject(self.active, id.to_owned(), revision.number));
+                        ui.close();
+                    }
+                });
+            }
+            if !any {
+                ui.weak(i18n.t(I18nKey::SideNoObjectHistory));
+            }
+        });
+        picked
     }
 
     /// `[message............] [Commit]`: a revision of the changes. `Ctrl+Enter` in the field too.
@@ -266,16 +327,21 @@ enum ChangeAction {
     Open(usize, String),
     /// Back to the last revision: as git's "Discard changes".
     Discard(usize, String),
+    /// The object as it was at revision `.2`: as git's `restore --source <rev> <file>`.
+    RestoreObject(usize, String, u32),
+    /// The whole work as it was at that revision: as git's `restore --source <rev> .`.
+    RestoreRevision(u32),
 }
 
-/// `M  0_master  #0106  hkbModifierList  GetUpModList`. `pending`: a change since the last revision,
-/// which can be discarded; else one of the history. A removed one can not be opened.
+/// `M  0_master  #0106  hkbModifierList  GetUpModList`. `revision`: `None` for a change since the last
+/// revision, which can be discarded; else the revision of the history it is of, which the object can
+/// be put back to. A removed one can not be opened.
 fn change_row(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     workspace: &crate::patch::workspace::Workspace,
     change: &ObjectChange,
-    pending: bool,
+    revision: Option<u32>,
 ) -> Option<ChangeAction> {
     let behavior = workspace.behaviors.iter().position(|behavior| behavior.meshes_path == change.behavior);
     let name = behavior.map_or_else(|| file_stem(&change.behavior), |at| workspace.behaviors[at].name.as_str());
@@ -295,10 +361,16 @@ fn change_row(
         if let (true, Some(at)) = (response.clicked(), behavior.filter(|_| object.is_some())) {
             picked = Some(ChangeAction::Open(at, change.id.clone()));
         }
-        if let (true, Some(at)) = (pending, behavior) {
+        if let Some(at) = behavior {
             response.context_menu(|ui| {
-                if ui.add(Button::new(i18n.t(I18nKey::SideDiscard)).destructive()).clicked() {
-                    picked = Some(ChangeAction::Discard(at, change.id.clone()));
+                let (label, action) = match revision {
+                    None => (I18nKey::SideDiscard, ChangeAction::Discard(at, change.id.clone())),
+                    Some(number) => {
+                        (I18nKey::SideRestoreObject, ChangeAction::RestoreObject(at, change.id.clone(), number))
+                    }
+                };
+                if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
+                    picked = Some(action);
                     ui.close();
                 }
             });
@@ -320,6 +392,7 @@ fn local_time(seconds: u64) -> String {
         .map(|time| time.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_default()
 }
+
 /// `EXPLORER`: the name of the view, as VS Code puts it at the top of the side bar.
 fn view_title(ui: &mut egui::Ui, title: &str) {
     ui.label(egui::RichText::new(title.to_uppercase()).small().strong());

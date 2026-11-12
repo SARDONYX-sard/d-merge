@@ -82,8 +82,15 @@ fn current(workspace: &Workspace) -> BTreeMap<ObjectKey, &str> {
 impl History {
     /// What the work was at the last revision: every revision replayed. Empty without one.
     pub(crate) fn head(&self) -> BTreeMap<ObjectKey, &str> {
+        self.state_at(u32::MAX)
+    }
+
+    /// What the work was at revision `number`: the revisions up to it replayed. `0`: before the first,
+    /// the template as it is.
+    pub(crate) fn state_at(&self, number: u32) -> BTreeMap<ObjectKey, &str> {
         let mut state = BTreeMap::new();
-        for change in self.revisions.iter().flat_map(|revision| &revision.changes) {
+        let upto = self.revisions.iter().take_while(|revision| revision.number <= number);
+        for change in upto.flat_map(|revision| &revision.changes) {
             let key = (change.behavior.clone(), change.id.clone());
             match &change.text {
                 Some(text) => state.insert(key, text.as_str()),
@@ -133,26 +140,72 @@ impl History {
         self.revisions.push(Revision { number, time, message: message.trim().to_owned(), changes });
         Some(number)
     }
+
+    /// The revisions that changed `key`, newest first: GitLens' "File History" of an object.
+    pub(crate) fn of_object<'a>(
+        &'a self,
+        key: &'a ObjectKey,
+    ) -> impl Iterator<Item = (&'a Revision, &'a ObjectChange)> {
+        self.revisions.iter().rev().filter_map(move |revision| {
+            let change = revision.changes.iter().find(|change| change.behavior == key.0 && change.id == key.1)?;
+            Some((revision, change))
+        })
+    }
+}
+
+/// Sets object `id` of `behavior` to `text`: an edit of the template, a new object, or (`None`) gone.
+fn set_object(behavior: &mut super::Behavior, id: &str, text: Option<String>) {
+    match text {
+        Some(text) if behavior.template_object(id).is_some() => behavior.set_text(id, &text),
+        Some(text) => {
+            behavior.added.insert(id.to_owned(), text);
+        }
+        None => {
+            behavior.edits.remove(id);
+            behavior.added.remove(id);
+        }
+    }
 }
 
 impl Workspace {
     /// Puts object `id` of the behavior at `behavior` back to what it was at the last revision: as
     /// git's "discard changes". Gone if it was not there.
     pub(crate) fn discard_change(&mut self, behavior: usize, id: &str) {
+        self.restore_object(behavior, id, u32::MAX);
+    }
+
+    /// Puts object `id` of the behavior at `behavior` as it was at revision `number`: as git's
+    /// `restore --source <rev> <file>`. The work's history stays: it is a change to commit.
+    pub(crate) fn restore_object(&mut self, behavior: usize, id: &str, number: u32) {
         let Some(of) = self.behaviors.get(behavior) else { return };
         let key = (of.meshes_path.clone(), id.to_owned());
-        let before = self.history.head().get(&key).map(|text| (*text).to_owned());
-        let of = &mut self.behaviors[behavior];
-        match before {
-            Some(text) if of.template_object(id).is_some() => of.set_text(id, &text),
-            Some(text) => {
-                of.added.insert(id.to_owned(), text);
-            }
-            None => {
-                of.edits.remove(id);
-                of.added.remove(id);
+        let text = self.history.state_at(number).get(&key).map(|text| (*text).to_owned());
+        set_object(&mut self.behaviors[behavior], id, text);
+    }
+
+    /// Puts the whole work as it was at revision `number`: as git's `restore --source <rev> .`. Its
+    /// history stays, and what differs is a change to commit. Returns the objects of behaviors the
+    /// work no longer has, which can not be put back.
+    pub(crate) fn restore_revision(&mut self, number: u32) -> usize {
+        let then: BTreeMap<ObjectKey, String> =
+            self.history.state_at(number).into_iter().map(|(key, text)| (key, text.to_owned())).collect();
+        let mut missing = 0;
+        for of in &mut self.behaviors {
+            let now: Vec<String> = of.edits.keys().chain(of.added.keys()).cloned().collect();
+            for id in now {
+                let key = (of.meshes_path.clone(), id);
+                if !then.contains_key(&key) {
+                    set_object(of, &key.1, None);
+                }
             }
         }
+        for ((behavior, id), text) in then {
+            match self.behaviors.iter_mut().find(|of| of.meshes_path == behavior) {
+                Some(of) => set_object(of, &id, Some(text)),
+                None => missing += 1,
+            }
+        }
+        missing
     }
 }
 
@@ -193,6 +246,31 @@ mod tests {
         assert_eq!(history.revisions[0].message, "first");
         let head = history.head();
         assert_eq!(head.values().copied().collect::<Vec<_>>(), ["2", "1"], "a and c, b gone");
+    }
+
+    #[test]
+    fn the_work_goes_back_to_a_revision() {
+        let mut workspace = work(&[("a", "1")]);
+        let mut history = History::default();
+        history.commit(&workspace, "first", 10);
+        let mut second = work(&[("a", "2"), ("b", "1")]);
+        history.commit(&second, "second", 11);
+        second.history = history;
+
+        let key = (second.behaviors[0].meshes_path.clone(), "a".to_owned());
+        let numbers: Vec<u32> = second.history.of_object(&key).map(|(revision, _)| revision.number).collect();
+        assert_eq!(numbers, [2, 1], "newest first");
+
+        second.restore_object(0, "a", 1);
+        assert_eq!(second.behaviors[0].added.get("a").map(String::as_str), Some("1"));
+        assert_eq!(second.restore_revision(1), 0);
+        let ids: Vec<&String> = second.behaviors[0].added.keys().collect();
+        assert_eq!(ids, ["a"], "b came later");
+        assert_eq!(second.history.revisions.len(), 2, "the history stays");
+
+        workspace.history = second.history.clone();
+        workspace.restore_revision(0);
+        assert!(workspace.behaviors[0].added.is_empty(), "before the first: the template");
     }
 
     #[test]

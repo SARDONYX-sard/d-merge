@@ -1386,8 +1386,23 @@ pub enum I18nKey {
     /// Nothing is changed yet.
     SideNoChanges,
 
+    /// No revision changed this object.
+    SideNoObjectHistory,
+
     /// Animation data has no events or variables.
     SideNoVariables,
+
+    /// Object history
+    SideObjectHistory,
+
+    /// Restore this object to this revision
+    SideRestoreObject,
+
+    /// Restore the work to this revision
+    SideRestoreRevision,
+
+    /// Puts every object as it was at this revision. The history stays: what differs from the last revision is a change, to commit or to discard.
+    SideRestoreRevisionHover,
 
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
