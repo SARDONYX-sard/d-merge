@@ -437,7 +437,7 @@ fn set_block_roles(roles: &mut [LineRole], lines: &[&str], block: &Block, fits: 
             continue; // Nemesis' mark of a deleted line.
         }
         let replacing = replaced.find(|at| roles[*at] != LineRole::Other).map(|at| roles[at]);
-        let role = replacing.unwrap_or(if fits { before.after() } else { LineRole::Other });
+        let role = replacing.unwrap_or_else(|| if fits { before.after() } else { LineRole::Other });
         roles[no] = role;
         before = role;
     }

@@ -391,6 +391,12 @@ impl Graph {
         &self.unlinked
     }
 
+    /// Is `node` one of [`Self::unlinked`]? Without looking through them.
+    pub(super) fn is_unlinked(&self, node: Node) -> bool {
+        let entry = self.entry(node);
+        entry.is_new && !entry.reachable && entry.id.starts_with('#')
+    }
+
     pub(super) const fn generation(&self) -> u64 {
         self.generation
     }
@@ -889,6 +895,15 @@ mod tests {
         state.prepare(&graph, None, false);
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"]); // only the root starts open
         assert_eq!(unlinked(&graph), ["#new1"]);
+    }
+
+    /// The list's "unlinked only" asks each node: it must agree with the list of them.
+    #[test]
+    fn is_unlinked_agrees_with_the_unlinked_list() {
+        let graph = sample();
+        let asked: Vec<&str> =
+            graph.nodes().filter(|&node| graph.is_unlinked(node)).map(|node| graph.id(node)).collect();
+        assert_eq!(asked, unlinked(&graph));
     }
 
     #[test]

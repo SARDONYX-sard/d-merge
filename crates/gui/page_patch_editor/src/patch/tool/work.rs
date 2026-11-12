@@ -311,6 +311,9 @@ impl PatchTool {
     ) -> bool {
         match Workspace::import(selected, Path::new(&self.template_dir)) {
             Ok((workspace, code, skipped)) => {
+                // Read again: the object that was being worked on comes back.
+                let was_open =
+                    self.loaded_for.as_deref().is_some_and(|loaded| loaded == code).then(|| self.editor_place());
                 self.save_now(notify, i18n);
                 self.workspace = workspace;
                 self.reset_names();
@@ -326,6 +329,9 @@ impl PatchTool {
                 self.active = 0;
                 self.selected = None;
                 self.editor_for = None;
+                if let Some(Some(place)) = was_open {
+                    self.reopen_editor_place(&place);
+                }
                 if !skipped.is_empty() {
                     notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
                 }

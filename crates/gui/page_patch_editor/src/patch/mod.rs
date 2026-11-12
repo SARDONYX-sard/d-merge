@@ -126,6 +126,8 @@ pub(crate) struct PatchTool {
     selected: Option<Rc<str>>,
     filter: String,
     changed_only: bool,
+    /// Only the new objects nothing links to. See [`tree::Graph::unlinked`].
+    unlinked_only: bool,
 
     /// The text in the editor and what it belongs to (`(behavior, id)`).
     editor_text: String,
@@ -279,6 +281,7 @@ struct ObjectList {
     generation: u64,
     filter: String,
     changed_only: bool,
+    unlinked_only: bool,
     rows: Vec<tree::Node>,
 }
 

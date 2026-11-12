@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! [Objects] [Events / Variables] [Search]  [+] [⧉] [↶]    <- new, duplicate, revert or delete
-//! [filter......................]     [Δ] [≡]        <- only changed, tree or flat list
+//! [filter..................]  [⚠] [Δ] [≡]        <- only unlinked, only changed, tree or flat list
 //! (the tree or the list)
 //! ```
 //! A window has the class list: nothing moves in the side bar when it is opened.
@@ -71,7 +71,7 @@ impl PatchTool {
         // A tree from the root container, unless filtering: a filter wants the flat list.
         if asdsf {
             self.anim_tree_panel(ui, i18n, &names.graph);
-        } else if self.tree_view && self.filter.is_empty() {
+        } else if self.tree_view && self.filter.is_empty() && !self.unlinked_only {
             self.tree_panel(ui, i18n, &names.graph);
         } else {
             self.flat_list(ui, i18n, &names.graph);
@@ -99,7 +99,7 @@ impl PatchTool {
         }
     }
 
-    /// `[Δ] [≡]`: only what changed, a tree or a flat list.
+    /// `[⚠] [Δ] [≡]`: only the unlinked (a flat list), only what changed, a tree or a flat list.
     fn list_toggles(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, asdsf: bool) {
         if asdsf {
             let collapse = Button::new("").icon(Icon::ChevronRight).small();
@@ -118,6 +118,12 @@ impl PatchTool {
         let changed = Button::selectable(self.changed_only, "").icon(Icon::Diff).small();
         if ui.add(changed).on_hover_text(i18n.t(I18nKey::NemesisChangedOnly)).clicked() {
             self.changed_only = !self.changed_only;
+        }
+        if !asdsf {
+            let unlinked = Button::selectable(self.unlinked_only, "⚠").small();
+            if ui.add(unlinked).on_hover_text(i18n.t(I18nKey::NemesisUnlinkedOnly)).clicked() {
+                self.unlinked_only = !self.unlinked_only;
+            }
         }
     }
 

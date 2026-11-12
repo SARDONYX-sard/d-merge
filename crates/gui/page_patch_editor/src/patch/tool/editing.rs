@@ -48,6 +48,24 @@ impl PatchTool {
         self.selected = Some(id.into());
     }
 
+    /// What the editor shows, to find it again in another workspace: the behavior's `meshes_path`
+    /// (e.g. `meshes/actors/character/behaviors/0_master.bin`) and the object id (e.g. `#0106`).
+    pub(in crate::patch) fn editor_place(&self) -> Option<(String, Rc<str>)> {
+        let behavior = self.workspace.behaviors.get(self.active)?;
+        Some((behavior.meshes_path.clone(), self.selected.clone()?))
+    }
+
+    /// Shows the place of [`Self::editor_place`] again, if the work still has it, with the keyboard in
+    /// the editor at its cursor.
+    pub(in crate::patch) fn reopen_editor_place(&mut self, (meshes_path, id): &(String, Rc<str>)) {
+        let found = self.workspace.behaviors.iter().position(|behavior| behavior.meshes_path == *meshes_path);
+        let Some(index) = found.filter(|&index| self.workspace.behaviors[index].text(id).is_some()) else { return };
+        self.active = index;
+        self.tabs.open(index, id, None);
+        self.selected = Some(Rc::clone(id));
+        self.focus_editor = Some(FocusAt::Keep);
+    }
+
     /// Opens the Pandora patch file of the active behavior. The first time, it is written from what
     /// the work has changed so far.
     pub(in crate::patch) fn open_pandora_doc(&mut self) {
@@ -342,5 +360,42 @@ impl PatchTool {
     pub(in crate::patch) fn reset_names(&mut self) {
         self.names = None;
         self.changed_objects.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::patch::workspace::{ADSF, Behavior};
+
+    /// A clip data "behavior" with the files `ids` (it needs no template file).
+    fn clip_data(ids: &[&str]) -> Behavior {
+        let mut adsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        for id in ids {
+            adsf.added.insert((*id).to_owned(), String::new());
+        }
+        adsf
+    }
+
+    /// Reading the mod again: the object being edited is shown again, if it is still there.
+    #[test]
+    fn the_editor_place_comes_back() {
+        let mut tool = PatchTool::default();
+        tool.workspace.behaviors.push(clip_data(&["M~1/a.txt"]));
+        tool.selected = Some("M~1/a.txt".into());
+        let place = tool.editor_place().unwrap();
+
+        tool.selected = None;
+        tool.reopen_editor_place(&place);
+        assert_eq!(tool.selected.as_deref(), Some("M~1/a.txt"));
+        assert!(matches!(tool.focus_editor, Some(FocusAt::Keep)));
+
+        // Gone from the mod: nothing is opened.
+        tool.workspace.behaviors[0] = clip_data(&[]);
+        tool.selected = None;
+        tool.reopen_editor_place(&place);
+        assert_eq!(tool.selected, None);
     }
 }

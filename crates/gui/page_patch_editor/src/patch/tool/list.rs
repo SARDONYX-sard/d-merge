@@ -40,7 +40,7 @@ impl PatchTool {
         }
     }
 
-    /// Recomputes the flat list when the objects, the filter or "changed only" changed.
+    /// Recomputes the flat list when the objects, the filter, "changed only" or "unlinked only" changed.
     ///
     /// New objects come first and show where they are linked: `+ #mymod$0  hkbFoo  ← #0106`.
     ///
@@ -48,7 +48,10 @@ impl PatchTool {
     pub(in crate::patch) fn refresh_list(&mut self, graph: &tree::Graph) {
         let generation = if self.filter.is_empty() { graph.tree_generation() } else { graph.generation() };
         let fresh = self.list.as_ref().is_some_and(|list| {
-            list.generation == generation && list.filter == self.filter && list.changed_only == self.changed_only
+            list.generation == generation
+                && list.filter == self.filter
+                && list.changed_only == self.changed_only
+                && list.unlinked_only == self.unlinked_only
         });
         if fresh {
             return;
@@ -57,6 +60,7 @@ impl PatchTool {
         let rows = graph
             .nodes()
             .filter(|&node| !self.changed_only || graph.is_changed(node))
+            .filter(|&node| !self.unlinked_only || graph.is_unlinked(node))
             .filter(|&node| contains_ignore_case(graph.label(node), filter))
             .collect();
         // Anim data is grouped by actor: see `ui::anim_tree`.
@@ -64,7 +68,13 @@ impl PatchTool {
         if self.workspace.behaviors[self.active].is_anim_data() {
             rows.sort_by(|&a, &b| cmp_ignore_case(graph.id(a), graph.id(b)));
         }
-        self.list = Some(ObjectList { generation, filter: self.filter.clone(), changed_only: self.changed_only, rows });
+        self.list = Some(ObjectList {
+            generation,
+            filter: self.filter.clone(),
+            changed_only: self.changed_only,
+            unlinked_only: self.unlinked_only,
+            rows,
+        });
     }
 
     /// Deletes a new object, or drops the edits of a template object.

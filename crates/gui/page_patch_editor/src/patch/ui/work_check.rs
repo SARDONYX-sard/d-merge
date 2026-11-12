@@ -18,6 +18,9 @@
 //!
 //! The window keeps up as they are corrected, one object at a time:
 //! see [`PatchTool::refresh_work_check`].
+//!
+//! The whole work can be checked too (every behavior): its rows then say their behavior,
+//! e.g. `0_master  #0106:12  ...`, and a click switches to it.
 
 use egui_code_editor::{Diagnostic, Severity};
 use gui_shared::{
@@ -60,6 +63,8 @@ impl CheckScope {
 /// One problem found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CheckRow {
+    /// In `Workspace::behaviors`.
+    behavior: usize,
     id: String,
     /// 0-based line.
     line: usize,
@@ -70,8 +75,8 @@ struct CheckRow {
 /// What the window shows. See the module docs.
 #[derive(Debug)]
 pub(in crate::patch) struct WorkCheck {
-    /// In `Workspace::behaviors`.
-    behavior: usize,
+    /// In `Workspace::behaviors`. `None`: the whole work, with [`CheckScope::All`].
+    behavior: Option<usize>,
     scope: CheckScope,
     rows: Vec<CheckRow>,
 }
@@ -82,8 +87,20 @@ const fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
     behavior.is_anim_data() || object.is_new || object.is_edited
 }
 
-/// The problems of one object. `mode`: the patch page's, which the parser checks by.
-fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>, mode: ParserMode) -> Vec<CheckRow> {
+/// What is checked and how: the same for every object of a check.
+#[derive(Debug, Clone, Copy)]
+struct Checker<'a> {
+    /// `index` in `Workspace::behaviors`
+    index: usize,
+    behavior: &'a Behavior,
+    code: &'a str,
+    /// The patch page's, which the parser checks by.
+    mode: ParserMode,
+}
+
+/// The problems of one object.
+fn object_rows(checker: Checker<'_>, object: &ObjectText<'_>) -> Vec<CheckRow> {
+    let Checker { index, behavior, code, mode } = checker;
     let (id, text) = (object.id, object.text);
     // Animation data only has the parser's word: see `anim_lines`.
     let mut found: Vec<Diagnostic> = if behavior.is_anim_data() {
@@ -99,6 +116,7 @@ fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>, mode: P
         diagnostics::add_parser_error(&mut found, text, &error, to_editor_line);
     }
     let to_row = |problem: Diagnostic| CheckRow {
+        behavior: index,
         id: id.to_owned(),
         line: problem.line,
         message: problem.message,
@@ -107,18 +125,18 @@ fn object_rows(behavior: &Behavior, code: &str, object: &ObjectText<'_>, mode: P
     found.into_iter().map(to_row).collect()
 }
 
-/// The problems of the files of `scope`, by file.
-fn run(behavior: &Behavior, code: &str, scope: &CheckScope, mode: ParserMode) -> Vec<CheckRow> {
+/// The problems of the files of `scope`, unsorted.
+fn run(checker: Checker<'_>, scope: &CheckScope, rows: &mut Vec<CheckRow>) {
+    let behavior = checker.behavior;
     let objects = behavior.texts().filter(|object| {
         !behavior.is_ref(object.id) && is_checked(behavior, object) && scope.contains(behavior.adsf, object.id)
     });
-    let mut rows: Vec<CheckRow> = objects.flat_map(|object| object_rows(behavior, code, &object, mode)).collect();
-    sort_rows(&mut rows);
-    rows
+    rows.extend(objects.flat_map(|object| object_rows(checker, &object)));
 }
 
+/// By behavior, file, line.
 fn sort_rows(rows: &mut [CheckRow]) {
-    rows.sort_by(|a, b| (&a.id, a.line).cmp(&(&b.id, b.line)));
+    rows.sort_by(|a, b| (a.behavior, &a.id, a.line).cmp(&(b.behavior, &b.id, b.line)));
 }
 
 /// `Check`, `Check all`, for a row of anim data. Returns which: `Some(true)` is the row's.
@@ -136,39 +154,71 @@ pub(super) fn check_items(ui: &mut egui::Ui, i18n: &I18nMap) -> Option<bool> {
 }
 
 impl PatchTool {
-    /// Checks the files of `scope` of the active behavior, and opens the window.
-    pub(in crate::patch) fn start_work_check(&mut self, scope: CheckScope) {
-        let rows = run(&self.workspace.behaviors[self.active], self.mod_code.trim(), &scope, self.parser_mode);
-        self.work_check = Some(WorkCheck { behavior: self.active, scope, rows });
+    /// What checks the objects of behavior `index`.
+    fn checker(&self, index: usize) -> Checker<'_> {
+        let behavior = &self.workspace.behaviors[index];
+        Checker { index, behavior, code: self.mod_code.trim(), mode: self.parser_mode }
     }
 
-    /// The object `id` changed: only its rows are found again, so a correction goes from the list, even
-    /// with thousands of objects. Only when the window is open, after typing has paused.
+    /// Checks the files of `scope` of the active behavior, and opens the window.
+    pub(in crate::patch) fn start_work_check(&mut self, scope: CheckScope) {
+        let mut rows = Vec::new();
+        run(self.checker(self.active), &scope, &mut rows);
+        sort_rows(&mut rows);
+        self.work_check = Some(WorkCheck { behavior: Some(self.active), scope, rows });
+    }
+
+    /// Checks every behavior of the work, and opens the window.
+    pub(in crate::patch) fn start_whole_work_check(&mut self) {
+        let mut rows = Vec::new();
+        for index in 0..self.workspace.behaviors.len() {
+            run(self.checker(index), &CheckScope::All, &mut rows);
+        }
+        sort_rows(&mut rows);
+        self.work_check = Some(WorkCheck { behavior: None, scope: CheckScope::All, rows });
+    }
+
+    /// The object `id` of the active behavior changed: only its rows are found again, so a correction
+    /// goes from the list, even with thousands of objects. Only when the window is open, after typing
+    /// has paused.
     pub(in crate::patch) fn refresh_work_check(&mut self, id: &str) {
-        let Some(check) = &mut self.work_check else { return };
-        check.rows.retain(|row| row.id != id);
-        let Some(behavior) = self.workspace.behaviors.get(check.behavior) else { return };
+        let Some(check) = &self.work_check else { return };
+        let index = self.active;
+        if check.behavior.is_some_and(|checked| checked != index) || index >= self.workspace.behaviors.len() {
+            return;
+        }
+        let checker = self.checker(index);
+        let behavior = checker.behavior;
         let object = behavior.object_text(id).filter(|object| {
             !behavior.is_ref(object.id) && is_checked(behavior, object) && check.scope.contains(behavior.adsf, id)
         });
-        if let Some(object) = object {
-            check.rows.extend(object_rows(behavior, self.mod_code.trim(), &object, self.parser_mode));
+        let found = object.map(|object| object_rows(checker, &object)).unwrap_or_default();
+        let Some(check) = &mut self.work_check else { return };
+        check.rows.retain(|row| row.behavior != index || row.id != id);
+        if !found.is_empty() {
+            check.rows.extend(found);
             sort_rows(&mut check.rows);
         }
     }
 
     pub(in crate::patch) fn work_check_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         let active = self.active;
-        self.work_check = self.work_check.take().filter(|check| check.behavior == active);
+        // A check of one behavior goes with it; one of the whole work stays.
+        self.work_check = self.work_check.take().filter(|check| check.behavior.is_none_or(|checked| checked == active));
         let Some(check) = &self.work_check else { return };
         let mut open = true;
         let mut picked = None;
+        let behavior_names = check.behavior.is_none().then_some(self.workspace.behaviors.as_slice());
         egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisCheckTitle))
             .open(&mut open)
             .default_size([680.0, 360.0])
             .resizable(true)
-            .show(ctx, |ui| picked = check_ui(ui, i18n, &check.rows));
-        if let Some((id, line)) = picked {
+            .show(ctx, |ui| picked = check_ui(ui, i18n, &check.rows, behavior_names));
+        if let Some((behavior, id, line)) = picked {
+            if behavior != self.active {
+                self.active = behavior;
+                self.selected = None;
+            }
             let current = self.selected.clone().unwrap_or_default();
             self.open_location(&current, &id, line);
         }
@@ -178,8 +228,14 @@ impl PatchTool {
     }
 }
 
-/// The counts and the rows. Returns where a click goes: `(file, line)`.
-fn check_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &[CheckRow]) -> Option<(String, usize)> {
+/// The counts and the rows. `behaviors`: those of the work, if all of them were checked, for their
+/// names. Returns where a click goes: `(behavior, file, line)`.
+fn check_ui(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    rows: &[CheckRow],
+    behaviors: Option<&[Behavior]>,
+) -> Option<(usize, String, usize)> {
     if rows.is_empty() {
         ui.weak(i18n.t(I18nKey::NemesisCheckNone));
         return None;
@@ -201,9 +257,14 @@ fn check_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &[CheckRow]) -> Option<(Str
             for row in &rows[range] {
                 ui.horizontal(|ui| {
                     ui.colored_label(row.severity.color(ui.visuals()), row.severity.icon());
-                    let text = format!("{}:{}  {}", row.id, row.line + 1, row.message);
+                    // e.g. `0_master  #0106:12  Unknown field` (the behavior only for the whole work)
+                    let name = behaviors.and_then(|behaviors| behaviors.get(row.behavior)).map(|b| b.name.as_str());
+                    let text = match name {
+                        Some(name) => format!("{name}  {}:{}  {}", row.id, row.line + 1, row.message),
+                        None => format!("{}:{}  {}", row.id, row.line + 1, row.message),
+                    };
                     if ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace())).clicked() {
-                        picked = Some((row.id.clone(), row.line));
+                        picked = Some((row.behavior, row.id.clone(), row.line));
                     }
                 });
             }
@@ -229,8 +290,36 @@ mod tests {
         adsf
     }
 
+    /// The sorted rows of `behavior` as the only one of a work, of mod code `m`.
+    fn rows_of(behavior: &Behavior, scope: &CheckScope, mode: ParserMode) -> Vec<CheckRow> {
+        let mut rows = Vec::new();
+        run(Checker { index: 0, behavior, code: "m", mode }, scope, &mut rows);
+        sort_rows(&mut rows);
+        rows
+    }
+
+    /// Every behavior is checked; a correction in one leaves the rows of the others.
+    #[test]
+    fn the_whole_work_is_checked() {
+        let mut tool = PatchTool::default();
+        tool.workspace.behaviors.extend([clip_data(), clip_data()]);
+        tool.mod_code = "m".to_owned();
+        tool.parser_mode = ParserMode::Strict;
+        tool.start_whole_work_check();
+        let rows = |tool: &PatchTool| {
+            tool.work_check.as_ref().unwrap().rows.iter().map(|row| row.behavior).collect::<Vec<_>>()
+        };
+        assert_eq!(rows(&tool), [0, 0, 0, 1, 1, 1]);
+
+        tool.active = 1;
+        let motion = "Male~1/m$2.txt";
+        tool.workspace.behaviors[1].added.remove(motion);
+        tool.refresh_work_check(motion);
+        assert_eq!(rows(&tool), [0, 0, 0, 1, 1]);
+    }
+
     fn found(scope: &CheckScope) -> Vec<String> {
-        run(&clip_data(), "m", scope, ParserMode::Strict).into_iter().map(|row| row.id).collect()
+        rows_of(&clip_data(), scope, ParserMode::Strict).into_iter().map(|row| row.id).collect()
     }
 
     #[test]
@@ -253,8 +342,8 @@ mod tests {
         let mut adsf = clip_data();
         adsf.added.clear();
         adsf.added.insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
-        assert_eq!(run(&adsf, "m", &CheckScope::All, ParserMode::Strict).len(), 1);
-        assert!(run(&adsf, "m", &CheckScope::All, ParserMode::Lenient).is_empty());
+        assert_eq!(rows_of(&adsf, &CheckScope::All, ParserMode::Strict).len(), 1);
+        assert!(rows_of(&adsf, &CheckScope::All, ParserMode::Lenient).is_empty());
     }
 
     #[test]
@@ -295,7 +384,7 @@ mod tests {
         let id = "DefaultMaleData~DefaultMale/m$Start.txt";
         asdsf.added.insert(id.to_owned(), "V3\nabc\ndef\n".to_owned());
 
-        let rows = run(&asdsf, "m", &CheckScope::All, ParserMode::Strict);
+        let rows = rows_of(&asdsf, &CheckScope::All, ParserMode::Strict);
         let row = rows.iter().find(|row| row.message.contains("triggers_len")).expect("the parser's reason");
         assert_eq!((row.id.as_str(), row.line, row.severity), (id, 1, Severity::Error));
     }
@@ -312,10 +401,10 @@ mod tests {
         let mut behavior = Behavior::open(&template).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
 
-        assert!(run(&behavior, "m", &CheckScope::All, ParserMode::Strict).is_empty(), "nothing changed");
+        assert!(rows_of(&behavior, &CheckScope::All, ParserMode::Strict).is_empty(), "nothing changed");
         let typo = object.replace("userData", "typoField");
         behavior.set_text("#0100", &typo);
-        let rows = run(&behavior, "m", &CheckScope::All, ParserMode::Strict);
+        let rows = rows_of(&behavior, &CheckScope::All, ParserMode::Strict);
         assert!(rows.iter().any(|row| row.id == "#0100" && row.line == 1), "{rows:?}");
         assert!(rows.iter().all(|row| row.id != "#0101"), "{rows:?}");
     }

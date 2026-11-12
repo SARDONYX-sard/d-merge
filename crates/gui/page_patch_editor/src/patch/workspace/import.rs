@@ -196,22 +196,31 @@ mod tests {
     ///
     /// e.g., `Combat Gameplay Overhaul` deletes elements of `#0521` with blank lines. They were read as
     /// lines, and the written patch had a block adding blank lines, which the parser rejects.
+    ///
+    /// `PATCH_EDITOR_ONLY`: only the mods whose folder name contains it, with the patches that break
+    /// printed whole.
     #[test]
     #[ignore = "needs real mods"]
     fn a_patch_read_and_written_again_still_parses() {
         let mods = std::env::var("PATCH_EDITOR_MODS").unwrap();
+        let only = std::env::var("PATCH_EDITOR_ONLY").ok();
         let (mut total, mut broken) = (0, 0);
-        for mod_dir in std::fs::read_dir(&mods).unwrap().flatten().map(|entry| entry.path()) {
+        let mod_dirs = std::fs::read_dir(&mods).unwrap().flatten().map(|entry| entry.path());
+        let mod_dirs = mod_dirs.filter(|dir| only.as_deref().is_none_or(|only| dir.to_string_lossy().contains(only)));
+        for mod_dir in mod_dirs {
             let Ok(codes) = std::fs::read_dir(mod_dir.join("Nemesis_Engine").join("mod")) else { continue };
             for code_dir in codes.flatten().map(|entry| entry.path()).filter(|dir| dir.is_dir()) {
                 let Ok((workspace, code, _)) = Workspace::import(&code_dir, &template_root()) else { continue };
                 for behavior in workspace.behaviors.iter().filter(|behavior| !behavior.is_anim_data()) {
                     for id in behavior.edits.keys() {
-                        let file =
+                        let mut file =
                             behavior.patch_folders_in(&code_dir).into_iter().map(|dir| dir.join(format!("{id}.txt")));
-                        let Some(original) = file.filter_map(|path| read_text(&path).ok()).next() else { continue };
+                        let Some(original) = file.find_map(|path| read_text(&path).ok()) else { continue };
                         if nemesis_diff::validate(&original).is_err() {
                             continue; // d-merge rejects it as well: not ours to fix.
+                        }
+                        if !original.contains(&format!("name=\"{id}\"")) {
+                            continue; // Another object in it, e.g. `BFCO`'s `#3018.txt` holds `#3108`.
                         }
                         total += 1;
                         let written = behavior.patch(&code, id).unwrap_or_default();
@@ -219,6 +228,9 @@ mod tests {
                             broken += 1;
                             let first = err.lines().next().unwrap_or_default();
                             println!("{} {}/{id}: {first}", code_dir.display(), behavior.name);
+                            if only.is_some() {
+                                println!("--- original\n{original}\n--- written\n{written}\n--- error\n{err}");
+                            }
                         }
                     }
                 }

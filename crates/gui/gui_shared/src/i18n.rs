@@ -651,6 +651,9 @@ pub enum I18nKey {
     /// Not linked
     NemesisNotLinked,
 
+    /// Only the new objects nothing links to (Nemesis ignores them)
+    NemesisUnlinkedOnly,
+
     /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
     NemesisNotLinkedHover,
 
@@ -1065,6 +1068,12 @@ pub enum I18nKey {
 
     /// Check all
     NemesisCheckAll,
+
+    /// Check the whole work
+    NemesisCheckWork,
+
+    /// Checks what the mod changes in every behavior and animation data of this work, without opening them.
+    NemesisCheckWorkHover,
 
     /// Expand all
     ExpandAllButton,

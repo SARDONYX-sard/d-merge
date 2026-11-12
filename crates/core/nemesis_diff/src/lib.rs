@@ -165,12 +165,83 @@ pub fn object_patch(mod_code: &str, template: &str, edited: &str) -> Option<Stri
     if before == after {
         return None;
     }
-    let before_lines: Vec<&str> = before.split_inclusive('\n').collect();
-    let after_lines: Vec<&str> = after.split_inclusive('\n').collect();
+    let lines = Lines::new(&before, &after);
+    Some(write_patch(mod_code, &lines, &patch_hunks(&lines)))
+}
 
-    let mut out = String::with_capacity(after.len() + 128);
+/// The lines of the two [`normalize`]d sides of a patch.
+struct Lines<'a> {
+    before_text: &'a str,
+    after_text: &'a str,
+    before: Vec<&'a str>,
+    after: Vec<&'a str>,
+}
+
+impl<'a> Lines<'a> {
+    fn new(before: &'a str, after: &'a str) -> Self {
+        Self {
+            before_text: before,
+            after_text: after,
+            before: before.split_inclusive('\n').collect(),
+            after: after.split_inclusive('\n').collect(),
+        }
+    }
+}
+
+/// The hunks a patch is written from.
+///
+/// The histogram diff gives the shortest blocks, but on the many alike lines of an array of objects
+/// it may pair an added element with the lines of the next field, e.g. a push to `variableInfos`
+/// becomes a block taking out `</hkparam>` and `<hkparam name="characterPropertyInfos" ...>`, which
+/// the parser rejects (`TK Dodge RE`, `#0087`). Only then (a block whose tags don't nest, and a patch
+/// the parser rejects) the other algorithms are tried, and the first that parses is taken.
+fn patch_hunks(lines: &Lines<'_>) -> Vec<Hunk> {
+    use imara_diff::Algorithm;
+    let hunks = line_hunks(lines.before_text, lines.after_text);
+    let crosses = |hunk: &Hunk| !nests(&lines.before[hunk.old.clone()]) || !nests(&lines.after[hunk.new.clone()]);
+    if !hunks.iter().any(crosses) {
+        return hunks;
+    }
+    let parses = |hunks: &[Hunk]| validate(&write_patch("m", lines, hunks)).is_ok();
+    if parses(&hunks) {
+        return hunks; // e.g. the push to an empty array, which keeps its line: see `kept_array`
+    }
+    [Algorithm::Myers, Algorithm::MyersMinimal]
+        .into_iter()
+        .map(|algorithm| line_hunks_by(algorithm, lines.before_text, lines.after_text))
+        .find(|other| parses(other))
+        .unwrap_or(hunks)
+}
+
+/// Do the tags of `lines` close only what they open, and close all of it?
+///
+/// e.g. `<hkobject>`, `<hkparam name="a">1</hkparam>`, `</hkobject>`: yes. `</hkparam>`, `<hkparam ...>`: no.
+fn nests(lines: &[&str]) -> bool {
+    let mut depth = 0_i32;
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.starts_with("</") {
+            depth -= 1;
+        } else if trimmed.starts_with('<')
+            && !trimmed.starts_with("<!--")
+            && !trimmed.ends_with("/>")
+            && !trimmed.contains("</")
+        {
+            depth += 1;
+        }
+        if depth < 0 {
+            return false;
+        }
+    }
+    depth == 0
+}
+
+/// The patch of `hunks`. See [`object_patch`].
+fn write_patch(mod_code: &str, lines: &Lines<'_>, hunks: &[Hunk]) -> String {
+    let (before_lines, after_lines) = (&lines.before, &lines.after);
+    let mut out = String::with_capacity(lines.after_text.len() + 128);
     let mut at = 0; // next unwritten `before` line
-    for Hunk { old, new } in line_hunks(&before, &after) {
+    for Hunk { old, new } in hunks.iter().cloned() {
         before_lines[at..old.start].iter().for_each(|line| out.push_str(line));
 
         let _ = writeln!(out, "{}", open_marker(mod_code));
@@ -187,7 +258,7 @@ pub fn object_patch(mod_code: &str, template: &str, edited: &str) -> Option<Stri
         at = old.end;
     }
     before_lines[at..].iter().for_each(|line| out.push_str(line));
-    Some(out)
+    out
 }
 
 /// One changed block: lines of the template (`old`) replaced by lines of the edit (`new`).
@@ -199,10 +270,15 @@ pub struct Hunk {
 }
 
 /// Line diff of two already [`normalize`]d texts.
+#[inline]
 fn line_hunks(before: &str, after: &str) -> Vec<Hunk> {
-    use imara_diff::{Algorithm, Diff, InternedInput};
+    line_hunks_by(imara_diff::Algorithm::Histogram, before, after)
+}
+
+fn line_hunks_by(algorithm: imara_diff::Algorithm, before: &str, after: &str) -> Vec<Hunk> {
+    use imara_diff::{Diff, InternedInput};
     let input = InternedInput::new(before, after);
-    let mut diff = Diff::compute(Algorithm::Histogram, &input);
+    let mut diff = Diff::compute(algorithm, &input);
     diff.postprocess_lines(&input);
     diff.hunks()
         .map(|h| Hunk {
@@ -225,22 +301,22 @@ pub fn line_changes(old: &str, new: &str) -> Vec<Hunk> {
 #[inline]
 pub fn hunks(template: &str, edited: &str) -> Vec<Hunk> {
     let before = normalize(template);
-    line_hunks(&before, &align_numelements(&before, &normalize(edited)))
+    let after = align_numelements(&before, &normalize(edited));
+    patch_hunks(&Lines::new(&before, &after))
 }
 
 /// `edited` ([`normalize`]d) with hunk `index` put back to the template's lines.
 pub fn revert_hunk(template: &str, edited: &str, index: usize) -> String {
     let before = normalize(template);
     let after = align_numelements(&before, &normalize(edited));
-    let Some(Hunk { old, new }) = line_hunks(&before, &after).into_iter().nth(index) else {
+    let lines = Lines::new(&before, &after);
+    let Some(Hunk { old, new }) = patch_hunks(&lines).into_iter().nth(index) else {
         return after;
     };
-    let before_lines: Vec<&str> = before.split_inclusive('\n').collect();
-    let after_lines: Vec<&str> = after.split_inclusive('\n').collect();
     let mut out = String::with_capacity(after.len());
-    after_lines[..new.start].iter().for_each(|line| out.push_str(line));
-    before_lines[old].iter().for_each(|line| out.push_str(line));
-    after_lines[new.end..].iter().for_each(|line| out.push_str(line));
+    lines.after[..new.start].iter().for_each(|line| out.push_str(line));
+    lines.before[old].iter().for_each(|line| out.push_str(line));
+    lines.after[new.end..].iter().for_each(|line| out.push_str(line));
     out
 }
 
@@ -962,6 +1038,14 @@ mod tests {
         assert_eq!(apply_to_template(&patch, template), "a\nd\n");
         // Before its fix the blank lines were read as lines, and written again as a block adding them.
         assert_eq!(object_patch("m", template, "a\nd\n").as_deref(), Some(patch.as_str()));
+    }
+
+    #[test]
+    fn a_block_of_whole_elements_nests() {
+        assert!(nests(&["<hkobject>", "<hkparam name=\"a\">1</hkparam>", "<hkparam name=\"b\"/>", "</hkobject>"]));
+        assert!(nests(&["<!-- comment -->", "#0105"]));
+        assert!(!nests(&["</hkparam>", "<hkparam name=\"b\" numelements=\"1\">"]));
+        assert!(!nests(&["<hkobject>"]));
     }
 
     /// A deletion written again passes d-merge's parser.
