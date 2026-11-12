@@ -179,3 +179,52 @@ impl Workspace {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::*;
+
+    /// The shipped templates of the repository.
+    fn template_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates")
+    }
+
+    /// On all the mods in a folder (`PATCH_EDITOR_MODS`, e.g. MO2's `mods`): a behavior patch that
+    /// d-merge's parser accepts as the mod has it is still accepted once read and written again.
+    ///
+    /// e.g., `Combat Gameplay Overhaul` deletes elements of `#0521` with blank lines. They were read as
+    /// lines, and the written patch had a block adding blank lines, which the parser rejects.
+    #[test]
+    #[ignore = "needs real mods"]
+    fn a_patch_read_and_written_again_still_parses() {
+        let mods = std::env::var("PATCH_EDITOR_MODS").unwrap();
+        let (mut total, mut broken) = (0, 0);
+        for mod_dir in std::fs::read_dir(&mods).unwrap().flatten().map(|entry| entry.path()) {
+            let Ok(codes) = std::fs::read_dir(mod_dir.join("Nemesis_Engine").join("mod")) else { continue };
+            for code_dir in codes.flatten().map(|entry| entry.path()).filter(|dir| dir.is_dir()) {
+                let Ok((workspace, code, _)) = Workspace::import(&code_dir, &template_root()) else { continue };
+                for behavior in workspace.behaviors.iter().filter(|behavior| !behavior.is_anim_data()) {
+                    for id in behavior.edits.keys() {
+                        let file =
+                            behavior.patch_folders_in(&code_dir).into_iter().map(|dir| dir.join(format!("{id}.txt")));
+                        let Some(original) = file.filter_map(|path| read_text(&path).ok()).next() else { continue };
+                        if nemesis_diff::validate(&original).is_err() {
+                            continue; // d-merge rejects it as well: not ours to fix.
+                        }
+                        total += 1;
+                        let written = behavior.patch(&code, id).unwrap_or_default();
+                        if let Err(err) = nemesis_diff::validate(&written) {
+                            broken += 1;
+                            let first = err.lines().next().unwrap_or_default();
+                            println!("{} {}/{id}: {first}", code_dir.display(), behavior.name);
+                        }
+                    }
+                }
+            }
+        }
+        println!("{broken} of {total} patches broken by writing them again");
+        assert_eq!(broken, 0);
+    }
+}

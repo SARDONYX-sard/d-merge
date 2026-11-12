@@ -34,7 +34,22 @@
 //! 1                   RotationsLen
 //! 3.3 0 0 0 1         Rotation(0)
 //! ```
-//! `MOD_CODE` markers and the template's lines after `ORIGINAL` are not part of the layout.
+//! # Patches
+//! A patch is a free line diff, like git's: a block may replace any lines with any number of lines,
+//! and its counts don't have to say how many elements the mod's side has. So, as d-merge's parser
+//! does, the layout is read on the template's side (the lines around the blocks and those after
+//! `ORIGINAL`), whose counts are right, and the mod's lines get their roles from it:
+//! ```text
+//! 1                   ClipTriggersLen         template's side: walked
+//! <!-- MOD_CODE ~m~ OPEN -->
+//! a:0.1               ClipTrigger(0)          k-th line of the block = k-th line of `ORIGINAL`
+//! b:0.2               ClipTrigger(1)          past them: what follows the line before, see `LineRole::after`
+//! <!-- ORIGINAL -->
+//! x:0.5               ClipTrigger(0)          template's side: walked
+//! <!-- CLOSE -->
+//! ```
+//! A block without `ORIGINAL` adds lines: they follow the line before them, e.g. a push after the last
+//! trigger is the next trigger. Blank lines of a block are Nemesis' marks of deleted lines.
 //!
 //! An anim set's anim infos go to the end of the file whatever its count says: a pushing patch does
 //! not change the count (see [`nemesis_diff::asdsf::add_anim_infos`]).
@@ -42,7 +57,7 @@
 //! The format allows too much for these roles to tell what is wrong: they are a guide to reading a
 //! file. What is wrong is for d-merge's parser to say, see [`crate::patch::anim::patch_file`].
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Range};
 
 use egui_code_editor::{CompletionList, Language, languages::Xml};
 
@@ -124,6 +139,48 @@ impl LineRole {
         }
     }
 
+    /// The role of a line added after a line of this role: the next element of the list it is in, or
+    /// the first element of the list it counts. An added line is far more often an element than the
+    /// next field, which a patch has no reason to add.
+    ///
+    /// e.g., `Trigger(1)` -> `Trigger(2)`, `TriggersLen` -> `Trigger(0)`, `AnimExtension(0)` -> `AnimDir(1)`
+    const fn after(self) -> Self {
+        match self {
+            Self::Version => Self::TriggersLen,
+            Self::TriggersLen => Self::Trigger(0),
+            Self::Trigger(i) => Self::Trigger(i + 1),
+            Self::ConditionsLen => Self::ConditionVariable(0),
+            Self::ConditionVariable(i) => Self::ConditionA(i),
+            Self::ConditionA(i) => Self::ConditionB(i),
+            Self::ConditionB(i) => Self::ConditionVariable(i + 1),
+            Self::AttacksLen => Self::AttackTrigger(0),
+            Self::AttackTrigger(i) => Self::AttackContextual(i),
+            Self::AttackContextual(i) => Self::AttackClipsLen(i),
+            Self::AttackClipsLen(i) | Self::AttackClip(i) => Self::AttackClip(i),
+            Self::AnimInfosLen => Self::AnimDir(0),
+            Self::AnimDir(i) => Self::AnimFile(i),
+            Self::AnimFile(i) => Self::AnimExtension(i),
+            Self::AnimExtension(i) => Self::AnimDir(i + 1),
+
+            Self::ClipName => Self::ClipId,
+            Self::ClipId => Self::Speed,
+            Self::Speed => Self::CropStart,
+            Self::CropStart => Self::CropEnd,
+            Self::CropEnd => Self::ClipTriggersLen,
+            Self::ClipTriggersLen => Self::ClipTrigger(0),
+            Self::ClipTrigger(i) => Self::ClipTrigger(i + 1),
+
+            Self::MotionId => Self::Duration,
+            Self::Duration => Self::TranslationsLen,
+            Self::TranslationsLen => Self::Translation(0),
+            Self::Translation(i) => Self::Translation(i + 1),
+            Self::RotationsLen => Self::Rotation(0),
+            Self::Rotation(i) => Self::Rotation(i + 1),
+
+            Self::Other => Self::Other,
+        }
+    }
+
     /// What the hover says.
     pub(in crate::patch) const fn doc(self) -> Option<&'static str> {
         Some(match self {
@@ -169,33 +226,92 @@ impl LineRole {
     }
 }
 
-/// Goes through the lines that belong to the layout, setting their roles.
+/// Where a line of a patch is. See the module docs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Part {
+    /// Around the blocks: both the template's and the mod's.
+    Common,
+    /// From `OPEN` to `ORIGINAL` or `CLOSE`: the mod's.
+    Open,
+    /// From `ORIGINAL` to `CLOSE`: the template's.
+    Original,
+    /// `<!-- ... -->`
+    Marker,
+}
+
+/// One block of a patch, by line numbers.
+///
+/// ```text
+/// <!-- MOD_CODE ~m~ OPEN -->
+/// a                   open
+/// <!-- ORIGINAL -->
+/// x                   original (empty: the block adds `open`)
+/// <!-- CLOSE -->
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Block {
+    open: Range<usize>,
+    original: Range<usize>,
+}
+
+/// The part of every line, and the blocks.
+fn parts(lines: &[&str]) -> (Vec<Part>, Vec<Block>) {
+    let mut parts = Vec::with_capacity(lines.len());
+    let mut blocks = Vec::new();
+    let mut section = Part::Common;
+    for (no, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("<!--") {
+            parts.push(section);
+            continue;
+        }
+        parts.push(Part::Marker);
+        if trimmed.starts_with("<!-- MOD_CODE") {
+            section = Part::Open;
+            blocks.push(Block { open: no + 1..no + 1, original: no + 1..no + 1 });
+        } else if trimmed.starts_with("<!-- ORIGINAL") {
+            section = Part::Original;
+            if let Some(block) = blocks.last_mut() {
+                block.open.end = no;
+                block.original = no + 1..no + 1;
+            }
+        } else if trimmed.starts_with("<!-- CLOSE") {
+            if let Some(block) = blocks.last_mut() {
+                match section {
+                    Part::Open => block.open.end = no,
+                    Part::Original => block.original.end = no,
+                    Part::Common | Part::Marker => {}
+                }
+            }
+            section = Part::Common;
+        }
+    }
+    (parts, blocks)
+}
+
+/// Goes through the lines of the template's side, setting their roles.
 struct Walk<'a> {
     /// `(line number, text)`
     lines: Vec<(usize, &'a str)>,
     at: usize,
     roles: Vec<LineRole>,
+    /// A count was not a number: the rest of the text is not in this layout.
+    misfit: bool,
 }
 
 impl<'a> Walk<'a> {
-    fn new(text: &'a str) -> Self {
-        let mut in_original = false;
-        let mut lines = Vec::new();
-        let count = text.split('\n').count();
-        for (no, line) in text.split('\n').enumerate() {
-            let trimmed = line.trim();
+    fn new(lines: &[&'a str], parts: &[Part]) -> Self {
+        let last = lines.len().saturating_sub(1);
+        let mut walked = Vec::new();
+        for (no, (line, part)) in lines.iter().zip(parts).enumerate() {
             // Blank lines may separate elements. The last one is where the next line gets typed:
             // it has the role of what comes next, for the completion.
-            let is_separator = trimmed.is_empty() && no + 1 < count;
-            if trimmed.starts_with("<!-- ORIGINAL") {
-                in_original = true;
-            } else if trimmed.starts_with("<!-- CLOSE") {
-                in_original = false;
-            } else if !trimmed.starts_with("<!--") && !in_original && !is_separator {
-                lines.push((no, line));
+            let is_separator = line.trim().is_empty() && no != last;
+            if matches!(part, Part::Common | Part::Original) && !is_separator {
+                walked.push((no, *line));
             }
         }
-        Self { lines, at: 0, roles: vec![LineRole::Other; count] }
+        Self { lines: walked, at: 0, roles: vec![LineRole::Other; lines.len()], misfit: false }
     }
 
     const fn is_done(&self) -> bool {
@@ -212,7 +328,9 @@ impl<'a> Walk<'a> {
 
     /// Gives the next line this role, and reads it as a count.
     fn count(&mut self, role: LineRole) -> Option<u32> {
-        self.set(role)?.trim().parse().ok()
+        let count = self.set(role)?.trim().parse().ok();
+        self.misfit |= count.is_none();
+        count
     }
 
     /// `count` lines per element.
@@ -279,8 +397,55 @@ fn walk_motion(walk: &mut Walk<'_>) -> Option<()> {
 }
 
 /// The role of every line of an anim set patch or a clip data patch, by the file `id`.
+///
+/// The template's side is walked, then the mod's lines get their roles from it: see the module docs.
 pub(in crate::patch) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRole> {
-    let mut walk = Walk::new(text);
+    let lines: Vec<&str> = text.split('\n').collect();
+    let (parts, blocks) = parts(&lines);
+    let (mut roles, fits) = walk_template_side(is_adsf, id, &lines, &parts);
+    for block in &blocks {
+        set_block_roles(&mut roles, &lines, block, fits);
+    }
+    // The line being typed at the end, if the walk did not get to it.
+    if fits
+        && let Some(last) = lines.len().checked_sub(1)
+        && lines[last].trim().is_empty()
+        && parts[last] == Part::Common
+        && roles[last] == LineRole::Other
+    {
+        roles[last] = role_before(&roles, last).after();
+    }
+    roles
+}
+
+/// The last role before line `at` (`Other` if none).
+fn role_before(roles: &[LineRole], at: usize) -> LineRole {
+    roles[..at].iter().rev().find(|role| **role != LineRole::Other).copied().unwrap_or(LineRole::Other)
+}
+
+/// The roles of the mod's lines of `block`: the k-th has the role of the k-th line it replaces, and
+/// those past them follow the line before.
+///
+/// e.g., `OPEN` `a`, `b`, `ORIGINAL` `x` (`ClipTrigger(0)`) -> `a`: `ClipTrigger(0)`, `b`: `ClipTrigger(1)`
+///
+/// `fits`: the template's side fits the layout. If not, nothing is guessed: only replacing lines get roles.
+fn set_block_roles(roles: &mut [LineRole], lines: &[&str], block: &Block, fits: bool) {
+    let mut before = role_before(roles, block.open.start);
+    let mut replaced = block.original.clone(); // the lines of `ORIGINAL` not matched yet
+    for no in block.open.clone() {
+        if lines[no].trim().is_empty() {
+            continue; // Nemesis' mark of a deleted line.
+        }
+        let replacing = replaced.find(|at| roles[*at] != LineRole::Other).map(|at| roles[at]);
+        let role = replacing.unwrap_or(if fits { before.after() } else { LineRole::Other });
+        roles[no] = role;
+        before = role;
+    }
+}
+
+/// The roles of the lines of the template's side, and whether they fit the layout. See [`Walk`].
+fn walk_template_side(is_adsf: bool, id: &str, lines: &[&str], parts: &[Part]) -> (Vec<LineRole>, bool) {
+    let mut walk = Walk::new(lines, parts);
     let _partial = if is_adsf {
         match AdsfFile::of(id) {
             AdsfFile::AddAnim | AdsfFile::IndexedAnim => walk_clip(&mut walk),
@@ -293,7 +458,8 @@ pub(in crate::patch) fn roles(is_adsf: bool, id: &str, text: &str) -> Vec<LineRo
             AsdsfFile::ProjectsHeader | AsdsfFile::SetsHeader => None,
         }
     };
-    walk.roles
+    let fits = !walk.misfit && walk.at > 0; // A header has no layout: nothing was walked.
+    (walk.roles, fits)
 }
 
 /// The editor's language for these files.
@@ -384,14 +550,89 @@ mod tests {
     }
 
     #[test]
-    fn markers_and_the_template_lines_are_not_in_the_layout() {
+    fn a_replacing_line_has_the_role_of_the_line_it_replaces() {
         let clip = "Idle\n1\n1\n0\n0\n<!-- MOD_CODE ~m~ OPEN -->\n1\n<!-- ORIGINAL -->\n0\n<!-- CLOSE -->\nDraw:0.5\n";
         let roles = roles(true, "D~1/Idle~348.txt", clip);
         assert_eq!(roles[4], LineRole::CropEnd);
-        assert_eq!(roles[5], LineRole::Other);
+        assert_eq!(roles[5], LineRole::Other); // marker
         assert_eq!(roles[6], LineRole::ClipTriggersLen);
-        assert_eq!(roles[8], LineRole::Other);
+        assert_eq!(roles[8], LineRole::ClipTriggersLen); // the template's line it replaces
         assert_eq!(roles[10], LineRole::ClipTrigger(0));
+    }
+
+    /// The mod's count says 2, but there is one trigger: the template's count is what the layout is read
+    /// by, as d-merge's parser does.
+    #[test]
+    fn the_counts_are_the_templates() {
+        let lines = [
+            "V3",
+            "<!-- MOD_CODE ~m~ OPEN -->",
+            "2", // 2
+            "<!-- ORIGINAL -->",
+            "1", // 4
+            "<!-- CLOSE -->",
+            "trig", // 6
+            "0",    // 7
+            "0",    // 8
+            "0",    // 9
+        ];
+        let roles = roles(false, "A~A/x.txt", &lines.join("\n"));
+        assert_eq!(roles[2], LineRole::TriggersLen);
+        assert_eq!(roles[4], LineRole::TriggersLen);
+        assert_eq!(roles[6], LineRole::Trigger(0));
+        assert_eq!(roles[7], LineRole::ConditionsLen);
+        assert_eq!(roles[8], LineRole::AttacksLen);
+        assert_eq!(roles[9], LineRole::AnimInfosLen);
+    }
+
+    #[test]
+    fn added_lines_follow_the_line_before_them() {
+        let lines = [
+            "Idle",
+            "1",
+            "1",
+            "0",
+            "0",
+            "1",
+            "a:0.1", // 6: ClipTrigger(0)
+            "<!-- MOD_CODE ~m~ OPEN -->",
+            "b:0.2", // 8: a push
+            "c:0.3", // 9
+            "<!-- CLOSE -->",
+        ];
+        let roles = roles(true, "D~1/Idle~348.txt", &lines.join("\n"));
+        assert_eq!(roles[6], LineRole::ClipTrigger(0));
+        assert_eq!(roles[8], LineRole::ClipTrigger(1));
+        assert_eq!(roles[9], LineRole::ClipTrigger(2));
+    }
+
+    /// More lines than it replaces: those past them follow; blank ones mark deleted lines.
+    #[test]
+    fn a_block_may_have_any_number_of_lines() {
+        let lines = [
+            "m$0",
+            "1",
+            "1",
+            "<!-- MOD_CODE ~m~ OPEN -->",
+            "0.5 0 0 0", // 4: Translation(0)
+            "1 0 0 0",   // 5: Translation(1)
+            "<!-- ORIGINAL -->",
+            "1 0 0 0", // 7
+            "<!-- CLOSE -->",
+            "1",
+            "<!-- MOD_CODE ~m~ OPEN -->",
+            "", // 11: deleted
+            "<!-- ORIGINAL -->",
+            "1 0 0 0 1", // 13
+            "<!-- CLOSE -->",
+        ];
+        let roles = roles(true, "D~1/m$0.txt", &lines.join("\n"));
+        assert_eq!(roles[4], LineRole::Translation(0));
+        assert_eq!(roles[5], LineRole::Translation(1));
+        assert_eq!(roles[7], LineRole::Translation(0));
+        assert_eq!(roles[9], LineRole::RotationsLen);
+        assert_eq!(roles[11], LineRole::Other);
+        assert_eq!(roles[13], LineRole::Rotation(0));
     }
 
     #[test]

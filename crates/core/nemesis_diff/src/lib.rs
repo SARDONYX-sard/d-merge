@@ -973,7 +973,10 @@ mod tests {
                         \t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">1.000000</hkparam>\n\t\t\t\t</hkobject>\n\
                         \t\t\t</hkparam>\n\
                         \t\t</hkobject>\n";
-        let edited = template.replace("\t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">1.000000</hkparam>\n\t\t\t\t</hkobject>\n", "");
+        let edited = template.replace(
+            "\t\t\t\t<hkobject>\n\t\t\t\t\t<hkparam name=\"localTime\">1.000000</hkparam>\n\t\t\t\t</hkobject>\n",
+            "",
+        );
         let patch = object_patch("mymod", template, &edited).unwrap();
         assert!(patch.contains("OPEN -->\n\n\n\n<!-- ORIGINAL -->"), "{patch}");
         validate(&patch).unwrap();
