@@ -45,9 +45,9 @@ impl PatchTool {
     pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
         self.tree_focus = true;
         self.tree_view = true;
-        self.side_view = crate::patch::ui::side_bar::SideView::Explorer;
-        self.side_bar_hidden = false;
-        self.objects_closed = false;
+        self.side.view = crate::patch::ui::side_bar::SideView::Explorer;
+        self.side.hidden = false;
+        self.side.objects_closed = false;
         self.filter.clear();
         ui.memory_mut(|m| m.surrender_focus(editor));
     }

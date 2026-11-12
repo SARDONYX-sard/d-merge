@@ -46,7 +46,7 @@ use gui_shared::{
     },
 };
 
-use self::workspace::{Behavior, TemplateEntry, Workspace};
+use self::workspace::{Behavior, Workspace};
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
@@ -106,12 +106,8 @@ pub(crate) struct PatchTool {
     mod_code: String,
     /// `settings.behavior.template_dir` (`.bin` or `.xml` templates under `meshes/`).
     template_dir: String,
-    /// Templates found in `template_dir` that the work's scope allows, for the picker.
-    catalog: Vec<TemplateEntry>,
-    /// `(template_dir, scope)` of `catalog`.
-    catalog_for: Option<(String, workspace::TemplateScope)>,
-    picker_open: bool,
-    picker_filter: String,
+    /// The window of the templates to add. See [`ui::template_picker`].
+    picker: ui::template_picker::TemplatePicker,
     /// The next quick pick window drawn takes the keyboard.
     focus_quick_pick: bool,
     /// The details of the bar above are shown. See [`ui::top_bar`].
@@ -206,20 +202,12 @@ pub(crate) struct PatchTool {
     search: search::Search,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
-    /// The view of the side bar. See [`ui::side_bar`].
-    side_view: ui::side_bar::SideView,
-    /// Only the activity bar shows: its icon of the view shown was clicked.
-    side_bar_hidden: bool,
-    /// The OBJECTS section of the explorer is folded.
-    objects_closed: bool,
+    /// The side bar: which view, and whether it shows. See [`ui::side_bar`].
+    side: ui::side_bar::SideBar,
     /// Edits made, counted: what is found anew after one, e.g. [`changes::Pending`].
     edits: u64,
-    /// The changes since the last revision. See [`changes`].
-    pending: changes::Pending,
-    /// The message of the next revision, as it is typed.
-    commit_message: String,
-    /// The name of a new branch, while it is typed.
-    new_branch: Option<String>,
+    /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
+    scm: changes::Scm,
     /// The lines accepted last in the merge panel: where the conflict is now. See [`editor::merge`].
     merge_accepted: Vec<String>,
     /// The window making many objects from one. See [`repeat`].
@@ -227,17 +215,9 @@ pub(crate) struct PatchTool {
     /// The window of a diff or a blame of the history. See [`ui::revision_view`].
     revision_view: Option<ui::revision_view::RevisionView>,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
-    problems: Option<Vec<problems::Problem>>,
-    /// The work changed as a whole: `problems` are found again.
-    problems_stale: bool,
-    /// The Problems panel shows: a click on the status bar's counts.
-    problems_open: bool,
-    /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
-    anim_folders_open: fast_hash::HashSet<String>,
-    /// The button above the list was clicked: done where the list has its files.
-    anim_expand_all: bool,
-    /// The selection the way to it was last opened for.
-    anim_revealed: Option<Rc<str>>,
+    problems: problems::Problems,
+    /// The tree of the animation data files. See [`ui::anim_tree`].
+    anim_tree: ui::anim_tree::AnimTreeState,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
     /// The works opened lately, the last one first. From the settings.
@@ -262,8 +242,6 @@ pub(crate) struct PatchTool {
     names: Option<(usize, Rc<editor::names::Names>)>,
     /// Objects edited since `names` last looked. See [`Self::object_changed`].
     changed_objects: Vec<String>,
-    /// Directories opened / closed in the template picker's tree.
-    picker_toggled: fast_hash::HashSet<String>,
     new_names: vars_edit::NewNames,
     vars_error: Option<String>,
 }

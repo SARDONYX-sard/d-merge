@@ -28,15 +28,15 @@ use crate::patch::{
 impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let anim = self.workspace.behaviors[self.active].is_anim_data();
-        let mut open = !self.objects_closed;
+        let mut open = !self.side.objects_closed;
         super::behaviors::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
             // Right to left: VS Code's order is `[+] [≡] [⋯]`.
             self.more_menu(ui, i18n, anim);
             self.view_buttons(ui, i18n, anim);
             self.new_button(ui, i18n, anim);
         });
-        self.objects_closed = !open;
-        if self.objects_closed {
+        self.side.objects_closed = !open;
+        if self.side.objects_closed {
             return;
         }
         ui.add(
@@ -64,10 +64,10 @@ impl PatchTool {
     fn view_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, anim: bool) {
         if anim {
             let expand = Button::new("").icon(Icon::ChevronDown).small();
-            self.anim_expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::ExpandAllButton)).clicked();
+            self.anim_tree.expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::ExpandAllButton)).clicked();
             let collapse = Button::new("").icon(Icon::ChevronRight).small();
             if ui.add(collapse).on_hover_text(i18n.t(I18nKey::CollapseAllButton)).clicked() {
-                self.anim_folders_open.clear();
+                self.anim_tree.open.clear();
             }
             return;
         }
@@ -164,17 +164,17 @@ impl PatchTool {
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         // Only when the selection changes or the editor gets the keyboard: else what is open is the user's.
         let forced = std::mem::take(&mut self.reveal_in_side_bar);
-        let reveal = take_reveal(&mut self.anim_revealed, self.selected.as_ref(), forced);
+        let reveal = take_reveal(&mut self.anim_tree.revealed, self.selected.as_ref(), forced);
         if reveal && let Some(id) = &self.selected {
-            anim_tree::reveal(&mut self.anim_folders_open, is_adsf, id);
+            anim_tree::reveal(&mut self.anim_tree.open, is_adsf, id);
         }
         let nodes = self.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let files: Vec<AnimFile<'_>> =
             nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect();
-        if std::mem::take(&mut self.anim_expand_all) {
-            anim_tree::expand_all(&mut self.anim_folders_open, &files);
+        if std::mem::take(&mut self.anim_tree.expand_all) {
+            anim_tree::expand_all(&mut self.anim_tree.open, &files);
         }
-        let rows = anim_tree::rows(&files, &self.anim_folders_open, is_adsf, !self.filter.is_empty());
+        let rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, !self.filter.is_empty());
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
@@ -195,11 +195,11 @@ impl PatchTool {
                         }
                         response.context_menu(|ui| {
                             if ui.button(i18n.t(I18nKey::NemesisExpandAllBelow)).clicked() {
-                                anim_tree::expand(&mut self.anim_folders_open, name);
+                                anim_tree::expand(&mut self.anim_tree.open, name);
                                 ui.close();
                             }
                             if ui.button(i18n.t(I18nKey::NemesisCollapseAllBelow)).clicked() {
-                                anim_tree::collapse(&mut self.anim_folders_open, name);
+                                anim_tree::collapse(&mut self.anim_tree.open, name);
                                 ui.close();
                             }
                             ui.separator();
@@ -224,7 +224,7 @@ impl PatchTool {
             }
         });
         if let Some(key) = toggled {
-            anim_tree::toggle(&mut self.anim_folders_open, &key);
+            anim_tree::toggle(&mut self.anim_tree.open, &key);
         }
         self.apply_row_action(ui, graph, menu_action);
         self.duplicate_anim_files();
@@ -245,7 +245,7 @@ impl PatchTool {
         for id in &made {
             self.object_changed(id);
         }
-        self.anim_folders_open.insert(to);
+        self.anim_tree.open.insert(to);
     }
 
     /// `    ● Idle~mymod$0.txt`

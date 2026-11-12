@@ -64,7 +64,7 @@ impl PatchTool {
         self.behaviors_open = open;
         match add {
             Some(AddEvent::Template) => {
-                self.picker_open = true;
+                self.picker.open = true;
                 self.focus_quick_pick = true;
             }
             Some(AddEvent::File) => self.add_custom_template(notify, i18n),
@@ -144,47 +144,47 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        if !self.picker_open {
+        if !self.picker.open {
             return;
         }
         let scope = self.workspace.scope;
-        let fresh = self.catalog_for.as_ref().is_some_and(|(dir, of)| *dir == self.template_dir && *of == scope);
+        let fresh = self.picker.catalog_for.as_ref().is_some_and(|(dir, of)| *dir == self.template_dir && *of == scope);
         if !fresh {
-            self.catalog = crate::patch::workspace::catalog(Path::new(&self.template_dir), scope);
-            self.catalog_for = Some((self.template_dir.clone(), scope));
+            self.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.template_dir), scope);
+            self.picker.catalog_for = Some((self.template_dir.clone(), scope));
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut picked = None;
         quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open).show(ctx, |ui| {
             picked = self.template_picker_ui(ui, i18n);
         });
-        self.picker_open = open && picked.is_none();
+        self.picker.open = open && picked.is_none();
         if let Some(path) = picked {
             self.add_behavior(&path, notify, i18n);
         }
     }
 
     fn template_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PathBuf> {
-        let field = TextEdit::singleline(&mut self.picker_filter)
+        let field = TextEdit::singleline(&mut self.picker.filter)
             .hint_text(i18n.t(I18nKey::NemesisFilterHint))
             .desired_width(ui.available_width());
         let field = ui.add(field);
         if std::mem::take(&mut self.focus_quick_pick) {
             field.request_focus();
         }
-        ui.weak(format!("{} ({})", self.template_dir, self.catalog.len()));
+        ui.weak(format!("{} ({})", self.template_dir, self.picker.catalog.len()));
         if self.workspace.scope == TemplateScope::Nemesis {
             ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
         }
-        if self.catalog.is_empty() {
+        if self.picker.catalog.is_empty() {
             ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
             return None;
         }
         // No filter: as a directory tree. A filter wants all the matches at once.
-        let clicked = if self.picker_filter.is_empty() {
-            super::template_picker::tree_ui(ui, &self.catalog, &mut self.picker_toggled, i18n)
+        let clicked = if self.picker.filter.is_empty() {
+            super::template_picker::tree_ui(ui, &self.picker.catalog, &mut self.picker.toggled, i18n)
         } else {
-            super::template_picker::filtered_ui(ui, &self.catalog, &self.picker_filter, i18n)
+            super::template_picker::filtered_ui(ui, &self.picker.catalog, &self.picker.filter, i18n)
         };
         clicked.map(Path::to_path_buf)
     }

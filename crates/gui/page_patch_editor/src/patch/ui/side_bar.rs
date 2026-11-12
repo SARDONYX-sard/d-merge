@@ -37,6 +37,16 @@ pub(in crate::patch) enum SideView {
     Variables,
 }
 
+/// What the side bar shows.
+#[derive(Debug, Default)]
+pub(in crate::patch) struct SideBar {
+    pub(in crate::patch) view: SideView,
+    /// Only the activity bar shows: the icon of the view shown was clicked.
+    pub(in crate::patch) hidden: bool,
+    /// The OBJECTS section of the explorer is folded.
+    pub(in crate::patch) objects_closed: bool,
+}
+
 /// The views in the activity bar, top to bottom: `(view, icon, name, key)`.
 /// The order is the user's (not VS Code's): from the bottom, events / variables, explorer, changes,
 /// search.
@@ -66,12 +76,12 @@ impl PatchTool {
             .resizable(false)
             .exact_size(ACTIVITY_SIZE)
             .show(ui, |ui| self.activity_bar(ui, i18n));
-        if self.side_bar_hidden {
+        if self.side.hidden {
             return;
         }
         egui::Panel::left((id, "side_bar")).resizable(true).default_size(320.0).show(ui, |ui| {
-            let (_, _, title, _) = VIEWS.iter().find(|(view, ..)| *view == self.side_view).copied().unwrap_or(VIEWS[0]);
-            match self.side_view {
+            let (_, _, title, _) = VIEWS.iter().find(|(view, ..)| *view == self.side.view).copied().unwrap_or(VIEWS[0]);
+            match self.side.view {
                 SideView::Explorer => {
                     view_title(ui, i18n.t(title));
                     self.behaviors_section(ui, i18n, notify);
@@ -102,12 +112,12 @@ impl PatchTool {
 
     /// Shows `view`, or hides the side bar if it is the one shown, as a click on its icon does.
     pub(in crate::patch) fn toggle_side_view(&mut self, view: SideView) {
-        if self.side_view == view && !self.side_bar_hidden {
-            self.side_bar_hidden = true;
+        if self.side.view == view && !self.side.hidden {
+            self.side.hidden = true;
             return;
         }
-        self.side_view = view;
-        self.side_bar_hidden = false;
+        self.side.view = view;
+        self.side.hidden = false;
         self.focus_search |= view == SideView::Search;
     }
 
@@ -117,8 +127,8 @@ impl PatchTool {
         let keys = [(Key::E, SideView::Explorer), (Key::F, SideView::Search), (Key::G, SideView::Changes)];
         for (key, view) in keys {
             if ui.input_mut(|input| input.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, key)) {
-                self.side_view = view;
-                self.side_bar_hidden = false;
+                self.side.view = view;
+                self.side.hidden = false;
                 self.focus_search |= view == SideView::Search;
             }
         }
@@ -127,11 +137,11 @@ impl PatchTool {
     /// The icons of [`VIEWS`]: the one shown has a bar on its left, as in VS Code; Changes has the
     /// count of changes on it.
     fn activity_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        self.pending.refresh(&self.workspace, self.edits);
-        let changes = self.pending.changes.len();
+        self.scm.pending.refresh(&self.workspace, self.edits);
+        let changes = self.scm.pending.changes.len();
         let mut clicked = None;
         for (view, icon, name, key) in VIEWS {
-            let shown = view == self.side_view && !self.side_bar_hidden;
+            let shown = view == self.side.view && !self.side.hidden;
             // As wide as the panel lets it: `ACTIVITY_SIZE` is the panel's, its margins included.
             let size = egui::vec2(ui.available_width(), ACTIVITY_SIZE);
             let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
@@ -162,17 +172,17 @@ impl PatchTool {
     fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut egui_widgets::notify::Notification) {
         view_title(ui, i18n.t(I18nKey::SideChanges));
         self.branch_row(ui, i18n, notify);
-        self.pending.refresh(&self.workspace, self.edits);
+        self.scm.pending.refresh(&self.workspace, self.edits);
         self.commit_box(ui, i18n);
 
         let mut picked = None;
         egui::ScrollArea::both().id_salt("side_changes").auto_shrink(false).show(ui, |ui| {
-            let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), self.pending.changes.len());
+            let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), self.scm.pending.changes.len());
             egui::CollapsingHeader::new(title).id_salt("side_pending").default_open(true).show(ui, |ui| {
-                if self.pending.changes.is_empty() {
+                if self.scm.pending.changes.is_empty() {
                     ui.weak(i18n.t(I18nKey::SideNoChanges));
                 }
-                for change in &self.pending.changes {
+                for change in &self.scm.pending.changes {
                     if let Some(action) = change_row(ui, i18n, &self.workspace, change, None) {
                         picked = Some(action);
                     }
@@ -255,14 +265,14 @@ impl PatchTool {
                     }
                 }
             });
-            match &mut self.new_branch {
+            match &mut self.scm.new_branch {
                 None => {
                     if ui
                         .add(Button::new("").icon(Icon::Plus).small())
                         .on_hover_text(i18n.t(I18nKey::SideNewBranch))
                         .clicked()
                     {
-                        self.new_branch = Some(String::new());
+                        self.scm.new_branch = Some(String::new());
                     }
                 }
                 Some(name) => {
@@ -271,12 +281,12 @@ impl PatchTool {
                     );
                     if field.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
                         let name = std::mem::take(name);
-                        self.new_branch = None;
+                        self.scm.new_branch = None;
                         if self.workspace.history.create_branch(&name) {
                             self.mark_dirty();
                         }
                     } else if field.lost_focus() {
-                        self.new_branch = None;
+                        self.scm.new_branch = None;
                     } else {
                         field.request_focus();
                     }
@@ -353,13 +363,13 @@ impl PatchTool {
 
     /// `[message............] [Commit]`: a revision of the changes. `Ctrl+Enter` in the field too.
     fn commit_box(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let can_commit = !self.pending.changes.is_empty() && !self.commit_message.trim().is_empty();
+        let can_commit = !self.scm.pending.changes.is_empty() && !self.scm.commit_message.trim().is_empty();
         let mut commit = false;
         ui.horizontal(|ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let button = Button::new(i18n.t(I18nKey::SideCommit)).small().primary();
                 commit |= ui.add_enabled(can_commit, button).on_hover_text(i18n.t(I18nKey::SideCommitHover)).clicked();
-                let field = egui::TextEdit::singleline(&mut self.commit_message)
+                let field = egui::TextEdit::singleline(&mut self.scm.commit_message)
                     .hint_text(i18n.t(I18nKey::SideCommitMessageHint))
                     .desired_width(ui.available_width());
                 let response = ui.add(field);
@@ -370,7 +380,7 @@ impl PatchTool {
         if commit {
             let time =
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_secs());
-            let message = std::mem::take(&mut self.commit_message);
+            let message = std::mem::take(&mut self.scm.commit_message);
             let workspace = &mut self.workspace;
             let mut history = std::mem::take(&mut workspace.history);
             history.commit(workspace, &message, time);
@@ -506,10 +516,10 @@ mod tests {
     fn a_view_icon_shows_or_hides() {
         let mut tool = PatchTool::default();
         tool.toggle_side_view(SideView::Search);
-        assert_eq!((tool.side_view, tool.side_bar_hidden, tool.focus_search), (SideView::Search, false, true));
+        assert_eq!((tool.side.view, tool.side.hidden, tool.focus_search), (SideView::Search, false, true));
         tool.toggle_side_view(SideView::Search);
-        assert!(tool.side_bar_hidden);
+        assert!(tool.side.hidden);
         tool.toggle_side_view(SideView::Changes);
-        assert_eq!((tool.side_view, tool.side_bar_hidden), (SideView::Changes, false));
+        assert_eq!((tool.side.view, tool.side.hidden), (SideView::Changes, false));
     }
 }

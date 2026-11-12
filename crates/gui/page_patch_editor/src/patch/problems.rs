@@ -24,6 +24,17 @@ use super::{
     workspace::{Behavior, ObjectText},
 };
 
+/// The problems of the work, and how they are shown.
+#[derive(Debug, Default)]
+pub(super) struct Problems {
+    /// `None` until the work was checked.
+    pub(super) list: Option<Vec<Problem>>,
+    /// The work changed as a whole (read, loaded, restored): `list` is found again.
+    pub(super) stale: bool,
+    /// The Problems panel shows: a click on the status bar's counts.
+    pub(super) open: bool,
+}
+
 /// One problem.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Problem {
@@ -108,19 +119,19 @@ impl PatchTool {
 
     /// Checks the whole work again if it changed as a whole (read, loaded, restored). Call each frame.
     pub(super) fn diagnose_work(&mut self) {
-        if !self.problems_stale || self.job.is_some() || self.loaded_for.is_none() {
+        if !self.problems.stale || self.job.is_some() || self.loaded_for.is_none() {
             return;
         }
         let mut found: Vec<Problem> =
             (0..self.workspace.behaviors.len()).flat_map(|index| behavior_problems(self.checker(index))).collect();
         sort(&mut found);
-        self.problems = Some(found);
-        self.problems_stale = false;
+        self.problems.list = Some(found);
+        self.problems.stale = false;
     }
 
     /// The errors and warnings of the work, once it was checked: the status bar's counts.
     pub(super) fn problem_counts(&self) -> Option<(usize, usize)> {
-        self.problems.as_deref().map(counts)
+        self.problems.list.as_deref().map(counts)
     }
 
     /// The object `id` of the active behavior changed: only its problems are found again. After
@@ -130,7 +141,7 @@ impl PatchTool {
         let Some(behavior) = self.workspace.behaviors.get(index) else { return };
         let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
         let found = object.map(|object| object_problems(self.checker(index), &object)).unwrap_or_default();
-        let Some(problems) = &mut self.problems else { return };
+        let Some(problems) = &mut self.problems.list else { return };
         problems.retain(|problem| problem.behavior != index || problem.id != id);
         if !found.is_empty() {
             problems.extend(found);
@@ -173,7 +184,7 @@ mod tests {
         tool.reset_names(); // as a read or a load does
         tool.diagnose_work();
         assert_eq!(tool.problem_counts(), Some((3, 0)));
-        let ids: Vec<&str> = tool.problems.iter().flatten().map(|problem| problem.id.as_str()).collect();
+        let ids: Vec<&str> = tool.problems.list.iter().flatten().map(|problem| problem.id.as_str()).collect();
         assert_eq!(ids, ["Female~1/Bad~m$0.txt", "Male~1/Bad~m$0.txt", "Male~1/m$2.txt"]);
 
         let motion = "Male~1/m$2.txt";

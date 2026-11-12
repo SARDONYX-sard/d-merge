@@ -318,8 +318,8 @@ impl PatchTool {
                     egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
                 });
             });
-            if self.problems_open
-                && let Some(problems) = &self.problems
+            if self.problems.open
+                && let Some(problems) = &self.problems.list
             {
                 go_to_problem = super::problems::problems_panel(ui, i18n, problems, &self.workspace.behaviors);
             }
@@ -359,7 +359,7 @@ impl PatchTool {
             });
         });
         if toggle_problems {
-            self.problems_open = !self.problems_open;
+            self.problems.open = !self.problems.open;
         }
         if let Some((behavior, object, line)) = go_to_problem {
             if behavior != self.active {

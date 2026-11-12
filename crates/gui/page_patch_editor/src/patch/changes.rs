@@ -7,6 +7,16 @@
 
 use super::workspace::{Workspace, history::ObjectChange};
 
+/// The state of the Changes view, as VS Code's Source Control.
+#[derive(Debug, Default)]
+pub(super) struct Scm {
+    pub(super) pending: Pending,
+    /// The message of the next revision, as it is typed.
+    pub(super) commit_message: String,
+    /// The name of a new branch, while it is typed.
+    pub(super) new_branch: Option<String>,
+}
+
 /// The changes since the last revision, and what they were found for.
 #[derive(Debug, Default)]
 pub(super) struct Pending {

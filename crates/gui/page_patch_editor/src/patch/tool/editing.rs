@@ -361,7 +361,7 @@ impl PatchTool {
         self.names = None;
         self.changed_objects.clear();
         self.edits += 1; // what was found of the work before is not of this one
-        self.problems_stale = true;
+        self.problems.stale = true;
     }
 }
 
